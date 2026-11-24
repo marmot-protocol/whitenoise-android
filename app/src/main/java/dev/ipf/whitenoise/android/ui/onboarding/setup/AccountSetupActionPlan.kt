@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingIssueFfi
-import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 
 /** Pure projection of the current native grant, including the focused exact Remove choice. */
@@ -28,19 +26,6 @@ internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): A
 
 internal val AccountSetupState.blocksSetupActions: Boolean
     get() = error || staleDecision || optionalMetadataPending
-
-/** The simplified timeout view is for an active relay check whose primary action is Retry. */
-internal fun AccountSetupState.focusesRelayTimeout(): Boolean {
-    val step = currentStep ?: return false
-    val proposalStep = snapshot?.proposal?.step
-    val activeDecision = !disconnected && snapshot?.cancellationPending == false && proposalStep != step.step
-    val relayTimeout =
-        step.step in relaySetupSteps && step.findings.any { it.issue == OnboardingIssueFfi.TIMED_OUT }
-    val retryFirst =
-        !blocksSetupActions && step.status != OnboardingStatusFfi.WAITING_FOR_SIGNER &&
-            actionPlan(step.actions).primary == OnboardingActionFfi.RETRY
-    return activeDecision && relayTimeout && retryFirst
-}
 
 private fun AccountSetupState.preferredAction(offered: List<OnboardingActionFfi>): OnboardingActionFfi? {
     val snapshot = checkNotNull(snapshot)

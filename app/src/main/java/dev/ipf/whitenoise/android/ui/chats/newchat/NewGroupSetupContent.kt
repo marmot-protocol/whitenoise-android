@@ -151,7 +151,10 @@ internal fun NewGroupSetupContent(
                         } else {
                             pluralStringResource(R.plurals.group_setup_selected_members, count, count)
                         },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

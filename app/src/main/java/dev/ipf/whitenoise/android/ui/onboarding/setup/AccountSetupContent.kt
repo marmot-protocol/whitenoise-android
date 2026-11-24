@@ -320,7 +320,8 @@ private fun SetupStepFindings(
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || directRemovalFinding || (focusedTimeout && finding.issue == OnboardingIssueFfi.TIMED_OUT)
+            val summarizedTimeout = focusedTimeout && finding.issue == OnboardingIssueFfi.TIMED_OUT
+            routineDeviceNotice || directRemovalFinding || summarizedTimeout
         }.forEach { finding ->
             SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
         }

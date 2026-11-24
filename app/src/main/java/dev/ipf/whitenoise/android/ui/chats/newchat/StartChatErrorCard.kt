@@ -53,7 +53,8 @@ internal fun StartChatErrorCard(
             error.title.resolveForCompose()
         }
     val detail = error.detail.resolveForCompose()
-    val retryLabel = stringResource(if (error.retryGroupIdHex != null) R.string.new_message_open_chat else R.string.retry)
+    val retryLabel =
+        stringResource(if (error.retryGroupIdHex != null) R.string.new_message_open_chat else R.string.retry)
     Column(
         Modifier
             .fillMaxWidth()

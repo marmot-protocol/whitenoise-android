@@ -216,14 +216,6 @@
         "test_ids": [
           "ONB-017"
         ]
-      },
-      {
-        "surface": "SetupRelayTimeoutHosts",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "fun SetupRelayTimeoutHosts(",
-        "test_ids": [
-          "ONB-017"
-        ]
       }
     ],
     "source_coverage": [

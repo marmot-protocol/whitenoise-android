@@ -157,7 +157,11 @@ class NewMessagePresentationTest {
 
     /** Directory failure copy is not hidden just because the query also has address syntax. */
     @Test fun addressDirectoryFailureKeepsRowAndRetry() {
-        show(identifier = true, query = TextFieldState("ada@example.com"), search = RecipientUserSearchState(failed = true))
+        show(
+            identifier = true,
+            query = TextFieldState("ada@example.com"),
+            search = RecipientUserSearchState(failed = true),
+        )
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
         composeRule.onNodeWithText(context.getString(R.string.user_search_failed)).assertExists()
         composeRule.onNodeWithTag("people.retry").performClick()

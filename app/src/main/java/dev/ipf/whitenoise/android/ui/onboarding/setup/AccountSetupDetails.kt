@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,23 +85,6 @@ private fun setupDefaultHeadingTitle(
         step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_chats_on_this_device
         else -> setupStepTitle(step.step)
     }
-
-/** Name the affected relays here and show their exact addresses in Details. */
-@Composable
-internal fun SetupRelayTimeoutHosts(findings: List<OnboardingFindingFfi>) {
-    findings
-        .filter { it.issue == OnboardingIssueFfi.TIMED_OUT }
-        .mapNotNull { finding -> finding.endpoint?.let { Uri.parse(it).host }?.takeIf(String::isNotBlank) }
-        .distinct()
-        .forEach { host ->
-            Text(
-                host,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    textDirection = TextDirection.Ltr,
-                ),
-            )
-        }
-}
 
 /** A snapshot-only stage count with TalkBack language in stages rather than percentages. */
 @Composable
