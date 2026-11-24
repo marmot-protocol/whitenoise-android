@@ -11,7 +11,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -1661,7 +1660,6 @@ class WhiteNoiseAppState private constructor(
             maxEntries = MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES,
             lock = groupMemberSnapshotLock,
         )
-    private val conversationStateLock = Any()
     internal val longMessageCollapseState =
         LongMessageCollapseState(
             registry = accountScopedCaches,
@@ -1675,41 +1673,6 @@ class WhiteNoiseAppState private constructor(
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
             observable = true,
         )
-    private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
-
-    // A failed optimistic send can be retried by a replacement controller after
-    // navigation. Keep its one-shot acceptance cleanup beside the retained row,
-    // under the same bounded conversation-state lifecycle.
-    private val durableAcceptanceCallbacksByConversation = mutableMapOf<String, MutableMap<String, () -> Unit>>()
-    private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
-    private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-    private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-    private val optimisticSendPositionPreservesByConversation =
-        mutableMapOf<String, OptimisticSendPositionPreserves>()
-    private val retentionAtSendByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-
-    // Canonical MDK app-event id -> local optimistic text id. MDK can accept a
-    // text intent before publishing it, so the eventual projection needs this
-    // exact bridge instead of matching identical pending texts heuristically.
-    private val acceptedPendingTextOptimisticIdsByConversation =
-        mutableMapOf<String, MutableMap<String, String>>()
-
-    // Stable client-key phase for each optimistic send. The controller keeps
-    // this beside the retained optimistic row so a replacement conversation
-    // can still distinguish cancellable pre-acceptance work from an intent
-    // already owned by MDK.
-    private val optimisticSendPhasesByConversation =
-        mutableMapOf<String, MutableMap<String, OptimisticSendPhase>>()
-    private val optimisticCancellationGenerationByConversation = mutableMapOf<String, MutableStateFlow<Long>>()
-
-    // Retained-upload bytes survive screen disposal so a user who navigates
-    // out of a chat mid-send and returns sees the pending bubble still carry
-    // its preview/filename instead of an empty placeholder. Cap (and sizeOf
-    // policy) match the controller-local version they replace.
-    private val retainedMediaUploadsByConversation = mutableMapOf<String, dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload>>()
-    private val activeUploadKeysByConversation = mutableMapOf<String, MutableSet<String>>()
-    private val pendingProjectionsAwaitingBridgeByConversation =
-        mutableMapOf<String, MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi>>()
 
     // In-flight attachment downloads, keyed by the mediaCacheKey. Routed
     // through `mutationsScope` so the FFI download continues even when the
@@ -1734,25 +1697,24 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val conversationStateRetention =
-        ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES, isProtected = inFlightMediaUploads::hasUploads)
+    private val retainedConversationStates =
+        RetainedConversationStates(
+            MAX_RETAINED_CONVERSATION_STATES,
+            isProtected = inFlightMediaUploads::hasUploads,
+            activeConversationKey = ::activeConversationStateKey,
+            closeStagedUploadSource = ::closeStagedUploadSourceOffMain,
+        )
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
     // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
-    // Transient view invalidation, bounded with the existing retained conversation state.
-    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
-
-    // Never reuse a stamp after conversation eviction or account-cache cleanup.
-    private var nativeComposerCleanupSequence = 0L
-
     /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
     internal fun nativeComposerCleanupRevision(
         accountRef: String?,
         groupIdHex: String,
-    ): Long = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0L
+    ): Long = retainedConversationStates.nativeComposerCleanupRevision(accountRef, groupIdHex)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
@@ -1928,11 +1890,7 @@ class WhiteNoiseAppState private constructor(
             scope = mutationsScope,
             onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
                 if (nativeDraftConsumed) {
-                    synchronized(conversationStateLock) {
-                        val key = retainConversationState(accountRef, groupIdHex)
-                        nativeComposerCleanupSequence += 1
-                        nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
-                    }
+                    retainedConversationStates.recordNativeComposerCleanup(accountRef, groupIdHex)
                 } else {
                     draftHydrationRevision += 1
                 }
@@ -2699,95 +2657,57 @@ class WhiteNoiseAppState private constructor(
     internal fun optimisticMessages(
         accountRef: String?,
         groupIdHex: String,
-    ): SnapshotStateMap<String, TimelineMessage> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticMessagesByConversation.getOrPut(key) { mutableStateMapOf() }
-        }
+    ): SnapshotStateMap<String, TimelineMessage> = retainedConversationStates.optimisticMessages(accountRef, groupIdHex)
 
     internal fun durableAcceptanceCallbacks(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, () -> Unit> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            durableAcceptanceCallbacksByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, () -> Unit> = retainedConversationStates.durableAcceptanceCallbacks(accountRef, groupIdHex)
 
     internal fun projectedMessageIds(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableSet<String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            projectedMessageIdsByConversation.getOrPut(key) { mutableSetOf() }
-        }
+    ): MutableSet<String> = retainedConversationStates.projectedMessageIds(accountRef, groupIdHex)
 
     internal fun timelineOrderOverrides(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            timelineOrderOverridesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.timelineOrderOverrides(accountRef, groupIdHex)
 
     internal fun timelineTimestampOverrides(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.timelineTimestampOverrides(accountRef, groupIdHex)
 
     internal fun optimisticSendPositionPreserves(
         accountRef: String?,
         groupIdHex: String,
     ): OptimisticSendPositionPreserves =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticSendPositionPreservesByConversation.getOrPut(key) {
-                OptimisticSendPositionPreserves()
-            }
-        }
+        retainedConversationStates.optimisticSendPositionPreserves(
+            accountRef,
+            groupIdHex,
+        )
 
     internal fun retentionAtSend(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            retentionAtSendByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.retentionAtSend(accountRef, groupIdHex)
 
     internal fun acceptedPendingTextOptimisticIds(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, String> = retainedConversationStates.acceptedPendingTextOptimisticIds(accountRef, groupIdHex)
 
     internal fun optimisticSendPhases(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, OptimisticSendPhase> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticSendPhasesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, OptimisticSendPhase> = retainedConversationStates.optimisticSendPhases(accountRef, groupIdHex)
 
     /** Shares retry wakeups across controllers for the same account and conversation. */
     internal fun optimisticCancellationGeneration(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableStateFlow<Long> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticCancellationGenerationByConversation.getOrPut(key) { MutableStateFlow(0L) }
-        }
+    ): MutableStateFlow<Long> = retainedConversationStates.optimisticCancellationGeneration(accountRef, groupIdHex)
 
     /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
     internal fun acceptedPendingTextOptimisticId(
@@ -2795,28 +2715,21 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         confirmedMessageIdHex: String,
     ): String? =
-        synchronized(conversationStateLock) {
-            acceptedPendingTextOptimisticIdsByConversation[conversationKey(accountRef, groupIdHex)]
-                ?.get(confirmedMessageIdHex)
-        }
+        retainedConversationStates.acceptedPendingTextOptimisticId(
+            accountRef,
+            groupIdHex,
+            confirmedMessageIdHex,
+        )
 
     /** Returns the account/group retained queue whose removal callback releases private source ownership. */
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
     ): dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            retainedMediaUploadsByConversation.getOrPut(key) {
-                dev.ipf.whitenoise.android.media.ByteSizeLruCache(
-                    maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
-                    sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
-                    onEntryRemoved = { upload -> upload.releaseSource(::closeStagedUploadSourceOffMain) },
-                    // Evicting a send whose items all live in private files frees no heap, only its retry.
-                    isEvictable = { upload -> upload.attachments.any { it.inMemoryBytes != null } },
-                )
-            }
-        }
+        retainedConversationStates.retainedMediaUploads(
+            accountRef,
+            groupIdHex,
+        )
 
     /** Deletes a released private upload snapshot on the IO pool; unlinking a large file must not block Main. */
     internal fun closeStagedUploadSourceOffMain(source: StagedUploadSource) {
@@ -2826,11 +2739,7 @@ class WhiteNoiseAppState private constructor(
     internal fun activeUploadKeys(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableSet<String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            activeUploadKeysByConversation.getOrPut(key) { mutableSetOf() }
-        }
+    ): MutableSet<String> = retainedConversationStates.activeUploadKeys(accountRef, groupIdHex)
 
     /** Captures the account-scoped media-upload lifetime for a suspended send. */
     internal fun mediaUploadSessionEpoch(): Long = mediaUploadSessionLifetime.capture()
@@ -2856,9 +2765,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         if (job != null) {
             inFlightMediaUploads.untrack(conversationKey(accountRef, groupIdHex), uploadKey, job)
-            synchronized(conversationStateLock) {
-                conversationStateRetention.prune(activeConversationStateKey()).forEach(::removeConversationState)
-            }
+            retainedConversationStates.prune()
         }
     }
 
@@ -2866,49 +2773,10 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ): MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            pendingProjectionsAwaitingBridgeByConversation.getOrPut(key) { linkedMapOf() }
-        }
-
-    private fun retainConversationState(
-        accountRef: String?,
-        groupIdHex: String,
-    ): String {
-        val key = conversationKey(accountRef, groupIdHex)
-        conversationStateRetention
-            .retain(key, protectedKey = activeConversationStateKey())
-            .forEach(::removeConversationState)
-        return key
-    }
-
-    private fun promoteConversationState(
-        accountRef: String?,
-        groupIdHex: String,
-    ) {
-        val key = conversationKey(accountRef, groupIdHex)
-        conversationStateRetention
-            .promote(key, protectedKey = key)
-            .forEach(::removeConversationState)
-    }
-
-    /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
-    private fun removeConversationState(staleKey: String) {
-        nativeComposerCleanupRevisions.remove(staleKey)
-        optimisticMessagesByConversation.remove(staleKey)
-        durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
-        projectedMessageIdsByConversation.remove(staleKey)
-        timelineOrderOverridesByConversation.remove(staleKey)
-        timelineTimestampOverridesByConversation.remove(staleKey)
-        optimisticSendPositionPreservesByConversation.remove(staleKey)
-        retentionAtSendByConversation.remove(staleKey)
-        acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
-        optimisticSendPhasesByConversation.remove(staleKey)
-        optimisticCancellationGenerationByConversation.remove(staleKey)
-        retainedMediaUploadsByConversation.remove(staleKey)?.clear()
-        activeUploadKeysByConversation.remove(staleKey)
-        pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
-    }
+        retainedConversationStates.pendingProjectionsAwaitingBridge(
+            accountRef,
+            groupIdHex,
+        )
 
     private fun activeConversationStateKey(): String? =
         activeConversationGroupIdHex?.let { groupIdHex ->
@@ -2918,7 +2786,7 @@ class WhiteNoiseAppState private constructor(
     private fun conversationKey(
         accountRef: String?,
         groupIdHex: String,
-    ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+    ): String = RetainedConversationStates.key(accountRef, groupIdHex)
 
     /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
     internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
@@ -5155,44 +5023,13 @@ class WhiteNoiseAppState private constructor(
         // a cancelled upload cannot resume against an emptied retained-upload
         // map and falsely mark the bubble Failed (or publish after the switch).
         inFlightMediaUploads.cancelAll()
-        // The per-conversation maps below hold (or potentially hold)
-        // decrypted plaintext keyed by account/group. Wiping them at the
+        // The retained per-conversation send state holds (or potentially
+        // holds) decrypted plaintext keyed by account/group. Wiping them at the
         // same call site keeps account-switch and sign-out symmetric with
         // the L1 plaintext clear above; an unwiped retained-upload cache
         // would otherwise let the next signed-in account see the previous
         // account's outgoing bytes.
-        synchronized(conversationStateLock) {
-            retainedMediaUploadsByConversation.values.forEach { it.clear() }
-            retainedMediaUploadsByConversation.clear()
-            activeUploadKeysByConversation.values.forEach { it.clear() }
-            activeUploadKeysByConversation.clear()
-            pendingProjectionsAwaitingBridgeByConversation.values.forEach { it.clear() }
-            pendingProjectionsAwaitingBridgeByConversation.clear()
-            // The optimistic message map holds decrypted outgoing records
-            // (AppMessageRecordFfi plaintext); the override maps hold its
-            // ordering keys. They were previously pruned only per-key by the
-            // LRU, so a signed-out account's sent plaintext lingered in memory.
-            optimisticMessagesByConversation.values.forEach { it.clear() }
-            optimisticMessagesByConversation.clear()
-            durableAcceptanceCallbacksByConversation.values.forEach { it.clear() }
-            durableAcceptanceCallbacksByConversation.clear()
-            projectedMessageIdsByConversation.values.forEach { it.clear() }
-            projectedMessageIdsByConversation.clear()
-            timelineOrderOverridesByConversation.values.forEach { it.clear() }
-            timelineOrderOverridesByConversation.clear()
-            timelineTimestampOverridesByConversation.values.forEach { it.clear() }
-            timelineTimestampOverridesByConversation.clear()
-            optimisticSendPositionPreservesByConversation.values.forEach { it.clear() }
-            optimisticSendPositionPreservesByConversation.clear()
-            retentionAtSendByConversation.values.forEach { it.clear() }
-            retentionAtSendByConversation.clear()
-            acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
-            acceptedPendingTextOptimisticIdsByConversation.clear()
-            optimisticSendPhasesByConversation.values.forEach { it.clear() }
-            optimisticSendPhasesByConversation.clear()
-            optimisticCancellationGenerationByConversation.clear()
-            nativeComposerCleanupRevisions.clear()
-        }
+        retainedConversationStates.clearAll()
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
         // starts cold.
@@ -6659,9 +6496,7 @@ class WhiteNoiseAppState private constructor(
             suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
         if (groupIdHex != null) {
-            synchronized(conversationStateLock) {
-                promoteConversationState(activeConversationAccountRef, groupIdHex)
-            }
+            retainedConversationStates.promote(activeConversationAccountRef, groupIdHex)
         }
     }
 

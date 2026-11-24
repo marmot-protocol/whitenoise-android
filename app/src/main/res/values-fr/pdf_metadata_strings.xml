@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d page</item>
+        <item quantity="other">PDF · %d pages</item>
+    </plurals>
+    <string name="composer_pdf_metadata_removed">Métadonnées supprimées</string>
+    <string name="composer_pdf_metadata_removed_on_send">Métadonnées supprimées à l\'envoi</string>
+    <string name="composer_pdf_metadata_signed">Signé : métadonnées conservées</string>
+    <string name="composer_pdf_metadata_encrypted">Protégé : métadonnées conservées</string>
+    <string name="composer_pdf_metadata_unsupported">Métadonnées non supprimables</string>
+    <string name="composer_pdf_metadata_sending_as_is">Envoyé avec métadonnées</string>
+    <string name="composer_pdf_metadata_dialog_title">Envoyer avec les métadonnées ?</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s est signé. Supprimer ses métadonnées invaliderait la signature : il ne peut être envoyé que tel quel.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s est protégé par mot de passe : ses métadonnées ne peuvent pas être supprimées.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise ne peut pas supprimer sans risque les métadonnées de %1$s.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">Les métadonnées de %1$d PDF ne peuvent pas être supprimées : %2$s.</item>
+        <item quantity="other">Les métadonnées de %1$d PDF ne peuvent pas être supprimées : %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Tous les membres de cette discussion pourront voir des informations comme l\'auteur, les applications qui l\'ont créé et la date de création ou de modification.</string>
+    <string name="composer_pdf_metadata_send_as_is">Envoyer tel quel</string>
+    <string name="media_file_pdf_metadata_kept">Ce PDF n\'a pas été envoyé, car ses métadonnées n\'ont pas pu être supprimées. Envoyez-le depuis le champ de message pour choisir de l\'envoyer tel quel.</string>
+</resources>

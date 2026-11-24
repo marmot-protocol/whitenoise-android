@@ -102,4 +102,12 @@
     <string name="storage_cache_cleared">Освобождено %1$s</string>
     <string name="storage_caches_cleared">Фото и временные файлы очищены</string>
     <string name="storage_action_failed">Не удалось освободить место. Повторите попытку.</string>
+    <string name="storage_automatic_cleanup">Автоматическая очистка</string>
+    <string name="storage_highlight_share">%1$s · %2$s от %3$s</string>
+    <string name="storage_highlight_shared">%1$s · общие для всех профилей, не входят в эту сумму</string>
+    <string name="storage_share_under_one">менее %1$s</string>
+    <string name="storage_select">Выбрать</string>
+    <string name="storage_deselect">Снять выбор</string>
+    <string name="storage_select_named">Выбрать %1$s</string>
+    <string name="storage_open_failed">Не удалось открыть вложение</string>
 </resources>

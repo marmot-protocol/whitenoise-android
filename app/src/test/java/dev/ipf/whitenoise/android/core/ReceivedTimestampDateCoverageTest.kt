@@ -48,7 +48,7 @@ class ReceivedTimestampDateCoverageTest {
         val rows = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt")
         assertTrue(rows.functionBody("differentDay").contains("IdentityFormatter.localDate("))
         assertTrue(rows.functionBody("messageDayLabel").contains("IdentityFormatter.localDate("))
-        val media = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
+        val media = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaMonthSections.kt")
         assertTrue(media.functionBody("monthKeyForMedia").contains("IdentityFormatter.clampedLocalDate("))
         val global = appModuleSource("src/main/java/dev/ipf/whitenoise/android/core/GlobalAttachmentLibrary.kt")
         assertTrue(globalAttachmentDay.containsMatchIn(global))

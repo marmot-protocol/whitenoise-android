@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "StoredAttachmentCheck",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "fun StoredAttachmentCheck(",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
         "surface": "StoredAttachmentPreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
         "anchor": "fun StoredAttachmentPreview(",
@@ -32,6 +40,14 @@
         ]
       },
       {
+        "surface": "string:storage_deselect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_deselect",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
         "surface": "string:storage_largest_first",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
         "anchor": "R.string.storage_largest_first",
@@ -48,13 +64,29 @@
           "SET-048",
           "SET-049"
         ]
+      },
+      {
+        "surface": "string:storage_select",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_select",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_select_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_select_named",
+        "test_ids": [
+          "SET-048"
+        ]
       }
     ],
     "source_coverage": [
       {
-        "surface": "R.string.explanation_privacy_storage_attachment",
+        "surface": "R.string.explanation_privacy_storage_attachment_open",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
-        "anchor": "R.string.explanation_privacy_storage_attachment",
+        "anchor": "R.string.explanation_privacy_storage_attachment_open",
         "test_ids": [
           "SET-055"
         ]
