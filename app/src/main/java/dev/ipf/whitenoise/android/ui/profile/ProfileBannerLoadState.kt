@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * [AvatarImageLoader.load] answers null both while it is working and when the
@@ -97,7 +98,7 @@ internal fun ProfileBannerImage(state: ProfileBannerLoadState) {
                 .fillMaxWidth()
                 .padding(horizontal = Dimens.spaceLg)
                 .aspectRatio(2f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .testTag(PROFILE_BANNER_TAG),
         contentAlignment = Alignment.Center,

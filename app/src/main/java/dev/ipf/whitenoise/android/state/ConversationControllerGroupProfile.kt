@@ -13,6 +13,20 @@ import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.isActive
 
+/** Commits edited profile fields with the existing group-change admission flow. */
+internal suspend fun WhiteNoiseAppState.commitGroupProfile(
+    account: String,
+    groupIdHex: String,
+    name: String?,
+    description: String?,
+) {
+    runGroupChange(account, groupIdHex, actionLabel = R.string.edit_group_info_title) {
+        marmotIo(MarmotTraceSection.UPDATE_GROUP_PROFILE) {
+            updateGroupProfile(account, groupIdHex, name, description)
+        }
+    }
+}
+
 /**
  * Shared shape of the two local removals: one mutation slot, a success notice chosen by the removal itself. Both
  * close this conversation, so the notice is app-wide instead of scoped to the closed route (#3310), and like a

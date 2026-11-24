@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
 private val SUCCESS_STATUSES = setOf("completed", "complete", "finished", "success", "succeeded", "done")
@@ -286,7 +287,7 @@ internal fun AgentOperationChip(
                         Modifier
                     },
                 ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

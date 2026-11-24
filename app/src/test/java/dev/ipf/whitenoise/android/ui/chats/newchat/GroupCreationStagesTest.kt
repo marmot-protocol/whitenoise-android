@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
-import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.whitenoise.android.R
@@ -164,7 +163,7 @@ class GroupCreationStagesTest {
                             createOrRetry = {
                                 canonical ?: run {
                                     creates++
-                                    owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
+                                    owner.acceptCreatedGroup("accepted", outcomes) { it }
                                 }
                             },
                             openCurrentChat = {
@@ -204,7 +203,7 @@ class GroupCreationStagesTest {
     @Test fun openingConsumesTheCapturedReport() {
         val owner = GroupCreationSession { true }
         val outcomes = listOf(MemberResolutionOutcomeFfi("bob", MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u))
-        owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
+        owner.acceptCreatedGroup("accepted", outcomes) { it }
 
         assertEquals(AppText.Plain("bob"), owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
         assertNull(owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })

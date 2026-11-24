@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * Contact-card bubble drawn from the share caption (name + phone), so no vCard
@@ -52,8 +53,8 @@ internal fun ContactMessageBubble(
         modifier =
             modifier
                 .width(260.dp)
-                .clip(RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
+                .clip(RoundedCornerShape(Radii.lg)),
+        shape = RoundedCornerShape(Radii.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(12.dp)) {
