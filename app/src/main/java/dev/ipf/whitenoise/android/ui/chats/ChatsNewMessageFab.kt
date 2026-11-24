@@ -277,8 +277,9 @@ private val ChatFabIconSize = 24.dp
 
 /**
  * The pen stays flat in every state, so pressing it no longer lifts it (#4101). It is the one FAB without the
- * floating-control shadow: it hands off to the shell's flat morph surface, and the two must paint the same
- * pixels on the handoff's first frame (`ComposerFabHandoffScreenshotTest`), which a shadow would break.
+ * floating-control shadow, by the owner's decision: it hands off to the shell's flat morph surface, and the two
+ * must paint the same pixels on the handoff's first frame (`ComposerFabHandoffScreenshotTest`), which a shadow
+ * would break.
  */
 @Composable
 private fun chatsFabElevation() =
