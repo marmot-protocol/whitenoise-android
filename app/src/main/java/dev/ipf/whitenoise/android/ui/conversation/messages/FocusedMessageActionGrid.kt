@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
@@ -24,7 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -33,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -53,21 +60,36 @@ private val FocusedActionCellVerticalPadding = 8.dp
  * The box wraps its columns, and each column is as wide as its widest one-line label, so a short neighbour
  * never reserves an equal share that forces a longer label to wrap. When two such columns do not fit the
  * width the stack offers, the actions become one column up to that full width before any label wraps.
+ *
+ * Actions that are not [FocusedMessageAction.firstLevel] wait behind a More actions row under the grid
+ * until [showingAll]; [onShowingAllChange] toggles it. The row stays the menu's last child in both states,
+ * so a screen reader keeps its focus on it while the grid above changes (#4077).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
-    val cellWidths = rememberOneLineActionCellWidths(actions)
-    val actionCellHeight = rememberActionCellHeight(actions)
+internal fun FocusedActionMenu(
+    actions: List<FocusedMessageAction>,
+    showingAll: Boolean = true,
+    onShowingAllChange: (Boolean) -> Unit = {},
+) {
+    val disclosure =
+        if (hasMoreMessageActions(actions, FocusedMessageAction::firstLevel)) {
+            focusedActionDisclosure(showingAll) { onShowingAllChange(!showingAll) }
+        } else {
+            null
+        }
+    val visibleActions = visibleMessageActions(actions, FocusedMessageAction::firstLevel, showingAll)
+    val cellWidths = rememberOneLineActionCellWidths(visibleActions + listOfNotNull(disclosure))
+    val actionCellHeight = rememberActionCellHeight(visibleActions)
     DropdownMenuGroup(
         shapes = MenuDefaults.groupShapes(),
         border = amoledOutlineBorder(),
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
         BoxWithConstraints {
-            val columnWidths = messageActionColumnWidths(cellWidths, maxWidth)
+            val columnWidths = messageActionColumnWidths(cellWidths.take(visibleActions.size), maxWidth)
             Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                actions.chunked(columnWidths.size).forEach { rowActions ->
+                visibleActions.chunked(columnWidths.size).forEach { rowActions ->
                     Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
                         rowActions.forEachIndexed { column, action ->
                             FocusedActionCell(
@@ -78,10 +100,58 @@ internal fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
                         }
                     }
                 }
+                if (disclosure != null) {
+                    val gridWidth = columnWidths.reduce { total, width -> total + messageActionColumnGap + width }
+                    FocusedActionCell(
+                        action = disclosure,
+                        minimumHeight = actionCellHeight,
+                        modifier =
+                            Modifier
+                                .width(minOf(maxOf(gridWidth, cellWidths.last()), maxWidth))
+                                .testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
+                    )
+                }
             }
         }
     }
 }
+
+/** The row that shows every action, or returns to the first level once they are shown. */
+@Composable
+private fun focusedActionDisclosure(
+    showingAll: Boolean,
+    onToggle: () -> Unit,
+): FocusedMessageAction {
+    val label = stringResource(if (showingAll) R.string.fewer_message_actions else R.string.more_message_actions)
+    val explanation =
+        stringResource(
+            if (showingAll) R.string.explanation_message_action_fewer else R.string.explanation_message_action_more,
+        )
+    return FocusedMessageAction(
+        label = label,
+        supportingLabel = null,
+        enabled = true,
+        destructive = false,
+        icon = {
+            Icon(
+                painter = painterResource(R.drawable.ic_expand_more),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(FocusedActionIconSize)
+                        .rotate(if (showingAll) DISCLOSURE_OPEN_ROTATION else 0f),
+            )
+        },
+        onClick = onToggle,
+        explanation = Explanation(label, explanation),
+        dismissBeforeActivation = false,
+    )
+}
+
+internal const val FOCUSED_ACTION_DISCLOSURE_TEST_TAG = "focused-action-disclosure"
+
+// The chevron points down to open the full set and up to return from it.
+private const val DISCLOSURE_OPEN_ROTATION = 180f
 
 /**
  * Each action's cell width with its whole label on one line, in the label's real typography.

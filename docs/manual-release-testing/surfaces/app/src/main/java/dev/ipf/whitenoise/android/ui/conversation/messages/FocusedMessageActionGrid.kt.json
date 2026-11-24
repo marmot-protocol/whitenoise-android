@@ -9,7 +9,8 @@
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004",
-          "MSG-005"
+          "MSG-005",
+          "MSG-050"
         ]
       },
       {
@@ -27,6 +28,14 @@
         "test_ids": [
           "MSG-049"
         ]
+      },
+      {
+        "surface": "focusedActionDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun focusedActionDisclosure(",
+        "test_ids": [
+          "MSG-050"
+        ]
       }
     ],
     "source_coverage": [
@@ -36,6 +45,14 @@
         "anchor": "fun FocusedActionMenu(",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "surface": "Common long-press actions lead; the rest wait behind More actions, and Back returns to the first level",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "if (disclosure != null) {",
+        "test_ids": [
+          "MSG-050"
         ]
       }
     ]

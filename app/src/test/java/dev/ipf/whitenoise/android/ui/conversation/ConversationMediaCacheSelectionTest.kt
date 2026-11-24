@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -151,11 +152,13 @@ class ConversationMediaCacheSelectionTest {
         // Robolectric must render the recorded media layer before its actions become visible.
         composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).captureToImage()
         val select = ApplicationProvider.getApplicationContext<Context>().getString(R.string.select)
+        val more = ApplicationProvider.getApplicationContext<Context>().getString(R.string.more_message_actions)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText(select).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText(select).fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithText(more).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule
-            .onNodeWithText(select)
+            .messageAction(select)
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()

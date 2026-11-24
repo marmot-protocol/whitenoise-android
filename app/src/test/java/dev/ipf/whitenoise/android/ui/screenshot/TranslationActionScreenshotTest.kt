@@ -91,6 +91,8 @@ class TranslationActionScreenshotTest {
             }
         }
         composeRule.waitForIdle()
+        composeRule.onNodeWithText("More actions").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Select text").assertIsDisplayed()
         composeRule.onNodeWithText("Translate").assertIsDisplayed()
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name")

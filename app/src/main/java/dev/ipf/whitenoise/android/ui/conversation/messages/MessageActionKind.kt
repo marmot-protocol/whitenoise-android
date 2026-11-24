@@ -80,6 +80,47 @@ internal fun messageActionKinds(
     ).filter { (_, enabled) -> enabled }.map { (kind, _) -> kind }
 
 /**
+ * The long-press menu's first level, in display order (#4077). Reactions sit above it; every other
+ * available action, Delete included, waits behind More actions. Keep on screen and Show less stay
+ * here because they act on how a long message is shown, which is why it was pressed.
+ */
+private val firstLevelMessageActionKinds =
+    listOf(
+        MessageActionKind.KeepOnScreen,
+        MessageActionKind.ShowLess,
+        MessageActionKind.Reply,
+        MessageActionKind.Edit,
+        MessageActionKind.CopyText,
+        MessageActionKind.Forward,
+        MessageActionKind.Save,
+    )
+
+/** Whether [kind] belongs on the menu's first level; null is Delete, which does not. */
+internal fun isFirstLevelMessageAction(kind: MessageActionKind?): Boolean = kind in firstLevelMessageActionKinds
+
+/** [kinds] with the first-level actions leading in their own order and the rest after them, unchanged. */
+internal fun messageActionMenuOrder(kinds: List<MessageActionKind>): List<MessageActionKind> =
+    kinds.sortedBy { kind ->
+        firstLevelMessageActionKinds.indexOf(kind).takeIf { it >= 0 } ?: firstLevelMessageActionKinds.size
+    }
+
+/** The actions the menu shows: all of them when [showAll] or no disclosure is needed, else the first level. */
+internal fun <T> visibleMessageActions(
+    actions: List<T>,
+    firstLevel: (T) -> Boolean,
+    showAll: Boolean,
+): List<T> = if (showAll || !hasMoreMessageActions(actions, firstLevel)) actions else actions.filter(firstLevel)
+
+/**
+ * Whether [actions] need a More actions disclosure: at least one first-level action to show without
+ * it, and at least two to hide behind it, since a disclosure for one action takes that action's room.
+ */
+internal fun <T> hasMoreMessageActions(
+    actions: List<T>,
+    firstLevel: (T) -> Boolean,
+): Boolean = actions.any(firstLevel) && actions.count { !firstLevel(it) } > 1
+
+/**
  * Column widths for actions whose one-line cell widths are [cellWidths], in menu order.
  *
  * Two columns, each as wide as its widest cell, when both fit [availableWidth] beside the gap. Otherwise

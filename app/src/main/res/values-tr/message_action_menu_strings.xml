@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="more_message_actions">Diğer eylemler</string>
+    <string name="fewer_message_actions">Daha az eylem</string>
+    <string name="explanation_message_action_more">Bu mesaj için tüm eylemleri gösterir.</string>
+    <string name="explanation_message_action_fewer">Yalnızca en sık kullanılan eylemlere geri döner.</string>
+</resources>

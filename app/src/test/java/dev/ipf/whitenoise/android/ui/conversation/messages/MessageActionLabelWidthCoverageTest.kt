@@ -46,8 +46,8 @@ class MessageActionLabelWidthCoverageTest {
     fun normalScaleKeepsEveryLabelOnOneLineInTwoColumns() {
         render(fontScale = 1f)
 
-        assertEquals("Keep on screen pairs with Edit", cell("Keep on screen").top, cell("Edit").top, 0.5f)
-        assertTrue("Keep on screen gets the wider column", cell("Keep on screen").width > cell("Edit").width)
+        assertEquals("Keep on screen pairs with Reply", cell("Keep on screen").top, cell("Reply").top, 0.5f)
+        assertTrue("Keep on screen gets the wider column", cell("Keep on screen").width > cell("Reply").width)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped", 1, labelLines(it)) }
     }
 
@@ -110,7 +110,7 @@ class MessageActionLabelWidthCoverageTest {
 
         val columnWidth = with(composeRule.density) { (560.dp - 32.dp).toPx() }
         val cells = MAXIMUM_LABELS.map(::cell)
-        assertEquals("two columns at 300% on a wide window", cell("Keep on screen").top, cell("Edit").top, 0.5f)
+        assertEquals("two columns at 300% on a wide window", cell("Keep on screen").top, cell("Reply").top, 0.5f)
         assertTrue("the panel outgrows the column", cells.maxOf { it.right } - cells.minOf { it.left } > columnWidth)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped on a wide window", 1, labelLines(it)) }
         val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).boundsInRoot()
@@ -144,7 +144,7 @@ class MessageActionLabelWidthCoverageTest {
     fun rightToLeftMirrorsTheLabelSizedColumns() {
         render(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertTrue("the first action sits on the right", cell("Keep on screen").left > cell("Edit").left)
+        assertTrue("the first action sits on the right", cell("Keep on screen").left > cell("Reply").left)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped in RTL", 1, labelLines(it)) }
     }
 
@@ -231,6 +231,9 @@ class MessageActionLabelWidthCoverageTest {
                 }
             }
         }
+        composeRule.waitForIdle()
+        // Measure the full action set, whose longest labels wait behind More actions (#4077).
+        composeRule.onNodeWithText("More actions", substring = false).performScrollTo().performClick()
         composeRule.waitForIdle()
     }
 

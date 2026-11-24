@@ -18,6 +18,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntRect
@@ -60,6 +63,25 @@ class ConversationPolishScreenshotTest {
 
     @Test
     fun actionGridAmoled() = captureActionMenu("message_action_menu_grid_amoled", dark = true, amoled = true)
+
+    /** The full action set behind More actions keeps the first level and ends with Delete (#4077). */
+    @Test
+    fun actionGridMoreActionsLight() =
+        captureActionMenu("message_action_menu_more_actions_light", dark = false, amoled = false, showAll = true)
+
+    @Test
+    fun actionGridMoreActionsAmoled() =
+        captureActionMenu("message_action_menu_more_actions_amoled", dark = true, amoled = true, showAll = true)
+
+    @Test
+    fun actionGridMoreActionsLargeFont() =
+        captureActionMenu(
+            "message_action_menu_more_actions_font_scale_2x",
+            dark = false,
+            amoled = false,
+            fontScale = 2f,
+            showAll = true,
+        )
 
     @Test
     fun actionGridLargeFontFallback() =
@@ -255,11 +277,16 @@ class ConversationPolishScreenshotTest {
         dark: Boolean,
         amoled: Boolean,
         fontScale: Float = 1f,
+        showAll: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
                 MaximumActionMenu()
             }
+        }
+        if (showAll) {
+            composeRule.onNodeWithText("More actions").performScrollTo().performClick()
+            composeRule.waitForIdle()
         }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }

@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -41,6 +42,7 @@ class MessageActionMenuLayoutTest {
     fun literalCodeMenuIsAccessibleWithLargeRtlText() {
         val callbacks = mutableListOf<String>()
         renderMenu(fontScale = 1.3f, layoutDirection = LayoutDirection.Rtl, callbacks = callbacks, literalCode = true)
+        showAllActions()
         composeRule.onNodeWithText("Read code literally").performScrollTo().assertIsDisplayed()
         composeRule
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
@@ -63,26 +65,41 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("showLess"), callbacks)
     }
 
-    /** The maximum menu pairs actions into two label-sized columns with delete last. */
+    /**
+     * The maximum menu's first level pairs the common actions into two label-sized columns, with
+     * More actions under them (#4077). The full set keeps that first level in place and ends with Delete.
+     */
     @Test
     fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
         val keepOnScreen = bounds("Keep on screen")
-        val edit = bounds("Edit")
-        val selectText = bounds("Select text")
         val reply = bounds("Reply")
-        val delete = bounds("Delete")
-        val info = bounds("Info")
+        val edit = bounds("Edit")
+        val copy = bounds("Copy")
+        val save = bounds("Save")
+        val more = bounds("More actions")
+        listOf("Select text", "Share", "Read Aloud", "Select", "Info", "Delete").forEach {
+            composeRule.onNodeWithText(it, substring = false).assertDoesNotExist()
+        }
 
-        assertEquals("the first two actions share a row", keepOnScreen.top, edit.top, 0.5f)
-        assertTrue("and sit in different columns", edit.left > keepOnScreen.left)
-        assertEquals("a column keeps one width", keepOnScreen.width, selectText.width, 0.5f)
-        assertTrue("later actions come below the first row", selectText.top > keepOnScreen.top)
-        assertEquals("the left column stays aligned", keepOnScreen.left, selectText.left, 0.5f)
-        assertEquals("and the row below pairs in order", selectText.top, reply.top, 0.5f)
+        assertEquals("the first two actions share a row", keepOnScreen.top, reply.top, 0.5f)
+        assertTrue("and sit in different columns", reply.left > keepOnScreen.left)
+        assertEquals("a column keeps one width", keepOnScreen.width, edit.width, 0.5f)
+        assertEquals("the left column stays aligned", keepOnScreen.left, edit.left, 0.5f)
+        assertEquals("and the row below pairs in order", edit.top, copy.top, 0.5f)
+        assertTrue("More actions follows the first level", more.top > save.top)
+        assertEquals("across the grid's width", keepOnScreen.left, more.left, 0.5f)
+        assertEquals(save.right, more.right, 0.5f)
+
+        showAllActions()
+        assertEquals("the first level keeps its column", keepOnScreen.left, bounds("Keep on screen").left, 0.5f)
+        assertEquals("and its row order", bounds("Keep on screen").top, bounds("Reply").top, 0.5f)
+        val info = bounds("Info")
+        val delete = bounds("Delete")
         assertEquals("delete ends the grid beside the last action", info.top, delete.top, 0.5f)
         assertTrue("with delete on the right", delete.left > info.left)
+        assertTrue("Fewer actions closes the grid", bounds("Fewer actions").top > delete.top)
     }
 
     /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
@@ -119,6 +136,7 @@ class MessageActionMenuLayoutTest {
     @Test
     fun shareActionHasDeterministicMenuPresentation() {
         renderMenu(fontScale = 1f)
+        showAllActions()
 
         composeRule
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
@@ -129,8 +147,10 @@ class MessageActionMenuLayoutTest {
     @Test
     fun largeFontFallsBackToOneReadableColumn() {
         renderMenu(fontScale = 2f, literalCode = true)
+        showAllActions()
 
-        assertTrue(bounds("Select text").top > bounds("Edit").top)
+        assertTrue(bounds("Reply").top > bounds("Keep on screen").top)
+        assertEquals(bounds("Reply").left, bounds("Keep on screen").left, 0.5f)
         // At this font the column scrolls, so a row further down the list is composed but
         // unmeasured until it is scrolled to. Reachability is the claim worth pinning.
         composeRule.onNodeWithText("Select", substring = false).performScrollTo().assertIsDisplayed()
@@ -157,8 +177,8 @@ class MessageActionMenuLayoutTest {
     fun rtlKeepsSingleColumnCommandOrder() {
         renderMenu(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertTrue(bounds("Reply").top > bounds("Edit").top)
-        assertEquals(bounds("Reply").right, bounds("Edit").right, 0.5f)
+        assertTrue(bounds("Copy").top > bounds("Reply").top)
+        assertEquals(bounds("Copy").right, bounds("Reply").right, 0.5f)
     }
 
     /** Every maximum variant action invokes its original callback. */
@@ -184,6 +204,10 @@ class MessageActionMenuLayoutTest {
         ).forEachIndexed { index, label ->
             // A terminal action consumes its popup; the next action needs a fresh mounted menu.
             composeRule.runOnIdle { lifetime.value = index }
+            composeRule.waitForIdle()
+            if (composeRule.onAllNodesWithText(label, substring = false).fetchSemanticsNodes().isEmpty()) {
+                showAllActions()
+            }
             composeRule.onNodeWithText(label, substring = false).performScrollTo().performClick()
             composeRule.waitForIdle()
         }
@@ -302,6 +326,12 @@ class MessageActionMenuLayoutTest {
         assertTrue(picker.right <= menu.right + BOUNDS_TOLERANCE_PX)
         assertTrue(picker.width >= TOUCH_TARGET_PX)
         assertTrue(picker.height >= TOUCH_TARGET_PX)
+    }
+
+    /** Opens the full action set through the menu's More actions row. */
+    private fun showAllActions() {
+        composeRule.onNodeWithText("More actions").performScrollTo().performClick()
+        composeRule.waitForIdle()
     }
 
     /** Composes the menu under test with the given fixture. */
