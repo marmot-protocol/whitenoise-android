@@ -4,7 +4,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
 /**
- * Spacing scale on a 4dp grid. Layout gaps and paddings should pull from here
+ * The spacing scale on a 4dp grid; [WhiteNoiseSpacing] is the semantic layer of named
+ * aliases over it (screen margin, notice inset, sheet inset). Layout gaps and paddings should pull from here
  * rather than inlining `.dp` literals, so vertical/horizontal rhythm stays
  * consistent across screens.
  *
@@ -24,7 +25,7 @@ object Dimens {
 
 /**
  * Corner-radius tokens. Consolidates the nine ad-hoc radii previously in use
- * down to four steps plus a pill. `md` (12dp) is the default for cards/inputs;
+ * down to five steps (`sm` to `xxl`) plus a pill. `md` (12dp) is the default for cards/inputs;
  * `pill` is for fully-rounded chips and badges.
  */
 object Radii {
