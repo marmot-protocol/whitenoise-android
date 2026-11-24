@@ -38,8 +38,8 @@ class DisappearingLabelPluralCoverageTest {
                 "${file.parentFile.name} must not define a disappearing_*_format string",
                 !Regex("""name="disappearing_\w+_format"""").containsMatchIn(text),
             )
-            val plainNumbers =
-                Regex("""<string name="(disappearing_\w+)"[^>]*>[^<]*%(?:\d\$)?d""").findAll(text).map { it.groupValues[1] }.toList()
+            val plainNumber = Regex("""<string name="(disappearing_\w+)"[^>]*>[^<]*%(?:\d\$)?d""")
+            val plainNumbers = plainNumber.findAll(text).map { it.groupValues[1] }.toList()
             assertEquals("${file.parentFile.name} has plain-number duration strings", emptyList<String>(), plainNumbers)
             units.forEach { unit ->
                 val block =
