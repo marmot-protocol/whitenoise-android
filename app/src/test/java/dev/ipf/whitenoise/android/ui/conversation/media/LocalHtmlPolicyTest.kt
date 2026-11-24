@@ -243,7 +243,21 @@ class LocalHtmlPolicyTest {
             assertTrue("the sender's own rules are untouched", "body{background:#000;color:#eee;}" in senderRules)
             assertEquals(Jsoup.parse(document.html).body().html(), Jsoup.parse(themed.html).body().html())
             assertEquals(document.links, themed.links)
-            assertEquals(document, LocalHtmlPolicy.themed(document, LocalHtmlPalette.Dark))
+        }
+
+    /** A sender's root `lang` or `dir` that spells the header's rules cannot divert the recolouring. */
+    @Test
+    fun themedIgnoresHeaderRulesSpelledInRootAttributes() =
+        runBlocking {
+            val sender = "<html lang=\"body{background:#000;color:#eee;\" dir=\"a{color:#8ac7ff}\"><p>text</p></html>"
+            val document = LocalHtmlPolicy.sanitize(sender)
+            val palette = LocalHtmlPalette(background = 0xF7F7F7, text = 0x1A1A1A, link = 0x123456, border = 0xABCDEF)
+            val themed = Jsoup.parse(LocalHtmlPolicy.themed(document, palette).html)
+            val root = Jsoup.parse(document.html).selectFirst("html")!!
+            assertEquals(root.attributes(), themed.selectFirst("html")!!.attributes())
+            val header = themed.head().selectFirst("style")!!.data()
+            assertTrue("body{background:#f7f7f7;color:#1a1a1a;" in header)
+            assertTrue("a{color:#123456}" in header)
         }
 
     @Test fun formattingTextAndBoundedTableSpansSurvive() =

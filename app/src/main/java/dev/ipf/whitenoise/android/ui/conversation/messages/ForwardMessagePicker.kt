@@ -225,7 +225,7 @@ private fun rememberForwardDestinationState(
  * account-scoped search/folders/chat rows, and the confirm bar that binds the
  * explicit destination account to the accepted selection. Folder preference
  * changes refresh the current account's shortcuts while the picker stays open.
- * The shared top bar leads with Close, which first closes an open search.
+ * The shared top bar leads with Close, which always closes the picker; system Back closes an open search first.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -374,7 +374,7 @@ internal fun ForwardMessagePickerContent(
             ) {
                 WhiteNoiseTopBar(
                     title = forwardTitle,
-                    onBack = { if (searchOpen) closeSearch() else onDismiss() },
+                    onBack = onDismiss,
                     modifier = Modifier.searchCollapseHost(searchCollapse),
                     containerColor = amoledSheetContainerColor(),
                     navigation = WhiteNoiseTopBarNavigation.Close,

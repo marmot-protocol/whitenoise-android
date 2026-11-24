@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -36,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.DocumentLoading
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentViewerError
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentViewerFrame
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlPalette
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlPolicy
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlView
 import dev.ipf.whitenoise.android.ui.conversation.media.PdfPageImage
@@ -99,23 +101,44 @@ class DocumentAttachmentViewerScreenshotTest {
             DocumentViewerError(R.string.document_pdf_unavailable, {}, {})
         }
 
-    @Test fun htmlRenderedNotice() =
-        render("html_rendered_notice", DocumentAttachmentKind.Html) {
-            Text(
-                stringResource(R.string.document_html_omitted),
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            // Robolectric covers native chrome, not Chromium layout or document-directed networking.
-            val document =
-                remember {
-                    runBlocking {
-                        LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
-                    }
-                }
+    @Test fun htmlRenderedNotice() = htmlRendered("html_rendered_notice", dark = true)
 
-            LocalHtmlView(document, Modifier.fillMaxSize(), {}, {})
-        }
+    /** The rendered page takes the light theme's palette and background, like the frame around it. */
+    @Test fun htmlRenderedLight() = htmlRendered("html_rendered_light", dark = false)
+
+    /** Renders the omitted-content notice above a sanitized page themed like production. */
+    private fun htmlRendered(
+        name: String,
+        dark: Boolean,
+    ) = render(name, DocumentAttachmentKind.Html, dark = dark) {
+        Text(
+            stringResource(R.string.document_html_omitted),
+            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        // Robolectric covers native chrome, not Chromium layout or document-directed networking.
+        val document =
+            remember {
+                runBlocking {
+                    LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
+                }
+            }
+        val colors = MaterialTheme.colorScheme
+        val palette =
+            LocalHtmlPalette(
+                background = colors.background.toArgb(),
+                text = colors.onBackground.toArgb(),
+                link = colors.primary.toArgb(),
+                border = colors.outline.toArgb(),
+            )
+        LocalHtmlView(
+            LocalHtmlPolicy.themed(document, palette),
+            Modifier.fillMaxSize(),
+            {},
+            {},
+            backgroundColor = colors.background.toArgb(),
+        )
+    }
 
     @Test fun htmlSourceLight() =
         render("html_source_light", DocumentAttachmentKind.Html, source = true, dark = false) {

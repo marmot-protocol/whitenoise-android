@@ -3,7 +3,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -37,7 +41,12 @@ internal fun NostrLinkedImageDialog(
     ) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                AttachmentViewerChrome(title = stringResource(R.string.attachment_type_image), onClose = dismiss)
+                AttachmentViewerChrome(
+                    title = stringResource(R.string.attachment_type_image),
+                    onClose = dismiss,
+                    // The parent pads the system bars; this adds only a cutout it leaves uncovered.
+                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                )
                 NostrEventImagePane(
                     url = url,
                     loadImage = loadImage,

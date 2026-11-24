@@ -8,7 +8,11 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
@@ -177,6 +181,8 @@ private fun NostrEventReaderHeader(
         title = card.kind.label(card.eventKind),
         onClose = onDismiss,
         modifier = Modifier.nativePageHeader(),
+        // The parent pads the system bars; this adds only a side or top cutout it leaves uncovered.
+        windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         actions = {
             if (onCopyReference != null && onOpenExternal != null) {
                 EventCardActions(
