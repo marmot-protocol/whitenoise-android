@@ -1517,9 +1517,18 @@
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_90_days">3 ay</string>
     <string name="disappearing_custom">Özel süre</string>
-    <string name="disappearing_days_format">%1$d gün</string>
-    <string name="disappearing_hours_format">%1$d saat</string>
-    <string name="disappearing_minutes_format">%1$d dakika</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d saat</item>
+        <item quantity="other">%d saat</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d dakika</item>
+        <item quantity="other">%d dakika</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Dakika</string>
     <string name="disappearing_unit_hours">Saat</string>
     <string name="disappearing_unit_days">Gün</string>
@@ -1560,7 +1569,10 @@
     <string name="disappearing_5_minutes">5 dakika</string>
     <string name="disappearing_30_seconds">30 saniye</string>
     <string name="disappearing_explainer">Okunmamış gelen mesajların süresi, onları okuduğunuzda başlar. Diğer yeni mesajlar seçtiğiniz süre sonunda herkes için kalıcı olarak silinir.</string>
-    <string name="disappearing_seconds_format">%1$d saniye</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d saniye</item>
+        <item quantity="other">%d saniye</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Saniye</string>
     <string name="disappearing_set">Ayarla</string>
     <string name="disappearing_custom_decrease">Kısalt</string>

@@ -1586,9 +1586,24 @@
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_90_days">3 месяца</string>
     <string name="disappearing_custom">Своё время</string>
-    <string name="disappearing_days_format">%1$d дн.</string>
-    <string name="disappearing_hours_format">%1$d ч.</string>
-    <string name="disappearing_minutes_format">%1$d мин.</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d дн.</item>
+        <item quantity="few">%d дн.</item>
+        <item quantity="many">%d дн.</item>
+        <item quantity="other">%d дн.</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d ч.</item>
+        <item quantity="few">%d ч.</item>
+        <item quantity="many">%d ч.</item>
+        <item quantity="other">%d ч.</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d мин.</item>
+        <item quantity="few">%d мин.</item>
+        <item quantity="many">%d мин.</item>
+        <item quantity="other">%d мин.</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Минуты</string>
     <string name="disappearing_unit_hours">Часы</string>
     <string name="disappearing_unit_days">Дни</string>
@@ -1635,7 +1650,12 @@
     <string name="disappearing_5_minutes">5 минут</string>
     <string name="disappearing_30_seconds">30 секунд</string>
     <string name="disappearing_explainer">Таймер непрочитанных входящих сообщений запускается, когда вы их читаете. Остальные новые сообщения навсегда удаляются у всех по истечении выбранного срока.</string>
-    <string name="disappearing_seconds_format">%1$d сек.</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d сек.</item>
+        <item quantity="few">%d сек.</item>
+        <item quantity="many">%d сек.</item>
+        <item quantity="other">%d сек.</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Секунды</string>
     <string name="disappearing_set">Задать</string>
     <string name="disappearing_custom_decrease">Сократить</string>
