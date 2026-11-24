@@ -247,7 +247,7 @@ internal fun WhiteNoiseAlertDialog(
     }
 }
 
-/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions. */
+/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions inside a basic dialog. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun WhiteNoiseDialogSurface(
@@ -262,20 +262,6 @@ internal fun WhiteNoiseDialogSurface(
         border = amoledOutlineBorder(),
         content = content,
     )
-}
-
-/** The app dialog window and surface around [content] that owns its own buttons (stacked actions, inputs). */
-@Suppress("FunctionNaming")
-@Composable
-internal fun WhiteNoiseBasicAlertDialog(
-    onDismissRequest: () -> Unit,
-    ownerKey: Any? = LocalSettingsCardMorph.current,
-    dismissEnabled: () -> Boolean = { true },
-    content: @Composable PopupSurfaceMotion.() -> Unit,
-) {
-    AnimatedBasicAlertDialog(onDismissRequest, ownerKey, dismissEnabled) {
-        WhiteNoiseDialogSurface { content() }
-    }
 }
 
 /** One option in a speech picker: its own label, selected state, availability reason and action. */

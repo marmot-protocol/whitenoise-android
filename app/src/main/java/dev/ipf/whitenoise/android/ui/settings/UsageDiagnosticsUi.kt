@@ -32,8 +32,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
+import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -313,8 +314,10 @@ internal fun AuditUploadConsentDialog(
     onConfirm: () -> Unit,
     ownerKey: Any? = Unit,
 ) {
-    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismiss, ownerKey = ownerKey) {
-        AuditUploadConsentContent(dismiss, { close(onConfirm) })
+    AnimatedBasicAlertDialog(onDismissRequest = onDismiss, ownerKey = ownerKey) {
+        WhiteNoiseDialogSurface {
+            AuditUploadConsentContent(dismiss, { close(onConfirm) })
+        }
     }
 }
 

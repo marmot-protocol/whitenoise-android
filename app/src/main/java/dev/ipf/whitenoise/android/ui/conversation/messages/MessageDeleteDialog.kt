@@ -25,7 +25,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 
 /**
@@ -84,21 +85,23 @@ internal fun MessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismissRequest) {
-        MessageDeleteDialogContent(
-            capability = capability,
-            mine = mine,
-            senderDisplayName = senderDisplayName,
-            deleteInFlight = deleteInFlight,
-            onDeleteForEveryone = onDeleteForEveryone,
-            onDeleteForMe = onDeleteForMe,
-            onCancel = dismiss,
-        )
+    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest) {
+        WhiteNoiseDialogSurface {
+            MessageDeleteDialogContent(
+                capability = capability,
+                mine = mine,
+                senderDisplayName = senderDisplayName,
+                deleteInFlight = deleteInFlight,
+                onDeleteForEveryone = onDeleteForEveryone,
+                onDeleteForMe = onDeleteForMe,
+                onCancel = dismiss,
+            )
+        }
     }
 }
 
 /**
- * The dialog body, separated from the [WhiteNoiseBasicAlertDialog] wrapper so behavior
+ * The dialog body, separated from the [AnimatedBasicAlertDialog] wrapper so behavior
  * and screenshot tests can compose it directly (a dialog renders in its own
  * window, which the JVM screenshot harness can't capture).
  */
@@ -215,15 +218,17 @@ internal fun BatchMessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
-        BatchMessageDeleteDialogContent(
-            selectedCount = selectedCount,
-            breakdown = breakdown,
-            deleteInFlight = deleteInFlight,
-            onDeleteForEveryone = onDeleteForEveryone,
-            onDeleteForMe = onDeleteForMe,
-            onCancel = dismiss,
-        )
+    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
+        WhiteNoiseDialogSurface {
+            BatchMessageDeleteDialogContent(
+                selectedCount = selectedCount,
+                breakdown = breakdown,
+                deleteInFlight = deleteInFlight,
+                onDeleteForEveryone = onDeleteForEveryone,
+                onDeleteForMe = onDeleteForMe,
+                onCancel = dismiss,
+            )
+        }
     }
 }
 

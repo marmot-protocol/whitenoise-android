@@ -27,7 +27,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import java.math.RoundingMode
 import java.text.NumberFormat
 import java.text.ParsePosition
@@ -81,12 +82,14 @@ internal fun TtsCustomRateDialog(
     onDismiss: () -> Unit,
     onRateSelected: (Float) -> Unit,
 ) {
-    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismiss) {
-        TtsCustomRateEditor(
-            initialRate = initialRate,
-            onDismiss = dismiss,
-            onRateSelected = { rate -> close { onRateSelected(rate) } },
-        )
+    AnimatedBasicAlertDialog(onDismissRequest = onDismiss) {
+        WhiteNoiseDialogSurface {
+            TtsCustomRateEditor(
+                initialRate = initialRate,
+                onDismiss = dismiss,
+                onRateSelected = { rate -> close { onRateSelected(rate) } },
+            )
+        }
     }
 }
 
