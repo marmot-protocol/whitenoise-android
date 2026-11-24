@@ -40,6 +40,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextOverflow.Companion.MiddleEllipsis
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -49,10 +51,6 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 private val StoredAttachmentPreviewSize = 40.dp
 
@@ -231,17 +229,16 @@ private fun StoredAttachmentCheck(
 }
 
 /**
- * The day an attachment arrived in the locale's medium date form, such as "14 Mar 2025". A full date, unlike the chat
- * list's relative times, keeps an old file's age readable when deciding what to remove.
+ * The day an attachment arrived in the user's date format, else the locale's medium form, such as "14 Mar 2025", or
+ * null for a stamp too far out to show. A full date, unlike the chat list's relative times, keeps an old file's age
+ * readable when deciding what to remove.
  */
 @Composable
-private fun storageReceivedDate(epochSeconds: Long): String {
+private fun storageReceivedDate(epochSeconds: Long): String? {
     val locale = LocalConfiguration.current.locales[0]
-    return remember(epochSeconds, locale) {
-        DateTimeFormatter
-            .ofLocalizedDate(FormatStyle.MEDIUM)
-            .withLocale(locale)
-            .format(Instant.ofEpochSecond(epochSeconds).atZone(ZoneId.systemDefault()))
+    val dateFormat = DateTimeFormatState.dateFormat
+    return remember(epochSeconds, locale, dateFormat) {
+        IdentityFormatter.localDate(epochSeconds.toULong())?.let { IdentityFormatter.date(it, locale, dateFormat) }
     }
 }
 
