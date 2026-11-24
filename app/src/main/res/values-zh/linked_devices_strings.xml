@@ -160,8 +160,8 @@
     <string name="link_offer_reminder">关联此设备，即可看到你其他设备上的聊天。</string>
     <string name="link_request_default_label">新设备</string>
     <string name="link_request_options">选项</string>
-    <string name="link_request_options_detail">选择设备名称，并决定是否分享聊天及其历史消息。</string>
-    <string name="explanation_link_request_options">打开新设备的名称及其接收的内容。</string>
+    <string name="link_request_options_detail">选择是否分享聊天及其历史消息。</string>
+    <string name="explanation_link_request_options">打开新设备接收的内容。</string>
     <string name="device_move_advanced">高级</string>
     <string name="setup_device_link_next">登录后，你可以关联这台设备，接收其他设备上的聊天。</string>
     <string name="unlinked_account_remove_for">从此设备移除 %1$s</string>
