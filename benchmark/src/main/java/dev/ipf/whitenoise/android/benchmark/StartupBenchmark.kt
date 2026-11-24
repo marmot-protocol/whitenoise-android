@@ -51,7 +51,7 @@ class StartupBenchmark {
                 tracedJourney(STARTUP_LOCAL_CHECKPOINT_TRACE) {
                     journeys.run { launchForStartupMeasurement() }
                     if (groupName == null) {
-                        journeys.waitForUsefulSurface(BenchmarkUsefulSurface.ChatList)
+                        journeys.requireStartupChatList()
                     } else {
                         journeys.requirePopulatedLocalList(groupName)
                     }
