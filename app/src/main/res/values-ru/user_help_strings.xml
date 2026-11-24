@@ -6,12 +6,13 @@
     <string name="learn_share_body">Откройте «Поделиться и связаться», чтобы показать QR-код или отправить ссылку на профиль. Храните закрытый ключ в секрете.</string>
     <string name="learn_actions_title">Ответить или отреагировать</string>
     <string name="learn_actions_body">Смахните сообщение к центру чата, чтобы ответить. Нажмите и удерживайте его, чтобы увидеть другие действия, включая реакции.</string>
+    <string name="learn_example_question">Увидимся завтра?</string>
     <string name="learn_example_message">До завтра!</string>
     <string name="learn_show_actions">Показать действия с сообщением</string>
     <string name="learn_open_share">Открыть раздел обмена профилем</string>
     <string name="learn_group_title">Создайте приватную группу</string>
     <string name="learn_group_body">Соберите нужных людей в одном чате. Создайте группу в разделе «Новый чат» и выберите, кого пригласить. Ваши сообщения защищены сквозным шифрованием.</string>
-    <string name="learn_demo_label">Тренировочное сообщение · ничего не отправляется</string>
+    <string name="learn_demo_label">Учебный чат · Ничего не отправляется</string>
     <string name="learn_demo_sender">Демонстрационный контакт</string>
     <string name="learn_marmot_title">Общайтесь через разные приложения</string>
     <string name="learn_marmot_body">Друзья могут присоединиться к беседе из другого совместимого приложения. White Noise использует Marmot — открытый протокол, позволяющий разным командам создавать совместимые приложения.</string>

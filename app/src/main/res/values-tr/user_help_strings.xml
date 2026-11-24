@@ -6,12 +6,13 @@
     <string name="learn_share_body">QR kodunu göstermek veya profil bağlantını paylaşmak için Paylaş ve bağlan ekranını aç. Özel giriş anahtarını kimseyle paylaşma.</string>
     <string name="learn_actions_title">Yanıtla veya tepki ver</string>
     <string name="learn_actions_body">Yanıtlamak için mesajı sohbetin ortasına doğru kaydır. Tepkiler dahil diğer işlemleri görmek için mesaja basılı tut.</string>
+    <string name="learn_example_question">Yarın görüşüyor muyuz?</string>
     <string name="learn_example_message">Yarın görüşürüz!</string>
     <string name="learn_show_actions">Mesaj işlemlerini göster</string>
     <string name="learn_open_share">Paylaş ve bağlan bölümünü aç</string>
     <string name="learn_group_title">Özel grup oluştur</string>
     <string name="learn_group_body">İstediğin kişileri aynı sohbette buluştur. Yeni Sohbet bölümünden bir grup başlat ve davet edeceğin kişileri seç. Mesajların uçtan uca şifrelenir.</string>
-    <string name="learn_demo_label">Deneme mesajı · hiçbir şey gönderilmez</string>
+    <string name="learn_demo_label">Alıştırma sohbeti · Hiçbir şey gönderilmez</string>
     <string name="learn_demo_sender">Örnek kişi</string>
     <string name="learn_marmot_title">Farklı uygulamalarda sohbet et</string>
     <string name="learn_marmot_body">Arkadaşların sohbete başka bir uyumlu uygulamadan katılabilir. White Noise, farklı ekiplerin birlikte çalışan uygulamalar geliştirmesini sağlayan açık Marmot protokolünü kullanır.</string>

@@ -26,7 +26,7 @@ name: settings-help-support
       text: "See you tomorrow!"
     direction: DOWN
 - longPressOn: "See you tomorrow!"
-- assertVisible: "Practice message · nothing is sent"
+- assertVisible: "Practice chat · nothing is sent"
 - tapOn: "Reply"
 - assertVisible: "Demo contact"
 - tapOn: "Next"

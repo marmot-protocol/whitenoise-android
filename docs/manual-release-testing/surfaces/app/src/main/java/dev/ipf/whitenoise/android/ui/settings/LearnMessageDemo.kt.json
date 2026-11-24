@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "LearnDemoMessage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "fun LearnDemoMessage(",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
         "surface": "LearnMessageDemo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "fun LearnMessageDemo(",
@@ -41,6 +49,14 @@
         "surface": "R.string.learn_example_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.learn_example_message",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.learn_example_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.learn_example_question",
         "test_ids": [
           "SET-071"
         ]

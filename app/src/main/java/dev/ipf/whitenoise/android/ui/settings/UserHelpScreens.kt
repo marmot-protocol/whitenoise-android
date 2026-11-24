@@ -113,7 +113,7 @@ private fun LearnTopicPage(
         Image(
             painter = painterResource(topic.artwork),
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = if (topic == LearnTopic.Actions) 156.dp else 220.dp),
             colorFilter = if (lightBackground) LightBackgroundArtwork else null,
         )
         Text(

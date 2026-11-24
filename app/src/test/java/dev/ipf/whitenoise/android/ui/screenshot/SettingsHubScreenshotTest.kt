@@ -121,6 +121,9 @@ class SettingsHubScreenshotTest {
                 advanceWalkthrough("Find someone", "learn_white_noise_connect_amoled")
                 advanceWalkthrough("Make a private group", "learn_white_noise_groups_amoled")
                 advanceWalkthrough("Reply or react", "learn_white_noise_actions_amoled")
+                composeRule.onNodeWithText("See you tomorrow?").assertExists()
+                composeRule.onNodeWithText("10:24", useUnmergedTree = true).assertExists()
+                composeRule.onNodeWithText("10:25", useUnmergedTree = true).assertExists()
                 val example = composeRule.onNodeWithText("See you tomorrow!")
                 example.performScrollTo().performTouchInput { longClick() }
                 composeRule.onNodeWithText("Reply").assertExists()

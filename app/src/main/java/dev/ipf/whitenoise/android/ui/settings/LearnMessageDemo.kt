@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReplySwipeGlyph
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberMessageReplySwipeState
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -51,7 +52,13 @@ internal fun LearnMessageDemo() {
     val message = stringResource(R.string.learn_example_message)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.learn_demo_label), style = MaterialTheme.typography.labelLarge)
-        LearnDemoBubble(message, onShowActions = { menuOpen = !menuOpen }, onReply = beginReply)
+        LearnDemoMessage(
+            message = stringResource(R.string.learn_example_question),
+            time = "10:24",
+            mine = true,
+            modifier = Modifier.align(Alignment.End),
+        )
+        LearnDemoBubble(message, onShowActions = { menuOpen = true }, onReply = beginReply)
         if (reacted) {
             ReactionPillRow(
                 tallies = listOf(ReactionTally("👍", count = 1, mine = true)),
@@ -121,15 +128,12 @@ private fun LearnDemoBubble(
             ),
     ) {
         MessageReplySwipeGlyph(state = swipe, messageIdHex = DEMO_MESSAGE_ID)
-        MessageBubbleFrame(
-            presentation = messageBubblePresentation(deleted = false, mine = false),
-            highlighted = false,
+        LearnDemoMessage(
+            message = message,
+            time = "10:25",
             mine = false,
-            mentionedSelf = false,
-            mentionedYouLabel = "",
             modifier =
                 Modifier
-                    .heightIn(min = 48.dp)
                     .onGloballyPositioned { if (swipe.atRest) swipe.bubbleBoundsInRoot = it.boundsInRoot() }
                     .graphicsLayer { translationX = if (rtl) -swipe.displayedDistance else swipe.displayedDistance }
                     .combinedClickable(
@@ -138,8 +142,32 @@ private fun LearnDemoBubble(
                         onLongClick = onShowActions,
                         onLongClickLabel = showActions,
                     ),
-        ) {
-            Text(message, style = MaterialTheme.typography.bodyLarge)
-        }
+        )
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun LearnDemoMessage(
+    message: String,
+    time: String,
+    mine: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    MessageBubbleFrame(
+        presentation = messageBubblePresentation(deleted = false, mine = mine),
+        highlighted = false,
+        mine = mine,
+        mentionedSelf = false,
+        mentionedYouLabel = "",
+        modifier = modifier,
+    ) {
+        Text(message, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = time,
+            modifier = Modifier.align(Alignment.End),
+            style = MaterialTheme.typography.labelSmall,
+            color = messageBubbleTimestampColor(mine = mine, deleted = false),
+        )
     }
 }
