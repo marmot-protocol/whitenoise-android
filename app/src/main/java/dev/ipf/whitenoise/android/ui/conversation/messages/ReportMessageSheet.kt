@@ -273,7 +273,11 @@ private fun ReportMessageBody(
                 onValueChange = { onExplanationChange(it.take(REPORT_EXPLANATION_LIMIT)) },
                 label = {
                     val hint =
-                        if (teamOnly) R.string.report_team_explanation_hint else R.string.report_message_explanation_hint
+                        if (teamOnly) {
+                        R.string.report_team_explanation_hint
+                    } else {
+                        R.string.report_message_explanation_hint
+                    }
                     Text(stringResource(hint))
                 },
                 modifier = Modifier.fillMaxWidth().testTag("message.report.explanation"),

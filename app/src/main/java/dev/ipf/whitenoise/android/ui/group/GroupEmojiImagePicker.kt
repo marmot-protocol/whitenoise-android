@@ -156,7 +156,10 @@ internal fun GroupEmojiImagePickerSheet(
         ) {
             WhiteNoiseSheetHeader(stringResource(R.string.group_image_emoji_title))
             Column(
-                modifier = Modifier.weight(1f).padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
