@@ -67,16 +67,12 @@ internal fun ConfirmDialog(
         },
         title = { ConfirmText(title, emojiLabels) },
         text = {
-            if (identity == null) {
+            Column(
+                Modifier.fadingVerticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 message?.let { ConfirmText(it, emojiLabels) }
-            } else {
-                Column(
-                    Modifier.fadingVerticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    message?.let { ConfirmText(it, emojiLabels) }
-                    identity()
-                }
+                identity?.invoke()
             }
         },
     )
