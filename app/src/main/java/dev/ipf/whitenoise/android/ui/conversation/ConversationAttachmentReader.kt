@@ -42,20 +42,6 @@ internal data class DocumentReadOutcome(
     val totalBytes: Long,
 )
 
-internal enum class DocumentReadFailure {
-    TOO_LARGE,
-    UNREADABLE,
-    EMPTY,
-    UNPROCESSABLE_IMAGE,
-    STORAGE,
-
-    /** A video file whose private metadata could not be removed. It is refused, never sent as-is (#3376). */
-    VIDEO_METADATA,
-
-    /** A PDF whose metadata stays, which nobody chose to send as it is (#3377). */
-    PDF_METADATA,
-}
-
 /** The visual album read for one send. [videoMetadataRefused] reports a video refused for its private metadata. */
 internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
