@@ -17,21 +17,57 @@ internal fun deviceUnlinkedAccount(event: MarmotEventFfi) = (event as? MarmotEve
  * go of it, whether or not it was the active one. If it was the active profile and another is still signed in, the
  * app moves to that one, otherwise the unlinked-account prompt covers its chats. Nothing is wiped here: removing the
  * account from this device is the user's explicit choice. The prompt reads the account list, so when that list
- * cannot be re-read even after retries the notice is shown instead, and the unlink is never silent.
+ * cannot be re-read even after retries the notice is shown instead, and the unlink is never silent. The user can
+ * remove the account, and even sign in to it again, before this has spoken. [copy] is the account's copy as it stood
+ * when the unlink was reported, and once that copy is removed this neither announces it nor moves away from it.
  */
-internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(accountRef: String) {
+internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
+    accountRef: String,
+    copy: Long = accountSession.copyLifetimes.capture(accountRef),
+) {
+    val copies = accountSession.copyLifetimes
     val name = accounts.firstOrNull { it.label == accountRef }?.accountIdHex?.let(::unlinkedAccountName)
     val listed = readWithRetries { runCatchingCancellable { refreshAccounts() }.isSuccess }
     val active = activeAccountRef == accountRef
     val next = signOutOutcome(accounts, accountRef).nextActiveRef
-    if (unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
-        presentText(
-            title = AppText.Resource(R.string.device_unlinked_title),
-            detail = AppText.Resource(R.string.device_unlinked_detail, listOf(name ?: accountRef)),
-        )
+    val gone = unlinkedCopyGone(listed, accountListLoaded, isListed = accounts.any { it.label == accountRef })
+    if (!gone && unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
+        copies.runIfCurrent(accountRef, copy) {
+            presentText(
+                ToastMessage(
+                    title = AppText.Resource(R.string.device_unlinked_title),
+                    detail = AppText.Resource(R.string.device_unlinked_detail, listOf(name ?: accountRef)),
+                    unlinkedAccount = accountRef,
+                ),
+            )
+        }
     }
-    if (active && next != null) setActiveAccount(next)
+    // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all.
+    if (active && next != null && copies.isCurrent(accountRef, copy)) {
+        setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
+    }
 }
+
+/**
+ * Takes down the notice that [accountRef] was unlinked once that account is gone from this device, and outdates any
+ * such notice still on its way. The notice asks the user to remove the account, so it stops being true when no copy
+ * is left, and it stays while one is. A notice about another account, or about anything else, stays too.
+ */
+internal fun WhiteNoiseAppState.retireDeviceUnlinkedNotice(accountRef: String) {
+    if (accounts.any { it.label == accountRef }) return
+    accountSession.copyLifetimes.copyRemoved(accountRef) { if (toast?.unlinkedAccount == accountRef) clearToast() }
+}
+
+/**
+ * Whether an unlink was reported only after its copy had left this device, which shows as the account missing from
+ * the list. That is believed only of a list this handler re-read ([listed]) and that was published at least once
+ * ([listLoaded]). A list that could not be read may predate the account, and staying quiet then would hide the unlink.
+ */
+internal fun unlinkedCopyGone(
+    listed: Boolean,
+    listLoaded: Boolean,
+    isListed: Boolean,
+): Boolean = listed && listLoaded && !isListed
 
 /**
  * Whether the unlink needs its own notice. With nowhere to move to, the unlinked-account prompt says it itself and

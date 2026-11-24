@@ -7,7 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -40,7 +39,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -166,19 +164,15 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
 import dev.ipf.whitenoise.android.ui.chats.toggleGlobalSearchByMe
-import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
-import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
-import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -965,32 +959,6 @@ internal fun ConversationScreen(
     recoveryFirstFrameEffect()
     val timelineIdSet = remember(orderedTimelineIds) { orderedTimelineIds.toSet() }
     val selectableTimelineIds = remember(timelineSelectionById) { timelineSelectionById.keys }
-    val dragSelectionDensity = LocalDensity.current
-    val dragEdgeThresholdPx = with(dragSelectionDensity) { 56.dp.toPx() }
-    val dragMaxScrollStepPx = with(dragSelectionDensity) { 18.dp.toPx() }
-    var transcriptWindowTop by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var transcriptHeightPx by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var dragAnchorTimelineId by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    var dragPointerWindowY by
-        remember(controller, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
-
-    LaunchedEffect(timelineViewport, ttsFollowHandle) {
-        snapshotFlow { timelineViewport.readingBoundsInWindow }.collect { bounds ->
-            if (bounds != null) {
-                transcriptWindowTop = bounds.top
-                transcriptHeightPx = bounds.height
-            }
-        }
-    }
-    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
-    LaunchedEffect(timelineViewport, ttsFollowHandle) {
-        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
-            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
-        }
-    }
 
     /** Captures the logical first visible message against the latest filtered timeline. */
     fun currentScrollAnchor(): ConversationScrollAnchor {
@@ -1002,6 +970,39 @@ internal fun ConversationScreen(
             renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
             trailingRowCount = controller.conversationTrailingRowCount(liveRenderedTimeline.size),
         )
+    }
+
+    val messageDragSelection =
+        rememberConversationMessageDragSelection(
+            controller = controller,
+            accountRef = conversationAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            listState = listState,
+            timelineViewport = timelineViewport,
+            currentScrollAnchor = ::currentScrollAnchor,
+            inputs =
+                ConversationMessageDragSelection.Inputs(
+                    orderedTimelineIds = orderedTimelineIds,
+                    timelineIdSet = timelineIdSet,
+                    selectableTimelineIds = selectableTimelineIds,
+                    timelineSelectionById = timelineSelectionById,
+                    selectedMessages = selectedMessages,
+                    scrollCoordinator = scrollCoordinator,
+                ),
+        )
+    // A row keeps the drag callbacks it was composed with. Moves resolve through the current instance, so a move
+    // that reaches a replaced drag state finds no anchor, as the screen's rememberUpdatedState updater did.
+    val currentMessageDragSelection by rememberUpdatedState(messageDragSelection)
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.readingBoundsInWindow }.collect { bounds ->
+            if (bounds != null) messageDragSelection.updateTranscriptBounds(bounds)
+        }
+    }
+    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
+            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
+        }
     }
 
     val viewportCaptureRevision = scrollEvidenceSink?.viewportCaptureRevision?.value ?: 0L
@@ -1038,97 +1039,7 @@ internal fun ConversationScreen(
     }
     viewportEvidenceEffect()
 
-    /** Resolves the live range without rewriting unchanged selection keys; true while a nonempty range is active. */
-    @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
-    fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
-        val anchorId = dragAnchorTimelineId ?: return false
-        val endpointId =
-            reverseLazyListDragSelectionEndpoint(
-                timelineViewport.readingLayoutInfo().visibleItemsInfo.mapNotNull { visible ->
-                    val id = visible.key as? String
-                    id
-                        ?.takeIf(timelineIdSet::contains)
-                        ?.let {
-                            DragSelectionVisibleItem(
-                                key = it,
-                                start = visible.offset.toFloat(),
-                                end = (visible.offset + visible.size).toFloat(),
-                            )
-                        }
-                },
-                pointerWindowY = pointerWindowY,
-                viewportWindowTop = transcriptWindowTop,
-                // A reversed list's item offsets start above its bottom content padding.
-                viewportHeight =
-                    listState.layoutInfo.viewportSize.height - listState.layoutInfo.beforeContentPadding,
-            ) ?: return false
-        if (endpointId == anchorId && selectedMessages.isEmpty()) return false
-        val nextTimelineIds =
-            anchoredDragSelection(
-                orderedIds = orderedTimelineIds,
-                eligibleIds = selectableTimelineIds,
-                anchorId = anchorId,
-                endpointId = endpointId,
-            )
-        val nextSelections = nextTimelineIds.mapNotNull(timelineSelectionById::get)
-        val nextMessageIds = nextSelections.mapTo(linkedSetOf()) { it.action.messageId }
-        if (nextMessageIds == selectedMessages.keys) return nextMessageIds.isNotEmpty()
-        selectedMessages.clear()
-        nextSelections.forEach { selection -> selectedMessages[selection.action.messageId] = selection }
-        return nextMessageIds.isNotEmpty()
-    }
-
-    /** Ends a message drag, optionally clearing the selection, and settles reading at the current anchor. */
-    fun finishMessageDrag(clearSelection: Boolean) {
-        val hadActiveDrag = dragAnchorTimelineId != null
-        dragAnchorTimelineId = null
-        dragPointerWindowY = null
-        if (clearSelection) selectedMessages.clear()
-        if (hadActiveDrag) scrollCoordinator.settleReadingAt(currentScrollAnchor())
-    }
-
-    // Local function references compare equal despite changed captures. A lambda lets the frame loop
-    // observe the current timeline and action eligibility even while the pointer stays stationary.
-    val currentMessageDragSelectionUpdater by rememberUpdatedState<(Float) -> Boolean> { pointerWindowY ->
-        updateMessageDragSelection(pointerWindowY)
-    }
-
-    /**
-     * Ends a drag whose anchor left the timeline and scrolls while its pointer is held at an edge.
-     * The shared delta uses physical top/bottom signs for a normal list. This transcript is reversed:
-     * positive logical scroll reveals older rows at the physical top, so only this caller negates it.
-     * Resolve the stationary pointer again after the native list has consumed the scroll.
-     */
-    @Composable
-    fun messageDragSelectionEffects() {
-        LaunchedEffect(orderedTimelineIds, selectableTimelineIds) {
-            val anchorId = dragAnchorTimelineId ?: return@LaunchedEffect
-            if (anchorId !in orderedTimelineIds || anchorId !in selectableTimelineIds) {
-                finishMessageDrag(clearSelection = true)
-            }
-        }
-
-        LaunchedEffect(dragAnchorTimelineId, listState) {
-            while (dragAnchorTimelineId != null) {
-                withFrameNanos { }
-                val pointerWindowY = dragPointerWindowY ?: continue
-                val pointerY = pointerWindowY - transcriptWindowTop
-                val scrollDelta =
-                    dragSelectionAutoScrollDelta(
-                        pointerY = pointerY,
-                        viewportStart = 0f,
-                        viewportEnd = transcriptHeightPx,
-                        edgeThreshold = dragEdgeThresholdPx,
-                        maxStep = dragMaxScrollStepPx,
-                    )
-                if (scrollDelta != 0f) {
-                    listState.scrollBy(-scrollDelta)
-                    currentMessageDragSelectionUpdater(pointerWindowY)
-                }
-            }
-        }
-    }
-    messageDragSelectionEffects()
+    messageDragSelection.messageDragSelectionEffects(orderedTimelineIds, selectableTimelineIds)
     val invalidVisibleMessageIds =
         remember(renderedTimeline, selectableMessages) {
             renderedTimeline
@@ -1352,7 +1263,7 @@ internal fun ConversationScreen(
                 claimedByApp = {
                     scrollCoordinator.mode.ownsListMovement ||
                         ttsQuickTransportViewportLock.holdsViewport ||
-                        dragAnchorTimelineId != null
+                        messageDragSelection.dragAnchorTimelineId != null
                 },
                 touchDragActive = { touchDragActive },
                 onStarted = { onReaderScrollStarted() },
@@ -1509,7 +1420,7 @@ internal fun ConversationScreen(
     // Scoped to the actual controller: neither account/runtime replacement nor route exit
     // can reuse a menu's pending keyboard restoration.
     val menuIme = remember(controller) { ConversationMenuImeHandoff() }
-    val suppressMenuImeRestore = selectionMode || dragAnchorTimelineId != null
+    val suppressMenuImeRestore = selectionMode || messageDragSelection.dragAnchorTimelineId != null
     val displayedMenuImeBottom =
         conversationMenuImeBackdrop(
             handoff = menuIme,
@@ -4500,7 +4411,8 @@ internal fun ConversationScreen(
                                                         }
                                                     }
                                                 },
-                                                rangeDragActive = dragAnchorTimelineId == item.presentationId,
+                                                rangeDragActive =
+                                                    messageDragSelection.dragAnchorTimelineId == item.presentationId,
                                                 onDragSelectionStart = { pointerWindowY ->
                                                     openActionMenuId = null
                                                     clearTextSelection()
@@ -4513,15 +4425,23 @@ internal fun ConversationScreen(
                                                     )
                                                     scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                                     controller.onOlderPagingGestureStarted()
-                                                    dragAnchorTimelineId = item.presentationId
-                                                    dragPointerWindowY = pointerWindowY
+                                                    messageDragSelection.startMessageDrag(
+                                                        timelineId = item.presentationId,
+                                                        pointerWindowY = pointerWindowY,
+                                                    )
                                                 },
                                                 onDragSelection = { pointerWindowY ->
-                                                    dragPointerWindowY = pointerWindowY
-                                                    currentMessageDragSelectionUpdater(pointerWindowY)
+                                                    messageDragSelection.moveMessageDragPointer(pointerWindowY)
+                                                    currentMessageDragSelection.updateMessageDragSelection(
+                                                        pointerWindowY,
+                                                    )
                                                 },
-                                                onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
-                                                onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
+                                                onDragSelectionEnd = {
+                                                    messageDragSelection.finishMessageDrag(clearSelection = false)
+                                                },
+                                                onDragSelectionCancel = {
+                                                    messageDragSelection.finishMessageDrag(clearSelection = true)
+                                                },
                                                 quickReactionEmojis = quickReactionEmojis,
                                                 recentEmojis = recentEmojiRecentsOwner.recents,
                                                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },

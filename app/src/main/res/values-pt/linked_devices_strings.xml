@@ -160,8 +160,8 @@
     <string name="link_offer_reminder">Vincule este dispositivo para ver as conversas dos seus outros dispositivos.</string>
     <string name="link_request_default_label">Novo dispositivo</string>
     <string name="link_request_options">Opções</string>
-    <string name="link_request_options_detail">Escolha o nome do dispositivo e se deseja compartilhar as conversas e o histórico delas.</string>
-    <string name="explanation_link_request_options">Abre o nome do novo dispositivo e o que ele recebe.</string>
+    <string name="link_request_options_detail">Escolha se deseja compartilhar as conversas e o histórico delas.</string>
+    <string name="explanation_link_request_options">Abre o que o novo dispositivo recebe.</string>
     <string name="device_move_advanced">Avançado</string>
     <string name="setup_device_link_next">Depois de entrar, você pode vincular este dispositivo para receber as conversas dos seus outros dispositivos.</string>
     <string name="unlinked_account_remove_for">Remover %1$s deste dispositivo</string>

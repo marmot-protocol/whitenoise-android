@@ -160,8 +160,8 @@
     <string name="link_offer_reminder">Vincula este dispositivo para ver los chats de tus otros dispositivos.</string>
     <string name="link_request_default_label">Dispositivo nuevo</string>
     <string name="link_request_options">Opciones</string>
-    <string name="link_request_options_detail">Elige el nombre del dispositivo y si quieres compartir los chats y su historial.</string>
-    <string name="explanation_link_request_options">Abre el nombre del nuevo dispositivo y lo que recibe.</string>
+    <string name="link_request_options_detail">Elige si quieres compartir los chats y su historial.</string>
+    <string name="explanation_link_request_options">Abre lo que recibe el nuevo dispositivo.</string>
     <string name="device_move_advanced">Avanzado</string>
     <string name="setup_device_link_next">Después de iniciar sesión, puedes vincular este dispositivo para recibir los chats de tus otros dispositivos.</string>
     <string name="unlinked_account_remove_for">Quitar %1$s de este dispositivo</string>
