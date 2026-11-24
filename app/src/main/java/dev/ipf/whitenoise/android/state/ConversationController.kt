@@ -294,14 +294,7 @@ class ConversationController(
         { account, groupIdHex, archived ->
             appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
         },
-    private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
-        { account, groupIdHex, name, description ->
-            appState.runGroupChange(account, groupIdHex, actionLabel = R.string.edit_group_info_title) {
-                appState.marmotIo(MarmotTraceSection.UPDATE_GROUP_PROFILE) {
-                    updateGroupProfile(account, groupIdHex, name, description)
-                }
-            }
-        },
+    private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit = appState::commitGroupProfile,
     internal val clockMillis: () -> Long = System::currentTimeMillis,
     internal val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
