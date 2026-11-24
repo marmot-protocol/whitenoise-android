@@ -22,6 +22,14 @@
         ]
       },
       {
+        "surface": "Error callout actions wrap below the explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "FlowRow {",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
         "surface": "Error callout copy action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
         "anchor": "R.string.copy",

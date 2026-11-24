@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
@@ -9,7 +9,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -42,41 +41,35 @@ internal fun ErrorCallout(
         title = title,
         icon = R.drawable.ic_error,
         isError = true,
-        content =
-            message?.let {
-                {
-                    SelectionContainer(messageModifier) { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                }
-            },
-        trailing =
-            if (report == null && onRetry == null && onDismiss == null) {
-                null
-            } else {
-                {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (report != null) {
-                            IconButton(
-                                onClick = { clipboard.setText(AnnotatedString(report)) },
-                                modifier = copyModifier,
-                            ) {
-                                Icon(
-                                    painterResource(R.drawable.ic_content_copy),
-                                    contentDescription = stringResource(R.string.copy),
-                                )
-                            }
+        content = {
+            if (message != null) {
+                SelectionContainer(messageModifier) { Text(message, style = MaterialTheme.typography.bodyMedium) }
+            }
+            if (report != null || onRetry != null || onDismiss != null) {
+                FlowRow {
+                    if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                    if (report != null) {
+                        IconButton(
+                            onClick = { clipboard.setText(AnnotatedString(report)) },
+                            modifier = copyModifier,
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_content_copy),
+                                contentDescription = stringResource(R.string.copy),
+                            )
                         }
-                        if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-                        if (onDismiss != null) {
-                            IconButton(onClick = onDismiss) {
-                                Icon(
-                                    painterResource(R.drawable.ic_close),
-                                    contentDescription = stringResource(R.string.dismiss),
-                                )
-                            }
+                    }
+                    if (onDismiss != null) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.dismiss),
+                            )
                         }
                     }
                 }
-            },
+            }
+        },
     )
 }
 
