@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -143,16 +144,16 @@ class ConversationAnchoringSourceCoverageTest {
     @Test
     fun reversedDragSelectionMapsEdgesBeforeReadingThePostScrollEndpoint() {
         val source = conversationScreenSource().motionOwnerSource()
-        val start = source.indexOf("fun messageDragSelectionEffects()")
-        val loop = source.substring(start, source.indexOf("    messageDragSelectionEffects()", start))
+        val loop = source.functionBody("messageDragSelectionEffects")
         val scroll = loop.indexOf("listState.scrollBy(-scrollDelta)")
-        val endpoint = loop.indexOf("currentMessageDragSelectionUpdater(pointerWindowY)")
+        val endpoint = loop.indexOf("updateMessageDragSelection(pointerWindowY)")
         assertTrue("reversed list must invert the shared physical edge delta", scroll >= 0)
         assertTrue("endpoint must use the post-scroll native viewport", endpoint > scroll)
         assertTrue(loop.contains("while (dragAnchorTimelineId != null)"))
         assertTrue(loop.contains("withFrameNanos"))
         assertTrue(loop.contains("dragSelectionAutoScrollDelta("))
-        assertTrue(source.contains("currentMessageDragSelectionUpdater by rememberUpdatedState<(Float) -> Boolean>"))
+        assertTrue(source.contains("val latest = rememberUpdatedState(inputs)"))
+        assertTrue(source.functionBody("updateMessageDragSelection").contains("with(latest.value)"))
     }
 
     private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
