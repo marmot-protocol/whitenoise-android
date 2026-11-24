@@ -142,8 +142,15 @@ internal fun AnimatedAlertDialog(
             confirmButton(surface)
         },
         modifier =
-            (if (measured) Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f } else surface.modifier())
-                .then(surface.inputModifier())
+            Modifier
+                .dialogWindowWidthBounds()
+                .then(
+                    if (measured) {
+                        Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f }
+                    } else {
+                        surface.modifier()
+                    },
+                ).then(surface.inputModifier())
                 .then(
                     if (measured && sourceCurrent && nativeWidth != null) {
                         Modifier.requiredWidth(nativeWidth!!)
@@ -216,7 +223,7 @@ internal fun AnimatedBasicAlertDialog(
     if (!surface.visible) return
     androidx.compose.material3.BasicAlertDialog(
         onDismissRequest = surface.dismiss,
-        modifier = surface.modifier().then(surface.inputModifier()),
+        modifier = Modifier.dialogWindowWidthBounds().then(surface.modifier()).then(surface.inputModifier()),
     ) {
         DialogWindowMotion(surface.presence)
         content(surface)

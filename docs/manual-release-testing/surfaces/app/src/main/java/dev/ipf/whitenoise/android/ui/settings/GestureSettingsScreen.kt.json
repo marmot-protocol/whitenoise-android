@@ -28,6 +28,14 @@
         ]
       },
       {
+        "surface": "Swipe action choice dialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "ChoiceDialog(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
         "surface": "R.string.chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
         "anchor": "R.string.chats",
