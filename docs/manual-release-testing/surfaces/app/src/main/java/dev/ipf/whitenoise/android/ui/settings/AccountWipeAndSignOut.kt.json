@@ -71,6 +71,14 @@
           "ACC-009",
           "ACC-014"
         ]
+      },
+      {
+        "surface": "ProfileKeyWipeConfirmationBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
+        "anchor": "fun ProfileKeyWipeConfirmationBody(",
+        "test_ids": [
+          "ACC-014"
+        ]
       }
     ],
     "settings_controls": [
