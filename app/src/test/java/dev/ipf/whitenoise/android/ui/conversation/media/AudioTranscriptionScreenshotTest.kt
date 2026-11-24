@@ -335,10 +335,20 @@ class AudioTranscriptionScreenshotTest {
     /** Records three actual inline transcript toggles without adding fixture-only motion. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
-    fun captureTranscriptFrames() {
+    fun captureTranscriptFrames() = captureTranscriptToggles("transcript", TranscriptPlacement.SEPARATE_FOOTER)
+
+    /** Records the timestamp and transcript animating together in the shared footer. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun captureSharedFooterFrames() = captureTranscriptToggles("transcript-shared-footer", TranscriptPlacement.SHARED_FOOTER)
+
+    private fun captureTranscriptToggles(
+        directory: String,
+        placement: TranscriptPlacement,
+    ) {
         org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
-        val output = File("build/animation-frames/transcript")
-        check(!output.exists()) { "Archive the previous transcript output first" }
+        val output = File("build/animation-frames", directory)
+        check(!output.exists()) { "Archive the previous transcript output at ${output.path} first" }
         check(output.mkdirs())
         val shown = mutableStateOf(false)
         composeRule.setContent {
@@ -346,7 +356,7 @@ class AudioTranscriptionScreenshotTest {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     IncomingVoiceMessage(
                         state = if (shown.value) completed() else null,
-                        placement = TranscriptPlacement.SEPARATE_FOOTER,
+                        placement = placement,
                         onToggle = { shown.value = it },
                     )
                 }
