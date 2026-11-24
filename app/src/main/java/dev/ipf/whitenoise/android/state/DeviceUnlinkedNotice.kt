@@ -17,14 +17,17 @@ internal fun deviceUnlinkedAccount(event: MarmotEventFfi) = (event as? MarmotEve
  * go of it, whether or not it was the active one. If it was the active profile and another is still signed in, the
  * app moves to that one, otherwise the unlinked-account prompt covers its chats. Nothing is wiped here: removing the
  * account from this device is the user's explicit choice. The prompt reads the account list, so when that list
- * cannot be re-read even after retries the notice is shown instead, and the unlink is never silent.
+ * cannot be re-read even after retries the notice is shown instead, and the unlink is never silent. The re-read can
+ * outlast the user removing the account from this device, and then nothing is left for the notice to be about.
  */
 internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(accountRef: String) {
-    val name = accounts.firstOrNull { it.label == accountRef }?.accountIdHex?.let(::unlinkedAccountName)
+    val known = accounts.firstOrNull { it.label == accountRef }
+    val name = known?.accountIdHex?.let(::unlinkedAccountName)
     val listed = readWithRetries { runCatchingCancellable { refreshAccounts() }.isSuccess }
+    val removed = unlinkedCopyRemoved(wasListed = known != null, isListed = accounts.any { it.label == accountRef })
     val active = activeAccountRef == accountRef
     val next = signOutOutcome(accounts, accountRef).nextActiveRef
-    if (unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
+    if (!removed && unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
         presentText(
             ToastMessage(
                 title = AppText.Resource(R.string.device_unlinked_title),
@@ -44,6 +47,16 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(accountRef: String
 internal fun WhiteNoiseAppState.retireDeviceUnlinkedNotice(accountRef: String) {
     if (toast?.unlinkedAccount == accountRef && accounts.none { it.label == accountRef }) clearToast()
 }
+
+/**
+ * Whether the account's copy was removed from this device while the unlink handler was re-reading the accounts. Only
+ * an account that was listed when the handler began and is not listed now counts. One that was never listed may
+ * simply not have been read yet, and staying quiet about it would make the unlink silent.
+ */
+internal fun unlinkedCopyRemoved(
+    wasListed: Boolean,
+    isListed: Boolean,
+): Boolean = wasListed && !isListed
 
 /**
  * Whether the unlink needs its own notice. With nowhere to move to, the unlinked-account prompt says it itself and

@@ -19,8 +19,10 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -30,6 +32,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
 import java.lang.reflect.Proxy
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.resumeWithException
@@ -53,6 +57,14 @@ class AccountWipeMemberMuteRetentionTest {
     private var savedUnlinked = false
     private var nativeWipeTarget: Any? = null
 
+    @Volatile private var heldAccountRead: HeldAccountRead? = null
+
+    /** Stops the next account read inside the runtime, once it is [reached], until the test supplies its [listing]. */
+    private class HeldAccountRead {
+        val reached = CompletableDeferred<Unit>()
+        val listing = CompletableFuture<List<AccountSummaryFfi>>()
+    }
+
     /** Builds a locally signing account summary whose id is derived from the label hash. */
     private fun localAccount(
         label: String,
@@ -71,6 +83,12 @@ class AccountWipeMemberMuteRetentionTest {
         running = !signedOut,
         unlinked = false,
     )
+
+    /** The accounts MDK lists while the unlinked copy is still on this device. */
+    private fun unlinkedListing(): List<AccountSummaryFfi> {
+        val unlinked = localAccount(WIPED_ACCOUNT).copy(unlinked = savedUnlinked)
+        return listOf(unlinked) + remainingAccounts
+    }
 
     @Suppress("UNCHECKED_CAST")
     private val marmot =
@@ -99,9 +117,15 @@ class AccountWipeMemberMuteRetentionTest {
                         wiped = localCleanupCompleted
                     }
                 "listAccounts" -> {
-                    val unlinked = localAccount(WIPED_ACCOUNT).copy(unlinked = savedUnlinked)
-                    val before = listOf(unlinked) + remainingAccounts
-                    listAccountsFailure?.let(::suspendFailure) ?: if (wiped) remainingAccounts else before
+                    val held = heldAccountRead
+                    if (held != null) {
+                        heldAccountRead = null
+                        held.reached.complete(Unit)
+                        held.listing.get(PAUSED_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    } else {
+                        val listing = if (wiped) remainingAccounts else unlinkedListing()
+                        listAccountsFailure?.let(::suspendFailure) ?: listing
+                    }
                 }
                 "signInAccount" -> {
                     signInCalls++
@@ -402,6 +426,31 @@ class AccountWipeMemberMuteRetentionTest {
         }
 
     /**
+     * The unlink handler re-reads the accounts before it speaks. A removal that finishes while that read is paused
+     * leaves nothing to announce, whether the read then returns the list from before the removal or from after it.
+     */
+    @Test
+    fun aNoticeStillBeingPreparedIsNotPublishedOnceItsAccountIsRemoved() =
+        runBlocking {
+            for (readPredatesRemoval in listOf(false, true)) {
+                savedUnlinked = true
+                wiped = false
+                val state = appState(active = SURVIVING_ACCOUNT)
+                val read = HeldAccountRead().also { heldAccountRead = it }
+                val handler = launch(start = CoroutineStart.UNDISPATCHED) { state.presentDeviceUnlinked(WIPED_ACCOUNT) }
+                withTimeout(PAUSED_READ_TIMEOUT_MS) { read.reached.await() }
+                val listedBefore = unlinkedListing()
+
+                assertTrue(withTimeout(PAUSED_READ_TIMEOUT_MS) { state.removeUnlinkedAccount(WIPED_ACCOUNT) })
+                read.listing.complete(if (readPredatesRemoval) listedBefore else remainingAccounts)
+                withTimeout(PAUSED_READ_TIMEOUT_MS) { handler.join() }
+
+                assertNull(state.toast)
+                assertTrue(state.accounts.none { it.label == WIPED_ACCOUNT })
+            }
+        }
+
+    /**
      * Sign out and wipe in Settings retires the unlinked notice as well. Both removal routes do it in a finally
      * after their wipe attempt, so cleanup that throws once the removal is published cannot leave the notice up.
      */
@@ -491,5 +540,6 @@ class AccountWipeMemberMuteRetentionTest {
         const val SURVIVING_ACCOUNT = "surviving-account"
         const val GROUP = "aa11bb22"
         const val MEMBER = "11aa22bb"
+        const val PAUSED_READ_TIMEOUT_MS = 10_000L
     }
 }

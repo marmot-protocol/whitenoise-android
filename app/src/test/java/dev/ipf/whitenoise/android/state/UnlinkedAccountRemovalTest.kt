@@ -27,6 +27,15 @@ class UnlinkedAccountRemovalTest {
         assertTrue(unlinkNoticeNeeded(listed = true, active = true, hasNext = true))
     }
 
+    /** Only an account that was listed and no longer is counts as removed, so an unread list never hides an unlink. */
+    @Test
+    fun aCopyCountsAsRemovedOnlyWhenItWasListedAndNoLongerIs() {
+        assertTrue(unlinkedCopyRemoved(wasListed = true, isListed = false))
+        assertFalse(unlinkedCopyRemoved(wasListed = true, isListed = true))
+        assertFalse(unlinkedCopyRemoved(wasListed = false, isListed = false))
+        assertFalse(unlinkedCopyRemoved(wasListed = false, isListed = true))
+    }
+
     /** A read that fails is tried again, and one that never succeeds stops after the last attempt. */
     @Test
     fun aFailedReadIsRetriedAFewTimes() =
