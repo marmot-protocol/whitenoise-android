@@ -2242,12 +2242,12 @@ internal fun MessageBubble(
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 val footerVoice =
                     bubbleMedia.audio.lastOrNull()?.takeIf {
-                        !mine && !deleted && !bodyOrWarningInsideBubble && !fileFooterInCard && remoteGiphyMedia == null
+                        !mine && !deleted && !bodyOrWarningInsideBubble && !fileFooterInCard &&
+                            remoteGiphyMedia == null && bubbleMedia.rejected.isEmpty()
                     }
-                val completedTranscript =
-                    footerVoice?.let { voice ->
-                        audioTranscription?.completedText(voiceTranscription, voice.index, voice.value.sourceEpoch)
-                    }
+                val completedTranscript = footerVoice?.let {
+                    audioTranscription?.completedText(voiceTranscription, it.index, it.value.sourceEpoch)
+                }
                 val soleCaptionedVisual =
                     if (bubbleMedia.hasConfirmedMedia) {
                         bubbleMedia.visuals.singleOrNull()?.value.takeIf {
