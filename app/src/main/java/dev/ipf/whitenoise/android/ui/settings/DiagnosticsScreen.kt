@@ -31,7 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
@@ -67,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.statusColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -382,7 +382,7 @@ private fun DiagnosticsStreamIndicator(status: DiagnosticsStreamStatus) {
     ) {
         val color =
             if (status == DiagnosticsStreamStatus.Live) {
-                Color(0xFF188038)
+                MaterialTheme.statusColors.success
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             }

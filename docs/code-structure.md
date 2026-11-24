@@ -97,3 +97,18 @@ and documentation contracts` CI job: it compares the baseline with the pull
 request's base and fails when an entry is added or a limit rises.
 
 Both files live in `app/src/test/java/dev/ipf/whitenoise/android/`.
+
+## UI bypass ratchet
+
+`UiBypassRatchetTest` counts raw UI primitives per file under `ui/`: `ModalBottomSheet(`,
+`TopAppBar(` variants, `Scaffold(`, `Toast.makeText`, `HorizontalDivider(`, `TextField(`,
+`RoundedCornerShape(<n>.dp)`, `Color(0x` and `fontSize =`. Each count must stay within
+`app/src/test/resources/ui-bypass/baseline.txt` (one sorted `path|RULE=n` line per file). The
+`ui/theme` files and the shared wrapper that owns a primitive are exempt for it.
+
+- Use the shared component or token instead: `WhiteNoiseSheets`, `WhiteNoiseTopBar`,
+  `WhiteNoiseScaffold`, `AppDivider`, `WhiteNoiseTextField`, `Radii`, `MaterialTheme.colorScheme`,
+  `MaterialTheme.statusColors`, `MaterialTheme.typography`. `Dimens` is the spacing scale and
+  `WhiteNoiseSpacing` its semantic aliases.
+- Never raise a number or add a line. When a change removes bypasses, lower the numbers in the
+  same change; the test writes the current counts to `app/build/ui-bypass/baseline.proposed.txt`.

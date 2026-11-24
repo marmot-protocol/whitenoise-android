@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /** The camera's controls over a black preview: white chrome, as a phone camera shows it in every theme. */
 private val CameraChrome = Color.White
@@ -158,7 +159,7 @@ private fun NoSoundNotice() {
         modifier =
             Modifier
                 .padding(horizontal = 24.dp, vertical = 8.dp)
-                .background(CameraScrim, RoundedCornerShape(12.dp))
+                .background(CameraScrim, RoundedCornerShape(Radii.md))
                 .padding(horizontal = 12.dp, vertical = 6.dp)
                 .testTag("camera.noSound"),
     )

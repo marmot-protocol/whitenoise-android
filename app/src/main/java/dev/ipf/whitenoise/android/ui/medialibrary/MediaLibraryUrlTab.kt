@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.net.URI
@@ -123,9 +124,9 @@ private fun UrlLibraryRow(
             modifier =
                 Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radii.sm))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .amoledSurfaceBorder(RoundedCornerShape(8.dp)),
+                    .amoledSurfaceBorder(RoundedCornerShape(Radii.sm)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

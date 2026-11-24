@@ -104,6 +104,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighligh
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchMatchRanges
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import java.net.IDN
 import java.net.URI
@@ -918,7 +919,7 @@ private fun MarkdownCodeBlockView(
                         } else {
                             Color.Transparent
                         },
-                        RoundedCornerShape(8.dp),
+                        RoundedCornerShape(Radii.sm),
                     ).padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             MarkdownBodyText(

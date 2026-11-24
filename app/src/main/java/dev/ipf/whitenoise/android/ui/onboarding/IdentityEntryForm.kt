@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * The shared nsec/npub entry field used by the onboarding sign-in screen and
@@ -162,7 +163,7 @@ internal fun IdentityEntryForm(
             OutlinedButton(
                 onClick = { showScanner = true },
                 enabled = !busy,
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(Radii.xxl),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) {
                 Icon(painterResource(R.drawable.ic_qr_code_scanner), contentDescription = null)
