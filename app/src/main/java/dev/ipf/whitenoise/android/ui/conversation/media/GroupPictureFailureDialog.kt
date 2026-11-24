@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 
 /** The viewer keeps draft ownership, retry and cancellation; this renders the existing failure controls. */
 @Composable
@@ -16,7 +16,7 @@ internal fun GroupPictureFailureDialog(
     onDismiss: () -> Unit,
 ) {
     val currentOnRetry = rememberUpdatedState(onRetry)
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
         text = { Text(stringResource(R.string.error_try_again)) },

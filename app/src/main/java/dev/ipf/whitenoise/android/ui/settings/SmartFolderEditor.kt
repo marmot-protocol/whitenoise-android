@@ -564,11 +564,8 @@ internal fun SmartFolderConditionDialog(
                                 },
                             ) { Text(stringResource(R.string.smart_folder_add_key)) }
                             if (invalidKey) {
-                                WhiteNoiseCallout(
-                                    text = stringResource(R.string.smart_folder_invalid_key),
-                                    icon = R.drawable.ic_error,
-                                    isError = true,
-                                )
+                                val message = stringResource(R.string.smart_folder_invalid_key)
+                                WhiteNoiseCallout(text = message, icon = R.drawable.ic_error, isError = true)
                             }
                         }
                     }

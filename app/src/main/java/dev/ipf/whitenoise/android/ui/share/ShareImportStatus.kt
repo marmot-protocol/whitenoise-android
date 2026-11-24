@@ -26,7 +26,7 @@ import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -46,7 +46,7 @@ internal fun ShareImportStatus(
     val hasContent = request?.payload?.let { !it.text.isNullOrBlank() || it.streamUris.isNotEmpty() } == true
     when {
         importing || importCancellationAccepted ->
-            AnimatedAlertDialog(
+            WhiteNoiseAlertDialog(
                 onDismissRequest = onCancel,
                 ownerKey = importRequestId,
                 onDismissStart = { importCancellationAccepted = true },
@@ -99,7 +99,7 @@ internal fun ShareImportErrorDialog(
     val currentHasContent = rememberUpdatedState(hasContent)
     val currentPayload = rememberUpdatedState(payload)
     key(payload, hasContent) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = onCancel,
             title = { Text(stringResource(R.string.share_import_error_title)) },
             text = {

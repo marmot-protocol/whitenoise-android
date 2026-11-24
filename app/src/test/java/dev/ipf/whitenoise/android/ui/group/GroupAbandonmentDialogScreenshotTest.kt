@@ -91,10 +91,13 @@ class GroupAbandonmentDialogScreenshotTest {
         composeRule.onNodeWithTag("group.abandon.error").performScrollTo()
         val bottom = detail.assertIsDisplayed().getUnclippedBoundsInRoot().bottom
         val copy = composeRule.onNodeWithTag("group.abandon.error.copy").assertIsDisplayed()
+        val close = composeRule.onNodeWithTag("group.abandon.cancel").assertIsDisplayed()
+        val retry = composeRule.onNodeWithTag("group.abandon.confirm").assertIsDisplayed()
         assertTrue(bottom < initialBottom)
-        assertTrue(bottom < copy.getUnclippedBoundsInRoot().top)
-        composeRule.onNodeWithTag("group.abandon.cancel").assertIsDisplayed()
-        composeRule.onNodeWithTag("group.abandon.confirm").assertIsDisplayed()
+        val footerTop = copy.getUnclippedBoundsInRoot().top
+        assertTrue(bottom < footerTop)
+        assertEquals(footerTop, close.getUnclippedBoundsInRoot().top)
+        assertEquals(footerTop, retry.getUnclippedBoundsInRoot().top)
     }
 
     /** A failed group reset in the dark theme. */

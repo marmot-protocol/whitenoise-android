@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * The reviewed target of a local abandonment, captured when its confirmation opens so the acting account and the
@@ -206,6 +208,7 @@ internal fun GroupAbandonmentReviewDialog(
     val running = status == GroupAbandonmentStatus.Running
     val failed = status == GroupAbandonmentStatus.Failed
     val report = error?.report.takeIf { failed }
+    val actionPadding = if (report == null) ButtonDefaults.TextButtonContentPadding else RecoveryActionPadding
     val clipboard = LocalClipboardManager.current
     val anyDm = targets.any { it.isDm }
     val titleRes =
@@ -234,6 +237,7 @@ internal fun GroupAbandonmentReviewDialog(
                 enabled = !running && confirmEnabled,
                 modifier = Modifier.testTag("group.abandon.confirm"),
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                contentPadding = actionPadding,
             ) { Text(stringResource(confirmLabel)) }
         },
         dismissButton = {
@@ -241,14 +245,20 @@ internal fun GroupAbandonmentReviewDialog(
                 TextButton(
                     onClick = { clipboard.setText(AnnotatedString(report)) },
                     modifier = Modifier.testTag("group.abandon.error.copy"),
+                    contentPadding = actionPadding,
                 ) { Text(stringResource(R.string.copy)) }
             }
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("group.abandon.cancel")) {
-                Text(stringResource(if (failed) R.string.close else R.string.cancel))
-            }
+            TextButton(
+                onClick = dismiss,
+                modifier = Modifier.testTag("group.abandon.cancel"),
+                contentPadding = actionPadding,
+            ) { Text(stringResource(if (failed) R.string.close else R.string.cancel)) }
         },
     )
 }
+
+/** Standard inner spacing lets the three recovery actions fit a narrow dialog. Material still handles wrapping. */
+private val RecoveryActionPadding = PaddingValues(horizontal = 4.dp, vertical = WhiteNoiseSpacing.Related)
 
 /** Identities first, then the consequences for each kind of chat, then any failure, scrolling as one block. */
 @Suppress("FunctionNaming")

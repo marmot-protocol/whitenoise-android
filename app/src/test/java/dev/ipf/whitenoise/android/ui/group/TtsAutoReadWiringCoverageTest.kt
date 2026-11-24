@@ -174,7 +174,7 @@ class TtsAutoReadWiringCoverageTest {
             "if (!appState.confirmTtsPlaybackTrust(canCommit)) return@LaunchedEffect appState.speakAloudAutoRead(" in
                 resume.replace(Regex("\\s+"), " "),
         )
-        val message = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        val message = source("ui/conversation/messages/MessageBubbleReadAloud.kt").functionBody("startSpeakAloud")
         val reader = source("ui/conversation/media/TextAttachmentSpeech.kt")
         val messageConsent = message.indexOf("confirmTtsPlaybackTrust(canCommit)")
         assertTrue(messageConsent in 0 until message.indexOf("speakAloudAutoRead("))
@@ -185,7 +185,7 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue(
             "long-press must start through the consent-gated startSpeakAloud",
             "startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)" in
-                source("ui/conversation/messages/MessageBubble.kt"),
+                source("ui/conversation/messages/MessageBubbleReadAloud.kt"),
         )
         // Resume (TtsController.resume) cannot reach a new connection: handle replacement stops the queue, so a
         // Paused session never survives onto an unapproved engine. Nothing to gate there.
@@ -213,9 +213,10 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun speakFromHereClaimsAutoReadOwnershipThroughAppState() {
-        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val source = source("ui/conversation/messages/MessageBubbleReadAloud.kt")
         val body = source.functionBody("startSpeakAloud")
-        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
+        val entries =
+            source.substringAfter("suspend fun Inputs.speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
         assertTrue(
             "speak-from-here must build bounded candidates through the shared preparation helper",
@@ -247,9 +248,10 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun literalCodeModeAppliesOnlyToTheSelectedSpeakFromHereEntry() {
-        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val source = source("ui/conversation/messages/MessageBubbleReadAloud.kt")
         val body = source.functionBody("startSpeakAloud")
-        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
+        val entries =
+            source.substringAfter("suspend fun Inputs.speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
         assertTrue("the requested mode must reach preparation", "speakFromHereEntries(literalCode)" in body)
         assertTrue("the entry position must participate in mode selection", "mapIndexed" in entries)
