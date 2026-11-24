@@ -36,10 +36,11 @@ import javax.crypto.spec.GCMParameterSpec
  * its message isn't currently loaded (the in-memory hash→key map only covers
  * loaded rows). The hash is non-secret metadata bound into the GCM AAD.
  *
- * Index state is synchronized on `this`, but expensive read/write/hydration
- * disk I/O is kept outside that monitor so main-thread probes don't block on
- * background cache work. `clear()` is the exception: sign-out/account-switch
- * wipes intentionally hold the monitor to preserve the privacy guarantee.
+ * Index state is guarded by `this` for pure in-memory operations only — no disk
+ * I/O runs under `this`, so main-thread [contains] probes never block on
+ * background cache work. Filesystem publication, deletion, and [clear] wipes are
+ * serialized on [publicationLock] (always acquired outside `this`, under lock
+ * order `hydrationLock` -> `publicationLock` -> `this` -> `fileNameMemo`).
  *
  * Eviction is LRU by access order via `LinkedHashMap(accessOrder=true)`.
  * During preparation, the directory is scanned and the in-memory index is
@@ -84,6 +85,10 @@ internal class DiskByteCache(
     private var hydrated = false
     private var legacyPlaintextWiped = false
     private val hydrationLock = Any()
+
+    // Serializes filesystem temp creation, atomic rename/directory sync, stale/poisoned
+    // unlinks, hydration cleanup, and clear() wipes without blocking the index monitor (`this`).
+    private val publicationLock = Any()
 
     // Bumped on every clear(). A deferred put() captures this at schedule time
     // and is rejected if a wipe intervened, so decrypted plaintext from a
@@ -149,11 +154,13 @@ internal class DiskByteCache(
 
     /**
      * Definitive off-main probe. Unlike [contains], this waits for cold-start
-     * hydration before reporting a miss, but still avoids decrypting the entry.
+     * hydration and for any in-flight publication before reporting a miss, so a
+     * same-key replacement detached during its directory sync still reads as
+     * present. It never decrypts the entry.
      */
     fun containsAfterHydration(key: String): Boolean {
         ensureHydrated()
-        return contains(key)
+        return synchronized(publicationLock) { contains(key) }
     }
 
     /** The plaintext size recorded for [key] in the index, read without decrypting anything, or null on a miss. */
@@ -192,12 +199,14 @@ internal class DiskByteCache(
             synchronized(this) {
                 (index[hashed] ?: return null) to cacheLifetime.capture()
             }
-        if (smallOnly && (entry.plaintextSize > maxInMemoryEntryBytes || entry.plaintextSize > maxBytes)) return null
+        val maxPlaintextBytes = if (smallOnly) minOf(maxInMemoryEntryBytes, maxBytes) else null
+        if (maxPlaintextBytes != null && entry.plaintextSize > maxPlaintextBytes) return null
         return try {
-            val bytes = readEncrypted(entry.file, hashed)
+            val bytes = readEncrypted(entry, hashed, maxPlaintextBytes) ?: return null
+            if (maxPlaintextBytes != null && bytes.size.toLong() > maxPlaintextBytes) return null
             synchronized(this) {
                 // A concurrent clear() (sign-out / account switch) bumps
-                // `generation` and deletes files under this lock, but an
+                // `generation` here, then unlinks files under publicationLock, but an
                 // already-open read still succeeds after the unlink on POSIX —
                 // so re-check before handing back plaintext for a session that
                 // was wiped mid-read. Mirrors put()'s write-side guard (#154).
@@ -219,14 +228,7 @@ internal class DiskByteCache(
             // (permission, temporary I/O). Only drop stale index state when the
             // path is actually gone; otherwise report a miss but keep accounting
             // so LRU eviction can still reclaim the bytes. See #1321.
-            val backingStillPresent = entry.file.isFile
-            synchronized(this) {
-                // Only evict if a concurrent put() hasn't already replaced it.
-                if (!backingStillPresent && index[hashed] === entry) {
-                    index.remove(hashed)
-                    residentBytes -= entry.size
-                }
-            }
+            if (!entry.file.isFile) dropIndexedEntry(hashed, entry)
             null
         } catch (error: GeneralSecurityException) {
             if (error.isAuthenticationFailure()) {
@@ -250,7 +252,7 @@ internal class DiskByteCache(
         ensureHydrated()
         val (entries, generation) = synchronized(this) { index.toList() to cacheLifetime.capture() }
         entries.forEach { (slot, entry) ->
-            val bytes = runCatching { readEncrypted(entry.file, slot) }.getOrNull() ?: return@forEach
+            val bytes = runCatching { readEncrypted(entry, slot) }.getOrNull() ?: return@forEach
             if (cacheLifetime.isCurrent(generation)) visit(slot, bytes)
         }
     }
@@ -267,9 +269,23 @@ internal class DiskByteCache(
         expected: ByteArray,
     ) {
         val entry = synchronized(this) { index[slot] } ?: return
-        val bytes = runCatching { readEncrypted(entry.file, slot) }.getOrNull() ?: return
-        synchronized(this) {
-            if (index[slot] === entry && bytes.contentEquals(expected)) removeStoredEntry(slot)
+        val bytes = runCatching { readEncrypted(entry, slot) }.getOrNull()
+        if (bytes == null || !bytes.contentEquals(expected)) return
+        val stale =
+            synchronized(publicationLock) {
+                synchronized(this) {
+                    if (index[slot] !== entry) {
+                        emptyList()
+                    } else {
+                        index.remove(slot)
+                        residentBytes -= entry.size
+                        listOf(slot to filesFor(entry))
+                    }
+                }
+            }
+        if (stale.isNotEmpty()) {
+            deleteStaleEntries(stale)
+            onMutation()
         }
     }
 
@@ -301,8 +317,8 @@ internal class DiskByteCache(
             }
             // Leases are ephemeral; publication performs the durability fsync once,
             // after moving or copying the plaintext into its presentation directory.
-            FileOutputStream(tmp).use { output ->
-                readEncryptedTo(entry.file, hashed, output, cancellationCheck)
+            if (!FileOutputStream(tmp).use { output -> readEncryptedTo(entry, hashed, output, cancellationCheck) }) {
+                return null
             }
             afterLeasePlaintextWritten()
             cancellationCheck()
@@ -318,7 +334,7 @@ internal class DiskByteCache(
             if (error.isAuthenticationFailure() || error.isMalformedEnvelope()) {
                 evictPoisonedEntry(hashed, entry, generationAtLookup)
             } else if (!entry.file.isFile) {
-                dropMissingEntry(hashed, entry)
+                dropIndexedEntry(hashed, entry)
             }
             return null
         } catch (error: GeneralSecurityException) {
@@ -339,7 +355,7 @@ internal class DiskByteCache(
     }
 
     /** Removes stale accounting only when [entry] is still the indexed generation. */
-    private fun dropMissingEntry(
+    private fun dropIndexedEntry(
         hashed: String,
         entry: Entry,
     ) {
@@ -381,8 +397,12 @@ internal class DiskByteCache(
         val hashed = fileNameFor(key)
         val file = File(cacheDir, hashed)
         val putContext =
-            synchronized(this) {
-                if (!publicationTokenIsCurrent(token)) return
+            synchronized(publicationLock) {
+                val (existingSnapshot, unresolvedAtStart) =
+                    synchronized(this) {
+                        if (!publicationTokenIsCurrent(token)) return
+                        index[hashed] to unresolvedEnvelopes.contains(hashed)
+                    }
                 cacheDir.mkdirs()
                 val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "enc")
                 val output =
@@ -394,42 +414,49 @@ internal class DiskByteCache(
                 PutContext(
                     tmp = tmp,
                     output = output,
-                    existingSnapshot = index[hashed],
-                    unresolvedAtStart = unresolvedEnvelopes.contains(hashed),
+                    existingSnapshot = existingSnapshot,
+                    unresolvedAtStart = unresolvedAtStart,
                 )
             }
         afterTempFileCreated()
         // Atomic write: encrypt into a sibling `.tmp` envelope, then rename onto
         // the final path in one commit step so data and expiry metadata cannot
         // diverge across process death. See #1373.
-        try {
-            putContext.output.use { output ->
-                writeEncrypted(output, hashed, bytes, ciphertextTag)
+        val written =
+            try {
+                putContext.output.use { output ->
+                    writeEncrypted(output, hashed, bytes, ciphertextTag)
+                }
+            } catch (_: GeneralSecurityException) {
+                abortPut(putContext.tmp)
+                return
+            } catch (_: ProviderException) {
+                abortPut(putContext.tmp)
+                return
+            } catch (_: IOException) {
+                abortPut(putContext.tmp)
+                // Disk full / permission error. L1 still holds the bytes; this
+                // entry just won't survive restart. Silent fail is acceptable.
+                return
             }
-        } catch (_: GeneralSecurityException) {
+        afterEncryptedWrite()
+        if (written.bytes <= 0L || written.bytes > Int.MAX_VALUE) {
             abortPut(putContext.tmp)
-            return
-        } catch (_: ProviderException) {
-            abortPut(putContext.tmp)
-            return
-        } catch (_: IOException) {
-            abortPut(putContext.tmp)
-            // Disk full / permission error. L1 still holds the bytes; this
-            // entry just won't survive restart. Silent fail is acceptable.
             return
         }
-        afterEncryptedWrite()
         val evicted = mutableListOf<Pair<String, List<File>>>()
-        synchronized(this) {
+        synchronized(publicationLock) {
             // A concurrent clear() (sign-out / account switch) or expiry sweep may
             // have run while we were writing — abort and drop temp artifacts
             // rather than re-persisting plaintext for a wiped session. See #154,
             // #1033.
-            if (
-                !publicationTokenIsCurrent(token) ||
-                index[hashed] !== putContext.existingSnapshot ||
-                unresolvedEnvelopes.contains(hashed) != putContext.unresolvedAtStart
-            ) {
+            val canPublish =
+                synchronized(this) {
+                    publicationTokenIsCurrent(token) &&
+                        index[hashed] === putContext.existingSnapshot &&
+                        unresolvedEnvelopes.contains(hashed) == putContext.unresolvedAtStart
+                }
+            if (!canPublish) {
                 abortPut(putContext.tmp)
                 return
             }
@@ -437,31 +464,27 @@ internal class DiskByteCache(
                 runCatching { putContext.tmp.delete() }
                 return
             }
+            // Detach the superseded entry before directory sync so eviction cannot pick it and
+            // unlink the new file. contains() misses until the swap; containsAfterHydration() waits.
+            putContext.existingSnapshot?.let { dropIndexedEntry(hashed, it) }
             // The rename has already atomically published one complete envelope.
             // A directory-sync failure means durability is uncertain, but deleting
             // the new file here would turn a complete old-or-new result into a
             // guaranteed cache miss and still require another directory sync.
             runCatching { syncCacheDirectory(cacheDir) }
-            val existing = putContext.existingSnapshot
-            if (existing != null) {
-                index.remove(hashed)
-                residentBytes -= existing.size
+            synchronized(this) {
+                unresolvedEnvelopes.remove(hashed)
+                val size = written.bytes.toInt()
+                index[hashed] = Entry(file, size, bytes.size.toLong(), ciphertextTag, written.envelopeId)
+                residentBytes += size
+                evicted += evictedEntryFiles()
             }
-            unresolvedEnvelopes.remove(hashed)
-            val fileLength = file.length()
-            if (fileLength <= 0L || fileLength > Int.MAX_VALUE) {
-                runCatching { file.delete() }
-                return
-            }
-            val size = fileLength.toInt()
-            index[hashed] = Entry(file, size, bytes.size.toLong(), ciphertextTag)
-            residentBytes += size
-            evicted += evictedEntryFiles()
         }
         deleteStaleEntries(evicted)
         onMutation()
     }
 
+    /** Encrypts and publishes [bytes] under a freshly captured publication token. */
     fun put(
         key: String,
         bytes: ByteArray,
@@ -481,15 +504,17 @@ internal class DiskByteCache(
     private fun removeStoredEntry(hashed: String) {
         ensureHydrated()
         val stale =
-            synchronized(this) {
-                val entry = index.remove(hashed)
-                if (entry != null) {
-                    residentBytes -= entry.size
-                    listOf(hashed to filesFor(entry))
-                } else if (unresolvedEnvelopes.remove(hashed)) {
-                    listOf(hashed to filesForUnresolved(hashed))
-                } else {
-                    return
+            synchronized(publicationLock) {
+                synchronized(this) {
+                    val entry = index.remove(hashed)
+                    if (entry != null) {
+                        residentBytes -= entry.size
+                        listOf(hashed to filesFor(entry))
+                    } else if (unresolvedEnvelopes.remove(hashed)) {
+                        listOf(hashed to filesForUnresolved(hashed))
+                    } else {
+                        return
+                    }
                 }
             }
         deleteStaleEntries(stale)
@@ -509,40 +534,50 @@ internal class DiskByteCache(
         ensureHydrated()
         val stale = mutableListOf<Pair<String, List<File>>>()
         val removed =
-            synchronized(this) {
-                expirySweeps.advance()
-                var removed = 0
-                val iterator = index.entries.iterator()
-                while (iterator.hasNext()) {
-                    val (hashed, entry) = iterator.next()
-                    if (entry.tag != null && entry.tag in ciphertextTags) {
-                        stale += hashed to filesFor(entry)
-                        residentBytes -= entry.size
-                        iterator.remove()
-                        removed++
-                    }
-                }
-                // Fail closed: an unresolved envelope's tag is unauthenticated, so
-                // any non-empty sweep must delete all of them rather than risk leaving
-                // an expired attachment readable after provider recovery.
-                val unresolvedIterator = unresolvedEnvelopes.iterator()
-                while (unresolvedIterator.hasNext()) {
-                    val hashed = unresolvedIterator.next()
-                    unresolvedIterator.remove()
-                    stale += hashed to filesForUnresolved(hashed)
-                    removed++
-                }
-                removed
+            synchronized(publicationLock) {
+                removeTaggedAndUnresolvedLocked(ciphertextTags, stale)
             }
         deleteStaleEntries(stale)
         if (removed > 0) onMutation()
         return removed
     }
 
+    /** Advances the expiry epoch and detaches tagged and unresolved entries under the index monitor. */
+    private fun removeTaggedAndUnresolvedLocked(
+        ciphertextTags: Set<String>,
+        stale: MutableList<Pair<String, List<File>>>,
+    ): Int =
+        synchronized(this) {
+            expirySweeps.advance()
+            var removed = 0
+            val iterator = index.entries.iterator()
+            while (iterator.hasNext()) {
+                val (hashed, entry) = iterator.next()
+                if (entry.tag != null && entry.tag in ciphertextTags) {
+                    stale += hashed to filesFor(entry)
+                    residentBytes -= entry.size
+                    iterator.remove()
+                    removed++
+                }
+            }
+            // Fail closed: an unresolved envelope's tag is unauthenticated, so
+            // any non-empty sweep must delete all of them rather than risk leaving
+            // an expired attachment readable after provider recovery.
+            val unresolvedIterator = unresolvedEnvelopes.iterator()
+            while (unresolvedIterator.hasNext()) {
+                val hashed = unresolvedIterator.next()
+                unresolvedIterator.remove()
+                stale += hashed to filesForUnresolved(hashed)
+                removed++
+            }
+            removed
+        }
+
     /**
      * Delete each removed entry only while its key remains absent. The liveness
-     * check and unlink share the monitor with put's rename, so a same-key re-put
-     * cannot publish between them and have its fresh envelope unlinked.
+     * check and unlink share [publicationLock] with put's rename, so a same-key
+     * re-put cannot publish between them and have its fresh envelope unlinked,
+     * while the index monitor (`this`) is never held across disk I/O.
      */
     private fun deleteStaleEntries(stale: List<Pair<String, List<File>>>) {
         if (stale.isEmpty()) return
@@ -553,8 +588,9 @@ internal class DiskByteCache(
                 }
             if (!absentAtProbe) return@forEach
             beforeStaleFilesDeleted()
-            synchronized(this) {
-                if (!index.containsKey(hashed)) {
+            synchronized(publicationLock) {
+                val stillAbsent = synchronized(this) { !index.containsKey(hashed) }
+                if (stillAbsent) {
                     files.forEach { runCatching { it.delete() } }
                 }
             }
@@ -585,41 +621,48 @@ internal class DiskByteCache(
     }
 
     /** Wipes every cache surface and invalidates reads, writes, sweeps, and filename memoization. */
-    @Synchronized
     fun clear(onFailure: (Throwable) -> Unit = {}) {
-        // Bump first so any put scheduled against the prior generation is
-        // rejected even if it grabs this lock right after the wipe. See #154.
-        cacheLifetime.advance()
-        // The memo retains raw cache-key strings, which can carry account and
-        // blob identifiers — drop them with the rest of the account's data.
-        // The epoch bump rejects re-inserts from lookups mid-hash right now.
-        synchronized(fileNameMemo) {
-            fileNameMemoLifetime.advance()
-            fileNameMemo.clear()
-        }
-        // Keep deletion under the lock so a concurrent put cannot recreate an entry during the orphan sweep.
-        val files = index.values.flatMap { listOf(it.file, legacyTagFileFor(it.file, SUFFIX)) }.toMutableSet()
-        index.clear()
-        unresolvedEnvelopes.clear()
-        residentBytes = 0L
-        hydrated = true
-        // Sweep directly instead of calling ensureHydrated(): sign-out can run
-        // before the cache has ever been touched, and building the full index
-        // just to delete it causes avoidable main-thread directory work.
-        val listed =
-            runCatching {
-                if (cacheDir.exists()) {
-                    cacheDir.listFiles() ?: throw IOException("could not list disk cache")
-                } else {
-                    emptyArray()
+        synchronized(publicationLock) {
+            val files =
+                synchronized(this) {
+                    // Bump first so any put scheduled against the prior generation is
+                    // rejected even if it grabs this lock right after the wipe. See #154.
+                    cacheLifetime.advance()
+                    // The memo retains raw cache-key strings, which can carry account and
+                    // blob identifiers — drop them with the rest of the account's data.
+                    // The epoch bump rejects re-inserts from lookups mid-hash right now.
+                    synchronized(fileNameMemo) {
+                        fileNameMemoLifetime.advance()
+                        fileNameMemo.clear()
+                    }
+                    val indexed =
+                        index.values
+                            .flatMap { listOf(it.file, legacyTagFileFor(it.file, SUFFIX)) }
+                            .toMutableSet()
+                    index.clear()
+                    unresolvedEnvelopes.clear()
+                    residentBytes = 0L
+                    hydrated = true
+                    indexed
                 }
-            }.onFailure(onFailure).getOrDefault(emptyArray())
-        val suffixes = listOf(SUFFIX, LEGACY_SUFFIX, TMP_SUFFIX, TAG_SUFFIX)
-        files += listed.filter { file -> file.isFile && suffixes.any { file.name.endsWith(it) } }
-        files.forEach { file ->
-            runCatching {
-                check(file.delete() || !file.exists()) { "could not delete disk cache file" }
-            }.onFailure(onFailure)
+            // Keep deletion under publicationLock (outside the index monitor) so a
+            // concurrent put cannot recreate an entry during the orphan sweep while
+            // main-thread contains() never blocks on unlinks.
+            val listed =
+                runCatching {
+                    if (cacheDir.exists()) {
+                        cacheDir.listFiles() ?: throw IOException("could not list disk cache")
+                    } else {
+                        emptyArray()
+                    }
+                }.onFailure(onFailure).getOrDefault(emptyArray())
+            val suffixes = listOf(SUFFIX, LEGACY_SUFFIX, TMP_SUFFIX, TAG_SUFFIX)
+            files += listed.filter { file -> file.isFile && suffixes.any { file.name.endsWith(it) } }
+            files.forEach { file ->
+                runCatching {
+                    check(file.delete() || !file.exists()) { "could not delete disk cache file" }
+                }.onFailure(onFailure)
+            }
         }
         onMutation()
     }
@@ -676,8 +719,8 @@ internal class DiskByteCache(
         pauseBeforeDelete: () -> Unit = {},
     ) {
         pauseBeforeDelete()
-        synchronized(this) {
-            if (!cacheLifetime.isCurrent(generationAtStart)) return
+        synchronized(publicationLock) {
+            if (!synchronized(this) { cacheLifetime.isCurrent(generationAtStart) }) return
             files.forEach { file ->
                 runCatching { file.delete() }.onFailure {
                     android.util.Log.w("DiskByteCache", "failed to delete hydration artifact")
@@ -710,7 +753,8 @@ internal class DiskByteCache(
             val envelopeRead = readAuthenticatedEnvelopeHeader(file)
             when (envelopeRead.outcome) {
                 EnvelopeHeaderOutcome.VALID -> {
-                    val envelope = envelopeRead.header ?: continue
+                    val metadata = envelopeRead.metadata ?: continue
+                    val envelope = metadata.envelope
                     val plaintextSize =
                         envelope.plaintextBytes
                             ?: (size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES)
@@ -722,7 +766,8 @@ internal class DiskByteCache(
                         )
                         continue
                     }
-                    hydratedIndex[file.name] = Entry(file, size.toInt(), plaintextSize, envelope.ciphertextTag)
+                    hydratedIndex[file.name] =
+                        Entry(file, size.toInt(), plaintextSize, envelope.ciphertextTag, metadata.envelopeId())
                     hydratedBytes += size
                 }
                 EnvelopeHeaderOutcome.CORRUPT -> {
@@ -835,7 +880,7 @@ internal class DiskByteCache(
     }
 
     private data class EnvelopeHeaderRead(
-        val header: EnvelopeHeader?,
+        val metadata: AuthenticatedMetadata?,
         val outcome: EnvelopeHeaderOutcome,
     )
 
@@ -847,7 +892,7 @@ internal class DiskByteCache(
         return try {
             FileInputStream(file).use { input ->
                 EnvelopeHeaderRead(
-                    readAndAuthenticateMetadata(input, file.name).envelope,
+                    readAndAuthenticateMetadata(input, file.name),
                     EnvelopeHeaderOutcome.VALID,
                 )
             }
@@ -961,14 +1006,14 @@ internal class DiskByteCache(
             metadataIv +
             metadataAuthTag
 
-    /** Writes and durably syncs one metadata-bound authenticated envelope. */
+    /** Writes and durably syncs one metadata-bound authenticated envelope, returning its exact length and identity. */
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun writeEncrypted(
         output: FileOutputStream,
         fileName: String,
         plaintext: ByteArray,
         ciphertextTag: String?,
-    ) {
+    ): WrittenEnvelope {
         val header = envelopeHeaderBytes(ciphertextTag, plaintext.size)
         val metadataAad = buildMetadataAad(fileName, header)
         val metadataCipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
@@ -987,44 +1032,55 @@ internal class DiskByteCache(
         output.write(metadataIv)
         output.write(metadataAuthTag)
         val payloadAad = buildPayloadAad(fileName, header, metadataIv, metadataAuthTag)
-        if (header[ENVELOPE_MAGIC.size] == CHUNKED_ENVELOPE_VERSION) {
-            writeChunkedPayload(output, plaintext, payloadAad)
-        } else {
-            writeLegacyPayload(output, plaintext, payloadAad)
-        }
+        val payloadBytes =
+            if (header[ENVELOPE_MAGIC.size] == CHUNKED_ENVELOPE_VERSION) {
+                writeChunkedPayload(output, plaintext, payloadAad)
+            } else {
+                writeLegacyPayload(output, plaintext, payloadAad)
+            }
         // Make the complete envelope durable before the single publication
         // rename. If the rename itself is lost in a power failure, recovery
         // sees the old envelope; if it lands, the new envelope is complete.
         output.fd.sync()
+        return WrittenEnvelope(
+            bytes = header.size.toLong() + metadataIv.size + metadataAuthTag.size + payloadBytes,
+            envelopeId = metadataIv + metadataAuthTag,
+        )
     }
 
-    /** Encrypts a small payload as one legacy-compatible authenticated message. */
+    /** Encrypts a small payload as one legacy-compatible authenticated message and returns bytes written. */
     private fun writeLegacyPayload(
         output: FileOutputStream,
         plaintext: ByteArray,
         payloadAad: ByteArray,
-    ) {
+    ): Long {
         val cipher = newPayloadCipher(Cipher.ENCRYPT_MODE, payloadAad)
+        val ciphertext = cipher.doFinal(plaintext)
         output.write(cipher.iv)
-        output.write(cipher.doFinal(plaintext))
+        output.write(ciphertext)
+        return cipher.iv.size.toLong() + ciphertext.size
     }
 
-    /** Encrypts a large payload in independently authenticated, bounded-size chunks. */
+    /** Encrypts a large payload in independently authenticated, bounded-size chunks and returns bytes written. */
     private fun writeChunkedPayload(
         output: FileOutputStream,
         plaintext: ByteArray,
         payloadAad: ByteArray,
-    ) {
+    ): Long {
         var offset = 0
         var chunkIndex = 0
+        var written = 0L
         while (offset < plaintext.size) {
             val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES, plaintext.size - offset)
             val cipher = newPayloadCipher(Cipher.ENCRYPT_MODE, buildChunkAad(payloadAad, chunkIndex, chunkBytes))
+            val ciphertext = cipher.doFinal(plaintext, offset, chunkBytes)
             output.write(cipher.iv)
-            output.write(cipher.doFinal(plaintext, offset, chunkBytes))
+            output.write(ciphertext)
+            written += cipher.iv.size.toLong() + ciphertext.size
             offset += chunkBytes
             chunkIndex += 1
         }
+        return written
     }
 
     /** Creates a payload cipher bound to the envelope metadata and optional supplied IV. */
@@ -1058,14 +1114,16 @@ internal class DiskByteCache(
                 .putInt(plaintextBytes)
                 .array()
 
-    /** Authenticates one envelope into a bounded byte array for byte-oriented callers. */
+    /** Authenticates one envelope matching [entry] into a bounded byte array, or null if over [maxPlaintextBytes]. */
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun readEncrypted(
-        file: File,
+        entry: Entry,
         fileName: String,
-    ): ByteArray =
-        FileInputStream(file).use { input ->
+        maxPlaintextBytes: Long? = null,
+    ): ByteArray? =
+        FileInputStream(entry.file).use { input ->
             val authenticated = readAndAuthenticateMetadata(input, fileName)
+            if (!authenticated.matches(entry.envelopeId)) return@use null
             val payloadAad =
                 buildPayloadAad(
                     fileName,
@@ -1073,23 +1131,38 @@ internal class DiskByteCache(
                     authenticated.metadataIv,
                     authenticated.metadataAuthTag,
                 )
-            when (authenticated.envelope.version) {
-                CHUNKED_ENVELOPE_VERSION ->
-                    readChunkedPayload(input, authenticated.envelope.plaintextBytes!!, payloadAad)
-                else -> readLegacyPayload(input, file.length(), authenticated.envelope.headerBytes, payloadAad)
-            }
+            val bytes =
+                when (authenticated.envelope.version) {
+                    CHUNKED_ENVELOPE_VERSION ->
+                        readChunkedPayload(
+                            input,
+                            authenticated.envelope.plaintextBytes!!,
+                            payloadAad,
+                            maxPlaintextBytes,
+                        )
+                    else ->
+                        readLegacyPayload(
+                            input,
+                            input.channel.size(),
+                            authenticated.envelope.headerBytes,
+                            payloadAad,
+                            maxPlaintextBytes,
+                        )
+                }
+            bytes?.takeIf { maxPlaintextBytes == null || it.size.toLong() <= maxPlaintextBytes }
         }
 
-    /** Authenticates an envelope and streams its plaintext into an owner-private file. */
+    /** Authenticates an envelope matching [entry] and streams its plaintext into an owner-private file. */
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun readEncryptedTo(
-        file: File,
+        entry: Entry,
         fileName: String,
         output: FileOutputStream,
         cancellationCheck: () -> Unit,
-    ) {
-        FileInputStream(file).use { input ->
+    ): Boolean =
+        FileInputStream(entry.file).use { input ->
             val authenticated = readAndAuthenticateMetadata(input, fileName)
+            if (!authenticated.matches(entry.envelopeId)) return@use false
             val payloadAad =
                 buildPayloadAad(
                     fileName,
@@ -1110,14 +1183,14 @@ internal class DiskByteCache(
                     readLegacyPayloadTo(
                         input,
                         output,
-                        file.length(),
+                        input.channel.size(),
                         authenticated.envelope.headerBytes,
                         payloadAad,
                         cancellationCheck,
                     )
             }
+            true
         }
-    }
 
     /** Verifies and streams every large-entry chunk while honoring cancellation boundaries. */
     private fun readChunkedPayloadTo(
@@ -1172,15 +1245,17 @@ internal class DiskByteCache(
         output.write(plaintext)
     }
 
-    /** Authenticates a bounded legacy payload into a caller-owned byte array. */
+    /** Authenticates a bounded legacy payload into a caller-owned byte array, or null when over [maxPlaintextBytes]. */
     private fun readLegacyPayload(
         input: InputStream,
         fileBytes: Long,
         headerBytes: Int,
         payloadAad: ByteArray,
-    ): ByteArray {
+        maxPlaintextBytes: Long? = null,
+    ): ByteArray? {
         val ciphertextBytes = fileBytes - headerBytes - METADATA_AUTH_BYTES - IV_BYTES
         val plaintextBytes = validateLegacyPayloadSize(ciphertextBytes)
+        if (maxPlaintextBytes != null && plaintextBytes > maxPlaintextBytes) return null
         ensurePlaintextAllocationFits(Math.addExact(ciphertextBytes, plaintextBytes))
         val payloadIv = input.readExactly(IV_BYTES)
         val ciphertext = input.readExactly(ciphertextBytes.toInt())
@@ -1200,12 +1275,14 @@ internal class DiskByteCache(
         return plaintextBytes
     }
 
-    /** Authenticates a chunked entry into one bounded byte array for legacy callers. */
+    /** Authenticates a chunked entry into one bounded byte array, or null when over [maxPlaintextBytes]. */
     private fun readChunkedPayload(
         input: InputStream,
         plaintextBytes: Long,
         payloadAad: ByteArray,
-    ): ByteArray {
+        maxPlaintextBytes: Long? = null,
+    ): ByteArray? {
+        if (maxPlaintextBytes != null && plaintextBytes > maxPlaintextBytes) return null
         ensurePlaintextAllocationFits(plaintextBytes)
         val plaintext = plaintextAllocator(plaintextBytes.toInt())
         var offset = 0
@@ -1258,12 +1335,20 @@ internal class DiskByteCache(
         entry: Entry,
         generationAtLookup: Long,
     ) {
-        synchronized(this) {
-            if (!cacheLifetime.isCurrent(generationAtLookup) || index[fileName] !== entry) return
+        synchronized(publicationLock) {
+            val stillPoisoned =
+                synchronized(this) {
+                    cacheLifetime.isCurrent(generationAtLookup) && index[fileName] === entry
+                }
+            if (!stillPoisoned) return
             if (entry.file.exists() && !entry.file.delete()) return
             runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
-            index.remove(fileName)
-            residentBytes -= entry.size
+            synchronized(this) {
+                if (cacheLifetime.isCurrent(generationAtLookup) && index[fileName] === entry) {
+                    index.remove(fileName)
+                    residentBytes -= entry.size
+                }
+            }
         }
     }
 
@@ -1313,6 +1398,20 @@ internal class DiskByteCache(
         val envelope: EnvelopeHeader,
         val metadataIv: ByteArray,
         val metadataAuthTag: ByteArray,
+    ) {
+        /**
+         * Identifies one written file generation: the authenticated metadata IV and tag are fresh per
+         * write, so a same-key replacement on the same path never shares them with the indexed entry.
+         */
+        fun envelopeId(): ByteArray = metadataIv + metadataAuthTag
+
+        /** Whether this file is the generation the index recorded, so a reader never pairs mixed generations. */
+        fun matches(expectedEnvelopeId: ByteArray): Boolean = envelopeId().contentEquals(expectedEnvelopeId)
+    }
+
+    private class WrittenEnvelope(
+        val bytes: Long,
+        val envelopeId: ByteArray,
     )
 
     private data class PutContext(
@@ -1322,11 +1421,12 @@ internal class DiskByteCache(
         val unresolvedAtStart: Boolean,
     )
 
-    private data class Entry(
+    private class Entry(
         val file: File,
         val size: Int,
         val plaintextSize: Long,
-        val tag: String? = null,
+        val tag: String?,
+        val envelopeId: ByteArray,
     )
 
     private data class HydratedIndex(
@@ -1365,24 +1465,6 @@ internal class DiskByteCache(
         val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)
         val TMP_COUNTER = AtomicLong()
 
-        val HEX =
-            charArrayOf(
-                '0',
-                '1',
-                '2',
-                '3',
-                '4',
-                '5',
-                '6',
-                '7',
-                '8',
-                '9',
-                'a',
-                'b',
-                'c',
-                'd',
-                'e',
-                'f',
-            )
+        val HEX = "0123456789abcdef".toCharArray()
     }
 }
