@@ -63,8 +63,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.editedLabelTarget
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
-import java.util.Locale
-import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +71,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.util.Locale
+import kotlin.coroutines.resume
 
 internal const val GIPHY_MAX_BODY_BYTES = GIPHY_MAX_MEDIA_BYTES
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024

@@ -46,8 +46,8 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import java.io.File
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Diagnostics & Improvements: the native usage receipt and the independent audit-log choice as two switches, the
