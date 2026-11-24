@@ -5,4 +5,7 @@
     <string name="fewer_message_actions">Fewer actions</string>
     <string name="explanation_message_action_more">Shows every action for this message.</string>
     <string name="explanation_message_action_fewer">Returns to the most common actions.</string>
+    <!-- Spoken state of the More/Fewer actions button, so a screen reader hears what activating it changed. -->
+    <string name="message_actions_all_shown">All actions shown</string>
+    <string name="message_actions_common_shown">Common actions shown</string>
 </resources>

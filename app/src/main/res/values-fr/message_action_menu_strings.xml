@@ -4,4 +4,6 @@
     <string name="fewer_message_actions">Moins d\'actions</string>
     <string name="explanation_message_action_more">Affiche toutes les actions de ce message.</string>
     <string name="explanation_message_action_fewer">Affiche de nouveau uniquement les actions les plus courantes.</string>
+    <string name="message_actions_all_shown">Toutes les actions affichées</string>
+    <string name="message_actions_common_shown">Actions courantes affichées</string>
 </resources>

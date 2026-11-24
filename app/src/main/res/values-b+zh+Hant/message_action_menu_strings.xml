@@ -4,4 +4,6 @@
     <string name="fewer_message_actions">收起操作</string>
     <string name="explanation_message_action_more">顯示這則訊息的所有操作。</string>
     <string name="explanation_message_action_fewer">僅顯示最常用的操作。</string>
+    <string name="message_actions_all_shown">已顯示所有操作</string>
+    <string name="message_actions_common_shown">已顯示常用操作</string>
 </resources>

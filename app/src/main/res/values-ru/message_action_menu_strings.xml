@@ -4,4 +4,6 @@
     <string name="fewer_message_actions">Меньше действий</string>
     <string name="explanation_message_action_more">Показывает все действия с этим сообщением.</string>
     <string name="explanation_message_action_fewer">Снова показывает только основные действия.</string>
+    <string name="message_actions_all_shown">Показаны все действия</string>
+    <string name="message_actions_common_shown">Показаны основные действия</string>
 </resources>

@@ -26,6 +26,14 @@
         "test_ids": [
           "MSG-050"
         ]
+      },
+      {
+        "surface": "Modifier.focusedActionDisclosureState",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "fun Modifier.focusedActionDisclosureState(",
+        "test_ids": [
+          "MSG-050"
+        ]
       }
     ],
     "settings_controls": [
@@ -57,6 +65,22 @@
         "surface": "setting:explanation_message_action_fewer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
         "anchor": "R.string.explanation_message_action_fewer",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:message_actions_all_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.message_actions_all_shown",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:message_actions_common_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.message_actions_common_shown",
         "test_ids": [
           "MSG-050"
         ]

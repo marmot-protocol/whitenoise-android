@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,8 +45,15 @@ class FocusedMessageActionDisclosureTest {
         listOf("Reply", "Copy", "Forward", "More actions").forEach { rule.onNodeWithText(it).assertExists() }
         listOf("Select", "Info", "Delete").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
 
+        rule
+            .onNodeWithTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Common actions shown"))
         rule.onNodeWithText("More actions").performClick()
         rule.waitForIdle()
+        rule
+            .onNodeWithTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "All actions shown"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
 
         listOf("Reply", "Copy", "Forward", "Select", "Info", "Delete", "Fewer actions").forEach {
             rule.onNodeWithText(it).assertExists()

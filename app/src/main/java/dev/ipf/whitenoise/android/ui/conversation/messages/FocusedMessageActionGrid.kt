@@ -117,7 +117,8 @@ internal fun FocusedActionMenu(
                                         } else {
                                             maxOf(columnWidths[0], disclosureWidth)
                                         },
-                                    ).testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
+                                    ).focusedActionDisclosureState(showingAll)
+                                    .testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
                         )
                     }
                 }

@@ -4,4 +4,6 @@
     <string name="fewer_message_actions">Weniger Aktionen</string>
     <string name="explanation_message_action_more">Zeigt alle Aktionen für diese Nachricht.</string>
     <string name="explanation_message_action_fewer">Zeigt wieder nur die häufigsten Aktionen.</string>
+    <string name="message_actions_all_shown">Alle Aktionen angezeigt</string>
+    <string name="message_actions_common_shown">Häufige Aktionen angezeigt</string>
 </resources>

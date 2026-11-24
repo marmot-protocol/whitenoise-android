@@ -31,6 +31,10 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import dev.ipf.whitenoise.android.R
@@ -197,6 +201,20 @@ internal fun focusedActionDisclosure(
         explanation = Explanation(label, explanation),
         dismissBeforeActivation = false,
     )
+}
+
+/**
+ * Speaks what activating the disclosure changed. The revealed actions sit before it in reading order, so
+ * its state, announced politely as it changes, is how a screen reader learns the full set is showing.
+ */
+@Composable
+internal fun Modifier.focusedActionDisclosureState(showingAll: Boolean): Modifier {
+    val state =
+        stringResource(if (showingAll) R.string.message_actions_all_shown else R.string.message_actions_common_shown)
+    return semantics {
+        stateDescription = state
+        liveRegion = LiveRegionMode.Polite
+    }
 }
 
 /**
