@@ -6,7 +6,6 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -37,7 +36,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,9 +53,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -109,16 +105,12 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
-import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
-import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -249,9 +241,11 @@ internal fun ChatsScreen(
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     // #2925: a Select all bound to MDK's complete view; null for loaded-window selections.
-    var completeSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
-        mutableStateOf<ChatListCompleteSelection?>(null)
-    }
+    val completeSelectionState =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<ChatListCompleteSelection?>(null)
+        }
+    var completeSelection by completeSelectionState
     var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatDeparture?>(null)
     }
@@ -970,7 +964,8 @@ internal fun ChatsScreen(
             }
         }
     }
-    var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
+    val programmaticViewportGenerationState = remember(chatListState) { mutableLongStateOf(0L) }
+    var programmaticViewportGeneration by programmaticViewportGenerationState
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
     val completeSearchSections =
         rememberCompleteChatSearchSections(
@@ -1327,99 +1322,30 @@ internal fun ChatsScreen(
     )
     GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
-    val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
-    var chatListWindowTop by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var chatListHeightPx by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var dragAnchorChatId by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    var dragPointerWindowY by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
-
-    @Suppress("ReturnCount") // Guard clauses keep invalid live-list gesture state explicit.
-    fun updateChatDragSelection(pointerWindowY: Float): Boolean {
-        val anchorId = dragAnchorChatId ?: return false
-        val pointerY = pointerWindowY - chatListWindowTop
-        val endpointId =
-            dragSelectionEndpoint(
-                chatListState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
-                    val id = visible.key as? String
-                    id
-                        ?.takeIf(visibleChatIds::contains)
-                        ?.let {
-                            DragSelectionVisibleItem(
-                                key = it,
-                                start = visible.offset.toFloat(),
-                                end = (visible.offset + visible.size).toFloat(),
-                            )
-                        }
-                },
-                pointerY,
-            ) ?: return false
-        if (endpointId == anchorId && selectedChatIds.isEmpty()) return false
-        completeSelection = null
-        val next =
-            anchoredDragSelection(
-                orderedIds = orderedVisibleChatIds,
-                eligibleIds = visibleChatIds,
-                anchorId = anchorId,
-                endpointId = endpointId,
-            )
-        selectedChatIds.clear()
-        selectedChatIds.addAll(next)
-        return true
-    }
-
-    fun finishChatDrag(clearSelection: Boolean) {
-        dragAnchorChatId = null
-        dragPointerWindowY = null
-        if (clearSelection) {
-            completeSelection = null
-            selectedChatIds.clear()
-        }
-    }
+    val chatDragSelection =
+        rememberChatListDragSelection(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            selectedChatIds = selectedChatIds,
+            completeSelection = completeSelectionState,
+        )
+    // A row's drag callbacks and each drag effect keep the values of the composition that built them.
+    val chatDragInputs =
+        ChatListDragSelection.Inputs(
+            chatListState = chatListState,
+            visibleChatIds = visibleChatIds,
+            orderedVisibleChatIds = orderedVisibleChatIds,
+        )
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
-        finishChatDrag(clearSelection = true)
+        chatDragSelection.finishChatDrag(clearSelection = true)
         actionSheetChatId = null
     }
-    LaunchedEffect(chatListDatasetKey) {
-        if (dragAnchorChatId != null) finishChatDrag(clearSelection = true)
-    }
-    LaunchedEffect(visibleChatIds) {
-        val anchorId = dragAnchorChatId ?: return@LaunchedEffect
-        if (anchorId !in visibleChatIds) finishChatDrag(clearSelection = true)
-    }
-
-    LaunchedEffect(dragAnchorChatId, chatListState) {
-        var autoScrollActive = false
-        while (dragAnchorChatId != null) {
-            withFrameNanos { }
-            val pointerWindowY = dragPointerWindowY ?: continue
-            val pointerY = pointerWindowY - chatListWindowTop
-            val scrollDelta =
-                dragSelectionAutoScrollDelta(
-                    pointerY = pointerY,
-                    viewportStart = 0f,
-                    viewportEnd = chatListHeightPx,
-                    edgeThreshold = dragEdgeThresholdPx,
-                    maxStep = dragMaxScrollStepPx,
-                )
-            if (scrollDelta != 0f) {
-                if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
-                    programmaticViewportGeneration += 1L
-                }
-                autoScrollActive = true
-                chatListState.scrollBy(scrollDelta)
-                updateChatDragSelection(pointerWindowY)
-            } else {
-                autoScrollActive = false
-            }
-        }
-    }
+    chatDragSelection.chatDragSelectionEffects(
+        datasetKey = chatListDatasetKey,
+        inputs = chatDragInputs,
+        programmaticViewportGenerationState = programmaticViewportGenerationState,
+    )
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
@@ -1883,7 +1809,7 @@ internal fun ChatsScreen(
                 val swipeEnabled =
                     chatListInteractionsEnabled &&
                         !selectionMode &&
-                        dragAnchorChatId == null &&
+                        chatDragSelection.dragAnchorChatId == null &&
                         actionSheetChatId == null
                 val latestSwipeAdmission by rememberUpdatedState<() -> Boolean> {
                     val visible = rowId in visibleChatIds && item.group.groupIdHex !in leavingAndDeleting
@@ -1985,21 +1911,20 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                dragAnchorChatId = rowId
-                                dragPointerWindowY = pointerWindowY
+                                chatDragSelection.startChatDrag(rowId, pointerWindowY)
                             }
                         },
                         onDragSelection = { pointerWindowY ->
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                dragPointerWindowY = pointerWindowY
-                                updateChatDragSelection(pointerWindowY)
+                                chatDragSelection.moveChatDragPointer(pointerWindowY)
+                                chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)
                             } else {
                                 false
                             }
                         },
                         onDragSelectionEnd = {
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                finishChatDrag(clearSelection = false)
+                                chatDragSelection.finishChatDrag(clearSelection = false)
                             }
                             heldMenuToken[1] = null
                         },
@@ -2007,11 +1932,11 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                finishChatDrag(clearSelection = true)
+                                chatDragSelection.finishChatDrag(clearSelection = true)
                             }
                             heldMenuToken[1] = null
                         },
-                        rangeDragActive = dragAnchorChatId == rowId,
+                        rangeDragActive = chatDragSelection.dragAnchorChatId == rowId,
                         onToggleSelection = {
                             if (menuActionsCurrent()) {
                                 // A row choice made while Select all resolves supersedes that pending read.
@@ -2586,10 +2511,7 @@ internal fun ChatsScreen(
                                             .chatListEdgeFade(chatListState, motion = edgeFadeMotion)
                                             .then(folderArrival)
                                             .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                            .onGloballyPositioned { coordinates ->
-                                                chatListWindowTop = coordinates.positionInWindow().y
-                                                chatListHeightPx = coordinates.size.height.toFloat()
-                                            },
+                                            .onGloballyPositioned(chatDragSelection::updateListBounds),
                                     state = chatListState,
                                 ) {
                                     controller.error
