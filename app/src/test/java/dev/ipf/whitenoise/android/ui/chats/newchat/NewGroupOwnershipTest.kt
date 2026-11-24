@@ -69,7 +69,6 @@ class NewGroupOwnershipTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("new_group.continue").performClick()
         assertEquals("Team 😀", text("group_setup.name"))
-        composeRule.onNodeWithTag("group_setup.customize").performClick()
         assertEquals("Plans for Friday", text("group_setup.description"))
     }
 

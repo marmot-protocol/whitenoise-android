@@ -301,6 +301,7 @@ private fun SetupDecisionContent(state: AccountSetupState) {
     }
 }
 
+/** Keeps findings already summarized in the heading available under Details. */
 @Composable
 private fun SetupStepFindings(
     state: AccountSetupState,

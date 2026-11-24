@@ -156,6 +156,16 @@ class NewGroupPresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.group_preparing_photo)).assertIsDisplayed()
     }
 
+    /** An image that needs reselection after setup opens reveals the action that fixes it. */
+    @Test fun latePhotoReselectionRevealsThePhotoAction() {
+        val draft = NewGroupDraft()
+        setup(draft, presentation())
+        composeRule.onNodeWithTag("group_setup.photoAction").assertDoesNotExist()
+        composeRule.runOnIdle { draft.imageNeedsReselection = true }
+        composeRule.onNodeWithTag("group_setup.photoAction").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.group_photo_reselect)).assertIsDisplayed()
+    }
+
     /** Accepted canonical creation locks both fields and keeps Open chat rather than a second create action. */
     @Test fun canonicalRecoveryHasLockedFieldsAndOpenAction() {
         val draft = NewGroupDraft(retryGroupIdHex = "canonical")

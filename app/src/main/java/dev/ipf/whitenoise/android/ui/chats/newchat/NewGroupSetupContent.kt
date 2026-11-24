@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -92,7 +93,7 @@ internal data class NewGroupSetupActions(
     val removeFailedRecipient: () -> Unit = {},
 )
 
-/** Keep the name, membership and timer visible while the optional profile fields start collapsed. */
+/** Start with the essential fields and reveal any existing draft customization on entry. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod") // Compose naming follows the framework convention.
 internal fun NewGroupSetupContent(
@@ -102,7 +103,12 @@ internal fun NewGroupSetupContent(
     photoMenu: @Composable () -> Unit = {},
     startingAs: StartingAccount? = null,
 ) {
-    var customize by rememberSaveable { mutableStateOf(false) }
+    var customize by rememberSaveable {
+        mutableStateOf(draft.description.text.isNotBlank() || draft.imageDraft != null || draft.imageNeedsReselection)
+    }
+    LaunchedEffect(draft.imageNeedsReselection) {
+        if (draft.imageNeedsReselection) customize = true
+    }
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.group_setup_title),
@@ -200,6 +206,7 @@ internal fun NewGroupSetupContent(
     }
 }
 
+/** Anchor the emoji sheet to the name and advance to the description when it is visible. */
 @Composable
 @Suppress("FunctionNaming") // Compose naming follows the framework convention.
 private fun GroupSetupNameField(
@@ -231,6 +238,7 @@ private fun GroupSetupNameField(
     )
 }
 
+/** Toggle optional draft fields while exposing the current disclosure state to accessibility. */
 @Composable
 @Suppress("FunctionNaming") // Compose naming follows the framework convention.
 private fun GroupSetupCustomizeButton(

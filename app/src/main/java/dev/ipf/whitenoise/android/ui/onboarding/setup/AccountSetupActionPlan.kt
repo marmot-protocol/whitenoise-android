@@ -10,6 +10,7 @@ internal data class AccountSetupActionPlan(
     val directRemove: Boolean,
 )
 
+/** Orders the actions offered by the current native decision, including the exact relay removal path. */
 internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): AccountSetupActionPlan {
     val directRemove = directRemoveAvailable(offered)
     val primary = preferredAction(offered) ?: if (directRemove) null else fallbackAction(offered)

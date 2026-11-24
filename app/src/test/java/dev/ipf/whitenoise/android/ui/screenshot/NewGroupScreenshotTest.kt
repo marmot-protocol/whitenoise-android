@@ -79,7 +79,7 @@ class NewGroupScreenshotTest {
     @Test fun setupDark() = setup("group_setup_dark.png", dark = true)
 
     /** AMOLED setup and primary action. */
-    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true, description = "")
+    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
 
     /** Optional photo and description use the same form and retain the current draft. */
     @Test fun setupCustomizedAmoled() =
@@ -87,7 +87,15 @@ class NewGroupScreenshotTest {
             "group_setup_customized_amoled.png",
             dark = true,
             amoled = true,
-            customized = true,
+            description = "A place to coordinate our next trip.",
+        )
+
+    /** An authored description reopens customization at large RTL text sizes. */
+    @Test fun setupCustomizedLargeRtl() =
+        setup(
+            "group_setup_customized_large_rtl.png",
+            largeRtl = true,
+            description = "A place to coordinate our next trip.",
         )
 
     /** Native image work gets feedback and disabled competing controls. */
@@ -198,8 +206,7 @@ class NewGroupScreenshotTest {
         canonical: Boolean = false,
         recovery: Boolean = false,
         unknown: Boolean = false,
-        description: String = "A place to coordinate our next trip.",
-        customized: Boolean = false,
+        description: String = "",
     ) {
         val draft =
             NewGroupDraft(
@@ -242,7 +249,6 @@ class NewGroupScreenshotTest {
                 }
             }
         }
-        if (customized) composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.screen").captureRoboImage("src/test/snapshots/$file")
     }
 
