@@ -29,18 +29,24 @@ internal fun SetupActionButtons(
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
 ) {
-    if (state.snapshot == null) return
-    val step = state.currentStep ?: return
+    state.decisionButtons().forEach { (action, primary) ->
+        SetupOfferedAction(state, action, primary, onAction, onEdit)
+    }
+}
+
+/** The native plan's visible decision buttons, each paired with whether it is the one filled primary. */
+internal fun AccountSetupState.decisionButtons(): List<Pair<OnboardingActionFfi, Boolean>> {
+    val step = currentStep
+    if (snapshot == null || step == null) return emptyList()
     val offered =
-        state.orderedRelayActions(step.actions).filterNot { action ->
-            val routineRetry = action == OnboardingActionFfi.RETRY && state.routineDeviceNotice
-            val disconnectedNonSigner = state.disconnected && action != OnboardingActionFfi.RECONNECT_SIGNER
+        orderedRelayActions(step.actions).filterNot { action ->
+            val routineRetry = action == OnboardingActionFfi.RETRY && routineDeviceNotice
+            val disconnectedNonSigner = disconnected && action != OnboardingActionFfi.RECONNECT_SIGNER
             routineRetry || disconnectedNonSigner
         }
-    val plan = state.actionPlan(offered)
-    val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
-    visible.forEach { action ->
-        SetupOfferedAction(state, action, action == plan.primary && !plan.directRemove, onAction, onEdit)
+    val plan = actionPlan(offered)
+    return listOfNotNull(plan.primary, plan.secondary).distinct().map { action ->
+        action to (action == plan.primary && !plan.directRemove)
     }
 }
 

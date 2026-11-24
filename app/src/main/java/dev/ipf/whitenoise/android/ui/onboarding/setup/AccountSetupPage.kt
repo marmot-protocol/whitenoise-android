@@ -109,9 +109,17 @@ internal fun SetupPinnedActions(
     }
 }
 
-/** Whether the surface pins anything; a running check without a failure leaves no empty action bar. */
+/**
+ * Whether the surface pins anything, from the same predicates [SetupPinnedActions] renders with, so a running check
+ * or a decision that offers nothing leaves no empty action band.
+ */
 internal val AccountSetupState.hasPinnedActions: Boolean
-    get() = setupSurface() != SetupSurface.Progress || showsSetupFailure
+    get() =
+        when (setupSurface()) {
+            SetupSurface.Editor, SetupSurface.Ready -> true
+            SetupSurface.Progress -> showsSetupFailure
+            SetupSurface.Decision -> showsSetupFailure || pinsDecisionActions
+        }
 
 /** The current decision's offered actions show unless a failure or a lost signer without Reconnect blocks them. */
 private val AccountSetupState.offersDecisionActions: Boolean
@@ -122,9 +130,12 @@ private val AccountSetupState.offersDecisionActions: Boolean
         return !blockedByFailure && (!disconnected || reconnectOffered)
     }
 
-/** The decision pins its own buttons: offered actions, or the direct removal of one exact relay. */
+/** The decision pins its own buttons: offered actions the plan shows, or the direct removal of one exact relay. */
 private val AccountSetupState.pinsDecisionActions: Boolean
-    get() = offersDecisionActions || (snapshot != null && currentStep != null && directRemovalEndpoint() != null)
+    get() {
+        val offered = offersDecisionActions && decisionButtons().isNotEmpty()
+        return offered || (snapshot != null && currentStep != null && directRemovalEndpoint() != null)
+    }
 
 /** Resume is the way forward after a failure or a lost connection until setup is ready. */
 @Composable

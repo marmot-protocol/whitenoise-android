@@ -106,9 +106,11 @@ class AccountSetupPinnedActionsTest {
         assertEquals(1, reconnected)
     }
 
-    /** A running check pins nothing, so the page keeps no empty action band; a failure still pins Resume. */
+    /** A running check or a decision offering nothing pins no empty action band; a failure still pins Resume. */
     @Test fun runningCheckHasNoPinnedBar() {
         assertFalse(AccountSetupState().hasPinnedActions)
+        assertFalse(AccountSetupState(snapshot = setupSnapshot(actions = emptyList())).hasPinnedActions)
+        assertTrue(AccountSetupState(snapshot = setupSnapshot(actions = emptyList()), error = true).hasPinnedActions)
         assertTrue(AccountSetupState(snapshot = setupSnapshot(), busy = true, error = true).hasPinnedActions)
         assertTrue(AccountSetupState(snapshot = setupSnapshot(ready = true)).hasPinnedActions)
     }
