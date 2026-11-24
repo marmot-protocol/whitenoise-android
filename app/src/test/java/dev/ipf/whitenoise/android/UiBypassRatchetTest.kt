@@ -8,8 +8,8 @@ import java.io.File
  * Stops new raw UI primitives from creeping back in next to the shared components and theme tokens.
  * For every Kotlin file under `ui/`, counts each pattern in [UiBypassRule] and compares it with the
  * checked-in `ui-bypass/baseline.txt` (one `path|rule=count,...` line per file, sorted, zero counts
- * omitted). A count may only go down; it is not forced down, so parallel changes do not conflict. The shared wrapper and theme files that own a primitive are
- * exempt for that rule.
+ * omitted). A count may only go down; it is not forced down, so parallel changes do not conflict.
+ * The shared wrapper and theme files that own a primitive are exempt for that rule.
  */
 class UiBypassRatchetTest {
     @Test
@@ -43,7 +43,8 @@ class UiBypassRatchetTest {
     private fun proposedBaselineFile(): File =
         File(invariantGateRepositoryRoot(), "app/build/ui-bypass/baseline.proposed.txt")
 
-    private fun baselineFile(): File = File(invariantGateRepositoryRoot(), "app/src/test/resources/ui-bypass/baseline.txt")
+    private fun baselineFile(): File =
+        File(invariantGateRepositoryRoot(), "app/src/test/resources/ui-bypass/baseline.txt")
 
     private fun readBaseline(): Map<String, Map<UiBypassRule, Int>> =
         baselineFile()
@@ -80,7 +81,7 @@ class UiBypassRatchetTest {
         source.replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "").replace(Regex("""(?m)^\s*//.*$"""), "")
 
     private companion object {
-        const val HEADER = "UI bypass ratchet (docs/code-structure.md): raw primitives replace shared components and tokens."
+        const val HEADER = "UI bypass ratchet (docs/code-structure.md): raw primitives bypass shared components."
     }
 }
 
