@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RootToastSnackbar.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RootToastSnackbarEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RootToastSnackbar.kt",
+        "anchor": "fun RootToastSnackbarEffect(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025",
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group-change notice waits until the app is on screen and unlocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/RootToastSnackbar.kt",
+        "anchor": "private fun rememberAppOnScreen(",
+        "test_ids": [
+          "GRP-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

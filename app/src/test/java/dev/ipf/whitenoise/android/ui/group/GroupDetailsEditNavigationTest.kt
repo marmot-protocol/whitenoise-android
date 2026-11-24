@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppReadAloud
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -527,11 +528,11 @@ class GroupDetailsEditNavigationTest {
 
     /** Controlled source-render fixture copied from GroupAdvancedSettingsIconsTest; no engine handle. */
     private fun WhiteNoiseAppState.applyCaptureSpeechCatalog() {
-        val delegate = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
+        val delegate = AppReadAloud::class.java.getDeclaredField("ttsResolution\$delegate")
         delegate.isAccessible = true
 
         @Suppress("UNCHECKED_CAST")
-        val state = delegate.get(this) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
+        val state = delegate.get(readAloud) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
         state.value =
             TtsResolutionResult(
                 status = TextToSpeech.SUCCESS,

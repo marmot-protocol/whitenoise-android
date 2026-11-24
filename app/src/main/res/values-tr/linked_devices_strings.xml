@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Bağlı cihazlar</string>
+    <string name="linked_devices">Cihazlar</string>
+    <string name="settings_search_alias_linked_devices">bağlı cihazlar|cihaz bağla|cihazı bağla</string>
+    <string name="group_account_devices_title">Bağlı cihazlar</string>
     <string name="linked_devices_detail">Bağlı bir cihazdan gönderdiğiniz mesajlar, tüm bağlı cihazlarınızda sizin mesajlarınız olarak görünür.</string>
     <string name="linked_devices_this_device">Bu cihaz</string>
     <string name="linked_devices_other_devices">Diğer cihazlar</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Bu sohbetler kaldırma işlemini cihazlarınızdan alamıyor. Bir sohbet yöneticisi cihazı orada kaldırabilir.</string>
     <string name="devices_key_refresh_overdue">Bu cihaz davet anahtarlarını yenileyemedi. 30 gün sonra yeni sohbetlere eklenemeyebilir. Cihazlarınızın yetişebilmesi için uygulamayı açık tutun.</string>
     <string name="devices_stalled">Bu cihaz artık diğer cihazlarınıza yetişemiyor. Devam etmek için bağlantısını onarın.</string>
-    <string name="device_repair_confirm_again">Ayarlar bölümünde bağlı cihazları açın ve bağlantı kurmadan önce onarımı yeniden onaylayın.</string>
+    <string name="device_repair_confirm_again">Ayarlar bölümünde “Cihazlar”ı açın ve bağlantı kurmadan önce onarımı yeniden onaylayın.</string>
     <string name="device_repair_try_link_again">Bağlantı sıfırlandı. Onarımı tamamlamak için cihazı tekrar bağlamayı deneyin.</string>
     <string name="devices_repair">Bu cihazın bağlantısını onar</string>
     <string name="devices_repair_confirm">Bu cihazı yeniden bağlayabilmeniz için mevcut bağlantı kaldırılır. Sohbetleriniz, mesajlarınız, taslaklarınız ve ayarlarınız korunur. Bağlamayı iptal etseniz bile eski bağlantı geri yüklenemez.</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">Diğer cihazlarınızdaki sohbetleri görmek için bu cihazı bağlayın.</string>
     <string name="link_request_default_label">Yeni cihaz</string>
     <string name="link_request_options">Seçenekler</string>
-    <string name="link_request_options_detail">Cihazın adını seçin ve sohbetleri geçmişleriyle birlikte paylaşıp paylaşmayacağınıza karar verin.</string>
-    <string name="explanation_link_request_options">Yeni cihazın adını ve neler alacağını açar.</string>
+    <string name="link_request_options_detail">Sohbetlerin ve geçmişlerinin paylaşılıp paylaşılmayacağını seçin.</string>
+    <string name="explanation_link_request_options">Yeni cihazın neler alacağını açar.</string>
     <string name="device_move_advanced">Gelişmiş</string>
     <string name="setup_device_link_next">Oturum açtıktan sonra diğer cihazlarınızdaki sohbetleri almak için bu cihazı bağlayabilirsiniz.</string>
     <string name="unlinked_account_remove_for">%1$s hesabını bu cihazdan kaldır</string>

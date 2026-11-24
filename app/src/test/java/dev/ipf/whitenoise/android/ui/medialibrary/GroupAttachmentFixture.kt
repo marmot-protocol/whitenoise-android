@@ -24,6 +24,8 @@ internal class GroupAttachmentFixture(
     var failNext = false
     var failVersion = false
     var beforePage: suspend () -> Unit = {}
+    var versionCalls = 0
+    var beforeVersion: suspend () -> Unit = {}
     val cursors = mutableListOf<FakeAttachmentCursor>()
     val versions = mutableListOf<FakeAttachmentVersion>()
 
@@ -55,6 +57,8 @@ internal class GroupAttachmentFixture(
 
     /** Independent version reads can fail without advancing the pager's retained baseline. */
     override suspend fun version(): AttachmentHistoryVersion {
+        versionCalls++
+        beforeVersion()
         if (failVersion) {
             failVersion = false
             error("version failure")

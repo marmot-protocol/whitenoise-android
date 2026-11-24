@@ -157,14 +157,14 @@ class DeviceLinkFlowTest {
         }
     }
 
-    /** Link device sends the name and both choices as entered. */
+    /** Link device sends the name entered on the step and both choices as entered. */
     @Test
     fun linkDeviceSendsTheEnteredChoices() {
         var linked: DeviceLinkChoices? = null
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
 
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("  Desk  ")
         compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("  Desk  ")
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
@@ -201,28 +201,67 @@ class DeviceLinkFlowTest {
         compose.runOnIdle { assertEquals(true, linked?.bringHistory) }
     }
 
-    /** Both choices start on, as MDK offers them, and one tap links under the placeholder name, options closed. */
+    /**
+     * Both choices start on, as MDK offers them, and one tap links with the options closed. The empty name field
+     * is on the step and shows the default name, which is the one sent.
+     */
     @Test
     fun bothChoicesStartOn() {
         var linked: DeviceLinkChoices? = null
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
 
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertDoesNotExist()
+        val placeholder = context.getString(R.string.link_request_default_label)
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertDoesNotExist()
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
-        val placeholder = context.getString(R.string.link_request_default_label)
         compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
     }
 
-    /** A name over MDK's byte limit says so, cannot be submitted, and keeps the options open when they are toggled. */
+    /** A name the user clears, or one of only spaces, goes back to showing the default, which is the name sent. */
+    @Test
+    fun aClearedNameFallsBackToTheShownDefault() {
+        var linked: DeviceLinkChoices? = null
+        request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
+
+        val placeholder = context.getString(R.string.link_request_default_label)
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("Desk")
+        compose.onNodeWithText(placeholder, useUnmergedTree = true).assertDoesNotExist()
+        listOf("", "   ").forEach { blank ->
+            compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement(blank)
+            compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
+        }
+        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+
+        compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
+    }
+
+    /** The name is asked for only while the code is compared, not once the request is answered or over. */
+    @Test
+    fun theNameFieldShowsOnlyWhileComparing() {
+        val state = mutableStateOf<DeviceLinkPromptStateFfi>(DeviceLinkPromptStateFfi.Preparing)
+        compose.setContent {
+            WhiteNoiseTheme { DeviceLinkRequestContent(state.value, null, {}, {}, {}) }
+        }
+
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertDoesNotExist()
+        compose.runOnIdle { state.value = DeviceLinkPromptStateFfi.Comparing(CODE) }
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertExists()
+        listOf(DeviceLinkPromptStateFfi.Linking, DeviceLinkPromptStateFfi.Linked).forEach { answered ->
+            compose.runOnIdle { state.value = answered }
+            compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertDoesNotExist()
+        }
+    }
+
+    /** A name over MDK's byte limit says so on the step and cannot be submitted, with the options closed. */
     @Test
     fun anOverlongNameCannotBeSubmitted() {
         var links = 0
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { links++ })
 
-        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("a".repeat(65))
-        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("a".repeat(65))
+        compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertDoesNotExist()
 
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.link_request_label_too_long)).assertExists()
@@ -237,8 +276,7 @@ class DeviceLinkFlowTest {
         compose.setContent {
             WhiteNoiseTheme { DeviceLinkRequestContent(state.value, null, {}, {}, { closes++ }) }
         }
-        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("é".repeat(33))
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("é".repeat(33))
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         listOf(DeviceLinkPromptStateFfi.Linked, DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.TIMED_OUT))
             .forEach { terminal ->

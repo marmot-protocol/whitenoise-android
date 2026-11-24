@@ -259,7 +259,7 @@
       "manual_ids": [
         "SET-060"
       ],
-      "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
+      "assertions": "Devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
       "postcondition": "none"
     },
     "navigation-profile-edit-cancel": {
@@ -3891,6 +3891,7 @@
     "presentation-modal-voice-unavailable":{"suite":"modals","manual_ids":["MED-008"],"assertions":"Actual unavailable-recording notice, Dismiss/Back/reopen and exact Record again handoff. Supplied state does not certify microphone or recording restoration.","postcondition":"presentation-checked","presentation":"modal-voice-unavailable","presentation_actions":["notice-dismiss","notice-dismiss","record-again"],"layer":"production-presentation-ui"},
     "presentation-modal-signin-recovery":{"suite":"modals","manual_ids":["ONB-009","ONB-024"],"assertions":"Real sign-in recovery consent, original key retention, Cancel/Back/reopen and exact Confirm callback; no native account recovery.","postcondition":"presentation-checked","presentation":"modal-signin-recovery","presentation_actions":["recovery-dismiss","recovery-dismiss","recover-consent"],"layer":"production-presentation-ui"},
     "presentation-modal-signin-busy":{"suite":"modals","manual_ids":["ONB-009"],"assertions":"Actual busy SignInContent suppresses supplied recovery consent and disables the key field; original key remains intact.","postcondition":"presentation-checked","presentation":"modal-signin-busy","presentation_actions":["done"],"layer":"production-presentation-ui"},
+    "presentation-modal-pdfmeta-send":{"suite":"modals","manual_ids":["MED-065"],"assertions":"Actual composer PDF metadata question from the real choices: Cancel and Back keep the send waiting with nothing sent, then Send as is sends once with consent for the signed PDF only; no file is read or uploaded.","postcondition":"presentation-checked","presentation":"modal-pdfmeta-send","presentation_actions":["cancel","cancel","send-as-is"],"layer":"production-presentation-ui"},
     "presentation-modal-retained-recovery":{"suite":"modals","manual_ids":["ONB-009","ONB-024"],"assertions":"Actual recovery-required retained-account action, destructive consequences, Cancel/Back/reopen and exact account-label handoff; no native recovery.","postcondition":"presentation-checked","presentation":"modal-retained-recovery","presentation_actions":["recover-retained"],"layer":"production-presentation-ui"},
     "presentation-modal-retained-busy":{"suite":"modals","manual_ids":["ONB-009"],"assertions":"Actual retained-account busy guard: no recovery consent or dispatch; supplied account state is not native recovery.","postcondition":"presentation-checked","presentation":"modal-retained-busy","presentation_actions":["done"],"layer":"production-presentation-ui"},
     "presentation-modal-retained-disabled":{"suite":"modals","manual_ids":["ONB-009"],"assertions":"Actual retained-account disabled guard: no recovery consent or dispatch; supplied account state is not native recovery.","postcondition":"presentation-checked","presentation":"modal-retained-disabled","presentation_actions":["done"],"layer":"production-presentation-ui"},
