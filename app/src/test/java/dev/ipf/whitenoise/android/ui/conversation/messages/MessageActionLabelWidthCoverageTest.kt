@@ -58,13 +58,14 @@ class MessageActionLabelWidthCoverageTest {
         render(fontScale = 1f)
 
         val cells = MAXIMUM_LABELS.map(::cell)
+        // The tagged stack bounds are already inside its 16dp padding.
         val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val gridWidth = cells.maxOf { it.right } - cells.minOf { it.left }
-        val stackContentWidth = stack.width - with(composeRule.density) { 32.dp.toPx() }
-        assertTrue(
-            "the grid $gridWidth must stay narrower than the stack $stackContentWidth",
-            gridWidth < stackContentWidth,
-        )
+        assertTrue("the grid $gridWidth must stay narrower than the stack ${stack.width}", gridWidth < stack.width)
+        // The full-width row under the grid spans exactly the two columns, so nothing pads the panel past them.
+        val fewer = cell("Fewer actions")
+        assertEquals("the panel starts at the first column", cells.minOf { it.left }, fewer.left, 0.5f)
+        assertEquals("and ends at the second", cells.maxOf { it.right }, fewer.right, 0.5f)
     }
 
     /** A larger text scale first uses spare width: every label still fits one line at 130%. */

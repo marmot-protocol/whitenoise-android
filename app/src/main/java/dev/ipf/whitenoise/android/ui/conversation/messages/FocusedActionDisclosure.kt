@@ -43,8 +43,9 @@ private const val REVEALED_CELL_INITIAL_SCALE = 0.92f
 /**
  * How the actions behind More actions arrive and leave (#4077), on the app's open and close curves.
  *
- * Rows unfold from their top edge, so the panel and the row beneath it grow and shrink with them instead
- * of jumping to the new height; a cell sharing a row with the first level fades and settles into its slot.
+ * The hidden rows unfold together from their top edge, like one sheet drawn out of the panel, so the panel
+ * and the row beneath it grow and shrink with them instead of jumping to the new height; a cell sharing a
+ * row with the first level fades and settles into its slot.
  * With system animations off every change is immediate.
  */
 @Immutable
@@ -64,9 +65,9 @@ internal class FocusedActionReveal(
     private val cellExit: ExitTransition
         get() = fadeOut(close()) + scaleOut(close(), targetScale = REVEALED_CELL_INITIAL_SCALE)
 
-    /** A whole row of hidden actions, unfolding beneath the rows above it. */
+    /** The rows of hidden actions, unfolding as one block beneath the first level. */
     @Composable
-    fun Row(
+    fun Rows(
         visible: Boolean,
         content: @Composable () -> Unit,
     ) {
