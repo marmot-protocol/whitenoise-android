@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -138,7 +138,7 @@ private fun sentenceChooserActions(
     val readLabel = stringResource(R.string.tts_read_from_sentence)
     val chooseLabel = stringResource(R.string.tts_choose_sentence)
     if (choosing && choices.isNotEmpty()) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             modifier = Modifier.testTag("tts_sentence_chooser").exposePerformanceTestTags(),
             onDismissRequest = { choosing = false },
             title = { Text(chooseLabel) },

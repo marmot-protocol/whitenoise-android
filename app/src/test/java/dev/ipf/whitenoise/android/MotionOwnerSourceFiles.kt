@@ -7,7 +7,12 @@ internal fun File.motionOwnerSource(): String {
     val parts =
         when (name) {
             "ProfileEditScreen.kt" -> listOf("ProfileImageDrafts.kt")
-            "ConversationScreen.kt" -> listOf("ConversationNavigationState.kt", "ConversationMessageNavigator.kt")
+            "ConversationScreen.kt" ->
+                listOf(
+                    "ConversationNavigationState.kt",
+                    "ConversationMessageNavigator.kt",
+                    "ConversationMessageDragSelection.kt",
+                )
             "ConversationMediaDraft.kt" -> listOf("ConversationMediaDraftPhotos.kt")
             "SettingsScreen.kt" -> listOf("SettingsAppUpdates.kt")
             "AccountKeysScreen.kt" -> listOf("ProfileKeyClipboard.kt")

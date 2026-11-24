@@ -56,9 +56,9 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -476,7 +476,7 @@ private fun TextAttachmentFilenameDialog(
     onCopy: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag(TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG),
         title = { Text(stringResource(R.string.text_attachment_filename)) },

@@ -28,9 +28,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
@@ -118,7 +118,7 @@ internal fun OnboardingSavedAccountActions(
     val currentRecoveryAccount by rememberUpdatedState(recoveryAccount)
     val currentOnRecover by rememberUpdatedState(onRecover)
     if (recoveryAccount != null && recoveryEnabled) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { recoveryAccountLabel = null },
             ownerKey = recoveryAccount,
             title = { Text(stringResource(savedAccountConsentTitle(recoveryAccount))) },
