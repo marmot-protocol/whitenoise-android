@@ -134,10 +134,15 @@ class AppReadAloudTest {
     @Test
     fun turningOffTheOwnedConversationEndsOnlyThatSession() {
         readAloud.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.ON)
+        readAloud.setConversationAutoReadOverride(GROUP_B, TtsAutoReadOverride.ON)
         assertTrue(readAloud.speakAloudAutoRead(GROUP_A, listOf(entry("Backlog.")), Locale.US))
+        val session = readAloud.ttsController.state.value.sessionId
 
         readAloud.setConversationAutoReadOverride(GROUP_B, TtsAutoReadOverride.OFF)
         assertTrue(readAloud.ownsTtsAutoReadSession(GROUP_A))
+        val playing = readAloud.ttsController.state.value
+        assertTrue(playing is TtsState.Speaking)
+        assertEquals(session, playing.sessionId)
 
         readAloud.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.OFF)
 
