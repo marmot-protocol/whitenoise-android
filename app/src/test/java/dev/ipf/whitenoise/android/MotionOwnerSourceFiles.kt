@@ -12,6 +12,7 @@ internal fun File.motionOwnerSource(): String {
                     "ConversationNavigationState.kt",
                     "ConversationMessageNavigator.kt",
                     "ConversationMessageDragSelection.kt",
+                    "ConversationReadAloudFollow.kt",
                 )
             "ConversationMediaDraft.kt" -> listOf("ConversationMediaDraftPhotos.kt")
             "SettingsScreen.kt" -> listOf("SettingsAppUpdates.kt")

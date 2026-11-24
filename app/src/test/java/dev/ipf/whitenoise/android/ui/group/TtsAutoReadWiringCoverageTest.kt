@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.group
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -211,6 +212,43 @@ class TtsAutoReadWiringCoverageTest {
         )
     }
 
+    /** Read-aloud follow keeps its keys outside the screen, and every screen event resolves ownership at call time. */
+    @Test
+    fun conversationScreenRoutesReadAloudFollowThroughItsKeyedHolder() {
+        val screen = ownSource("ui/conversation/ConversationScreen.kt")
+        val follow = ownSource("ui/conversation/ConversationReadAloudFollow.kt")
+
+        assertTrue(
+            "the holder must keep the handle's group key and be remembered on everything it holds",
+            "rememberConversationTtsFollowHandle(controller.group.groupIdHex)" in follow &&
+                "remember(appState, controller, handle)" in follow,
+        )
+        assertTrue(
+            "the speech-bounds collector must keep its keys",
+            "LaunchedEffect(timelineViewport, handle)" in follow.functionBody("speechBoundsEffect"),
+        )
+        assertTrue(
+            "the follow effects must receive the holder's handle",
+            "handle = handle," in follow.functionBody("followEffects"),
+        )
+        assertTrue(
+            "each event must read session ownership when it arrives",
+            listOf("suspendForDirectDrag", "onSentenceSeek", "revealCurrentPassage").all { event ->
+                "appState.ownsTtsAutoReadSession(controller.group.groupIdHex)" in follow.functionBody(event)
+            },
+        )
+        assertFalse("the screen must not bypass the holder", "ttsFollowHandle" in screen)
+        assertFalse("the screen must not call the follow effects directly", "ConversationTtsFollowEffects(" in screen)
+        val readingBounds = screen.indexOf("LaunchedEffect(timelineViewport, readAloudFollow.handle)")
+        val speechBounds = screen.indexOf("readAloudFollow.speechBoundsEffect(timelineViewport)")
+        val viewportEvidence = screen.indexOf("fun viewportEvidenceEffect()")
+        assertTrue(
+            "reading bounds, then speech bounds, then viewport evidence must launch in that order",
+            readingBounds >= 0 && speechBounds > readingBounds && viewportEvidence > speechBounds,
+        )
+        assertEquals(3, Regex("""readAloudFollow\.suspendForDirectDrag\(\)""").findAll(screen).count())
+    }
+
     @Test
     fun speakFromHereClaimsAutoReadOwnershipThroughAppState() {
         val source = source("ui/conversation/messages/MessageBubble.kt")
@@ -256,9 +294,14 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue("only the selected first entry may become literal code", "index == 0 && literalCode" in entries)
     }
 
-    private fun source(relativePath: String): String =
+    private fun source(relativePath: String): String = sourceFile(relativePath).motionOwnerSource()
+
+    /** One file without the declarations moved out of it. */
+    private fun ownSource(relativePath: String): String = sourceFile(relativePath).readText()
+
+    private fun sourceFile(relativePath: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing source file: $relativePath")
+        ).firstOrNull(File::exists) ?: error("Missing source file: $relativePath")
 }
