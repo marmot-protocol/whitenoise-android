@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,8 +131,8 @@ private fun groupedPublicKeyText(
 }
 
 /**
- * The one public-key presentation of an identity screen: profile, Share & Connect and the profile QR sheet. The key
- * starts short, and a tap copies the complete key and expands it in place into monospace groups of five for
+ * The one public-key presentation of an identity screen: profile, direct-chat details, Share & Connect and the QR
+ * sheet. The key starts short, and a tap copies the complete key and expands it in place into monospace groups of five for
  * comparison (#3321, #3565). It stays expanded while the screen shows this key; later taps copy again. The copy glyph
  * turns into a check while [copied]. Text and glyph are one button, so the key has a single accessible Copy public
  * key action, and its spoken value is always the canonical contiguous [npub]. A reference that is not a complete
@@ -146,6 +147,7 @@ internal fun CopyablePublicKey(
     modifier: Modifier = Modifier,
     targetTestTag: String? = null,
     textTestTag: String? = null,
+    @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val copyable = isCanonicalNpub(npub)
     var expanded by rememberSaveable(npub) { mutableStateOf(false) }
@@ -164,7 +166,7 @@ internal fun CopyablePublicKey(
                             .explainOnLongPress(
                                 Explanation(
                                     copyLabel,
-                                    stringResource(R.string.explanation_organize_copy_public_key),
+                                    stringResource(explanationRes),
                                 ),
                             ).clickable(role = Role.Button, onClickLabel = copyLabel) {
                                 onCopy()

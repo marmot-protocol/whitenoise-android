@@ -6,13 +6,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DisbandFailureReasonFfi
@@ -22,6 +20,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /**
@@ -48,7 +47,7 @@ internal fun SettingsGroupScope.groupDisbandRows(
                 explanation = stringResource(R.string.explanation_group_enable_disbanding),
                 onClick = onEnable,
                 enabled = enabled,
-                leading = { DisbandLeading(inProgress = enableInProgress, destructive = false) },
+                leading = { DisbandLeading(inProgress = enableInProgress) },
             )
         }
     }
@@ -61,7 +60,7 @@ internal fun SettingsGroupScope.groupDisbandRows(
                 onClick = onDisbandRequested,
                 enabled = enabled,
                 destructive = true,
-                leading = { DisbandLeading(inProgress = disbandInProgress, destructive = true) },
+                leading = { DisbandLeading(inProgress = disbandInProgress) },
             )
         }
     }
@@ -115,16 +114,11 @@ internal fun GroupDisbandConfirmDialog(
 @Composable
 private fun DisbandLeading(
     inProgress: Boolean,
-    destructive: Boolean,
 ) {
     if (inProgress) {
         CircularProgressIndicator(modifier = Modifier.size(DisbandProgressSize), strokeWidth = 2.dp)
     } else {
-        Icon(
-            painterResource(R.drawable.ic_delete),
-            contentDescription = null,
-            tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        SettingsLeadingIcon(R.drawable.ic_delete)
     }
 }
 
