@@ -328,6 +328,7 @@ fun WhiteNoiseTheme(
 
     CompositionLocalProvider(
         LocalAmoledSurfaceTheme provides amoledActive,
+        LocalStatusColors provides if (darkTheme) DarkStatusColors else LightStatusColors,
         LocalMessageBubbleBaseColorScheme provides baseColorScheme.withAmoledPalette(amoledActive),
         // One settings observer for the whole theme; chat rows and pills read it instead of registering their own.
         LocalSystemAnimationsEnabled provides observeSystemAnimationsEnabled(),

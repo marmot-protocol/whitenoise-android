@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
@@ -295,7 +296,7 @@ private fun GroupAbandonmentFailure(
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth().testTag("group.abandon.error"),
     ) {
@@ -346,7 +347,7 @@ internal fun GroupLeaveBlockedNotice(
     val hint = if (isDm) R.string.leave_blocked_abandon_hint_dm else R.string.leave_blocked_abandon_hint_group
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth().testTag("chat_info.leave_blocked"),
     ) {

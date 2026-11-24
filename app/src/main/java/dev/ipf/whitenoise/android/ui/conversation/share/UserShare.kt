@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * A shared Nostr user — the actionable, identity-native counterpart to a phone
@@ -91,9 +92,9 @@ internal fun UserMessageBubble(
         modifier =
             modifier
                 .width(260.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radii.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(

@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
@@ -74,7 +75,7 @@ internal fun FlowSearchField(
     onScanQr: (() -> Unit)? = null,
     clipboardInput: ((String?) -> String?)? = null,
 ) {
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(Radii.xxl)
     TextField(
         value = value,
         onValueChange = onValueChange,
