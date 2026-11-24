@@ -864,15 +864,7 @@
           "represented_by": "home.HistoryBackups"
         },
         {
-          "declaration": "\"turn_on\"",
-          "represented_by": "home.HistoryBackups"
-        },
-        {
           "declaration": "\"new_words\"",
-          "represented_by": "home.HistoryBackups"
-        },
-        {
-          "declaration": "\"turn_off\"",
           "represented_by": "home.HistoryBackups"
         },
         {
