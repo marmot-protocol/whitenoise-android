@@ -1532,9 +1532,18 @@
     <string name="disappearing_1_day">1 jour</string>
     <string name="disappearing_90_days">3 mois</string>
     <string name="disappearing_custom">Durée personnalisée</string>
-    <string name="disappearing_days_format">%1$d jours</string>
-    <string name="disappearing_hours_format">%1$d heures</string>
-    <string name="disappearing_minutes_format">%1$d minutes</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d jour</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d heure</item>
+        <item quantity="other">%d heures</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutes</string>
     <string name="disappearing_unit_hours">Heures</string>
     <string name="disappearing_unit_days">Jours</string>
@@ -1575,7 +1584,10 @@
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 secondes</string>
     <string name="disappearing_explainer">Les messages reçus non lus démarrent leur délai lorsque vous les lisez. Les autres nouveaux messages sont définitivement supprimés pour tout le monde après la durée choisie.</string>
-    <string name="disappearing_seconds_format">%1$d secondes</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d seconde</item>
+        <item quantity="other">%d secondes</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Secondes</string>
     <string name="disappearing_set">Définir</string>
     <string name="disappearing_custom_decrease">Raccourcir</string>

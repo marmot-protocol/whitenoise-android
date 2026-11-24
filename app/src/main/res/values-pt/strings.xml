@@ -1521,9 +1521,18 @@
     <string name="disappearing_1_day">1 dia</string>
     <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tempo personalizado</string>
-    <string name="disappearing_days_format">%1$d dias</string>
-    <string name="disappearing_hours_format">%1$d horas</string>
-    <string name="disappearing_minutes_format">%1$d minutos</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d dia</item>
+        <item quantity="other">%d dias</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d hora</item>
+        <item quantity="other">%d horas</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minuto</item>
+        <item quantity="other">%d minutos</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutos</string>
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Dias</string>
@@ -1564,7 +1573,10 @@
     <string name="disappearing_5_minutes">5 minutos</string>
     <string name="disappearing_30_seconds">30 segundos</string>
     <string name="disappearing_explainer">As mensagens recebidas não lidas iniciam o temporizador quando você as lê. As outras mensagens novas são excluídas permanentemente para todos após o período escolhido.</string>
-    <string name="disappearing_seconds_format">%1$d segundos</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d segundo</item>
+        <item quantity="other">%d segundos</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Definir</string>
     <string name="disappearing_custom_decrease">Encurtar</string>

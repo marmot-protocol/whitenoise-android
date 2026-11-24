@@ -1812,9 +1812,18 @@
     <string name="disappearing_1_day">1 day</string>
     <string name="disappearing_90_days">3 months</string>
     <string name="disappearing_custom">Custom time</string>
-    <string name="disappearing_days_format">%1$d days</string>
-    <string name="disappearing_hours_format">%1$d hours</string>
-    <string name="disappearing_minutes_format">%1$d minutes</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutes</string>
     <string name="disappearing_unit_hours">Hours</string>
     <string name="disappearing_unit_days">Days</string>
@@ -1855,7 +1864,10 @@
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 seconds</string>
     <string name="disappearing_explainer">New messages are deleted for everyone after this time. Unread messages start counting once read.</string>
-    <string name="disappearing_seconds_format">%1$d seconds</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
     <string name="disappearing_custom_decrease">Shorter</string>
