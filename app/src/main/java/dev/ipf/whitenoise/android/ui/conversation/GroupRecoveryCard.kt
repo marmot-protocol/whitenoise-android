@@ -34,7 +34,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.dismissGroupCommitRefusal
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -295,7 +295,7 @@ private fun GroupRejoinInvitationDialog(
     val currentOnConfirm = rememberUpdatedState(onConfirm)
     val currentOnDecline = rememberUpdatedState(onDecline)
     key(invitation, busy) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { if (!busy) onDismiss() },
             dismissEnabled = { !busy },
             title = { Text(stringResource(R.string.group_rejoin_title)) },

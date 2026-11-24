@@ -14,8 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -86,7 +86,7 @@ internal fun GroupDetailsConfirmation(
     ownerKey: Any? = Unit,
 ) {
     if (model is GroupDetailsConfirmationState.StepDownSoleAdmin) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             modifier = Modifier.exposePerformanceTestTags(),
             onDismissRequest = onDismiss,
             ownerKey = ownerKey,
@@ -111,7 +111,7 @@ internal fun GroupDetailsConfirmation(
         return
     }
     if (model is GroupDetailsConfirmationState.BlockedLeave) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             modifier = Modifier.exposePerformanceTestTags(),
             onDismissRequest = onDismiss,
             ownerKey = ownerKey,
