@@ -19,11 +19,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -62,7 +61,10 @@ import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -152,7 +154,7 @@ private fun ShareChatPickerScaffold(
         },
         overlayBackRegistrar = overlayBackRegistrar,
     ) {
-        Scaffold(
+        WhiteNoiseScaffold(
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -163,12 +165,16 @@ private fun ShareChatPickerScaffold(
                         paneTitle = shareToTitle
                     },
             containerColor = amoledSheetContainerColor(),
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            // The bar column below places the banner slot itself so the picker's snackbars land under it.
+            topNoticeSlot = false,
             topBar = {
                 // App banners and the picker's own snackbars sit below its bar, never over the footer (#3312).
                 Column {
-                    TopAppBar(
-                        title = { Text(shareToTitle) },
-                        navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
+                    WhiteNoiseTopBar(
+                        title = shareToTitle,
+                        onBack = actions.dismiss,
+                        navigation = WhiteNoiseTopBarNavigation.Close,
                         actions = {
                             val selected = pickerState.selectedAccountRef
                             if (onOpenEmojiSet != null && selected != null) {

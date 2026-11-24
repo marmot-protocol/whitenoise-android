@@ -4,25 +4,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,11 +56,9 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
@@ -269,8 +262,7 @@ internal data class ShareConnectProfile(
     val nostrAddress: String,
 )
 
-/** Share & Connect as the prototype lays it out: centered top bar with share, identity column, pinned scan button. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Share & Connect as the prototype lays it out: top bar with share, identity column, pinned scan button. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Single visual surface with one anchored share menu.
 @Composable
 internal fun ShareConnectContent(
@@ -288,44 +280,23 @@ internal fun ShareConnectContent(
     onCopy: () -> Unit,
     onOpenScanner: () -> Unit,
 ) {
-    WhiteNoiseScaffold(
-        modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
-        contentWindowInsets = WindowInsets.safeDrawing,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.share_and_connect)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-                actions = {
-                    ShareConnectShareAction(
-                        pictureShareInProgress = pictureShareInProgress,
-                        gallerySaveInProgress = gallerySaveInProgress,
-                        canSaveToGallery = canSaveToGallery,
-                        onShareUrl = onShareUrl,
-                        onSharePicture = onSharePicture,
-                        onSaveToGallery = onSaveToGallery,
-                    )
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+    SettingsScaffold(
+        title = stringResource(R.string.share_and_connect),
+        onBack = onBack,
+        modifier = Modifier.testTag("share_connect.screen"),
+        topBarActions = {
+            ShareConnectShareAction(
+                pictureShareInProgress = pictureShareInProgress,
+                gallerySaveInProgress = gallerySaveInProgress,
+                canSaveToGallery = canSaveToGallery,
+                onShareUrl = onShareUrl,
+                onSharePicture = onSharePicture,
+                onSaveToGallery = onSaveToGallery,
             )
         },
         bottomBar = { ShareConnectBottomAction(onClick = onOpenScanner) },
-    ) { innerPadding ->
-        AdaptiveContent(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
-        }
+    ) {
+        ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
     }
 }
 

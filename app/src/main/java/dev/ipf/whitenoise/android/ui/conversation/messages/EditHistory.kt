@@ -9,14 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -40,10 +34,10 @@ import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -52,7 +46,6 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 /** The prototype's edit history: a full-screen dialog listing the newest revision first, the original last. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
 internal fun EditHistoryDialog(
@@ -82,25 +75,14 @@ internal fun EditHistoryDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Scaffold(
+        WhiteNoiseScaffold(
             modifier = Modifier.fillMaxSize().testTag("message.history"),
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
-                // App banners sit below this screen's bar rather than over it (#3312).
-                Column {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.edit_history)) },
-                        navigationIcon = {
-                            IconButton(onClick = dismiss) {
-                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-                            }
-                        },
-                    )
-                    TopNoticeSlot()
-                }
+                WhiteNoiseTopBar(title = stringResource(R.string.edit_history), onBack = dismiss)
             },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
                 Column(
                     modifier =
                         Modifier

@@ -183,7 +183,7 @@ private fun NostrEventReaderHeader(
         IconButton(onClick = onDismiss) {
             Icon(
                 painterResource(R.drawable.ic_arrow_back),
-                contentDescription = stringResource(R.string.close),
+                contentDescription = stringResource(R.string.back),
             )
         }
         Text(

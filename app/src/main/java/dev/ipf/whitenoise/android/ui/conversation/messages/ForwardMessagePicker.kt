@@ -22,10 +22,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -78,12 +76,14 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigationButton
 import dev.ipf.whitenoise.android.ui.common.controlHandoffEndpoint
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
@@ -354,7 +354,7 @@ internal fun ForwardMessagePickerContent(
     val sendingAccount = destination.accounts.firstOrNull { it.label == destination.selectedAccountRef }
     val forwardTitle = stringResource(R.string.forward)
 
-    Scaffold(
+    WhiteNoiseScaffold(
         modifier =
             Modifier
                 .fillMaxSize()
@@ -364,115 +364,118 @@ internal fun ForwardMessagePickerContent(
                     paneTitle = forwardTitle
                 },
         containerColor = amoledSheetContainerColor(),
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
-            // App banners sit below this screen's bar rather than over it (#3312).
-            Column {
-                MeasuredControlHandoffHost(
-                    state = searchHandoff,
-                    destination = searchOpen,
-                    outlineVisible = { searchOpen },
-                ) {
-                    TopAppBar(
-                        modifier = Modifier.searchCollapseHost(searchCollapse),
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = amoledSheetContainerColor()),
-                        title = {
-                            if (searchOpen) {
-                                CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
-                                    WhiteNoiseCompactSearchField(
-                                        value = query,
-                                        onValueChange = {
-                                            query = it
-                                            startFailed = false
-                                        },
-                                        placeholder = stringResource(R.string.forward_search_chats),
-                                        clearDescription = stringResource(R.string.chat_list_search_clear),
-                                        outlined = true,
-                                        onClear = closeSearch,
-                                        emptyTrailingIcon = {
-                                            IconButton(onClick = closeSearch) {
-                                                Icon(
-                                                    painterResource(R.drawable.ic_close),
-                                                    stringResource(R.string.close),
-                                                )
-                                            }
-                                        },
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .searchExpandReveal(query)
-                                                .controlHandoffEndpoint(searchHandoff, true)
-                                                .focusRequester(searchFocus)
-                                                .testTag("forward.searchField"),
-                                    )
-                                }
-                            } else {
-                                Column {
-                                    Text(
-                                        forwardTitle,
-                                        modifier = Modifier.testTag("forward.title"),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    ForwardSelectionSummary(messageCount, attachmentCount)
-                                }
-                            }
-                        },
-                        actions = {
-                            if (!searchOpen) {
-                                IconButton(
-                                    onClick = { searchOpen = true },
-                                    modifier = Modifier.controlHandoffEndpoint(searchHandoff, false),
-                                ) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_search),
-                                        contentDescription = stringResource(R.string.forward_search_chats),
-                                    )
-                                }
-                            }
-                        },
-                        navigationIcon = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { if (searchOpen) closeSearch() else onDismiss() }) {
-                                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
-                                }
-                                sendingAccount?.let { account ->
-                                    val name = appState.networkDisplayName(account.accountIdHex)
-                                    val description = stringResource(R.string.share_sending_as_value, name)
-                                    val avatarModifier =
+            MeasuredControlHandoffHost(
+                state = searchHandoff,
+                destination = searchOpen,
+                outlineVisible = { searchOpen },
+            ) {
+                // Modal flow: Close, not Back, because dismissing leaves the conversation unchanged.
+                WhiteNoiseTopBar(
+                    title = forwardTitle,
+                    onBack = { if (searchOpen) closeSearch() else onDismiss() },
+                    navigation = WhiteNoiseTopBarNavigation.Close,
+                    modifier = Modifier.searchCollapseHost(searchCollapse),
+                    containerColor = amoledSheetContainerColor(),
+                    scrolledContainerColor = amoledSheetContainerColor(),
+                    titleContent = {
+                        if (searchOpen) {
+                            CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
+                                WhiteNoiseCompactSearchField(
+                                    value = query,
+                                    onValueChange = {
+                                        query = it
+                                        startFailed = false
+                                    },
+                                    placeholder = stringResource(R.string.forward_search_chats),
+                                    clearDescription = stringResource(R.string.chat_list_search_clear),
+                                    outlined = true,
+                                    onClear = closeSearch,
+                                    emptyTrailingIcon = {
+                                        IconButton(onClick = closeSearch) {
+                                            Icon(
+                                                painterResource(R.drawable.ic_close),
+                                                stringResource(R.string.close),
+                                            )
+                                        }
+                                    },
+                                    modifier =
                                         Modifier
-                                            .size(48.dp)
-                                            .testTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG)
-                                            .semantics { contentDescription = description }
-                                    if (destination.accounts.size > 1) {
-                                        IconButton(
-                                            onClick = { accountSelectorOpen = true },
-                                            modifier = avatarModifier,
-                                        ) {
-                                            Avatar(
-                                                name,
-                                                account.accountIdHex,
-                                                size = 32.dp,
-                                                pictureUrl = appState.avatarUrl(account.accountIdHex),
-                                                pictureDomain = AvatarImageLoader.publicProfiles(),
-                                            )
-                                        }
-                                    } else {
-                                        Box(avatarModifier, contentAlignment = Alignment.Center) {
-                                            Avatar(
-                                                name,
-                                                account.accountIdHex,
-                                                size = 32.dp,
-                                                pictureUrl = appState.avatarUrl(account.accountIdHex),
-                                                pictureDomain = AvatarImageLoader.publicProfiles(),
-                                            )
-                                        }
+                                            .fillMaxWidth()
+                                            .searchExpandReveal(query)
+                                            .controlHandoffEndpoint(searchHandoff, true)
+                                            .focusRequester(searchFocus)
+                                            .testTag("forward.searchField"),
+                                )
+                            }
+                        } else {
+                            Column {
+                                Text(
+                                    forwardTitle,
+                                    modifier = Modifier.testTag("forward.title"),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                ForwardSelectionSummary(messageCount, attachmentCount)
+                            }
+                        }
+                    },
+                    actions = {
+                        if (!searchOpen) {
+                            IconButton(
+                                onClick = { searchOpen = true },
+                                modifier = Modifier.controlHandoffEndpoint(searchHandoff, false),
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_search),
+                                    contentDescription = stringResource(R.string.forward_search_chats),
+                                )
+                            }
+                        }
+                    },
+                    navigationContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            WhiteNoiseTopBarNavigationButton(
+                                kind = WhiteNoiseTopBarNavigation.Close,
+                                onClick = { if (searchOpen) closeSearch() else onDismiss() },
+                            )
+                            sendingAccount?.let { account ->
+                                val name = appState.networkDisplayName(account.accountIdHex)
+                                val description = stringResource(R.string.share_sending_as_value, name)
+                                val avatarModifier =
+                                    Modifier
+                                        .size(48.dp)
+                                        .testTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG)
+                                        .semantics { contentDescription = description }
+                                if (destination.accounts.size > 1) {
+                                    IconButton(
+                                        onClick = { accountSelectorOpen = true },
+                                        modifier = avatarModifier,
+                                    ) {
+                                        Avatar(
+                                            name,
+                                            account.accountIdHex,
+                                            size = 32.dp,
+                                            pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                                        )
+                                    }
+                                } else {
+                                    Box(avatarModifier, contentAlignment = Alignment.Center) {
+                                        Avatar(
+                                            name,
+                                            account.accountIdHex,
+                                            size = 32.dp,
+                                            pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                                        )
                                     }
                                 }
                             }
-                        },
-                    )
-                }
-                TopNoticeSlot()
+                        }
+                    },
+                )
             }
         },
         bottomBar = {
@@ -515,7 +518,6 @@ internal fun ForwardMessagePickerContent(
         Column(
             Modifier
                 .fillMaxSize()
-                .nativePageBody(padding)
                 .padding(padding)
                 .consumeWindowInsets(padding),
         ) {
