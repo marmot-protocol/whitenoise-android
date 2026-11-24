@@ -43,7 +43,10 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
             )
         }
     }
-    if (active && next != null) setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
+    // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all.
+    if (active && next != null && copies.isCurrent(accountRef, copy)) {
+        setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
+    }
 }
 
 /**

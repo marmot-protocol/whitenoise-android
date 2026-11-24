@@ -507,6 +507,30 @@ class AccountWipeMemberMuteRetentionTest {
         }
 
     /**
+     * A handler outdated by its copy's removal must not begin a profile switch at all, because beginning one
+     * supersedes a switch the user has pending. Advancing the copy's boundary stands in for the removal and the
+     * account being added back and made active again, which this runtime double cannot activate.
+     */
+    @Test
+    fun anOutdatedHandlerLeavesAPendingProfileSwitchAlone() =
+        runBlocking {
+            savedUnlinked = true
+            val state = appState(active = WIPED_ACCOUNT)
+            val read = HeldAccountRead().also { heldAccountRead = it }
+            val handler = launch(start = CoroutineStart.UNDISPATCHED) { state.presentDeviceUnlinked(WIPED_ACCOUNT) }
+            withTimeout(PAUSED_READ_TIMEOUT_MS) { read.reached.await() }
+
+            state.accountSession.copyLifetimes.copyRemoved(WIPED_ACCOUNT) {}
+            val pendingSwitch = state.accountSession.handoff.beginRequest(SURVIVING_ACCOUNT)
+            read.listing.complete(unlinkedListing())
+            withTimeout(PAUSED_READ_TIMEOUT_MS) { handler.join() }
+
+            assertTrue(state.accountSession.handoff.isCurrent(pendingSwitch))
+            assertNull(state.toast)
+            assertEquals(WIPED_ACCOUNT, state.activeAccountRef)
+        }
+
+    /**
      * Sign out and wipe in Settings retires the unlinked notice as well. Both removal routes do it in a finally
      * after their wipe attempt, so cleanup that throws once the removal is published cannot leave the notice up.
      */
