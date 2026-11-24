@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Estas palabras ya no son válidas. Empieza de nuevo para obtener palabras nuevas.</string>
     <string name="history_backups_problem_failed">Algo salió mal. Inténtalo de nuevo.</string>
     <string name="history_backups_chat_hint">Una copia tiene mensajes anteriores de este chat. Para recuperarlos, vuelve a escribir las mismas palabras de recuperación en Configuración → Perfil → Copias del historial.</string>
+    <string name="history_backups_reveal_warning">Asegúrate de que nadie pueda ver tu pantalla. Muestra las palabras y guárdalas en un lugar seguro.</string>
+    <string name="history_backups_word_correct">Palabra correcta</string>
+    <string name="history_backups_word_incorrect">Palabra incorrecta</string>
+    <string name="history_backups_online_summary">Guarda el historial de chats cifrado en línea.</string>
 </resources>

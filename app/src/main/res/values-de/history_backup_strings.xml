@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Diese Wörter sind nicht mehr gültig. Beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_problem_failed">Etwas ist schiefgelaufen. Versuche es erneut.</string>
     <string name="history_backups_chat_hint">Eine Sicherung enthält ältere Nachrichten für diesen Chat. Gib dieselben Wiederherstellungswörter erneut unter Einstellungen → Profil → Verlaufssicherungen ein, um sie zu übernehmen.</string>
+    <string name="history_backups_reveal_warning">Achte darauf, dass niemand deinen Bildschirm sehen kann. Zeige die Wörter an und bewahre sie sicher auf.</string>
+    <string name="history_backups_word_correct">Richtiges Wort</string>
+    <string name="history_backups_word_incorrect">Falsches Wort</string>
+    <string name="history_backups_online_summary">Verschlüsselten Chatverlauf online sichern.</string>
 </resources>

@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Bu kelimeler artık geçerli değil. Yeni kelimeler almak için baştan başla.</string>
     <string name="history_backups_problem_failed">Bir sorun oluştu. Tekrar dene.</string>
     <string name="history_backups_chat_hint">Bir yedekte bu sohbetin daha eski mesajları var. Bunları getirmek için aynı kurtarma kelimelerini Ayarlar → Profil → Geçmiş yedekleri bölümüne yeniden gir.</string>
+    <string name="history_backups_reveal_warning">Ekranınızı kimsenin göremediğinden emin olun. Sözcükleri gösterin ve güvenli bir yerde saklayın.</string>
+    <string name="history_backups_word_correct">Doğru sözcük</string>
+    <string name="history_backups_word_incorrect">Yanlış sözcük</string>
+    <string name="history_backups_online_summary">Şifreli sohbet geçmişini çevrimiçi kaydedin.</string>
 </resources>

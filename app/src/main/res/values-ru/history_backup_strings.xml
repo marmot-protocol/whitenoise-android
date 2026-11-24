@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Эти слова больше не действуют. Начните заново, чтобы получить новые.</string>
     <string name="history_backups_problem_failed">Что-то пошло не так. Попробуйте ещё раз.</string>
     <string name="history_backups_chat_hint">В резервной копии есть более старые сообщения этого чата. Чтобы вернуть их, снова введите те же слова восстановления в разделе Настройки → Профиль → Резервные копии истории.</string>
+    <string name="history_backups_reveal_warning">Убедитесь, что никто не видит ваш экран. Покажите слова и сохраните их в надёжном месте.</string>
+    <string name="history_backups_word_correct">Верное слово</string>
+    <string name="history_backups_word_incorrect">Неверное слово</string>
+    <string name="history_backups_online_summary">Сохраняйте зашифрованную историю чатов онлайн.</string>
 </resources>

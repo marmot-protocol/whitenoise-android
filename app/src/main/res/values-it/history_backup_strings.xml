@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Queste parole non sono più valide. Ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_problem_failed">Qualcosa è andato storto. Riprova.</string>
     <string name="history_backups_chat_hint">Un backup contiene messaggi meno recenti di questa chat. Per recuperarli, inserisci di nuovo le stesse parole di recupero in Impostazioni → Profilo → Backup della cronologia.</string>
+    <string name="history_backups_reveal_warning">Assicurati che nessuno possa vedere lo schermo. Mostra le parole e conservale in un luogo sicuro.</string>
+    <string name="history_backups_word_correct">Parola corretta</string>
+    <string name="history_backups_word_incorrect">Parola errata</string>
+    <string name="history_backups_online_summary">Salva online la cronologia cifrata delle chat.</string>
 </resources>

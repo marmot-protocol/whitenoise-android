@@ -147,7 +147,11 @@ internal fun RecoveryWordsSetupContent(
 /** Keeps the reveal and copy actions beside the privacy warning. */
 @Suppress("FunctionNaming")
 @Composable
-private fun RecoveryWordsControls(words: List<String>, revealed: Boolean, onToggleReveal: () -> Unit) {
+private fun RecoveryWordsControls(
+    words: List<String>,
+    revealed: Boolean,
+    onToggleReveal: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalAlignment = Alignment.CenterVertically,
@@ -171,7 +175,10 @@ private fun RecoveryWordsControls(words: List<String>, revealed: Boolean, onTogg
 /** The twelve words in reading order, two columns of six, numbered as the user writes them down. */
 @Suppress("FunctionNaming")
 @Composable
-private fun RecoveryWordsGrid(words: List<String>, revealed: Boolean) {
+private fun RecoveryWordsGrid(
+    words: List<String>,
+    revealed: Boolean,
+) {
     val half = (words.size + 1) / 2
     SettingsPanel(
         modifier = Modifier.testTag("history_backups.words"),

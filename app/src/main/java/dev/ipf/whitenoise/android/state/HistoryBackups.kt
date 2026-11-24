@@ -71,8 +71,10 @@ internal class RecoveryWordsSetup(
         )
 
     /** Presentation feedback for the two answers from this setup. MDK still decides whether to enable backups. */
-    fun matchesAnswer(index: Int, answer: String): Boolean? =
-        expectedAnswers.getOrNull(index)?.let { it.equals(answer.trim(), ignoreCase = true) }
+    fun matchesAnswer(
+        index: Int,
+        answer: String,
+    ): Boolean? = expectedAnswers.getOrNull(index)?.let { it.equals(answer.trim(), ignoreCase = true) }
 
     /** Formats setup state without exposing the words. */
     override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirming=$confirming)"

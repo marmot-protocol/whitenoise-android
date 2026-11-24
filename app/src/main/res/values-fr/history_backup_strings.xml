@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">Ces mots ne sont plus valides. Recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_problem_failed">Une erreur s’est produite. Réessayez.</string>
     <string name="history_backups_chat_hint">Une sauvegarde contient des messages plus anciens de cette discussion. Pour les récupérer, saisissez à nouveau les mêmes mots de récupération dans Paramètres → Profil → Sauvegardes de l’historique.</string>
+    <string name="history_backups_reveal_warning">Assure-toi que personne ne voit ton écran. Affiche les mots et conserve-les en lieu sûr.</string>
+    <string name="history_backups_word_correct">Mot correct</string>
+    <string name="history_backups_word_incorrect">Mot incorrect</string>
+    <string name="history_backups_online_summary">Sauvegarde ton historique de discussion chiffré en ligne.</string>
 </resources>

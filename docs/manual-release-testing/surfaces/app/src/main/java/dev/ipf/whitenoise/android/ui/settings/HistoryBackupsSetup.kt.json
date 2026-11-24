@@ -43,6 +43,14 @@
           "SET-072",
           "SET-071"
         ]
+      },
+      {
+        "surface": "RecoveryWordsControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun RecoveryWordsControls(",
+        "test_ids": [
+          "SET-072"
+        ]
       }
     ],
     "string_resources": [

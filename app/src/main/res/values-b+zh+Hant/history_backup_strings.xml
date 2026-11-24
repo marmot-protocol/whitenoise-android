@@ -48,4 +48,8 @@
     <string name="history_backups_problem_expired">這些詞已失效。請重新開始以取得新的復原詞。</string>
     <string name="history_backups_problem_failed">發生問題。請重試。</string>
     <string name="history_backups_chat_hint">某個備份中有此聊天較早的訊息。若要匯入，請在「設定 → 個人檔案 → 歷史記錄備份」中再次輸入相同的復原詞。</string>
+    <string name="history_backups_reveal_warning">請確認沒有人能看到你的螢幕。顯示復原詞並妥善保存。</string>
+    <string name="history_backups_word_correct">單詞正確</string>
+    <string name="history_backups_word_incorrect">單詞錯誤</string>
+    <string name="history_backups_online_summary">在線上儲存加密的聊天記錄。</string>
 </resources>
