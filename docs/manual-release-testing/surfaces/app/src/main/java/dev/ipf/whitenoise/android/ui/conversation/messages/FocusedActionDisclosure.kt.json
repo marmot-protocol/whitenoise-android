@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "Row",
+        "surface": "Rows",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
-        "anchor": "fun Row(",
+        "anchor": "fun Rows(",
         "test_ids": [
           "MSG-050"
         ]
