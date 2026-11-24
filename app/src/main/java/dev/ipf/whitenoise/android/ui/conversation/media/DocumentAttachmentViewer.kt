@@ -336,6 +336,7 @@ internal fun DocumentViewerError(
     }
 }
 
+/** Confirms a link opened from a document on the app dialog surface, like links everywhere else. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun DocumentLinkConfirmation(
@@ -343,8 +344,6 @@ internal fun DocumentLinkConfirmation(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Color.White)) {
-        dev.ipf.whitenoise.android.ui
-            .WebLinkConfirmation(url, onDismiss, onConfirm, Color.Black, Color.White, Color.White)
-    }
+    dev.ipf.whitenoise.android.ui
+        .WebLinkConfirmation(url, onDismiss, onConfirm)
 }

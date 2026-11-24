@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -75,6 +76,7 @@ internal fun AnimatedAlertDialog(
     border: BorderStroke? = null,
 ) {
     val density = LocalDensity.current
+    val appWindowWidth = LocalWindowInfo.current.containerDpSize.width
     val measured = source != null && rememberSystemAnimationsEnabled()
     var nativeWidth by remember(source) { mutableStateOf<Dp?>(null) }
     var destination by remember(source) { mutableStateOf(Rect.Zero) }
@@ -142,8 +144,15 @@ internal fun AnimatedAlertDialog(
             confirmButton(surface)
         },
         modifier =
-            (if (measured) Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f } else surface.modifier())
-                .then(surface.inputModifier())
+            Modifier
+                .dialogWidthBounds(appWindowWidth)
+                .then(
+                    if (measured) {
+                        Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f }
+                    } else {
+                        surface.modifier()
+                    },
+                ).then(surface.inputModifier())
                 .then(
                     if (measured && sourceCurrent && nativeWidth != null) {
                         Modifier.requiredWidth(nativeWidth!!)
@@ -211,12 +220,13 @@ internal fun AnimatedBasicAlertDialog(
     dismissEnabled: () -> Boolean = { true },
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
+    val appWindowWidth = LocalWindowInfo.current.containerDpSize.width
     val surface =
         rememberPopupSurfaceMotion(true, onDismissRequest, ownerKey = ownerKey, dismissEnabled = dismissEnabled)
     if (!surface.visible) return
     androidx.compose.material3.BasicAlertDialog(
         onDismissRequest = surface.dismiss,
-        modifier = surface.modifier().then(surface.inputModifier()),
+        modifier = Modifier.dialogWidthBounds(appWindowWidth).then(surface.modifier()).then(surface.inputModifier()),
     ) {
         DialogWindowMotion(surface.presence)
         content(surface)

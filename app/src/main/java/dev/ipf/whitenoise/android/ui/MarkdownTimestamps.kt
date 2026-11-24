@@ -66,7 +66,7 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.delay
@@ -397,7 +397,7 @@ private fun TimestampOverlays(
     val tokens = text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length).map { it.item }
     key(tokens) { TimestampHoverTooltip(state, tokens) }
     state.tapped?.let { token ->
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             modifier = Modifier.testTag("timestamp.disclosure").exposePerformanceTestTags(),
             onDismissRequest = { state.tapped = null },
             text = { Text(timestampDisclosure(token)) },
