@@ -112,6 +112,24 @@ class SettingsHubScreenshotTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun emptyChatsFirstRunHelpLight() =
+        capture("empty_chats_first_run_help_light", false) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun emptyChatsFirstRunHelpRtlLargeFont() =
+        capture("empty_chats_first_run_help_rtl_large_font", false, rtl = true) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
     fun firstRunWalkthrough() =
         capture(
             "learn_white_noise_amoled",

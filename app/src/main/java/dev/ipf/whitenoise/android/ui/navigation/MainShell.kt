@@ -227,6 +227,7 @@ internal fun MainShell(
         rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
             mutableStateOf(SettingsHomeViewport.Top)
         }
+
     fun updateSettingsViewport(event: SettingsHomeViewportEvent) {
         settingsHomeViewport = reduceSettingsHomeViewport(settingsHomeViewport, event)
     }

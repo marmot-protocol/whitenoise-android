@@ -105,10 +105,10 @@ internal fun EmptyChats(
                 Text(stringResource(R.string.new_chat))
             }
             if (!arriving && onFirstRunHelp != null) {
-                TextButton(onClick = { onFirstRunHelp(false) }) {
+                TextButton(onClick = { onFirstRunHelp(false) }, modifier = Modifier.padding(horizontal = 24.dp)) {
                     Text(stringResource(R.string.learn_white_noise))
                 }
-                TextButton(onClick = { onFirstRunHelp(true) }) {
+                TextButton(onClick = { onFirstRunHelp(true) }, modifier = Modifier.padding(horizontal = 24.dp)) {
                     Text(stringResource(R.string.chat_with_support))
                 }
             }
