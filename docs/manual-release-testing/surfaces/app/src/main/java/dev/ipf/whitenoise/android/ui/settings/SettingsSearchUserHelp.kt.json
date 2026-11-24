@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
         "anchor": "R.string.learn_white_noise",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
         "anchor": "R.string.settings_help_support",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ]

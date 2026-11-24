@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,7 +26,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -108,8 +108,7 @@ class EmojiSheetBelowFieldScreenshotTest {
                         Text("Group details above the name", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(540.dp))
                         GroupNameEmojiField(
-                            value = TextFieldValue("Marmot team"),
-                            onValueChange = {},
+                            state = rememberTextFieldState("Marmot team"),
                             label = "Group name",
                             emojiPickerOpen = open,
                             onEmojiPickerClick = { open = true },

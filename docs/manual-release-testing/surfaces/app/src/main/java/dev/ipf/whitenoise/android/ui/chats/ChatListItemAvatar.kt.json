@@ -9,7 +9,8 @@
         "anchor": "fun ChatListItemAvatar(",
         "test_ids": [
           "CHL-001",
-          "FIND-021"
+          "FIND-021",
+          "PRO-012"
         ]
       }
     ]

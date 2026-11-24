@@ -23,9 +23,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSystemPasteGuard
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f

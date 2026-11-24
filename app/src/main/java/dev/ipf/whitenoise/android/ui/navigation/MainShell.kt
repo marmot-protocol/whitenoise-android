@@ -1776,7 +1776,6 @@ internal fun MainShell(
                     contentVisible = !appState.appLock.screenVisible,
                     topLevelBubble = true,
                     cardMorph = true,
-                    closingAnchor = dev.ipf.whitenoise.android.ui.chats.ChatsPenMorphAnchor,
                 ) { animatedSection ->
                     when (animatedSection) {
                         MainSection.Chats -> {

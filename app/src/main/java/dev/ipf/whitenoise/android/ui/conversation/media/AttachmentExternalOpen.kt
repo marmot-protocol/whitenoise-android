@@ -411,11 +411,12 @@ internal fun classifyAttachmentOpen(
             } else {
                 AttachmentOpenClassification.InvalidAndroidPackage
             }
-        fileName
-            .substringAfterLast(
-                '.',
-                "",
-            ).lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ->
+        // The cached copy is named from the sanitized name, so classify that name: an invisible character in the raw
+        // name must not separate the checked extension from the one the opening app sees.
+        MediaPipeline
+            .safeDisplayName(fileName)
+            .substringAfterLast('.', "")
+            .lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ->
             AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         else -> AttachmentOpenClassification.Ready(openMime)

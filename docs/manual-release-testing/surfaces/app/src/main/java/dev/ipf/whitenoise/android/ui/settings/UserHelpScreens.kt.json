@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "fun LearnMarmotLink(",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "fun LearnTopicPage(",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "fun LearnWhiteNoiseScreen(",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ],
@@ -34,7 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.done",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -42,7 +42,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_actions_body",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -50,7 +50,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_actions_title",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -58,7 +58,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_find_body",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -66,7 +66,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_find_title",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -74,7 +74,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_group_body",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -82,7 +82,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_group_title",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -90,7 +90,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_marmot_body",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -98,7 +98,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_marmot_link",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -106,7 +106,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_marmot_link_failed",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -114,7 +114,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_marmot_title",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -122,7 +122,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_open_share",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -130,7 +130,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_share_body",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -138,7 +138,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_share_title",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -146,7 +146,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_white_noise",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ]

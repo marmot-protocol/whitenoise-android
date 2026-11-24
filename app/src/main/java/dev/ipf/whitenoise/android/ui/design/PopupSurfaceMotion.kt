@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.design
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,10 +19,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
-import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
-import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
-import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.SurfaceMotion
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 
 private const val POPUP_INITIAL_SCALE = 0.88f
@@ -112,9 +108,9 @@ internal fun rememberPopupSurfaceMotion(
                 if (!motion) {
                     snap()
                 } else if (targetState) {
-                    tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing)
+                    SurfaceMotion.Open.spec()
                 } else {
-                    tween(APP_MOTION_CLOSE_MILLIS, easing = AppMotionCloseEasing)
+                    SurfaceMotion.Close.spec()
                 }
             },
             label = "popup presence",

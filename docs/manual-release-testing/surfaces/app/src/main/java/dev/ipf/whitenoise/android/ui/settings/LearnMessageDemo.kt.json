@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "fun LearnDemoBubble(",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "fun LearnMessageDemo(",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ],
@@ -26,7 +26,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.learn_demo_label",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -34,7 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.learn_demo_sender",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -42,7 +42,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.learn_example_message",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -50,7 +50,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.learn_show_actions",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -58,7 +58,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.message_react",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       },
       {
@@ -66,7 +66,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
         "anchor": "R.string.reply",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ]

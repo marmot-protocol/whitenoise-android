@@ -50,7 +50,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 
 /** Renders bounded event cards and their lifecycle-bound fullscreen viewers. */
@@ -103,7 +103,7 @@ internal fun NostrEventCards(
     }
     videoSelection?.let { (card, origin) ->
         card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(url, card.mediaMimeType, origin = origin, onDismiss = { videoSelection = null })
+            NostrVideoPlayerDialog(url, origin = origin, onDismiss = { videoSelection = null })
         }
     }
 }

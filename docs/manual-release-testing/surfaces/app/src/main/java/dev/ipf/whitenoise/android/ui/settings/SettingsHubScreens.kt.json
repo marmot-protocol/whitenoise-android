@@ -445,7 +445,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
         "anchor": "R.string.learn_white_noise",
         "test_ids": [
-          "SET-069"
+          "SET-071"
         ]
       }
     ]
