@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.ui.theme.Dimens
+import androidx.compose.foundation.layout.PaddingValues
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -29,7 +32,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,15 +142,16 @@ internal fun GlobalSearchRecentSection(
     face: @Composable (GlobalSearchRecent) -> Unit,
 ) {
     Column(modifier.fillMaxWidth().testTag(GLOBAL_SEARCH_RECENTS_TAG)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        SectionHeader(
+            text = stringResource(R.string.chat_list_search_recent),
+            contentPadding =
+                PaddingValues(
+                    start = Dimens.spaceLg,
+                    top = Dimens.spaceXs,
+                    end = Dimens.spaceXs,
+                    bottom = Dimens.spaceXs,
+                ),
         ) {
-            Text(
-                text = stringResource(R.string.chat_list_search_recent),
-                modifier = Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.titleSmall,
-            )
             TextButton(onClick = onClear, modifier = Modifier.testTag(GLOBAL_SEARCH_RECENTS_CLEAR_TAG)) {
                 Text(stringResource(R.string.chat_list_search_recent_clear))
             }

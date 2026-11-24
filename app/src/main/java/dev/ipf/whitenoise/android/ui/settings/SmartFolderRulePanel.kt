@@ -2,10 +2,11 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.foundation.layout.PaddingValues
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -76,12 +76,10 @@ internal fun SmartFolderRulePanel(
         Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.smart_folder_filters),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-            )
+        SectionHeader(
+            text = stringResource(R.string.smart_folder_filters),
+            contentPadding = PaddingValues(0.dp),
+        ) {
             if (state.advanced || editSimpleRules) {
                 SmartFolderPresetMenu(applyPreset)
             }

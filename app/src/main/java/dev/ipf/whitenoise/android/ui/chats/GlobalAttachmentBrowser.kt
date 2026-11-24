@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +35,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -316,16 +316,10 @@ private fun LibrarySectionHeader(
             GlobalAttachmentSectionKey.ThisMonth -> stringResource(R.string.library_section_this_month)
             is GlobalAttachmentSectionKey.Month -> key.month.format(monthFormat)
         }
-    Text(
+    SectionHeader(
         text = label,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(vertical = WhiteNoiseSpacing.Related)
-                .semantics { heading() },
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+        contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.Related),
     )
 }
 

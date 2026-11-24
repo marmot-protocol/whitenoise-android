@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -2623,9 +2624,9 @@ internal fun ChatsScreen(
                                                 key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
                                                 contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
                                             ) {
-                                                ChatListSearchSectionHeader(
-                                                    title = stringResource(R.string.chat_list_filter_groups),
-                                                    testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                SectionHeader(
+                                                    text = stringResource(R.string.chat_list_filter_groups),
+                                                    modifier = Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG),
                                                 )
                                             }
                                         }

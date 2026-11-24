@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.stickers
 
+import androidx.compose.foundation.layout.PaddingValues
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -194,12 +196,7 @@ internal fun stickerPackTitle(pack: StickerPackFfi): String {
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerSectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = WhiteNoiseSpacing.Related).semantics { heading() },
-    )
+    SectionHeader(text, contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related))
 }
 
 /** Secondary explanatory text inside a sticker page. */

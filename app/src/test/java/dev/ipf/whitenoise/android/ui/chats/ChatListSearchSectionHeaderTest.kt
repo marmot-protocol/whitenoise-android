@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,10 +82,10 @@ class ChatListSearchSectionHeaderTest {
                         color = MaterialTheme.colorScheme.surface,
                     ) {
                         Column {
-                            ChatListSearchSectionHeader("Groups", CHAT_LIST_SEARCH_GROUPS_HEADER_TAG)
+                            SectionHeader("Groups", Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG))
                             SearchPreviewRow("Marmot release")
                             SearchPreviewRow("Marmot friends")
-                            ChatListSearchSectionHeader("Messages", CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG)
+                            SectionHeader("Messages", Modifier.testTag(CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG))
                             SearchPreviewRow("…planning the marmot release")
                         }
                     }

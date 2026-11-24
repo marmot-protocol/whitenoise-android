@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -71,9 +72,9 @@ internal fun LazyListScope.globalSearchResultItems(
 ) {
     if (content.rows.isNotEmpty()) {
         item(key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY, contentType = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY) {
-            ChatListSearchSectionHeader(
-                title = stringResource(R.string.notification_channel_messages),
-                testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
+            SectionHeader(
+                text = stringResource(R.string.notification_channel_messages),
+                modifier = Modifier.testTag(CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG),
             )
         }
     }

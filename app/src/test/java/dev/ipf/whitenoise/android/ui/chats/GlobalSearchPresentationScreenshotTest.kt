@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
@@ -111,7 +112,7 @@ class GlobalSearchPresentationScreenshotTest {
                         Column(Modifier.fillMaxWidth().testTag("global-search-preview")) {
                             ChatListTopBar(app, true, query, remember { FocusRequester() }, {}, {}, {}, {}, {}, {})
                             if (person != null) {
-                                ChatListSearchSectionHeader("People", "global-search-heading")
+                                SectionHeader("People", Modifier.testTag("global-search-heading"))
                                 GlobalPersonRow(
                                     "npub1" + "a".repeat(58),
                                     displayName = person.displayName,
