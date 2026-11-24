@@ -2145,6 +2145,7 @@
     <string name="setup_finding_retired_relay">Este relay foi desativado.</string>
     <string name="setup_finding_unsafe_relay">Este endereço de relay não é seguro para uso.</string>
     <string name="setup_finding_unreachable">Não foi possível acessar este relay.</string>
+    <string name="setup_relay_timeout_title">Um relay não respondeu a tempo</string>
     <string name="setup_finding_timed_out">Esta verificação excedeu o tempo limite.</string>
     <string name="setup_finding_authentication_required">Este relay exige autenticação.</string>
     <string name="setup_finding_payment_required">Este relay exige pagamento.</string>
@@ -2309,6 +2310,13 @@
     <string name="new_message_no_results_detail">Confira a ortografia ou tente outra busca.</string>
     <string name="new_message_chat_created">Conversa criada</string>
     <string name="new_message_open_chat">Abrir conversa</string>
+    <string name="group_setup_customize">Personalizar foto e descrição do grupo</string>
+    <string name="group_setup_hide_customization">Ocultar personalização</string>
+    <string name="group_setup_no_members">Nenhum membro selecionado</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d membro selecionado</item>
+        <item quantity="other">%d membros selecionados</item>
+    </plurals>
     <string name="group_setup_title">Configurar grupo</string>
     <string name="group_create_action">Criar grupo</string>
     <string name="group_add_photo">Adicionar foto</string>
@@ -2449,6 +2457,8 @@
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
     <string name="error_incompatible_key_package">A chave de conversa desta pessoa não é compatível. Peça que ela atualize e abra o White Noise e tente novamente.</string>
     <string name="error_incompatible_key_package_for">A chave de conversa de %1$s não é compatível. Peça que essa pessoa atualize e abra o White Noise e tente novamente.</string>
+    <string name="new_message_copy_inbox_instructions">Copiar instruções</string>
+    <string name="new_message_inbox_instructions">Não consegui iniciar uma conversa com você no White Noise. Pode verificar seus relays de entrada nas configurações do White Noise e me avisar quando eu puder tentar de novo?</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>

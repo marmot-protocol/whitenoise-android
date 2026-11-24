@@ -2145,6 +2145,7 @@
     <string name="setup_finding_retired_relay">Ce relais a été retiré du service.</string>
     <string name="setup_finding_unsafe_relay">Cette adresse de relais ne peut pas être utilisée en toute sécurité.</string>
     <string name="setup_finding_unreachable">Ce relais n’a pas pu être joint.</string>
+    <string name="setup_relay_timeout_title">Un relais n’a pas répondu à temps</string>
     <string name="setup_finding_timed_out">Cette vérification a dépassé le délai prévu.</string>
     <string name="setup_finding_authentication_required">Ce relais exige une authentification.</string>
     <string name="setup_finding_payment_required">Ce relais exige un paiement.</string>
@@ -2309,6 +2310,13 @@
     <string name="new_message_no_results_detail">Vérifiez l’orthographe ou essayez une autre recherche.</string>
     <string name="new_message_chat_created">Discussion créée</string>
     <string name="new_message_open_chat">Ouvrir la discussion</string>
+    <string name="group_setup_customize">Personnaliser la photo et la description du groupe</string>
+    <string name="group_setup_hide_customization">Masquer les options de personnalisation</string>
+    <string name="group_setup_no_members">Aucun membre sélectionné</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d membre sélectionné</item>
+        <item quantity="other">%d membres sélectionnés</item>
+    </plurals>
     <string name="group_setup_title">Configurer le groupe</string>
     <string name="group_create_action">Créer le groupe</string>
     <string name="group_add_photo">Ajouter une photo</string>
@@ -2449,6 +2457,8 @@
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_incompatible_key_package">La clé de discussion de cette personne est incompatible. Demandez-lui de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_incompatible_key_package_for">La clé de discussion de %1$s est incompatible. Demandez à cette personne de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
+    <string name="new_message_copy_inbox_instructions">Copier les instructions</string>
+    <string name="new_message_inbox_instructions">Je n’ai pas pu démarrer une discussion avec toi sur White Noise. Peux-tu vérifier tes relais de réception dans les paramètres de White Noise et me dire quand je peux réessayer ?</string>
     <string name="error_missing_member_inbox">Aucun relais de réception utilisable pour cette personne. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_missing_member_inbox_for">Aucun relais de réception utilisable pour %1$s. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_invite_welcome_too_large">Cette invitation est trop volumineuse pour les relais de réception d’un destinataire. Demandez-lui d’ajouter un relais de réception qui accepte des messages plus volumineux.</string>

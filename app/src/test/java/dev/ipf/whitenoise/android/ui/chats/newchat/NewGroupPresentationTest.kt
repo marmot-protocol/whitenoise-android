@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -115,6 +116,7 @@ class NewGroupPresentationTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun descriptionGrowsWhenTextWrapsAndShrinksWhenCleared() {
         setup(NewGroupDraft(), presentation())
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         val description = composeRule.onNodeWithTag("group_setup.description")
         val emptyHeight = description.fetchSemanticsNode().size.height
         val nameHeight =
@@ -148,6 +150,7 @@ class NewGroupPresentationTest {
     /** Native image preparation disables photo and creation while surfacing the real work state. */
     @Test fun preparingPhotoLocksCompetingActions() {
         setup(NewGroupDraft(), presentation(preparing = true, editable = false, enabled = false))
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.photoAction").assertIsNotEnabled()
         composeRule.onNodeWithTag("group_setup.create").assertIsNotEnabled()
         composeRule.onNodeWithText(context.getString(R.string.group_preparing_photo)).assertIsDisplayed()
@@ -158,6 +161,7 @@ class NewGroupPresentationTest {
         val draft = NewGroupDraft(retryGroupIdHex = "canonical")
         setup(draft, presentation(editable = false))
         composeRule.onNodeWithTag("group_setup.name").assertIsNotEnabled()
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.description").assertIsNotEnabled()
         composeRule.onNodeWithTag("group_setup.create").assertIsEnabled()
         composeRule.onNodeWithText(context.getString(R.string.new_message_open_chat)).assertIsDisplayed()
@@ -279,7 +283,11 @@ class NewGroupPresentationTest {
         val bounds = button.getUnclippedBoundsInRoot()
         assertTrue(bounds.bottom - bounds.top >= 48.dp)
         composeRule.onNodeWithTag("group_setup.name").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("group_setup.description").performScrollTo().assertIsDisplayed()
+        val form = composeRule.onNodeWithTag("group_setup.content")
+        form.performScrollToKey("group_setup.customize")
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
+        form.performScrollToKey("group_setup.description")
+        composeRule.onNodeWithTag("group_setup.description").assertIsDisplayed()
     }
 
     /** Photo menu retains every real native acquisition path plus explicit removal. */

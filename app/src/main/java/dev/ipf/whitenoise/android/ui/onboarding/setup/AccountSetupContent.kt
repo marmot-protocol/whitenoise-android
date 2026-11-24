@@ -189,9 +189,8 @@ internal fun AccountSetupContent(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    val blockedByFailure = state.error || state.staleDecision || state.optionalMetadataPending
                     val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
-                    if (!blockedByFailure && (!state.disconnected || reconnectOffered)) {
+                    if (!state.blocksSetupActions && (!state.disconnected || reconnectOffered)) {
                         SetupActionButtons(state, onAction, onEdit)
                     }
                 }
@@ -311,6 +310,8 @@ private fun SetupStepFindings(
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
     val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
+    val focusedTimeout = state.focusesRelayTimeout()
+    if (focusedTimeout) SetupRelayTimeoutHosts(step.findings)
     step.findings
         .distinct()
         .filterNot { finding ->
@@ -319,7 +320,7 @@ private fun SetupStepFindings(
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || directRemovalFinding
+            routineDeviceNotice || directRemovalFinding || (focusedTimeout && finding.issue == OnboardingIssueFfi.TIMED_OUT)
         }.forEach { finding ->
             SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
         }

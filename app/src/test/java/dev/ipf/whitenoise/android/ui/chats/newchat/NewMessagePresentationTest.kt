@@ -2,11 +2,13 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -50,9 +52,11 @@ class NewMessagePresentationTest {
         assertEquals(listOf("agent"), calls)
     }
 
-    @Test fun chatCreationDisablesAgentDiscovery() {
+    @Test fun chatCreationDisablesEmptyQueryShortcuts() {
         show(creating = person.accountIdHex)
         composeRule.onNodeWithTag("new_message.agentSettings").assertIsNotEnabled()
+        composeRule.onNodeWithText(context.getString(R.string.new_group)).assertIsNotEnabled()
+        composeRule.onNodeWithText(context.getString(R.string.new_message_connect_qr)).assertIsNotEnabled()
     }
 
     /** The agent row becomes available again when its owner finishes invitation sharing. */
@@ -66,8 +70,8 @@ class NewMessagePresentationTest {
         assertEquals(listOf("agent"), calls)
     }
 
-    /** Target quick links remain present for a nonblank search and invoke their distinct existing owners. */
-    @Test fun searchKeepsQuickActionsAvailable() {
+    /** Empty-query shortcuts invoke their distinct existing owners. */
+    @Test fun emptyQueryOffersQuickActions() {
         show()
         composeRule.onNodeWithText(context.getString(R.string.new_group)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.new_message_connect_qr)).performClick()
@@ -75,6 +79,26 @@ class NewMessagePresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.show_my_qr_code)).assertDoesNotExist()
         composeRule.onNodeWithText("New Message").assertExists()
         assertEquals(listOf("group", "scan", "invite"), calls)
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h380dp-mdpi")
+    fun typedResultsFitInAShortViewportAndClearingRestoresShortcuts() {
+        val query = TextFieldState("Ada")
+        show(query = query, fontScale = 2f)
+        composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.new_group)).assertDoesNotExist()
+        composeRule.onNodeWithTag("new_message.agentSettings").assertDoesNotExist()
+
+        composeRule.runOnIdle { query.clearText() }
+        composeRule.onNodeWithText(context.getString(R.string.new_group)).assertIsDisplayed()
+    }
+
+    @Test fun noResultsStillOffersContextualInvitation() {
+        show(people = emptyList(), query = TextFieldState("No such person"))
+        composeRule.onNodeWithText(context.getString(R.string.no_matches)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.new_message_invite_friend)).performClick()
+        assertEquals(listOf("invite"), calls)
     }
 
     /** Material long-press opens the profile and does not also activate the chat tap callback. */
@@ -102,16 +126,15 @@ class NewMessagePresentationTest {
 
     /** A current create prevents new navigation or a second person activation. */
     @Test fun creatingDisablesActionsAndPeople() {
-        show(creating = person.accountIdHex)
-        composeRule.onNodeWithText(context.getString(R.string.new_group)).assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.new_message_connect_qr)).assertIsNotEnabled()
+        show(creating = person.accountIdHex, query = TextFieldState("Ada"))
+        composeRule.onNodeWithText(context.getString(R.string.new_group)).assertDoesNotExist()
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(context.getString(R.string.clear)).assertIsNotEnabled()
     }
 
     /** Partial remote results never remove local matches; retry invokes the real owner's retry boundary. */
     @Test fun partialSearchRetainsPeopleAndOffersRetry() {
-        show(search = RecipientUserSearchState(isIncomplete = true))
+        show(search = RecipientUserSearchState(isIncomplete = true), query = TextFieldState("Ada"))
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
         composeRule.onNodeWithTag("people.retry").performClick()
         assertEquals(listOf("retrySearch"), calls)
@@ -119,14 +142,14 @@ class NewMessagePresentationTest {
 
     /** Resolving an identifier is not a completed empty search and never exposes a premature invitation. */
     @Test fun identifierResolutionDoesNotClaimNoMatches() {
-        show(people = emptyList(), identifier = true, resolving = true)
+        show(people = emptyList(), identifier = true, resolving = true, query = TextFieldState("npub1ada"))
         composeRule.onNodeWithText(context.getString(R.string.no_matches)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.user_search_searching)).assertExists()
     }
 
     /** Complete addresses still show ordinary directory rows while HTTPS lookup is pending. */
     @Test fun addressLookupKeepsDirectoryRowActionable() {
-        show(identifier = true, resolving = true, query = "ada@example.com")
+        show(identifier = true, resolving = true, query = TextFieldState("ada@example.com"))
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").performClick()
         composeRule.onNodeWithText(context.getString(R.string.user_search_searching)).assertExists()
         assertEquals(listOf("person"), calls)
@@ -134,7 +157,7 @@ class NewMessagePresentationTest {
 
     /** Directory failure copy is not hidden just because the query also has address syntax. */
     @Test fun addressDirectoryFailureKeepsRowAndRetry() {
-        show(identifier = true, query = "ada@example.com", search = RecipientUserSearchState(failed = true))
+        show(identifier = true, query = TextFieldState("ada@example.com"), search = RecipientUserSearchState(failed = true))
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
         composeRule.onNodeWithText(context.getString(R.string.user_search_failed)).assertExists()
         composeRule.onNodeWithTag("people.retry").performClick()
@@ -143,7 +166,7 @@ class NewMessagePresentationTest {
 
     /** A failed HTTPS lookup remains retryable even when ordinary directory matches exist. */
     @Test fun addressLookupFailureKeepsRowAndRetry() {
-        show(identifier = true, query = "ada@example.com", lookupFailed = true)
+        show(identifier = true, query = TextFieldState("ada@example.com"), lookupFailed = true)
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
         composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertExists()
         composeRule.onNodeWithTag("people.retry").performClick()
@@ -154,7 +177,7 @@ class NewMessagePresentationTest {
     @Test fun addressLookupRetryRemainsAvailableDuringDiscovery() {
         show(
             identifier = true,
-            query = "ada@example.com",
+            query = TextFieldState("ada@example.com"),
             lookupFailed = true,
             search = RecipientUserSearchState(isSearching = true),
         )
@@ -250,14 +273,15 @@ class NewMessagePresentationTest {
         creating: String? = null,
         identifier: Boolean = false,
         resolving: Boolean = false,
-        query: String = "Ada",
+        query: TextFieldState = TextFieldState(),
         lookupFailed: Boolean = false,
+        fontScale: Float = 1f,
         inviteSharing: () -> Boolean = { false },
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(fontScale = fontScale) {
                 NewMessageContent(
-                    TextFieldState(query),
+                    query,
                     people,
                     search,
                     identifier,
@@ -281,7 +305,7 @@ class NewMessagePresentationTest {
                     isValidNpub = { true },
                     identifierLookupFailed = lookupFailed,
                     inviteShareInProgress = inviteSharing(),
-                    addressFallback = identifier && query.contains('@'),
+                    addressFallback = identifier && query.text.contains('@'),
                 )
             }
         }

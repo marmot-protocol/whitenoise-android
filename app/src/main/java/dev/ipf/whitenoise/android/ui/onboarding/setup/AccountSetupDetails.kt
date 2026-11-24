@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
@@ -45,7 +47,11 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 internal fun SetupDecisionHeading(state: AccountSetupState) {
     val step = state.currentStep ?: return
     val proposal = state.snapshot?.proposal?.takeIf { it.step == step.step }
-    val title = setupPendingHeadingTitle(state, step, proposal) ?: setupDefaultHeadingTitle(step, proposal)
+    val title =
+        setupPendingHeadingTitle(state, step, proposal) ?: when {
+            state.focusesRelayTimeout() -> R.string.setup_relay_timeout_title
+            else -> setupDefaultHeadingTitle(step, proposal)
+        }
     Text(stringResource(title), style = MaterialTheme.typography.titleLarge)
 }
 
@@ -80,6 +86,23 @@ private fun setupDefaultHeadingTitle(
         step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_chats_on_this_device
         else -> setupStepTitle(step.step)
     }
+
+/** Name the affected relays here and show their exact addresses in Details. */
+@Composable
+internal fun SetupRelayTimeoutHosts(findings: List<OnboardingFindingFfi>) {
+    findings
+        .filter { it.issue == OnboardingIssueFfi.TIMED_OUT }
+        .mapNotNull { finding -> finding.endpoint?.let { Uri.parse(it).host }?.takeIf(String::isNotBlank) }
+        .distinct()
+        .forEach { host ->
+            Text(
+                host,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    textDirection = TextDirection.Ltr,
+                ),
+            )
+        }
+}
 
 /** A snapshot-only stage count with TalkBack language in stages rather than percentages. */
 @Composable
@@ -234,7 +257,7 @@ internal fun SetupFindingContent(
                     it,
                     style =
                         MaterialTheme.typography.bodyMedium.copy(
-                            textDirection = androidx.compose.ui.text.style.TextDirection.Ltr,
+                            textDirection = TextDirection.Ltr,
                         ),
                 )
             }

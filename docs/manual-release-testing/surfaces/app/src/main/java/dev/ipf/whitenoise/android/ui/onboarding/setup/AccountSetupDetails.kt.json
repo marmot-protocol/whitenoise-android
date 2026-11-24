@@ -122,6 +122,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "Plain-language timeout heading with accessible stage progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_relay_timeout_title",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ],
     "composable_surfaces": [
@@ -205,6 +213,14 @@
         "surface": "SetupFindingEvidence",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
         "anchor": "fun SetupFindingEvidence(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "SetupRelayTimeoutHosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "fun SetupRelayTimeoutHosts(",
         "test_ids": [
           "ONB-017"
         ]

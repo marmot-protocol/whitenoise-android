@@ -7,6 +7,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -71,7 +72,7 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** Prototype centered avatar and two-field setup. */
+    /** The group name, member count and timer lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
@@ -79,6 +80,10 @@ class NewGroupScreenshotTest {
 
     /** AMOLED setup and primary action. */
     @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true, description = "")
+
+    /** Optional photo and description use the same form and retain the current draft. */
+    @Test fun setupCustomizedAmoled() =
+        setup("group_setup_customized_amoled.png", dark = true, amoled = true, customized = true)
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -189,6 +194,7 @@ class NewGroupScreenshotTest {
         recovery: Boolean = false,
         unknown: Boolean = false,
         description: String = "A place to coordinate our next trip.",
+        customized: Boolean = false,
     ) {
         val draft =
             NewGroupDraft(
@@ -231,6 +237,7 @@ class NewGroupScreenshotTest {
                 }
             }
         }
+        if (customized) composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.screen").captureRoboImage("src/test/snapshots/$file")
     }
 

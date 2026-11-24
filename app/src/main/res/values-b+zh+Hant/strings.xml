@@ -2106,6 +2106,7 @@
     <string name="setup_finding_retired_relay">此中繼站已停用。</string>
     <string name="setup_finding_unsafe_relay">此中繼站位址無法安全使用。</string>
     <string name="setup_finding_unreachable">無法連線至此中繼站。</string>
+    <string name="setup_relay_timeout_title">有一個中繼未及時回應</string>
     <string name="setup_finding_timed_out">此次檢查已逾時。</string>
     <string name="setup_finding_authentication_required">此中繼站要求驗證身分。</string>
     <string name="setup_finding_payment_required">此中繼站要求付費。</string>
@@ -2270,6 +2271,12 @@
     <string name="new_message_no_results_detail">檢查拼寫或嘗試不同的搜尋.</string>
     <string name="new_message_chat_created">聊天已建立</string>
     <string name="new_message_open_chat">開啟聊天</string>
+    <string name="group_setup_customize">自訂群組照片和描述</string>
+    <string name="group_setup_hide_customization">隱藏自訂選項</string>
+    <string name="group_setup_no_members">尚未選取成員</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="other">已選取 %d 位成員</item>
+    </plurals>
     <string name="group_setup_title">設定組</string>
     <string name="group_create_action">建立組</string>
     <string name="group_add_photo">新增圖片</string>
@@ -2407,6 +2414,8 @@
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_incompatible_key_package">對方的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
     <string name="error_incompatible_key_package_for">%1$s 的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
+    <string name="new_message_copy_inbox_instructions">複製操作說明</string>
+    <string name="new_message_inbox_instructions">我無法在 White Noise 上與你開始聊天。可以在 White Noise 設定中檢查你的收件匣中繼，然後告訴我何時可以再試嗎？</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>

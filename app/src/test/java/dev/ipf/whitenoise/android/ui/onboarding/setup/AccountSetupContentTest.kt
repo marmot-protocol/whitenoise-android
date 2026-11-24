@@ -22,6 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
@@ -546,6 +547,44 @@ class AccountSetupContentTest {
             ),
             actions,
         )
+    }
+
+    @Test fun focusedRelayTimeoutShowsHostAndKeepsFullEndpointInDetails() {
+        val endpoint = "wss://relay_edge.example:7443/inbox"
+        val snapshot = focusedRelayTimeoutSnapshot(endpoint)
+        show(AccountSetupState(snapshot))
+        val retry = composeRule.onNodeWithTag("setup-action-RETRY")
+        retry.assertIsDisplayed()
+        composeRule.onNodeWithText("A relay didn’t respond in time").assertIsDisplayed()
+        composeRule.onNodeWithText("relay_edge.example").assertIsDisplayed()
+        composeRule.onNodeWithText(endpoint).assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-action-EDIT_RELAYS").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("setup-details").performClick()
+        composeRule.onNodeWithText(endpoint).performScrollTo().assertIsDisplayed()
+        retry.performScrollTo().performClick()
+        assertEquals(listOf(OnboardingActionFfi.RETRY), actions.map { it.action })
+    }
+
+    @Test fun blockedRetryKeepsOriginalRelayFinding() {
+        val endpoint = "wss://slow.example/inbox"
+        show(AccountSetupState(focusedRelayTimeoutSnapshot(endpoint), error = true))
+        composeRule.onNodeWithTag("setup-action-RETRY").assertDoesNotExist()
+        composeRule.onNodeWithText("A relay didn’t respond in time").assertDoesNotExist()
+        composeRule.onNodeWithText(endpoint).assertExists()
+    }
+
+    private fun focusedRelayTimeoutSnapshot(endpoint: String): OnboardingSnapshotFfi {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.RETRY, OnboardingActionFfi.EDIT_RELAYS),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.apply {
+            status = OnboardingStatusFfi.RETRYABLE_FAILURE
+            findings = listOf(setupFinding(OnboardingIssueFfi.TIMED_OUT, endpoint))
+        }
+        return snapshot
     }
 
     /** A direct Remove uses the rendered native revision/epoch and has no approval side effect. */

@@ -61,10 +61,15 @@ class NewGroupOwnershipTest {
         composeRule.setContent { WhiteNoiseTheme { NewGroupFlow(state, { _, _ -> }, {}) } }
         composeRule.onNodeWithTag("new_group.continue").performClick()
         composeRule.onNodeWithTag("group_setup.name").performTextReplacement("Team 😀")
+        composeRule.onNodeWithTag("group_setup.description").assertDoesNotExist()
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.description").performTextReplacement("Plans for Friday")
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
+        composeRule.onNodeWithTag("group_setup.description").assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("new_group.continue").performClick()
         assertEquals("Team 😀", text("group_setup.name"))
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         assertEquals("Plans for Friday", text("group_setup.description"))
     }
 
