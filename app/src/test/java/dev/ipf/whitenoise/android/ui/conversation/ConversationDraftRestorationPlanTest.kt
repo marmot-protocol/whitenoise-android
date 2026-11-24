@@ -123,6 +123,31 @@ class ConversationDraftRestorationPlanTest {
         assertFalse(pickerUri in projected.inputs.preparedDocuments)
     }
 
+    /**
+     * The screen's merge of a restore that relinked a saved-state video and document keeps each copy where its old
+     * entry stood, beside entries that kept their URIs, so preview and a collection send read the copies.
+     */
+    @Test
+    fun relinkedEntriesReachTheComposerInPlaceThroughTheScreenMerge() {
+        val video = attachment("video", "video/mp4")
+        val photo = attachment("photo")
+        val notesUri = Uri.parse("content://picker/notes")
+        val reportUri = Uri.parse("content://picker/report")
+        val notes = attachment(stagedDocumentAttachmentId("account", "group", notesUri.toString()), "application/pdf")
+        val report = attachment(stagedDocumentAttachmentId("account", "group", reportUri.toString()), "application/pdf")
+        val shelf = listOf(PendingMediaSlot(video.id, Uri.parse("content://picker/video")), slot(photo.id))
+        val inputs = emptyInputs().copy(slots = shelf, documents = listOf(notesUri, reportUri))
+        val plan = planDraftRestoration(inputs, "account", "group", listOf(video, photo, notes, report), emptySet())
+        val videoCopy = Uri.parse("content://app/video")
+        val reportCopy = Uri.parse("content://app/report")
+        val restored = project(inputs, plan, mapOf(video.id to videoCopy, report.id to reportCopy)).shelf()
+
+        val merged = mergeReconciledComposerAttachments(inputs.slots, inputs.documents, restored, owns = { false })
+
+        assertEquals(listOf(PendingMediaSlot(video.id, videoCopy), slot(photo.id)), merged.mediaSlots)
+        assertEquals(listOf(notesUri, reportCopy), merged.documentUris)
+    }
+
     /** A stored pick this composer prepared itself is never offered for relinking. */
     @Test
     fun preparedStoredPickIsNotRelinked() {

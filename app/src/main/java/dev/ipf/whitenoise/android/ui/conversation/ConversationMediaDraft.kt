@@ -76,11 +76,6 @@ internal data class ActivePhotoEditor(
     val origin: Rect? = null,
 )
 
-internal data class RestoredConversationAttachments(
-    val mediaSlots: List<PendingMediaSlot>,
-    val documentUris: List<Uri>,
-)
-
 /**
  * Owns the transient photo-draft workflow for one conversation.
  *
@@ -527,7 +522,7 @@ internal class ConversationMediaDraftState(
                 backedPhotos = projection.inputs.backedPhotos
                 nonEditableDescriptions = projection.inputs.descriptions
                 attempt.adopt()
-                DraftRestorePass.Finished(RestoredConversationAttachments(projection.media, projection.documents))
+                DraftRestorePass.Finished(projection.shelf())
             } finally {
                 // A restore cancelled or abandoned before the composer took its files leaves none behind.
                 attempt.releaseUnadopted()

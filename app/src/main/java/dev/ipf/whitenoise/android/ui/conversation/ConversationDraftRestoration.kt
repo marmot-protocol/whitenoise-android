@@ -145,7 +145,11 @@ internal data class DraftRestorationProjection(
     val inputs: DraftRestorationInputs,
     val media: List<PendingMediaSlot>,
     val documents: List<Uri>,
-)
+    val relinkedDocuments: Map<Uri, Uri> = emptyMap(),
+) {
+    /** The shelf this projection shows, with each relinked document's old URI, for the screen to merge in place. */
+    fun shelf() = RestoredConversationAttachments(media, documents, relinkedDocuments)
+}
 
 /**
  * Plans which restored photos and documents to drop and which slots to keep, reconciling the composer against the
@@ -251,5 +255,5 @@ internal fun projectDraftRestoration(
             backedPhotos = inputs.backedPhotos.filterKeys { it !in plan.removedPhotos },
             descriptions = descriptions,
         )
-    return DraftRestorationProjection(projected, media, documentUris)
+    return DraftRestorationProjection(projected, media, documentUris, relinkedDocuments)
 }
