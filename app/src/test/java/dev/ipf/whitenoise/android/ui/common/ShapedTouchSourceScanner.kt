@@ -150,7 +150,8 @@ private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
     (calls("IconButton") + calls("IconToggleButton"))
         .filter { (_, args) ->
             val modifier = modifierArgument(args)
-            val sized = twoArgumentSize.containsMatchIn(args) || oneSideSize.containsMatchIn(args)
+            // Only the button's own modifier sizes it, never a sized child in its `content`.
+            val sized = twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
             val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
             sized || slotSized
         }.map { (start, _) -> STRETCHED_ICON_BUTTON to start }

@@ -306,6 +306,7 @@ class ShapedTouchFeedbackCoverageTest {
             }
             Box(Modifier.clip(CircleShape).clickable { go() }) { Avatar(title) }
             SlotIconButton(onClick = go, modifier = Modifier.width(40.dp).height(48.dp)) {}
+            IconButton(onClick = go, modifier = Modifier.size(48.dp), content = { Box(Modifier.width(24.dp)) })
             Icon(p, null, Modifier.size(48.dp).clip(CircleShape).clickable { retry() })
             Box(Modifier.background(c, CircleShape).clip(CircleShape).clickable { go() })
             Card(onClick = go) {}
