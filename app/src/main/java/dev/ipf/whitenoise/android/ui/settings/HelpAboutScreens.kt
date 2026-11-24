@@ -193,7 +193,8 @@ internal fun AboutScreen(
         return
     }
     val context = LocalContext.current
-    val alreadyEnabled = rememberTransientNoticeOf(R.string.developer_tools_already_enabled, TransientNoticeKind.Information)
+    val alreadyEnabled =
+        rememberTransientNoticeOf(R.string.developer_tools_already_enabled, TransientNoticeKind.Information)
     AboutContent(
         versionName = versionName,
         buildNumber = buildNumber,
