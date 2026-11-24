@@ -13,16 +13,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 
 /**
  * A yes/no confirmation on the app dialog; a destructive confirm takes the error role, and [dismissLabel] replaces
- * Cancel.
+ * Cancel. [identity] is the body-content slot shown below [message] (the acting identity, an identifier, or the whole
+ * body when [message] is null). [emojiLabels] renders the title and message with authored emoji artwork. The tags,
+ * [confirmModifier] and [closeOnConfirm] exist for the few flows that keep the dialog open while they run.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 internal fun ConfirmDialog(
     title: String,
-    message: String,
+    message: String?,
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -31,15 +34,24 @@ internal fun ConfirmDialog(
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
     ownerKey: Any? = dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph.current,
+    modifier: Modifier = Modifier,
+    icon: (@Composable () -> Unit)? = null,
+    emojiLabels: Boolean = false,
+    closeOnConfirm: Boolean = true,
+    confirmModifier: Modifier = Modifier,
+    confirmTag: String = "confirmation.confirm",
+    cancelTag: String = "confirmation.cancel",
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         ownerKey = ownerKey,
+        modifier = modifier,
+        icon = icon,
         confirmButton = {
             TextButton(
-                onClick = { close(onConfirm) },
+                onClick = { if (closeOnConfirm) close(onConfirm) else onConfirm() },
                 enabled = confirmEnabled,
-                modifier = Modifier.testTag("confirmation.confirm"),
+                modifier = confirmModifier.testTag(confirmTag),
                 colors =
                     if (destructive) {
                         ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -49,23 +61,32 @@ internal fun ConfirmDialog(
             ) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("confirmation.cancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag(cancelTag)) {
                 Text(dismissLabel ?: stringResource(R.string.cancel))
             }
         },
-        title = { Text(title) },
+        title = { ConfirmText(title, emojiLabels) },
         text = {
             if (identity == null) {
-                Text(message)
+                message?.let { ConfirmText(it, emojiLabels) }
             } else {
                 Column(
                     Modifier.fadingVerticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text(message)
+                    message?.let { ConfirmText(it, emojiLabels) }
                     identity()
                 }
             }
         },
     )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ConfirmText(
+    text: String,
+    emoji: Boolean,
+) {
+    if (emoji) EmojiLabel(text) else Text(text)
 }

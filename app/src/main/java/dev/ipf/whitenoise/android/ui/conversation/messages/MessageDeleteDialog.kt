@@ -9,13 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,7 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
-import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 
 /**
@@ -76,7 +73,6 @@ internal fun messageDeleteSupportingCopy(
  * keeps it open — when still shown — so the error toast never has to compete
  * with a silently vanished dialog.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MessageDeleteDialog(
     capability: MessageDeleteCapability,
@@ -87,27 +83,21 @@ internal fun MessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest) {
-        Surface(
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
-        ) {
-            MessageDeleteDialogContent(
-                capability = capability,
-                mine = mine,
-                senderDisplayName = senderDisplayName,
-                deleteInFlight = deleteInFlight,
-                onDeleteForEveryone = onDeleteForEveryone,
-                onDeleteForMe = onDeleteForMe,
-                onCancel = dismiss,
-            )
-        }
+    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismissRequest) {
+        MessageDeleteDialogContent(
+            capability = capability,
+            mine = mine,
+            senderDisplayName = senderDisplayName,
+            deleteInFlight = deleteInFlight,
+            onDeleteForEveryone = onDeleteForEveryone,
+            onDeleteForMe = onDeleteForMe,
+            onCancel = dismiss,
+        )
     }
 }
 
 /**
- * The dialog body, separated from the [AnimatedBasicAlertDialog] wrapper so behavior
+ * The dialog body, separated from the [WhiteNoiseBasicAlertDialog] wrapper so behavior
  * and screenshot tests can compose it directly (a dialog renders in its own
  * window, which the JVM screenshot harness can't capture).
  */
@@ -214,7 +204,6 @@ internal fun MessageDeleteDialogContent(
  * allowed, the rest hidden locally) and hiding all on this device; otherwise
  * only the local-hide action is offered.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BatchMessageDeleteDialog(
     selectedCount: Int,
@@ -224,21 +213,15 @@ internal fun BatchMessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
-        Surface(
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
-        ) {
-            BatchMessageDeleteDialogContent(
-                selectedCount = selectedCount,
-                breakdown = breakdown,
-                deleteInFlight = deleteInFlight,
-                onDeleteForEveryone = onDeleteForEveryone,
-                onDeleteForMe = onDeleteForMe,
-                onCancel = dismiss,
-            )
-        }
+    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
+        BatchMessageDeleteDialogContent(
+            selectedCount = selectedCount,
+            breakdown = breakdown,
+            deleteInFlight = deleteInFlight,
+            onDeleteForEveryone = onDeleteForEveryone,
+            onDeleteForMe = onDeleteForMe,
+            onCancel = dismiss,
+        )
     }
 }
 

@@ -32,8 +32,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
-import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -307,14 +307,13 @@ private fun IndependentAuditLogChoice(
 }
 
 /** Prominent disclosure shown before enabling audit uploads from Diagnostics & Improvements settings. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AuditUploadConsentDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     ownerKey: Any? = Unit,
 ) {
-    AnimatedBasicAlertDialog(onDismissRequest = onDismiss, ownerKey = ownerKey) {
+    WhiteNoiseBasicAlertDialog(onDismissRequest = onDismiss, ownerKey = ownerKey) {
         AuditUploadConsentContent(dismiss, { close(onConfirm) })
     }
 }
@@ -325,31 +324,25 @@ internal fun AuditUploadConsentContent(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.testTag("audit.consent.surface"),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    Column(
+        Modifier.widthIn(max = 360.dp).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(
-            Modifier.widthIn(max = 360.dp).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
-            Text(
-                stringResource(R.string.audit_upload_disclosure),
-                modifier =
-                    Modifier
-                        .weight(1f, fill = false)
-                        .testTag("audit.consent.disclosure")
-                        .fadingVerticalScroll(rememberScrollState()),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
-                Text(stringResource(R.string.audit_upload_confirm))
-            }
-            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+        Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.audit_upload_disclosure),
+            modifier =
+                Modifier
+                    .weight(1f, fill = false)
+                    .testTag("audit.consent.disclosure")
+                    .fadingVerticalScroll(rememberScrollState()),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
+            Text(stringResource(R.string.audit_upload_confirm))
+        }
+        TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
+            Text(stringResource(R.string.cancel))
         }
     }
 }

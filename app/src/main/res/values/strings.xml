@@ -1082,6 +1082,7 @@
     <string name="relay_url_help">Enter a relay URL beginning with wss://.</string>
     <string name="relay_url">Relay URL</string>
     <string name="remove_named_relay">Remove %1$s</string>
+    <string name="remove_named_relay_question">Remove %1$s?</string>
     <string name="name">Name</string>
     <string name="support_white_noise">Support White Noise</string>
     <string name="support_white_noise_detail">White Noise is free and open source. Donations keep it improving and available to all.</string>

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.ButtonDefaults
@@ -39,8 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -228,25 +226,22 @@ internal fun GroupAbandonmentReviewDialog(
             anyDm -> R.string.delete_group_confirm
             else -> R.string.group_reset_confirm
         }
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
+    ConfirmDialog(
+        onDismiss = onDismiss,
         modifier = Modifier.testTag("group.abandon.dialog"),
-        title = { Text(stringResource(titleRes)) },
-        text = { GroupAbandonmentBody(targets, failed, error, identity) },
+        title = stringResource(titleRes),
+        message = null,
+        identity = { GroupAbandonmentBody(targets, failed, error, identity) },
         icon = if (running) ({ CircularProgressIndicator() }) else null,
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                enabled = !running && confirmEnabled,
-                modifier = Modifier.testTag("group.abandon.confirm"),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(confirmLabel)) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("group.abandon.cancel")) {
-                Text(stringResource(if (failed) R.string.close else R.string.cancel))
-            }
-        },
+        confirmLabel = stringResource(confirmLabel),
+        // Failure keeps the dialog open so the same button can retry.
+        onConfirm = onConfirm,
+        closeOnConfirm = false,
+        confirmEnabled = !running && confirmEnabled,
+        destructive = true,
+        dismissLabel = stringResource(if (failed) R.string.close else R.string.cancel),
+        confirmTag = "group.abandon.confirm",
+        cancelTag = "group.abandon.cancel",
     )
 }
 
@@ -261,10 +256,7 @@ private fun GroupAbandonmentBody(
 ) {
     val style = MaterialTheme.typography.bodyMedium
     val color = MaterialTheme.colorScheme.onSurface
-    Column(
-        Modifier.fadingVerticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.testTag("group.abandon.identity"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             targets.forEach { target ->
                 val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
@@ -378,15 +370,13 @@ internal fun GroupSoleAdminLeaveDialog(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
+    ConfirmDialog(
+        onDismiss = onDismiss,
         modifier = Modifier.testTag("chat_info.sole_admin_leave"),
-        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-        text = {
-            Column(
-                Modifier.fadingVerticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+        title = stringResource(R.string.confirm_leave_sole_admin_title),
+        message = null,
+        identity = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, groupName))
                 Text(
                     stringResource(
@@ -396,17 +386,11 @@ internal fun GroupSoleAdminLeaveDialog(
                 identity?.invoke()
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = onAbandon,
-                modifier = Modifier.testTag("chat_info.sole_admin_leave.abandon"),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat_info.sole_admin_leave.cancel")) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
+        confirmLabel = stringResource(groupAbandonmentActionLabel(isDm)),
+        onConfirm = onAbandon,
+        closeOnConfirm = false,
+        destructive = true,
+        confirmTag = "chat_info.sole_admin_leave.abandon",
+        cancelTag = "chat_info.sole_admin_leave.cancel",
     )
 }

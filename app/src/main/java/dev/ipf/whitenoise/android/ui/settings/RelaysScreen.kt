@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,9 +31,8 @@ import dev.ipf.whitenoise.android.state.publishMissingRelayLists
 import dev.ipf.whitenoise.android.state.refreshAccountRelayLists
 import dev.ipf.whitenoise.android.state.removeAccountRelay
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
-import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -182,28 +180,24 @@ internal fun RelaysScreen(
         )
     }
     if (restoreDialog) {
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { restoreDialog = false },
-            title = { Text(stringResource(R.string.restore_default_relays_question)) },
-            text = { Text(stringResource(R.string.relay_restore_detail)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        restoreDialog = false
-                        runEdit { appState.restoreDefaultAccountRelays(account) }
-                    },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.restore_defaults),
-                                stringResource(R.string.explanation_relays_restore_confirm),
-                            ),
-                        ),
-                ) { Text(stringResource(R.string.restore_defaults), color = MaterialTheme.colorScheme.error) }
+        ConfirmDialog(
+            title = stringResource(R.string.restore_default_relays_question),
+            message = stringResource(R.string.relay_restore_detail),
+            confirmLabel = stringResource(R.string.restore_defaults),
+            onConfirm = {
+                restoreDialog = false
+                runEdit { appState.restoreDefaultAccountRelays(account) }
             },
-            dismissButton = {
-                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { restoreDialog = false },
+            // Custom relays the person added are discarded and must be re-added by hand.
+            destructive = true,
+            confirmModifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.restore_defaults),
+                        stringResource(R.string.explanation_relays_restore_confirm),
+                    ),
+                ),
         )
     }
 }
@@ -493,28 +487,24 @@ internal fun RelayDetailsScreen(
         }
     }
     if (removeDialog) {
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { removeDialog = false },
-            title = { EmojiLabel(stringResource(R.string.remove_named_relay, relay.name)) },
-            text = { Text(stringResource(R.string.relay_remove_detail)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        removeDialog = false
-                        onRemove()
-                    },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.remove_relay),
-                                stringResource(R.string.explanation_relays_remove_confirm),
-                            ),
-                        ),
-                ) { Text(stringResource(R.string.remove_relay), color = MaterialTheme.colorScheme.error) }
+        ConfirmDialog(
+            title = stringResource(R.string.remove_named_relay_question, relay.name),
+            message = stringResource(R.string.relay_remove_detail),
+            confirmLabel = stringResource(R.string.remove),
+            onConfirm = {
+                removeDialog = false
+                onRemove()
             },
-            dismissButton = {
-                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { removeDialog = false },
+            destructive = true,
+            emojiLabels = true,
+            confirmModifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.remove_relay),
+                        stringResource(R.string.explanation_relays_remove_confirm),
+                    ),
+                ),
         )
     }
 }

@@ -13,9 +13,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -242,6 +244,37 @@ internal fun WhiteNoiseAlertDialog(
             titleContentColor = scheme.onSurface,
             textContentColor = scheme.onSurfaceVariant,
         )
+    }
+}
+
+/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun WhiteNoiseDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = AlertDialogDefaults.shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
+        border = amoledOutlineBorder(),
+        content = content,
+    )
+}
+
+/** The app dialog window and [WhiteNoiseDialogSurface] around [content] that owns its own buttons (stacked actions, inputs). */
+@Suppress("FunctionNaming")
+@Composable
+internal fun WhiteNoiseBasicAlertDialog(
+    onDismissRequest: () -> Unit,
+    ownerKey: Any? = LocalSettingsCardMorph.current,
+    dismissEnabled: () -> Boolean = { true },
+    content: @Composable PopupSurfaceMotion.() -> Unit,
+) {
+    AnimatedBasicAlertDialog(onDismissRequest, ownerKey, dismissEnabled) {
+        WhiteNoiseDialogSurface { content() }
     }
 }
 
