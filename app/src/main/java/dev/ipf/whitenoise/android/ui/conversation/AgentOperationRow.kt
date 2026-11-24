@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,12 +56,10 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
@@ -344,11 +341,7 @@ private fun AgentOperationHeader(
         )
         AgentOperationStatus(operation = operation, color = statusColor)
         if (operation.canExpand) {
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
+            DisclosureChevron(expanded)
         }
     }
 }

@@ -4,18 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -24,12 +21,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleTheme
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-private const val EXPANDED_DISCLOSURE_ROTATION = 180f
 
 /** Synthetic sample; the screen retains simulation state without writing app or system preferences. */
 @Composable
@@ -90,11 +87,7 @@ private fun AppearancePreviewDisclosure(
         modifier = Modifier.semantics { stateDescription = disclosure },
         explanation = stringResource(R.string.explanation_appearance_preview_disclosure),
         trailing = {
-            Icon(
-                painterResource(R.drawable.ic_expand_more),
-                null,
-                Modifier.rotate(if (state.expanded) EXPANDED_DISCLOSURE_ROTATION else 0f),
-            )
+            DisclosureChevron(state.expanded)
         },
         leading = { SettingsLeadingIcon(R.drawable.ic_visibility) },
     )

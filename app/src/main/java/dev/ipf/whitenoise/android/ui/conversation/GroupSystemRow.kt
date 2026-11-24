@@ -59,13 +59,11 @@ import dev.ipf.whitenoise.android.core.GroupSystemLinkedSummary
 import dev.ipf.whitenoise.android.core.GroupSystemSubjectLink
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -204,12 +202,7 @@ private fun GroupSystemDebugDetails(record: AppMessageRecordFfi) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        Icon(
-            imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp),
-        )
+        DisclosureChevron(detailsExpanded, tint = MaterialTheme.colorScheme.primary)
     }
     if (detailsExpanded) {
         Spacer(Modifier.height(4.dp))
