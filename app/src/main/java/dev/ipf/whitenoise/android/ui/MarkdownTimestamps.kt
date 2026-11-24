@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -345,7 +347,7 @@ private fun rememberTimestampClocks(
                     Icon(
                         painterResource(R.drawable.ic_schedule),
                         contentDescription = timestampDisclosure(range.item),
-                        modifier = Modifier.fillMaxSize().clickable { state.tapped = range.item },
+                        modifier = Modifier.fillMaxSize().clip(CircleShape).clickable { state.tapped = range.item },
                     )
                 }
         }

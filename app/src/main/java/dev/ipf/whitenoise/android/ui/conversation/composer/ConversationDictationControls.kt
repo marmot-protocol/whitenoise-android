@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,7 +55,7 @@ import dev.ipf.whitenoise.android.audio.followUpAwaitingPrevious
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.audio.supportsFollowUpCapture
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
-import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -249,7 +248,7 @@ private fun ConversationDictationActiveActions(
     val sendLabel = stringResource(R.string.send)
     val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
     ConversationDictationLeadingActions(controller, facts)
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
         modifier =
@@ -262,13 +261,12 @@ private fun ConversationDictationActiveActions(
                         R.string.explanation_conversation_dictation_cancel,
                     ),
                 ),
-        shape = CenteredCircleShape,
     ) {
         Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
     }
     ConversationDictationPasteAction(controller, facts)
     if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        IconButton(
+        SlotIconButton(
             onClick = settleControlMorph(controller::send),
             enabled = facts.completionActionsEnabled,
             modifier =
@@ -281,7 +279,6 @@ private fun ConversationDictationActiveActions(
                         selected = true
                         progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
                     },
-            shape = CenteredCircleShape,
         ) {
             CircularProgressIndicator(
                 modifier =
@@ -316,7 +313,7 @@ private fun ConversationDictationPasteAction(
     facts: DictationControlFacts,
 ) {
     val pasteLabel = stringResource(R.string.paste_dictation_transcript)
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(controller::paste),
         enabled = facts.completionActionsEnabled,
         modifier =
@@ -335,7 +332,6 @@ private fun ConversationDictationPasteAction(
                         progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
                     }
                 },
-        shape = CenteredCircleShape,
     ) {
         if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
             CircularProgressIndicator(
@@ -392,10 +388,9 @@ private fun ConversationDictationDismissAction(
             is ConversationDictationState.Failed -> R.string.dismiss
             else -> R.string.dictation_cancel
         }
-    IconButton(
+    SlotIconButton(
         onClick = settleControlMorph(onClick),
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
-        shape = CenteredCircleShape,
     ) {
         Icon(
             painterResource(R.drawable.ic_close),

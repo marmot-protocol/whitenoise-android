@@ -3,8 +3,8 @@ package dev.ipf.whitenoise.android.ui.common
 /*
  * The source scanner behind ShapedTouchFeedbackCoverageTest. It reads Kotlin as text: comments and string
  * contents are blanked first (keeping offsets and line numbers), then calls are matched by balancing
- * brackets. It is deliberately narrow — five patterns that draw a rectangular highlight around a round
- * or rounded control — and reports each as "<kind> @<line>".
+ * brackets. It is deliberately narrow — the patterns that draw a rectangular or stretched highlight around a
+ * round or rounded control — and reports each as "<kind> @<line>".
  */
 
 internal const val SHAPED_SURFACE = "click modifier inside a shaped Surface's modifier"
@@ -12,6 +12,11 @@ internal const val CLICK_BEFORE_CLIP = "click modifier before a round clip"
 internal const val ROUND_CHILD = "clickable Box around a round or rounded child"
 internal const val ROUND_COMPONENT = "click modifier passed to a round component"
 internal const val STRETCHED_ICON_BUTTON = "IconButton sized to a box that may not be square"
+internal const val CLICK_OVER_SHAPED_FILL = "click modifier over a shaped background or border without a clip"
+internal const val BARE_GLYPH = "click modifier on a bare Icon without a shaped clip"
+
+/** The package whose icon buttons sit in slots narrower than they are tall. */
+private const val COMPOSER_PACKAGE = "conversation/composer/"
 
 private val clickModifier =
     Regex("""\.(clickable|combinedClickable|toggleable|selectable|triStateToggleable)\s*([({])""")
@@ -22,22 +27,36 @@ private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
 private val roundChild =
     Regex("""CircleShape|PillShape|RoundedCornerShape|shapes\.\w+|(?<![\w.])(Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
 private val roundComponentCall = Regex("""(?<![\w.])(\w*Swatch|Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
-private val twoArgumentSize = Regex("""\.size\(\s*[^,()]+,\s*[^,()]+\)""")
+private val twoArgumentSize = Regex("""\.(size|requiredSize)\(\s*[^,()]+,\s*[^,()]+\)""")
+private val oneSideSize = Regex("""\.(width|height|requiredWidth|requiredHeight)\(""")
+private val shapedFill = Regex("""\.(background|border)\s*\(""")
+private val shapeName = Regex("""CircleShape|PillShape|RoundedCornerShape|CutCornerShape|shapes\.\w+|\w+Shape\b""")
+private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
 private const val DECLARATION_LOOKBEHIND = 12
 
-/** Every shape-rule finding in [source], as "<kind> @<line>". */
-internal fun shapedTouchFindings(source: String): List<String> {
+/**
+ * Every shape-rule finding in [source], as "<kind> @<line>". [path] is the file's path below `ui/`, with `/`
+ * separators, for the rules that depend on where a control lives.
+ */
+internal fun shapedTouchFindings(
+    source: String,
+    path: String = "",
+): List<String> {
     val code = blankCommentsAndStrings(source)
     return (
         code.clicksBeforeClip() + code.clicksInShapedSurfaces() + code.clickableBoxesAroundRoundChildren() +
-            code.clicksOnRoundComponents() + code.stretchedIconButtons()
+            code.clicksOnRoundComponents() + code.stretchedIconButtons(path) + code.clicksOverShapedFills() +
+            code.clicksOnBareGlyphs()
     ).sortedBy { it.second }.map { (kind, offset) -> "$kind @${code.lineAt(offset)}" }
 }
 
-/** Rule 2: a click modifier with its own highlight, followed in the same chain by a clip that is not a rectangle. */
+/**
+ * Rule 2: a click modifier with its own highlight, followed in the same chain by a clip that is not a
+ * rectangle, directly or inside `.then(…)`.
+ */
 private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
     clickModifier
         .findAll(this)
@@ -45,22 +64,37 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
             val open = match.groups[2]!!.range.first
             val close = closingBracket(open)
             !noIndication.containsMatchIn(substring(open + 1, close)) &&
-                chainAfter(close).any { (name, args) -> name == "clip" && "RectangleShape" !in args }
+                chainAfter(close).any { (name, args) ->
+                    (name == "clip" && "RectangleShape" !in args) || (name == "then" && args.hasShapedClip())
+                }
         }.map { CLICK_BEFORE_CLIP to it.range.first }
         .toList()
 
-/** Rule 1: a click modifier in the `modifier` of a non-clickable Surface whose shape is not a rectangle. */
+/**
+ * Rule 1: a click modifier in the `modifier` of a non-clickable Surface whose shape is not a rectangle, or
+ * of a non-clickable card, whose default shape is rounded.
+ */
 private fun String.clicksInShapedSurfaces(): List<Pair<String, Int>> =
-    calls("Surface").flatMap { (start, args) ->
-        val named = topLevelNamedArguments(args)
-        val shape = named["shape"]
-        val clickableOverload = listOf("onClick", "checked", "selected").any(named::containsKey)
-        if (clickableOverload || shape == null || "RectangleShape" in shape) {
-            emptyList()
-        } else {
-            args.undecoratedClicks().map { SHAPED_SURFACE to start + it }
+    calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null) } +
+        listOf("Card", "ElevatedCard", "OutlinedCard").flatMap { calls(it) }.flatMap {
+            shapedContainerClicks(it, defaultShape = "rounded")
         }
+
+/** The click modifiers in one shaped container call's `modifier`, unless it is clickable itself or rectangular. */
+private fun shapedContainerClicks(
+    call: Pair<Int, String>,
+    defaultShape: String?,
+): List<Pair<String, Int>> {
+    val (start, args) = call
+    val named = topLevelNamedArguments(args)
+    val shape = named["shape"] ?: defaultShape
+    val clickableOverload = listOf("onClick", "checked", "selected").any(named::containsKey)
+    return if (clickableOverload || shape == null || "RectangleShape" in shape) {
+        emptyList()
+    } else {
+        args.undecoratedClicks().map { SHAPED_SURFACE to start + it }
     }
+}
 
 /** Rule 3: a clickable Box whose content draws a round or rounded shape without a shaped highlight. */
 private fun String.clickableBoxesAroundRoundChildren(): List<Pair<String, Int>> =
@@ -86,13 +120,55 @@ private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
             substring(open + 1, closingBracket(open)).undecoratedClicks().map { ROUND_COMPONENT to open + 1 + it }
         }.toList()
 
-/** Rule 5: an IconButton given a width, a height or two sizes, without the centred circle shape. */
-private fun String.stretchedIconButtons(): List<Pair<String, Int>> =
-    calls("IconButton")
+/**
+ * Rule 5: a transparent icon button given a width, a height or two sizes, or taking its size from its caller's
+ * modifier in the composer, whose slots are narrower than they are tall. Its one shape clips the highlight
+ * and the touch area together, so it draws a capsule or loses taps; a slot like that takes [SlotIconButton].
+ */
+private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
+    (calls("IconButton") + calls("IconToggleButton"))
         .filter { (_, args) ->
-            "CenteredCircleShape" !in args &&
-                (twoArgumentSize.containsMatchIn(args) || ".width(" in args || ".height(" in args)
+            val modifier = topLevelNamedArguments(args)["modifier"]?.trim().orEmpty()
+            val sized = twoArgumentSize.containsMatchIn(args) || oneSideSize.containsMatchIn(args)
+            val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
+            sized || slotSized
         }.map { (start, _) -> STRETCHED_ICON_BUTTON to start }
+
+/** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
+private fun String.clicksOverShapedFills(): List<Pair<String, Int>> =
+    clickModifier
+        .findAll(this)
+        .filter { match ->
+            val open = match.groups[2]!!.range.first
+            val before = chainBefore(match.range.first)
+            !noIndication.containsMatchIn(substring(open + 1, closingBracket(open))) &&
+                !before.hasShapedClip() &&
+                shapedFill.findAll(before).any { fill ->
+                    val fillArgs = before.substring(fill.range.last + 1, before.closingBracket(fill.range.last))
+                    shapeName.containsMatchIn(fillArgs) && "RectangleShape" !in fillArgs
+                }
+        }.map { CLICK_OVER_SHAPED_FILL to it.range.first }
+        .toList()
+
+/** Rule 7: a click modifier on a bare Icon, whose highlight is a square around a glyph unless it is clipped. */
+private fun String.clicksOnBareGlyphs(): List<Pair<String, Int>> =
+    calls("Icon").flatMap { (start, args) -> args.undecoratedClicks().map { BARE_GLYPH to start + it } }
+
+/** The modifier chain that ends at [end]: back to the start of its argument or assignment. */
+private fun String.chainBefore(end: Int): String {
+    var depth = 0
+    var index = end - 1
+    var atBoundary = false
+    while (index >= 0 && !atBoundary) {
+        when (this[index]) {
+            ')', '}', ']' -> depth++
+            '(', '{', '[' -> if (depth == 0) atBoundary = true else depth--
+            ',', '=' -> atBoundary = depth == 0
+        }
+        if (!atBoundary) index--
+    }
+    return substring(index + 1, end)
+}
 
 /** Offsets, within this argument text, of click modifiers that draw their own highlight before any clip. */
 private fun String.undecoratedClicks(): List<Int> =
@@ -101,9 +177,16 @@ private fun String.undecoratedClicks(): List<Int> =
         .filter { match ->
             val open = match.groups[2]!!.range.first
             !noIndication.containsMatchIn(substring(open + 1, closingBracket(open))) &&
-                ".clip(" !in substring(0, match.range.first)
+                !substring(0, match.range.first).hasShapedClip()
         }.map { it.range.first }
         .toList()
+
+/** Whether this text clips to a shape other than a rectangle, which then shapes a later click's highlight. */
+private fun String.hasShapedClip(): Boolean =
+    clipCall.findAll(this).any { match ->
+        val open = match.range.last
+        "RectangleShape" !in substring(open + 1, closingBracket(open))
+    }
 
 /** Each call of [name] as (offset of its argument text, argument text), not counting longer names. */
 private fun String.calls(name: String): List<Pair<Int, String>> =

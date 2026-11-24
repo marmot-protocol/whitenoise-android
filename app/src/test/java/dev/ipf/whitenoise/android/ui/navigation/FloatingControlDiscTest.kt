@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -9,10 +11,12 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.ChatListJumpToTopButton
@@ -44,28 +48,43 @@ class FloatingControlDiscTest {
         composeRule.setContent { WhiteNoiseTheme { content() } }
     }
 
-    /** The disc's touch target is 48 dp square while the visible disc stays 34 dp, and a tap reaches it. */
+    /**
+     * The disc keeps the 42 dp slot the jump controls always had in their stack, so the visible 34 dp disc does
+     * not move, while its 48 dp touch target reaches past the slot and takes the tap, even outside the slot.
+     */
     @Test
-    fun discKeepsA48DpTargetAroundA34DpDisc() {
+    fun discKeepsItsSlotWhileA48DpTargetOverhangsIt() {
         var clicks = 0
         show {
             FloatingControlDisc(
                 icon = painterResource(R.drawable.ic_jump_to_edge),
                 contentDescription = "Jump",
                 onClick = { clicks++ },
-                modifier = Modifier.testTag("target"),
+                modifier = Modifier.testTag("slot"),
             )
         }
-        composeRule
-            .onNodeWithTag("target")
-            .assertWidthIsEqualTo(48.dp)
-            .assertHeightIsEqualTo(48.dp)
-            .performClick()
+        val slot = composeRule.onNodeWithTag("slot")
+        slot.assertWidthIsEqualTo(FloatingControlSlot)
+        slot.assertHeightIsEqualTo(FloatingControlSlot)
+        val target = composeRule.onNodeWithContentDescription("Jump")
+        target.assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp).performClick()
+        // A tap in the target's corner lands outside the 42 dp slot and still reaches the control.
+        target.performTouchInput { click(Offset(1f, 1f)) }
         composeRule
             .onNodeWithTag(FLOATING_CONTROL_DISC_TAG, useUnmergedTree = true)
             .assertWidthIsEqualTo(FloatingControlDiscSize)
             .assertHeightIsEqualTo(FloatingControlDiscSize)
-        composeRule.runOnIdle { assertEquals(1, clicks) }
+        composeRule.runOnIdle { assertEquals(2, clicks) }
+    }
+
+    /** The mention pill keeps its 34 dp height in the stack while its touch target is 48 dp tall. */
+    @Test
+    fun mentionPillKeepsItsHeightWhileTheTargetOverhangs() {
+        show { Box(Modifier.testTag("slot")) { ConversationJumpToMentionButton(count = 2) {} } }
+        composeRule.onNodeWithTag("slot").assertHeightIsEqualTo(FloatingControlPillHeight)
+        composeRule
+            .onNodeWithContentDescription("mention", substring = true, ignoreCase = true)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     /** Jump to newest takes the shared 48 dp target, badge included. */

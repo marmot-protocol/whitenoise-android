@@ -11,7 +11,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.GpsFixed
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlDisc
 
-/** Scrolls back to the passage being read aloud after the reader moved away; the shared floating disc. */
+/** Scrolls back to the passage being read aloud after the reader moved away, as the shared floating disc. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun TtsResumeFollowButton(
@@ -24,8 +24,9 @@ internal fun TtsResumeFollowButton(
         icon = rememberVectorPainter(Icons.Default.GpsFixed),
         contentDescription = resumeFollowLabel,
         onClick = onClick,
-        modifier =
-            modifier.explainOnLongPress(
+        modifier = modifier,
+        targetModifier =
+            Modifier.explainOnLongPress(
                 composerExplanation(
                     R.string.tts_resume_follow,
                     R.string.explanation_conversation_tts_resume_follow,

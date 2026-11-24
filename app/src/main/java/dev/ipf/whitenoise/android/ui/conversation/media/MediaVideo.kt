@@ -556,13 +556,10 @@ internal fun MediaVideoBubble(
             }
             if (!transferShown) {
                 val discPress = remember { MutableInteractionSource() }
-                Surface(
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    shape = CircleShape,
+                // A 48 dp target around the 44 dp disc, which draws the press highlight on its own circle.
+                Box(
                     modifier =
                         Modifier
-                            .size(VIDEO_PLAY_DISC_SIZE)
                             .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
                             .shapedTouchTarget(
                                 discPress,
@@ -580,51 +577,59 @@ internal fun MediaVideoBubble(
                                     }
                                 },
                             ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.shapedPressFeedback(discPress, CircleShape), contentAlignment = Alignment.Center) {
-                        when {
-                            uploadFailed ->
-                                Icon(
-                                    painterResource(R.drawable.ic_refresh),
-                                    contentDescription = stringResource(R.string.video_failed),
-                                    modifier =
-                                        Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .clickable { onRetryUpload?.invoke() },
-                                )
-                            uploading -> VideoUploadIndicator(uploadProgress)
-                            !cacheProbeReady ->
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
-                                    strokeWidth = 2.dp,
-                                    color = LocalContentColor.current,
-                                )
-                            !startDownload && localFile == null ->
-                                Icon(
-                                    Icons.Default.ArrowDownward,
-                                    contentDescription = stringResource(R.string.media_tap_to_download),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            loading -> VideoDownloadingRing()
-                            failed ->
-                                Icon(
-                                    painterResource(R.drawable.ic_refresh),
-                                    contentDescription = stringResource(R.string.video_failed),
-                                    modifier =
-                                        Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .clickable(enabled = !loading) { retryFailedPlayback() },
-                                )
-                            // An accepted download that has not started yet is still a download, never Play.
-                            localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
-                            else ->
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_play_arrow),
-                                    contentDescription = stringResource(R.string.reply_media_video),
-                                    modifier = Modifier.size(24.dp),
-                                )
+                    Surface(
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        shape = CircleShape,
+                        modifier = Modifier.size(VIDEO_PLAY_DISC_SIZE),
+                    ) {
+                        Box(Modifier.shapedPressFeedback(discPress, CircleShape), contentAlignment = Alignment.Center) {
+                            when {
+                                uploadFailed ->
+                                    Icon(
+                                        painterResource(R.drawable.ic_refresh),
+                                        contentDescription = stringResource(R.string.video_failed),
+                                        modifier =
+                                            Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .clickable { onRetryUpload?.invoke() },
+                                    )
+                                uploading -> VideoUploadIndicator(uploadProgress)
+                                !cacheProbeReady ->
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
+                                        strokeWidth = 2.dp,
+                                        color = LocalContentColor.current,
+                                    )
+                                !startDownload && localFile == null ->
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = stringResource(R.string.media_tap_to_download),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                loading -> VideoDownloadingRing()
+                                failed ->
+                                    Icon(
+                                        painterResource(R.drawable.ic_refresh),
+                                        contentDescription = stringResource(R.string.video_failed),
+                                        modifier =
+                                            Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .clickable(enabled = !loading) { retryFailedPlayback() },
+                                    )
+                                // An accepted download that has not started yet is still a download, never Play.
+                                localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
+                                else ->
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_play_arrow),
+                                        contentDescription = stringResource(R.string.reply_media_video),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                            }
                         }
                     }
                 }

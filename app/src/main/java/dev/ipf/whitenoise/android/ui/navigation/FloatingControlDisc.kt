@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
+import dev.ipf.whitenoise.android.ui.common.touchTargetOverhang
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 
 /** Diameter of the visible disc of every floating control. */
@@ -35,10 +36,11 @@ internal val FloatingControlIconSize = 16.dp
 internal val FloatingControlPillHeight = FloatingControlDiscSize
 
 /**
- * Frame the badge hangs from: it keeps a badge's corner the same small distance outside the disc that the
- * jump control's badge always had, whatever the size of the touch target around it.
+ * The slot a floating disc takes in its stack, the size the jump controls always had: their 48 dp target
+ * reaches 3 dp past it on each side, into the gap, so the visible disc and the badge hanging from the slot's
+ * corner stay where they were.
  */
-private val FloatingControlBadgeFrame = 42.dp
+internal val FloatingControlSlot = 42.dp
 
 internal const val FLOATING_CONTROL_DISC_TAG = "floating_control.disc"
 
@@ -54,11 +56,13 @@ internal object FloatingControlColors {
 }
 
 /**
- * The one floating control (#4065) — jump to newest, jump to top, resume read-aloud follow: a
- * [FloatingControlDiscSize] disc with a [FloatingControlIconSize] glyph inside a 48 dp touch target, a
- * press highlight clipped to the disc, and the [WhiteNoiseElevation.FloatingControl] shadow at rest and
- * pressed. [badge] hangs from the disc's top end corner and adds nothing to the control's own description;
- * describe the count in [contentDescription] instead.
+ * The one floating control (#4065) — jump to newest, jump to top, resume read-aloud follow. A
+ * [FloatingControlDiscSize] disc with a [FloatingControlIconSize] glyph sits in a [FloatingControlSlot] slot,
+ * and its 48 dp touch target overhangs that slot. The press highlight is clipped to the disc, and the disc
+ * casts the [WhiteNoiseElevation.FloatingControl] shadow at rest and pressed. [badge] hangs from the slot's
+ * top end corner and adds nothing to the control's own description, so describe the count in
+ * [contentDescription] instead. [modifier] places the slot, and [targetModifier] adds gestures or semantics
+ * to the full 48 dp target.
  */
 @Composable
 internal fun FloatingControlDisc(
@@ -66,33 +70,39 @@ internal fun FloatingControlDisc(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    targetModifier: Modifier = Modifier,
     iconModifier: Modifier = Modifier,
     container: Color = FloatingControlColors.container,
     content: Color = FloatingControlColors.content,
     badge: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val press = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            modifier
-                .semantics { this.contentDescription = contentDescription }
-                .shapedTouchTarget(press, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.size(FloatingControlBadgeFrame), contentAlignment = Alignment.Center) {
-            Surface(
-                shape = CircleShape,
-                color = container,
-                contentColor = content,
-                shadowElevation = WhiteNoiseElevation.FloatingControl,
-                modifier = Modifier.size(FloatingControlDiscSize).testTag(FLOATING_CONTROL_DISC_TAG),
-            ) {
-                // Inside the Surface, so its clip shapes the highlight without clipping the shadow away.
-                Box(Modifier.fillMaxSize().shapedPressFeedback(press, CircleShape), Alignment.Center) {
-                    Icon(icon, contentDescription = null, modifier = iconModifier.size(FloatingControlIconSize))
+    // The outer box is the slot the stack places, and the target inside it reaches past the slot's edges.
+    Box(modifier) {
+        Box(
+            modifier =
+                Modifier
+                    .touchTargetOverhang(FloatingControlSlot, FloatingControlSlot)
+                    .then(targetModifier)
+                    .semantics { this.contentDescription = contentDescription }
+                    .shapedTouchTarget(press, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(FloatingControlSlot), contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = CircleShape,
+                    color = container,
+                    contentColor = content,
+                    shadowElevation = WhiteNoiseElevation.FloatingControl,
+                    modifier = Modifier.size(FloatingControlDiscSize).testTag(FLOATING_CONTROL_DISC_TAG),
+                ) {
+                    // Inside the Surface, so its clip shapes the highlight without clipping the shadow away.
+                    Box(Modifier.fillMaxSize().shapedPressFeedback(press, CircleShape), Alignment.Center) {
+                        Icon(icon, contentDescription = null, modifier = iconModifier.size(FloatingControlIconSize))
+                    }
                 }
+                badge?.invoke(this)
             }
-            badge?.invoke(this)
         }
     }
 }

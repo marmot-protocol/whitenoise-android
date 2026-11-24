@@ -305,7 +305,7 @@ internal fun SettingsCallout(
 }
 
 /**
- * Pinned action area above the navigation bar and keyboard; a Save button lives here. It takes the docked
+ * Pinned action area above the navigation bar and keyboard, where a Save button lives. It takes the docked
  * tint unless [elevated] is false, for a page whose own colour already sets the area apart.
  */
 @Suppress("FunctionNaming")

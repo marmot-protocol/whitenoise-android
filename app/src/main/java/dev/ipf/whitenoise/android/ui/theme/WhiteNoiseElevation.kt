@@ -24,9 +24,6 @@ object WhiteNoiseElevation {
     /** Flat: a surface that lies on its parent. */
     val None = Level0
 
-    /** A raised surface inside content, such as the QR frame or a status card. */
-    val Raised = Level1
-
     /** The profile editor's avatar, lifted off its banner by a shadow. */
     val ProfileAvatar = Level2
 

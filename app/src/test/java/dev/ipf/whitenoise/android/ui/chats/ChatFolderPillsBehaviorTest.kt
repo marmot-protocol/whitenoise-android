@@ -7,11 +7,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -99,7 +102,7 @@ class ChatFolderPillsBehaviorTest {
         assertEquals("folder-1", selected)
     }
 
-    /** Current edit and manage callbacks keep exact folder selection. */
+    /** Current edit and manage callbacks keep exact folder selection, and the manage button takes a 48 dp touch. */
     @Test fun currentEditAndManageCallbacksKeepExactFolderSelection() {
         var latest by mutableStateOf(false)
         var selected: String? = "folder-0"
@@ -123,7 +126,11 @@ class ChatFolderPillsBehaviorTest {
             .onNodeWithTag(chatListFilterChipTag("folder-0"))
             .performSemanticsAction(SemanticsActions.OnLongClick)
         composeRule.onNodeWithTag("chats.folders").performScrollToIndex(2)
-        composeRule.onNodeWithTag("chats.manageFolders").performClick()
+        composeRule
+            .onNodeWithTag("chats.manageFolders")
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
+            .performClick()
         assertEquals(listOf("current:folder-0"), edits)
         assertEquals(1, managed)
         assertEquals("folder-0", selected)

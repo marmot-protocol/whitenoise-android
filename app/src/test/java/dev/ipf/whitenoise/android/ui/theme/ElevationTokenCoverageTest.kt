@@ -20,9 +20,12 @@ class ElevationTokenCoverageTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" && THEME_PACKAGE !in it.invariantSeparatorsPath }
                 .flatMap { file ->
-                    file.readLines().mapIndexedNotNull { index, line ->
+                    val lines = file.readLines().map { it.substringBefore("//") }
+                    lines.mapIndexedNotNull { index, line ->
                         "${file.relativeTo(root).invariantSeparatorsPath}:${index + 1}: ${line.trim()}"
-                            .takeIf { elevationLiteral.containsMatchIn(line.substringBefore("//")) }
+                            .takeIf {
+                                elevationLiteral.containsMatchIn(line.withWrappedValue(lines.getOrNull(index + 1)))
+                            }
                     }
                 }.toList()
         assertEquals(
@@ -33,7 +36,7 @@ class ElevationTokenCoverageTest {
         )
     }
 
-    /** The pattern catches named arguments and constants alike, so the scan cannot pass vacuously. */
+    /** The pattern catches arguments, constants, branches and elevation calls, so the scan cannot pass vacuously. */
     @Test
     fun literalPatternFindsArgumentsAndConstants() {
         listOf(
@@ -42,6 +45,11 @@ class ElevationTokenCoverageTest {
             "elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),",
             "private val SettingsBottomActionElevation = 2.dp",
             "tonalElevation = if (morphing) Dp(0f) else tonalElevation,",
+            "tonalElevation = if (flat) WhiteNoiseElevation.None else 2.dp,",
+            "modifier = Modifier.shadow(4.dp, CircleShape),",
+            "color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),",
+            "elevation = CardDefaults.cardElevation(2.dp),",
+            "shadowElevation =".withWrappedValue("    2.dp,"),
         ).forEach { assertTrue(it, elevationLiteral.containsMatchIn(it)) }
         listOf(
             "shadowElevation = WhiteNoiseElevation.FloatingControl,",
@@ -70,6 +78,16 @@ class ElevationTokenCoverageTest {
     private companion object {
         const val SOURCE_ROOT = "src/main/java/dev/ipf/whitenoise/android"
         const val THEME_PACKAGE = "/ui/theme/"
-        val elevationLiteral = Regex("""[Ee]levation\w*\s*(:\s*Dp\s*)?=\s*(if\s*\(.*\)\s*)?(-?[0-9.]+\.dp|Dp\()""")
+
+        /** An elevation assignment or elevation call whose value, before the next comma, holds a literal. */
+        val elevationLiteral =
+            Regex(
+                """([Ee]levation\w*\s*(:\s*Dp\s*)?=|\.shadow\(|surfaceColorAtElevation\(|cardElevation\()""" +
+                    """[^,]*?(\b[0-9.]+\.dp\b|\bDp\()""",
+            )
+
+        /** This line with the next one appended when it ends in `=` or `(`, so a wrapped value is read too. */
+        fun String.withWrappedValue(next: String?): String =
+            if (next != null && trimEnd().let { it.endsWith("=") || it.endsWith("(") }) "$this ${next.trim()}" else this
     }
 }

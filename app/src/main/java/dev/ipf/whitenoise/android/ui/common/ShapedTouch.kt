@@ -11,9 +11,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 
 /*
  * Press feedback that follows the visible shape (#4102, #4065). A round or pill control often draws a small
@@ -33,8 +38,10 @@ import androidx.compose.ui.unit.dp
 internal val MinimumTouchTarget = 48.dp
 
 /**
- * Takes the touch for a control at least [minSize] square, without drawing any highlight itself. Pair it
- * with [shapedPressFeedback] on the visible shape inside, using the same [interactionSource].
+ * Takes the touch for a control, without drawing any highlight itself. Pair it with [shapedPressFeedback]
+ * on the visible shape inside, using the same [interactionSource]. It asks for at least [minSize] square,
+ * but cannot grow past a size an earlier modifier fixed. To keep a smaller layout slot while the target
+ * grows, put [touchTargetOverhang] first.
  */
 internal fun Modifier.shapedTouchTarget(
     interactionSource: MutableInteractionSource,
@@ -57,6 +64,27 @@ internal fun Modifier.shapedTouchTarget(
         )
 
 /**
+ * Keeps a control's layout slot at [slotWidth] by [slotHeight] while its touch target keeps its own measured
+ * size, at least [MinimumTouchTarget] once [shapedTouchTarget] follows, centred over the slot and reaching
+ * into the space around it. A floating control keeps the place it always had in its stack, and only its
+ * target grows. Put it first in the chain, so every later modifier sees the full target. An unspecified side
+ * takes the target's own size.
+ */
+internal fun Modifier.touchTargetOverhang(
+    slotWidth: Dp = Dp.Unspecified,
+    slotHeight: Dp = Dp.Unspecified,
+): Modifier =
+    layout { measurable, constraints ->
+        val target = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+        val width = if (slotWidth.isSpecified) slotWidth.roundToPx() else target.width
+        val height = if (slotHeight.isSpecified) slotHeight.roundToPx() else target.height
+        val slot = IntSize(constraints.constrainWidth(width), constraints.constrainHeight(height))
+        layout(slot.width, slot.height) {
+            target.placeRelative((slot.width - target.width) / 2, (slot.height - target.height) / 2)
+        }
+    }
+
+/**
  * Clips to [shape] and draws the press highlight of [interactionSource] inside it, so a tap on the larger
  * [shapedTouchTarget] lights up the circle or pill the user sees instead of the square around it.
  */
@@ -66,9 +94,9 @@ internal fun Modifier.shapedPressFeedback(
 ): Modifier = clip(shape).indication(interactionSource, ripple())
 
 /**
- * A circle as wide as the shorter side, centred in its bounds. A circle clip on a slot that is not square
- * stretches into a capsule; give an `IconButton` in a fixed-width composer slot this shape instead, so its
- * press highlight stays a circle while the whole slot still takes the touch.
+ * A circle as wide as the shorter side, centred in its bounds. [SlotIconButton] draws its highlight and fill
+ * on it, so a slot that is not square still shows a round highlight. Don't hand it to an `IconButton`: that
+ * clip also limits where the button takes touches.
  */
 internal val CenteredCircleShape: Shape =
     GenericShape { size, _ ->

@@ -4,9 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
@@ -18,7 +16,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTile
 private const val BYTES_PER_UNIT = 1024.0
 private val FILE_SIZE_UNITS = listOf("KB", "MB", "GB")
 
-/** [bytes] as a short size: whole bytes below 1 KB, then KB, MB or GB with one decimal; blank when unknown. */
+/** [bytes] as a short size: whole bytes below 1 KB, then KB, MB or GB with one decimal, and blank when unknown. */
 private fun formatFileSize(bytes: Long): String {
     if (bytes < BYTES_PER_UNIT) return if (bytes < 0L) "" else "$bytes B"
     var size = bytes / BYTES_PER_UNIT

@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -48,14 +46,11 @@ internal fun TextEntryEmojiAction(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
 
-    IconButton(
+    SlotIconButton(
         onClick = onClick,
         enabled = enabled,
-        colors =
-            IconButtonDefaults.iconButtonColors(
-                containerColor = containerColor,
-                contentColor = contentColor,
-            ),
+        containerColor = containerColor,
+        contentColor = contentColor,
         modifier =
             modifier
                 .size(TextEntryEmojiActionSize)

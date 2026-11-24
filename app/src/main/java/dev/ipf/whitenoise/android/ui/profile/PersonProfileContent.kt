@@ -6,6 +6,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -54,6 +54,8 @@ import dev.ipf.whitenoise.android.ui.common.IdentityHeader
 import dev.ipf.whitenoise.android.ui.common.IdentityName
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -342,11 +344,11 @@ private fun PersonProfileIdentity(
             }
         },
         avatar = { avatarSize ->
+            val avatarPress = remember { MutableInteractionSource() }
             Box(
-                // Clipped to the round avatar first, so the press highlight follows it.
-                Modifier.size(avatarSize).testTag("person_profile.avatar").clip(CircleShape).clickable(
+                Modifier.size(avatarSize).testTag("person_profile.avatar").shapedTouchTarget(
+                    avatarPress,
                     enabled = person.avatarClickable,
-                    role = Role.Button,
                     onClickLabel = stringResource(R.string.profile_view_picture),
                     onClick = onAvatar,
                 ),
@@ -359,6 +361,9 @@ private fun PersonProfileIdentity(
                     pictureDomain = AvatarImageLoader.publicProfiles(),
                     followedAccount = person.seed.takeUnless { person.self },
                 )
+                // The highlight covers the round avatar only — a clip on the box would cut away the followed
+                // badge that overhangs the avatar's corner.
+                Box(Modifier.matchParentSize().shapedPressFeedback(avatarPress, CircleShape))
             }
         },
     ) {

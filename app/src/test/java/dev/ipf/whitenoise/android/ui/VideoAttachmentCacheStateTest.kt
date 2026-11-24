@@ -342,6 +342,7 @@ class VideoAttachmentCacheStateTest {
         }
     }
 
+    /** A video bubble that already has a cached poster reads only duration metadata and extracts no poster frame. */
     @Test
     fun cachedPosterSkipsPosterFrameExtraction() {
         val source =

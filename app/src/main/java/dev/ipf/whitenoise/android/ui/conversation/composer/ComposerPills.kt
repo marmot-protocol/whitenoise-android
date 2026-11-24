@@ -51,7 +51,6 @@ import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
 import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -137,7 +136,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
-import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -1791,7 +1790,7 @@ internal fun ComposerPill(
                                             contentAlignment = Alignment.CenterStart,
                                         ) {
                                             ComposerToolbarTargets {
-                                                IconButton(
+                                                SlotIconButton(
                                                     onClick = onAttachmentsToggle,
                                                     enabled = inputContentVisible,
                                                     modifier =
@@ -1806,7 +1805,6 @@ internal fun ComposerPill(
                                                                     Modifier.clearAndSetSemantics {}
                                                                 },
                                                             ),
-                                                    shape = CenteredCircleShape,
                                                 ) {
                                                     // Swap the glyph on open (X) the way the emoji toggle swaps
                                                     // to a keyboard, so sighted users get a visual cue, not just
@@ -1953,7 +1951,7 @@ internal fun ComposerPill(
                                 ) { dictationControls() }
                             } else if (onDictation != null && toolbar == null) {
                                 ComposerToolbarTargets {
-                                    IconButton(
+                                    SlotIconButton(
                                         onClick = onDictation,
                                         enabled = inputContentVisible,
                                         modifier =
@@ -1969,7 +1967,6 @@ internal fun ComposerPill(
                                                         Modifier.clearAndSetSemantics {}
                                                     },
                                                 ),
-                                        shape = CenteredCircleShape,
                                     ) {
                                         // The prototype's microphone is dictation; voice notes use the waveform glyph.
                                         Icon(

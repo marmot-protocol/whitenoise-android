@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
+import dev.ipf.whitenoise.android.ui.common.touchTargetOverhang
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlPillHeight
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -265,11 +266,13 @@ internal fun ConversationJumpToMentionButton(
         stringResource(R.string.conversation_jump_to_mention) + ", " +
             pluralStringResource(R.plurals.unread_mentions_count, count, count)
     val press = remember { MutableInteractionSource() }
-    // A 48 dp touch target around the 34 dp pill, with the highlight drawn on the pill.
+    // The pill keeps its 34 dp place in the stack while its 48 dp touch target reaches into the gaps around
+    // it, and the highlight is drawn on the pill.
     Box(
         modifier =
             Modifier
                 .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
+                .touchTargetOverhang(slotHeight = FloatingControlPillHeight)
                 .explainOnLongPress(
                     composerExplanation(
                         R.string.conversation_jump_to_mention,
