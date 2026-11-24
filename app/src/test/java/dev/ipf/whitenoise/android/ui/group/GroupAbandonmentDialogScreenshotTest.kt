@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -13,6 +14,8 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +25,12 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.ui.chats.newchat.GROUP_REVIEW_ACTOR_HEX
+import dev.ipf.whitenoise.android.ui.chats.newchat.GROUP_REVIEW_ACTOR_NPUB
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
+import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -39,6 +48,16 @@ class GroupAbandonmentDialogScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
     private val app get() = ApplicationProvider.getApplicationContext<android.app.Application>()
+    private val reviewState by lazy {
+        emptyAppState(
+            accounts =
+                listOf(
+                    testAccount(DM.accountRef, GROUP_REVIEW_ACTOR_HEX),
+                    testAccount("active", "c".repeat(64)),
+                ),
+            activeAccountRef = "active",
+        ).withGroupReviewActorNpub()
+    }
 
     /** A direct-chat review in the light theme. */
     @Test fun dmReviewLight() = capture("dm_review_light", DM)
@@ -125,15 +144,20 @@ class GroupAbandonmentDialogScreenshotTest {
         var confirms = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                GroupAbandonmentDialog(listOf(DM, GROUP), onConfirm = { confirms++ }, onDismiss = {})
+                GroupAbandonmentDialog(
+                    listOf(DM, GROUP),
+                    onConfirm = { confirms++ },
+                    onDismiss = {},
+                    identity = { GroupActingAccountIdentity(reviewState, DM.accountRef) },
+                )
             }
         }
         composeRule.onNodeWithText(app.getString(R.string.chats_abandon_dialog_title)).assertIsDisplayed()
         listOf(
             app.getString(R.string.abandon_identity_chat, DM.conversationTitle),
             app.getString(R.string.abandon_identity_group, GROUP.conversationTitle),
-            app.getString(R.string.abandon_identity_account, DM.accountName),
         ).forEach { composeRule.onNodeWithText(it).assertExists() }
+        composeRule.onAllNodesWithTag("group.action.acting_account").assertCountEquals(1)
         composeRule.onNodeWithTag("group.abandon.confirm").performClick()
         composeRule.waitForIdle()
         assertEquals(1, confirms)
@@ -165,9 +189,9 @@ class GroupAbandonmentDialogScreenshotTest {
         render(DM, GroupAbandonmentStatus.Review, onConfirm = { confirms++ }, onDismiss = { dismissals++ })
         composeRule.onNodeWithText(app.getString(R.string.chat_abandon_dialog_title)).assertIsDisplayed()
         val chat = app.getString(R.string.abandon_identity_chat, DM.conversationTitle)
-        val account = app.getString(R.string.abandon_identity_account, DM.accountName)
         composeRule.onNodeWithText(chat).assertIsDisplayed()
-        composeRule.onNodeWithText(account).assertIsDisplayed()
+        val role = app.getString(R.string.group_action_acting_account)
+        composeRule.onNodeWithContentDescription("$role, $GROUP_REVIEW_ACTOR_NPUB").assertIsDisplayed()
         composeRule
             .onNodeWithTag("group.abandon.confirm")
             .assertTextEquals(app.getString(R.string.delete_group_confirm))
@@ -249,7 +273,12 @@ class GroupAbandonmentDialogScreenshotTest {
                 LocalLayoutDirection provides if (large) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = if (large) 2f else 1f) {
-                    GroupAbandonmentDialog(listOf(DM, GROUP), onConfirm = {}, onDismiss = {})
+                    GroupAbandonmentDialog(
+                        listOf(DM, GROUP),
+                        onConfirm = {},
+                        onDismiss = {},
+                        identity = { GroupActingAccountIdentity(reviewState, DM.accountRef) },
+                    )
                 }
             }
         }
@@ -311,7 +340,14 @@ class GroupAbandonmentDialogScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
-                    GroupAbandonmentDialog(target, status, onConfirm, onDismiss, error)
+                    GroupAbandonmentDialog(
+                        target,
+                        status,
+                        onConfirm,
+                        onDismiss,
+                        error,
+                        identity = { GroupActingAccountIdentity(reviewState, target.accountRef) },
+                    )
                 }
             }
         }
@@ -319,8 +355,8 @@ class GroupAbandonmentDialogScreenshotTest {
     }
 
     private companion object {
-        val DM = GroupAbandonmentTarget("account-a", "Carol", "group-dm", "Alice", isDm = true)
-        val GROUP = GroupAbandonmentTarget("account-a", "Carol", "group-hiking", "Hiking club", isDm = false)
+        val DM = GroupAbandonmentTarget("account-a", "group-dm", "Alice", isDm = true)
+        val GROUP = GroupAbandonmentTarget("account-a", "group-hiking", "Hiking club", isDm = false)
         val LONG_DM = DM.copy(conversationTitle = "Alexandria Montgomery-Fitzwilliam (work phone, second account)")
         val FAILED = GroupAbandonmentStatus.Failed
         const val ERROR_MESSAGE = "The relay did not answer."

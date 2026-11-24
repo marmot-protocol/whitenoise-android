@@ -175,7 +175,6 @@
     <string name="chat_abandon_confirm">放弃</string>
     <string name="abandon_identity_chat">对话：%1$s</string>
     <string name="abandon_identity_group">群组：%1$s</string>
-    <string name="abandon_identity_account">你的账户：%1$s</string>
     <string name="chats_abandon_action">在此设备上放弃所选对话</string>
     <string name="chats_abandon_dialog_title">要在此设备上放弃所选对话吗？</string>
     <string name="toast_chat_already_abandoned">此对话已从此设备删除。</string>

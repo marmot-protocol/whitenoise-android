@@ -193,7 +193,6 @@
     <string name="chat_abandon_confirm">Покинуть</string>
     <string name="abandon_identity_chat">Чат: %1$s</string>
     <string name="abandon_identity_group">Группа: %1$s</string>
-    <string name="abandon_identity_account">Ваша учётная запись: %1$s</string>
     <string name="chats_abandon_action">Покинуть чаты на этом устройстве</string>
     <string name="chats_abandon_dialog_title">Покинуть выбранные чаты на этом устройстве?</string>
     <string name="toast_chat_already_abandoned">Этот чат уже удалён с этого устройства.</string>

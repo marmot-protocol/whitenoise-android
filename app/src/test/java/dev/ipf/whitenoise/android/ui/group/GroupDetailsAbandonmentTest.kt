@@ -131,7 +131,6 @@ class GroupDetailsAbandonmentTest {
         review.open(
             GroupAbandonmentTarget(
                 accountRef = "same",
-                accountName = "Same",
                 groupIdHex = "ab",
                 conversationTitle = "Chat",
                 isDm = true,

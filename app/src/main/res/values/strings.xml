@@ -241,7 +241,6 @@
     <string name="chat_abandon_confirm">Abandon</string>
     <string name="abandon_identity_chat">Direct chat: %1$s</string>
     <string name="abandon_identity_group">Group: %1$s</string>
-    <string name="abandon_identity_account">Your account: %1$s</string>
     <string name="chats_abandon_action">Abandon chats on this device</string>
     <string name="chats_abandon_dialog_title">Abandon the selected chats on this device?</string>
     <string name="toast_chat_already_abandoned">This chat is already deleted from this device.</string>

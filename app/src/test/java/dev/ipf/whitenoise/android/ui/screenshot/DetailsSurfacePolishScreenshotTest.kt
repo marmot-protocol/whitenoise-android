@@ -152,7 +152,7 @@ class DetailsSurfacePolishScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_reset_row_light.png")
         composeRule.onNodeWithText(reset).performClick()
         composeRule.onNodeWithText(app.getString(R.string.group_reset_dialog_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(app.getString(R.string.abandon_identity_account, "Alice")).assertIsDisplayed()
+        composeRule.onNodeWithTag("group.action.acting_account").assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_details_reset_dialog_light.png")
     }
 

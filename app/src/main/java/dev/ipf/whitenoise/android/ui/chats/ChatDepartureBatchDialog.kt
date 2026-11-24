@@ -72,8 +72,7 @@ internal class PendingChatDeparture(
         controller.accountRef
             ?.takeIf { abandon }
             ?.let { account ->
-                val accountName = abandonmentAccountName(appState, account)
-                targets.map { GroupAbandonmentTarget(account, accountName, it.groupId, it.title, it.isDm) }
+                targets.map { GroupAbandonmentTarget(account, it.groupId, it.title, it.isDm) }
             }.orEmpty()
 }
 

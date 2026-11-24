@@ -110,7 +110,6 @@ import dev.ipf.whitenoise.android.state.transferAdmin
 import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
-import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -707,7 +706,6 @@ internal fun GroupDetailsScreen(
             abandonment.open(
                 GroupAbandonmentTarget(
                     accountRef = account,
-                    accountName = abandonmentAccountName(appState, account),
                     groupIdHex = controller.group.groupIdHex,
                     conversationTitle = conversationTitle,
                     isDm = isDm,
@@ -1262,8 +1260,7 @@ internal fun GroupDetailsScreen(
 
         abandonment.target?.let { target ->
             GroupAbandonmentReviewDialog(
-                // The acting account's name resolves while the review shows, as the group-action identity does.
-                targets = listOf(target.copy(accountName = abandonmentAccountName(appState, target.accountRef))),
+                targets = listOf(target),
                 status =
                     when {
                         activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
@@ -1289,7 +1286,7 @@ internal fun GroupDetailsScreen(
                 onDismiss = abandonment::dismiss,
                 // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
                 error = controller.lastMutationError.takeIf { abandonment.attempted },
-                identity = ownIdentity,
+                identity = { GroupActingAccountIdentity(appState, target.accountRef) },
                 confirmEnabled = mutationOwnerCurrent,
             )
         }

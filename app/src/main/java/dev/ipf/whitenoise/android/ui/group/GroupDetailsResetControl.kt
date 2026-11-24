@@ -39,7 +39,6 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
  */
 internal data class GroupAbandonmentTarget(
     val accountRef: String,
-    val accountName: String,
     val groupIdHex: String,
     val conversationTitle: String,
     val isDm: Boolean,
@@ -258,9 +257,6 @@ private fun GroupAbandonmentBody(
             targets.forEach { target ->
                 val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
                 Text(stringResource(identity, target.conversationTitle), style = style, color = color)
-            }
-            targets.firstOrNull()?.let { first ->
-                Text(stringResource(R.string.abandon_identity_account, first.accountName), style = style, color = color)
             }
         }
         identity?.invoke()

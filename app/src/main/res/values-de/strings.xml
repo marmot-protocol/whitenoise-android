@@ -181,7 +181,6 @@
     <string name="chat_abandon_confirm">Aufgeben</string>
     <string name="abandon_identity_chat">Direktchat: %1$s</string>
     <string name="abandon_identity_group">Gruppe: %1$s</string>
-    <string name="abandon_identity_account">Dein Konto: %1$s</string>
     <string name="chats_abandon_action">Chats auf diesem Gerät aufgeben</string>
     <string name="chats_abandon_dialog_title">Ausgewählte Chats auf diesem Gerät aufgeben?</string>
     <string name="toast_chat_already_abandoned">Dieser Chat ist auf diesem Gerät bereits gelöscht.</string>

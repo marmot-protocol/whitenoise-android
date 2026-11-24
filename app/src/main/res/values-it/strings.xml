@@ -183,7 +183,6 @@
     <string name="chat_abandon_confirm">Abbandona</string>
     <string name="abandon_identity_chat">Chat: %1$s</string>
     <string name="abandon_identity_group">Gruppo: %1$s</string>
-    <string name="abandon_identity_account">Il tuo account: %1$s</string>
     <string name="chats_abandon_action">Abbandona le chat su questo dispositivo</string>
     <string name="chats_abandon_dialog_title">Abbandonare le chat selezionate su questo dispositivo?</string>
     <string name="toast_chat_already_abandoned">Questa chat è già stata eliminata da questo dispositivo.</string>
