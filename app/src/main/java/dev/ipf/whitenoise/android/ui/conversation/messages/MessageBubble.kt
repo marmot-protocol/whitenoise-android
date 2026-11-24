@@ -2610,8 +2610,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
-                                contentModifier =
-                                    textSelectionBoundsModifier.animateTranscriptFooter(footerVoice != null),
+                                contentModifier = textSelectionBoundsModifier,
                                 media = {
                                     LookaheadScope {
                                         Column(
@@ -2701,6 +2700,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
+                                contentModifier = Modifier.animateTranscriptFooter(footerVoice != null),
                                 media = {
                                     LookaheadScope {
                                         Column(
