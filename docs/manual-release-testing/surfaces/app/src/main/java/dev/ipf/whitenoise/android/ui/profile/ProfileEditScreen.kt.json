@@ -250,6 +250,15 @@
           "PRO-001",
           "PRO-002"
         ]
+      },
+      {
+        "surface": "string:profile_saving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_saving",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
       }
     ],
     "source_coverage": [
