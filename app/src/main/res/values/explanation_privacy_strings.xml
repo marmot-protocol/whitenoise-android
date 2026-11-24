@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Chooses how long attachments stay on this device. Older ones are removed now and as they age, and downloading one again keeps it for the full period. Messages stay.</string>
     <string name="explanation_privacy_storage_chat">Opens the attachments stored for this chat.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Asks you to confirm, then removes every attachment in this chat from this device. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
-    <string name="explanation_privacy_storage_attachment">Selects or deselects this attachment so you can remove it together with others. Nothing is removed until you choose Remove.</string>
     <string name="explanation_privacy_storage_select_all">Selects every attachment in this list so you can remove them together. Nothing is removed until you choose Remove.</string>
     <string name="explanation_privacy_storage_select_shown">Selects only the attachments loaded so far. More load as you scroll, and nothing is removed until you choose Remove.</string>
     <string name="explanation_privacy_storage_clear_selection">Clears the current selection without removing anything.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Mutes message notifications from this person. It applies only to messages; delivery and unread counts do not change.</string>
     <string name="explanation_privacy_profile_system">Opens Android\'s settings for notifications from this person, where you can set a custom sound and behavior. Custom settings apply across conversations for this account.</string>
     <string name="explanation_privacy_profile_vibration">Chooses the vibration pattern for notifications from this person.</string>
+    <string name="explanation_privacy_storage_attachment_open">Opens this attachment so you can check it before removing it. The check mark, or holding the row, selects it to remove with others. Nothing is removed until you choose Remove.</string>
 </resources>

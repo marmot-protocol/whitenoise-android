@@ -26,4 +26,5 @@
     <string name="shared_media_share_photos_failed">Fotoğraflar paylaşılamadı</string>
     <string name="shared_media_share_photos_unavailable">Seçilen bazı fotoğraflar artık kullanılamıyor, bu yüzden hiçbir şey paylaşılmadı. Seçimleri kaldırıldı. Tekrar deneyin.</string>
     <string name="shared_media_share_photos_too_large">Bu fotoğraflar birlikte paylaşılamayacak kadar büyük. Daha azını seçip tekrar deneyin.</string>
+    <string name="shared_media_jump_to_date">Tarihe git</string>
 </resources>

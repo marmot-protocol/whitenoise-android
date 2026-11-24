@@ -24,4 +24,5 @@
     <string name="shared_media_share_photos_failed">无法分享照片</string>
     <string name="shared_media_share_photos_unavailable">部分所选照片已不可用，因此未分享任何内容。这些照片已取消选择。请重试。</string>
     <string name="shared_media_share_photos_too_large">这些照片太大，无法一次分享。请少选一些后重试。</string>
+    <string name="shared_media_jump_to_date">跳转到日期</string>
 </resources>

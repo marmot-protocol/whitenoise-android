@@ -8,7 +8,8 @@ name: settings-linked-devices
 - tapOn: "Account"
 - assertVisible:
     id: "settings.account.group"
-- tapOn: "Linked devices"
+- tapOn:
+    id: "settings.account.linked_devices"
 - assertVisible:
     id: "linked_devices.list"
 - assertVisible:

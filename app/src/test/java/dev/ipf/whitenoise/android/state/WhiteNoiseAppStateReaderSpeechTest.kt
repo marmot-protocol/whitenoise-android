@@ -282,7 +282,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
                     EngineTrust.Unknown,
                     voiceResolution = TtsVoiceResolution.Empty.copy(effectiveKey = voice),
                 )
-            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            val consent = TtsPlaybackTrustConsent(appState.readAloud) { handle }
             try {
                 assertTrue(consent.needsAcknowledgment())
                 val pending = async(start = CoroutineStart.UNDISPATCHED) { consent.confirm { true } }
@@ -303,7 +303,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
         runBlocking {
             val appState = testAppState(twoAccounts = true)
             val handle = TtsEngineHandle(TextToSpeech(context, {}), "test.external.reader", EngineTrust.Unknown)
-            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            val consent = TtsPlaybackTrustConsent(appState.readAloud) { handle }
             try {
                 val approved = async(start = CoroutineStart.UNDISPATCHED) { consent.confirm { true } }
                 requireNotNull(consent.pending).respond(true)
@@ -333,7 +333,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
             val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
             val handle = TtsEngineHandle(TextToSpeech(context, {}), "test.external.reader", EngineTrust.Unknown)
             var attachedHandle: TtsEngineHandle? = handle
-            val consent = TtsPlaybackTrustConsent(appState) { attachedHandle }
+            val consent = TtsPlaybackTrustConsent(appState.readAloud) { attachedHandle }
             try {
                 suspend fun startSpeech() = consent.confirm { true } && appState.speakAloud(entries, Locale.US)
 

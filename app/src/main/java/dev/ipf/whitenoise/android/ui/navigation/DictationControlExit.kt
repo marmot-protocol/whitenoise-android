@@ -20,9 +20,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
-import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
-import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.SurfaceMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
 import kotlin.math.roundToInt
 
@@ -103,7 +102,7 @@ internal fun DictationControlExit(
         if (entering) {
             try {
                 entrance.snapTo(1f)
-                entrance.animateTo(0f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
+                entrance.animateTo(0f, SurfaceMotion.Open.spec())
             } finally {
                 entering = false
             }

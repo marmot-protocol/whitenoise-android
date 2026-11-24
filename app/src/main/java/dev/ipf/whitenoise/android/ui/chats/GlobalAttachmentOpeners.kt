@@ -107,6 +107,12 @@ internal class GlobalAttachmentOpener(
     /** Opens the item's message instead, when no controller can own the item. */
     var onViewInChat: (GlobalAttachmentItem) -> Unit = {}
 
+    /**
+     * Set by callers that open only copies already on the device: a file whose copy is gone by the time it opens is
+     * reported here instead of being downloaded. Null keeps the library's download-on-first-tap.
+     */
+    var onMissingFile: ((GlobalAttachmentItem) -> Unit)? = null
+
     private val controllers = mutableMapOf<String, ConversationController>()
     private var closed = false
 
@@ -163,11 +169,20 @@ internal class GlobalAttachmentOpener(
         val index = item.attachmentIndex
         val fetch = suspend { materializeDocumentFile(context, controller, message, index, reference, retained = null) }
         if (!controller.hasCachedAttachmentAfterHydration(item.messageIdHex, item.attachmentIndex)) {
-            downloadLibraryFile(appState) { fetch() }
+            val missing = onMissingFile
+            if (missing != null) missing(item) else downloadLibraryFile(appState) { fetch() }
             return
         }
+        val file =
+            runCatchingCancellable { fetch() }
+                .getOrElse { error ->
+                    appState.presentFailure(R.string.media_couldnt_open, "GLOBAL_LIBRARY_FILE_OPEN", error)
+                    return
+                }
+        // A closed opener belongs to an account or runtime that is gone, so its file never reaches another app.
+        if (closed) return
         val outcome =
-            runCatchingCancellable { openFile(fetch(), reference.mediaType, reference.fileName, null, null) }
+            runCatchingCancellable { openFile(file, reference.mediaType, reference.fileName, null, null) }
                 .getOrElse { error ->
                     appState.presentFailure(R.string.media_couldnt_open, "GLOBAL_LIBRARY_FILE_OPEN", error)
                     return
@@ -260,7 +275,7 @@ internal fun rememberGlobalAttachmentOpener(
 }
 
 /**
- * The full-screen viewer for a library tap, with Go to Message leaving for the shown item's chat. Once the
+ * The full-screen viewer for a library tap, with Go to Message, when given, leaving for the shown item's chat. Once the
  * library settles, pages whose item it no longer lists (deleted, expired or hidden since the tap) leave the
  * viewer, and a viewer left with none closes with a notice. While the library rereads, the pages stay as
  * they were, so an unrelated change cannot close it.
@@ -271,7 +286,7 @@ internal fun GlobalAttachmentViewerHost(
     appState: WhiteNoiseAppState,
     items: List<GlobalAttachmentItem>,
     loading: Boolean,
-    onGoToMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
+    onGoToMessage: ((groupIdHex: String, messageIdHex: String) -> Unit)?,
 ) {
     val request = opener.viewer ?: return
     // The last settled pages, kept while the library rereads; a plain holder, since it never drives recomposition.
@@ -290,10 +305,13 @@ internal fun GlobalAttachmentViewerHost(
         pages = pages,
         startIndex = request.startIndex.coerceAtMost(pages.lastIndex),
         onDismiss = opener::dismissViewer,
-        onGoToMessage = { page ->
-            opener.dismissViewer()
-            onGoToMessage(page.groupIdHex ?: request.controller.group.groupIdHex, page.messageIdHex)
-        },
+        onGoToMessage =
+            onGoToMessage?.let { goTo ->
+                { page ->
+                    opener.dismissViewer()
+                    goTo(page.groupIdHex ?: request.controller.group.groupIdHex, page.messageIdHex)
+                }
+            },
         pageController = { page -> opener.pageController(page, request.controller) },
     )
 }

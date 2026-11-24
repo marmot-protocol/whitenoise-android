@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 
 private const val FIRST_READ_GRACE_MS = 600L
 
-/** Which page of Linked devices is showing in place of the roster. Saved by slot so rotation keeps the page. */
+/** Which page of Devices is showing in place of the roster. Saved by slot so rotation keeps the page. */
 private data class LinkedDevicesPage(
     val linking: Boolean = false,
     val deviceSlot: String? = null,
@@ -37,7 +37,7 @@ private data class LinkedDevicesPage(
 )
 
 /**
- * Settings → Linked devices for the active account: the roster, a device's page, this device's own link, and the
+ * Settings → Devices for the active account: the roster, a device's page, this device's own link, and the
  * dialogs for repair and sign-in review. With no active account there is nothing to read, so the roster shows its
  * loading state.
  */
@@ -56,7 +56,7 @@ internal fun LinkedDevicesScreen(
 }
 
 /**
- * The pages of Linked devices for one account on one runtime. The open page is keyed to that pairing, so nothing
+ * The pages of Devices for one account on one runtime. The open page is keyed to that pairing, so nothing
  * opened for one profile reopens over another. Leaving the link step with Back only closes it; only Cancel cancels.
  */
 @Composable

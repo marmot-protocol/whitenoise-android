@@ -10,11 +10,17 @@ import org.junit.Test
 
 /** Where a chat's Remove all confirmation takes its count and size from. */
 class StoredAttachmentsFiguresTest {
-    /** A fully loaded list is summed, even when the overview holds an older row for the chat. */
-    @Test fun completeListIsSummed() {
+    /** The overview's row answers even for a fully loaded list, since MarmotKit counts a shared file once. */
+    @Test fun overviewRowIsPreferred() {
         val list = StoredAttachmentsUiState(items = listOf(attachment("a", 10), attachment("b", 5)), complete = true)
-        val storage = ManageStorageUiState(chats = listOf(chat("g", 999)))
-        assertEquals(2L to 15L, chatFigures(storage, list, "g"))
+        val storage = ManageStorageUiState(chats = listOf(chat("g", 12)))
+        assertEquals(12L to 12L, chatFigures(storage, list, "g"))
+    }
+
+    /** A fully loaded list is summed when the overview has not loaded the chat. */
+    @Test fun completeListIsSummedWithoutAnOverviewRow() {
+        val list = StoredAttachmentsUiState(items = listOf(attachment("a", 10), attachment("b", 5)), complete = true)
+        assertEquals(2L to 15L, chatFigures(ManageStorageUiState(chats = listOf(chat("other", 40))), list, "g"))
     }
 
     /** While the list still pages, the overview's row answers. */
