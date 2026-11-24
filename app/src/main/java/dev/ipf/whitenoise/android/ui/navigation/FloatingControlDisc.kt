@@ -63,8 +63,8 @@ internal object FloatingControlColors {
  * The one floating control (#4065) — jump to newest, jump to top, resume read-aloud follow. A
  * [FloatingControlDiscSize] disc with a [FloatingControlIconSize] glyph sits in a [FloatingControlSlot] slot,
  * and its 48 dp touch target overhangs that slot. The press highlight is clipped to the disc, and the disc
- * casts the [WhiteNoiseElevation.FloatingControl] shadow at rest and pressed. [badge] hangs from the slot's
- * top end corner and adds nothing to the control's own description, so describe the count in
+ * casts the [WhiteNoiseElevation.FloatingControl] shadow at rest and pressed. [badge] hangs from the top end
+ * corner of a 42 dp frame around the disc and adds nothing to the control's own description, so describe the count in
  * [contentDescription] instead. [modifier] places the [slot], and [targetModifier] adds gestures or semantics
  * to the full 48 dp target. A control that always had a larger slot passes it, so it keeps its place.
  */

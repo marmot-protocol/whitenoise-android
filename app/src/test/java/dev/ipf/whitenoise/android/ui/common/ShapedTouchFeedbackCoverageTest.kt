@@ -41,7 +41,9 @@ class ShapedTouchFeedbackCoverageTest {
         val wrappers =
             sources.values
                 .map(::passThroughIconButtonWrappers)
-                .fold(emptyMap<String, Int>()) { all, next -> all + next }
+                .fold(emptyMap<String, Set<Int>>()) { all, next ->
+                    (all.keys + next.keys).associateWith { all[it].orEmpty() + next[it].orEmpty() }
+                }
         val found =
             sources.flatMap { (path, source) ->
                 (shapedTouchFindings(source, path) + stretchedWrapperCalls(source, wrappers)).map { "$path: $it" }
@@ -125,6 +127,9 @@ class ShapedTouchFeedbackCoverageTest {
         val defaultCardClipped = "Card(modifier = Modifier.clip(CardDefaults.shape).clickable { go() }) {}"
         assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(defaultCard).map(::kind))
         assertEquals(emptyList<String>(), shapedTouchFindings(defaultCardClipped))
+        val outlinedClipped =
+            "OutlinedCard(modifier = Modifier.clip(CardDefaults.outlinedShape).clickable { go() }) {}"
+        assertEquals(emptyList<String>(), shapedTouchFindings(outlinedClipped))
     }
 
     /**
@@ -143,7 +148,7 @@ class ShapedTouchFeedbackCoverageTest {
         val caller = "PasteButton(onPaste = go, modifier = Modifier.width(40.dp).height(48.dp))"
         val square = "PasteButton(onPaste = go, modifier = Modifier.size(48.dp))"
         val wrappers = passThroughIconButtonWrappers(wrapper)
-        assertEquals(mapOf("PasteButton" to 1), wrappers)
+        assertEquals(mapOf("PasteButton" to setOf(1)), wrappers)
         assertEquals(listOf(STRETCHED_ICON_BUTTON), stretchedWrapperCalls(caller, wrappers).map(::kind))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(square, wrappers))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(wrapper, wrappers))
@@ -176,7 +181,7 @@ class ShapedTouchFeedbackCoverageTest {
             }
             """.trimIndent()
         val wrappers = passThroughIconButtonWrappers(header)
-        assertEquals(mapOf("ActionButton" to 1), wrappers)
+        assertEquals(mapOf("ActionButton" to setOf(1)), wrappers)
         assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), stretchedWrapperCalls(header, wrappers))
     }
 
@@ -191,7 +196,47 @@ class ShapedTouchFeedbackCoverageTest {
                 IconButton(onClick = onToggle, modifier = modifier) { Icon() }
             }
             """.trimIndent()
-        assertEquals(mapOf("PlayPause" to 1), passThroughIconButtonWrappers(source))
+        assertEquals(mapOf("PlayPause" to setOf(1)), passThroughIconButtonWrappers(source))
+    }
+
+    /**
+     * A slot size is read from the binding in scope at the call — the nearest one before it, not a same-named
+     * one elsewhere — and over a chain ktlint wraps onto several lines.
+     */
+    @Test
+    fun theNearestWrappedBindingIsRead() {
+        val wrappers = mapOf("ActionButton" to setOf(1))
+        val source =
+            """
+            @Composable
+            internal fun Elsewhere() {
+                val cell = Modifier.size(48.dp)
+                ActionButton(action, cell)
+            }
+
+            @Composable
+            internal fun Header() {
+                val cell =
+                    Modifier
+                        .width(36.dp)
+                        .height(48.dp)
+                ActionButton(action, cell.testTag("x"))
+            }
+            """.trimIndent()
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @13"), stretchedWrapperCalls(source, wrappers))
+    }
+
+    /** A `modifier` parameter after one with a generic type keeps its position. */
+    @Test
+    fun aModifierAfterAGenericParameterKeepsItsPosition() {
+        val source =
+            """
+            @Composable
+            internal fun Picker(options: Map<String, Int>, onPick: (String) -> Unit, modifier: Modifier) {
+                IconButton(onClick = { onPick("a") }, modifier = modifier) { Icon() }
+            }
+            """.trimIndent()
+        assertEquals(mapOf("Picker" to setOf(2)), passThroughIconButtonWrappers(source))
     }
 
     /** A rectangular clip before the click does not count as shaping it, so the square highlight is still found. */

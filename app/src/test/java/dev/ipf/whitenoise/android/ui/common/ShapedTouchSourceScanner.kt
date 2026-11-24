@@ -31,6 +31,14 @@ private val twoArgumentSize = Regex("""\.(size|requiredSize)\(\s*[^,()]+,\s*[^,(
 private val oneSideSize = Regex("""\.(width|height|requiredWidth|requiredHeight)\(""")
 private val shapedFill = Regex("""\.(background|border)\s*\(""")
 private val shapeName = Regex("""CircleShape|PillShape|RoundedCornerShape|CutCornerShape|shapes\.\w+|\w+Shape\b""")
+
+/** Each Material card and the shape it takes when none is named. */
+private val cardDefaultShapes =
+    mapOf(
+        "Card" to "CardDefaults.shape",
+        "ElevatedCard" to "CardDefaults.elevatedShape",
+        "OutlinedCard" to "CardDefaults.outlinedShape",
+    )
 private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
 private val modifierParameter = Regex("""^\s*(@\w+\s+)*modifier\s*:""")
@@ -86,8 +94,8 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
  */
 private fun String.clicksInShapedSurfaces(): List<Pair<String, Int>> =
     calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null) } +
-        listOf("Card", "ElevatedCard", "OutlinedCard").flatMap { calls(it) }.flatMap {
-            shapedContainerClicks(it, defaultShape = "CardDefaults.shape")
+        cardDefaultShapes.flatMap { (card, defaultShape) ->
+            calls(card).flatMap { shapedContainerClicks(it, defaultShape) }
         }
 
 /** The click modifiers in one shaped container call's `modifier`, unless it is clickable itself or rectangular. */
@@ -160,17 +168,18 @@ private fun modifierArgument(args: String): String =
  * The functions in [source] that wrap a transparent icon button and pass their caller's `modifier` straight
  * to it, so the caller decides its size, each with the position of its `modifier` parameter.
  */
-internal fun passThroughIconButtonWrappers(source: String): Map<String, Int> {
+internal fun passThroughIconButtonWrappers(source: String): Map<String, Set<Int>> {
     val code = blankCommentsAndStrings(source)
     return (code.calls("IconButton") + code.calls("IconToggleButton"))
         .filter { (_, args) -> modifierArgument(args).startsWith("modifier") }
         .mapNotNull { (start, _) -> code.functionContaining(start) }
         .mapNotNull { (name, parameters) ->
-            topLevelArguments(parameters)
+            parameterList(parameters)
                 .indexOfFirst { modifierParameter.containsMatchIn(it) }
                 .takeIf { it >= 0 }
                 ?.let { name to it }
-        }.toMap()
+        }.groupBy({ it.first }, { it.second })
+        .mapValues { (_, indices) -> indices.toSet() }
 }
 
 /**
@@ -180,18 +189,21 @@ internal fun passThroughIconButtonWrappers(source: String): Map<String, Int> {
  */
 internal fun stretchedWrapperCalls(
     source: String,
-    wrappers: Map<String, Int>,
+    wrappers: Map<String, Set<Int>>,
 ): List<String> {
     val code = blankCommentsAndStrings(source)
-    return wrappers.flatMap { (name, modifierIndex) ->
+    return wrappers.flatMap { (name, modifierIndices) ->
         code
             .calls(name)
             .filter { (start, args) ->
                 val nameStart = start - 1 - name.length
                 val before = code.substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
-                val modifier = code.withLocalBinding(wrapperModifier(args, modifierIndex))
                 !declaration.containsMatchIn(before) &&
-                    (twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier))
+                    modifierIndices.any { index ->
+                        // Only bindings declared before this call are in scope for it.
+                        val modifier = code.substring(0, start).withLocalBinding(wrapperModifier(args, index))
+                        twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
+                    }
             }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
     }
 }
@@ -215,10 +227,56 @@ private fun String.withLocalBinding(expression: String): String {
     return if (binding == null) expression else "$binding $expression"
 }
 
-/** The initializer of `val [name] = …` in this text, to the end of its line, or null. */
+/**
+ * The initializer of the last `val [name] = …` in this text, the one nearest the end, read over the lines a
+ * wrapped modifier chain continues onto, or null.
+ */
 private fun String.localBinding(name: String): String? {
-    val pattern = Regex("""\bval\s+${Regex.escape(name)}\s*=\s*([^\n]*)""")
-    return pattern.find(this)?.groupValues?.get(1)
+    val declaration = Regex("""\bval\s+${Regex.escape(name)}\s*=\s*""").findAll(this).lastOrNull()
+    return declaration?.let { initializerFrom(it.range.last + 1) }
+}
+
+/** The expression starting at [start]: up to a line break outside brackets that no `.` call continues. */
+private fun String.initializerFrom(start: Int): String {
+    var depth = 0
+    var index = start
+    while (index < length && !endsStatementAt(index, depth)) {
+        when (this[index]) {
+            '(', '{', '[' -> depth++
+            ')', '}', ']' -> depth--
+        }
+        index++
+    }
+    return substring(start, index)
+}
+
+/** Whether a line break at [index], outside brackets at [depth], ends the statement it is in. */
+private fun String.endsStatementAt(
+    index: Int,
+    depth: Int,
+): Boolean = this[index] == '\n' && depth <= 0 && !continuesOnNextLine(index + 1)
+
+/** Whether the line starting at [from] continues a call chain with a leading `.`. */
+private fun String.continuesOnNextLine(from: Int): Boolean {
+    var index = from
+    while (index < length && (this[index] == ' ' || this[index] == '\t')) index++
+    return index < length && this[index] == '.'
+}
+
+/** A function's parameter list split at top-level commas, counting `<…>` type arguments as brackets. */
+private fun parameterList(parameters: String): List<String> {
+    val parts = mutableListOf<String>()
+    var depth = 0
+    var start = 0
+    parameters.forEachIndexed { index, char ->
+        when {
+            char in "({[<" -> depth++
+            char in ")}]" || (char == '>' && parameters.getOrNull(index - 1) != '-') -> depth--
+            char == ',' && depth == 0 -> parts += parameters.substring(start, index).also { start = index + 1 }
+        }
+    }
+    parts += parameters.substring(start)
+    return parts.filter { it.isNotBlank() }
 }
 
 /** The name and parameter text of the function whose body contains [offset], or null. */
