@@ -48,6 +48,24 @@
           "SCR-004"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:share_choose_sending_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "R.string.share_choose_sending_account",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "string:share_choose_sending_account_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "R.string.share_choose_sending_account_description",
+        "test_ids": [
+          "SYS-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

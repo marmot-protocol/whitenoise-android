@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+  "legacy_sha256": "3dae07334fe4b8e3cdf5a934ee02017fac084ae55f3243f112b90d00019fec5c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseModalBottomSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+        "anchor": "fun WhiteNoiseModalBottomSheet(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseSheetHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+        "anchor": "fun WhiteNoiseSheetHeader(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SYS-001",
+          "MSG-045",
+          "MSG-046",
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
