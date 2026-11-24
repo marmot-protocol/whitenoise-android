@@ -15,9 +15,12 @@ name: settings-help-support
     id: "settings.help_support.group"
 - tapOn: "Learn White Noise"
 - assertVisible: "Share your profile"
-- tapOn: "Find someone"
-- tapOn: "Make a private group"
-- tapOn: "Reply or react"
+- tapOn: "Next"
+- assertVisible: "Find someone"
+- tapOn: "Next"
+- assertVisible: "Make a private group"
+- tapOn: "Next"
+- assertVisible: "Reply or react"
 - scrollUntilVisible:
     element:
       text: "See you tomorrow!"
@@ -28,9 +31,10 @@ name: settings-help-support
 - assertVisible: "Demo contact"
 - scrollUntilVisible:
     element:
-      text: "Chat across apps"
+      text: "Next"
     direction: DOWN
-- tapOn: "Chat across apps"
+- tapOn: "Next"
+- assertVisible: "Chat across apps"
 - assertVisible: "Explore Marmot apps"
 - tapOn: "Done"
 - assertVisible:

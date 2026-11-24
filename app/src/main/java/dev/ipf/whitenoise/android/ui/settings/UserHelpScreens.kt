@@ -49,23 +49,12 @@ private enum class LearnTopic(
     @StringRes val title: Int,
     @StringRes val body: Int,
     @DrawableRes val artwork: Int,
-    @StringRes val continueLabel: Int,
 ) {
-    Invite(R.string.learn_share_title, R.string.learn_share_body, R.drawable.learn_share, R.string.learn_find_title),
-    Connect(R.string.learn_find_title, R.string.learn_find_body, R.drawable.learn_connect, R.string.learn_group_title),
-    Groups(
-        R.string.learn_group_title,
-        R.string.learn_group_body,
-        R.drawable.learn_groups,
-        R.string.learn_actions_title,
-    ),
-    Actions(
-        R.string.learn_actions_title,
-        R.string.learn_actions_body,
-        R.drawable.learn_actions,
-        R.string.learn_marmot_title,
-    ),
-    Interop(R.string.learn_marmot_title, R.string.learn_marmot_body, R.drawable.learn_marmot, R.string.done),
+    Invite(R.string.learn_share_title, R.string.learn_share_body, R.drawable.learn_share),
+    Connect(R.string.learn_find_title, R.string.learn_find_body, R.drawable.learn_connect),
+    Groups(R.string.learn_group_title, R.string.learn_group_body, R.drawable.learn_groups),
+    Actions(R.string.learn_actions_title, R.string.learn_actions_body, R.drawable.learn_actions),
+    Interop(R.string.learn_marmot_title, R.string.learn_marmot_body, R.drawable.learn_marmot),
 }
 
 @Suppress("FunctionNaming")
@@ -138,6 +127,11 @@ private fun LearnTopicPage(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (topic == LearnTopic.Actions) LearnMessageDemo()
+        if (topic == LearnTopic.Invite) {
+            OutlinedButton(onShareProfile, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.learn_open_share))
+            }
+        }
         if (topic == LearnTopic.Interop) LearnMarmotLink()
         Row(
             Modifier.align(Alignment.CenterHorizontally).clearAndSetSemantics { },
@@ -149,17 +143,8 @@ private fun LearnTopicPage(
                 Box(Modifier.size(width = width, height = 6.dp).background(color, CircleShape))
             }
         }
-        if (topic == LearnTopic.Invite) {
-            WhiteNoiseButton(onShareProfile, Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.learn_open_share))
-            }
-            OutlinedButton(onContinue, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Text(stringResource(topic.continueLabel))
-            }
-        } else {
-            WhiteNoiseButton(onContinue, Modifier.fillMaxWidth()) {
-                Text(stringResource(topic.continueLabel))
-            }
+        WhiteNoiseButton(onContinue, Modifier.fillMaxWidth()) {
+            Text(stringResource(if (topic == LearnTopic.entries.last()) R.string.done else R.string.next))
         }
     }
 }

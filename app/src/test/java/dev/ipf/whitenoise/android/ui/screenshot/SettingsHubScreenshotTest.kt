@@ -148,7 +148,7 @@ class SettingsHubScreenshotTest {
         label: String,
         snapshot: String,
     ) {
-        composeRule.onNodeWithText(label).performScrollTo().performClick()
+        composeRule.onNodeWithText("Next").performScrollTo().performClick()
         composeRule.onNodeWithText(label).assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot.png")
     }
