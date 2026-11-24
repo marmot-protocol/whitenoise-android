@@ -11,7 +11,8 @@ import androidx.compose.ui.unit.dp
  * same distance wherever it appears. `ElevationTokenCoverageTest` rejects a literal outside this file.
  *
  * Shadow or tint: a surface that floats over moving content (floating controls, FABs, menus, the kept card)
- * casts a shadow, and a surface that sits in the layout (bottom bars, panels, dialogs) takes a tint.
+ * casts a shadow, and a surface that sits in the layout (bottom bars, panels, dialogs) takes a tint. The chat
+ * list pen is the one flat FAB, so its morph into the composer stays shadow-free.
  */
 object WhiteNoiseElevation {
     val Level0 = 0.dp

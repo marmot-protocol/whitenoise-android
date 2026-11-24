@@ -67,8 +67,6 @@ import dev.ipf.whitenoise.android.ui.theme.Radii
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
 private val SUCCESS_STATUSES = setOf("completed", "complete", "finished", "success", "succeeded", "done")
 
-/** The operation card's shape, shared by its surface and its press highlight. */
-private val AgentOperationCardShape = RoundedCornerShape(Radii.md)
 private const val AGENT_OPERATION_ROW_WIDTH_FRACTION = 0.95f
 
 internal fun shouldRenderDedicatedAgentOperationRow(
@@ -293,7 +291,7 @@ internal fun AgentOperationChip(
                         Modifier
                     },
                 ),
-        shape = AgentOperationCardShape,
+        shape = RoundedCornerShape(Radii.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

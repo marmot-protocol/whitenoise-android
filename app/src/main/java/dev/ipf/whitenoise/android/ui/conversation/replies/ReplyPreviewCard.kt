@@ -246,7 +246,6 @@ internal fun ReplyPreviewCard(
         modifier =
             Modifier
                 .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-                // Clipped first, so the press highlight keeps the card's rounded corners.
                 .then(
                     if (onClick != null) {
                         Modifier.clickable(
