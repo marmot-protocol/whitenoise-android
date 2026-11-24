@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -26,6 +27,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
@@ -39,6 +41,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -238,13 +241,13 @@ class AppNavigationTest {
         assertEquals(headerBefore, headerAfter)
     }
 
-    /**
-     * A global confirmation follows navigation into Settings and shows below its top bar, above and clear of the
-     * account actions, under the same top-notice host the app root installs (#3312).
-     */
+    /** A global confirmation follows navigation and leaves the Settings profile row steady and tappable. */
     @Test
-    fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
+    fun globalConfirmationKeepsSettingsProfileRowSteadyAndTappable() {
         val appState = appState()
+        // This shell fixture has no native profile to encode for the Share & Connect QR.
+        val npubs = WhiteNoiseAppState::class.java.getDeclaredField("npubs").apply { isAccessible = true }
+        (npubs.get(appState) as BoundedNpubCache).put(ACCOUNT_ID, ACCOUNT_NPUB)
         val noticeHost = TopNoticeHost(SnackbarHostState(), notice = { appState.transientNotice })
         composeRule.setContent {
             CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
@@ -255,24 +258,34 @@ class AppNavigationTest {
         }
         awaitAttachedChatsController(appState)
 
+        val settingsEntry = composeRule.onNodeWithContentDescription("Open settings", substring = true)
+        val profile = composeRule.onNodeWithTag("settings.active_profile")
+        settingsEntry.performClick()
+        val originalProfileBounds = profile.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        settingsEntry.assertIsDisplayed()
+
         composeRule.runOnIdle {
             appState.presentTransient(AppText.Plain(GLOBAL_NOTICE_TEXT))
         }
-        composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
+        settingsEntry.performClick()
 
-        composeRule.onNodeWithText("Settings").assertIsDisplayed()
-        val profile =
-            composeRule
-                .onNodeWithTag("settings.active_profile")
-                .assertIsDisplayed()
-                .assertHasClickAction()
         val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
-
         val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
         val title = composeRule.onNodeWithText("Settings").fetchSemanticsNode().boundsInRoot
-        assertTrue("the banner sits below the Settings bar", title.bottom <= noticeBounds.top)
-        val profileTop = profile.fetchSemanticsNode().boundsInRoot.top
-        assertTrue("the banner stays clear of the account row", noticeBounds.bottom <= profileTop)
+        val profileBounds =
+            profile
+                .assertIsDisplayed()
+                .assertHasClickAction()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue("the bubble sits below the Settings bar", title.bottom <= noticeBounds.top)
+        assertEquals(originalProfileBounds, profileBounds)
+
+        val touch = noticeBounds.center
+        assertTrue("the touch passes through the bubble to the profile row", profileBounds.contains(touch))
+        profile.performTouchInput { click(touch - profileBounds.topLeft) }
+        composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
     }
 
     /** The actual shell admits one focused editor and real IME; explicit close resets the query before re-entry. */
@@ -525,6 +538,7 @@ class AppNavigationTest {
     private companion object {
         const val ACCOUNT_REF = "alice"
         val ACCOUNT_ID = "a0".repeat(32)
+        const val ACCOUNT_NPUB = "npub15zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zsqun85q9"
         val GROUP_A = "c2".repeat(32)
         val GROUP_B = "c3".repeat(32)
         const val GROUP_A_NAME = "Group A"

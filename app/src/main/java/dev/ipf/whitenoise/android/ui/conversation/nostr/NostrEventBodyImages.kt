@@ -165,7 +165,7 @@ private class NostrBodyImageCollector {
 private const val IMAGE_SCAN_NODE_BUDGET = 1024
 private const val IMAGE_DESTINATION_MAX_CHARS = 2048
 private val IMAGE_PATH_HINTS = setOf("jpg", "jpeg", "png", "webp", "gif")
-private val VIDEO_PATH_HINTS = setOf("mp4", "m4v", "mov", "webm", "m3u8")
+private val VIDEO_PATH_HINTS = setOf("mp4", "m4v", "mov", "webm")
 
 /** A large body remains readable; extra card image discovery simply declines another parse. */
 internal fun boundedNostrImageBody(body: String?): String? =

@@ -282,6 +282,7 @@ internal fun MainShell(
         rememberMainShellGlobalSearchState(
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+            recentsOwner = shellStateHolder.globalSearchRecents,
         )
     val scopedGlobalSearchState = globalSearch.scopedState
     // Only the temporary view choice survives conversation navigation; native rows stay screen-owned.
@@ -1775,7 +1776,6 @@ internal fun MainShell(
                     contentVisible = !appState.appLock.screenVisible,
                     topLevelBubble = true,
                     cardMorph = true,
-                    closingAnchor = dev.ipf.whitenoise.android.ui.chats.ChatsPenMorphAnchor,
                 ) { animatedSection ->
                     when (animatedSection) {
                         MainSection.Chats -> {
@@ -1801,6 +1801,7 @@ internal fun MainShell(
                                 globalSearchState = scopedGlobalSearchState,
                                 onGlobalSearchStateChange = globalSearch.update,
                                 searchViewport = globalSearch.viewport,
+                                searchRecents = globalSearch.recents,
                                 unreadOnlyFilter = unreadFilter.value,
                                 onUnreadOnlyFilterChange = { enabled ->
                                     val currentUnreadOwner =

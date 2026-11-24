@@ -363,8 +363,6 @@ class StalenessGuardCoverageTest {
                 // MDK advances read state monotonically and rollback only restores the matching read request.
                 "ConversationController.kt:submitVisibleReadUpTo" to
                     "monotonic engine cursor with conditional rollback",
-                // activeStreamIds admits one watcher per stream; removal is a separate terminal tombstone.
-                "ConversationController.kt:watchAgentTextStream" to "keyed single-owner stream lifecycle",
                 // Runs under cancelBlockedLeave's mutation lock and the group commit lock, rechecking the owner first.
                 "ConversationController.kt:cancelNativeBlockedLeave" to
                     "serialized group command with captured owner checks",
@@ -418,7 +416,6 @@ class StalenessGuardCoverageTest {
                 "AppState.kt" to
                     listOf(
                         "mediaCacheRevisionState",
-                        "transientNoticeSequence",
                         "relationshipRevision",
                         "runtimeGeneration",
                         "profileRevision",
@@ -427,6 +424,7 @@ class StalenessGuardCoverageTest {
                         "draftHydrationRevision",
                         "notificationDrainSequence",
                     ),
+                "TransientNotices.kt" to listOf("transientNoticeSequence"),
                 "ProfilePresentationNames.kt" to
                     listOf("profileAccountRevisionEpoch", "profileAccountRevisionSequence"),
                 "ChatsController.kt" to
@@ -437,11 +435,7 @@ class StalenessGuardCoverageTest {
                         "memberSnapshotsRevision",
                         "nextActivitySequence",
                     ),
-                "ConversationController.kt" to
-                    listOf(
-                        "retryGeneration",
-                        "streamDebugEventSequence",
-                    ),
+                "ConversationController.kt" to listOf("retryGeneration"),
                 "ConversationTimelineSession.kt" to listOf("lastStartedGeneration"),
                 "TtsPlaybackQueue.kt" to
                     listOf("messageProgressGeneration", "edgeRequestGeneration", "parkedTerminalGeneration"),

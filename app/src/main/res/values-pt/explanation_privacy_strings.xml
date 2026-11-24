@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Escolhe por quanto tempo os anexos ficam neste dispositivo. Os mais antigos são removidos agora e conforme envelhecem, e baixar um de novo o mantém pelo período completo. As mensagens permanecem.</string>
     <string name="explanation_privacy_storage_chat">Abre os anexos armazenados deste chat.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Pede sua confirmação e depois remove deste dispositivo todos os anexos deste chat. As mensagens permanecem, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
-    <string name="explanation_privacy_storage_attachment">Seleciona ou desmarca este anexo para você removê-lo junto com outros. Nada é removido até você escolher Remover.</string>
     <string name="explanation_privacy_storage_select_all">Seleciona todos os anexos desta lista para você removê-los juntos. Nada é removido até você escolher Remover.</string>
     <string name="explanation_privacy_storage_select_shown">Seleciona apenas os anexos carregados até agora. Mais são carregados conforme você rola, e nada é removido até você escolher Remover.</string>
     <string name="explanation_privacy_storage_clear_selection">Limpa a seleção atual sem remover nada.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Silencia as notificações de mensagens desta pessoa. Vale só para mensagens; a entrega e os contadores de não lidas não mudam.</string>
     <string name="explanation_privacy_profile_system">Abre as configurações do Android para notificações desta pessoa, onde você pode definir um som e um comportamento personalizados. As configurações personalizadas valem para todas as conversas desta conta.</string>
     <string name="explanation_privacy_profile_vibration">Escolhe o padrão de vibração das notificações desta pessoa.</string>
+    <string name="explanation_privacy_storage_attachment_open">Abre este anexo para você conferir antes de removê-lo. A marca de seleção, ou tocar e segurar a linha, o seleciona para remover junto com outros. Nada é removido até você escolher Remover.</string>
 </resources>

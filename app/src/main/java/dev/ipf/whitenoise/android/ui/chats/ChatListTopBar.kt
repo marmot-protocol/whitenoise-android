@@ -98,6 +98,7 @@ internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-accoun
 
 /** Separates the active avatar from the stacked other accounts without breaking the avatar cluster. */
 private val CHAT_LIST_ACCOUNT_AVATAR_SIZE = 40.dp
+private val CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET = 48.dp
 private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
 
 /** Stable test tag for a folder pill. */
@@ -234,9 +235,6 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
-                            val (settingsOrigin, openSettings) =
-                                dev.ipf.whitenoise.android.ui.settings
-                                    .rememberSettingsRouteClick(onOpenSettings)
                             val avatarExplanation =
                                 if (appState.chatsAvatarOpensSelector()) {
                                     chatsExplanation(
@@ -260,7 +258,7 @@ internal fun ChatListTopBar(
                                     seed = active?.accountIdHex ?: "whitenoise",
                                     pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                                     size = CHAT_LIST_ACCOUNT_AVATAR_SIZE,
-                                    touchTargetSize = 48.dp,
+                                    touchTargetSize = CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET,
                                     actionDescription =
                                         stringResource(
                                             if (appState.chatsAvatarOpensSelector()) {
@@ -274,7 +272,7 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                openSettings()
+                                                onOpenSettings()
                                             }
                                         }
                                     },
@@ -282,7 +280,6 @@ internal fun ChatListTopBar(
                                         Modifier
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
-                                            .then(settingsOrigin)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other

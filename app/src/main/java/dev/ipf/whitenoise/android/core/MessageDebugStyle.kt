@@ -14,7 +14,6 @@ enum class MessageDebugCategory(
     val label: String,
 ) {
     UserVisible("user-visible"),
-    StreamSignaling("stream-signaling"),
     AgentChrome("agent-chrome"),
     GroupSystem("group-system"),
     Control("control"),
@@ -23,7 +22,7 @@ enum class MessageDebugCategory(
 
 /**
  * Debug-row presentation derived from a timeline record: a [category] label, a
- * [kindLabel] such as "kind 1200 · agent-stream-start", a multi-line
+ * [kindLabel] such as "kind 7 · reaction", a multi-line
  * [tagsSummary], and a kind-specific [detailText]. [isUserVisibleBubble] lets
  * the conversation skip debug rendering for ordinary chat bubbles even when
  * streaming debug is on.
@@ -44,7 +43,7 @@ data class MessageDebugStyle(
  * mode the raw MLS dump is tucked behind a per-row tap, never the default
  * (#857). [AgentOperation] always renders as an expandable tool-call chip.
  * [DebugRow] is reserved for the other non-user-visible signaling kinds
- * (reactions, deletes, agent-stream-start, unknown) when streaming debug is on;
+ * (reactions, deletes, unknown) when streaming debug is on;
  * [Bubble] is the ordinary chat bubble.
  */
 enum class TimelineRowKind {
@@ -91,12 +90,11 @@ object MessageDebugClassifier {
         )
     }
 
+    /** The debug category whose accent and label the row shows for [record]. */
     private fun categoryOf(record: AppMessageRecordFfi): MessageDebugCategory =
         when {
-            // User-visible bubbles: plain chat / reply / media / agent-stream final.
-            MessageProjector.isStreamFinal(record) -> MessageDebugCategory.UserVisible
+            // User-visible bubbles: plain chat / reply / media, including an agent's reply.
             MessageProjector.isChatKind(record.kind) -> MessageDebugCategory.UserVisible
-            MessageProjector.isStreamStart(record) -> MessageDebugCategory.StreamSignaling
             MessageProjector.isAgentOperation(record) -> MessageDebugCategory.AgentChrome
             MessageProjector.isGroupSystem(record) -> MessageDebugCategory.GroupSystem
             MessageProjector.isReaction(record) -> MessageDebugCategory.Control
@@ -105,11 +103,10 @@ object MessageDebugClassifier {
             else -> MessageDebugCategory.Unknown
         }
 
+    /** A short readable name for [record]'s event kind. */
     private fun kindName(record: AppMessageRecordFfi): String =
         when {
-            MessageProjector.isStreamFinal(record) -> "agent-stream-final"
             MessageProjector.isChatKind(record.kind) -> "chat"
-            MessageProjector.isStreamStart(record) -> "agent-stream-start"
             MessageProjector.isAgentOperation(record) -> "agent-operation"
             MessageProjector.isGroupSystem(record) -> "group-system"
             MessageProjector.isReaction(record) -> "reaction"
@@ -123,13 +120,9 @@ object MessageDebugClassifier {
         return "tags:\n" + record.tags.joinToString("\n") { it.values.joinToString(" ") }
     }
 
+    /** The kind-specific detail line: delete or reaction targets, else the reply target and pretty body. */
     private fun detailText(record: AppMessageRecordFfi): String =
         when {
-            MessageProjector.isStreamStart(record) ->
-                MessageProjector.streamId(record)?.let { "stream id: $it" } ?: "stream id: (none)"
-            MessageProjector.isStreamFinal(record) ->
-                MessageProjector.streamId(record)?.let { "stream id: $it" }
-                    ?: prettyBody(record)
             MessageProjector.isDelete(record) -> {
                 val targets = MessageProjector.deletedTargetMessageIds(record)
                 if (targets.isEmpty()) "delete target: (none)" else "delete target: ${targets.joinToString(", ")}"

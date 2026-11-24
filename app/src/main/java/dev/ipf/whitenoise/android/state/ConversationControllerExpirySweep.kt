@@ -125,3 +125,8 @@ internal fun ConversationController.retainedRowExpiryDeadlineMillis(messageId: S
 internal fun ConversationController.signalForegroundSweepScheduleChanged() {
     foregroundSweepScheduleSignals.trySend(Unit)
 }
+
+/** Current wall-clock seconds from the controller's lifecycle-stable clock. */
+internal fun ConversationController.nowSeconds(): ULong = (clockMillis() / MILLIS_PER_SECOND).toULong()
+
+private const val MILLIS_PER_SECOND = 1_000L

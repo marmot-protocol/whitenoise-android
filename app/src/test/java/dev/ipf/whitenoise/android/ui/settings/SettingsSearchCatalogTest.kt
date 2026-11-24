@@ -125,6 +125,18 @@ class SettingsSearchCatalogTest {
         assertTrue(catalog.any { it.titleRes == R.string.folder_new_title })
     }
 
+    /** The Devices row is still found by the words of its earlier name, which the rest of the app keeps using. */
+    @Test fun devicesRowIsFoundByItsEarlierName() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val documents =
+            prepareSettingsSearch(catalog, SettingsSearchEligibility(true, false, false, true)) {
+                context.getString(it)
+            }
+        listOf("devices", "linked", "linked devices", "link device").forEach { query ->
+            assertTrue(query, searchSettings(documents, query).any { it.entry.id == "Account.linked_devices" })
+        }
+    }
+
     @Test fun localizedShareMenuLabelsResolveToOneExistingShareTrigger() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val documents =

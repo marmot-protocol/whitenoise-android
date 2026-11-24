@@ -14,7 +14,12 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterMenu
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterOptions
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterPicker
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFolderOption
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecent
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentAvatarSize
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentSection
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentTitle
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 
 /** The real shell-owned filter presentation receives fixed options, without native search or preference writes. */
@@ -23,6 +28,10 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 internal fun MaestroSearchPresentation(fixture: MaestroPresentationFixture) {
     if (fixture.scenario.startsWith("extra-search-menu-")) {
         SearchMenuPresentation(fixture)
+        return
+    }
+    if (fixture.scenario == "extra-search-recent-remove") {
+        SearchRecentPresentation(fixture)
         return
     }
     val folder = fixture.scenario.startsWith("extra-search-folder-")
@@ -74,5 +83,26 @@ private fun SearchMenuPresentation(fixture: MaestroPresentationFixture) {
             },
             onClearAll = { fixture.finish("clear-handoff") },
         )
+    }
+}
+
+/** The real Recent row with fixed entries; long press and Remove must dispatch removal of that one profile. */
+@Composable
+@Suppress("FunctionNaming")
+private fun SearchRecentPresentation(fixture: MaestroPresentationFixture) {
+    val profile = GlobalSearchRecent.Profile("npub1fixturealice")
+    val titles = mapOf(profile to "Fixture Alice", GlobalSearchRecent.Chat("f1".repeat(32)) to "Fixture group")
+    GlobalSearchRecentSection(
+        entries = titles.keys.toList(),
+        onOpen = { error("Recent fixture opens nothing") },
+        onRemove = {
+            check(it == profile)
+            fixture.finish("removed")
+        },
+        onClear = { error("Recent fixture clears nothing") },
+    ) { entry ->
+        val title = titles.getValue(entry)
+        Avatar(title, entry.key, GlobalSearchRecentAvatarSize)
+        GlobalSearchRecentTitle(title)
     }
 }

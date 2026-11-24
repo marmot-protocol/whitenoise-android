@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppReadAloud
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -100,6 +101,16 @@ class GroupDetailsEditNavigationTest {
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w320dp-h600dp-mdpi")
+    fun editGroupSharedFieldsAmoledCompact() {
+        render(controller(group()), darkTheme = true, amoled = true)
+
+        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).performClick()
+        assertEditorIsOpen()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_edit_shared_fields_amoled_compact.png")
     }
 
     /** Unavailable call actions do not occupy the primary action row. */
@@ -517,11 +528,11 @@ class GroupDetailsEditNavigationTest {
 
     /** Controlled source-render fixture copied from GroupAdvancedSettingsIconsTest; no engine handle. */
     private fun WhiteNoiseAppState.applyCaptureSpeechCatalog() {
-        val delegate = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
+        val delegate = AppReadAloud::class.java.getDeclaredField("ttsResolution\$delegate")
         delegate.isAccessible = true
 
         @Suppress("UNCHECKED_CAST")
-        val state = delegate.get(this) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
+        val state = delegate.get(readAloud) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
         state.value =
             TtsResolutionResult(
                 status = TextToSpeech.SUCCESS,
@@ -916,7 +927,7 @@ class GroupDetailsEditNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 
@@ -1105,7 +1116,7 @@ class GroupDetailsConfirmationNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 

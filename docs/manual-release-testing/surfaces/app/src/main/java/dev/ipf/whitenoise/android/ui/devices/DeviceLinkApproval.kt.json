@@ -172,9 +172,17 @@
         ]
       },
       {
-        "surface": "DeviceLinkChoiceFields",
+        "surface": "DeviceLinkNameField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "fun DeviceLinkChoiceFields(",
+        "anchor": "fun DeviceLinkNameField(",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "DeviceLinkSharingChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
+        "anchor": "fun DeviceLinkSharingChoices(",
         "test_ids": [
           "SET-061"
         ]

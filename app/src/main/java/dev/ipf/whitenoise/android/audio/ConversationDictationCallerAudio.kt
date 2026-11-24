@@ -23,8 +23,8 @@ import kotlin.math.max
 internal const val CALLER_AUDIO_SAMPLE_RATE_HZ = 16_000
 internal const val CALLER_AUDIO_CHANNEL_COUNT = 1
 
-/** Keep two seconds of following context before exposing the newest sentence boundary. */
-internal const val CALLER_AUDIO_MINIMUM_TAIL_BYTES = CALLER_AUDIO_SAMPLE_RATE_HZ * 2 * 2
+/** Keep one second of following audio before exposing the newest sentence boundary. */
+internal const val CALLER_AUDIO_MINIMUM_TAIL_BYTES = CALLER_AUDIO_SAMPLE_RATE_HZ * 2
 
 /** One read per 100 ms of mono 16 kHz audio. */
 private const val FRAMES_PER_READ = 1_600

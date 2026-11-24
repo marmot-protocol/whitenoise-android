@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.state.IdentityImportOutcome
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
@@ -232,6 +233,12 @@ internal fun OnboardingScreen(
                                 } else {
                                     R.string.onboarding_recover_setup_failed
                                 },
+                                kind =
+                                    if (recovered) {
+                                        TransientNoticeKind.Confirmation
+                                    } else {
+                                        TransientNoticeKind.Information
+                                    },
                             )
                         }
                     } finally {

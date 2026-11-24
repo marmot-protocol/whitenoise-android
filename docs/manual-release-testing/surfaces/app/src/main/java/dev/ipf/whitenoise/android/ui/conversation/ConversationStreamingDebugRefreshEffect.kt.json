@@ -1,0 +1,8 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffect.kt",
+  "legacy_sha256": "7b974e89851a3adefec9303dff5adb8ed879625c23df65ea140d17bd376f31fe",
+  "categories": {
+    "composable_surfaces": []
+  },
+  "discovery_exceptions": []
+}

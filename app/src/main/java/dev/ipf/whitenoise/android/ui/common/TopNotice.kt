@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.SnackbarDuration
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -31,8 +33,10 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.isForConversation
 import kotlinx.coroutines.delay
 
@@ -66,13 +70,15 @@ internal class TopNoticeClaim
  * region that can host them claims a slot while composed, and the newest claim owns the banners: a destination
  * pushed over the shell, or a modal over a destination, takes them over and hands them back when it leaves.
  * Nothing renders while [presentationAllowed] is false, which is how app lock hides stale text and actions.
- * The host keeps no notice of its own: [notice] reads the app's existing notice and [snackbarHostState] is the
- * existing snackbar queue, so each event still has exactly one presentation.
+ * The host reads the app's temporary notice, retained partial result and snackbar queue. One slot owns their
+ * presentation at a time.
  */
 @Stable
 internal class TopNoticeHost(
     val snackbarHostState: SnackbarHostState,
     private val notice: () -> TransientNotice?,
+    val partial: () -> TransientNotice? = { null },
+    val dismissNotice: (TransientNotice) -> Unit = {},
     private val presentationAllowed: () -> Boolean = { true },
 ) {
     private val claims = mutableStateListOf<TopNoticeClaim>()
@@ -134,6 +140,15 @@ internal class TopNoticeSlotState(
     val hostNotice: TransientNotice?
         get() = host?.transientNotice
 
+    fun partialNotice(scope: ConversationNoticeDestination?): TransientNotice? {
+        val retained = host?.partial?.invoke()
+        return topNoticeFor(retained, owner = true, scope = scope)
+    }
+
+    fun dismiss(notice: TransientNotice) {
+        host?.dismissNotice?.invoke(notice)
+    }
+
     /** True while this slot draws something, so a caller can hand it a system-bar inset it would otherwise own. */
     fun presents(
         notice: TransientNotice?,
@@ -141,9 +156,12 @@ internal class TopNoticeSlotState(
     ): Boolean {
         val snackbar = snackbarHostState?.currentSnackbarData
         // Empty slots still claim ownership, but their callers do not depend on the claim order.
-        if (notice == null && snackbar == null) return false
+        val partial = host?.partial?.invoke()
+        if (notice == null && partial == null && snackbar == null) return false
         val owner = owns
-        return topNoticeFor(notice, owner, scope) != null || (owner && snackbar != null)
+        return topNoticeFor(notice, owner, scope)?.kind?.let { it != TransientNoticeKind.Confirmation } == true ||
+            topNoticeFor(partial, owner, scope) != null ||
+            (owner && snackbar != null)
     }
 }
 
@@ -159,43 +177,53 @@ internal fun rememberTopNoticeSlot(): TopNoticeSlotState {
     return remember(host, claim) { TopNoticeSlotState(host, claim) }
 }
 
-/**
- * Renders the owning slot's banners: the notice first, then any snackbar with its dismiss, retry and report-copy
- * actions. The region wraps long text and is bounded to part of the visible window, scrolling inside itself at
- * large font scales or in a short window, so the screen beneath always keeps room for its content. Regions sit
- * outside padded content, in bar slots, the shell, the root and modal columns, so the region keeps itself clear
- * of a side cutout or side navigation bar. That padding honours what an ancestor already consumed, so a region
- * inside padded content, like the conversation's row, is not padded twice.
- */
+/** Measures actionable/status notices and layers a compact confirmation above the destination. */
 @Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+@Suppress("FunctionNaming")
 internal fun TopNoticeRegion(
     slot: TopNoticeSlotState,
     modifier: Modifier = Modifier,
     notice: TransientNotice? = slot.hostNotice,
     scope: ConversationNoticeDestination? = LocalTopNoticeScope.current,
+    confirmationNeedsStatusInset: Boolean = false,
 ) {
     if (!slot.owns) return
     val shown = topNoticeFor(notice, owner = true, scope = scope)
-    val snackbarHostState = slot.snackbarHostState
-    // An empty region composes nothing, so it can never hold space or catch a touch above the screen it serves.
-    if (shown == null && snackbarHostState?.currentSnackbarData == null) return
-    Column(
-        modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-            .heightIn(max = topNoticeMaxHeight())
-            .fadingVerticalScroll(rememberScrollState())
-            .testTag(TOP_NOTICE_REGION_TAG),
-    ) {
-        shown?.let {
-            val tag = if (it.conversation == null) GLOBAL_TRANSIENT_NOTICE_TAG else CONVERSATION_TRANSIENT_NOTICE_TAG
-            InlineConfirmationNotice(
-                notice = it,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag(tag),
+    val snackbarHostState = slot.snackbarHostState?.takeIf { it.currentSnackbarData != null }
+    val inlineNotice = shown?.takeUnless { it.kind == TransientNoticeKind.Confirmation }
+    val partialNotice = slot.partialNotice(scope)
+    val hasMeasuredNotice = inlineNotice != null || partialNotice != null || snackbarHostState != null
+    val bubbleNeedsInset = confirmationNeedsStatusInset && !hasMeasuredNotice
+    Column(modifier.fillMaxWidth().zIndex(1f)) {
+        if (hasMeasuredNotice) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    .heightIn(max = topNoticeMaxHeight())
+                    .fadingVerticalScroll(rememberScrollState())
+                    .testTag(TOP_NOTICE_REGION_TAG),
+            ) {
+                listOfNotNull(partialNotice, inlineNotice).forEach {
+                    val tag =
+                        if (it.conversation == null) GLOBAL_TRANSIENT_NOTICE_TAG else CONVERSATION_TRANSIENT_NOTICE_TAG
+                    InlineConfirmationNotice(
+                        notice = it,
+                        onDismiss = if (it.kind == TransientNoticeKind.Partial) ({ slot.dismiss(it) }) else null,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag(tag),
+                    )
+                }
+                snackbarHostState?.let { WhiteNoiseSnackbarHost(it) }
+            }
+        }
+        // Anchor below measured feedback so the bubble never covers its actions.
+        key(scope) {
+            val inset = if (bubbleNeedsInset) Modifier.statusBarsPadding() else Modifier
+            AnchoredConfirmationBubble(
+                notice = shown?.takeIf { it.kind == TransientNoticeKind.Confirmation },
+                modifier = inset.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
             )
         }
-        snackbarHostState?.takeIf { it.currentSnackbarData != null }?.let { WhiteNoiseSnackbarHost(it) }
     }
 }
 

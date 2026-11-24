@@ -52,9 +52,9 @@
         ]
       },
       {
-        "surface": "Linked devices in groups: R.string.linked_devices",
+        "surface": "Linked devices in groups: R.string.group_account_devices_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
-        "anchor": "R.string.linked_devices",
+        "anchor": "R.string.group_account_devices_title",
         "test_ids": [
           "GRP-044"
         ]

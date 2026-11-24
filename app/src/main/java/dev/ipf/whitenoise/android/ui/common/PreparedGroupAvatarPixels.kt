@@ -6,7 +6,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.firstFrameGroupAvatarSources
 import dev.ipf.whitenoise.android.state.isRenderable
 
 /** Short-lived decoded-pixel pins for at most one bounded visible working set, not a protocol cache. */
@@ -19,6 +22,15 @@ internal data class PreparedGroupAvatarPixels(
     val recordLoaded: ((AvatarAssetFfi, ImageBitmap) -> Unit)? = null,
     val compatibility: RetainedGroupCompatibilityPixels? = null,
 ) {
+    fun matchesOwner(
+        accountRef: String?,
+        runtimeGeneration: Int,
+        lifetime: Long,
+    ): Boolean =
+        this.accountRef == accountRef &&
+            this.runtimeGeneration == runtimeGeneration &&
+            this.lifetime == lifetime
+
     /** Records an exact completed load; absent loads and previous-revision fallback never enter the window. */
     fun recordCompleted(
         asset: AvatarAssetFfi?,
@@ -45,6 +57,26 @@ internal data class PreparedGroupAvatarPixels(
         }
 }
 
+internal data class CompatibilityAvatarSelection(
+    val row: String,
+    val sources: Map<ChatListAvatarSource, String>,
+)
+
+/** The encrypted fallback remains drawable while a legacy URL is unavailable. */
+internal fun chatRowCompatibilityAvatarSelection(
+    item: ChatListItem,
+    accountRef: String?,
+    avatarUrl: (String) -> String?,
+): CompatibilityAvatarSelection {
+    val sources = firstFrameGroupAvatarSources(item, accountRef) { item.selectedAvatarUrl ?: avatarUrl(it) }.toMap()
+    val encryptedFallback =
+        encryptedGroupAvatarCacheKey(accountRef, item.group)?.let { ChatListAvatarSource.ENCRYPTED_GROUP to it }
+    return CompatibilityAvatarSelection(
+        item.group.groupIdHex,
+        if (encryptedFallback == null) sources else sources + encryptedFallback,
+    )
+}
+
 /** A compatibility image belongs to a selected row and the exact URL or encrypted image key. */
 internal class RetainedGroupCompatibilityPixels {
     private data class Picture(
@@ -53,13 +85,14 @@ internal class RetainedGroupCompatibilityPixels {
         val image: ImageBitmap,
     )
 
-    private var rows by mutableStateOf(emptySet<String>())
+    private var rows by mutableStateOf(emptyMap<String, Map<ChatListAvatarSource, String>>())
     private val pictures = mutableMapOf<String, Picture>()
 
-    /** Keeps only rows in the current bounded window that do not have a durable asset. */
-    fun select(visibleRows: Set<String>) {
-        rows = visibleRows
-        pictures.keys.retainAll(rows)
+    /** Retire pictures when their row leaves the working set or the projection changes its source. */
+    fun select(selected: List<CompatibilityAvatarSelection>) {
+        val available = selected.associate { it.row to it.sources }
+        pictures.entries.removeAll { (row, picture) -> available[row]?.get(picture.source) != picture.key }
+        rows = available
     }
 
     /** A row that drew before its first measurement can record on the next composition. */
@@ -79,9 +112,7 @@ internal class RetainedGroupCompatibilityPixels {
         key: String?,
         image: ImageBitmap?,
     ) {
-        if (row !in rows || PrivateContactAvatarLoader.isPrivate(key)) return
-        val previous = pictures[row]
-        if (previous != null && (source != previous.source || key != previous.key)) pictures.remove(row)
+        if (rows[row]?.get(source) != key || PrivateContactAvatarLoader.isPrivate(key)) return
         if (key != null && image != null) pictures[row] = Picture(source, key, image)
     }
 }

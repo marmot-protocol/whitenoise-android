@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="other">PDF · %d 页</item>
+    </plurals>
+    <string name="composer_pdf_metadata_removed">已移除元数据</string>
+    <string name="composer_pdf_metadata_removed_on_send">发送时移除元数据</string>
+    <string name="composer_pdf_metadata_signed">已签名：保留元数据</string>
+    <string name="composer_pdf_metadata_encrypted">受保护：保留元数据</string>
+    <string name="composer_pdf_metadata_unsupported">无法移除元数据</string>
+    <string name="composer_pdf_metadata_sending_as_is">将连同元数据发送</string>
+    <string name="composer_pdf_metadata_dialog_title">连同元数据发送？</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s 已签名。移除其元数据会破坏签名，因此只能按原样发送。</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s 受密码保护，因此无法移除其元数据。</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise 无法安全地移除 %1$s 的元数据。</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="other">无法移除 %1$d 个 PDF 的元数据：%2$s。</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">此聊天中的所有人都能看到作者、创建它的应用以及创建或修改时间等信息。</string>
+    <string name="composer_pdf_metadata_send_as_is">按原样发送</string>
+    <string name="media_file_pdf_metadata_kept">此 PDF 未发送，因为无法移除其元数据。请从消息框发送，以选择是否按原样发送。</string>
+</resources>

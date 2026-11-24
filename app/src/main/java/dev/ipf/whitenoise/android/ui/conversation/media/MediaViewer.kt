@@ -96,22 +96,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Upgrade receive-side compatibility references before a transfer. Timeline
- * fallback records can temporarily carry sourceEpoch=0; passing that value to
- * MarmotKit can never succeed and previously left visual media spinning.
- */
-internal suspend fun authoritativeVisualMediaReference(
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-    resolve: suspend () -> MediaAttachmentReferenceFfi,
-): MediaAttachmentReferenceFfi =
-    if (mine || reference.sourceEpoch != 0uL) {
-        reference
-    } else {
-        resolve()
-    }
-
-/**
  * Resolve the decrypted bytes for an attachment, preferring the retained
  * plaintext in `pendingAttachmentsList` for own optimistic sends so the
  * viewer / save / share paths don't spin while waiting for the projection
@@ -306,11 +290,13 @@ internal fun FullScreenMediaViewer(
     }
 
     // Render ownership is independent of action retirement during a valid visual exit.
-    val accountOwnerCurrent = actionOwner.accountRef != null && currentActionOwner() == actionOwner
-    val sourceOwnerCurrent =
-        accountOwnerCurrent &&
+    fun viewerSourceIsCurrent(): Boolean =
+        actionOwner.accountRef != null &&
+            currentActionOwner() == actionOwner &&
             controller.ownsRetainedForegroundPresentation &&
             controller.boundAccountRef == actionOwner.accountRef
+
+    val sourceOwnerCurrent = viewerSourceIsCurrent()
     val privacyBlocked = viewerPrivacyBlocked()
     LaunchedEffect(sourceOwnerCurrent, privacyBlocked) {
         if (!sourceOwnerCurrent || privacyBlocked) onDismiss()
@@ -492,7 +478,7 @@ internal fun FullScreenMediaViewer(
             closing = closingMotion,
             allowMotion =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ) &&
                     scale == 1f &&
@@ -515,9 +501,10 @@ internal fun FullScreenMediaViewer(
             attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
             fallbackCloseAllowed =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ),
+            hasVideoSurface = currentPageIsVideo,
         ) { motionBodyModifier ->
             MediaViewerFrame(
                 senderLabel = appState.displayName(currentPage.sender),
@@ -734,7 +721,11 @@ internal fun FullScreenMediaViewer(
                     val sourceController = pageController(pageDescriptor)
                     // Retained cross-chat pages can outlive their controller lookup. Reject the opener's
                     // fallback before either renderer reads thumbnails, pending media, files or decoded pixels.
-                    if (!exportPageOwnerIsCurrent(pageDescriptor, sourceController)) {
+                    val pageSourceCurrent =
+                        viewerSourceIsCurrent() &&
+                            !viewerPrivacyBlocked() &&
+                            actionOwner.matchesPageSource(pageDescriptor, sourceController)
+                    if (!pageSourceCurrent) {
                         Box(Modifier.fillMaxSize())
                         return@StableMediaViewerPager
                     }
@@ -1031,7 +1022,7 @@ internal fun MediaViewerFrame(
                             placeable.placeRelative(0, inset)
                         }
                     }.windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
-            snackbar = { SwipeDismissibleSnackbar(it) },
+            snackbar = { SwipeDismissibleSnackbar(it, overlayConfirmation = true) },
         )
     }
 }

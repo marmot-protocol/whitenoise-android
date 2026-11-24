@@ -140,7 +140,13 @@ internal suspend fun ConversationController.publishInitialAdminInviteResult(
 internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
     val account = conversationAccountRef ?: return
     val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_some_members_not_added
-    appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
+    appState.presentConversationTransient(
+        account,
+        group.groupIdHex,
+        title,
+        skipped,
+        kind = if (skipped == null) TransientNoticeKind.Confirmation else TransientNoticeKind.Partial,
+    )
 }
 
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */

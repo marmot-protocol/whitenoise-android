@@ -37,5 +37,6 @@ internal fun conversationSearchRecord(
         override val sender = record.sender
         override val mediaTypes = media.map { it.mediaType }
         override val mediaLabels = media.map { it.fileName.ifBlank { it.mediaType } }
+        override val inThread = item.projected?.thread != null
     }
 }

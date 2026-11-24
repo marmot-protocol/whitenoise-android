@@ -17,10 +17,7 @@ internal fun nextReadAnchor(
 ): String? {
     val candidate = timeline.getOrNull(candidateIndex)
     val candidateId = candidate?.record?.messageIdHex
-    // Synthetic streaming-debug rows carry a non-hex id and never mark read;
-    // don't let one become the read anchor or it would pin the pointer off a
-    // real message until the next chat row advances it.
-    if (candidateId.isNullOrBlank() || candidateId.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+    if (candidateId.isNullOrBlank()) {
         return currentAnchorId
     }
     val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }

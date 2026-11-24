@@ -11,17 +11,6 @@ import java.io.File
 import java.time.Instant
 
 class FreshSweepCoverageTest {
-    /** Pins selection memoization to its own derivation block, independent of earlier reveal effects. */
-    @Test
-    fun conversationStreamingDebugRefreshKeepsItsOwnComposableGroup() {
-        val helper = source("ui/conversation/ConversationStreamingDebugRefreshEffect.kt")
-        val screen = source("ui/conversation/ConversationScreen.kt")
-
-        assertTrue(helper.contains("LaunchedEffect(controller, streamingDebugEnabled)"))
-        assertTrue(screen.contains("ConversationStreamingDebugRefreshEffect("))
-        assertFalse(screen.contains("LaunchedEffect(controller, appState.streamingDebugEnabled)"))
-    }
-
     /** Selection projections are remembered by their real inputs, and names resolve only for the selected set. */
     @Test
     fun conversationSelectionDerivationsAreRememberedByTheirRealInputs() {
@@ -249,7 +238,6 @@ class FreshSweepCoverageTest {
         val postCommit = body.indexOf("runBestEffortPostCommitSteps(")
         val members = body.indexOf("\"members\" to { refreshMembers() }")
         val timeline = body.indexOf("refreshCurrentTimeline(account)")
-        val watcher = body.indexOf("watchAgentTextStream(account, streamId)")
         val readState = body.indexOf("\"read-state\" to { initializeReadState(account) }")
 
         assertTrue(
@@ -267,7 +255,6 @@ class FreshSweepCoverageTest {
         assertTrue("warm-up must run from the controller lifecycle scope", warmupLaunch < postCommit)
         assertTrue("member refresh must remain background work", postCommit < members)
         assertTrue("timeline refresh must remain background work", postCommit < timeline)
-        assertTrue("stream watchers must start from background work", postCommit < watcher)
         assertTrue("read-state initialization must remain background work", postCommit < readState)
     }
 

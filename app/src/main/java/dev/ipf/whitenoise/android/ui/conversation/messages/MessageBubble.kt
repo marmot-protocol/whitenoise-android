@@ -107,7 +107,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.dismissReports
 import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
-import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportsFor
@@ -142,7 +141,6 @@ import dev.ipf.whitenoise.android.ui.conversation.PollMessageContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
-import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
@@ -921,102 +919,29 @@ internal fun MessageBubble(
         }
     }
 
-    /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
-    fun beginReply() {
-        if (deleted || actionsReadOnly) return
-        val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
-        controller.replyingTo = target
-        onActionMenuOpenChange(false)
-    }
-
-    /** Closes the action menu and shows Info, unless the message is already deleted. */
-    fun openInfoSheet() {
-        surfaces.infoOrigin = null
-        if (deleted) return
-        onActionMenuOpenChange(false)
-        surfaces.infoSheetOpen = true
-    }
-
-    /** Closes the action menu and asks which delete scope to use, when any scope is offered. */
-    fun requestDelete() {
-        if (!deleteCapability.canDeleteAtAll) return
-        onActionMenuOpenChange(false)
-        surfaces.deleteDialogOpen = true
-    }
-
-    /** Hides the message on this device only, closing the dialog once the controller confirms the removal. */
-    fun performDeleteForMe() {
-        if (surfaces.deleteInFlight) return
-        surfaces.deleteInFlight = true
-        appState.launchMutation {
-            try {
-                val removed = controller.hideMessageForMe(record.messageIdHex)
-                if (removed) surfaces.deleteDialogOpen = false
-            } finally {
-                surfaces.deleteInFlight = false
-            }
-        }
-    }
-
-    /** Deletes the message for every member, keeping the dialog open until the outcome is known. */
-    fun performDeleteForEveryone() {
-        // The in-flight flag is the repeated-tap guard on top of the
-        // controller's own idempotency (a second deleteMessage on an already
-        // tombstoned id is a no-op).
-        if (surfaces.deleteInFlight) return
-        surfaces.deleteInFlight = true
-        // launchMutation so the MLS commit + Nostr publish survive navigating
-        // away from the conversation. The dialog stays open with its options
-        // disabled until the outcome is known, and stays open on failure so
-        // the error toast never explains a surface that silently vanished;
-        // the optimistic tombstone rollback restores the bubble either way.
-        appState.launchMutation {
-            try {
-                val removed = controller.deleteMessage(record, optimisticKeyOverride = item.id)
-                if (removed) surfaces.deleteDialogOpen = false
-            } finally {
-                // Cancellation must not leave the flag stuck true, which would
-                // disable deletion for this bubble's remember scope.
-                surfaces.deleteInFlight = false
-            }
-        }
-    }
-
-    fun reactWithEmoji(emoji: String) {
-        // Chokepoint guard: never react to a deleted message, whatever path
-        // (menu, emoji picker) called in — even if that surface was open when
-        // the delete landed.
-        if (deleted || actionsReadOnly) return
-        // Route via launchMutation: same survives-navigation rationale as delete/send.
-        val reactionOrigin = localReactionMotion.takeOrigin(emoji)
-        appState.launchMutation {
-            val target =
-                if (isPollRecord) {
-                    currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
-                } else {
-                    record
-                }
-            controller.toggleReaction(emoji, target, onLocalIntent = { added ->
-                localReactionMotion.accept(emoji, added, reactionOrigin)
-            }) {
-                !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
-            }
-        }
-    }
-
-    /** Copies the whole message as plain text, a poll as its question and options from the current row. */
-    fun copyMessageText() {
-        if (deleted) return
-        // Polls use the current question/options; ordinary messages copy the visible rendition.
-        val text =
-            if (isPollRecord) {
-                currentPollCopyText(controller, pollOwner, messageTextCopy)
-            } else {
-                visibleTranslation ?: displayedBody
-            }
-        text?.let { clipboard.setText(AnnotatedString(it)) }
-        onActionMenuOpenChange(false)
-    }
+    val messageActions =
+        rememberMessageBubbleActions(
+            appState = appState,
+            controller = controller,
+            surfaces = surfaces,
+            pollOwner = pollOwner,
+            inputs =
+                MessageBubbleActions.Inputs(
+                    item = item,
+                    isPollRecord = isPollRecord,
+                    deleted = deleted,
+                    actionsReadOnly = actionsReadOnly,
+                    deleteCapability = deleteCapability,
+                    forwardPayload = forwardPayload,
+                    visibleTranslation = visibleTranslation,
+                    displayedBody = displayedBody,
+                    messageTextCopy = messageTextCopy,
+                    localReactionMotion = localReactionMotion,
+                    clipboard = clipboard,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onForwardMenuHandoff = onForwardMenuHandoff,
+                ),
+        )
 
     /** Captures display names and the conversation size alongside the rendered speech projection. */
     suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
@@ -1319,13 +1244,6 @@ internal fun MessageBubble(
             }
         }
 
-    /** Copies a link destination to the clipboard and closes the action menu. */
-    fun copyMarkdownLink(url: String) {
-        if (deleted) return
-        clipboard.setText(AnnotatedString(url))
-        onActionMenuOpenChange(false)
-    }
-
     /** Enters text selection for this message with a cleared layout registry, closing the action menu. */
     fun beginTextSelection() {
         if (deleted) return
@@ -1333,16 +1251,6 @@ internal fun MessageBubble(
         textLayouts.textSelectionSeeded = false
         onActionMenuOpenChange(false)
         onTextSelectionModeChange(true)
-    }
-
-    /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
-    fun beginForward() {
-        surfaces.forwardOrigin = null
-        if (deleted || actionsReadOnly || forwardPayload == null) return
-        // Keep the dimmed menu below the picker until its window is dismissed.
-        onForwardMenuHandoff()
-        surfaces.forwardSnapshot = forwardPayload
-        surfaces.forwardSheetOpen = true
     }
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
@@ -1411,14 +1319,6 @@ internal fun MessageBubble(
             !deleted &&
             record.sticker == null
 
-    /** Opens this message in the edit composer; reply and edit modes are mutually exclusive in the composer banner. */
-    fun beginEdit() {
-        if (deleted || actionsReadOnly) return
-        onActionMenuOpenChange(false)
-        controller.replyingTo = null
-        controller.beginMessageEdit(record.messageIdHex)
-    }
-
     /**
      * Whether a press lands on this bubble's rendered text rather than a link, the row's empty width or its
      * chrome, so a double tap there may edit without stealing a link's own activation.
@@ -1441,7 +1341,7 @@ internal fun MessageBubble(
         when {
             pressInWindow == null -> Unit
             canEditMessage && !ownsActiveReadAloud() ->
-                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) beginEdit()
+                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) messageActions.beginEdit()
             else -> seekSpeakAloudAt(pressInWindow)
         }
     }
@@ -1518,8 +1418,8 @@ internal fun MessageBubble(
             if (!gestureCurrent || !ownerCurrent) return
             if (!targetCurrent || replySwipeUnavailable) return
             when (if (direction < 0) leftSwipe else rightSwipe) {
-                SwipeAction.Reply -> beginReply()
-                SwipeAction.Forward -> beginForward()
+                SwipeAction.Reply -> messageActions.beginReply()
+                SwipeAction.Forward -> messageActions.beginForward()
                 SwipeAction.React -> {
                     onActionMenuOpenChange(false)
                     surfaces.emojiPickerOpen = true
@@ -1578,7 +1478,11 @@ internal fun MessageBubble(
                 MessageRowAction(stringResource(R.string.discard_failed_message), discardableSend) {
                     appState.launchMutation { controller.discardFailedSend(item) }
                 },
-                MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
+                MessageRowAction(
+                    stringResource(R.string.reply),
+                    !deleted && !actionsReadOnly,
+                    messageActions::beginReply,
+                ),
                 MessageRowAction(stringResource(R.string.message_react), !deleted && !actionsReadOnly) {
                     onActionMenuOpenChange(false)
                     surfaces.emojiPickerOpen = true
@@ -1586,15 +1490,19 @@ internal fun MessageBubble(
                 MessageRowAction(
                     stringResource(R.string.copy),
                     messageBubbleCanCopyText(item, deleted, persistedFailure, displayedBody, messageTextCopy),
-                    ::copyMessageText,
+                    messageActions::copyMessageText,
                 ),
                 MessageRowAction(
                     stringResource(R.string.forward),
                     !deleted && !actionsReadOnly && forwardPayload != null,
-                    ::beginForward,
+                    messageActions::beginForward,
                 ),
-                MessageRowAction(stringResource(R.string.delete), deleteCapability.canDeleteAtAll, ::requestDelete),
-                MessageRowAction(stringResource(R.string.info), !deleted, ::openInfoSheet),
+                MessageRowAction(
+                    stringResource(R.string.delete),
+                    deleteCapability.canDeleteAtAll,
+                    messageActions::requestDelete,
+                ),
+                MessageRowAction(stringResource(R.string.info), !deleted, messageActions::openInfoSheet),
                 MessageRowAction(stringResource(R.string.go_to_message), replyPreview != null) {
                     onReplyPreviewClick(item)
                 },
@@ -1723,7 +1631,7 @@ internal fun MessageBubble(
                                 pressState.initiatingMenuHoldActive = false
                                 val linkDestination = textLayouts.pendingLongPressLinkDestination[0]
                                 textLayouts.pendingLongPressLinkDestination[0] = null
-                                if (linkDestination != null) copyMarkdownLink(linkDestination)
+                                if (linkDestination != null) messageActions.copyMarkdownLink(linkDestination)
                             },
                             onDragStart = { position ->
                                 pressState.initiatingMenuHoldActive = false
@@ -2186,7 +2094,7 @@ internal fun MessageBubble(
                 //   fallbacks stay hidden because the attachment is already
                 //   visible in the same bubble.
                 // - Non-media: render displayedBody (covers reactions,
-                //   deletions, agent streams, plain text).
+                //   deletions, plain text).
                 val bodyTextToRender: String? =
                     visibleTranslation ?: messageBodyTextToRender(
                         displayedBody = displayedBody,
@@ -2659,7 +2567,7 @@ internal fun MessageBubble(
                                     customBubbleColorActive = customBubbleColorActive,
                                     selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    onCopyMarkdownLink = messageActions::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
@@ -2751,7 +2659,7 @@ internal fun MessageBubble(
                                     customBubbleColorActive = customBubbleColorActive,
                                     selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    onCopyMarkdownLink = messageActions::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
@@ -2833,7 +2741,7 @@ internal fun MessageBubble(
                             customBubbleColorActive = customBubbleColorActive,
                             selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                             markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                            onCopyMarkdownLink = ::copyMarkdownLink,
+                            onCopyMarkdownLink = messageActions::copyMarkdownLink,
                             deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
@@ -2956,7 +2864,7 @@ internal fun MessageBubble(
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onEmojiUsed(emoji)
-                            reactWithEmoji(emoji)
+                            messageActions.reactWithEmoji(emoji)
                         }
                     },
                     onKeepOnScreen = {
@@ -2969,9 +2877,9 @@ internal fun MessageBubble(
                             surfaces.emojiPickerOpen = true
                         }
                     },
-                    onReply = ::beginReply,
-                    onEdit = ::beginEdit,
-                    onCopyText = ::copyMessageText,
+                    onReply = messageActions::beginReply,
+                    onEdit = messageActions::beginEdit,
+                    onCopyText = messageActions::copyMessageText,
                     onSpeak = {
                         speakFromHere()
                         onActionMenuOpenChange(false)
@@ -2983,27 +2891,27 @@ internal fun MessageBubble(
                     onShare = ::shareMessage,
                     onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,
-                    onForward = ::beginForward,
+                    onForward = messageActions::beginForward,
                     onSelect = {
                         if (batchSelectable && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onToggleSelection()
                         }
                     },
-                    onInfo = ::openInfoSheet,
+                    onInfo = messageActions::openInfoSheet,
                     onInfoAt = { origin ->
-                        openInfoSheet()
+                        messageActions.openInfoSheet()
                         surfaces.infoOrigin = origin
                     },
                     onForwardAt = { origin ->
-                        beginForward()
+                        messageActions.beginForward()
                         surfaces.forwardOrigin = origin
                     },
                     onReport = {
                         onActionMenuOpenChange(false)
                         surfaces.reportSheetOpen = true
                     },
-                    onDelete = ::requestDelete,
+                    onDelete = messageActions::requestDelete,
                     mine = mine,
                     selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
                     previewDescription =
@@ -3225,7 +3133,7 @@ internal fun MessageBubble(
                             onEmojiPicked = { emoji ->
                                 surfaces.emojiPickerOpen = false
                                 if (pickingSlot == null) {
-                                    reactWithEmoji(emoji)
+                                    messageActions.reactWithEmoji(emoji)
                                 } else {
                                     surfaces.pickConfigureReaction(pickingSlot, emoji)
                                     surfaces.configureReactionSlot = null
@@ -3332,8 +3240,8 @@ internal fun MessageBubble(
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         deleteInFlight = surfaces.deleteInFlight,
-                        onDeleteForEveryone = ::performDeleteForEveryone,
-                        onDeleteForMe = ::performDeleteForMe,
+                        onDeleteForEveryone = messageActions::performDeleteForEveryone,
+                        onDeleteForMe = messageActions::performDeleteForMe,
                         onDismissRequest = { surfaces.deleteDialogOpen = false },
                     )
                 }
@@ -3356,7 +3264,7 @@ internal fun MessageBubble(
                         item = item,
                         controller = controller,
                         appState = appState,
-                        onRemoveOwnReaction = if (actionsReadOnly || deleted) null else ::reactWithEmoji,
+                        onRemoveOwnReaction = if (actionsReadOnly || deleted) null else messageActions::reactWithEmoji,
                         onDismissRequest = { surfaces.reactionSheetOpen = false },
                     )
                 }

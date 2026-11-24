@@ -45,7 +45,6 @@ import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteEndpoint
 import dev.ipf.whitenoise.android.ui.settings.drawRouteContour
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -154,7 +153,7 @@ internal fun AnimatedAlertDialog(
                 ).onGloballyPositioned { coordinates ->
                     if (measured) {
                         if (nativeWidth == null) nativeWidth = with(density) { coordinates.size.width.toDp() }
-                        dialogView?.let { destination = coordinates.settingsMorphBounds(it) }
+                        dialogView?.let { destination = coordinates.motionBoundsOnScreen(it) }
                         if (sourceCurrent && source != null && !source.isCurrent()) {
                             sourceCurrent = false
                             surface.invalidateSource()
@@ -250,7 +249,7 @@ internal class PopupSourceActivation private constructor(
             direction: LayoutDirection,
         ): PopupSourceActivation? {
             if (coordinates == null || !coordinates.isAttached) return null
-            val bounds = coordinates.settingsMorphBounds(view)
+            val bounds = coordinates.motionBoundsOnScreen(view)
             if (bounds.isEmpty ||
                 !listOf(bounds.left, bounds.top, bounds.right, bounds.bottom).all { it.isFinite() }
             ) {
@@ -343,5 +342,5 @@ private fun sourceWindowIsCurrent(
     view.isAttachedToWindow &&
         view.windowToken == windowToken &&
         coordinates.isAttached &&
-        coordinates.settingsMorphBounds(view) == bounds &&
+        coordinates.motionBoundsOnScreen(view) == bounds &&
         android.graphics.Rect().also { view.getWindowVisibleDisplayFrame(it) } == windowBounds

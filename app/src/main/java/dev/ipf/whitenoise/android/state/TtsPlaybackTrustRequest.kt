@@ -30,7 +30,7 @@ internal class TtsPlaybackTrustRequest(
 
 /** Serializes the app's first-use warning without owning the engine or speech queue. */
 internal class TtsPlaybackTrustConsent(
-    private val appState: WhiteNoiseAppState,
+    private val readAloud: AppReadAloud,
     private val attachedHandle: () -> TtsEngineHandle?,
 ) {
     private var approvedUnverifiedHandle: TtsEngineHandle? = null
@@ -47,11 +47,11 @@ internal class TtsPlaybackTrustConsent(
         if (handle.trust == EngineTrust.Local) {
             false
         } else if (handle.connectedPackageVerified) {
-            requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
+            requiresTtsTrustWarning(handle.enginePackage, handle.trust, readAloud.ttsWarningPreferences)
         } else {
             // Approval covers one connection within one account session; any account switch revokes it.
             approvedUnverifiedHandle !== handle ||
-                approvedUnverifiedGeneration?.let(appState.accountSwitchHandoff::isCurrent) != true
+                approvedUnverifiedGeneration?.let(readAloud.host.accountSwitchHandoff::isCurrent) != true
         }
 
     /** A replacement connection cannot inherit consent from an inferred package. */
@@ -78,14 +78,14 @@ internal class TtsPlaybackTrustConsent(
         handle: TtsEngineHandle,
         isCurrent: () -> Boolean,
     ): Boolean {
-        val accountGeneration = appState.accountSwitchHandoff.capture()
-        val accountIsCurrent = appState.captureTtsAccountOwner(appState.activeAccountRef)
-        val playbackIsCurrent = appState.ttsController.speechStartProjectionGuard()
+        val accountGeneration = readAloud.host.accountSwitchHandoff.capture()
+        val accountIsCurrent = readAloud.captureTtsAccountOwner(readAloud.host.activeAccountRef)
+        val playbackIsCurrent = readAloud.ttsController.speechStartProjectionGuard()
         val question =
             TtsPlaybackTrustRequest {
                 attachedHandle() === handle &&
                     accountIsCurrent() &&
-                    !appState.appLock.screenVisible &&
+                    !readAloud.host.appLockScreenVisible &&
                     playbackIsCurrent() &&
                     isCurrent()
             }
@@ -96,7 +96,7 @@ internal class TtsPlaybackTrustConsent(
                 false
             } else {
                 if (handle.connectedPackageVerified) {
-                    appState.acknowledgeTtsTrustWarning(handle.enginePackage)
+                    readAloud.acknowledgeTtsTrustWarning(handle.enginePackage)
                 } else {
                     approvedUnverifiedHandle = handle
                     approvedUnverifiedGeneration = accountGeneration
@@ -110,7 +110,7 @@ internal class TtsPlaybackTrustConsent(
 }
 
 /** Captures a conversation's account before any suspending speech projection. */
-internal fun WhiteNoiseAppState.captureTtsAccountOwner(account: String?): () -> Boolean {
-    val generation = accountSwitchHandoff.capture()
-    return { account != null && account == activeAccountRef && accountSwitchHandoff.isCurrent(generation) }
-}
+internal fun WhiteNoiseAppState.captureTtsAccountOwner(account: String?): () -> Boolean =
+    readAloud.captureTtsAccountOwner(
+        account,
+    )

@@ -294,7 +294,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         """The init hook keeps its injected ExecOperations shape on the pinned Gradle wrapper it was checked against."""
         script=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
         wrapper=(ROOT/'gradle/wrapper/gradle-wrapper.properties').read_text()
-        self.assertIn('gradle-9.9.1-bin.zip',wrapper)
+        self.assertIn('gradle-9.9.2-bin.zip',wrapper)
         self.assertIn('import org.gradle.process.ExecOperations',script)
         self.assertRegex(script,r'@Inject\s+abstract ExecOperations getExecOperations\(\)')
         self.assertIn('selected.objects.newInstance(StartupTraceExecution)',script)

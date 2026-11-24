@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -20,16 +19,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -38,7 +28,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.toSize
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
@@ -50,8 +39,6 @@ import kotlinx.coroutines.launch
 private const val MAX_REGISTERED_MEDIA_THUMBNAILS = 128
 private const val MEDIA_OPEN_MILLIS = APP_MOTION_OPEN_MILLIS
 internal const val MEDIA_CLOSE_MILLIS = APP_MOTION_CLOSE_MILLIS
-private const val MEDIA_CONTENT_BLEND_START = 0.85f
-private const val MEDIA_CONTENT_BLEND_INTERVAL = 0.15f
 
 /** Visible, already drawn pixels only. No media reads, decodes or saved state. */
 internal class MediaViewerThumbnailRegistry {
@@ -243,6 +230,7 @@ internal fun MediaViewerMotion(
     selectedSourceEpoch: ULong? = null,
     attachmentAspectRatio: Float? = null,
     fallbackCloseAllowed: Boolean = false,
+    hasVideoSurface: Boolean = false,
     content: @Composable (Modifier) -> Unit,
 ) {
     val motionEnabled = rememberConversationMotionEnabled()
@@ -259,7 +247,6 @@ internal fun MediaViewerMotion(
     val awaitEntryFrame = rememberMediaViewerEntryFrame(enabled, initialAvailable)
     val progress = remember { Animatable(if (enabled && initialAvailable) 0f else 1f) }
     var entrySettled by remember { mutableStateOf(!enabled || !initialAvailable) }
-    val geometry = remember { arrayOfNulls<LayoutCoordinates>(2) }
     val readThumbnail =
         remember(registry, opening, selected, closing, selectedSourceEpoch, openingToken) {
             { registry?.motionThumbnail(opening, selected, closing, selectedSourceEpoch, openingToken) }
@@ -284,48 +271,25 @@ internal fun MediaViewerMotion(
             if (closing) closeWithoutTravel(fallbackProgress, sourceLost, fallbackCloseAllowed, latestClosed)
         }
     }
+    val motionDraw = remember(hasVideoSurface) { MediaViewerMotionDraw(hasVideoSurface) }
     val bodyModifier =
-        remember(geometry, enabled, readThumbnail) {
-            Modifier.onGloballyPositioned { geometry[1] = it }.graphicsLayer {
-                alpha = mediaViewerContentAlpha(enabled, progress.value) { readThumbnail() != null }
+        remember(motionDraw, enabled, readThumbnail) {
+            motionDraw.body(Modifier) {
+                mediaViewerContentAlpha(enabled, progress.value) { readThumbnail() != null }
             }
         }
     Box(
-        Modifier
-            .fillMaxSize()
-            .mediaViewerFallbackClose { fallbackProgress.value }
-            .onGloballyPositioned { geometry[0] = it },
+        motionDraw.travel(
+            Modifier.fillMaxSize().mediaViewerFallbackClose { fallbackProgress.value },
+            knownAspect,
+            readThumbnail,
+        ) {
+            if (enabled) progress.value else 1f
+        },
     ) {
         CompositionLocalProvider(LocalMediaViewerPressFeedback provides enabled) {
             content(bodyModifier)
         }
-        MediaMotionVisual({ if (enabled) readThumbnail() else null }) {
-            mediaMotionDrawGeometry(geometry, { progress.value }, knownAspect)
-        }
-    }
-}
-
-/** Reads actual viewer coordinates only while its traveling copy can still paint. */
-
-private fun mediaMotionDrawGeometry(
-    geometry: Array<LayoutCoordinates?>,
-    progress: () -> Float,
-    knownAspect: Float?,
-): MediaMotionDrawGeometry? {
-    val fraction = progress()
-    if (fraction >= 1f) return null
-    val root = geometry[0]?.takeIf { it.isAttached }
-    val body = geometry[1]?.takeIf { it.isAttached }
-    return if (root == null || body == null || knownAspect == null) {
-        null
-    } else {
-        val origin = root.positionOnScreen()
-        MediaMotionDrawGeometry(
-            origin,
-            Rect(body.positionOnScreen() - origin, body.size.toSize()),
-            fraction,
-            knownAspect,
-        )
     }
 }
 
@@ -369,62 +333,6 @@ internal suspend fun animateMediaViewerMotion(
     return sourceLost
 }
 
-/** Draws a fresh eligible source with reusable clipping objects and the existing pixel handoff. */
-@Composable
-private fun MediaMotionVisual(
-    thumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
-    geometry: () -> MediaMotionDrawGeometry?,
-) {
-    val outline = remember { Path() }
-    val blendPaint = remember { Paint() }
-    Canvas(Modifier.fillMaxSize()) {
-        val frame = geometry() ?: return@Canvas
-        val progress = frame.progress
-        if (progress >= 1f) return@Canvas
-        // Resolve once at draw time: disposed/offscreen rows never leave retained pixels.
-        val current = thumbnail() ?: return@Canvas
-        val layer = current.thumbnail.layer
-        val source = current.bounds.translate(-frame.origin)
-        val bounds = mediaViewerMotionBounds(source, size, progress, frame.aspectRatio, frame.viewport)
-        outline.reset()
-        val corners = current.corners
-        val remaining = 1f - progress
-        outline.addRoundRect(
-            RoundRect(
-                bounds,
-                CornerRadius(corners.topLeft * remaining),
-                CornerRadius(corners.topRight * remaining),
-                CornerRadius(corners.bottomRight * remaining),
-                CornerRadius(corners.bottomLeft * remaining),
-            ),
-        )
-        clipPath(outline) {
-            val alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-            if (alpha < 1f) {
-                drawContext.canvas.saveLayer(bounds, blendPaint.apply { this.alpha = alpha })
-            }
-            try {
-                val factor = mediaViewerThumbnailScale(layer.size.toSize(), bounds)
-                translate(
-                    bounds.center.x - layer.size.width * factor / 2f,
-                    bounds.center.y - layer.size.height * factor / 2f,
-                ) {
-                    scale(factor, factor, pivot = Offset.Zero) { drawLayer(layer) }
-                }
-            } finally {
-                if (alpha < 1f) drawContext.canvas.restore()
-            }
-        }
-    }
-}
-
-private data class MediaMotionDrawGeometry(
-    val origin: Offset,
-    val viewport: Rect,
-    val progress: Float,
-    val aspectRatio: Float,
-)
-
 /** Fences each fresh lookup by the opening registration or the selected return page's source epoch. */
 private fun MediaViewerThumbnailRegistry.motionThumbnail(
     opening: ConversationMediaViewerAttachmentId,
@@ -447,18 +355,6 @@ internal fun mediaViewerPlatformMotionAllowed(
     isVideo: Boolean,
     sdk: Int,
 ): Boolean = !isVideo || sdk >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-
-/** A settled or disabled canonical viewer never measures its source; active travel still checks live eligibility. */
-internal fun mediaViewerContentAlpha(
-    enabled: Boolean,
-    progress: Float,
-    sourceAvailable: () -> Boolean,
-): Float =
-    if (!enabled || progress >= 1f || !sourceAvailable()) {
-        1f
-    } else {
-        ((progress - MEDIA_CONTENT_BLEND_START) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-    }
 
 /** Physical corners of the actual source tile, before it leaves the album's rounded surface. */
 internal data class MediaThumbnailCorners(

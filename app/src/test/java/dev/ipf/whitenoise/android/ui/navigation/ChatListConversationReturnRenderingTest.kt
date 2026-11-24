@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -337,21 +338,27 @@ internal class ReturnFixture(
     private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
     private val unreadTarget: Boolean = false,
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+    rowCount: Int = 6,
     customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
     val avatarRequests = AtomicInteger()
     val rows =
-        (0..5).map { index ->
+        (0 until rowCount).map { index ->
+            val groupId =
+                if (index == rowCount - 1) {
+                    ConversationTimelineTestIds.GROUP_ID
+                } else {
+                    "%02x".format(index + 10).repeat(16)
+                }
             customizeRow(
                 index,
                 notificationChatListRow().copy(
-                    groupIdHex =
-                        if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
+                    groupIdHex = groupId,
                     title = "Return chat $index",
                     groupName = "Return chat $index",
-                    activitySortAt = (10 - index).toULong(),
+                    activitySortAt = (rowCount + 4 - index).toULong(),
                     unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
                     hasUnread = unreadTarget && index == 5,
                 ),
@@ -484,7 +491,13 @@ internal class ReturnWindow(
                 snapshot.rows.map { presented ->
                     val row = presented.row
                     val asset = avatarAssetForRow(row)
-                    val source = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource
+                    val direct = row.conversationKind == ChatConversationKindFfi.DIRECT
+                    val source =
+                        when {
+                            direct -> PresentationSourceFfi.PEER_PROFILE
+                            asset == null -> PresentationSourceFfi.GROUP
+                            else -> presented.presentation.avatarSource
+                        }
                     val avatar =
                         when {
                             asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
@@ -494,12 +507,14 @@ internal class ReturnWindow(
                                 SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
                             else -> return@map presented
                         }
+                    val peerId = if (direct) ConversationTimelineTestIds.SENDER_ID else presented.presentation.peerId
                     presented.copy(
                         avatarAsset = asset,
                         presentation =
                             presented.presentation.copy(
                                 avatar = avatar,
                                 avatarSource = source,
+                                peerId = peerId,
                             ),
                     )
                 },
@@ -518,7 +533,7 @@ internal class ReturnWindow(
     /** Holds the live stream until its owner cancels it. */
     override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
-    /** This six-row account has no next or previous page. */
+    /** This synthetic account has no next or previous page. */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,

@@ -42,6 +42,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.CONVERSATION_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.common.GLOBAL_TRANSIENT_NOTICE_TAG
@@ -107,7 +108,9 @@ class TopNoticeComposerBoundsAndroidTest {
         showConversation()
         val composerBefore = openTheKeyboard()
 
-        composeRule.runOnUiThread { appState.presentTransient(R.string.dictation_send_blocked) }
+        composeRule.runOnUiThread {
+            appState.presentTransient(R.string.dictation_send_blocked, kind = TransientNoticeKind.Information)
+        }
 
         assertBannerBelowTheHeader(GLOBAL_TRANSIENT_NOTICE_TAG, composerBefore)
         composeRule.onNodeWithText(context.getString(R.string.dictation_send_blocked)).assertIsDisplayed()
