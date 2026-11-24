@@ -1093,6 +1093,9 @@ class LocalizationResourceTest {
                 "tts_bar_spoken_minutes_seconds",
                 // Folder state joins two translated labels with locale-specific punctuation.
                 "smart_folder_quick_state",
+                // A group-change notice joins its translated headline and reason with a full stop, which only the
+                // Chinese locales change.
+                "group_change_notice_detail",
                 // "Audio" is the established media label in German, Spanish, French and Italian.
                 "library_audio",
                 // Pure positional-format string ("current/total"); no
