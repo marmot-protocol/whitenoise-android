@@ -79,6 +79,7 @@ private fun OtherModalPresentation(fixture: MaestroPresentationFixture) {
         "import" -> MaestroImportStatusPresentation(fixture)
         "image", "developer" -> MaestroActionModalPresentation(fixture)
         "signin", "retained", "scan" -> MaestroConsentModalPresentation(fixture)
+        "pdfmeta" -> MaestroPdfMetadataPresentation(fixture)
         else -> error("Unknown production modal presentation")
     }
 }

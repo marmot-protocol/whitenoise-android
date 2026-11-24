@@ -4239,6 +4239,7 @@ internal fun ConversationScreen(
                                                 prepared = mediaDraftState.preparedPreviews(),
                                                 preparing = mediaDraftState.isPreparing,
                                                 preparedDocuments = mediaDraftState.preparedDocuments,
+                                                pdfChoices = mediaSender.pdfChoices,
                                                 onOpenDocument = { uri ->
                                                     if (!attachmentSendClaim.isHeld && !mediaDraftState.isPreparing) {
                                                         mediaDraftState.preparedDocuments[uri]?.let { prepared ->
@@ -4277,11 +4278,14 @@ internal fun ConversationScreen(
                                 null
                             },
                         onSendAttachments = { caption, onResult ->
-                            sendStagedAttachmentsWithCaption(
-                                caption,
-                                onResult,
-                                composerTextState.captureCaptionSettlement(),
-                            )
+                            // PDFs whose metadata cannot be removed are sent as they are only once chosen (#3377).
+                            mediaSender.pdfChoices.confirmThen(pendingDocumentUris, { onResult(false) }) {
+                                sendStagedAttachmentsWithCaption(
+                                    caption,
+                                    onResult,
+                                    composerTextState.captureCaptionSettlement(),
+                                )
+                            }
                         },
                         onAfterSend = {
                             acceptedSendRevealedTranscript = true
