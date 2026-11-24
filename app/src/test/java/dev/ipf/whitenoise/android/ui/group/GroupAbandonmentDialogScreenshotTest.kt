@@ -73,8 +73,9 @@ class GroupAbandonmentDialogScreenshotTest {
     @Test fun groupReviewAmoled() = capture("group_review_amoled", GROUP, dark = true, amoled = true)
 
     @Test
-    fun groupReviewLargeRtl() =
+    fun groupReviewLargeRtl() {
         capture("group_review_large_rtl", GROUP, dark = true, amoled = true, scale = 2f, rtl = true)
+    }
 
     /** A long-named direct chat at 200% text in RTL keeps every line and both actions reachable. */
     @Test fun dmReviewLargeRtl() = capture("dm_review_large_rtl", LONG_DM, scale = 2f, rtl = true)
@@ -224,7 +225,13 @@ class GroupAbandonmentDialogScreenshotTest {
         assertTrue(accountBounds.bottom - accountBounds.top >= 48.dp)
         account.performClick()
         val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
-        assertEquals(GROUP_REVIEW_ACTOR_NPUB, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+        assertEquals(
+            GROUP_REVIEW_ACTOR_NPUB,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
         composeRule
             .onNodeWithTag("group.abandon.confirm")
             .assertTextEquals(app.getString(R.string.delete_group_confirm))
