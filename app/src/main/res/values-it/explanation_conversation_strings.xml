@@ -44,6 +44,7 @@
     <string name="explanation_poll_multiple_choice">I membri possono votare più di una risposta.</string>
 
     <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_transcribe">Converte questa registrazione in testo su questo dispositivo.</string>
     <string name="explanation_message_action_reply">Cita questo messaggio nel campo di testo, così la tua risposta resta collegata ad esso.</string>
     <string name="explanation_message_action_edit">Apre il tuo messaggio nel campo di testo così puoi modificarlo.</string>
     <string name="explanation_message_action_select">Attiva la modalità di selezione per scegliere più messaggi alla volta.</string>

@@ -115,11 +115,13 @@ internal class AudioTranscriptionToggleState(
         value: Boolean,
     ) = scope(provided).setShown(messageIdHex, value)
 
-    fun completedText(provided: VoiceTranscriptionScope?, index: Int, epoch: ULong): String? =
-        scope(provided).result(voicePlaybackKey(messageIdHex, index, epoch))?.text.takeIf { requested(provided) }
+    fun completedText(
+        provided: VoiceTranscriptionScope?,
+        index: Int,
+        epoch: ULong,
+    ): String? = scope(provided).result(voicePlaybackKey(messageIdHex, index, epoch))?.text.takeIf { requested(provided) }
 
-    fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? =
-        if (enabled) ({ setRequested(provided, true) }) else null
+    fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? = if (enabled) ({ setRequested(provided, true) }) else null
 
     fun register(
         key: Any,
@@ -137,8 +139,10 @@ internal class AudioTranscriptionToggleState(
 
 /** A received voice message has one transcription control shared by its recordings. */
 @Composable
-internal fun rememberReceivedAudioTranscription(messageIdHex: String, mine: Boolean): AudioTranscriptionToggleState? =
-    if (mine) null else remember(messageIdHex) { AudioTranscriptionToggleState(messageIdHex) }
+internal fun rememberReceivedAudioTranscription(
+    messageIdHex: String,
+    mine: Boolean,
+): AudioTranscriptionToggleState? = if (mine) null else remember(messageIdHex) { AudioTranscriptionToggleState(messageIdHex) }
 
 /**
  * Transcribes the received recording on this device while its message's transcript is shown, either because the
@@ -321,8 +325,7 @@ internal fun AudioTranscriptBody(
 }
 
 /** Keeps the timestamp and transcript in one animated content area. */
-internal fun Modifier.animateTranscriptFooter(enabled: Boolean): Modifier =
-    if (enabled) animateContentSize(alignment = Alignment.TopStart) else this
+internal fun Modifier.animateTranscriptFooter(enabled: Boolean): Modifier = if (enabled) animateContentSize(alignment = Alignment.TopStart) else this
 
 /** Uses the same last-line footer placement as a regular message caption. */
 @Composable

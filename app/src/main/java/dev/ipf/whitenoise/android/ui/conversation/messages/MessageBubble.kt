@@ -2148,15 +2148,8 @@ internal fun MessageBubble(
                                 !hasMedia &&
                                 visibleTranslation == null,
                     ) { EmojiShortcodes.art(it, customEmoji, receivedEmoji.art) }
-                // Detached media keeps its own rounded Surface. When a caption
-                // is attached, each child delegates its corners and border to
-                // the shared frame so the result is one continuous message card.
-                // Download gating, footer overlays, viewers, and retry behavior
-                // remain owned by the media children.
-                // Long-press on any media tile opens the action menu (not the
-                // viewer); anchored to the bubble top like the accessibility
-                // long-click path. Hoisted so every media call site shares one
-                // definition.
+                // Captions share a frame with their media. Long presses open the
+                // message menu, anchored to the bubble as in the accessibility action.
                 val onMediaLongPress =
                     remember(
                         textSelectionMode,
@@ -2242,12 +2235,17 @@ internal fun MessageBubble(
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 val footerVoice =
                     bubbleMedia.audio.lastOrNull()?.takeIf {
-                        !mine && !deleted && !bodyOrWarningInsideBubble && !fileFooterInCard &&
-                            remoteGiphyMedia == null && bubbleMedia.rejected.isEmpty()
+                        !mine &&
+                            !deleted &&
+                            !bodyOrWarningInsideBubble &&
+                            !fileFooterInCard &&
+                            remoteGiphyMedia == null &&
+                            bubbleMedia.rejected.isEmpty()
                     }
-                val completedTranscript = footerVoice?.let {
-                    audioTranscription?.completedText(voiceTranscription, it.index, it.value.sourceEpoch)
-                }
+                val completedTranscript =
+                    footerVoice?.let {
+                        audioTranscription?.completedText(voiceTranscription, it.index, it.value.sourceEpoch)
+                    }
                 val soleCaptionedVisual =
                     if (bubbleMedia.hasConfirmedMedia) {
                         bubbleMedia.visuals.singleOrNull()?.value.takeIf {

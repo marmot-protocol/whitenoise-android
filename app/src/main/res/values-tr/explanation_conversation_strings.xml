@@ -44,6 +44,7 @@
     <string name="explanation_poll_multiple_choice">Üyeler birden fazla seçeneğe oy verebilir.</string>
 
     <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_transcribe">Bu kaydı bu cihazda metne dönüştürür.</string>
     <string name="explanation_message_action_reply">Bu mesajı yazı alanında alıntılar, böylece yanıtınız ona bağlı kalır.</string>
     <string name="explanation_message_action_edit">Mesajınızı yazı alanında açar, böylece değiştirebilirsiniz.</string>
     <string name="explanation_message_action_select">Aynı anda birden fazla mesaj seçmek için seçim modunu açar.</string>
