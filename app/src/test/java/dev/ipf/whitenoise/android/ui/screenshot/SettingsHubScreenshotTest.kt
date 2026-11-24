@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -124,11 +125,13 @@ class SettingsHubScreenshotTest {
                 example.performScrollTo().performTouchInput { longClick() }
                 composeRule.onNodeWithText("Reply").assertExists()
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_actions_amoled.png")
-                example.performTouchInput { swipeRight() }
-                composeRule.mainClock.advanceTimeBy(1_000)
-                composeRule.waitForIdle()
+                composeRule.onNodeWithText("Reply").performClick()
                 composeRule.onNodeWithText("Demo contact").assertExists()
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_reply_amoled.png")
+                composeRule.onNodeWithContentDescription("Cancel reply").performClick()
+                composeRule.onNodeWithText("Demo contact").assertDoesNotExist()
+                example.performTouchInput { swipeRight() }
+                composeRule.onNodeWithText("Demo contact").assertExists()
                 advanceWalkthrough("Chat across apps", "learn_white_noise_marmot_amoled")
             },
         ) {
