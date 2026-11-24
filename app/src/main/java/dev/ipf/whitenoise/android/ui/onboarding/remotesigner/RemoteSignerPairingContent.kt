@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureInputCenter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.plainText
@@ -110,12 +111,11 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         WhiteNoiseSecureTextField(
             state = pairing.link,
             textObfuscationMode = TextObfuscationMode.Hidden,
-            modifier = Modifier.weight(1f).testTag("remote_signer.link"),
+            modifier = Modifier.weight(1f).alignBy(WhiteNoiseSecureInputCenter).testTag("remote_signer.link"),
             label = { Text(stringResource(R.string.remote_signer_link_label)) },
             placeholder = { Text(stringResource(R.string.remote_signer_link_placeholder)) },
             errorMessage = pairing.linkErrorRes?.let { stringResource(it) },
@@ -140,11 +140,16 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
                     imeAction = ImeAction.Done,
                 ),
             onKeyboardAction = { pairing.submitLink() },
+            containerModifier = Modifier.testTag("remote_signer.link.container"),
         )
         FilledTonalIconButton(
             onClick = { scanning = true },
             shape = MaterialTheme.shapes.extraLarge,
-            modifier = Modifier.size(WhiteNoiseButtonDefaults.TaskHeight).testTag("remote_signer.link.scan"),
+            modifier =
+                Modifier
+                    .alignBy { it.measuredHeight / 2 }
+                    .size(WhiteNoiseButtonDefaults.TaskHeight)
+                    .testTag("remote_signer.link.scan"),
         ) {
             Icon(painterResource(R.drawable.ic_qr_code_scanner), stringResource(R.string.scan_qr_code))
         }
