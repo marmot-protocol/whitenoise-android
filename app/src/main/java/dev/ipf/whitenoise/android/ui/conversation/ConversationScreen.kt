@@ -990,6 +990,9 @@ internal fun ConversationScreen(
                     scrollCoordinator = scrollCoordinator,
                 ),
         )
+    // A row keeps the drag callbacks it was composed with. Moves resolve through the current instance, so a move
+    // that reaches a replaced drag state finds no anchor, as the screen's rememberUpdatedState updater did.
+    val currentMessageDragSelection by rememberUpdatedState(messageDragSelection)
     LaunchedEffect(timelineViewport, ttsFollowHandle) {
         snapshotFlow { timelineViewport.readingBoundsInWindow }.collect { bounds ->
             if (bounds != null) messageDragSelection.updateTranscriptBounds(bounds)
@@ -4427,7 +4430,12 @@ internal fun ConversationScreen(
                                                         pointerWindowY = pointerWindowY,
                                                     )
                                                 },
-                                                onDragSelection = messageDragSelection::dragMessageSelection,
+                                                onDragSelection = { pointerWindowY ->
+                                                    messageDragSelection.moveMessageDragPointer(pointerWindowY)
+                                                    currentMessageDragSelection.updateMessageDragSelection(
+                                                        pointerWindowY,
+                                                    )
+                                                },
                                                 onDragSelectionEnd = {
                                                     messageDragSelection.finishMessageDrag(clearSelection = false)
                                                 },

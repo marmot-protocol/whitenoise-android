@@ -10,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.withFrameNanos
@@ -30,7 +29,9 @@ import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
  * The drag anchor, pointer and transcript bounds last as long as one instance, which the screen remembers on the
  * keys those states always used. [listState], [timelineViewport] and [currentScrollAnchor] are fixed for an instance:
  * both objects are remember keys, and the anchor function reads only the controller, the list state and the
- * viewport. Every value the screen recomputes per composition comes from [latest], read once per call.
+ * viewport. Every value the screen recomputes per composition comes from [latest], read once per call. [latest] is
+ * remembered on the same keys, so an instance replaced by a state reset keeps the values of the last composition it
+ * served and never reads its replacement's selection.
  */
 internal class ConversationMessageDragSelection(
     private val listState: LazyListState,
@@ -73,15 +74,14 @@ internal class ConversationMessageDragSelection(
         dragPointerWindowY = pointerWindowY
     }
 
-    /** Moves the held pointer and resolves the range under it; true while a nonempty range is active. */
-    fun dragMessageSelection(pointerWindowY: Float): Boolean {
+    /** Records the held pointer for the edge auto-scroll loop. */
+    fun moveMessageDragPointer(pointerWindowY: Float) {
         dragPointerWindowY = pointerWindowY
-        return updateMessageDragSelection(pointerWindowY)
     }
 
     /** Resolves the live range without rewriting unchanged selection keys; true while a nonempty range is active. */
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
-    private fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
+    fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         with(latest.value) {
             val anchorId = dragAnchorTimelineId ?: return false
             val endpointId =
@@ -181,8 +181,9 @@ internal class ConversationMessageDragSelection(
 /**
  * Remembers [ConversationMessageDragSelection] on the keys its drag state always used (the controller, the
  * conversation's account and the runtime generation) plus the list state and viewport, which change only with the
- * controller. [inputs] is held through [rememberUpdatedState], so a call always sees the latest composition's
- * values, as the screen's `rememberUpdatedState` updater did.
+ * controller. [inputs] is updated on every composition like `rememberUpdatedState`, but in a state remembered on the
+ * same keys: an instance sees the latest values while it is current and keeps its last ones once a reset replaces it,
+ * as the screen-local functions it replaces kept the values they captured.
  */
 @Composable
 @Suppress("LongParameterList") // Explicit keys and dependencies, so a stale capture cannot hide in a provider.
@@ -195,7 +196,9 @@ internal fun rememberConversationMessageDragSelection(
     currentScrollAnchor: () -> ConversationScrollAnchor,
     inputs: ConversationMessageDragSelection.Inputs,
 ): ConversationMessageDragSelection {
-    val latest = rememberUpdatedState(inputs)
+    val latest =
+        remember(controller, accountRef, runtimeGeneration, listState, timelineViewport) { mutableStateOf(inputs) }
+    latest.value = inputs
     return remember(controller, accountRef, runtimeGeneration, listState, timelineViewport) {
         ConversationMessageDragSelection(
             listState = listState,

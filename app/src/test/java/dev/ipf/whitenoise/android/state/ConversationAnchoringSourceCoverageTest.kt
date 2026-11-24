@@ -152,8 +152,30 @@ class ConversationAnchoringSourceCoverageTest {
         assertTrue(loop.contains("while (dragAnchorTimelineId != null)"))
         assertTrue(loop.contains("withFrameNanos"))
         assertTrue(loop.contains("dragSelectionAutoScrollDelta("))
-        assertTrue(source.contains("val latest = rememberUpdatedState(inputs)"))
+        assertTrue(source.contains("latest.value = inputs"))
         assertTrue(source.functionBody("updateMessageDragSelection").contains("with(latest.value)"))
+    }
+
+    /** A reset drag state stays isolated: late row moves find no anchor and old instances keep their own inputs. */
+    @Test
+    fun replacedDragSelectionNeverReachesItsReplacementsSelection() {
+        val source = conversationScreenSource().motionOwnerSource()
+        val remembered = source.functionBody("rememberConversationMessageDragSelection")
+        val keys = "remember(controller, accountRef, runtimeGeneration, listState, timelineViewport)"
+        assertTrue(
+            "inputs must be remembered on the holder's keys, never shared across holders",
+            remembered.contains("$keys { mutableStateOf(inputs) }") &&
+                remembered.contains("$keys {\n        ConversationMessageDragSelection(") &&
+                !remembered.contains("rememberUpdatedState"),
+        )
+        assertTrue(source.contains("val currentMessageDragSelection by rememberUpdatedState(messageDragSelection)"))
+        val move = source.substring(source.indexOf("onDragSelection = { pointerWindowY ->"))
+        val moveBody = move.substring(0, move.indexOf("onDragSelectionEnd ="))
+        assertTrue(
+            "a row's late move must resolve through the current holder, as the base updater did",
+            moveBody.contains("messageDragSelection.moveMessageDragPointer(pointerWindowY)") &&
+                moveBody.contains("currentMessageDragSelection.updateMessageDragSelection("),
+        )
     }
 
     private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
