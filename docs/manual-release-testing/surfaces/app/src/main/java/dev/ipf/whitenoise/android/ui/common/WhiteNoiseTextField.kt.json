@@ -35,7 +35,18 @@
         ]
       }
     ],
-    "settings_controls": []
+    "settings_controls": [],
+    "source_coverage": [
+      {
+        "surface": "Secure input center used by both QR controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun Modifier.reportSecureInputCenter()",
+        "test_ids": [
+          "ONB-004",
+          "ONB-027"
+        ]
+      }
+    ]
   },
   "discovery_exceptions": []
 }

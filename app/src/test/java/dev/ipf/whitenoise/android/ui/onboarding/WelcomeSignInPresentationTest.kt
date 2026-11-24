@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
@@ -22,9 +23,16 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerHost
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerSession
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerLinkField
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPairing
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -50,19 +58,37 @@ class WelcomeSignInPresentationTest {
                 SignInKeyField(TextFieldState(), false, error.value, {}, {}, {})
             }
         }
-        val field = composeRule.onNodeWithTag("onboarding.sign_in.private_key_container", useUnmergedTree = true)
-        val scan = composeRule.onNodeWithTag("onboarding.sign_in.scan")
-
-        /** Compare the center of the visible input surface with the scanner control. */
-        fun assertScannerAligned() {
-            val fieldBounds = field.fetchSemanticsNode().boundsInRoot
-            val scanBounds = scan.fetchSemanticsNode().boundsInRoot
-            assertEquals(fieldBounds.center.y, scanBounds.center.y, 0.5f)
-        }
-
-        assertScannerAligned()
+        assertScannerAligned("onboarding.sign_in.private_key_container", "onboarding.sign_in.scan")
         composeRule.runOnIdle { error.value = R.string.sign_in_error_public_key }
-        assertScannerAligned()
+        assertScannerAligned("onboarding.sign_in.private_key_container", "onboarding.sign_in.scan")
+    }
+
+    /** The bunker link shares input alignment with private-key sign-in at large text in RTL. */
+    @Test fun bunkerLinkScanButtonTracksTheInputSurface() {
+        val pairing =
+            RemoteSignerPairing(
+                FakeRemoteSignerHost(FakeRemoteSignerSession()),
+                CoroutineScope(Dispatchers.Unconfined),
+                sessionDispatcher = Dispatchers.Unconfined,
+            )
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(fontScale = 2f) { RemoteSignerLinkField(pairing) }
+            }
+        }
+        assertScannerAligned("remote_signer.link.container", "remote_signer.link.scan")
+        composeRule.runOnIdle { pairing.linkErrorRes = R.string.remote_signer_error_invalid_link }
+        assertScannerAligned("remote_signer.link.container", "remote_signer.link.scan")
+    }
+
+    /** Compares the actual secure input container with the sibling QR button. */
+    private fun assertScannerAligned(
+        fieldTag: String,
+        scanTag: String,
+    ) {
+        val field = composeRule.onNodeWithTag(fieldTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val scan = composeRule.onNodeWithTag(scanTag).fetchSemanticsNode().boundsInRoot
+        assertEquals(field.center.y, scan.center.y, 0.5f)
     }
 
     /** The native Amber capability moves to Sign In and never appears as an unsolicited Welcome action. */

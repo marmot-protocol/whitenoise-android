@@ -26,8 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.HorizontalAlignmentLine
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -42,6 +40,7 @@ import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureInputCenter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -49,8 +48,6 @@ import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-
-private val SignInInputCenter = HorizontalAlignmentLine(::minOf)
 
 /**
  * Paste and the real CameraX scanner only fill a fully masked native field; import always needs the explicit
@@ -109,7 +106,11 @@ internal fun SignInKeyField(
             state = key,
             enabled = !busy,
             textObfuscationMode = TextObfuscationMode.Hidden,
-            modifier = Modifier.weight(1f).alignBy(SignInInputCenter).testTag("onboarding.sign_in.private_key"),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .alignBy(WhiteNoiseSecureInputCenter)
+                    .testTag("onboarding.sign_in.private_key"),
             label = { Text(stringResource(R.string.private_key)) },
             placeholder = { Text(stringResource(R.string.onboarding_enter_private_key)) },
             errorMessage = errorRes?.let { stringResource(it) },
@@ -146,13 +147,7 @@ internal fun SignInKeyField(
                     imeAction = ImeAction.Done,
                 ),
             onKeyboardAction = { if (!busy && key.text.isNotBlank()) onSubmit() },
-            containerModifier =
-                Modifier.testTag("onboarding.sign_in.private_key_container").layout { measurable, constraints ->
-                    val field = measurable.measure(constraints)
-                    layout(field.width, field.height, mapOf(SignInInputCenter to field.height / 2)) {
-                        field.placeRelative(0, 0)
-                    }
-                },
+            containerModifier = Modifier.testTag("onboarding.sign_in.private_key_container"),
         )
         FilledTonalIconButton(
             onClick = {

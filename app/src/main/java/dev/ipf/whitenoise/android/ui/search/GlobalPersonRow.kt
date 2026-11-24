@@ -18,7 +18,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 
 /**
  * Shows the available profile metadata and opens the profile on tap. The shortened key copies the complete
- * [npub] on its own tap (#3565).
+ * [npub] on its own tap (#3565). [followedAccount] supplies the canonical hex id used by the avatar frame.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
@@ -27,13 +27,16 @@ internal fun GlobalPersonRow(
     npub: String,
     displayName: String? = null,
     pictureUrl: String? = null,
+    followedAccount: String? = null,
     onOpen: (String) -> Unit,
 ) {
     ListItem(
         onClick = { onOpen(npub) },
         shapes = WhiteNoiseListItemDefaults.shapes(),
         modifier = Modifier.testTag("global.person." + npub),
-        leadingContent = { PersonAvatar(displayName ?: IdentityFormatter.short(npub), npub, 40.dp, pictureUrl) },
+        leadingContent = {
+            PersonAvatar(displayName ?: IdentityFormatter.short(npub), npub, 40.dp, pictureUrl, followedAccount)
+        },
     ) {
         Column {
             Text(displayName ?: stringResource(R.string.chat_list_search_open_profile))

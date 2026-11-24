@@ -78,6 +78,7 @@ internal fun ChatListIdentifierResult(
                         appState.contactNicknameFor(accountRef, accountIdHex)
                             ?: appState.networkDisplayNameOrNull(accountIdHex),
                     pictureUrl = appState.contactAvatarSource(accountIdHex, accountRef),
+                    followedAccount = accountIdHex,
                     onOpen = onOpenProfile,
                 )
             }

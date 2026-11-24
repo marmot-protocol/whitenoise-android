@@ -24,6 +24,16 @@
           "CHL-028"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Followed frame on identifier preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
+        "anchor": "followedAccount = accountIdHex",
+        "test_ids": [
+          "FIND-005"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

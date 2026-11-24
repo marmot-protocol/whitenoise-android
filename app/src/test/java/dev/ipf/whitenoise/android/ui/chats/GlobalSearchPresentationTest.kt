@@ -206,8 +206,8 @@ class GlobalSearchPresentationTest {
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
-    ): WhiteNoiseAppState {
-        return WhiteNoiseAppState(
+    ): WhiteNoiseAppState =
+        WhiteNoiseAppState(
             context,
             DraftStore(
                 object : DraftPersistence {
@@ -228,5 +228,4 @@ class GlobalSearchPresentationTest {
             profileDisplayNameReader = profileDisplayNameReader,
             profileRefreshRequest = profileRefreshRequest,
         )
-    }
 }

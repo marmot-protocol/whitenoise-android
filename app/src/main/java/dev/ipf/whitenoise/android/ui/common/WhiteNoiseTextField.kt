@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -40,6 +42,9 @@ import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Container fill a hosting surface hands to its fields, for example the lowest surface inside settings. */
 val LocalWhiteNoiseTextFieldContainerColor = staticCompositionLocalOf { Color.Unspecified }
+
+/** Lets an adjacent control align with the secure input surface below its label and above its help text. */
+internal val WhiteNoiseSecureInputCenter = HorizontalAlignmentLine(::minOf)
 
 private object WhiteNoiseTextFieldDefaults {
     /** Material's standard content inset for input, supporting text, and leading icon artwork. */
@@ -238,13 +243,22 @@ internal fun WhiteNoiseSecureTextField(
                             isError = isError,
                             interactionSource = interactionSource,
                             colors = colors,
-                            modifier = containerModifier,
+                            modifier = containerModifier.reportSecureInputCenter(),
                         )
                     },
                 ),
         )
     }
 }
+
+/** Reports the measured surface center through Material's field decoration to its parent row. */
+private fun Modifier.reportSecureInputCenter(): Modifier =
+    layout { measurable, constraints ->
+        val field = measurable.measure(constraints)
+        layout(field.width, field.height, mapOf(WhiteNoiseSecureInputCenter to field.height / 2)) {
+            field.placeRelative(0, 0)
+        }
+    }
 
 /** Resolve state colors from the active palette, including existing AMOLED contrast. */
 @Composable
