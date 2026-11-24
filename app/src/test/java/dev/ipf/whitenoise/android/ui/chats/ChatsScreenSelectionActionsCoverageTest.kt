@@ -384,6 +384,10 @@ class ChatsScreenSelectionActionsCoverageTest {
             "rememberUpdatedState" in drag || "latest" in drag,
         )
         assertTrue(
+            "row callbacks keep their identity while the drag inputs are unchanged",
+            "remember(chatListState, visibleChatIds, orderedVisibleChatIds) {" in screen,
+        )
+        assertTrue(
             "a row resolves its range with the inputs of its own composition",
             "chatDragSelection.moveChatDragPointer(pointerWindowY)\n" in screen &&
                 "chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)" in screen,

@@ -1329,13 +1329,11 @@ internal fun ChatsScreen(
             selectedChatIds = selectedChatIds,
             completeSelection = completeSelectionState,
         )
-    // A row's drag callbacks and each drag effect keep the values of the composition that built them.
+    // Row drag callbacks and drag effects keep their composition's values; remembered so unchanged ones keep identity.
     val chatDragInputs =
-        ChatListDragSelection.Inputs(
-            chatListState = chatListState,
-            visibleChatIds = visibleChatIds,
-            orderedVisibleChatIds = orderedVisibleChatIds,
-        )
+        remember(chatListState, visibleChatIds, orderedVisibleChatIds) {
+            ChatListDragSelection.Inputs(chatListState, visibleChatIds, orderedVisibleChatIds)
+        }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
         chatDragSelection.finishChatDrag(clearSelection = true)
