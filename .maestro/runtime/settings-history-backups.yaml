@@ -5,9 +5,9 @@ name: settings-history-backups
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
-- tapOn: "Account"
+- tapOn: "Data & storage"
 - assertVisible:
-    id: "settings.account.group"
+    id: "data_usage.storage"
 - tapOn: "History backups"
 - assertVisible:
     id: "history_backups.list"
@@ -15,6 +15,6 @@ name: settings-history-backups
     id: "history_backups.status"
 - back
 - assertVisible:
-    id: "settings.account.group"
+    id: "data_usage.storage"
 - back
 - assertVisible: "Settings"

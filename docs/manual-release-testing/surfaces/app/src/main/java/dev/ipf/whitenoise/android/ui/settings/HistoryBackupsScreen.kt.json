@@ -74,14 +74,6 @@
         ]
       },
       {
-        "surface": "R.string.history_backups_explanation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_explanation",
-        "test_ids": [
-          "SET-072"
-        ]
-      },
-      {
         "surface": "R.string.history_backups_new_words",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_new_words",
@@ -149,22 +141,6 @@
         "surface": "R.string.history_backups_restore",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_restore",
-        "test_ids": [
-          "SET-071"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_restore_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_restore_detail",
-        "test_ids": [
-          "SET-071"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_restore_section",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_restore_section",
         "test_ids": [
           "SET-071"
         ]
@@ -282,22 +258,6 @@
         ]
       },
       {
-        "surface": "R.string.history_backups_turn_on",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_turn_on",
-        "test_ids": [
-          "SET-072"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_turn_on_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_turn_on_detail",
-        "test_ids": [
-          "SET-072"
-        ]
-      },
-      {
         "surface": "R.string.history_backups_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_unavailable",
@@ -351,6 +311,14 @@
         "anchor": "R.string.history_restore_unavailable",
         "test_ids": [
           "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_online_summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_online_summary",
+        "test_ids": [
+          "SET-072"
         ]
       }
     ]

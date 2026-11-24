@@ -244,9 +244,9 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
         SettingsDetail.Profile,
         SettingsDetail.AccountKeys,
-        SettingsDetail.HistoryBackups,
         SettingsDetail.Relays,
         -> SettingsDetail.Account
+        SettingsDetail.HistoryBackups -> SettingsDetail.Data
         SettingsDetail.ActionColor,
         SettingsDetail.ChatBubbleColors,
         -> SettingsDetail.Appearance

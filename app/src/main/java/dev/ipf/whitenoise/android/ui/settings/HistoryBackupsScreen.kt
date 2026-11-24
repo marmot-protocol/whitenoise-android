@@ -20,6 +20,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -118,6 +119,7 @@ internal fun HistoryBackupsContent(
         RecoveryWordsSetupContent(setup, state, actions)
         return
     }
+    var restoreOpen by rememberSaveable { mutableStateOf(state.restore != null) }
     var confirmTurnOff by remember { mutableStateOf(false) }
     // Typed restore words are composition-only: never saveable, cleared when this content leaves.
     val restoreWords = remember { TextFieldState() }
@@ -128,18 +130,25 @@ internal fun HistoryBackupsContent(
     DisposableEffect(restoreWords) { onDispose { restoreWords.clearText() } }
     SettingsScaffold(title = stringResource(R.string.history_backups), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag("history_backups.list")) {
-            item(key = "search.HistoryBackups.1") {
-                SettingsExplainer(stringResource(R.string.history_backups_explanation))
-            }
             item(key = "search.HistoryBackups.2") {
                 HistoryBackupsStatusGroup(state, actions, onTurnOff = { confirmTurnOff = true })
             }
             historyBackupsCallouts(state)
             if (state.status != HistoryBackupStatus.Unavailable && state.status != HistoryBackupStatus.Loading) {
-                item(key = "search.HistoryBackups.3") {
-                    SettingsSection(stringResource(R.string.history_backups_restore_section))
+                item(key = "search.HistoryBackups.4") {
+                    if (restoreOpen || state.restore != null) {
+                        HistoryRestoreGroup(state, restoreWords, actions)
+                    } else {
+                        WhiteNoiseOutlinedButton(
+                            onClick = { restoreOpen = true },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                                    .testTag("history_backups.open_restore"),
+                        ) { Text(stringResource(R.string.history_backups_restore)) }
+                    }
                 }
-                item(key = "search.HistoryBackups.4") { HistoryRestoreGroup(state, restoreWords, actions) }
             }
         }
     }
@@ -174,27 +183,32 @@ private fun HistoryBackupsStatusGroup(
         surface = "history-backups-controls",
     ) {
         row("status") { context ->
-            SettingsValue(
-                context = context,
-                title = stringResource(R.string.history_backups_status),
-                value = stringResource(historyBackupStatusText(status)),
-                modifier = Modifier.testTag("history_backups.status"),
-                leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
-            )
+            if (status == HistoryBackupStatus.Off || status is HistoryBackupStatus.On) {
+                val on = status is HistoryBackupStatus.On
+                SettingsSwitch(
+                    context = context,
+                    title = stringResource(R.string.history_backups_status),
+                    checked = on,
+                    onCheckedChange = { if (it) actions.onTurnOn() else onTurnOff() },
+                    enabled = idle,
+                    subtitle =
+                        stringResource(
+                            if (on) historyBackupStatusText(status) else R.string.history_backups_online_summary,
+                        ),
+                    modifier = Modifier.testTag("history_backups.status"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
+                )
+            } else {
+                SettingsValue(
+                    context = context,
+                    title = stringResource(R.string.history_backups_status),
+                    value = stringResource(historyBackupStatusText(status)),
+                    modifier = Modifier.testTag("history_backups.status"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
+                )
+            }
         }
         when (status) {
-            HistoryBackupStatus.Off ->
-                row("turn_on") { context ->
-                    SettingsAction(
-                        context = context,
-                        title = stringResource(R.string.history_backups_turn_on),
-                        subtitle = stringResource(R.string.history_backups_turn_on_detail),
-                        onClick = actions.onTurnOn,
-                        enabled = idle,
-                        modifier = Modifier.testTag("history_backups.turn_on"),
-                        leading = { SettingsLeadingIcon(R.drawable.ic_check) },
-                    )
-                }
             is HistoryBackupStatus.On -> {
                 row("new_words") { context ->
                     SettingsAction(
@@ -205,17 +219,6 @@ private fun HistoryBackupsStatusGroup(
                         enabled = idle,
                         modifier = Modifier.testTag("history_backups.new_words"),
                         leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
-                    )
-                }
-                row("turn_off") { context ->
-                    SettingsAction(
-                        context = context,
-                        title = stringResource(R.string.history_backups_turn_off),
-                        onClick = onTurnOff,
-                        enabled = idle,
-                        destructive = true,
-                        modifier = Modifier.testTag("history_backups.turn_off"),
-                        leading = { SettingsLeadingIcon(R.drawable.ic_block) },
                     )
                 }
             }
@@ -230,7 +233,7 @@ private fun HistoryBackupsStatusGroup(
                         leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                     )
                 }
-            HistoryBackupStatus.Loading, HistoryBackupStatus.Unavailable -> Unit
+            HistoryBackupStatus.Loading, HistoryBackupStatus.Unavailable, HistoryBackupStatus.Off -> Unit
         }
     }
 }
@@ -278,21 +281,11 @@ private fun HistoryRestoreGroup(
         Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Text(
-            stringResource(R.string.history_backups_restore_detail),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (restore != null) {
             Text(
                 text = historyRestoreProgressText(restore),
                 style = MaterialTheme.typography.bodyMedium,
-                color =
-                    if (restore.phase == BackupRestorePhaseFfi.PARTIAL) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier =
                     Modifier
                         .testTag("history_backups.restore_progress")

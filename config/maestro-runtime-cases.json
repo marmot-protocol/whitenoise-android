@@ -906,7 +906,7 @@
       "manual_ids": [
         "SET-072"
       ],
-      "assertions": "History backups opens from the Account hub with its status row and Back restores the hub; no words are generated and no backup or restore starts.",
+      "assertions": "History backups opens from Data & storage with its status row and Back restores Data & storage; no words are generated and no backup or restore starts.",
       "postcondition": "none"
     },
     "developer-quarantine": {

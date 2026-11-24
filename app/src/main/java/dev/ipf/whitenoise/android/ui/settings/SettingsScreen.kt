@@ -304,6 +304,7 @@ private fun SettingsDetailRoute(
             DataUsageScreen(
                 appState,
                 onBack = onBack,
+                onOpenHistoryBackups = { onDetailChange(SettingsDetail.HistoryBackups) },
                 onOpenManageStorage = { onDetailChange(SettingsDetail.ManageStorage) },
             )
         SettingsDetail.ManageStorage -> ManageStorageScreen(appState, onBack = onBack)

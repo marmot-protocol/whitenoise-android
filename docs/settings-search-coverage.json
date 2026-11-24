@@ -385,6 +385,10 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt": {
       "controls": [
         {
+          "declaration": "\"history_backups\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
           "declaration": "\"manage_storage\"",
           "represented_by": "Data.manage_storage"
         },
@@ -770,10 +774,6 @@
         {
           "declaration": "\"profile_keys\"",
           "represented_by": "home.ProfileKeys"
-        },
-        {
-          "declaration": "\"history_backups\"",
-          "represented_by": "home.HistoryBackups"
         },
         {
           "declaration": "\"relays\"",

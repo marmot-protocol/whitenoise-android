@@ -11,13 +11,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -54,6 +56,7 @@ internal fun RecoveryWordsSetupContent(
     state: HistoryBackupsState,
     actions: HistoryBackupsActions,
 ) {
+    var revealed by remember(setup) { mutableStateOf(false) }
     val first = remember(setup.confirmPositions) { TextFieldState() }
     val second = remember(setup.confirmPositions) { TextFieldState() }
     DisposableEffect(first, second) {
@@ -73,15 +76,16 @@ internal fun RecoveryWordsSetupContent(
         SettingsList(modifier = Modifier.testTag("history_backups.setup")) {
             if (!setup.confirming) {
                 item(key = "words.message") {
-                    SettingsExplainer(stringResource(R.string.history_backups_words_message))
+                    SettingsExplainer(stringResource(R.string.history_backups_reveal_warning))
                 }
-                item(key = "words.grid") { RecoveryWordsGrid(setup.words) }
-                item(key = "words.copy") { CopyRecoveryWordsRow(setup.words) }
+                item(key = "words.grid") {
+                    RecoveryWordsGrid(setup.words, revealed, onToggleReveal = { revealed = !revealed })
+                }
                 item(key = "words.actions") {
                     SetupButtons(
                         primary = stringResource(R.string.history_backups_words_written),
                         onPrimary = actions.onWordsWritten,
-                        primaryEnabled = true,
+                        primaryEnabled = revealed,
                         secondary = stringResource(R.string.cancel),
                         onSecondary = actions.onCancelSetup,
                         primaryTag = "history_backups.words_written",
@@ -99,12 +103,14 @@ internal fun RecoveryWordsSetupContent(
                     ) {
                         RecoveryWordsInput(
                             state = first,
+                            answerMatch = setup.matchesAnswer(0, first.text.toString()),
                             label = stringResource(R.string.history_backups_word_label, a),
                             enabled = state.running == null,
                             modifier = Modifier.fillMaxWidth().testTag("history_backups.confirm_first"),
                         )
                         RecoveryWordsInput(
                             state = second,
+                            answerMatch = setup.matchesAnswer(1, second.text.toString()),
                             label = stringResource(R.string.history_backups_word_label, b),
                             enabled = state.running == null,
                             modifier = Modifier.fillMaxWidth().testTag("history_backups.confirm_second"),
@@ -125,7 +131,7 @@ internal fun RecoveryWordsSetupContent(
                 }
                 item(key = "confirm.actions") {
                     SetupButtons(
-                        primary = stringResource(R.string.history_backups_turn_on),
+                        primary = stringResource(R.string.done),
                         onPrimary = { actions.onConfirm(listOf(first.text.toString(), second.text.toString())) },
                         primaryEnabled = state.running == null && first.text.isNotBlank() && second.text.isNotBlank(),
                         primaryLoading = state.running == HistoryBackupAction.Confirm,
@@ -143,13 +149,22 @@ internal fun RecoveryWordsSetupContent(
 /** The twelve words in reading order, two columns of six, numbered as the user writes them down. */
 @Suppress("FunctionNaming")
 @Composable
-private fun RecoveryWordsGrid(words: List<String>) {
+private fun RecoveryWordsGrid(words: List<String>, revealed: Boolean, onToggleReveal: () -> Unit) {
     val half = (words.size + 1) / 2
     SettingsPanel(
         modifier = Modifier.testTag("history_backups.words"),
         destination = SettingsDetail.HistoryBackups,
         surface = "history-backups-words",
     ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            IconButton(onClick = onToggleReveal, modifier = Modifier.testTag("history_backups.reveal_words")) {
+                Icon(
+                    painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+                    contentDescription = stringResource(if (revealed) R.string.hide else R.string.show),
+                )
+            }
+            if (revealed) CopyRecoveryWordsIcon(words)
+        }
         Row(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField)) {
             for (column in 0 until 2) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
@@ -161,7 +176,10 @@ private fun RecoveryWordsGrid(words: List<String>) {
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(words[index], style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = if (revealed) words[index] else "••••••",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                         }
                     }
                 }
@@ -176,7 +194,7 @@ private fun RecoveryWordsGrid(words: List<String>) {
  */
 @Suppress("FunctionNaming")
 @Composable
-private fun CopyRecoveryWordsRow(words: List<String>) {
+private fun CopyRecoveryWordsIcon(words: List<String>) {
     val context = LocalContext.current
     val label = stringResource(R.string.history_backups)
     var copied by remember(words) { mutableStateOf(false) }
@@ -186,19 +204,17 @@ private fun CopyRecoveryWordsRow(words: List<String>) {
             copied = false
         }
     }
-    SettingsGroup {
-        row("copy_words") { row ->
-            SettingsAction(
-                context = row,
-                title = stringResource(if (copied) R.string.copied else R.string.history_backups_copy_words),
-                onClick = {
-                    copySensitiveToClipboard(context, label, words.joinToString(" "))
-                    copied = true
-                },
-                modifier = Modifier.testTag("history_backups.copy_words"),
-                leading = { SettingsLeadingIcon(copyGlyph(copied)) },
-            )
-        }
+    IconButton(
+        onClick = {
+            copySensitiveToClipboard(context, label, words.joinToString(" "))
+            copied = true
+        },
+        modifier = Modifier.testTag("history_backups.copy_words"),
+    ) {
+        Icon(
+            painterResource(copyGlyph(copied)),
+            contentDescription = stringResource(if (copied) R.string.copied else R.string.history_backups_copy_words),
+        )
     }
 }
 
@@ -248,14 +264,36 @@ internal fun RecoveryWordsInput(
     supporting: String? = null,
     error: String? = null,
     multiLine: Boolean = false,
+    answerMatch: Boolean? = null,
 ) {
+    val answerLabel =
+        when (answerMatch.takeIf { state.text.isNotBlank() }) {
+            true -> stringResource(R.string.history_backups_word_correct)
+            false -> stringResource(R.string.history_backups_word_incorrect)
+            null -> null
+        }
     WhiteNoiseTextField(
         state = state,
         enabled = enabled,
         modifier = modifier,
         label = { Text(label) },
+        trailingIcon =
+            answerLabel?.let { description ->
+                {
+                    Icon(
+                        painterResource(if (answerMatch == true) R.drawable.ic_check else R.drawable.ic_block),
+                        contentDescription = description,
+                        tint =
+                            if (answerMatch == true) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                }
+            },
         supportingText = (error ?: supporting)?.let { { Text(it) } },
-        errorMessage = error,
+        errorMessage = error ?: answerLabel.takeIf { answerMatch == false },
         keyboardOptions =
             KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,

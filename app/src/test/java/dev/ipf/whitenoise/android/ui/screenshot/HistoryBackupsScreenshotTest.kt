@@ -120,6 +120,7 @@ class HistoryBackupsScreenshotTest {
             "history_backups_words_rtl_large",
             HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()),
             rtl = true,
+            revealWords = true,
         )
 
     @Test
@@ -174,6 +175,8 @@ class HistoryBackupsScreenshotTest {
                 )
             }
         }
+        compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.open_restore"))
+        compose.onNodeWithTag("history_backups.open_restore").performClick()
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
         val button = compose.onNodeWithTag("history_backups.restore")
         button.assertIsNotEnabled()
@@ -221,6 +224,7 @@ class HistoryBackupsScreenshotTest {
         dark: Boolean = false,
         rtl: Boolean = false,
         scrollTo: String? = null,
+        revealWords: Boolean = false,
     ) {
         compose.setContent {
             val density = LocalDensity.current
@@ -232,6 +236,14 @@ class HistoryBackupsScreenshotTest {
                     HistoryBackupsContent(state, HistoryBackupsActions(), onBack = {})
                 }
             }
+        }
+        if (revealWords) {
+            val word = state.setup!!.words.first()
+            compose.onNodeWithText(word).assertDoesNotExist()
+            compose.onNodeWithTag("history_backups.copy_words").assertDoesNotExist()
+            compose.onNodeWithTag("history_backups.reveal_words").performClick()
+            compose.onNodeWithText(word).assertIsDisplayed()
+            compose.onNodeWithTag("history_backups.copy_words").assertIsDisplayed()
         }
         if (scrollTo != null) {
             compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag(scrollTo))

@@ -441,24 +441,7 @@
         ]
       }
     ],
-    "string_resources": [
-      {
-        "surface": "R.string.explanation_organize_hub_history_backups",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
-        "anchor": "R.string.explanation_organize_hub_history_backups",
-        "test_ids": [
-          "SET-072"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
-        "anchor": "R.string.history_backups",
-        "test_ids": [
-          "SET-072"
-        ]
-      }
-    ]
+    "string_resources": []
   },
   "discovery_exceptions": []
 }

@@ -59,9 +59,20 @@ internal class RecoveryWordsSetup(
     /** The two 1-based positions to type back, ascending. */
     val confirmPositions: List<Int>,
     val confirming: Boolean = false,
+    private val expectedAnswers: List<String> = emptyList(),
 ) {
     /** The words are shown once: confirmation keeps only the positions, so they cannot be displayed again. */
-    fun confirming(): RecoveryWordsSetup = RecoveryWordsSetup(emptyList(), confirmPositions, confirming = true)
+    fun confirming(): RecoveryWordsSetup =
+        RecoveryWordsSetup(
+            emptyList(),
+            confirmPositions,
+            confirming = true,
+            expectedAnswers = confirmPositions.map { words[it - 1] },
+        )
+
+    /** Presentation feedback for the two answers from this setup. MDK still decides whether to enable backups. */
+    fun matchesAnswer(index: Int, answer: String): Boolean? =
+        expectedAnswers.getOrNull(index)?.let { it.equals(answer.trim(), ignoreCase = true) }
 
     /** Formats setup state without exposing the words. */
     override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirming=$confirming)"

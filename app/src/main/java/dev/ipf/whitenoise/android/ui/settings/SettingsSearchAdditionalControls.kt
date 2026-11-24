@@ -238,7 +238,7 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         control(
             "home.HistoryBackups",
             R.string.history_backups,
-            R.string.account,
+            R.string.data_usage_title,
             SettingsDetail.HistoryBackups,
             summary = R.string.explanation_organize_hub_history_backups,
             account = true,
