@@ -152,7 +152,8 @@ private fun LearnWalkthroughFooter(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             LearnTopic.entries.forEach { item ->
-                val color = if (item == currentTopic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                val colors = MaterialTheme.colorScheme
+                val color = if (item == currentTopic) colors.primary else colors.outline
                 val width = if (item == currentTopic) 16.dp else 6.dp
                 Box(Modifier.size(width = width, height = 6.dp).background(color, CircleShape))
             }
