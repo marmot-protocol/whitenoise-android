@@ -108,9 +108,10 @@ internal class RetainedConversationStates(
     fun pendingProjectionsAwaitingBridge(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, TimelineMessageRecordFfi> {
-        return retained(accountRef, groupIdHex) { pendingProjectionsAwaitingBridge }
-    }
+    ): MutableMap<String, TimelineMessageRecordFfi> =
+        retained(accountRef, groupIdHex) {
+            pendingProjectionsAwaitingBridge
+        }
 
     /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
     fun nativeComposerCleanupRevision(

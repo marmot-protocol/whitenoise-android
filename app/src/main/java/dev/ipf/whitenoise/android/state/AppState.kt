@@ -2680,9 +2680,11 @@ class WhiteNoiseAppState private constructor(
     internal fun optimisticSendPositionPreserves(
         accountRef: String?,
         groupIdHex: String,
-    ): OptimisticSendPositionPreserves {
-        return retainedConversationStates.optimisticSendPositionPreserves(accountRef, groupIdHex)
-    }
+    ): OptimisticSendPositionPreserves =
+        retainedConversationStates.optimisticSendPositionPreserves(
+            accountRef,
+            groupIdHex,
+        )
 
     internal fun retentionAtSend(
         accountRef: String?,
@@ -2710,17 +2712,22 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         confirmedMessageIdHex: String,
-    ): String? {
-        return retainedConversationStates.acceptedPendingTextOptimisticId(accountRef, groupIdHex, confirmedMessageIdHex)
-    }
+    ): String? =
+        retainedConversationStates.acceptedPendingTextOptimisticId(
+            accountRef,
+            groupIdHex,
+            confirmedMessageIdHex,
+        )
 
     /** Returns the account/group retained queue whose removal callback releases private source ownership. */
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
-    ): dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload> {
-        return retainedConversationStates.retainedMediaUploads(accountRef, groupIdHex)
-    }
+    ): dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload> =
+        retainedConversationStates.retainedMediaUploads(
+            accountRef,
+            groupIdHex,
+        )
 
     /** Deletes a released private upload snapshot on the IO pool; unlinking a large file must not block Main. */
     internal fun closeStagedUploadSourceOffMain(source: StagedUploadSource) {
@@ -2763,9 +2770,11 @@ class WhiteNoiseAppState private constructor(
     internal fun pendingProjectionsAwaitingBridge(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi> {
-        return retainedConversationStates.pendingProjectionsAwaitingBridge(accountRef, groupIdHex)
-    }
+    ): MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi> =
+        retainedConversationStates.pendingProjectionsAwaitingBridge(
+            accountRef,
+            groupIdHex,
+        )
 
     private fun activeConversationStateKey(): String? =
         activeConversationGroupIdHex?.let { groupIdHex ->
