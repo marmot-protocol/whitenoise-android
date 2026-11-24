@@ -92,4 +92,12 @@
     <string name="storage_cache_cleared">%1$s liberati</string>
     <string name="storage_caches_cleared">Immagini e file temporanei cancellati</string>
     <string name="storage_action_failed">Impossibile liberare spazio. Riprova.</string>
+    <string name="storage_automatic_cleanup">Pulizia automatica</string>
+    <string name="storage_highlight_share">%1$s · %2$s di %3$s</string>
+    <string name="storage_highlight_shared">%1$s · condiviso da tutti i profili, escluso da questo totale</string>
+    <string name="storage_share_under_one">meno del %1$s</string>
+    <string name="storage_select">Seleziona</string>
+    <string name="storage_deselect">Deseleziona</string>
+    <string name="storage_select_named">Seleziona %1$s</string>
+    <string name="storage_open_failed">Impossibile aprire questo allegato</string>
 </resources>
