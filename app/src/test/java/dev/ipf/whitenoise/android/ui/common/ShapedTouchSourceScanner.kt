@@ -228,12 +228,28 @@ private fun String.withLocalBinding(expression: String): String {
 }
 
 /**
- * The initializer of the last `val [name] = …` in this text, the one nearest the end, read over the lines a
- * wrapped modifier chain continues onto, or null.
+ * The initializer of the `val [name] = …` in scope at the end of this text — the nearest one whose block is
+ * still open there, not one in a block that has already closed — read over the lines a wrapped modifier chain
+ * continues onto, or null.
  */
 private fun String.localBinding(name: String): String? {
-    val declaration = Regex("""\bval\s+${Regex.escape(name)}\s*=\s*""").findAll(this).lastOrNull()
+    val declaration =
+        Regex("""\bval\s+${Regex.escape(name)}\s*=\s*""")
+            .findAll(this)
+            .lastOrNull { blockStaysOpen(from = it.range.last + 1) }
     return declaration?.let { initializerFrom(it.range.last + 1) }
+}
+
+/** Whether no brace closes the block open at [from] before the end of this text. */
+private fun String.blockStaysOpen(from: Int): Boolean {
+    var depth = 0
+    for (index in from until length) {
+        when (this[index]) {
+            '{' -> depth++
+            '}' -> if (--depth < 0) return false
+        }
+    }
+    return true
 }
 
 /** The expression starting at [start]: up to a line break outside brackets that no `.` call continues. */

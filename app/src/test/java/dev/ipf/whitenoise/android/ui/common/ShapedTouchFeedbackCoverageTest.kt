@@ -226,6 +226,38 @@ class ShapedTouchFeedbackCoverageTest {
         assertEquals(listOf("$STRETCHED_ICON_BUTTON @13"), stretchedWrapperCalls(source, wrappers))
     }
 
+    /** A binding in a block that has already closed is not the one a later call uses, in either direction. */
+    @Test
+    fun aShadowingBindingInAClosedBlockIsIgnored() {
+        val wrappers = mapOf("ActionButton" to setOf(1))
+        val stretchedOuter =
+            """
+            @Composable
+            internal fun Header(expanded: Boolean) {
+                val cell = Modifier.width(36.dp).height(48.dp)
+                if (expanded) {
+                    val cell = Modifier.size(48.dp)
+                    Spacer(cell)
+                }
+                ActionButton(action, cell)
+            }
+            """.trimIndent()
+        val squareOuter =
+            """
+            @Composable
+            internal fun Header(expanded: Boolean) {
+                val cell = Modifier.size(48.dp)
+                if (expanded) {
+                    val cell = Modifier.width(36.dp).height(48.dp)
+                    Spacer(cell)
+                }
+                ActionButton(action, cell)
+            }
+            """.trimIndent()
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @8"), stretchedWrapperCalls(stretchedOuter, wrappers))
+        assertEquals(emptyList<String>(), stretchedWrapperCalls(squareOuter, wrappers))
+    }
+
     /** A `modifier` parameter after one with a generic type keeps its position. */
     @Test
     fun aModifierAfterAGenericParameterKeepsItsPosition() {
