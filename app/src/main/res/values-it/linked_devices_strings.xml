@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Dispositivi collegati</string>
+    <string name="linked_devices">Dispositivi</string>
+    <string name="settings_search_alias_linked_devices">dispositivi collegati|collegare un dispositivo</string>
+    <string name="group_account_devices_title">Dispositivi collegati</string>
     <string name="linked_devices_detail">I messaggi che invii da un dispositivo collegato appaiono come tuoi su tutti i tuoi dispositivi collegati.</string>
     <string name="linked_devices_this_device">Questo dispositivo</string>
     <string name="linked_devices_other_devices">Altri dispositivi</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Queste chat non possono applicare la rimozione dai tuoi dispositivi. Un amministratore può rimuovere il dispositivo lì.</string>
     <string name="devices_key_refresh_overdue">Questo dispositivo non è riuscito a rinnovare le chiavi di invito. Dopo 30 giorni potrebbe non essere più possibile aggiungerlo a nuove chat. Tieni l’app aperta sui tuoi dispositivi perché possano aggiornarsi.</string>
     <string name="devices_stalled">Questo dispositivo non riesce più a tenere il passo con gli altri. Ripara il collegamento per continuare.</string>
-    <string name="device_repair_confirm_again">Apri i dispositivi collegati nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
+    <string name="device_repair_confirm_again">Apri «Dispositivi» nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
     <string name="device_repair_try_link_again">Collegamento reimpostato. Prova a collegare di nuovo il dispositivo per completare la riparazione.</string>
     <string name="devices_repair">Ripara il collegamento di questo dispositivo</string>
     <string name="devices_repair_confirm">Il collegamento attuale verrà rimosso per permetterti di collegare di nuovo il dispositivo. Conserverai chat, messaggi, bozze e impostazioni. Il vecchio collegamento non si può ripristinare, anche se annulli la procedura.</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">Collega questo dispositivo per vedere le chat degli altri tuoi dispositivi.</string>
     <string name="link_request_default_label">Nuovo dispositivo</string>
     <string name="link_request_options">Opzioni</string>
-    <string name="link_request_options_detail">Scegli il nome del dispositivo e se condividere le chat e la loro cronologia.</string>
-    <string name="explanation_link_request_options">Apre il nome del nuovo dispositivo e ciò che riceve.</string>
+    <string name="link_request_options_detail">Scegli se condividere le chat e la loro cronologia.</string>
+    <string name="explanation_link_request_options">Apre ciò che riceve il nuovo dispositivo.</string>
     <string name="device_move_advanced">Avanzate</string>
     <string name="setup_device_link_next">Dopo l’accesso puoi collegare questo dispositivo per ricevere le chat dagli altri dispositivi.</string>
     <string name="unlinked_account_remove_for">Rimuovi %1$s da questo dispositivo</string>

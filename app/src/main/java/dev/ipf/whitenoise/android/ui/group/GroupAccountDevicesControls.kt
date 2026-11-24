@@ -95,7 +95,7 @@ internal fun SettingsGroupScope.groupAccountDevicesRows(
                 val reason = accountDevicesActivationReason(activation)
                 SettingsValue(
                     context = context,
-                    title = stringResource(R.string.linked_devices),
+                    title = stringResource(R.string.group_account_devices_title),
                     value = stringResource(reason ?: R.string.group_account_devices_enabled),
                     modifier = Modifier.testTag(GROUP_ACCOUNT_DEVICES_STATUS_TAG),
                     explanation = stringResource(R.string.group_account_devices_enable_detail),

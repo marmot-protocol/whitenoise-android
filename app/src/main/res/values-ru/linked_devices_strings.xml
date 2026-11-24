@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Связанные устройства</string>
+    <string name="linked_devices">Устройства</string>
+    <string name="settings_search_alias_linked_devices">связанные устройства|привязанные устройства|привязать устройство|связать устройство</string>
+    <string name="group_account_devices_title">Связанные устройства</string>
     <string name="linked_devices_detail">Сообщения, отправленные с привязанного устройства, отображаются как ваши на всех ваших привязанных устройствах.</string>
     <string name="linked_devices_this_device">Это устройство</string>
     <string name="linked_devices_other_devices">Другие устройства</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Эти чаты не могут принять удаление от ваших устройств. Администратор чата может удалить устройство там.</string>
     <string name="devices_key_refresh_overdue">Этому устройству не удалось обновить ключи приглашений. Через 30 дней его, возможно, нельзя будет добавлять в новые чаты. Держите приложение открытым на своих устройствах, чтобы они синхронизировались.</string>
     <string name="devices_stalled">Это устройство больше не успевает за другими вашими устройствами. Восстановите его связь, чтобы продолжить.</string>
-    <string name="device_repair_confirm_again">Откройте связанные устройства в настройках и повторно подтвердите восстановление перед привязкой.</string>
+    <string name="device_repair_confirm_again">Откройте «Устройства» в настройках и повторно подтвердите восстановление перед привязкой.</string>
     <string name="device_repair_try_link_again">Связь сброшена. Попробуйте привязать устройство ещё раз, чтобы завершить восстановление.</string>
     <string name="devices_repair">Восстановить связь этого устройства</string>
     <string name="devices_repair_confirm">Текущая привязка будет удалена, чтобы вы могли привязать устройство заново. Чаты, сообщения, черновики и настройки сохранятся. Восстановить старую привязку нельзя, даже если вы отмените новую.</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">Свяжите это устройство, чтобы видеть чаты с других ваших устройств.</string>
     <string name="link_request_default_label">Новое устройство</string>
     <string name="link_request_options">Параметры</string>
-    <string name="link_request_options_detail">Выберите имя устройства и укажите, хотите ли вы поделиться чатами и их историей.</string>
-    <string name="explanation_link_request_options">Открывает название нового устройства и то, что оно получает.</string>
+    <string name="link_request_options_detail">Укажите, хотите ли вы поделиться чатами и их историей.</string>
+    <string name="explanation_link_request_options">Открывает то, что получает новое устройство.</string>
     <string name="device_move_advanced">Дополнительно</string>
     <string name="setup_device_link_next">После входа вы сможете привязать это устройство, чтобы получить чаты с других устройств.</string>
     <string name="unlinked_account_remove_for">Удалить %1$s с этого устройства</string>

@@ -26,4 +26,5 @@
     <string name="shared_media_share_photos_failed">Impossibile condividere le foto</string>
     <string name="shared_media_share_photos_unavailable">Alcune foto selezionate non sono più disponibili, quindi non è stato condiviso nulla. Sono state deselezionate. Riprova.</string>
     <string name="shared_media_share_photos_too_large">Queste foto sono troppo grandi per condividerle insieme. Selezionane meno e riprova.</string>
+    <string name="shared_media_jump_to_date">Vai a una data</string>
 </resources>

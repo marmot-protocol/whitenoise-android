@@ -54,6 +54,7 @@ class SharedPhotoShareLifecycleTest {
     private var ownershipLostOnFinalCheck = false
     private lateinit var share: SharedPhotoShare
 
+    /** Mounts a gallery share whose availability checks count calls and can drop ownership on the final one. */
     @Before
     fun setUp() {
         File(context.cacheDir, MediaCacheDirs.SHARED).listFiles()?.forEach(File::delete)
@@ -64,7 +65,7 @@ class SharedPhotoShareLifecycleTest {
                     rememberSharedPhotoShare(
                         ownsShare = { owned },
                         accountRef = { "account" },
-                        currentVisuals = {
+                        currentPhotos = {
                             checks += 1
                             if (checks == 2 && ownershipLostOnFinalCheck) owned = false
                             current

@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -81,20 +82,28 @@ internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
  * No theme, preference, or route changes occur here. Non-AMOLED rows keep Material's segmented
  * gap; AMOLED rows touch and share one-pixel seams.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
     destination: Any? = null,
     surface: Any = destination ?: Unit,
+    onMeasured: ((SurfaceMorphCard?) -> Unit)? = null,
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     val page = LocalSettingsCardMorph.current?.page
     val token = remember(page, destination, surface) { Any() }
-    val native = rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token)
+    val native =
+        rememberSettingsNativeSurface(
+            destination,
+            containerColor,
+            surface,
+            registrationToken = token,
+            onMeasured = onMeasured,
+        )
     Column(
         modifier
             .fillMaxWidth()

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d sayfa</item>
+        <item quantity="other">PDF · %d sayfa</item>
+    </plurals>
+    <string name="composer_pdf_metadata_removed">Meta veriler kaldırıldı</string>
+    <string name="composer_pdf_metadata_removed_on_send">Meta veriler gönderirken kaldırılır</string>
+    <string name="composer_pdf_metadata_signed">İmzalı: meta veriler kalır</string>
+    <string name="composer_pdf_metadata_encrypted">Korumalı: meta veriler kalır</string>
+    <string name="composer_pdf_metadata_unsupported">Meta veriler kaldırılamıyor</string>
+    <string name="composer_pdf_metadata_sending_as_is">Meta verilerle gönderilir</string>
+    <string name="composer_pdf_metadata_dialog_title">Meta verilerle gönderilsin mi?</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s imzalı. Meta verilerini kaldırmak imzayı bozar, bu yüzden yalnızca olduğu gibi gönderilebilir.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s parolayla korunuyor, bu yüzden meta verileri kaldırılamıyor.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise, %1$s dosyasının meta verilerini güvenli şekilde kaldıramıyor.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">%1$d PDF dosyasının meta verileri kaldırılamıyor: %2$s.</item>
+        <item quantity="other">%1$d PDF dosyasının meta verileri kaldırılamıyor: %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Bu sohbetteki herkes yazar, dosyayı oluşturan uygulamalar ve oluşturulma ya da değiştirilme zamanı gibi bilgileri görebilir.</string>
+    <string name="composer_pdf_metadata_send_as_is">Olduğu gibi gönder</string>
+    <string name="media_file_pdf_metadata_kept">Bu PDF, meta verileri kaldırılamadığı için gönderilmedi. Olduğu gibi gönderip göndermeyeceğini seçmek için mesaj kutusundan gönder.</string>
+</resources>

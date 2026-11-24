@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 

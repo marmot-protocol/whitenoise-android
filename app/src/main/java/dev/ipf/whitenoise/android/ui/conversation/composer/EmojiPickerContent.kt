@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.composerEmojiArtwork
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -57,7 +58,6 @@ import dev.ipf.whitenoise.android.ui.emojiSearchLayout
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
 import dev.ipf.whitenoise.android.ui.hides
 import dev.ipf.whitenoise.android.ui.installedSetSearchSections
-import dev.ipf.whitenoise.android.ui.libraryEmojiArtwork
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -423,13 +423,7 @@ internal fun EmojiGlyph(
             baseStyle = baseStyle,
             densityFontScale = LocalDensity.current.fontScale,
         )
-    val customEmoji = LocalCustomEmoji.current
-    val art =
-        if (customEmoji.usesInstalledArtwork(emoji) || customEmoji.usesConversationArtwork(emoji)) {
-            libraryEmojiArtwork(emoji)
-        } else {
-            EmojiShortcodes.art(emoji, customEmoji, emptyMap())
-        }
+    val art = composerEmojiArtwork(emoji)
     if (art != null) {
         // Artwork takes the Unicode glyph's em box, so every emoji in a row reads at one size.
         val artSize = with(LocalDensity.current) { emojiGlyphArtworkSize(fontSize, size) }

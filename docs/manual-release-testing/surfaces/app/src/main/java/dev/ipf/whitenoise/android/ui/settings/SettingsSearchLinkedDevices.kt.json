@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "Linked devices: R.string.settings_search_alias_linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
+        "anchor": "R.string.settings_search_alias_linked_devices",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
         "surface": "Linked devices: R.string.account",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
         "anchor": "R.string.account",
