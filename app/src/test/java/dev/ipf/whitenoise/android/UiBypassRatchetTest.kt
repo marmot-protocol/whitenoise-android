@@ -40,11 +40,11 @@ class UiBypassRatchetTest {
             "$path|" + counts.entries.sortedBy { it.key.name }.joinToString(",") { "${it.key.name}=${it.value}" } + "\n"
         }
 
-    private fun proposedBaselineFile(): File =
-        File(invariantGateRepositoryRoot(), "app/build/ui-bypass/baseline.proposed.txt")
+    private fun repoFile(path: String): File = File(invariantGateRepositoryRoot(), path)
 
-    private fun baselineFile(): File =
-        File(invariantGateRepositoryRoot(), "app/src/test/resources/ui-bypass/baseline.txt")
+    private fun proposedBaselineFile(): File = repoFile("app/build/ui-bypass/baseline.proposed.txt")
+
+    private fun baselineFile(): File = repoFile("app/src/test/resources/ui-bypass/baseline.txt")
 
     private fun readBaseline(): Map<String, Map<UiBypassRule, Int>> =
         baselineFile()
