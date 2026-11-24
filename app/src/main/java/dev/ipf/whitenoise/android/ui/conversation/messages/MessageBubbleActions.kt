@@ -13,6 +13,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.confirmedReplyTarget
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
@@ -26,7 +27,8 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
  * other value an action needs comes from [latest], the most recent composition that used this instance. Each action
  * reads it once when it runs and uses that one set of values throughout, including inside the mutation it launches,
  * as the local functions it replaces did with the values they captured. Once a confirmed send's record id replaces
- * [pollOwner] and so the instance, an action still holding this instance keeps the values from its own lifetime.
+ * [pollOwner] and so the instance, an action still holding this instance keeps the values from its own lifetime,
+ * except that Reply, Edit and a reaction target the confirmed message (see [actionRecord]).
  */
 internal class MessageBubbleActions(
     private val appState: WhiteNoiseAppState,
@@ -54,11 +56,24 @@ internal class MessageBubbleActions(
         val record: AppMessageRecordFfi get() = item.record
     }
 
+    /**
+     * The message Reply, Edit and a reaction act on. Usually [Inputs.record]. A menu action queued behind the exit
+     * animation can run on a replaced instance after the pending send it was opened for confirmed; that send's
+     * row is then gone, and its client token resolves through the controller's local-send mapping to the confirmed
+     * row, so Edit opens the text the timeline now shows. When nothing resolves, the record is used unchanged.
+     */
+    private fun Inputs.actionRecord(): AppMessageRecordFfi {
+        if (controller.currentActionTimelineItem(record.messageIdHex) != null) return record
+        val confirmedId = controller.confirmedReplyTarget(record.messageIdHex).takeIf { it != record.messageIdHex }
+        return confirmedId?.let(controller::currentActionTimelineItem)?.record ?: record
+    }
+
     /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
     fun beginReply() {
         with(latest.value) {
             if (deleted || actionsReadOnly) return
-            val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
+            val target =
+                if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else actionRecord()
             controller.replyingTo = target
             onActionMenuOpenChange(false)
         }
@@ -133,12 +148,13 @@ internal class MessageBubbleActions(
             if (deleted || actionsReadOnly) return
             // Route via launchMutation: same survives-navigation rationale as delete/send.
             val reactionOrigin = localReactionMotion.takeOrigin(emoji)
+            val actionRecord = if (isPollRecord) record else actionRecord()
             appState.launchMutation {
                 val target =
                     if (isPollRecord) {
                         currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
                     } else {
-                        record
+                        actionRecord
                     }
                 controller.toggleReaction(emoji, target, onLocalIntent = { added ->
                     localReactionMotion.accept(emoji, added, reactionOrigin)
@@ -192,7 +208,7 @@ internal class MessageBubbleActions(
             if (deleted || actionsReadOnly) return
             onActionMenuOpenChange(false)
             controller.replyingTo = null
-            controller.beginMessageEdit(record.messageIdHex)
+            controller.beginMessageEdit(actionRecord().messageIdHex)
         }
     }
 }
