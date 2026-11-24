@@ -340,7 +340,11 @@ class AudioTranscriptionScreenshotTest {
     /** Records the timestamp and transcript animating together in the shared footer. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
-    fun captureSharedFooterFrames() = captureTranscriptToggles("transcript-shared-footer", TranscriptPlacement.SHARED_FOOTER)
+    fun captureSharedFooterFrames() =
+        captureTranscriptToggles(
+            "transcript-shared-footer",
+            TranscriptPlacement.SHARED_FOOTER,
+        )
 
     private fun captureTranscriptToggles(
         directory: String,
@@ -449,7 +453,8 @@ class AudioTranscriptionScreenshotTest {
             Column(modifier = Modifier.weight(1f, fill = false).alignBy(MessageBubbleBottomAlignmentLine)) {
                 if (placement != TranscriptPlacement.BODY) {
                     val sharedFooter = placement == TranscriptPlacement.SHARED_FOOTER
-                    val footerTranscript = state?.takeIf { sharedFooter && it.phase == AudioTranscriptPhase.COMPLETE }?.text
+                    val footerTranscript =
+                        state?.takeIf { sharedFooter && it.phase == AudioTranscriptPhase.COMPLETE }?.text
                     MediaCaptionFrame(
                         presentation = messageBubblePresentation(deleted = false, mine = false),
                         highlighted = false,

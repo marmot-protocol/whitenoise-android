@@ -120,10 +120,16 @@ internal class AudioTranscriptionToggleState(
         provided: VoiceTranscriptionScope?,
         index: Int,
         epoch: ULong,
-    ): String? = scope(provided).result(voicePlaybackKey(messageIdHex, index, epoch))?.text.takeIf { requested(provided) }
+    ): String? {
+        val key = voicePlaybackKey(messageIdHex, index, epoch)
+        return scope(provided).result(key)?.text.takeIf { requested(provided) }
+    }
 
     /** Offers the menu action once a recording is ready, using the same request as the side disc. */
-    fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? = if (enabled) ({ setRequested(provided, true) }) else null
+    fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? {
+        if (!enabled) return null
+        return { setRequested(provided, true) }
+    }
 
     fun register(
         key: Any,
@@ -144,7 +150,10 @@ internal class AudioTranscriptionToggleState(
 internal fun rememberReceivedAudioTranscription(
     messageIdHex: String,
     mine: Boolean,
-): AudioTranscriptionToggleState? = if (mine) null else remember(messageIdHex) { AudioTranscriptionToggleState(messageIdHex) }
+): AudioTranscriptionToggleState? {
+    if (mine) return null
+    return remember(messageIdHex) { AudioTranscriptionToggleState(messageIdHex) }
+}
 
 /**
  * Transcribes the received recording on this device while its message's transcript is shown, either because the
@@ -327,7 +336,10 @@ internal fun AudioTranscriptBody(
 }
 
 /** Keeps the timestamp and transcript in one animated content area. */
-internal fun Modifier.animateTranscriptFooter(enabled: Boolean): Modifier = if (enabled) animateContentSize(alignment = Alignment.TopStart) else this
+internal fun Modifier.animateTranscriptFooter(enabled: Boolean): Modifier {
+    if (!enabled) return this
+    return animateContentSize(alignment = Alignment.TopStart)
+}
 
 /** Uses the same last-line footer placement as a regular message caption. */
 @Composable
