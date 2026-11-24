@@ -109,7 +109,11 @@ class FocusedMessageActionDisclosureTest {
             more = listOf("Select text", "Share", "Translate", "Read aloud", "Select", "Info", "Delete"),
             fontScale = 2f,
         )
-        rule.onNodeWithText("More actions").performScrollTo().assertIsDisplayed().performClick()
+        rule
+            .onNodeWithText("More actions")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         rule.waitForIdle()
 
         rule.onNodeWithText("Delete").performScrollTo().assertIsDisplayed()

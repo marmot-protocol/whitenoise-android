@@ -67,11 +67,21 @@ class ConversationPolishScreenshotTest {
     /** The full action set behind More actions keeps the first level and ends with Delete (#4077). */
     @Test
     fun actionGridMoreActionsLight() =
-        captureActionMenu("message_action_menu_more_actions_light", dark = false, amoled = false, showAll = true)
+        captureActionMenu(
+            "message_action_menu_more_actions_light",
+            dark = false,
+            amoled = false,
+            showAll = true,
+        )
 
     @Test
     fun actionGridMoreActionsAmoled() =
-        captureActionMenu("message_action_menu_more_actions_amoled", dark = true, amoled = true, showAll = true)
+        captureActionMenu(
+            "message_action_menu_more_actions_amoled",
+            dark = true,
+            amoled = true,
+            showAll = true,
+        )
 
     @Test
     fun actionGridMoreActionsLargeFont() =
