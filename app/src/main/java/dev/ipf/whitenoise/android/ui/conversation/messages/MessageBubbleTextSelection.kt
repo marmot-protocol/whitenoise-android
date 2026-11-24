@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.geometry.Offset
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 
@@ -12,8 +12,9 @@ import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
  * text leaf for selection, and telling ordinary text apart from links and empty row space.
  *
  * An instance lasts as long as the bubble keeps its [textLayouts], which is the only value the replaced local
- * functions captured that stays fixed for a mounted message. Every other value comes from [latest], the bubble's
- * most recent composition, read once when [beginTextSelection] runs.
+ * functions captured that stays fixed for a mounted message. Every other value comes from [latest], the most recent
+ * composition that used this instance, read once when [beginTextSelection] runs. Once a new record id replaces
+ * [textLayouts], a callback still holding this instance keeps the values from its own lifetime.
  */
 internal class MessageBubbleTextSelection(
     private val textLayouts: MessageBubbleTextLayouts,
@@ -60,14 +61,18 @@ internal class MessageBubbleTextSelection(
 /**
  * Remembers [MessageBubbleTextSelection] for the bubble's [textLayouts]. [inputs] is this composition's snapshot of
  * the other captured values and is only read when [MessageBubbleTextSelection.beginTextSelection] runs, so it adds
- * no snapshot read to composition and a new menu or selection callback never needs a new instance.
+ * no snapshot read to composition and a new menu or selection callback never needs a new instance. It is updated
+ * on every composition like `rememberUpdatedState`, but in a state remembered on the same key as the instance, so
+ * a replaced instance, such as one a queued menu action still holds after a pending send confirms, never sees the
+ * confirmed message's values.
  */
 @Composable
 internal fun rememberMessageBubbleTextSelection(
     textLayouts: MessageBubbleTextLayouts,
     inputs: MessageBubbleTextSelection.Inputs,
 ): MessageBubbleTextSelection {
-    val latest = rememberUpdatedState(inputs)
+    val latest = remember(textLayouts) { mutableStateOf(inputs) }
+    latest.value = inputs
     return remember(textLayouts) {
         MessageBubbleTextSelection(
             textLayouts = textLayouts,
