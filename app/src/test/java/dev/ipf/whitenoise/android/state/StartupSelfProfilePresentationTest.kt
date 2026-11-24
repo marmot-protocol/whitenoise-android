@@ -84,7 +84,12 @@ class StartupSelfProfilePresentationTest {
     @Test
     fun failedChatRowReadStillPublishesTheRetainedProfile() =
         runBlocking {
-            val fixture = fixture(failRows = true, read = ::profile)
+            val rowReadFailed = CountDownLatch(1)
+            val fixture =
+                fixture(failRows = true, onRowsRead = rowReadFailed::countDown) { id ->
+                    check(rowReadFailed.await(10, TimeUnit.SECONDS))
+                    profile(id)
+                }
             try {
                 fixture.bootstrap()
                 assertEquals(AppPhase.Ready, fixture.appState.phase)
