@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +50,7 @@ import dev.ipf.whitenoise.android.state.forwardTargetMembersRevision
 import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -280,7 +280,7 @@ private fun ForwardOperationDetailsSheet(
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
-    ModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
+    WhiteNoiseModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
         ForwardProgressContent(snapshot, targetTitles, Modifier.fillMaxWidth())
         ForwardOperationActions(
             snapshot = snapshot,

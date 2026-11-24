@@ -15,7 +15,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,7 +32,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -46,11 +44,14 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.filter
 
 internal enum class GroupMemberMenuAction {
@@ -124,20 +125,18 @@ internal fun TransferAdminSheet(
             }
         }
 
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         sheetState = sheetState,
         onDismissRequest = { terminal.close(onDismiss) },
-        containerColor = amoledSheetContainerColor(),
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.transfer_admin))
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.transfer_admin),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
             Text(
                 stringResource(R.string.transfer_admin_picker_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
@@ -257,21 +256,19 @@ internal fun SoleAdminDeletePicker(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal =
         rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         sheetState = sheetState,
         onDismissRequest = { terminal.close(onDismiss) },
-        containerColor = amoledSheetContainerColor(),
         modifier = soleAdminEmptyPickerTag(candidates.isEmpty()),
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.transfer_admin))
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.transfer_admin),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
             Text(
                 stringResource(R.string.transfer_admin_picker_subtitle),
                 style = MaterialTheme.typography.bodyMedium,

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -18,8 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
@@ -49,11 +45,14 @@ import dev.ipf.whitenoise.android.media.GroupEmojiImageRenderer
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.addGroupEmojiSelection
 import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -143,168 +142,160 @@ internal fun GroupEmojiImagePickerSheet(
         )
     val terminal = suppliedTerminal ?: rememberSheetTerminalMotion(sheetState)
     val inputBlocked = applyInFlight || !terminal.acceptsInput
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { if (!inputBlocked) terminal.close(onDismiss) },
         sheetState = sheetState,
-        sheetGesturesEnabled = !inputBlocked,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = !inputBlocked,
-                shouldDismissOnClickOutside = !inputBlocked,
-            ),
+        interactionEnabled = !inputBlocked,
     ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(PICKER_SHEET_HEIGHT_FRACTION)
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .testTag(GROUP_EMOJI_IMAGE_PICKER_TAG)
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .testTag(GROUP_EMOJI_IMAGE_PICKER_TAG),
         ) {
-            Text(
-                text = stringResource(R.string.group_image_emoji_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = stringResource(R.string.group_image_emoji_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            WhiteNoiseSheetHeader(stringResource(R.string.group_image_emoji_title))
+            Column(
+                modifier = Modifier.weight(1f).padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(88.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center,
+                Text(
+                    text = stringResource(R.string.group_image_emoji_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    when {
-                        preview != null ->
-                            Image(
-                                bitmap = preview,
-                                contentDescription =
-                                    stringResource(
-                                        R.string.group_image_emoji_preview_description,
-                                        previewEmojiLabel,
-                                    ),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.matchParentSize(),
-                            )
-                        currentRenderState is GroupEmojiImageRenderState.Loading &&
-                            currentRenderState.emojis == selectedEmojis ->
-                            CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
-                        else ->
-                            Icon(
-                                painterResource(R.drawable.ic_emoji_smileys),
-                                contentDescription = null,
-                                modifier = Modifier.size(36.dp),
-                            )
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(88.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            preview != null ->
+                                Image(
+                                    bitmap = preview,
+                                    contentDescription =
+                                        stringResource(
+                                            R.string.group_image_emoji_preview_description,
+                                            previewEmojiLabel,
+                                        ),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.matchParentSize(),
+                                )
+                            currentRenderState is GroupEmojiImageRenderState.Loading &&
+                                currentRenderState.emojis == selectedEmojis ->
+                                CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
+                            else ->
+                                Icon(
+                                    painterResource(R.drawable.ic_emoji_smileys),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp),
+                                )
+                        }
                     }
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (selectedEmojis.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.group_image_emoji_none_selected),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            selectedEmojis.forEachIndexed { index, emoji ->
-                                OutlinedButton(
-                                    onClick = {
-                                        selectedEmojis = selectedEmojis.toMutableList().also { it.removeAt(index) }
-                                        limitReached = false
-                                    },
-                                    enabled = !inputBlocked,
-                                ) {
-                                    Text(
-                                        text = "$emoji ×",
-                                        textAlign = TextAlign.Center,
-                                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (selectedEmojis.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.group_image_emoji_none_selected),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                selectedEmojis.forEachIndexed { index, emoji ->
+                                    OutlinedButton(
+                                        onClick = {
+                                            selectedEmojis = selectedEmojis.toMutableList().also { it.removeAt(index) }
+                                            limitReached = false
+                                        },
+                                        enabled = !inputBlocked,
+                                    ) {
+                                        Text(
+                                            text = "$emoji ×",
+                                            textAlign = TextAlign.Center,
+                                        )
+                                    }
                                 }
                             }
                         }
+                        Text(
+                            text = stringResource(R.string.group_image_emoji_private),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                }
+                val errorText =
+                    when {
+                        limitReached -> stringResource(R.string.group_image_emoji_limit)
+                        currentRenderState is GroupEmojiImageRenderState.Unsupported &&
+                            currentRenderState.emojis == selectedEmojis ->
+                            stringResource(R.string.group_image_emoji_unsupported)
+                        currentRenderState is GroupEmojiImageRenderState.Failed &&
+                            currentRenderState.emojis == selectedEmojis ->
+                            stringResource(R.string.toast_couldnt_prepare_image)
+                        else -> null
+                    }
+                errorText?.let {
                     Text(
-                        text = stringResource(R.string.group_image_emoji_private),
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            val errorText =
-                when {
-                    limitReached -> stringResource(R.string.group_image_emoji_limit)
-                    currentRenderState is GroupEmojiImageRenderState.Unsupported &&
-                        currentRenderState.emojis == selectedEmojis ->
-                        stringResource(R.string.group_image_emoji_unsupported)
-                    currentRenderState is GroupEmojiImageRenderState.Failed &&
-                        currentRenderState.emojis == selectedEmojis ->
-                        stringResource(R.string.toast_couldnt_prepare_image)
-                    else -> null
-                }
-            errorText?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                EmojiPickerContent(
+                    onEmojiPicked = { emoji ->
+                        val update = addGroupEmojiSelection(selectedEmojis, emoji)
+                        // Record recent-emoji usage only for accepted picks — a
+                        // rejected third tap or a blank emoji must not pollute the
+                        // shared recents list with something the user never applied.
+                        if (update.emojis.size > selectedEmojis.size) onEmojiUsed(emoji)
+                        selectedEmojis = update.emojis
+                        limitReached = update.limitReached
+                    },
+                    purpose = EmojiPickerPurpose.GROUP_IMAGE,
+                    recentEmojis = recentEmojis,
+                    selectionEnabled = !inputBlocked,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
-            }
-            EmojiPickerContent(
-                onEmojiPicked = { emoji ->
-                    val update = addGroupEmojiSelection(selectedEmojis, emoji)
-                    // Record recent-emoji usage only for accepted picks — a
-                    // rejected third tap or a blank emoji must not pollute the
-                    // shared recents list with something the user never applied.
-                    if (update.emojis.size > selectedEmojis.size) onEmojiUsed(emoji)
-                    selectedEmojis = update.emojis
-                    limitReached = update.limitReached
-                },
-                purpose = EmojiPickerPurpose.GROUP_IMAGE,
-                recentEmojis = recentEmojis,
-                selectionEnabled = !inputBlocked,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TextButton(
-                    onClick = { terminal.close(onDismiss) },
-                    enabled = !inputBlocked,
-                    modifier = Modifier.weight(1f),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Button(
-                    onClick = { readyDraft?.let(onApply) },
-                    enabled = readyDraft != null && !inputBlocked,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    // Keep the label's footprint while applying; closing alone is not work.
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            stringResource(R.string.group_image_emoji_use),
-                            modifier = Modifier.alpha(if (applyInFlight) 0f else 1f),
-                        )
-                        if (applyInFlight) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
+                    TextButton(
+                        onClick = { terminal.close(onDismiss) },
+                        enabled = !inputBlocked,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { readyDraft?.let(onApply) },
+                        enabled = readyDraft != null && !inputBlocked,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        // Keep the label's footprint while applying; closing alone is not work.
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                stringResource(R.string.group_image_emoji_use),
+                                modifier = Modifier.alpha(if (applyInFlight) 0f else 1f),
                             )
+                            if (applyInFlight) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
                         }
                     }
                 }

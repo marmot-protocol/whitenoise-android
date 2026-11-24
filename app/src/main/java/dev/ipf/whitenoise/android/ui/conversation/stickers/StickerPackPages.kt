@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation.DiscoveryState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
@@ -106,7 +107,7 @@ private fun StickerBrowserTopBar(
     onBack: () -> Unit,
     onClose: () -> Unit,
 ) {
-    StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
+    WhiteNoiseSheetHeader(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
         IconToggleButton(
             checked = linkOpen,
             onCheckedChange = onLinkOpenChange,
@@ -334,7 +335,7 @@ internal fun StickerPackDetailPage(
     val scope = rememberCoroutineScope()
     // A tap waits for MDK's link, so further taps meanwhile must not open a second share sheet.
     var sharing by remember(pack.coordinate) { mutableStateOf(false) }
-    StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
+    WhiteNoiseSheetHeader(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
         IconButton(
             enabled = !sharing,
             onClick = {

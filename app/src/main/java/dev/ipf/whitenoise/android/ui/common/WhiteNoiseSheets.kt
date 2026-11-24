@@ -2,10 +2,12 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,9 +30,17 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Ordinary sheets only. Material owns the handle, shape, width, IME, motion and dismissal. */
+/** Horizontal inset for sheet titles and hand-laid sheet content; list rows keep their own padding. */
+val WhiteNoiseSheetInset = WhiteNoiseSpacing.Section
+
+/**
+ * Ordinary sheets only. Material owns the handle, shape, width, IME, motion and dismissal.
+ * The container is `surfaceContainerLow`, which the AMOLED scheme already maps to black.
+ * [dragHandle] is replaced only by the full-height camera sheet (none) and the keyboard-compact report sheet.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
@@ -39,6 +49,8 @@ fun WhiteNoiseModalBottomSheet(
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     containerColor: Color? = null,
+    contentColor: Color? = null,
+    dragHandle: (@Composable () -> Unit)? = { BottomSheetDefaults.DragHandle(Modifier.testTag("sheet.dragHandle")) },
     contentWindowInsets: @Composable () -> WindowInsets = { WindowInsets.safeDrawing },
     interactionEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
@@ -56,9 +68,9 @@ fun WhiteNoiseModalBottomSheet(
                     shouldDismissOnClickOutside = interactionEnabled,
                 ),
             containerColor = containerColor ?: scheme.surfaceContainerLow,
-            contentColor = scheme.onSurface,
+            contentColor = contentColor ?: scheme.onSurface,
             contentWindowInsets = contentWindowInsets,
-            dragHandle = { BottomSheetDefaults.DragHandle(Modifier.testTag("sheet.dragHandle")) },
+            dragHandle = dragHandle,
             content = content,
         )
     }
@@ -71,23 +83,32 @@ fun WhiteNoiseSheetHeader(
     title: String,
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
+    onBack: (() -> Unit)? = null,
+    action: @Composable () -> Unit = {},
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .testTag("sheet.header")
             .padding(
-                start = WhiteNoiseSpacing.Section,
-                end = if (onClose == null) WhiteNoiseSpacing.Section else WhiteNoiseSpacing.Related,
+                start = if (onBack == null) WhiteNoiseSheetInset else Dimens.spaceXs,
+                end = if (onClose == null) WhiteNoiseSheetInset else WhiteNoiseSpacing.Related,
                 bottom = WhiteNoiseSpacing.Related,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onBack != null) {
+            IconButton(onClick = onBack) {
+                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
+            }
+            Spacer(Modifier.width(Dimens.spaceXs))
+        }
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
+        action()
         if (onClose != null) {
             IconButton(onClick = onClose, enabled = closeEnabled) {
                 Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
