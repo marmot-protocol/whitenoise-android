@@ -96,7 +96,6 @@
     <string name="storage_highlight_share">%1$s · %2$s di %3$s</string>
     <string name="storage_highlight_shared">%1$s · condiviso da tutti i profili, escluso da questo totale</string>
     <string name="storage_share_under_one">meno del %1$s</string>
-    <string name="storage_size_detail">%1$s · %2$s</string>
     <string name="storage_select">Seleziona</string>
     <string name="storage_deselect">Deseleziona</string>
     <string name="storage_select_named">Seleziona %1$s</string>

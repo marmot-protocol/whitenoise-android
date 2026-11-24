@@ -40,7 +40,7 @@
     <string name="storage_keep_media">Keep media</string>
     <string name="storage_automatic_cleanup">Automatic cleanup</string>
     <!-- A size ahead of a row's explanation. %1$s: size, such as "150 MB"; %2$s: the explanation. -->
-    <string name="storage_size_detail">%1$s · %2$s</string>
+    <string name="storage_size_detail" translatable="false">%1$s · %2$s</string>
     <string name="storage_keep_media_help">Attachments older than this are removed from this device now and as they age. Downloading one again keeps it for the full period.</string>
     <string name="storage_keep_media_failed">Couldn\'t load</string>
     <string name="storage_keep_forever">Forever</string>

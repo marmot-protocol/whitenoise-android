@@ -19,6 +19,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -128,9 +129,15 @@ internal fun StoredAttachmentsContent(
         bottomBar = { if (list.selecting) StorageSelectionBar(list, storage.busy) { confirm = SELECTION } },
     ) {
         // No list-wide spacing: attachment rows sit on the segmented gap, other items pad themselves.
-        SettingsList(listTag = "storage.attachments", verticalArrangement = Arrangement.Top) {
-            if (groupIdHex != null) storageChatActionItems(storage, list, groupIdHex, dialogs) { confirm = groupIdHex }
-            storageAttachmentItems(appState, list, groupIdHex == null, storage.busy, actions)
+        // Row thumbnails last as long as the list for this account and runtime, never in the app's media cache.
+        val thumbnails = remember(appState.activeAccountRef, appState.runtimeGeneration) { StoredThumbnailCache() }
+        CompositionLocalProvider(LocalStoredThumbnails provides thumbnails) {
+            SettingsList(listTag = "storage.attachments", verticalArrangement = Arrangement.Top) {
+                if (groupIdHex != null) {
+                    storageChatActionItems(storage, list, groupIdHex, dialogs) { confirm = groupIdHex }
+                }
+                storageAttachmentItems(appState, list, groupIdHex == null, storage.busy, actions)
+            }
         }
     }
     RemoveOlderDialogs(dialogs, groupIdHex, actions.onAction)

@@ -94,7 +94,11 @@ internal fun LazyListScope.storageAttachmentItems(
                     selected = attachment.key in list.selected,
                     enabled = !busy,
                     onToggle = { actions.onToggle(attachment.key) },
-                    onOpen = { actions.onOpen(attachment) },
+                    // While a selection is open a tap adds to it, as in the chat list; otherwise it opens the
+                    // attachment.
+                    onClick = {
+                        if (list.selecting) actions.onToggle(attachment.key) else actions.onOpen(attachment)
+                    },
                 )
             }
         }
@@ -117,7 +121,8 @@ internal fun LazyListScope.storageAttachmentItems(
 /**
  * One attachment: its preview or kind glyph, the sender's file name, then its size, the day it arrived and its chat,
  * with a check mark at the end. A missing or unreadable name falls back to the kind. Tapping the row opens the
- * attachment so it can be reviewed before removal; the check mark, or holding the row, selects it. The check mark is
+ * attachment so it can be reviewed before removal, or adds it to an open selection; the check mark, or holding the row,
+ * selects it. The check mark is
  * its own checkbox for TalkBack, named after the attachment, and a selected row takes a tonal fill.
  */
 @Composable
@@ -130,7 +135,7 @@ private fun StoredAttachmentRow(
     selected: Boolean,
     enabled: Boolean,
     onToggle: () -> Unit,
-    onOpen: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val kind = attachment.kind
     val kindLabel = stringResource(kind.labelRes)
@@ -138,11 +143,11 @@ private fun StoredAttachmentRow(
     val title = name ?: kindLabel
     val time = attachment.receivedAtSeconds.takeIf { it > 0 }?.let { storageReceivedDate(it) }
     val origin = if (showChat) storageChatTitle(appState, attachment.groupIdHex) else null
-    // Size leads the details, then the date, so the chat name is what shortens on a narrow row. The kind shows in the
-    // leading glyph and, for an unnamed attachment, as the title.
+    // Size leads the details, then the date and the chat, wrapping rather than clipping at large text sizes. The kind
+    // shows in the leading glyph and, for an unnamed attachment, as the title.
     val details = listOfNotNull(storageBytes(attachment.bytes), time, origin).joinToString(" · ")
     ListItem(
-        onClick = onOpen,
+        onClick = onClick,
         onLongClick = onToggle,
         onLongClickLabel = stringResource(if (selected) R.string.storage_deselect else R.string.storage_select),
         shapes = context.shapes,
@@ -162,8 +167,6 @@ private fun StoredAttachmentRow(
                 details,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(enabled),
                 style = LocalTextStyle.current.copy(textDirection = TextDirection.Content),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         },
         trailingContent = { StoredAttachmentCheck(title, selected, enabled, onToggle) },

@@ -10,6 +10,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GlobalAttachmentPresentation
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.globalAttachmentIsVideo
 import dev.ipf.whitenoise.android.core.globalAttachmentPresentation
 import dev.ipf.whitenoise.android.state.KeepMediaPeriod
@@ -135,7 +136,10 @@ private const val STORAGE_FILE_NAME_MAX_CHARS = 120
  * attachment's kind. The name comes from another device and is never trusted for layout or direction.
  */
 internal fun storageDisplayName(raw: String): String? {
-    val cleaned = storageNameCodePoints(raw.substringAfterLast('/').substringAfterLast('\\'))
+    // The shared remote-text filter first, as the chat's file card applies it, so the name matches the chat's and a
+    // stack of combining marks is capped; then what only matters for a one-line row title.
+    val segment = raw.replace('\\', '/').substringAfterLast('/')
+    val cleaned = storageNameCodePoints(ProfileSanitizer.stripUnsafe(segment))
     // A name of only dots, marks or spaces would draw as nothing, so it reads as no name at all.
     val readable = cleaned.codePoints().anyMatch { it.isVisibleNameCharacter() } && !cleaned.all { it == '.' }
     return if (readable) boundedStorageName(cleaned) else null

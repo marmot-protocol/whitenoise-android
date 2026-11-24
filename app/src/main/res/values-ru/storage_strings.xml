@@ -106,7 +106,6 @@
     <string name="storage_highlight_share">%1$s · %2$s от %3$s</string>
     <string name="storage_highlight_shared">%1$s · общие для всех профилей, не входят в эту сумму</string>
     <string name="storage_share_under_one">менее %1$s</string>
-    <string name="storage_size_detail">%1$s · %2$s</string>
     <string name="storage_select">Выбрать</string>
     <string name="storage_deselect">Снять выбор</string>
     <string name="storage_select_named">Выбрать %1$s</string>

@@ -254,6 +254,36 @@ class ManageStorageSemanticsTest {
         assertEquals(1, left)
     }
 
+    /** While a selection is open, tapping a row adds it to the selection instead of opening it. */
+    @Test fun tapWhileSelectingToggles() {
+        val rows = listOf(attachment("a", 9_000_000), attachment("b", 8_000_000))
+        val opened = mutableListOf<String>()
+        val toggled = mutableListOf<String>()
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StoredAttachmentsContent(
+                    appState = appState,
+                    storage = ManageStorageUiState(),
+                    list = StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows[1].key)),
+                    groupIdHex = null,
+                    onBack = {},
+                    actions =
+                        StoredAttachmentsActions(
+                            onToggle = { toggled += it },
+                            onSelectAll = {},
+                            onLoadMore = {},
+                            onRetry = {},
+                            onAction = {},
+                            onOpen = { opened += it.key },
+                        ),
+                )
+            }
+        }
+        composeRule.onAllNodesWithTag("storage.attachment")[0].performClick()
+        composeRule.runOnIdle { assertEquals(emptyList<String>() to listOf(rows[0].key), opened to toggled.toList()) }
+    }
+
     /** Tapping a row opens its attachment without selecting it; its check mark selects it without opening. */
     @Test fun rowOpensAndCheckMarkSelects() {
         val rows = listOf(attachment("a", 9_000_000))

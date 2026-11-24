@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -38,14 +40,38 @@ private const val STORED_THUMBNAIL_EDGE_PX = 192
 /** Rows decode a few at a time, so opening a long list never queues dozens of reads at once. */
 private val StoredThumbnailLoads = Semaphore(permits = 2)
 
+/** Rows the list remembers at once; at the decode edge that is under 8 MB of pixels. */
+private const val STORED_THUMBNAIL_CACHE_ROWS = 48
+
 /** What a row has to draw so far: the sender's thumbhash first, then pixels from the copy on this device. */
-private data class StoredThumbnail(
+internal data class StoredThumbnail(
     val thumbhash: String? = null,
     val bitmap: ImageBitmap? = null,
 )
 
 /**
- * A photo or video row's thumbnail. A decode this session already made, here or in the chat, shows at once; otherwise
+ * What the list resolved for its rows, kept for the screen rather than in the app's media cache: a 192 px poster there
+ * would stand in for a chat bubble's full-size one. A row scrolled back in draws its last result at once instead of
+ * scanning the chat's history and decoding again, including a row that only ever had a thumbhash.
+ */
+internal class StoredThumbnailCache {
+    private val entries = LruCache<String, StoredThumbnail>(STORED_THUMBNAIL_CACHE_ROWS)
+
+    operator fun get(key: String): StoredThumbnail? = entries.get(key)
+
+    operator fun set(
+        key: String,
+        thumbnail: StoredThumbnail,
+    ) {
+        entries.put(key, thumbnail)
+    }
+}
+
+/** The open list's [StoredThumbnailCache]; null outside the list, where nothing is kept. */
+internal val LocalStoredThumbnails = staticCompositionLocalOf<StoredThumbnailCache?> { null }
+
+/**
+ * A photo or video row's thumbnail. A decode the chat or this list already made shows at once; otherwise
  * the row looks up the attachment's message reference, paints its thumbhash, and then decodes the copy on this device
  * in the isolated media decoder: a photo within the presentation budget from its bytes, a video from the app's cached
  * file when there is one. Nothing is downloaded, and a result for another account is never drawn. Null keeps the kind
@@ -61,13 +87,16 @@ internal fun rememberStoredAttachmentThumbnail(
     val context = LocalContext.current
     val visual = kind == StoredAttachmentKind.Photo || kind == StoredAttachmentKind.Video
     val generation = appState.runtimeGeneration
+    val cache = LocalStoredThumbnails.current
     val loaded by produceState(StoredThumbnail(), account, generation, attachment.key, visual) {
         // A restarted producer keeps its last value, so clear it before anything for a new identity is drawn.
         value = StoredThumbnail()
         if (account == null || !visual) return@produceState
         val key = mediaCacheKey(account, attachment.groupIdHex, attachment.messageIdHex, attachment.attachmentIndex)
-        appState.cachedMediaThumbnail(key)?.let {
-            value = StoredThumbnail(bitmap = it.asImageBitmap())
+        val known =
+            appState.cachedMediaThumbnail(key)?.let { StoredThumbnail(bitmap = it.asImageBitmap()) } ?: cache?.get(key)
+        if (known != null) {
+            value = known
             return@produceState
         }
         StoredThumbnailLoads.withPermit {
@@ -75,16 +104,15 @@ internal fun rememberStoredAttachmentThumbnail(
             val current = { appState.activeAccountRef == account && appState.runtimeGeneration == generation }
             if (!current()) return@withPermit
             value = StoredThumbnail(thumbhash = reference.thumbhash)
+            cache?.set(key, value)
             val video = kind == StoredAttachmentKind.Video
             val bitmap =
                 runCatchingCancellable {
                     decodeStoredThumbnail(appState, context, account, attachment, reference, video)
                 }.getOrNull()
             bitmap?.takeIf { current() }?.let {
-                // Cached with its edge, so a row scrolled back skips the scan and decode, and a larger request
-                // elsewhere still decodes its own.
-                appState.cacheMediaThumbnail(key, it, STORED_THUMBNAIL_EDGE_PX)
                 value = value.copy(bitmap = it.asImageBitmap())
+                cache?.set(key, value)
             }
         }
     }

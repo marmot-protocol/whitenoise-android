@@ -91,7 +91,6 @@
     <string name="storage_highlight_share">%1$s · 占 %3$s 的 %2$s</string>
     <string name="storage_highlight_shared">%1$s · 由所有资料共享，不计入此总量</string>
     <string name="storage_share_under_one">不到 %1$s</string>
-    <string name="storage_size_detail">%1$s · %2$s</string>
     <string name="storage_select">选择</string>
     <string name="storage_deselect">取消选择</string>
     <string name="storage_select_named">选择 %1$s</string>
