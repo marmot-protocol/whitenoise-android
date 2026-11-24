@@ -8,15 +8,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,14 +22,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
 import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import kotlinx.coroutines.launch
@@ -169,8 +163,8 @@ internal fun NostrEventReaderScreen(
 }
 
 /**
- * Keeps Close, copy, and external-open controls distinct from links in the reader body. The reader is a viewer
- * that returns to the message it opened from, so it leads with an X labelled Close, like the media viewers.
+ * The reader's viewer chrome keeps Close, copy, and external-open controls distinct from links in the reader body.
+ * The reader returns to the message it opened from, so it leads with an X labelled Close, like the media viewers.
  */
 @Composable
 private fun NostrEventReaderHeader(
@@ -179,32 +173,22 @@ private fun NostrEventReaderHeader(
     onCopyReference: (() -> Unit)?,
     onOpenExternal: (() -> Unit)?,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().nativePageHeader().padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onDismiss) {
-            Icon(
-                painterResource(R.drawable.ic_close),
-                contentDescription = stringResource(R.string.close),
-            )
-        }
-        Text(
-            text = card.kind.label(card.eventKind),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (onCopyReference != null && onOpenExternal != null) {
-            EventCardActions(
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                copyDescription = stringResource(R.string.nostr_event_copy),
-                openDescription = stringResource(R.string.nostr_event_open),
-                onCopy = onCopyReference,
-                onOpen = onOpenExternal,
-            )
-        }
-    }
+    AttachmentViewerChrome(
+        title = card.kind.label(card.eventKind),
+        onClose = onDismiss,
+        modifier = Modifier.nativePageHeader(),
+        actions = {
+            if (onCopyReference != null && onOpenExternal != null) {
+                EventCardActions(
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    copyDescription = stringResource(R.string.nostr_event_copy),
+                    openDescription = stringResource(R.string.nostr_event_open),
+                    onCopy = onCopyReference,
+                    onOpen = onOpenExternal,
+                )
+            }
+        },
+    )
 }
 
 /** Renders event metadata and the bounded full Markdown body. */

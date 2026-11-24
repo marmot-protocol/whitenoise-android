@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -65,7 +65,7 @@ class DocumentAttachmentViewerScreenshotTest {
 
     @Test fun pdfPagesDark() =
         render("pdf_pages_dark", DocumentAttachmentKind.Pdf) {
-            Text("3 / 12", color = Color.White, modifier = Modifier.padding(16.dp))
+            Text("3 / 12", modifier = Modifier.padding(16.dp))
             val bitmap =
                 remember {
                     Bitmap.createBitmap(300, 420, Bitmap.Config.ARGB_8888).apply {
@@ -95,8 +95,8 @@ class DocumentAttachmentViewerScreenshotTest {
         render("html_rendered_notice", DocumentAttachmentKind.Html) {
             Text(
                 stringResource(R.string.document_html_omitted),
-                color = Color.White,
                 modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodySmall,
             )
             // Robolectric covers native chrome, not Chromium layout or document-directed networking.
             val document =

@@ -26,9 +26,28 @@ A page whose banner slot must sit above other bar content, such as its own
 snackbar host, passes `topNoticeSlot = false` and places `TopNoticeSlot()`
 itself.
 
-Out of scope for this rule: the chat list top bar, the collapsing group
-details header and the attachment viewers' chrome, which have their own
-designs.
+Out of scope for this rule: the chat list top bar and the collapsing group
+details header, which have their own designs. Attachment viewers use the
+viewer chrome below.
+
+## Attachment viewer chrome
+
+Every attachment viewer uses `AttachmentViewerChrome`
+([`ui/conversation/media/AttachmentViewerChrome.kt`](../app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt)):
+the image and video viewer, PDF and HTML documents, the text reader, the
+Nostr event reader, video player and linked image, and the photo editor.
+
+- It leads with Close (an X labelled Close), because a viewer returns to the
+  message it opened from.
+- The title is one line of `titleMedium` in semibold, with an optional
+  `labelMedium` second line such as the sender's time and position.
+- Direct actions follow the title, then one overflow slot. The slot takes the
+  viewer's existing More menu as it is; how viewer menus look is decided in
+  #4098.
+- Colours come from the theme. Readers dock the chrome on `surface`. Over
+  edge-to-edge media it is the themed background under a heavy scrim, so the
+  media still runs to the screen edges and the chrome pads itself clear of the
+  status bar and side cutouts.
 
 ## Back arrow or X
 
@@ -37,7 +56,7 @@ The leading control says how the user got here.
 | Control | Use it for | Examples |
 | --- | --- | --- |
 | Back arrow, labelled "Back" (`WhiteNoiseTopBarNavigation.Back`) | A page pushed onto the current stack, including a detail page shown as a full-screen dialog | Settings pages, Donate, Share & Connect, the contact picker, selection review, message details, edit history |
-| X, labelled "Close" (`WhiteNoiseTopBarNavigation.Close`) | A modal or full-screen flow that returns to where it started when it is cancelled or finished, and viewers opened from a message | Share to, Forward, the Nostr event reader, image, video and document viewers |
+| X, labelled "Close" (`WhiteNoiseTopBarNavigation.Close`) | A modal or full-screen flow that returns to where it started when it is cancelled or finished, and viewers opened from a message | Share to, Forward, every attachment viewer (image, video, document, text, Nostr) and the photo editor |
 
 The icon and its accessibility label always match: an arrow is "Back" and an X
 is "Close". Android system Back does the same as the leading control in both

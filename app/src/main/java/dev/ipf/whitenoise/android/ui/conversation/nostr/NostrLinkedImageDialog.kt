@@ -5,20 +5,21 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
 
-/** Created only by a user's media-link action, including its normal labelled-link confirmation. */
+/**
+ * Created only by a user's media-link action, including its normal labelled-link confirmation. It leads with the
+ * shared viewer chrome's Close, like every other viewer.
+ */
 @Composable
 internal fun NostrLinkedImageDialog(
     url: String,
@@ -36,9 +37,7 @@ internal fun NostrLinkedImageDialog(
     ) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                IconButton(onClick = dismiss) {
-                    Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
-                }
+                AttachmentViewerChrome(title = stringResource(R.string.attachment_type_image), onClose = dismiss)
                 NostrEventImagePane(
                     url = url,
                     loadImage = loadImage,

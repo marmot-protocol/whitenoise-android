@@ -66,7 +66,7 @@ class TextAttachmentReaderSessionTest {
         val session = appState.ttsController.state.value.sessionId
         val passage = requireNotNull(appState.ttsController.state.value.passage)
         appState.ttsController.seekToSentence(passage.messageIdHex, 1, passage.projectionId)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
         val spoken = engine.spoken.size
         notificationAction(TtsPlaybackForegroundService.ACTION_PAUSE)
         assertTrue(appState.ttsController.state.value is TtsState.Paused)

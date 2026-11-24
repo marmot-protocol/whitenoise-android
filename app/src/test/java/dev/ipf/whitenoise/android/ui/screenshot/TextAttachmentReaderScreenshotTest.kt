@@ -188,7 +188,7 @@ class TextAttachmentReaderScreenshotTest {
             onCopy = { copied = it },
         )
 
-        listOf(R.string.back, R.string.read_aloud, R.string.copy_text, R.string.share, R.string.more_options)
+        listOf(R.string.close, R.string.read_aloud, R.string.copy_text, R.string.share, R.string.more_options)
             .forEach { label ->
                 composeRule
                     .onNodeWithContentDescription(string(label))
@@ -238,7 +238,7 @@ class TextAttachmentReaderScreenshotTest {
             onShare = { shared += 1 },
         )
 
-        composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.share)).assertIsEnabled().performClick()
@@ -324,11 +324,11 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(source).performTouchInput { longClick() }
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
         assertTrue(copied.isNotBlank() && copied != source && source.contains(copied))
-        composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         assertEquals(0, dismissed)
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
         assertEquals(source, copied)
-        composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         assertEquals(1, dismissed)
     }
 

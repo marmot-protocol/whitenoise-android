@@ -4,6 +4,6 @@ name: presentation-text-invalid
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible: Maestro complete filename.txt
 - assertVisible: This file doesn’t use a supported text encoding. Open it in another app.
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

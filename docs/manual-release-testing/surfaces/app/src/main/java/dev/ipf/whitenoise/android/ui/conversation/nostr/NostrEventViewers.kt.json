@@ -65,9 +65,25 @@
         ]
       },
       {
-        "surface": "Nostr reader Close control",
+        "surface": "Shared viewer chrome: Nostr reader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
-        "anchor": "R.drawable.ic_close",
+        "anchor": "AttachmentViewerChrome(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "Nostr reader copy reference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_event_copy",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "Nostr reader open externally",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_event_open",
         "test_ids": [
           "RDR-001"
         ]

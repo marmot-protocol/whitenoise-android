@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -59,6 +58,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
+/** PDF pages rendered on demand under a page counter in the theme's content colour, with a retryable failure. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun PdfDocumentPages(
@@ -134,7 +134,7 @@ internal fun PdfDocumentPages(
             val placeholderRatio = pageRatio(info.width, info.height)
             val list = rememberLazyListState()
             val current by remember(list) { derivedStateOf { list.firstVisibleItemIndex + 1 } }
-            Text("$current / $count", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
+            Text("$current / $count", modifier = Modifier.padding(horizontal = 16.dp))
             WhiteNoiseLazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize(),
