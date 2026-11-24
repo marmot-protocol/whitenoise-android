@@ -382,6 +382,8 @@ internal fun GroupAvatar(
     // True only when [durableAvatar] is a member's profile picture (a DM peer), never a group image.
     durableAvatarIsPersonPicture: Boolean = false,
     retainCompatibility: Boolean = false,
+    // The direct chat's peer, as public-key hex, so the avatar carries the followed-person badge; null for groups.
+    followedAccount: String? = null,
 ) {
     val compatibility =
         if (retainCompatibility && durableAvatar == null) {
@@ -429,5 +431,6 @@ internal fun GroupAvatar(
             compatibility?.takeIf { presentation.image == null }?.let { retained ->
                 { image -> retained.record(group.groupIdHex, urlSource, publicUrl, image) }
             },
+        followedAccount = followedAccount,
     )
 }

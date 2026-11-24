@@ -27,10 +27,10 @@ import dev.ipf.marmotkit.UserSearchUpdateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
-import dev.ipf.whitenoise.android.ui.chats.newchat.FOLLOWED_PERSON_BADGE_TEST_TAG
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientUserSearchState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.aggregateRecipientSearchUpdates
+import dev.ipf.whitenoise.android.ui.common.FOLLOWED_PERSON_BADGE_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

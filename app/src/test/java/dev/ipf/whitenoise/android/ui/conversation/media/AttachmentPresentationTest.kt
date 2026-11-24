@@ -191,6 +191,14 @@ class AttachmentPresentationTest {
             AttachmentOpenClassification.Ready("text/plain"),
             classifyAttachmentOpen("application/pdf", "page.html") { false },
         )
+        // Invisible characters are stripped from the cached name, so they cannot hide an active extension.
+        listOf("page.ht\u200Bml", "page.svg\u202E", "dir/page.htm\u2066").forEach { name ->
+            assertEquals(
+                name,
+                AttachmentOpenClassification.Ready("text/plain"),
+                classifyAttachmentOpen("application/pdf", name) { false },
+            )
+        }
         assertEquals(
             AttachmentOpenClassification.Ready("application/json"),
             classifyAttachmentOpen("application/json", "data.json") { false },

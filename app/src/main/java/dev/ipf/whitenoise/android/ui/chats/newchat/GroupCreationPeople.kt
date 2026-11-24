@@ -48,7 +48,8 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -75,7 +76,12 @@ internal fun GroupCreationPersonRow(
 ) {
     val candidate = person.candidate
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
-    val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
+    val followed =
+        if (isFollowedPerson(candidate.isFollowing, candidate.accountIdHex)) {
+            stringResource(R.string.user_search_you_follow)
+        } else {
+            null
+        }
     val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
     val native =
         rememberSettingsNativeSurface(
@@ -98,6 +104,7 @@ internal fun GroupCreationPersonRow(
             48.dp,
             pictureUrl = person.avatarUrl,
             pictureDomain = AvatarImageLoader.publicProfiles(),
+            followedAccount = candidate.accountIdHex,
         )
     }
     val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
@@ -189,6 +196,7 @@ internal fun GroupSelectedPerson(
                     64.dp,
                     pictureUrl = person.avatarUrl,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = candidate.accountIdHex,
                 )
             }
             Surface(

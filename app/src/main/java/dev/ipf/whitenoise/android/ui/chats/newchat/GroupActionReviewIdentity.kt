@@ -57,6 +57,7 @@ internal fun GroupReviewPersonIdentity(
             48.dp,
             pictureUrl = person.picture,
             pictureDomain = AvatarImageLoader.publicProfiles(),
+            followedAccount = member.accountIdHex,
         )
         GroupReviewPersonText(person, role)
     }

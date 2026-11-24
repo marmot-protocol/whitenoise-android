@@ -755,9 +755,7 @@ private fun SettingsProfileHeader(
                         title = stringResource(R.string.settings_switch_profile),
                         onClick = onSwitchProfile,
                         modifier = Modifier.testTag("settings.switch_profile"),
-                        leading = {
-                            SettingsLeadingIcon(R.drawable.ic_settings_account_circle)
-                        },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_account_circle) },
                     )
                 }
             }

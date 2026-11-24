@@ -135,6 +135,7 @@ constexpr int64_t kMaxConversionPixels = 8388608;
 constexpr int kConversionAlignment = 64;
 constexpr int64_t kConversionPadding = 1024;
 constexpr int kMaxSamples = 65536;
+constexpr long kMaxWorkerThreads = 4;
 constexpr size_t kMaxAllocation = 64U * 1024 * 1024;
 constexpr int kIoBytes = 32768;
 constexpr int kMaxReadSteps = 8192;
@@ -280,6 +281,8 @@ struct Session {
     int64_t position = 0;
     int64_t deadline = 0;
     int edge = 0;
+    // Explicit playback reads raise this before opening tracks; automatic posters and probes stay single-threaded.
+    int threads = 1;
     AVFormatContext* format = nullptr;
     AVIOContext* io = nullptr;
     AVPacket* packet = nullptr;
@@ -395,6 +398,12 @@ bool allowedAudio(AVCodecID id) {
     }
 }
 
+/** Bounded worker thread count for video decode and pixel conversion: online cores, at most four. */
+int workerThreads() {
+    const long online = sysconf(_SC_NPROCESSORS_ONLN);
+    return int(std::clamp<long>(online, 1, kMaxWorkerThreads));
+}
+
 /** Select a supported stream of the requested media type without opening an unapproved decoder. */
 void selectTrack(Session& s, Track& track, AVMediaType type) {
     int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
@@ -425,8 +434,11 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     track.codec = avcodec_alloc_context3(decoder);
     check(track.codec, "decoder_allocation_refused");
     check(avcodec_parameters_to_context(track.codec, parameters) >= 0, "invalid_codec_parameters");
-    track.codec->thread_count = 1;
-    track.codec->thread_type = 0;
+    // Software video decode is the playback bottleneck: frame and slice threads keep 1080p/4K inside the frame
+    // interval. Threads share this process and its seccomp filter; audio decoding stays single-threaded.
+    const bool threaded = type == AVMEDIA_TYPE_VIDEO && s.threads > 1;
+    track.codec->thread_count = threaded ? s.threads : 1;
+    track.codec->thread_type = threaded ? FF_THREAD_FRAME | FF_THREAD_SLICE : 0;
     track.codec->max_pixels = kMaxPixels;
     track.codec->max_samples = kMaxSamples * 8LL;
     AVDictionary* options = nullptr;
@@ -554,11 +566,11 @@ void validateVideoColor(Session& s, const AVFrame* frame) {
 }
 
 /** Create the reusable scaler context with the required bounded conversion and color-management configuration. */
-SwsContext* dynamicScaler(SwsContext*& context) {
+SwsContext* dynamicScaler(SwsContext*& context, int threads) {
     if (!context) {
         context = sws_alloc_context();
         check(context, "pixel_context_allocation_refused");
-        context->threads = 1;
+        context->threads = threads;
         context->scaler = SWS_SCALE_BILINEAR;
         context->intent = SWS_INTENT_PERCEPTUAL;
         context->backends = SWS_BACKEND_STABLE;
@@ -602,7 +614,7 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
         converted.scaled->crop_left = converted.scaled->crop_right = 0;
         converted.scaled->crop_top = converted.scaled->crop_bottom = 0;
         check(av_frame_get_buffer(converted.scaled, kConversionAlignment) >= 0, "pixel_scale_allocation_refused");
-        check(sws_scale_frame(dynamicScaler(s.scale), converted.scaled, frame) >= 0, "pixel_scale_failed");
+        check(sws_scale_frame(dynamicScaler(s.scale, s.threads), converted.scaled, frame) >= 0, "pixel_scale_failed");
         colorSource = converted.scaled;
     }
     // Do not copy source HDR side data onto this SDR destination.
@@ -615,7 +627,7 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
     converted.rgba->color_trc = AVCOL_TRC_IEC61966_2_1;
     converted.rgba->flags = frame->flags & (AV_FRAME_FLAG_INTERLACED | AV_FRAME_FLAG_TOP_FIELD_FIRST);
     check(av_frame_get_buffer(converted.rgba, kConversionAlignment) >= 0, "pixel_rgba_allocation_refused");
-    check(sws_scale_frame(dynamicScaler(s.colors), converted.rgba, colorSource) >= 0, "pixel_color_conversion_failed");
+    check(sws_scale_frame(dynamicScaler(s.colors, s.threads), converted.rgba, colorSource) >= 0, "pixel_color_conversion_failed");
     // Copy only packed pixel bytes; SIMD/aligned AVFrame padding never crosses the shared-output boundary.
     for (int row = 0; row < height; ++row) {
         std::memcpy(out + int64_t(row) * width * 4,
@@ -819,6 +831,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     const bool wantAudio = audioOut != nullptr;
     check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio), "preferred_track_not_selected");
     if (!s.modeChosen) {
+        s.threads = workerThreads();
         if (wantVideo) openTrack(s, s.video, AVMEDIA_TYPE_VIDEO);
         if (wantAudio) openTrack(s, s.audio, AVMEDIA_TYPE_AUDIO);
         s.modeChosen = true; s.wantVideo = wantVideo; s.wantAudio = wantAudio;

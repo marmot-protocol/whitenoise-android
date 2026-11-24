@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -249,25 +250,30 @@ class NostrEventCardRendererTest {
         assertEquals(null, safeNostrMediaUrl("https://[::1]/video.mp4"))
     }
 
-    /** HLS video metadata stays playable when its URL has no file extension. */
+    /** HLS playlists are never offered for in-app playback; a later file variant of the same video is. */
     @Test
-    fun hlsVideoMetadataRemainsPlayableWithoutAFileExtension() {
-        val video =
+    fun hlsPlaylistsAreSkippedForTheNextFileVariant() {
+        fun video(vararg variants: List<String>) =
             event(
                 id = "a".repeat(64),
                 kind = 34_236,
-                tags =
-                    listOf(
-                        listOf(
-                            "imeta",
-                            "url https://media.example/watch/stream",
-                            "m application/vnd.apple.mpegurl",
-                        ),
-                    ),
+                tags = variants.map { listOf("imeta") + it },
             ).toCardModel()
 
-        assertEquals("https://media.example/watch/stream", video.mediaUrl)
-        assertEquals("application/vnd.apple.mpegurl", video.mediaMimeType)
+        val typed = video(listOf("url https://media.example/watch/stream", "m application/vnd.apple.mpegurl"))
+        assertNull(typed.mediaUrl)
+        val untyped = video(listOf("url https://media.example/watch/index.M3U8"))
+        assertNull(untyped.mediaUrl)
+        val mislabeled = video(listOf("url https://media.example/watch/index.m3u8", "m video/mp4"))
+        assertNull(mislabeled.mediaUrl)
+
+        val fallback =
+            video(
+                listOf("url https://media.example/watch/stream", "m application/x-mpegurl"),
+                listOf("url https://media.example/watch/clip.mp4", "m video/mp4"),
+            )
+        assertEquals("https://media.example/watch/clip.mp4", fallback.mediaUrl)
+        assertEquals("video/mp4", fallback.mediaMimeType)
     }
 
     /** Every initially supported media kind maps to its typed card renderer. */

@@ -45,7 +45,7 @@ class Media3PlayerViewReleaseCoverageTest {
         assertTrue("attachment viewer must use the isolated decoder", !source.contains("ExoPlayer"))
     }
 
-    /** Draft attachment playback retains controls on release; external Nostr URLs keep their own network route. */
+    /** Draft and referenced Nostr video playback detach their views and release their own isolated players. */
     @Test
     fun draftAndNetworkViewsDetachWithoutSharingCompressedSourceOwnership() {
         val draft = mediaSource("DraftVideoPreview.kt").readText()
@@ -63,11 +63,10 @@ class Media3PlayerViewReleaseCoverageTest {
                 .containsMatchIn(surface),
         )
 
-        val network = sourceFile("ui/conversation/nostr/NostrEventViewers.kt").readText()
+        val network = sourceFile("ui/conversation/nostr/NostrVideoPlayer.kt").readText()
         val owner = network.functionBody("rememberNostrVideoPlayer")
-        assertEquals(1, Regex("""ExoPlayer\s*\.Builder\(""").findAll(owner).count())
-        assertTrue(owner.contains("DefaultMediaSourceFactory(OkHttpDataSource.Factory(nostrMediaHttpClient))"))
-        assertTrue(!owner.contains("localVideoPlayer"))
+        assertEquals(1, Regex("localVideoPlayer\\(").findAll(owner).count())
+        assertTrue(!network.contains("ExoPlayer"))
         assertTrue(Regex("""onDispose\s*\{\s*player\.release\(\)\s*}""").containsMatchIn(owner))
         val networkSurface = network.functionBody("NostrVideoPlayerSurface")
         assertEquals(1, Regex("AndroidView\\(").findAll(networkSurface).count())

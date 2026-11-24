@@ -211,19 +211,31 @@ class MediaVideoGeometryTests(unittest.TestCase):
         """Perceptual cms follows bounded same encoding scale and emits srgb."""
         video = SOURCE.split("jlongArray video(", 1)[1].split("void configureResampler", 1)[0]
         self.assertIn("av_frame_copy_props(converted.scaled, frame)", video)
-        self.assertLess(video.index("sws_scale_frame(dynamicScaler(s.scale)"),
-                        video.index("sws_scale_frame(dynamicScaler(s.colors)"))
+        self.assertLess(video.index("sws_scale_frame(dynamicScaler(s.scale, s.threads)"),
+                        video.index("sws_scale_frame(dynamicScaler(s.colors, s.threads)"))
         self.assertNotIn("av_frame_copy_props(converted.rgba", video)
         for field, value in (("format", "AV_PIX_FMT_RGBA"), ("color_range", "AVCOL_RANGE_JPEG"),
                              ("colorspace", "AVCOL_SPC_RGB"), ("color_primaries", "AVCOL_PRI_BT709"),
                              ("color_trc", "AVCOL_TRC_IEC61966_2_1")):
             self.assertIn("converted.rgba->" + field + " = " + value, video)
-        for setting in ("context->intent = SWS_INTENT_PERCEPTUAL", "context->threads = 1",
+        for setting in ("context->intent = SWS_INTENT_PERCEPTUAL", "context->threads = threads",
                         "context->backends = SWS_BACKEND_STABLE"):
             self.assertIn(setting, SOURCE)
         self.assertNotIn("SWS_UNSTABLE", SOURCE)
         self.assertIn("converted.rgba->linesize[0]", video)
         self.assertIn("size_t(width) * 4", video)
+
+    def test_only_explicit_playback_threads_video_decode_and_conversion(self):
+        """Explicit playback threads video decode and conversion up to four; automatic reads and audio stay single."""
+        self.assertIn("constexpr long kMaxWorkerThreads = 4;", SOURCE)
+        self.assertIn("std::clamp<long>(online, 1, kMaxWorkerThreads)", SOURCE)
+        self.assertIn("int threads = 1;", SOURCE)
+        self.assertIn("const bool threaded = type == AVMEDIA_TYPE_VIDEO && s.threads > 1;", SOURCE)
+        self.assertIn("thread_type = threaded ? FF_THREAD_FRAME | FF_THREAD_SLICE : 0;", SOURCE)
+        preferred = SOURCE.split("jlongArray readPreferred(", 1)[1].split("jlongArray read(", 1)[0]
+        automatic = SOURCE.split("jlongArray read(", 1)[1].split("extern \"C\"", 1)[0]
+        self.assertLess(preferred.index("s.threads = workerThreads();"), preferred.index("openTrack(s, s.video"))
+        self.assertNotIn("workerThreads", automatic)
 
     def test_dolby_vision_base_layer_policy_rejects_profile_five_and_unknown_matrices(self):
         """Dolby vision base layer policy rejects profile five and unknown matrices."""
