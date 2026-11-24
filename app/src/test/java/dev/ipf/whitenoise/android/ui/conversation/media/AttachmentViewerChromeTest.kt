@@ -1,13 +1,22 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -67,6 +76,33 @@ class AttachmentViewerChromeTest {
         rule.onNodeWithText("More").assertExists()
     }
 
+    /** With pass-through, a tap on the chrome's empty background reaches the media below; a bar chrome takes it. */
+    @Test
+    fun passThroughChromeLetsBackgroundTapsReachTheMedia() {
+        var mediaTaps = 0
+        val passThrough = mutableStateOf(true)
+        rule.setContent {
+            WhiteNoiseTheme {
+                // The chrome is the media's sibling, drawn over it, as in the Nostr video player.
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().clickable { mediaTaps++ })
+                    AttachmentViewerChrome(
+                        title = "Video",
+                        onClose = {},
+                        modifier = Modifier.testTag("chrome"),
+                        passTouchesThrough = passThrough.value,
+                    )
+                }
+            }
+        }
+        val chrome = rule.onNodeWithTag("chrome", useUnmergedTree = true)
+        chrome.performTouchInput { click(Offset(width - 4f, height / 2f)) }
+        assertEquals("a pass-through chrome lets the tap reach the media", 1, mediaTaps)
+        rule.runOnIdle { passThrough.value = false }
+        chrome.performTouchInput { click(Offset(width - 4f, height / 2f)) }
+        assertEquals("a bar chrome takes the tap itself", 1, mediaTaps)
+    }
+
     /** Every attachment viewer draws its toolbar through the shared chrome, and the document viewer is themed. */
     @Test
     fun everyViewerUsesTheSharedChrome() {
@@ -92,7 +128,9 @@ class AttachmentViewerChromeTest {
         val viewer = document.functionBody("DocumentAttachmentViewer")
         val themed = "LocalHtmlPolicy.themed(document, palette)" in viewer
         assertTrue("the rendered HTML page takes the theme's palette", themed)
-        assertTrue("the WebView background follows the theme", "backgroundColor = MaterialTheme.colorScheme" in viewer)
+        val themedBackground = "MaterialTheme.colorScheme.background.toArgb()" in viewer
+        assertTrue("the WebView background follows the theme", themedBackground)
+        assertTrue("a page with its own colours keeps its canvas", "if (authorColours) document else" in viewer)
     }
 
     /** One production source by its path below the app package, from the module or the repository root. */

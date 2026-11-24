@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -14,10 +16,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,7 +67,8 @@ internal object AttachmentViewerChromeDefaults {
  * and [overflow] its existing More menu, passed through unchanged. The chrome draws only theme colours,
  * [containerColor] chooses docked or overlay, and [windowInsets] pads the row clear of the status bar and side
  * cutouts while the media stays edge to edge. [closeButton] draws Close for a viewer with its own press feedback,
- * and receives [onClose] and [closeEnabled].
+ * and receives [onClose] and [closeEnabled]. Over media that takes its own taps, [passTouchesThrough] lets taps
+ * outside the chrome's buttons reach it; otherwise the chrome's surface takes them, as a bar does.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -82,8 +87,9 @@ internal fun AttachmentViewerChrome(
     titleContent: (@Composable RowScope.() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     overflow: (@Composable () -> Unit)? = null,
+    passTouchesThrough: Boolean = false,
 ) {
-    Surface(modifier = modifier.fillMaxWidth(), color = containerColor, contentColor = contentColor) {
+    val row: @Composable () -> Unit = {
         Row(
             modifier =
                 Modifier
@@ -106,6 +112,14 @@ internal fun AttachmentViewerChrome(
             actions()
             overflow?.invoke()
         }
+    }
+    if (passTouchesThrough) {
+        // A plain background claims no pointer input, so taps outside the chrome's buttons reach the media below.
+        Box(modifier.fillMaxWidth().background(containerColor)) {
+            CompositionLocalProvider(LocalContentColor provides contentColor) { row() }
+        }
+    } else {
+        Surface(modifier = modifier.fillMaxWidth(), color = containerColor, contentColor = contentColor) { row() }
     }
 }
 

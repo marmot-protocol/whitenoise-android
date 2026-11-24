@@ -264,6 +264,21 @@ class LocalHtmlPolicyTest {
             assertEquals(Jsoup.parse(document.html).body().html(), themed.body().html())
         }
 
+    /** A page that sets only its own text colour keeps the dark canvas, so white text never lands on a light page. */
+    @Test
+    fun senderColoursAreDetectedInStyleAttributesAndElements() =
+        runBlocking {
+            val foregroundOnly = LocalHtmlPolicy.sanitize("<p style=\"color:#fff\">white text</p>")
+            assertTrue(LocalHtmlPolicy.hasAuthorColours(foregroundOnly))
+            val styleElement = LocalHtmlPolicy.sanitize("<style>p{font-weight:bold;color:white}</style><p>text</p>")
+            assertTrue(LocalHtmlPolicy.hasAuthorColours(styleElement))
+            val background = LocalHtmlPolicy.sanitize("<div style=\"background: navy\">text</div>")
+            assertTrue(LocalHtmlPolicy.hasAuthorColours(background))
+            val plain =
+                LocalHtmlPolicy.sanitize("<h1>Notes</h1><p style=\"border-color:red;margin:4px\">color: words</p>")
+            assertFalse("the policy header and non-colour CSS do not count", LocalHtmlPolicy.hasAuthorColours(plain))
+        }
+
     @Test fun formattingTextAndBoundedTableSpansSurvive() =
         runBlocking {
             val doc =

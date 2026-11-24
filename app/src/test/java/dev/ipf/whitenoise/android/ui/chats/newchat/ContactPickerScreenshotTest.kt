@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -57,6 +58,16 @@ class ContactPickerScreenshotTest {
         assertEquals(0, backs)
     }
 
+    /** A picker that overlays a chat, like Share user, leads with Close and still returns through its callback. */
+    @Test
+    fun closeNavigationIsLabelledClose() {
+        var closes = 0
+        setPicker(onBack = { closes += 1 }, navigation = WhiteNoiseTopBarNavigation.Close)
+        rule.onNodeWithContentDescription("Back").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Close").performClick()
+        assertEquals(1, closes)
+    }
+
     /** Renders the picker with one selected person and records the window. */
     private fun capture(
         name: String,
@@ -77,6 +88,7 @@ class ContactPickerScreenshotTest {
         rtl: Boolean = false,
         busy: Boolean = false,
         onBack: () -> Unit = {},
+        navigation: WhiteNoiseTopBarNavigation = WhiteNoiseTopBarNavigation.Back,
     ) {
         val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val selected =
@@ -99,6 +111,7 @@ class ContactPickerScreenshotTest {
                         onBack = onBack,
                         onConfirm = {},
                         busy = busy,
+                        navigation = navigation,
                     )
                 }
             }

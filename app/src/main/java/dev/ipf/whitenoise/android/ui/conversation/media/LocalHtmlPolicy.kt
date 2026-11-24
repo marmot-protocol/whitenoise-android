@@ -137,6 +137,21 @@ internal object LocalHtmlPolicy {
         return document.copy(html = html.substring(0, start) + header + html.substring(end))
     }
 
+    /**
+     * True when the sender's own CSS, in a style element or a `style` attribute, sets a text or background colour.
+     * Such a page keeps the policy's dark canvas: putting the theme's light page under sender-chosen colours could
+     * leave white text on a light background. The first style element is the policy's own header and is skipped.
+     */
+    fun hasAuthorColours(document: LocalHtmlDocument): Boolean {
+        val parsed = Jsoup.parse(document.html)
+        val senderCss =
+            parsed.select("style").drop(1).map { it.data() } + parsed.select("[style]").map { it.attr("style") }
+        return senderCss.any(AUTHOR_COLOUR::containsMatchIn)
+    }
+
+    /** A CSS declaration that sets a foreground or background colour. */
+    private val AUTHOR_COLOUR = Regex("(?i)(?:^|[\\s;{])(?:color|background(?:-color)?)\\s*:")
+
     /** A packed `0xRRGGBB` colour as a CSS hex literal. */
     private fun hex(rgb: Int): String = "#%06x".format(rgb and RGB_MASK)
 

@@ -208,6 +208,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Forward list position drives the bar tint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": ".trackWhiteNoiseHeader(listState)",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ]
   },

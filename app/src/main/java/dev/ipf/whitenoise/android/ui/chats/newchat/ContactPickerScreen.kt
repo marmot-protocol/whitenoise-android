@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,8 +43,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
@@ -89,6 +92,8 @@ internal fun ContactPickerScreen(
     reviewDescription: String? = null,
     // Callers whose selection survives recreation pass saveable review state so an open review survives with it.
     reviewOpen: MutableState<Boolean>? = null,
+    // A picker that overlays a chat and returns to it, like Share user, leads with Close; pushed steps keep Back.
+    navigation: WhiteNoiseTopBarNavigation = WhiteNoiseTopBarNavigation.Back,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
@@ -201,6 +206,7 @@ internal fun ContactPickerScreen(
             WhiteNoiseTopBar(
                 title = title,
                 onBack = onBack,
+                navigation = navigation,
                 navigationEnabled = !busy,
                 titleContent = {
                     Column {
@@ -283,8 +289,11 @@ internal fun ContactPickerScreen(
                     enabled = !busy,
                 )
             }
+            // The bar's tint follows the list position, so a search that shrinks the list to the top clears it.
+            val listState = rememberLazyListState()
             WhiteNoiseLazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().trackWhiteNoiseHeader(listState),
+                state = listState,
                 contentPadding = PaddingValues(bottom = 96.dp),
             ) {
                 if (recipientAddressLookupFailed(query, resolution.state)) {

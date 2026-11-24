@@ -60,6 +60,14 @@
           "MED-015",
           "RDR-004"
         ]
+      },
+      {
+        "surface": "Chrome over media passes taps through",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "passTouchesThrough",
+        "test_ids": [
+          "RDR-004"
+        ]
       }
     ]
   },

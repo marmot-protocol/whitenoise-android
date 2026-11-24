@@ -71,7 +71,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt" to 894,
         "dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt" to 937,
         "dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt" to 743,
-        "dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt" to 771,
+        "dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt" to 775,
         "dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt" to 3294,
         "dev/ipf/whitenoise/android/ui/conversation/messages/TtsPassageHighlight.kt" to 635,
         "dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt" to 2560,
@@ -88,5 +88,5 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt" to 926,
         "dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt" to 730,
         "dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt" to 716,
-        "dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt" to 650,
+        "dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt" to 651,
     )

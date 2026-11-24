@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -88,6 +89,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
@@ -635,8 +637,10 @@ private fun ForwardTargetList(
         filteredTargets.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
         ownerAccountRef,
     ) {
+        val listState = rememberLazyListState()
         WhiteNoiseLazyColumn(
-            modifier = modifier.fillMaxWidth().testTag("forward.destinations"),
+            modifier = modifier.fillMaxWidth().testTag("forward.destinations").trackWhiteNoiseHeader(listState),
+            state = listState,
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {
             if (targetLoading && awaitingRows) {

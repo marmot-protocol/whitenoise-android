@@ -5022,7 +5022,6 @@ internal fun ConversationScreen(
         )
 
         if (shareUserPickerOpen) {
-            val activeHex = conversationSelfAccountIdHex
             ContactPickerScreen(
                 appState = appState,
                 title = stringResource(R.string.share_user_title),
@@ -5040,7 +5039,8 @@ internal fun ConversationScreen(
                 confirmIcon = ImageVector.vectorResource(R.drawable.ic_arrow_upward),
                 confirmLabel = stringResource(R.string.send),
                 autoSelectResolvedIdentifier = true,
-                excludeAccountIdHexes = setOfNotNull(activeHex),
+                excludeAccountIdHexes = setOfNotNull(conversationSelfAccountIdHex),
+                navigation = dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation.Close,
             )
         }
 

@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -376,7 +377,7 @@ private fun ShareChatPickerTargetList(
         accountRef = pickerState.selectedAccountRef,
     ) {
         WhiteNoiseLazyColumn(
-            modifier = modifier.fillMaxWidth().testTag("share.destinations"),
+            modifier = modifier.fillMaxWidth().testTag("share.destinations").trackWhiteNoiseHeader(listState),
             state = listState,
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {

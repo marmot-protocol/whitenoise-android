@@ -53,6 +53,22 @@
         "test_ids": [
           "GRP-005"
         ]
+      },
+      {
+        "surface": "Contact picker list position drives the bar tint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": ".trackWhiteNoiseHeader(listState)",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "Share user picker leads with Close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "navigation: WhiteNoiseTopBarNavigation",
+        "test_ids": [
+          "MED-013"
+        ]
       }
     ]
   },

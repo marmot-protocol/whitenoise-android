@@ -206,6 +206,8 @@ private fun NostrVideoPlayerSurface(
             containerColor = AttachmentViewerChromeDefaults.overlayColor(),
             contentColor = MaterialTheme.colorScheme.onBackground,
             windowInsets = AttachmentViewerChromeDefaults.topInsets(),
+            // Taps beside Close still reach the player and toggle its transport controls.
+            passTouchesThrough = true,
         )
     }
 }

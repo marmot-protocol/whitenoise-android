@@ -72,6 +72,7 @@ internal fun DocumentAttachmentViewer(
     var sourceTab by remember(actions) { mutableStateOf(false) }
     var pendingLink by remember(actions) { mutableStateOf<String?>(null) }
     var generation by remember(actions) { mutableIntStateOf(0) }
+    var authorColours by remember(actions) { mutableStateOf(false) }
     val context = LocalContext.current
     LaunchedEffect(actions, generation) {
         if (kind != DocumentAttachmentKind.Html) return@LaunchedEffect
@@ -95,9 +96,17 @@ internal fun DocumentAttachmentViewer(
         original = decoded.text
         val sanitized =
             runCatchingCancellable {
-                withContext(Dispatchers.Default) { LocalHtmlPolicy.sanitize(decoded.text) }
+                withContext(Dispatchers.Default) {
+                    LocalHtmlPolicy.sanitize(decoded.text).let { it to LocalHtmlPolicy.hasAuthorColours(it) }
+                }
             }
-        if (actions.isCurrent()) sanitized.onSuccess { html = it }.onFailure { error = true }
+        if (actions.isCurrent()) {
+            sanitized
+                .onSuccess { (document, colours) ->
+                    html = document
+                    authorColours = colours
+                }.onFailure { error = true }
+        }
     }
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -140,9 +149,12 @@ internal fun DocumentAttachmentViewer(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                    // A page that sets its own colours keeps the dark canvas it was written against.
                     val palette = documentPalette()
                     LocalHtmlView(
-                        remember(document, palette) { LocalHtmlPolicy.themed(document, palette) },
+                        remember(document, palette, authorColours) {
+                            if (authorColours) document else LocalHtmlPolicy.themed(document, palette)
+                        },
                         Modifier.fillMaxSize(),
                         onLink = {
                             if (actions.isCurrent()) pendingLink = it
@@ -150,7 +162,8 @@ internal fun DocumentAttachmentViewer(
                         onUnavailable = {
                             error = true
                         },
-                        backgroundColor = MaterialTheme.colorScheme.background.toArgb(),
+                        backgroundColor =
+                            if (authorColours) Color.Black.toArgb() else MaterialTheme.colorScheme.background.toArgb(),
                     )
                 }
             }

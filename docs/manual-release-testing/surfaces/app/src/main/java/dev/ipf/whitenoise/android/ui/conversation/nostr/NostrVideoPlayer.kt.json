@@ -83,6 +83,14 @@
           "RDR-001",
           "RDR-004"
         ]
+      },
+      {
+        "surface": "Video taps beside Close reach the player",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "passTouchesThrough = true",
+        "test_ids": [
+          "RDR-004"
+        ]
       }
     ]
   },
