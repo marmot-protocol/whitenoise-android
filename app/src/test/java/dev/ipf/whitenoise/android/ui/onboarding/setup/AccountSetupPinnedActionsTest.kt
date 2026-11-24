@@ -12,8 +12,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -84,6 +86,30 @@ class AccountSetupPinnedActionsTest {
         assertEquals(1, reconnected)
     }
 
+    /** A lost signer beside a retired relay keeps Reconnect as the one filled action; Remove turns outlined. */
+    @Test fun disconnectedRelayRemovalIsNotASecondFilledAction() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.RECONNECT_SIGNER),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                setupFinding(
+                    OnboardingIssueFfi.RETIRED_RELAY,
+                    "wss://retired.example",
+                    actions = listOf(OnboardingActionFfi.EDIT_RELAYS),
+                ),
+            )
+        show(AccountSetupState(snapshot = snapshot, disconnected = true))
+        assertEquals("Reconnect is the filled primary", primary, containerPixel("setup-action-RECONNECT_SIGNER"))
+        assertEquals(
+            "Remove must be outlined, showing the bar behind it, not a second filled action",
+            backgroundBeside("setup-remove-relay"),
+            containerPixel("setup-remove-relay"),
+        )
+    }
+
     /** With no decision action left, Resume is the filled way forward. */
     @Test fun failureAloneFillsResume() {
         show(AccountSetupState(snapshot = setupSnapshot(), staleDecision = true))
@@ -131,6 +157,13 @@ class AccountSetupPinnedActionsTest {
         return image[CONTAINER_SAMPLE_X, image.height / 2].toArgb()
     }
 
+    /** Samples the page just outside a node's leading edge, the colour an outlined button's container shows. */
+    private fun backgroundBeside(tag: String): Int {
+        val bounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        val root = composeRule.onRoot().captureToImage().toPixelMap()
+        return root[(bounds.left - BACKGROUND_SAMPLE_OFFSET).toInt(), bounds.center.y.toInt()].toArgb()
+    }
+
     /** Finds a tagged node that no scrolling container owns, i.e. one in the pinned action bar. */
     private fun pinned(tag: String) = composeRule.onNode(hasTestTag(tag) and !hasAnyAncestor(hasScrollAction()))
 
@@ -158,5 +191,8 @@ class AccountSetupPinnedActionsTest {
     private companion object {
         /** Far enough inside a 56 dp pill to clear its 1 dp outline and rounded corner at mdpi. */
         const val CONTAINER_SAMPLE_X = 14
+
+        /** Inside the bar's 16 dp inset, clear of the button's outline. */
+        const val BACKGROUND_SAMPLE_OFFSET = 8f
     }
 }

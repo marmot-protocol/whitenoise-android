@@ -103,7 +103,8 @@ internal fun SetupPinnedActions(
             ) { Text(stringResource(R.string.setup_open_chats)) }
         SetupSurface.Progress -> Unit
         SetupSurface.Decision -> {
-            SetupDirectRelayRemovalAction(state, onRemoveRelay)
+            val offeredPrimary = state.offersDecisionActions && state.decisionButtons().any { (_, primary) -> primary }
+            SetupDirectRelayRemovalAction(state, primary = !offeredPrimary, onRemoveRelay)
             if (state.offersDecisionActions) SetupActionButtons(state, onAction, onEdit)
         }
     }
@@ -158,10 +159,14 @@ private fun SetupResumeAction(
 internal val AccountSetupState.showsSetupFailure: Boolean
     get() = error || (disconnected && snapshot?.ready != true) || staleDecision
 
-/** Removes the single exact endpoint named above; native review follows before anything is published. */
+/**
+ * Removes the single exact endpoint named above; native review follows before anything is published. It is filled
+ * only when no offered action is the decision's filled primary, such as Reconnect signer after a lost connection.
+ */
 @Composable
 private fun SetupDirectRelayRemovalAction(
     state: AccountSetupState,
+    primary: Boolean,
     onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
 ) {
     val snapshot = state.snapshot
@@ -170,14 +175,18 @@ private fun SetupDirectRelayRemovalAction(
     if (snapshot == null || step == null || endpoint == null) return
     val revision = snapshot.revision
     val recoveryEpoch = snapshot.recoveryEpoch
-    WhiteNoiseButton(
-        onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
-        enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
-        modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
-    ) {
+    val onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) }
+    val enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision
+    val modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay")
+    val content: @Composable () -> Unit = {
         Icon(painterResource(R.drawable.ic_delete), null)
         SetupButtonIconGap()
         Text(stringResource(R.string.setup_remove_relay))
+    }
+    if (primary) {
+        WhiteNoiseButton(onClick, modifier, enabled) { content() }
+    } else {
+        WhiteNoiseOutlinedButton(onClick, modifier, enabled) { content() }
     }
 }
 
