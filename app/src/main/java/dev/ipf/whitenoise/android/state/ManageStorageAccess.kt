@@ -141,6 +141,7 @@ internal class NativeManageStorageAccess(
                                 bytes = it.byteCount.toSaturatedLong(),
                                 mediaType = it.mediaType,
                                 receivedAtSeconds = it.receivedAt.toSaturatedLong(),
+                                fileName = it.fileName,
                             )
                         },
                     next = page.nextCursor?.let(::StorageCursor),

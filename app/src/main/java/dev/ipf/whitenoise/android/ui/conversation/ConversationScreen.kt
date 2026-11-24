@@ -280,7 +280,6 @@ import dev.ipf.whitenoise.android.ui.settings.ComposerSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsCardMorphHost
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -2798,7 +2797,8 @@ internal fun ConversationScreen(
 
         BackHandler(
             enabled =
-                !conversationSearchState.filterSheetOpen &&
+                !transcriptRoutedAway &&
+                    !conversationSearchState.filterSheetOpen &&
                     (systemBackClosesConversation || currentBackAction() != ConversationBackAction.NAVIGATE_UP),
         ) {
             scrollCoordinator.cancelForegroundRestoreForUserIntent()
@@ -3557,33 +3557,39 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    // One card morph for the transcript and both full-screen routes, so Back animates the return.
-    // The composer outline becomes the next route's cards and they fold back into it, the same
-    // container transform as Settings. Nothing travels with the closing keyboard.
+    val settingsRoute =
+        when {
+            showDetails -> ConversationSettingsRoute.Details
+            showComposerSettings -> ConversationSettingsRoute.Composer
+            else -> null
+        }
+    val routeOwner = Triple(controller, appState.activeAccountRef, appState.runtimeGeneration)
     val parentMorph = LocalSettingsCardMorph.current
     val routeMorph =
-        remember(controller, appState.runtimeGeneration, parentMorph) {
+        remember(routeOwner, parentMorph) {
             SettingsCardMorph(fullScreen = true, parent = parentMorph).apply {
                 anchor = ConversationMorphAnchor.Composer
+                captureContent = false
             }
         }
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     }
-    val transcriptRouteMotion =
-        rememberSettingsCardMorphHost(
-            morph = routeMorph,
-            target = showDetails to showComposerSettings,
-            ownerKey = controller to appState.runtimeGeneration,
-            motion = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
-            forward = transcriptRoutedAway,
-            captureContent = transcriptRoutedAway,
-        ).second
-    // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
-    val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    val settingsMotion =
+        rememberConversationSettingsMotion(
+            settingsRoute,
+            routeOwner,
+            routeMorph,
+            surfaceMotionEnabled &&
+                !routeTransitionInProgress &&
+                !routePresentationFrozen &&
+                conversationAccountRef == appState.activeAccountRef,
+        )
+    val routedAwayIme = rememberLeavingImeModifier(routeKey = settingsRoute)
     // The header opens chat details from its title and from the member shortcuts. The keyboard starts
     // closing as the composer unfolds into the details cards.
     val openDetailsFromHeader: () -> Unit = {
+        settingsMotion.launchFromComposer(captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)))
         keyboardController?.hide()
         showDetails = true
     }
@@ -3650,11 +3656,53 @@ internal fun ConversationScreen(
         onDismiss = { showHeaderTimerPicker = false },
         onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
     )
-    if (transcriptRoutedAway) {
-        if (showDetails) {
-            /** Shows group details in place of the transcript while they are open. */
-            @Composable
-            fun groupDetailsRoute() {
+    // The composer and long-message reader share a draft, including while chat settings covers it.
+    val draftAccountRef = controller.boundAccountRef
+
+    /** Loads the saved draft for the current account and group. */
+    @Composable
+    fun draftLoadEffect() {
+        LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
+            appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
+        }
+    }
+    draftLoadEffect()
+    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
+    val composerShareRevision =
+        rememberComposerShareRevision(
+            externalRevision = appState.inboundShareRevision,
+            editingMessageId = controller.editingMessageId,
+        )
+    val composerDictationRevision =
+        draftAccountRef?.let { accountRef ->
+            appState.conversationDictation.completionRevision(
+                accountRef = accountRef,
+                groupIdHex = controller.group.groupIdHex,
+            )
+        } ?: 0
+    // Capture the revision for this navigation entry. A later accepted
+    // transcript must rehydrate text/selection without being mistaken for a
+    // restored draft and reopening the IME. Re-entering the conversation gets
+    // a fresh baseline, so genuine draft restoration still focuses once.
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(
+            groupIdHex = controller.group.groupIdHex,
+            currentRevision = composerDictationRevision,
+        )
+    val composerTextState =
+        rememberComposerTextState(
+            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
+            initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+            externalRevision = composerShareRevision to composerDictationRevision,
+        )
+    // Capture the baseline during composition, before either editor can receive an input event.
+    val userTextEditRevisionOnEntry =
+        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
+
+    ConversationSettingsPage(settingsMotion, routedAwayIme) { route ->
+        when (route) {
+            ConversationSettingsRoute.Details ->
                 GroupDetailsScreen(
                     appState = appState,
                     controller = controller,
@@ -3676,20 +3724,13 @@ internal fun ConversationScreen(
                     onStartGroupWithPeer = onStartGroupWithPeer,
                     onStartGroupWithPeerMeasured = onStartGroupWithPeerMeasured,
                 )
-            }
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) { groupDetailsRoute() }
-            }
-        } else {
-            // The same full-screen editor as Settings; Back returns to this conversation.
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
-                    ComposerSettingsScreen(appState) { showComposerSettings = false }
-                }
+            ConversationSettingsRoute.Composer -> {
+                BackHandler { showComposerSettings = false }
+                ComposerSettingsScreen(appState) { showComposerSettings = false }
             }
         }
-        return
     }
+    if (!settingsMotion.keepTranscript) return
 
     val mediaViewerForwardActions = rememberMediaViewerForwardActions(controller, appState)
     val mediaViewerSessionState =
@@ -3770,33 +3811,6 @@ internal fun ConversationScreen(
             requestProfiles = composerGate == ComposerGate.COMPOSER,
         )
 
-    // #1206: one composer text state shared by the main composer and the
-    // long-message reader's composer, so in-progress text never drifts between
-    // them. Created at screen scope so both the bottom-bar composer and the
-    // per-message reader can receive the same instance.
-    val draftAccountRef = controller.boundAccountRef
-
-    /** Loads the saved draft for the current account and group. */
-    @Composable
-    fun draftLoadEffect() {
-        LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
-            appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
-        }
-    }
-    draftLoadEffect()
-    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
-    val composerShareRevision =
-        rememberComposerShareRevision(
-            externalRevision = appState.inboundShareRevision,
-            editingMessageId = controller.editingMessageId,
-        )
-    val composerDictationRevision =
-        draftAccountRef?.let { accountRef ->
-            appState.conversationDictation.completionRevision(
-                accountRef = accountRef,
-                groupIdHex = controller.group.groupIdHex,
-            )
-        } ?: 0
     val dictatedPendingSendRevision =
         draftAccountRef?.let { accountRef ->
             appState.conversationDictation.pendingSendRevision(
@@ -3821,24 +3835,6 @@ internal fun ConversationScreen(
         }
     }
     dictatedSendRevealEffect()
-    // Capture the revision for this navigation entry. A later accepted
-    // transcript must rehydrate text/selection without being mistaken for a
-    // restored draft and reopening the IME. Re-entering the conversation gets
-    // a fresh baseline, so genuine draft restoration still focuses once.
-    val composerDictationRevisionOnEntry =
-        rememberComposerDictationRevisionOnEntry(
-            groupIdHex = controller.group.groupIdHex,
-            currentRevision = composerDictationRevision,
-        )
-    val composerTextState =
-        rememberComposerTextState(
-            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
-            initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision to composerDictationRevision,
-        )
-    // Capture the baseline during composition, before either editor can receive an input event.
-    val userTextEditRevisionOnEntry =
-        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
     LaunchedEffect(controller, composerTextState) {
         var observedRevision = userTextEditRevisionOnEntry
         snapshotFlow { composerTextState.userTextEditRevision }.collect { revision ->
@@ -3856,7 +3852,6 @@ internal fun ConversationScreen(
     LaunchedEffect(controller, controller.editingMessageId, controller.replyingTo, navigationState.searchOpen) {
         scrollCoordinator.cancelForegroundRestoreForUserIntent()
     }
-    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
     // attachment sheet — the composer itself stays interactive while it's open.
@@ -3926,18 +3921,18 @@ internal fun ConversationScreen(
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
         batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
+    val presentedImeBottom = settingsMotion.outgoingImeBottom ?: displayedMenuImeBottom
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
-    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
+    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled, settingsMotion) {
         WhiteNoiseScaffold(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .then(
-                        if (displayedMenuImeBottom != null) {
+                        if (presentedImeBottom != null) {
                             Modifier
-                                .padding(bottom = with(density) { displayedMenuImeBottom.toDp() })
+                                .padding(bottom = with(density) { presentedImeBottom.toDp() })
                                 .consumeWindowInsets(WindowInsets.ime)
                         } else {
                             Modifier
@@ -4076,9 +4071,12 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (displayedMenuImeBottom ?: 0).toDp() }) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
+                            settingsMotion.launchFromComposer(
+                                captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)),
+                            )
                             keyboardController?.hide()
                             showComposerSettings = true
                         },
@@ -4447,6 +4445,7 @@ internal fun ConversationScreen(
                             .fillMaxSize()
                             .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
                             .conversationRouteBodyMotion()
+                            .conversationSettingsBody(settingsMotion)
                             // The composer bottomBar owns IME padding; consume here so the
                             // transcript does not count the keyboard a second time (#895).
                             .consumeWindowInsets(WindowInsets.ime)
@@ -5426,5 +5425,5 @@ internal fun ConversationScreen(
             }
         }
     }
-    conversationOverlays()
+    if (!transcriptRoutedAway) conversationOverlays()
 }

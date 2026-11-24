@@ -4,15 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "rememberMeasuredControlClick",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsMeasuredControlClick.kt",
-        "anchor": "fun rememberMeasuredControlClick(",
-        "test_ids": [
-          "NAV-011",
-          "CON-037"
-        ]
-      },
-      {
         "surface": "rememberMeasuredContourClick",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsMeasuredControlClick.kt",
         "anchor": "fun rememberMeasuredContourClick(",

@@ -192,3 +192,12 @@ private fun globalSearchResultAttachment(references: List<MediaAttachmentReferen
         }
     return GlobalSearchResultAttachment(kind, first.fileName.trim(), references.size)
 }
+
+internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_KEY = "chat-list-search-groups-header"
+internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY = "chat-list-search-messages-header"
+internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_TAG = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY
+internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY
+
+// Debounce before global message results read their first MDK page (#1944). Sits inside the existing
+// 250–300 ms chat-list input debounce band so a fast typist doesn't trigger a query per keystroke.
+internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L

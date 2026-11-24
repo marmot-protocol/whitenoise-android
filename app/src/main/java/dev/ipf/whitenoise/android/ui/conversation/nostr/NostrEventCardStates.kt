@@ -27,7 +27,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 
 @Composable
 internal fun EventCardActions(

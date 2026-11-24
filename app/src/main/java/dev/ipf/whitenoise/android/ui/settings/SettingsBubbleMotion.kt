@@ -5,41 +5,41 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.toRect
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphGeometry
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphResume
+import dev.ipf.whitenoise.android.ui.common.drawSurfaceArrival
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphInk
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphUnderlayCover
 import kotlin.math.ceil
 
 internal const val SETTINGS_BUBBLE_OPEN_MILLIS = APP_MOTION_OPEN_MILLIS
 internal const val SETTINGS_BUBBLE_CLOSE_MILLIS = APP_MOTION_CLOSE_MILLIS
 
-/** The card arrives quickly and settles softly. */
+/** The bubble leaves its origin quickly and settles softly on its card, like the New message pen. */
 internal val SettingsBubbleOpenEasing: Easing = AppMotionOpenEasing
 
-/** The card leaves without lingering over Chats. */
+/** Back starts at rest and lands in the origin without lingering. */
 internal val SettingsBubbleCloseEasing: Easing = AppMotionCloseEasing
 
-private const val SETTINGS_CARD_MIN_SCALE = 0.88f
-private const val SETTINGS_CARD_OPEN_FADE_END = 0.35f
-private const val SETTINGS_CARD_CLOSE_FADE_START = 0.4f
-private const val SETTINGS_CARD_SCRIM_ALPHA = 0.32f
-private val SettingsCardCornerRadius = 28.dp
+/** How far a route without a measured origin slides in from its logical edge. */
+internal val SettingsRouteSlideTravel = 48.dp
 
 /** The card belongs only to the top-level Chats/Settings pair; deeper routes keep the slide. */
 internal fun usesSettingsBubble(
@@ -52,27 +52,89 @@ internal class SettingsCardSnapshot {
     var picture: Picture? = null
 }
 
+private const val MIN_SHRINK_FROM = 0.001f
+
+/** A container growing from a measured control rectangle keeps that control's rounded-row corners at first. */
+private val SettingsRowContainerCornerRadius = 20.dp
+
 /**
- * Draws [content] as a card anchored to the vertical middle of the logical end edge. [presence]
- * runs from 0 (small rounded card) to 1 (full screen, square corners).
+ * How a borderless container leg continues an interrupted one: [shrinking] Back reverses a container
+ * still growing from [shrinkFrom], its drawn presence, and an open [resumedFrom] a shrinking one
+ * brings its body in from none.
  */
-private fun DrawScope.drawSettingsCard(
+internal class SettingsContainerResume(
+    val shrinking: Boolean = false,
+    val resumedFrom: Float? = null,
+    val shrinkFrom: Float = 1f,
+)
+
+/**
+ * Route motion for card-morph hosts in borderless themes, which have no outlines to morph. As in the
+ * contour morph, the destination's fixed header above [bodyTop] (host coordinates) stays live and
+ * still. Its body grows in one container from the activating control's local [origin] when there is
+ * one, and otherwise slides [travel] px over the backplate (Back slides). Back while a container is
+ * still growing ([resume] shrinking) shows the live parent at once and contracts the bare container
+ * from its drawn bounds into the same origin. Nothing is captured.
+ */
+@Suppress("LongParameterList")
+internal fun Modifier.settingsBorderlessRouteMotion(
+    progress: () -> Float,
+    origin: () -> Rect?,
+    bodyTop: () -> Float,
+    colors: SettingsMorphColors,
+    travel: Float,
+    resume: SettingsContainerResume = SettingsContainerResume(),
+): Modifier =
+    drawWithContent {
+        val p = progress().coerceIn(0f, 1f)
+        if (p >= 1f) {
+            drawContent()
+            return@drawWithContent
+        }
+        val top = bodyTop().coerceIn(0f, size.height)
+        val shrinkInto = origin()?.takeIf { resume.shrinking }
+        if (shrinkInto != null) {
+            drawContent()
+            clipRect(top = top) {
+                // The growing leg's backplate stays at first and fades out with the container, uncovering the parent.
+                val backplate = ((1f - p) / resume.shrinkFrom.coerceAtLeast(MIN_SHRINK_FROM)).coerceIn(0f, 1f)
+                drawRect(colors.backplate.copy(alpha = colors.backplate.alpha * backplate))
+                drawBorderlessContainer(shrinkInto, top, 1f - p, colors, null, null)
+            }
+            return@drawWithContent
+        }
+        drawRect(colors.backplate)
+        if (top > 0f) clipRect(bottom = top) { this@drawWithContent.drawContent() }
+        clipRect(top = top) {
+            val start = origin()
+            if (start == null) {
+                translate(left = travel * (1f - p)) { this@drawWithContent.drawContent() }
+                return@clipRect
+            }
+            drawBorderlessContainer(start, top, p, colors, resume.resumedFrom) { this@drawWithContent.drawContent() }
+        }
+    }
+
+/** One borderless container at [presence] between the control at [start] and the body below [top]. */
+@Suppress("LongParameterList")
+private fun DrawScope.drawBorderlessContainer(
+    start: Rect,
+    top: Float,
     presence: Float,
-    alpha: Float,
-    content: DrawScope.() -> Unit,
+    colors: SettingsMorphColors,
+    resumedFrom: Float?,
+    content: (DrawScope.() -> Unit)?,
 ) {
-    if (alpha <= 0f) return
-    val scale = SETTINGS_CARD_MIN_SCALE + (1f - SETTINGS_CARD_MIN_SCALE) * presence
-    val pivot = Offset(if (layoutDirection == LayoutDirection.Rtl) 0f else size.width, size.height / 2f)
-    val radius = SettingsCardCornerRadius.toPx() * (1f - presence)
-    val clip = Path().apply { addRoundRect(RoundRect(size.toRect(), CornerRadius(radius))) }
-    val layered = alpha < 1f
-    if (layered) drawIntoCanvas { it.saveLayer(size.toRect(), Paint().apply { this.alpha = alpha }) }
-    withTransform({
-        scale(scale, scale, pivot)
-        clipPath(clip)
-    }) { content() }
-    if (layered) drawIntoCanvas { it.restore() }
+    val bounds = lerp(start, Rect(0f, top, size.width, size.height), presence)
+    val startRadius = minOf(SettingsRowContainerCornerRadius.toPx(), minOf(start.width, start.height) / 2f)
+    val radius = (startRadius * (1f - presence)).coerceAtMost(minOf(bounds.width, bounds.height) / 2f)
+    drawContainer(
+        RoundRect(bounds, CornerRadius(radius)),
+        settingsContainerShapeAlpha(presence),
+        settingsResumedBodyAlpha(settingsContainerBodyAlpha(presence), presence, resumedFrom),
+        SettingsContainerColors(colors.backplate, colors.fill),
+        content = content,
+    )
 }
 
 /** Draws the content and keeps a copy of the frame for the next close. */
@@ -107,41 +169,61 @@ internal fun Modifier.recordSettingsCard(
 ): Modifier = drawWithContent { if (settled()) drawAndRecord(snapshot) else drawContent() }
 
 /**
- * Opening grows the live Settings destination as a card out of the end edge over the themed
- * backplate. Closing never retains the Settings composition: Chats is live at once and only an
- * inert picture of the last settled Settings frame shrinks back into the end edge over it, so no
- * old-route handlers, focus or editable state survive the switch. Chats itself is never captured,
- * because its window privacy flag is released while Settings is shown.
+ * The live Settings page fades around its one moving pen contour. Back reverses the outline over
+ * live Chats, using only a previously permitted Settings frame. An interrupted leg keeps the same
+ * ink and presence as it changes direction.
  */
+@Suppress("LongParameterList")
 internal fun Modifier.settingsBubbleMotion(
     opening: Boolean,
     progress: () -> Float,
     animating: () -> Boolean,
-    backplate: Color,
+    colors: SurfaceMorphColors,
     snapshot: SettingsCardSnapshot?,
+    closingPicture: () -> Picture? = { snapshot?.picture },
+    landing: () -> SurfaceMorphGeometry? = { null },
+    recording: () -> Boolean = { true },
+    resume: SurfaceMorphResume? = null,
 ): Modifier =
     if (opening) {
         drawWithContent {
             if (!animating()) {
-                if (snapshot != null) drawAndRecord(snapshot) else drawContent()
+                if (snapshot != null && recording()) drawAndRecord(snapshot) else drawContent()
                 return@drawWithContent
             }
+            // A Back during the open closes with this first permitted frame.
+            if (snapshot != null && snapshot.picture == null && recording()) record(snapshot)
             val presence = progress().coerceIn(0f, 1f)
-            drawRect(backplate)
-            drawSettingsCard(presence, (presence / SETTINGS_CARD_OPEN_FADE_END).coerceIn(0f, 1f)) {
-                this@drawWithContent.drawContent()
-            }
+            drawRect(colors.backplate, alpha = surfaceMorphUnderlayCover(presence))
+            val ink = surfaceMorphInk(presence, opening = true, resume)
+            drawSurfaceArrival(landing(), presence, colors, ink) { this@drawWithContent.drawContent() }
         }
     } else {
         drawWithContent {
             drawContent()
-            val picture = snapshot?.picture
-            if (!animating() || picture == null) return@drawWithContent
-            val p = progress().coerceIn(0f, 1f)
-            drawRect(Color.Black.copy(alpha = SETTINGS_CARD_SCRIM_ALPHA * (1f - p)))
-            val fade = ((p - SETTINGS_CARD_CLOSE_FADE_START) / (1f - SETTINGS_CARD_CLOSE_FADE_START)).coerceIn(0f, 1f)
-            drawSettingsCard(1f - p, 1f - fade) {
-                drawIntoCanvas { it.nativeCanvas.drawPicture(picture) }
-            }
+            if (!animating()) return@drawWithContent
+            val presence = 1f - progress().coerceIn(0f, 1f)
+            val picture = closingPicture()
+            val bubble = landing()
+            if (picture == null && bubble == null) return@drawWithContent
+            drawRect(colors.backplate, alpha = surfaceMorphUnderlayCover(presence))
+            val content: (DrawScope.() -> Unit)? =
+                picture?.let { frame -> { drawIntoCanvas { it.nativeCanvas.drawPicture(frame) } } }
+            val ink = surfaceMorphInk(presence, opening = false, resume)
+            drawSurfaceArrival(bubble, presence, colors, ink, content = content)
         }
     }
+
+/** Records this route's current frame into [snapshot] without drawing it. */
+private fun ContentDrawScope.record(snapshot: SettingsCardSnapshot) {
+    val width = ceil(size.width).toInt()
+    val height = ceil(size.height).toInt()
+    if (width <= 0 || height <= 0) return
+    val picture = Picture().also { snapshot.picture = it }
+    val recording = Canvas(picture.beginRecording(width, height))
+    try {
+        draw(this, layoutDirection, recording, size) { this@record.drawContent() }
+    } finally {
+        picture.endRecording()
+    }
+}

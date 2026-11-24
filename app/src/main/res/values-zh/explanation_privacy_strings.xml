@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">选择附件在此设备上保留多久。较旧的附件会现在以及随时间推移被删除，重新下载某个附件会让它保留完整期限。消息会保留。</string>
     <string name="explanation_privacy_storage_chat">打开为此聊天存储的附件。</string>
     <string name="explanation_privacy_storage_remove_all_chat">先请你确认，然后从此设备上删除此聊天中的所有附件。消息会保留，只要发送者的副本仍然可用，你就可以重新下载附件。</string>
-    <string name="explanation_privacy_storage_attachment">选中或取消选中此附件，以便你将它与其他附件一起删除。在你选择删除之前不会删除任何内容。</string>
     <string name="explanation_privacy_storage_select_all">选中此列表中的所有附件，以便你一起删除。在你选择删除之前不会删除任何内容。</string>
     <string name="explanation_privacy_storage_select_shown">仅选中目前已加载的附件。滚动时会加载更多，在你选择删除之前不会删除任何内容。</string>
     <string name="explanation_privacy_storage_clear_selection">清除当前选择，不删除任何内容。</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">将此人的消息通知静音。仅适用于消息，投递和未读计数不会改变。</string>
     <string name="explanation_privacy_profile_system">打开 Android 中来自此人的通知设置，你可以在那里设置自定义声音和行为。自定义设置适用于此账户的所有对话。</string>
     <string name="explanation_privacy_profile_vibration">选择来自此人的通知的振动模式。</string>
+    <string name="explanation_privacy_storage_attachment_open">打开此附件，以便在移除前查看。点按勾选标记或长按此行可将其选中，与其他附件一起移除。在你选择“移除”之前，不会移除任何内容。</string>
 </resources>
