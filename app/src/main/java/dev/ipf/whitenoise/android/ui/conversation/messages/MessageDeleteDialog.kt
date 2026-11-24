@@ -74,6 +74,7 @@ internal fun messageDeleteSupportingCopy(
  * with a silently vanished dialog.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun MessageDeleteDialog(
     capability: MessageDeleteCapability,
     mine: Boolean,
@@ -205,6 +206,7 @@ internal fun MessageDeleteDialogContent(
  * only the local-hide action is offered.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun BatchMessageDeleteDialog(
     selectedCount: Int,
     breakdown: BatchDeleteBreakdown,

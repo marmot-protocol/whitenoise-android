@@ -264,7 +264,7 @@ internal fun WhiteNoiseDialogSurface(
     )
 }
 
-/** The app dialog window and [WhiteNoiseDialogSurface] around [content] that owns its own buttons (stacked actions, inputs). */
+/** The app dialog window and surface around [content] that owns its own buttons (stacked actions, inputs). */
 @Suppress("FunctionNaming")
 @Composable
 internal fun WhiteNoiseBasicAlertDialog(
