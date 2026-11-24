@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -32,7 +33,9 @@ private const val DISABLED_ICON_ALPHA = 0.38f
  * either draws a capsule or, given a circle, stops answering taps above and below it. Here the whole slot
  * answers taps, and the press highlight and [containerColor] are a circle as wide as the slot's shorter side,
  * up to [highlightMax], centred in it. A slot sized by [modifier] keeps that size, and an unsized one is
- * 48 dp square with the 40 dp circle of an ordinary icon button.
+ * 48 dp square with the 40 dp circle of an ordinary icon button. As on an `IconButton`, a modifier passed in
+ * here — a morph or launcher origin, say — measures the 48 dp minimum touch box centred on a narrower slot,
+ * so motion that starts from the button keeps the geometry it had before the slot buttons.
  */
 @Composable
 internal fun SlotIconButton(
@@ -46,7 +49,10 @@ internal fun SlotIconButton(
 ) {
     val press = remember { MutableInteractionSource() }
     SlotIconButtonLayout(
-        target = modifier.shapedTouchTarget(press, onClick = onClick, enabled = enabled),
+        target =
+            modifier
+                .minimumInteractiveComponentSize()
+                .shapedTouchTarget(press, onClick = onClick, enabled = enabled),
         press = press,
         containerColor = containerColor,
         contentColor = if (enabled) contentColor else contentColor.copy(alpha = DISABLED_ICON_ALPHA),
@@ -72,6 +78,7 @@ internal fun SlotIconToggleButton(
     SlotIconButtonLayout(
         target =
             modifier
+                .minimumInteractiveComponentSize()
                 .sizeIn(minWidth = MinimumTouchTarget, minHeight = MinimumTouchTarget)
                 .toggleable(
                     value = checked,
