@@ -74,9 +74,9 @@
         ]
       },
       {
-        "surface": "GroupSetupCustomizeButton",
+        "surface": "GroupSetupDisclosure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
-        "anchor": "fun GroupSetupCustomizeButton(",
+        "anchor": "fun GroupSetupDisclosure(",
         "test_ids": [
           "NCH-002"
         ]
@@ -284,17 +284,9 @@
         ]
       },
       {
-        "surface": "Group setup member count and customization",
+        "surface": "Group setup member count and roster disclosure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.plurals.group_setup_selected_members",
-        "test_ids": [
-          "NCH-002"
-        ]
-      },
-      {
-        "surface": "Empty group setup member count",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
-        "anchor": "R.string.group_setup_no_members",
         "test_ids": [
           "NCH-002"
         ]
