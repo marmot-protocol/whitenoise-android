@@ -11,7 +11,7 @@ internal object ConversationMessageMetrics {
     val RichTextBottomAdjustment = 2.dp
     val RichComponentInset = 6.dp
     val GallerySpacing = 2.dp
-    val RichComponentCornerRadius = 10.dp
+    val MediaTileCornerRadius = 10.dp
 
     /** A lone photo or video keeps its own width; every other rich component shares this canvas. */
     val RichContentCanvasWidth = 256.dp
@@ -19,4 +19,4 @@ internal object ConversationMessageMetrics {
 }
 
 /** Rounded corners for media, cards and galleries inside a bubble. */
-internal val ConversationRichContentShape = RoundedCornerShape(ConversationMessageMetrics.RichComponentCornerRadius)
+internal val ConversationMediaTileShape = RoundedCornerShape(ConversationMessageMetrics.MediaTileCornerRadius)

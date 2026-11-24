@@ -17,7 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.BrokenImage
 
@@ -35,7 +35,7 @@ internal fun RejectedAttachmentPlaceholder(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
