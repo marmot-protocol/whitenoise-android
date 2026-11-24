@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /** The one resting interval between the final timeline row and the composer. */
 internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
@@ -19,7 +20,7 @@ internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
 internal val CONVERSATION_TIMELINE_ROW_SPACING = 2.dp
 
 /** Adds to the ordinary row interval for a direct transition between bubble authors. */
-internal val CONVERSATION_SENDER_CHANGE_EXTRA_SPACING = 6.dp
+internal val CONVERSATION_SENDER_CHANGE_EXTRA_SPACING = Dimens.spaceSm - CONVERSATION_TIMELINE_ROW_SPACING
 
 internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
     Arrangement.spacedBy(CONVERSATION_TIMELINE_ROW_SPACING, Alignment.Bottom)

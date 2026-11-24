@@ -83,19 +83,26 @@ class AudioTranscriptionScreenshotTest {
 
     /** An edge tap in the wide gutter toggles the action, while its press state stays inside the disc. */
     @Test
-    fun pressedDiscKeepsCircularFeedback() {
+    fun pressedDiscKeepsCircularFeedback() = capturePressed("pressed-dark", Appearance.DARK)
+
+    /** The off-state feedback is also visible and circular in the light theme. */
+    @Test
+    fun pressedDiscLight() = capturePressed("pressed-light", Appearance.LIGHT)
+
+    /** The active disc keeps its circular feedback with large text and RTL in AMOLED. */
+    @Test
+    fun pressedActiveDiscAmoledRtlLarge() =
+        capturePressed("pressed-amoled-rtl-large-on", Appearance.AMOLED_RTL, completed())
+
+    /** Samples the quick tap, release fade and held shape without changing the fixture's toggle state. */
+    private fun capturePressed(
+        name: String,
+        appearance: Appearance,
+        state: AudioTranscriptUi? = null,
+    ) {
         val requests = mutableListOf<Boolean>()
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                LazyColumn {
-                    item {
-                        Surface(Modifier.width(360.dp).testTag(FRAME)) {
-                            IncomingVoiceMessage(null, onToggle = { requests += it })
-                        }
-                    }
-                }
-            }
-        }
+        val toggleTo = state == null
+        composeRule.setContent { PressedVoicePreview(appearance, state) { requests += it } }
         val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
         val idle = disc.captureToImage().toPixelMap()
         val middleX = idle.width / 2
@@ -109,7 +116,7 @@ class AudioTranscriptionScreenshotTest {
             idle[middleX + 9, middleY] != released[middleX + 9, middleY],
         )
         composeRule.mainClock.advanceTimeBy(300)
-        assertEquals(listOf(true), requests)
+        assertEquals(listOf(toggleTo), requests)
         val faded = disc.captureToImage().toPixelMap()
         assertEquals("feedback fades to idle", idle[middleX + 9, middleY], faded[middleX + 9, middleY])
 
@@ -119,11 +126,37 @@ class AudioTranscriptionScreenshotTest {
         assertTrue("the disc responds to the edge press", idle[middleX + 9, middleY] != pressed[middleX + 9, middleY])
         assertEquals("the gutter has no state layer", idle[2, middleY], pressed[2, middleY])
         assertEquals("clipped disc corner", idle[middleX + 10, middleY + 10], pressed[middleX + 10, middleY + 10])
-        assertEquals(listOf(true), requests)
-        composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-pressed-dark.png")
+        assertEquals(listOf(toggleTo), requests)
+        composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-$name.png")
         disc.performTouchInput { up() }
         composeRule.mainClock.advanceTimeBy(300)
-        assertEquals(listOf(true, true), requests)
+        assertEquals(listOf(toggleTo, toggleTo), requests)
+    }
+
+    /** Uses a scrolling parent so the control receives the same delayed press interactions as a chat row. */
+    @Composable
+    private fun PressedVoicePreview(
+        appearance: Appearance,
+        state: AudioTranscriptUi?,
+        onToggle: (Boolean) -> Unit,
+    ) {
+        val amoledRtl = appearance == Appearance.AMOLED_RTL
+        val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+        WhiteNoiseTheme(
+            darkTheme = appearance != Appearance.LIGHT,
+            amoled = amoledRtl,
+            fontScale = if (amoledRtl) 2f else 1f,
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                LazyColumn {
+                    item {
+                        Surface(Modifier.width(360.dp).testTag(FRAME)) {
+                            IncomingVoiceMessage(state, onToggle = onToggle)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test

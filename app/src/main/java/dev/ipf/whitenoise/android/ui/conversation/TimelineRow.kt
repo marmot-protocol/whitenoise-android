@@ -22,6 +22,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatHistoryTransfer
+import dev.ipf.whitenoise.android.state.importedHistoryBoundary
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -104,9 +106,13 @@ internal fun TimelineRow(
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
-        // Ahead of the day separator, so the import line closes the imported rows instead of opening the next day.
-        val showsHistoryBoundary =
-            ImportedHistoryMarkers(older, item, atHistoryStart = older == null && !controller.hasMoreBefore)
+        val historyImport = LocalChatHistoryImport.current()
+        val historyBoundary = importedHistoryBoundary(older?.projected, item.projected, historyImport)
+        // Draw the import line ahead of the day separator to close the imported rows.
+        ImportedHistoryMarkers(
+            transfer = if (older == null && !controller.hasMoreBefore) chatHistoryTransfer(historyImport) else null,
+            boundary = historyBoundary,
+        )
         if (daySeparatorLabel != null) {
             val hasLeadingHeader =
                 controller.hasMoreBefore ||
@@ -126,7 +132,7 @@ internal fun TimelineRow(
                 followsGroupEvent = followsGroupEvent,
             )
         }
-        val hasLeadingSeparator = daySeparatorLabel != null || showUnreadDivider || showsHistoryBoundary
+        val hasLeadingSeparator = daySeparatorLabel != null || showUnreadDivider || historyBoundary != null
         val senderGap =
             if (!hasLeadingSeparator &&
                 conversationBubbleSenderChanges(

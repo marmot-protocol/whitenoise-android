@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
@@ -185,8 +186,8 @@ internal fun MessageSideDisc(
                     .drawBehind {
                         val stateAlpha =
                             when {
-                                focused -> DISC_PRESSED_OR_FOCUSED_ALPHA
-                                hovered -> DISC_HOVERED_ALPHA
+                                focused -> InteractionStateOpacity.PRESSED_OR_FOCUSED
+                                hovered -> InteractionStateOpacity.HOVERED
                                 else -> 0f
                             }
                         val alpha = maxOf(pressAlpha, stateAlpha)
@@ -209,9 +210,9 @@ private fun rememberMessageSideDiscPressAlpha(interactions: MutableInteractionSo
             .filterIsInstance<PressInteraction>()
             .collectLatest { interaction ->
                 when (interaction) {
-                    is PressInteraction.Press -> pressAlpha.snapTo(DISC_PRESSED_OR_FOCUSED_ALPHA)
+                    is PressInteraction.Press -> pressAlpha.snapTo(InteractionStateOpacity.PRESSED_OR_FOCUSED)
                     is PressInteraction.Release -> {
-                        pressAlpha.snapTo(DISC_PRESSED_OR_FOCUSED_ALPHA)
+                        pressAlpha.snapTo(InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         pressAlpha.animateTo(0f, tween(durationMillis = 150))
                     }
                     is PressInteraction.Cancel -> pressAlpha.snapTo(0f)
@@ -258,8 +259,6 @@ private fun MessageSidePendingRing(
 }
 
 private const val DISABLED_ALPHA = 0.38f
-private const val DISC_PRESSED_OR_FOCUSED_ALPHA = 0.12f
-private const val DISC_HOVERED_ALPHA = 0.08f
 
 internal const val MESSAGE_TRANSLATION_TOGGLE_TEST_TAG = "message-translation-toggle"
 internal const val MESSAGE_TRANSLATION_PENDING_TEST_TAG = "message-translation-pending"

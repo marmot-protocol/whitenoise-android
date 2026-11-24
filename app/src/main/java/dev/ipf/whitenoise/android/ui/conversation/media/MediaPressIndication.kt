@@ -31,10 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import kotlinx.coroutines.launch
-
-private const val MEDIA_PRESSED_ALPHA = 0.12f
-private const val MEDIA_HOVERED_ALPHA = 0.08f
 
 /** Limits the viewer's lighter feedback to motion-enabled media, leaving other dialogs unchanged. */
 internal val LocalMediaViewerPressFeedback = staticCompositionLocalOf { false }
@@ -123,9 +121,9 @@ private class MediaPressNode(
         drawContent()
         val alpha =
             when {
-                presses.isNotEmpty() -> MEDIA_PRESSED_ALPHA
-                focuses.isNotEmpty() -> MEDIA_PRESSED_ALPHA
-                hovers.isNotEmpty() -> MEDIA_HOVERED_ALPHA
+                presses.isNotEmpty() -> InteractionStateOpacity.PRESSED_OR_FOCUSED
+                focuses.isNotEmpty() -> InteractionStateOpacity.PRESSED_OR_FOCUSED
+                hovers.isNotEmpty() -> InteractionStateOpacity.HOVERED
                 else -> 0f
             }
         if (alpha > 0f) {

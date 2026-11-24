@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -214,7 +215,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
             .padding(bottom = WhiteNoiseSpacing.Section)
             .fadingVerticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
