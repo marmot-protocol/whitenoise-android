@@ -158,7 +158,7 @@
     <string name="link_offer_reminder">Diğer cihazlarınızdaki sohbetleri görmek için bu cihazı bağlayın.</string>
     <string name="link_request_default_label">Yeni cihaz</string>
     <string name="link_request_options">Seçenekler</string>
-    <string name="link_request_options_detail">Sohbetleri geçmişleriyle birlikte paylaşıp paylaşmayacağınıza karar verin.</string>
+    <string name="link_request_options_detail">Sohbetlerin ve geçmişlerinin paylaşılıp paylaşılmayacağını seçin.</string>
     <string name="explanation_link_request_options">Yeni cihazın neler alacağını açar.</string>
     <string name="device_move_advanced">Gelişmiş</string>
     <string name="setup_device_link_next">Oturum açtıktan sonra diğer cihazlarınızdaki sohbetleri almak için bu cihazı bağlayabilirsiniz.</string>

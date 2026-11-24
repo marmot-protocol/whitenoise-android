@@ -139,8 +139,13 @@ private fun launchAccountWipe(
             if (appState.activeAccountRef != requested || appState.runtimeGeneration != epoch) {
                 return@runAccountWipeMutation
             }
-            val report = appState.signOutAndWipeActiveAccount()?.report
-            appState.retireDeviceUnlinkedNotice(requested)
+            val report =
+                try {
+                    appState.signOutAndWipeActiveAccount()?.report
+                } finally {
+                    // Cleanup after the removal is published can still throw.
+                    appState.retireDeviceUnlinkedNotice(requested)
+                }
             if (report == null) {
                 // Total FFI failure: nothing was wiped and the
                 // runtime state was restored — this one is

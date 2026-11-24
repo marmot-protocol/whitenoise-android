@@ -27,8 +27,11 @@ internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(
         if (!ownsRequest()) return@withAccountLifetime null
         val unlinked = runCatchingCancellable { marmotIo { listAccounts().find { it.label == label && it.unlinked } } }
         val target = unlinked.getOrNull() ?: return@withAccountLifetime null
-        val completion = if (ownsRequest()) signOutAndWipeActiveAccountLocked(label, target.accountIdHex) else null
-        retireDeviceUnlinkedNotice(label)
-        completion
+        try {
+            if (ownsRequest()) signOutAndWipeActiveAccountLocked(label, target.accountIdHex) else null
+        } finally {
+            // Cleanup after the removal is published can still throw.
+            retireDeviceUnlinkedNotice(label)
+        }
     }
 }

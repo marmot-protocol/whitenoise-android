@@ -401,16 +401,30 @@ class AccountWipeMemberMuteRetentionTest {
             }
         }
 
-    /** Sign out and wipe in Settings retires the unlinked notice as well, after its own wipe attempt. */
+    /**
+     * Sign out and wipe in Settings retires the unlinked notice as well. Both removal routes do it in a finally
+     * after their wipe attempt, so cleanup that throws once the removal is published cannot leave the notice up.
+     */
     @Test
-    fun theSettingsWipeRetiresTheUnlinkedNoticeAfterItsWipe() {
-        val wipe =
+    fun bothRemovalRoutesRetireTheUnlinkedNoticeEvenWhenTheWipeThrows() {
+        val settings =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt")
                 .functionBody("launchAccountWipe")
-        val attempt = wipe.indexOf("signOutAndWipeActiveAccount()")
+        val removal =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/UnlinkedAccountRemoval.kt")
+                .functionBody("removeUnlinkedAccountForOutcome")
+        val routes =
+            listOf(
+                Triple(settings, "signOutAndWipeActiveAccount()", "retireDeviceUnlinkedNotice(requested)"),
+                Triple(removal, "signOutAndWipeActiveAccountLocked(", "retireDeviceUnlinkedNotice(label)"),
+            )
 
-        assertTrue(attempt >= 0)
-        assertTrue(wipe.indexOf("retireDeviceUnlinkedNotice(requested)") > attempt)
+        for ((body, attempt, retire) in routes) {
+            val attempted = body.indexOf(attempt)
+            val guarded = body.indexOf("} finally {", attempted)
+            assertTrue(attempted >= 0 && guarded > attempted)
+            assertTrue(body.indexOf(retire) > guarded)
+        }
     }
 
     /** An inactive wipe reports retained ownerless files, evicts unused playback and keeps a live player readable. */
