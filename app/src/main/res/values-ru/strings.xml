@@ -2379,8 +2379,8 @@
     <string name="new_message_no_results_detail">Проверьте правильность написания или попробуйте другой поиск.</string>
     <string name="new_message_chat_created">Чат создан</string>
     <string name="new_message_open_chat">Открыть чат</string>
-    <string name="group_setup_customize">Настроить фото и описание группы</string>
-    <string name="group_setup_hide_customization">Скрыть настройки оформления</string>
+    <string name="group_setup_customize">Настроить группу</string>
+    <string name="group_setup_hide_customization">Скрыть настройки группы</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">Выбран %d участник</item>
         <item quantity="few">Выбрано %d участника</item>

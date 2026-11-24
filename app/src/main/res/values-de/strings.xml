@@ -2322,7 +2322,7 @@
     <string name="new_message_no_results_detail">Prüfe die Schreibweise oder versuche eine andere Suche.</string>
     <string name="new_message_chat_created">Chat erstellt</string>
     <string name="new_message_open_chat">Chat öffnen</string>
-    <string name="group_setup_customize">Gruppenfoto und Beschreibung anpassen</string>
+    <string name="group_setup_customize">Gruppe anpassen</string>
     <string name="group_setup_hide_customization">Anpassungen ausblenden</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d Mitglied ausgewählt</item>

@@ -304,9 +304,10 @@ class NewGroupPresentationTest {
     @Config(qualifiers = "en-w320dp-h480dp-mdpi")
     fun largeFontShortViewportKeepsCreateAndFieldsReachable() {
         val draft = NewGroupDraft()
+        var timerClicks = 0
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
-                NewGroupSetupContent(draft, presentation(), NewGroupSetupActions({}, {}, {}, {}, {}))
+                NewGroupSetupContent(draft, presentation(), NewGroupSetupActions({}, {}, {}, { timerClicks++ }, {}))
             }
         }
         val button = composeRule.onNodeWithTag("group_setup.create")
@@ -315,10 +316,16 @@ class NewGroupPresentationTest {
         assertTrue(bounds.bottom - bounds.top >= 48.dp)
         composeRule.onNodeWithTag("group_setup.name").performScrollTo().assertIsDisplayed()
         val form = composeRule.onNodeWithTag("group_setup.content")
+        val timer = composeRule.onNodeWithText(context.getString(R.string.disappearing_messages))
+        timer.assertDoesNotExist()
         form.performScrollToKey("group_setup.customize")
         composeRule.onNodeWithTag("group_setup.customize").performClick()
         form.performScrollToKey("group_setup.description")
         composeRule.onNodeWithTag("group_setup.description").assertIsDisplayed()
+        form.performScrollToKey("group_setup.retention")
+        timer.assertIsDisplayed().performClick()
+        assertEquals(1, timerClicks)
+        button.assertIsDisplayed()
     }
 
     /** Photo menu retains every real native acquisition path plus explicit removal. */

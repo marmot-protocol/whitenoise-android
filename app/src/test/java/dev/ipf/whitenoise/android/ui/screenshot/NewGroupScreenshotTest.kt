@@ -72,7 +72,7 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** The group name, member count and timer lead the default form. */
+    /** The group name and member count lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
@@ -81,7 +81,7 @@ class NewGroupScreenshotTest {
     /** AMOLED setup and primary action. */
     @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
 
-    /** Optional photo and description use the same form and retain the current draft. */
+    /** Optional photo, description and timer use the same form and retain the current draft. */
     @Test fun setupCustomizedAmoled() =
         setup(
             "group_setup_customized_amoled.png",
@@ -99,8 +99,9 @@ class NewGroupScreenshotTest {
         )
 
     /** Expanding the member count reveals the selected roster without an extra screen. */
-    @Test fun setupMembersAmoled() =
+    @Test fun setupMembersAmoled() {
         setup("group_setup_members_amoled.png", dark = true, amoled = true, membersOpen = true)
+    }
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)

@@ -2485,7 +2485,7 @@
     <string name="new_message_no_results_detail">Check the spelling or try a different search.</string>
     <string name="new_message_chat_created">Chat created</string>
     <string name="new_message_open_chat">Open chat</string>
-    <string name="group_setup_customize">Customize photo and description</string>
+    <string name="group_setup_customize">Customize group</string>
     <string name="group_setup_hide_customization">Hide customization</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d member selected</item>

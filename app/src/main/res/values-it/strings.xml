@@ -2310,7 +2310,7 @@
     <string name="new_message_no_results_detail">Controlla l’ortografia o prova un’altra ricerca.</string>
     <string name="new_message_chat_created">Chat creata</string>
     <string name="new_message_open_chat">Apri chat</string>
-    <string name="group_setup_customize">Personalizza foto e descrizione del gruppo</string>
+    <string name="group_setup_customize">Personalizza il gruppo</string>
     <string name="group_setup_hide_customization">Nascondi le opzioni di personalizzazione</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d membro selezionato</item>

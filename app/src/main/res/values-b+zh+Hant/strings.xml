@@ -2271,7 +2271,7 @@
     <string name="new_message_no_results_detail">檢查拼寫或嘗試不同的搜尋.</string>
     <string name="new_message_chat_created">聊天已建立</string>
     <string name="new_message_open_chat">開啟聊天</string>
-    <string name="group_setup_customize">自訂群組照片和描述</string>
+    <string name="group_setup_customize">自訂群組</string>
     <string name="group_setup_hide_customization">隱藏自訂選項</string>
     <plurals name="group_setup_selected_members">
         <item quantity="other">已選取 %d 位成員</item>

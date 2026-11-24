@@ -141,20 +141,6 @@ internal fun NewGroupSetupContent(
                 item { GroupSetupRecovery(state, actions) }
             }
             item { GroupSetupNameField(draft, state, customize, actions.emoji) }
-            item {
-                SettingsGroup(Modifier.padding(top = WhiteNoiseSpacing.Related)) {
-                    row("retention") { context ->
-                        SettingsLink(
-                            context,
-                            stringResource(R.string.disappearing_messages),
-                            actions.retention,
-                            value = state.retentionLabel,
-                            enabled = state.detailsEditable,
-                            leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
-                        )
-                    }
-                }
-            }
             item { GroupSetupPhotoStatus(draft, state) }
             item(key = "group_setup.customize") {
                 GroupSetupDisclosure(
@@ -178,6 +164,20 @@ internal fun NewGroupSetupContent(
                         label = { Text(stringResource(R.string.description)) },
                         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
+                }
+                item(key = "group_setup.retention") {
+                    SettingsGroup(Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+                        row("retention") { context ->
+                            SettingsLink(
+                                context,
+                                stringResource(R.string.disappearing_messages),
+                                actions.retention,
+                                value = state.retentionLabel,
+                                enabled = state.detailsEditable,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
+                            )
+                        }
+                    }
                 }
             }
             if (state.members.isNotEmpty()) {

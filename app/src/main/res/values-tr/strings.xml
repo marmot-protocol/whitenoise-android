@@ -2303,7 +2303,7 @@
     <string name="new_message_no_results_detail">Yazımı kontrol edin veya farklı bir arama yapmayı deneyin.</string>
     <string name="new_message_chat_created">Sohbet oluşturuldu</string>
     <string name="new_message_open_chat">Sohbeti aç</string>
-    <string name="group_setup_customize">Grup fotoğrafını ve açıklamasını özelleştir</string>
+    <string name="group_setup_customize">Grubu özelleştir</string>
     <string name="group_setup_hide_customization">Özelleştirme seçeneklerini gizle</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d üye seçildi</item>
