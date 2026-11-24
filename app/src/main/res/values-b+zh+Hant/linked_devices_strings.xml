@@ -160,8 +160,8 @@
     <string name="link_offer_reminder">連結此裝置，即可看到你其他裝置上的聊天。</string>
     <string name="link_request_default_label">新裝置</string>
     <string name="link_request_options">選項</string>
-    <string name="link_request_options_detail">選擇裝置名稱，並決定是否分享聊天及其歷史訊息。</string>
-    <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
+    <string name="link_request_options_detail">選擇是否分享聊天及其歷史訊息。</string>
+    <string name="explanation_link_request_options">開啟新裝置接收的內容。</string>
     <string name="device_move_advanced">進階</string>
     <string name="setup_device_link_next">登入後，你可以連結這部裝置，接收其他裝置上的聊天。</string>
     <string name="unlinked_account_remove_for">從此裝置移除 %1$s</string>

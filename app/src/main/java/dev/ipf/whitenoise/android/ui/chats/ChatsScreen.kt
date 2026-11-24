@@ -930,7 +930,7 @@ internal fun ChatsScreen(
                 val hex = appState.accountIdHex(id.npub)
                 identifierResolution =
                     if (hex != null) {
-                        IdentifierResolution.Resolved(id.npub)
+                        IdentifierResolution.Resolved(id.npub, hex)
                     } else {
                         IdentifierResolution.Failed(R.string.chat_list_search_invalid_npub)
                     }
@@ -944,8 +944,8 @@ internal fun ChatsScreen(
                 val hex = Nip05Resolver.resolve(id.identifier)
                 val npub = presentableIdentifierNpub(hex, appState::npubForDisplay)
                 identifierResolution =
-                    if (npub != null) {
-                        IdentifierResolution.Resolved(npub)
+                    if (npub != null && hex != null) {
+                        IdentifierResolution.Resolved(npub, hex)
                     } else {
                         IdentifierResolution.Failed(
                             R.string.chat_list_search_nip05_not_found,

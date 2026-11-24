@@ -32,28 +32,11 @@
         ]
       },
       {
-        "surface": "Rendered sentence seek from other bubbles",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "fun seekRenderedSentenceOutsideCurrentProjection(",
-        "test_ids": [
-          "TTS-001",
-          "TTS-004"
-        ]
-      },
-      {
         "surface": "Read-aloud reveals collapsed long-message text inline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "rememberTtsMessageBodyExpanded(",
         "test_ids": [
           "TTS-001"
-        ]
-      },
-      {
-        "surface": "Accepted reaction presentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "localReactionMotion.accept(",
-        "test_ids": [
-          "MSG-041"
         ]
       }
     ],
@@ -161,14 +144,6 @@
         "anchor": "val sendSelectableTextLayoutReporter:",
         "test_ids": [
           "CON-036"
-        ]
-      },
-      {
-        "surface": "Forward picker opens on a payload snapshot",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "surfaces.forwardSnapshot = forwardPayload",
-        "test_ids": [
-          "MSG-010"
         ]
       },
       {

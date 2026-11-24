@@ -34,7 +34,9 @@ internal fun WhiteNoiseAppState.presentEventNotices(
     }
     // Another of the account's devices removed this one: MDK has signed the account out here.
     deviceUnlinkedAccount(event)?.let { account ->
-        scope.launch(Dispatchers.Main) { presentDeviceUnlinked(account) }
+        // Captured before the handler is queued, so a removal that reaches the main thread first still outdates it.
+        val copy = accountSession.copyLifetimes.capture(account)
+        scope.launch(Dispatchers.Main) { presentDeviceUnlinked(account, copy) }
     }
 }
 

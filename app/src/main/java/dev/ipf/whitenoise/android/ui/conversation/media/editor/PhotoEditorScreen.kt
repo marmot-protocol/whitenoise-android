@@ -89,9 +89,9 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
@@ -242,7 +242,7 @@ internal fun PhotoEditorScreen(
     val currentOnCancel by rememberUpdatedState(onCancel)
     val discardEnabled by rememberUpdatedState(!state.isSaving && inputEnabled())
     if (showHelp) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { showHelp = false },
             title = { Text(stringResource(R.string.help)) },
             text = {
@@ -257,7 +257,7 @@ internal fun PhotoEditorScreen(
     }
     if (showDiscardDialog) {
         key(stateHolder, discardEnabled) {
-            AnimatedAlertDialog(
+            WhiteNoiseAlertDialog(
                 onDismissRequest = { showDiscardDialog = false },
                 title = { Text(stringResource(R.string.photo_editor_discard_title)) },
                 text = { Text(stringResource(R.string.photo_editor_discard_message)) },

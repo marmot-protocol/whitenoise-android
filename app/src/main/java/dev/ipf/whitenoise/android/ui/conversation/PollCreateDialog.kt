@@ -52,8 +52,8 @@ import dev.ipf.whitenoise.android.state.POLL_DAY_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
@@ -85,7 +85,7 @@ internal fun PollCreateDialog(
     var submitting by remember { mutableStateOf(false) }
     var issue by remember { mutableStateOf<PollDraftIssue?>(null) }
     var deadlineAttempted by remember { mutableStateOf(false) }
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
         dismissEnabled = { !submitting },
         modifier =
