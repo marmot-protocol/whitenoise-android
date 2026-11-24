@@ -20,7 +20,8 @@ internal fun AccountSetupState.focusesRelayTimeout(): Boolean {
     val relayTimeout =
         step.step in relaySetupSteps && step.findings.any { it.issue == OnboardingIssueFfi.TIMED_OUT }
     val retryFirst =
-        !blocksSetupActions && step.status != OnboardingStatusFfi.WAITING_FOR_SIGNER &&
+        !blocksSetupActions &&
+            step.status != OnboardingStatusFfi.WAITING_FOR_SIGNER &&
             actionPlan(step.actions).primary == OnboardingActionFfi.RETRY
     return activeDecision && relayTimeout && retryFirst
 }
@@ -35,9 +36,7 @@ internal fun SetupRelayTimeoutHosts(findings: List<OnboardingFindingFfi>) {
         .forEach { host ->
             Text(
                 host,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    textDirection = TextDirection.Ltr,
-                ),
+                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
             )
         }
 }
