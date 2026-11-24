@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTextSelection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Select text from the message menu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTextSelection.kt",
+        "anchor": "fun beginTextSelection(",
+        "test_ids": [
+          "MSG-008",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "Double-tap edit on ordinary message text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTextSelection.kt",
+        "anchor": "fun ordinaryTextHitAt(",
+        "test_ids": [
+          "MSG-007"
+        ]
+      }
+    ]
+  }
+}
