@@ -11,15 +11,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import kotlinx.coroutines.CancellationException
 
-/** The optimistic row a first text send created, carried into admission, reconciliation and failure handling. */
-internal class OptimisticTextSendRow(
-    val key: String,
-    val tempId: String,
-    val record: AppMessageRecordFfi,
-    val order: ULong,
-    val chatListPreviewReserved: Boolean,
-)
-
 /**
  * The account a composer text send runs as, or null when a guard refuses it. Every guard runs before any
  * optimistic bubble exists, so a refused send keeps the composer's text.

@@ -4017,7 +4017,8 @@ class ConversationSendRetryIntegrationTest {
             controller.send("hello", onDurablyAccepted = { durable += 1 })
             val failed = controller.timeline.single()
             assertNotNull(appState.toast)
-            applyProjection(controller, projectedMessage(failed.record.recordedAt, null, null, sourceMessageIdHex = null))
+            val committed = projectedMessage(failed.record.recordedAt, null, null, sourceMessageIdHex = null)
+            applyProjection(controller, committed)
 
             controller.retryFailedSend(failed)
 

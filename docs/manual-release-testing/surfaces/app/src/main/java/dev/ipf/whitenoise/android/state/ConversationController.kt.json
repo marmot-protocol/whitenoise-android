@@ -298,16 +298,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_send_membership_verifying",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_send_membership_verifying",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.change_photo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.change_photo",
@@ -408,14 +398,6 @@
         "anchor": "internal fun MutableMap<String, *>.retainTimelineWindow()",
         "test_ids": [
           "CON-003"
-        ]
-      },
-      {
-        "surface": "Over-limit send or edit refused before any bubble",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_message_too_long",
-        "test_ids": [
-          "MSG-048"
         ]
       }
     ]
