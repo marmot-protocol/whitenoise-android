@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName") // The card, its surface variant and icon disc share one recipe.
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.BorderStroke
@@ -47,6 +49,7 @@ internal val ConversationEmbedActionIconSize = 20.dp
  * and apply [ConversationEmbedPadding] to their own content.
  */
 @Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun ConversationEmbedCard(
     modifier: Modifier = Modifier,
     surface: ConversationEmbedSurface = ConversationEmbedSurface.Filled,
@@ -74,6 +77,7 @@ internal fun ConversationEmbedCard(
 
 /** Circular glyph disc that leads share cards (location, contact, unresolved user). */
 @Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 internal fun ConversationEmbedIconDisc(
     painter: Painter,
     modifier: Modifier = Modifier,
