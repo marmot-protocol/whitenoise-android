@@ -38,6 +38,14 @@
         ]
       },
       {
+        "surface": "R.string.next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.next",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
         "surface": "R.string.learn_actions_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_actions_body",
