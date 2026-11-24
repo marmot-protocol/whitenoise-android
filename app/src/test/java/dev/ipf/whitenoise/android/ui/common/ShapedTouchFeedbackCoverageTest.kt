@@ -38,7 +38,10 @@ class ShapedTouchFeedbackCoverageTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
-        val wrappers = sources.values.flatMap(::passThroughIconButtonWrappers).toSet()
+        val wrappers =
+            sources.values
+                .map(::passThroughIconButtonWrappers)
+                .fold(emptyMap<String, Int>()) { all, next -> all + next }
         val found =
             sources.flatMap { (path, source) ->
                 (shapedTouchFindings(source, path) + stretchedWrapperCalls(source, wrappers)).map { "$path: $it" }
@@ -109,7 +112,7 @@ class ShapedTouchFeedbackCoverageTest {
         )
     }
 
-    /** A clip only excuses a click on a shaped Surface when it clips to the Surface's own shape. */
+    /** A clip only excuses a click on a shaped Surface or card when it clips to that container's own shape. */
     @Test
     fun aClipOfAnotherShapeDoesNotExcuseTheClick() {
         val mismatched =
@@ -117,6 +120,11 @@ class ShapedTouchFeedbackCoverageTest {
         val matched = "Surface(shape = CircleShape, modifier = Modifier.clip(CircleShape).clickable { go() }) {}"
         assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(mismatched).map(::kind))
         assertEquals(emptyList<String>(), shapedTouchFindings(matched))
+        // A card with no shape named has its default one, which a circle does not match.
+        val defaultCard = "Card(modifier = Modifier.clip(CircleShape).clickable { go() }) {}"
+        val defaultCardClipped = "Card(modifier = Modifier.clip(CardDefaults.shape).clickable { go() }) {}"
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(defaultCard).map(::kind))
+        assertEquals(emptyList<String>(), shapedTouchFindings(defaultCardClipped))
     }
 
     /**
@@ -135,10 +143,55 @@ class ShapedTouchFeedbackCoverageTest {
         val caller = "PasteButton(onPaste = go, modifier = Modifier.width(40.dp).height(48.dp))"
         val square = "PasteButton(onPaste = go, modifier = Modifier.size(48.dp))"
         val wrappers = passThroughIconButtonWrappers(wrapper)
-        assertEquals(setOf("PasteButton"), wrappers)
+        assertEquals(mapOf("PasteButton" to 1), wrappers)
         assertEquals(listOf(STRETCHED_ICON_BUTTON), stretchedWrapperCalls(caller, wrappers).map(::kind))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(square, wrappers))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(wrapper, wrappers))
+    }
+
+    /**
+     * The conversation header's shape on master: a slot size held in a local `val`, passed positionally to a
+     * private wrapper. It is found, while a size in another argument is not mistaken for the modifier's.
+     */
+    @Test
+    fun aSlotSizeHeldInALocalValIsFound() {
+        val header =
+            """
+            @Composable
+            internal fun Header(actions: List<Action>) {
+                val cell = Modifier.width(36.dp).height(48.dp)
+                for (action in actions) {
+                    ActionButton(action, cell.testTag("x"))
+                }
+                ActionButton(Action(size = Modifier.width(36.dp)), Modifier.size(48.dp))
+            }
+
+            @Composable
+            private fun ActionButton(
+                action: Action,
+                modifier: Modifier,
+            ) {
+                val content = @Composable { Icon() }
+                IconButton(onClick = action.onClick, modifier = modifier, content = content)
+            }
+            """.trimIndent()
+        val wrappers = passThroughIconButtonWrappers(header)
+        assertEquals(mapOf("ActionButton" to 1), wrappers)
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), stretchedWrapperCalls(header, wrappers))
+    }
+
+    /** A wrapper is named after the function whose body holds the icon button, not an earlier nested `fun`. */
+    @Test
+    fun aWrapperIsNamedAfterTheFunctionThatHoldsTheButton() {
+        val source =
+            """
+            @Composable
+            internal fun PlayPause(onToggle: () -> Unit, modifier: Modifier = Modifier) {
+                val listener = object : Listener { override fun onEvents(player: Player) { update() } }
+                IconButton(onClick = onToggle, modifier = modifier) { Icon() }
+            }
+            """.trimIndent()
+        assertEquals(mapOf("PlayPause" to 1), passThroughIconButtonWrappers(source))
     }
 
     /** A rectangular clip before the click does not count as shaping it, so the square highlight is still found. */

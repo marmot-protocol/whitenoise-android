@@ -49,6 +49,8 @@ internal fun TextEntryEmojiAction(
     SlotIconButton(
         onClick = onClick,
         enabled = enabled,
+        // The open-picker fill keeps the full 48 dp circle it always had in a square slot.
+        highlightMax = TextEntryEmojiActionSize,
         containerColor = containerColor,
         contentColor = contentColor,
         modifier =

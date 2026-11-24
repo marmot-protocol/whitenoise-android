@@ -33,6 +33,8 @@ private val shapedFill = Regex("""\.(background|border)\s*\(""")
 private val shapeName = Regex("""CircleShape|PillShape|RoundedCornerShape|CutCornerShape|shapes\.\w+|\w+Shape\b""")
 private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
+private val modifierParameter = Regex("""^\s*(@\w+\s+)*modifier\s*:""")
+private val leadingName = Regex("""^\s*(\w+)""")
 private val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
@@ -85,7 +87,7 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
 private fun String.clicksInShapedSurfaces(): List<Pair<String, Int>> =
     calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null) } +
         listOf("Card", "ElevatedCard", "OutlinedCard").flatMap { calls(it) }.flatMap {
-            shapedContainerClicks(it, defaultShape = "rounded")
+            shapedContainerClicks(it, defaultShape = "CardDefaults.shape")
         }
 
 /** The click modifiers in one shaped container call's `modifier`, unless it is clickable itself or rectangular. */
@@ -100,8 +102,9 @@ private fun shapedContainerClicks(
     return if (clickableOverload || shape == null || "RectangleShape" in shape) {
         emptyList()
     } else {
-        // A clip before the click only shapes the highlight like the Surface when it uses the Surface's shape.
-        args.undecoratedClicks(matching = named["shape"]?.trim()).map { SHAPED_SURFACE to start + it }
+        // A clip before the click only shapes the highlight like the container when it uses the container's own
+        // shape, which for a card with none named is its default.
+        args.undecoratedClicks(matching = shape.trim()).map { SHAPED_SURFACE to start + it }
     }
 }
 
@@ -155,41 +158,84 @@ private fun modifierArgument(args: String): String =
 
 /**
  * The functions in [source] that wrap a transparent icon button and pass their caller's `modifier` straight
- * to it, so the caller decides its size. Each name maps to nothing more: a call of it is checked for a size.
+ * to it, so the caller decides its size, each with the position of its `modifier` parameter.
  */
-internal fun passThroughIconButtonWrappers(source: String): Set<String> {
+internal fun passThroughIconButtonWrappers(source: String): Map<String, Int> {
     val code = blankCommentsAndStrings(source)
     return (code.calls("IconButton") + code.calls("IconToggleButton"))
         .filter { (_, args) -> modifierArgument(args).startsWith("modifier") }
-        .mapNotNull { (start, _) ->
-            enclosingFunction
-                .findAll(code.substring(0, start))
-                .lastOrNull()
-                ?.groupValues
-                ?.get(1)
-        }.toSet()
+        .mapNotNull { (start, _) -> code.functionContaining(start) }
+        .mapNotNull { (name, parameters) ->
+            topLevelArguments(parameters)
+                .indexOfFirst { modifierParameter.containsMatchIn(it) }
+                .takeIf { it >= 0 }
+                ?.let { name to it }
+        }.toMap()
 }
 
 /**
- * Rule 5, across files: a call that hands one of [wrappers] (see [passThroughIconButtonWrappers]) a width, a
- * height or two sizes, so the icon button inside it stretches into a capsule. Reported as "<kind> @<line>".
+ * Rule 5, across files: a call that hands one of [wrappers] (see [passThroughIconButtonWrappers]) a modifier
+ * with a width, a height or two sizes, written in the call or in a local `val` it starts from, so the icon
+ * button inside stretches into a capsule. Reported as "<kind> @<line>".
  */
 internal fun stretchedWrapperCalls(
     source: String,
-    wrappers: Set<String>,
+    wrappers: Map<String, Int>,
 ): List<String> {
     val code = blankCommentsAndStrings(source)
-    return wrappers.flatMap { name ->
+    return wrappers.flatMap { (name, modifierIndex) ->
         code
             .calls(name)
             .filter { (start, args) ->
                 val nameStart = start - 1 - name.length
                 val before = code.substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
+                val modifier = code.withLocalBinding(wrapperModifier(args, modifierIndex))
                 !declaration.containsMatchIn(before) &&
-                    (twoArgumentSize.containsMatchIn(args) || oneSideSize.containsMatchIn(args))
+                    (twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier))
             }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
     }
 }
+
+/** The modifier a wrapper call passes, named or at the wrapper's `modifier` parameter position. */
+private fun wrapperModifier(
+    args: String,
+    modifierIndex: Int,
+): String {
+    val arguments = topLevelArguments(args)
+    return topLevelNamedArguments(args)["modifier"]
+        ?: arguments.getOrNull(modifierIndex)?.takeUnless { namedArgument.containsMatchIn(it) }
+        ?: ""
+}
+
+/** [expression] with the initializer of the local `val` it starts from, if any, put in front of it. */
+private fun String.withLocalBinding(expression: String): String {
+    val head = leadingName.find(expression)?.groupValues?.get(1)
+    val local = head?.takeUnless { it == "Modifier" || it == "modifier" }
+    val binding = local?.let { localBinding(it) }
+    return if (binding == null) expression else "$binding $expression"
+}
+
+/** The initializer of `val [name] = …` in this text, to the end of its line, or null. */
+private fun String.localBinding(name: String): String? {
+    val pattern = Regex("""\bval\s+${Regex.escape(name)}\s*=\s*([^\n]*)""")
+    return pattern.find(this)?.groupValues?.get(1)
+}
+
+/** The name and parameter text of the function whose body contains [offset], or null. */
+private fun String.functionContaining(offset: Int): Pair<String, String>? =
+    enclosingFunction
+        .findAll(substring(0, offset))
+        .mapNotNull { match ->
+            val parametersOpen = match.range.last
+            val parametersClose = closingBracket(parametersOpen)
+            val bodyOpen = indexOfAny(charArrayOf('{', '='), parametersClose)
+            val bodyEnd = if (bodyOpen >= 0 && this[bodyOpen] == '{') closingBracket(bodyOpen) else length
+            if (bodyOpen in 0 until offset && offset < bodyEnd) {
+                match.groupValues[1] to substring(parametersOpen + 1, parametersClose)
+            } else {
+                null
+            }
+        }.lastOrNull()
 
 /** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
 private fun String.clicksOverShapedFills(): List<Pair<String, Int>> =

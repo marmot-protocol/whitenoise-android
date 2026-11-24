@@ -112,7 +112,7 @@ fun AccountAvatarButton(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            // Keep the complete marker inside IconButton's circular clip.
+                            // Inset so the whole marker sits on the avatar's edge.
                             .offset(x = (-2).dp, y = (-2).dp)
                             .size(12.dp)
                             .testTag(ACTIVE_ACCOUNT_UNREAD_DOT_TAG)

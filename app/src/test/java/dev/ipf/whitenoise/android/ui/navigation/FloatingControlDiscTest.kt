@@ -101,6 +101,13 @@ class FloatingControlDiscTest {
         composeRule.onNodeWithContentDescription("Scroll to top").assertMinimumTouchTarget()
     }
 
+    /** Resume following keeps the full 48 dp slot it always had in the stack, so its disc does not move. */
+    @Test
+    fun ttsResumeFollowKeepsItsSlot() {
+        show { TtsResumeFollowButton(onClick = {}, modifier = Modifier.testTag("slot")) }
+        composeRule.onNodeWithTag("slot").assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+    }
+
     /** The read-aloud resume-follow control takes the shared 48 dp target. */
     @Test
     fun ttsResumeFollowHasA48DpTarget() {

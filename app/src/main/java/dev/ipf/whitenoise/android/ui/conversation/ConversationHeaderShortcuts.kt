@@ -85,6 +85,10 @@ private class HeaderAction(
     val checked: Boolean? = null,
 )
 
+/**
+ * One header shortcut in its 36 by 48 dp cell: a slot button, or a slot toggle for an action with a checked
+ * state, so the whole cell takes the tap and the highlight stays a circle rather than a capsule.
+ */
 @Composable
 private fun HeaderActionButton(
     action: HeaderAction,
