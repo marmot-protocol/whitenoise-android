@@ -164,22 +164,6 @@ internal fun NewGroupSetupContent(
                 }
             }
             item { GroupSetupPhotoStatus(draft, state) }
-            if (state.members.isNotEmpty()) {
-                item(key = "group_setup.members") {
-                    val count = state.members.size
-                    GroupSetupDisclosure(
-                        label = pluralStringResource(R.plurals.group_setup_selected_members, count, count),
-                        expanded = showMembers,
-                        tag = "group_setup.members",
-                        onClick = { showMembers = !showMembers },
-                    )
-                }
-                if (showMembers) {
-                    itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
-                        GroupCreationPersonRow(person, index, state.members.size, selected = null)
-                    }
-                }
-            }
             item(key = "group_setup.customize") {
                 GroupSetupDisclosure(
                     label =
@@ -202,6 +186,22 @@ internal fun NewGroupSetupContent(
                         label = { Text(stringResource(R.string.description)) },
                         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
+                }
+            }
+            if (state.members.isNotEmpty()) {
+                item(key = "group_setup.members") {
+                    val count = state.members.size
+                    GroupSetupDisclosure(
+                        label = pluralStringResource(R.plurals.group_setup_selected_members, count, count),
+                        expanded = showMembers,
+                        tag = "group_setup.members",
+                        onClick = { showMembers = !showMembers },
+                    )
+                }
+                if (showMembers) {
+                    itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
+                        GroupCreationPersonRow(person, index, state.members.size, selected = null)
+                    }
                 }
             }
             if (state.members.isEmpty()) {

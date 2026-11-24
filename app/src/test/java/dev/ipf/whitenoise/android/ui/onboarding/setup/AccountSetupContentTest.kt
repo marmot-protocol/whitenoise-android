@@ -560,7 +560,7 @@ class AccountSetupContentTest {
         composeRule.onNodeWithTag("setup-stage-progress").assert(
             SemanticsMatcher.expectValue(
                 SemanticsProperties.StateDescription,
-                "2 of 6 stages complete. Stage 3 of 6 · Read and write relays. Needs attention",
+                "2 of 6 stages complete. Stage 3 of 6 · Read and write relays. Try again",
             ),
         )
         composeRule.onNodeWithText(endpoint).assertDoesNotExist()

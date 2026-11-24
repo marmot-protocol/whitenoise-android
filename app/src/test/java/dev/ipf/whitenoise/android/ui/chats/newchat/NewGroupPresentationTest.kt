@@ -174,11 +174,17 @@ class NewGroupPresentationTest {
     /** An image that needs reselection after setup opens reveals the action that fixes it. */
     @Test fun latePhotoReselectionRevealsThePhotoAction() {
         val draft = NewGroupDraft()
-        setup(draft, presentation())
-        composeRule.onNodeWithTag("group_setup.photoAction").assertDoesNotExist()
+        setup(draft, presentation().copy(members = listOf(person)))
+        composeRule.onNodeWithTag("group_setup.members").performClick()
+        val photo = composeRule.onNodeWithTag("group_setup.photoAction")
+        photo.assertDoesNotExist()
+
         composeRule.runOnIdle { draft.imageNeedsReselection = true }
-        composeRule.onNodeWithTag("group_setup.photoAction").assertIsDisplayed()
+
+        photo.assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.group_photo_reselect)).assertIsDisplayed()
+        val member = composeRule.onNodeWithText("Ada").assertIsDisplayed()
+        assertTrue(photo.getUnclippedBoundsInRoot().bottom < member.getUnclippedBoundsInRoot().top)
     }
 
     /** Accepted canonical creation locks both fields and keeps Open chat rather than a second create action. */
