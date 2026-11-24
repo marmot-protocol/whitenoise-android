@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -23,9 +23,10 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
  * actions, reply swipe, double tap, emoji picker, reaction sheet and delete dialog invoke them.
  *
  * An instance lasts as long as the bubble keeps its [appState], [controller], [surfaces] and [pollOwner]. Every
- * other value an action needs comes from [latest], the bubble's most recent composition. Each action reads it once
- * when it runs and uses that one set of values throughout, including inside the mutation it launches, as the local
- * functions it replaces did with the values they captured.
+ * other value an action needs comes from [latest], the most recent composition that used this instance. Each action
+ * reads it once when it runs and uses that one set of values throughout, including inside the mutation it launches,
+ * as the local functions it replaces did with the values they captured. Once a confirmed send's record id replaces
+ * [pollOwner] and so the instance, an action still holding this instance keeps the values from its own lifetime.
  */
 internal class MessageBubbleActions(
     private val appState: WhiteNoiseAppState,
@@ -200,7 +201,10 @@ internal class MessageBubbleActions(
  * Remembers [MessageBubbleActions] for the bubble's owner: its app state, controller, surfaces and poll owner, the
  * values the old local functions captured that stay fixed for a mounted message. [inputs] is this composition's
  * snapshot of everything else and is only read when an action runs, so it adds no snapshot read to composition and
- * a new row, menu callback or delete state never needs a new instance.
+ * a new row, menu callback or delete state never needs a new instance. It is updated on every composition like
+ * `rememberUpdatedState`, but in a state remembered on the same keys as the instance, so a replaced instance, such
+ * as one a menu action queued behind the exit animation still holds after a pending send confirms, never sees the
+ * confirmed message's values.
  */
 @Composable
 internal fun rememberMessageBubbleActions(
@@ -210,7 +214,8 @@ internal fun rememberMessageBubbleActions(
     pollOwner: PollMessageActionOwner,
     inputs: MessageBubbleActions.Inputs,
 ): MessageBubbleActions {
-    val latest = rememberUpdatedState(inputs)
+    val latest = remember(appState, controller, surfaces, pollOwner) { mutableStateOf(inputs) }
+    latest.value = inputs
     return remember(appState, controller, surfaces, pollOwner) {
         MessageBubbleActions(
             appState = appState,
