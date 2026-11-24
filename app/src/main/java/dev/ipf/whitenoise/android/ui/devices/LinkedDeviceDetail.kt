@@ -243,7 +243,7 @@ private fun RemoveDeviceDialog(
     ConfirmDialog(
         title = stringResource(R.string.device_detail_remove),
         message = stringResource(R.string.device_detail_remove_confirm, name),
-        confirmLabel = stringResource(R.string.remove),
+        confirmLabel = stringResource(R.string.device_detail_remove),
         onConfirm = onRemove,
         onDismiss = onDismiss,
         destructive = true,
