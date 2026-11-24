@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -53,7 +52,7 @@ class RetainedConversationStatesTest {
 
         assertTrue(held.acceptanceCallbacks.isEmpty())
         assertEquals(0, held.uploads.size())
-        assertTrue("eviction releases the retained upload source", held.sourceReleased())
+        assertTrue("eviction releases the retained upload source", held.sourceReleased)
         assertEquals(1, held.messages.size)
         assertEquals(setOf("projected"), held.projected)
         assertEquals(mapOf("order" to 1uL), held.orderOverrides)
@@ -91,7 +90,7 @@ class RetainedConversationStatesTest {
             assertTrue(held.acceptedTextIds.isEmpty())
             assertTrue(held.phases.isEmpty())
             assertEquals(0, held.uploads.size())
-            assertTrue(held.sourceReleased())
+            assertTrue(held.sourceReleased)
             assertTrue(held.activeUploadKeys.isEmpty())
             assertTrue(held.projectionsAwaitingBridge.isEmpty())
         }
@@ -164,56 +163,52 @@ class RetainedConversationStatesTest {
     }
 
     private fun fill(groupIdHex: String): HeldState {
-        var released = false
-        val upload = RetainedMediaUpload(emptyList(), null).apply { retainSource { released = true } }
-        val message = localTimelineMessage(timelineAppMessage("message-$groupIdHex"))
-        val held =
-            HeldState(
-                messages = states.optimisticMessages(ACCOUNT, groupIdHex).apply { put(message.id, message) },
-                acceptanceCallbacks = states.durableAcceptanceCallbacks(ACCOUNT, groupIdHex).apply { put("send") {} },
-                projected = states.projectedMessageIds(ACCOUNT, groupIdHex).apply { add("projected") },
-                orderOverrides = states.timelineOrderOverrides(ACCOUNT, groupIdHex).apply { put("order", 1uL) },
-                timestampOverrides =
-                    states.timelineTimestampOverrides(ACCOUNT, groupIdHex).apply { put("timestamp", 2uL) },
-                positionPreserves =
-                    states.optimisticSendPositionPreserves(ACCOUNT, groupIdHex).apply { add("preserve") },
-                retentionAtSend = states.retentionAtSend(ACCOUNT, groupIdHex).apply { put("retention", 3uL) },
-                acceptedTextIds =
-                    states.acceptedPendingTextOptimisticIds(ACCOUNT, groupIdHex).apply { put("event", "optimistic") },
-                phases =
-                    states.optimisticSendPhases(ACCOUNT, groupIdHex).apply {
-                        put("send", OptimisticSendPhase.ACCEPTED_PENDING)
-                    },
-                cancellationGeneration =
-                    states.optimisticCancellationGeneration(ACCOUNT, groupIdHex).apply { value = 4L },
-                uploads = states.retainedMediaUploads(ACCOUNT, groupIdHex).apply { put("upload", upload) },
-                activeUploadKeys = states.activeUploadKeys(ACCOUNT, groupIdHex).apply { add("upload") },
-                projectionsAwaitingBridge =
-                    states.pendingProjectionsAwaitingBridge(ACCOUNT, groupIdHex).apply {
-                        put("projection", requireNotNull(projectedTimelineMessage(message.record).projected))
-                    },
-                sourceReleased = { released },
-            )
+        val held = HeldState(states, groupIdHex)
+        held.populate()
         assertEquals("optimistic", states.acceptedPendingTextOptimisticId(ACCOUNT, groupIdHex, "event"))
         return held
     }
 
+    /** The live collections a controller would hold for one conversation. */
     private class HeldState(
-        val messages: SnapshotStateMap<String, TimelineMessage>,
-        val acceptanceCallbacks: MutableMap<String, () -> Unit>,
-        val projected: MutableSet<String>,
-        val orderOverrides: MutableMap<String, ULong>,
-        val timestampOverrides: MutableMap<String, ULong>,
-        val positionPreserves: OptimisticSendPositionPreserves,
-        val retentionAtSend: MutableMap<String, ULong>,
-        val acceptedTextIds: MutableMap<String, String>,
-        val phases: MutableMap<String, OptimisticSendPhase>,
-        val cancellationGeneration: kotlinx.coroutines.flow.MutableStateFlow<Long>,
-        val uploads: dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload>,
-        val activeUploadKeys: MutableSet<String>,
-        val projectionsAwaitingBridge: MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi>,
-        val sourceReleased: () -> Boolean,
-    )
+        states: RetainedConversationStates,
+        groupIdHex: String,
+    ) {
+        val messages = states.optimisticMessages(ACCOUNT, groupIdHex)
+        val acceptanceCallbacks = states.durableAcceptanceCallbacks(ACCOUNT, groupIdHex)
+        val projected = states.projectedMessageIds(ACCOUNT, groupIdHex)
+        val orderOverrides = states.timelineOrderOverrides(ACCOUNT, groupIdHex)
+        val timestampOverrides = states.timelineTimestampOverrides(ACCOUNT, groupIdHex)
+        val positionPreserves = states.optimisticSendPositionPreserves(ACCOUNT, groupIdHex)
+        val retentionAtSend = states.retentionAtSend(ACCOUNT, groupIdHex)
+        val acceptedTextIds = states.acceptedPendingTextOptimisticIds(ACCOUNT, groupIdHex)
+        val phases = states.optimisticSendPhases(ACCOUNT, groupIdHex)
+        val cancellationGeneration = states.optimisticCancellationGeneration(ACCOUNT, groupIdHex)
+        val uploads = states.retainedMediaUploads(ACCOUNT, groupIdHex)
+        val activeUploadKeys = states.activeUploadKeys(ACCOUNT, groupIdHex)
+        val projectionsAwaitingBridge = states.pendingProjectionsAwaitingBridge(ACCOUNT, groupIdHex)
+        var sourceReleased = false
+            private set
+        private val message = localTimelineMessage(timelineAppMessage("message-$groupIdHex"))
+
+        fun populate() {
+            messages[message.id] = message
+            acceptanceCallbacks["send"] = {}
+            projected += "projected"
+            orderOverrides["order"] = 1uL
+            timestampOverrides["timestamp"] = 2uL
+            positionPreserves.add("preserve")
+            retentionAtSend["retention"] = 3uL
+            acceptedTextIds["event"] = "optimistic"
+            phases["send"] = OptimisticSendPhase.ACCEPTED_PENDING
+            cancellationGeneration.value = 4L
+            val upload = RetainedMediaUpload(emptyList(), null)
+            upload.retainSource { sourceReleased = true }
+            uploads.put("upload", upload)
+            activeUploadKeys += "upload"
+            projectionsAwaitingBridge["projection"] = requireNotNull(projectedTimelineMessage(message.record).projected)
+        }
+    }
 
     private companion object {
         const val ACCOUNT = "account"
