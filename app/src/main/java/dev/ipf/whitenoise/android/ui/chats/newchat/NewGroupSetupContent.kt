@@ -117,15 +117,7 @@ internal fun NewGroupSetupContent(
         modifier = Modifier.imePadding().testTag("group_setup.screen"),
         bottomBar = {
             GroupCreationBottomAction(
-                label =
-                    stringResource(
-                        when {
-                            draft.retryGroupIdHex != null -> R.string.new_message_open_chat
-                            state.hasUnacceptedFailure -> R.string.retry
-                            state.members.isEmpty() -> R.string.group_create_solo
-                            else -> R.string.group_create_action
-                        },
-                    ),
+                label = stringResource(groupSetupActionLabel(draft, state)),
                 enabled = state.submitEnabled,
                 busy = state.busy,
                 onClick = actions.create,
@@ -212,6 +204,17 @@ internal fun NewGroupSetupContent(
         }
     }
 }
+
+private fun groupSetupActionLabel(
+    draft: NewGroupDraft,
+    state: NewGroupSetupPresentation,
+): Int =
+    when {
+        draft.retryGroupIdHex != null -> R.string.new_message_open_chat
+        state.hasUnacceptedFailure -> R.string.retry
+        state.members.isEmpty() -> R.string.group_create_solo
+        else -> R.string.group_create_action
+    }
 
 /** Anchor the emoji sheet to the name and advance to the description when it is visible. */
 @Composable
