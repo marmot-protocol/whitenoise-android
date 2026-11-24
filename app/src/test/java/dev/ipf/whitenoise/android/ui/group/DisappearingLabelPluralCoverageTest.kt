@@ -20,7 +20,7 @@ class DisappearingLabelPluralCoverageTest {
             val expected = "disappearing_${unit.lowercase()}_count"
             assertTrue(
                 "$unit must resolve through R.plurals.$expected, found: $branch",
-                "pluralStringResource(R.plurals.$expected" in branch,
+                "pluralStringResource(R.plurals.$expected, spec.count.toInt(), spec.count.toInt())" in branch,
             )
         }
     }
@@ -46,13 +46,24 @@ class DisappearingLabelPluralCoverageTest {
                     Regex("""<plurals name="disappearing_${unit}_count">(.*?)</plurals>""", RegexOption.DOT_MATCHES_ALL)
                         .find(text)
                 assertTrue("${file.parentFile.name} must define disappearing_${unit}_count", block != null)
-                assertTrue(
-                    "${file.parentFile.name} disappearing_${unit}_count needs an other quantity",
-                    "quantity=\"other\"" in block!!.groupValues[1],
+                val quantities =
+                    Regex("""quantity="(\w+)"""").findAll(block!!.groupValues[1]).map { it.groupValues[1] }.toSet()
+                assertEquals(
+                    "${file.parentFile.name} disappearing_${unit}_count quantities",
+                    requiredQuantities(file.parentFile.name),
+                    quantities,
                 )
             }
         }
     }
+
+    /** CLDR categories each shipped locale needs so a count of one never falls back to the plural form. */
+    private fun requiredQuantities(dir: String): Set<String> =
+        when {
+            dir.startsWith("values-ru") -> setOf("one", "few", "many", "other")
+            dir.startsWith("values-zh") || dir.startsWith("values-b+zh") -> setOf("other")
+            else -> setOf("one", "other")
+        }
 
     private fun countedUnits(): List<String> =
         Regex("""data class (\w+)\(\s*val count: Long""")
