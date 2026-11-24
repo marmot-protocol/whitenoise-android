@@ -1,5 +1,6 @@
 dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt|DIVIDER=2,FONT_SIZE=2,ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt|SCAFFOLD=1
+dev/ipf/whitenoise/android/ui/chats/ChatListPinnedBoundary.kt|DIVIDER=1
 dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt|TOP_BAR=1
 dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt|TOP_BAR=2
 dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt|SCAFFOLD=1
@@ -19,6 +20,7 @@ dev/ipf/whitenoise/android/ui/conversation/StreamDebug.kt|RAW_COLOR=5
 dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt|ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt|BOTTOM_SHEET=1
 dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt|FONT_SIZE=1
+dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt|ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt|TOAST=2
 dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt|RAW_COLOR=1,ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt|SCAFFOLD=1,TOP_BAR=1
