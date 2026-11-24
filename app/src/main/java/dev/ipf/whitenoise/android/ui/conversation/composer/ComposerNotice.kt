@@ -17,9 +17,6 @@ import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Colour role of a [ComposerNotice]. */
-internal enum class ComposerNoticeTone { Neutral, Error }
-
 /**
  * The one read-only panel that replaces the composer (blocked DM, disbanded, frozen, removed member): shared
  * padding, colour role by [tone] and navigation-bar inset. [action] sits under the centred [text].
