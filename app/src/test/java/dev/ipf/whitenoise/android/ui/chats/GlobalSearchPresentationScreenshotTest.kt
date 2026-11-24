@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
-import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
@@ -23,6 +22,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.FollowedPeople
 import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchContentFilterChips
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme

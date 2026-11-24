@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.chats
 
-import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +48,7 @@ import dev.ipf.whitenoise.android.core.globalAttachmentGridIsVisual
 import dev.ipf.whitenoise.android.core.globalAttachmentPresentation
 import dev.ipf.whitenoise.android.core.sectionGlobalAttachments
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
