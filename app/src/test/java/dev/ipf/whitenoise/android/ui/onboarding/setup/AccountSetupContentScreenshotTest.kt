@@ -568,7 +568,10 @@ class AccountSetupContentScreenshotTest {
 
     @Test fun focusedTimeoutDetailsAmoled() = focusedTimeout("focused_timeout_details_amoled", expanded = true)
 
-    private fun focusedTimeout(file: String, expanded: Boolean = false) {
+    private fun focusedTimeout(
+        file: String,
+        expanded: Boolean = false,
+    ) {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,

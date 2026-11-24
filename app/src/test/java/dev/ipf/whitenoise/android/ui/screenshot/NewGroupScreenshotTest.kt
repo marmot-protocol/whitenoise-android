@@ -83,7 +83,12 @@ class NewGroupScreenshotTest {
 
     /** Optional photo and description use the same form and retain the current draft. */
     @Test fun setupCustomizedAmoled() =
-        setup("group_setup_customized_amoled.png", dark = true, amoled = true, customized = true)
+        setup(
+            "group_setup_customized_amoled.png",
+            dark = true,
+            amoled = true,
+            customized = true,
+        )
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
