@@ -247,7 +247,7 @@ internal fun WhiteNoiseAlertDialog(
     }
 }
 
-/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions inside a basic dialog. */
+/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun WhiteNoiseDialogSurface(
