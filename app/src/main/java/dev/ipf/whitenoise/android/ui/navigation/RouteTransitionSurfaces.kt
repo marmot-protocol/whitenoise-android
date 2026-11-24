@@ -41,17 +41,16 @@ import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
-import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
+import dev.ipf.whitenoise.android.ui.common.SurfaceMotion
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
 import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** One visibility clock owns both drawing and outgoing-slot disposal. */
 internal interface ConversationRouteTransition<T> {
@@ -99,7 +98,7 @@ private class RetainedConversationRoute<T>(
             progress.animateTo(
                 end,
                 if (destination == null) {
-                    tween(APP_MOTION_CLOSE_MILLIS, easing = AppMotionCloseEasing)
+                    SurfaceMotion.Close.spec()
                 } else {
                     conversationRouteAnimationSpec
                 },
@@ -178,7 +177,7 @@ internal fun <T> ConversationRouteAnimatedContent(
         modifier =
             Modifier
                 .fillMaxSize()
-                .onGloballyPositioned { hostBounds = it.settingsMorphBounds(view) }
+                .onGloballyPositioned { hostBounds = it.motionBoundsOnScreen(view) }
                 .drawWithContent {
                     if (containerMorph) {
                         drawMeasuredPage(

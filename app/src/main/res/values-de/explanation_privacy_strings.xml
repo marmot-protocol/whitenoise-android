@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Legt fest, wie lange Anhänge auf diesem Gerät bleiben. Ältere werden jetzt und mit der Zeit entfernt, und ein erneuter Download behält sie für den vollen Zeitraum. Nachrichten bleiben erhalten.</string>
     <string name="explanation_privacy_storage_chat">Öffnet die für diesen Chat gespeicherten Anhänge.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Fragt nach deiner Bestätigung und entfernt dann alle Anhänge dieses Chats von diesem Gerät. Nachrichten bleiben erhalten, und du kannst Anhänge erneut herunterladen, solange die Kopie des Absenders noch verfügbar ist.</string>
-    <string name="explanation_privacy_storage_attachment">Wählt diesen Anhang aus oder ab, damit du ihn zusammen mit anderen entfernen kannst. Es wird nichts entfernt, bevor du Entfernen wählst.</string>
     <string name="explanation_privacy_storage_select_all">Wählt alle Anhänge dieser Liste aus, damit du sie zusammen entfernen kannst. Es wird nichts entfernt, bevor du Entfernen wählst.</string>
     <string name="explanation_privacy_storage_select_shown">Wählt nur die bisher geladenen Anhänge aus. Beim Scrollen werden weitere geladen, und es wird nichts entfernt, bevor du Entfernen wählst.</string>
     <string name="explanation_privacy_storage_clear_selection">Hebt die aktuelle Auswahl auf, ohne etwas zu entfernen.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Schaltet Nachrichtenbenachrichtigungen dieser Person stumm. Das gilt nur für Nachrichten; Zustellung und Zähler ungelesener Nachrichten ändern sich nicht.</string>
     <string name="explanation_privacy_profile_system">Öffnet die Android-Einstellungen für Benachrichtigungen dieser Person, in denen du einen eigenen Ton und ein eigenes Verhalten festlegen kannst. Eigene Einstellungen gelten in allen Unterhaltungen dieses Kontos.</string>
     <string name="explanation_privacy_profile_vibration">Legt das Vibrationsmuster für Benachrichtigungen dieser Person fest.</string>
+    <string name="explanation_privacy_storage_attachment_open">Öffnet diesen Anhang, damit du ihn vor dem Entfernen prüfen kannst. Das Häkchen oder langes Drücken auf die Zeile wählt ihn zum gemeinsamen Entfernen aus. Es wird nichts entfernt, bis du Entfernen wählst.</string>
 </resources>

@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Color
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -199,6 +202,7 @@ class DetailRouteMotionScreenshotTest {
      * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
      */
     @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
+    @OptIn(ExperimentalMaterial3Api::class)
     private fun capture(
         name: String,
         profile: Boolean = false,
@@ -325,7 +329,10 @@ class DetailRouteMotionScreenshotTest {
                     if (profile) {
                         ProfileSheet(state, PEER_NPUB, { _, _ -> }, {}, {})
                     } else {
-                        ConversationScreen(state, chat, controller, {})
+                        // Native press ripples use Android time independently of the Compose route clock.
+                        CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                            ConversationScreen(state, chat, controller, {})
+                        }
                     }
                 }
             }
@@ -516,9 +523,9 @@ class DetailRouteMotionScreenshotTest {
         action.performClick()
         rule.mainClock.advanceTimeByFrame()
         val protectedDestination = rule.onNodeWithText(destinationTitle, useUnmergedTree = profile)
-        // Borderless destinations are immediately visible; AMOLED contour entry holds its child.
+        // A container entry from the tapped row (contour or borderless) holds its child until it settles.
         // Lock removal below must hold for either presentation phase.
-        if (profile || !amoled) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
+        if (profile) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
         // Real observable lock state removes the protected route immediately, even mid-flight.
         rule.runOnIdle {
             state.appLock.javaClass
@@ -759,23 +766,21 @@ class DetailRouteMotionScreenshotTest {
         profile: Boolean,
     ) {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
-        var firstNativeBody: Bitmap? = null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
+        var handoff: Bitmap? = null
+        val composerEntry = name.startsWith("composer_") && name.endsWith("_entry")
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
         val borderlessPage = "_light" in name || "_dark" in name
-        val morphs =
-            !borderlessPage &&
-                (
-                    (profile && "_light" !in name && "_dark" !in name) ||
-                        name.startsWith("composer_") ||
-                        name.endsWith("_entry") ||
-                        (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
-                )
+        val settingsEntry = name.endsWith("_entry") || name.endsWith("_entry_back")
+        val canMorph = profile || name.startsWith("composer_") || settingsEntry
+        val morphs = !borderlessPage && canMorph
         val capturesSettledBody = morphs || profile || borderlessPage
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
-            if (captureFrames || frame in listOf(0, 6, 20)) {
+            val snapshotFrame = frame in listOf(0, 6, 20)
+            val handoffFrame = composerEntry && frame == 16
+            if (captureFrames || snapshotFrame || handoffFrame) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
                 if ((morphs || borderlessPage) && frame == 6) {
@@ -784,15 +789,14 @@ class DetailRouteMotionScreenshotTest {
                 if (capturesSettledBody && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                exportTransitionFrame(frames, name, frame, bitmap)
-                if (frame == 0) {
-                    if (borderlessPage) {
-                        firstNativeBody = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    } else {
-                        assertFirstFrameBackplate(name, bitmap)
-                    }
+                if (handoffFrame) {
+                    handoff = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if (!captureFrames && frame in listOf(0, 6, 20)) {
+                exportTransitionFrame(frames, name, frame, bitmap)
+                if (frame == 0 && !borderlessPage) {
+                    assertFirstFrameBackplate(name, bitmap)
+                }
+                if (!captureFrames && snapshotFrame) {
                     bitmap.captureRoboImage(
                         "src/test/snapshots/detail_motion_${name}_$frame.png",
                     )
@@ -800,8 +804,12 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        firstNativeBody?.let { first ->
-            assertNativeBodyEdgeContinuity(name, first, checkNotNull(settled))
+        if (borderlessPage) {
+            // Borderless themes move the route (a container from its control, or a slide back) instead of cutting.
+            org.junit.Assert.assertFalse(
+                "$name must move instead of cutting",
+                checkNotNull(intermediate).sameAs(checkNotNull(settled)),
+            )
         }
         if (profile || borderlessPage) {
             // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
@@ -813,8 +821,8 @@ class DetailRouteMotionScreenshotTest {
         if (morphs) {
             assertIntermediateMotion(name, checkNotNull(intermediate), checkNotNull(settled))
         }
-        if (name.startsWith("composer_") && name.endsWith("_entry")) {
-            assertNativeComposerHeader(name, checkNotNull(intermediate), checkNotNull(settled))
+        handoff?.let {
+            assertNativeComposerHeader(name, checkNotNull(intermediate), it, checkNotNull(settled))
         }
     }
 
@@ -833,27 +841,12 @@ class DetailRouteMotionScreenshotTest {
         )
     }
 
-    private fun assertNativeBodyEdgeContinuity(
-        name: String,
-        first: Bitmap,
-        settled: Bitmap,
-    ) {
-        for (y in listOf(first.height / 4, first.height / 2, first.height * 3 / 4)) {
-            assertEquals(
-                "$name must preserve each native surface at entry",
-                settled.getPixel(1, y),
-                first.getPixel(1, y),
-            )
-        }
-    }
-
     private fun assertNativeComposerHeader(
         name: String,
         middle: Bitmap,
+        handoff: Bitmap,
         settled: Bitmap,
     ) {
-        // The real route header must already occupy its final coordinates at native opacity.
-        // Compare raster ink, not only layout bounds, so an alpha/translation regression fails.
         val title =
             rule
                 .onNodeWithText(app.getString(R.string.composer_settings), useUnmergedTree = true)
@@ -861,15 +854,35 @@ class DetailRouteMotionScreenshotTest {
                 .boundsInRoot
         val left = title.left.toInt().coerceAtLeast(0)
         val top = title.top.toInt().coerceAtLeast(0)
-        val width = title.width.toInt().coerceAtMost(middle.width - left)
-        val height = title.height.toInt().coerceAtMost(middle.height - top)
+        val width = title.width.toInt().coerceAtMost(settled.width - left)
+        val height = title.height.toInt().coerceAtMost(settled.height - top)
+
+        fun titlePixels(frame: Bitmap) = Bitmap.createBitmap(frame, left, top, width, height)
+
+        val nativeTitle = titlePixels(settled)
+        val middleDifference = titlePixelDifference(titlePixels(middle), nativeTitle)
         org.junit.Assert.assertTrue(
-            "$name must preserve opaque native header ink in place",
-            Bitmap.createBitmap(middle, left, top, width, height).sameAs(
-                Bitmap.createBitmap(settled, left, top, width, height),
-            ),
+            "$name must give the outline time to move before showing the full title",
+            middleDifference > 0,
+        )
+        org.junit.Assert.assertTrue(
+            "$name must hand off to native header ink at its settled position",
+            titlePixelDifference(titlePixels(handoff), nativeTitle) < middleDifference / 10,
         )
     }
+
+    /** Allow for the final few percent of alpha while requiring glyphs in their final positions. */
+    private fun titlePixelDifference(
+        frame: Bitmap,
+        settled: Bitmap,
+    ): Long =
+        (0 until settled.height).sumOf { y ->
+            (0 until settled.width).sumOf { x ->
+                val actual = frame.getPixel(x, y)
+                val expected = settled.getPixel(x, y)
+                kotlin.math.abs(Color.red(actual) - Color.red(expected)).toLong()
+            }
+        }
 
     /**
      * Checks that the first frame shows the themed backplate: the chat's routes start as card bubbles over the morph

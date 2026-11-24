@@ -11,7 +11,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -53,21 +52,14 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
+import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryPager
 import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
-import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
-import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.DateFormatPreference
@@ -941,7 +933,6 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var bootstrapCompleted = false
-    internal val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
     val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
@@ -972,203 +963,101 @@ class WhiteNoiseAppState private constructor(
     internal val chatMutePreferences = ChatMutePreferences(appContext)
     internal val chatMuteOwner = ChatMuteOwner()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
-    internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
-    internal val ttsPlaybackTrust = TtsPlaybackTrustConsent(this) { attachedTtsHandle }
+    internal val readAloud: AppReadAloud =
+        AppReadAloud(
+            appContext,
+            object : AppReadAloudHost {
+                override val activeAccountRef: String? get() = this@WhiteNoiseAppState.activeAccountRef
+                override val accountSwitchHandoff: AccountSwitchLocalSnapshotHandoff
+                    get() = this@WhiteNoiseAppState.accountSwitchHandoff
+                override val mutationsScope: CoroutineScope get() = this@WhiteNoiseAppState.mutationsScope
+                override val appLockScreenVisible: Boolean get() = appLock.screenVisible
+
+                override fun createHistoryScope(): CoroutineScope =
+                    CoroutineScope(
+                        SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler,
+                    )
+
+                override fun createAutoReadContinuation() = createTtsAutoReadContinuation(this@WhiteNoiseAppState)
+
+                override fun historyPager(
+                    accountRef: String?,
+                    groupIdHex: String,
+                ): TtsHistoryPager? = ttsHistoryPagerFor(accountRef, groupIdHex)
+            },
+        )
+    internal val ttsPlaybackTrust get() = readAloud.ttsPlaybackTrust
 
     /** Reports whether the connected engine still requires playback consent. */
-    internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
+    internal fun ttsEngineNeedsAcknowledgment(): Boolean = readAloud.ttsEngineNeedsAcknowledgment()
 
     /** Checks engine consent and the playback owner before any text can be sent. */
-    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(current)
+    @Suppress("MaxLineLength")
+    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = readAloud.confirmTtsPlaybackTrust(current)
 
-    internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
-    internal val ttsVoicePreferences = TtsVoicePreferences(appContext)
-    internal val ttsEngineResolver =
-        TtsEngineResolver(appContext, selectedVoice = ttsVoicePreferences::selectedVoice)
-    internal val ttsRatePreferences = TtsRatePreferences(appContext)
-    internal val ttsMediaMixPreferences = TtsMediaMixPreferences(appContext)
-
-    // Process-wide read-aloud playback: survives navigation between chats and
-    // back to the chat list, matching VoicePlaybackController's lifetime.
-    val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
+    internal val ttsVoicePreferences get() = readAloud.ttsVoicePreferences
+    internal val ttsRatePreferences get() = readAloud.ttsRatePreferences
+    internal val ttsMediaMixPreferences get() = readAloud.ttsMediaMixPreferences
+    val ttsController: TtsController get() = readAloud.ttsController
     private val conversationDictationMediaHandoff by lazy {
         createConversationDictationMediaHandoff(ttsController, appContext) {
             conversationDictation.interruptForAudioFocusLoss()
         }
     }
-    var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
-        private set
-    var ttsVoiceResolution by mutableStateOf(TtsVoiceResolution.Empty)
-        private set
-
-    // The (account, conversation) pair that owns the current auto-read
-    // session, or null when speech is manual or idle. Live continuation
-    // appends only for the owner: a manual Speak aloud replaces the queue and
-    // ends the session; another chat's — or another ACCOUNT'S view of the
-    // same group — must never extend it.
-    internal var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
-    private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
-
-    // Manual speech deliberately has no auto-read session key, but it still
-    // owns decrypted text that must stop when its account is removed.
-    internal var ttsSpeechAccountRef: String? = null
-    internal val attachmentSpeechDestination =
-        MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
+    val ttsResolution: TtsResolutionResult? get() = readAloud.ttsResolution
+    val ttsVoiceResolution: TtsVoiceResolution get() = readAloud.ttsVoiceResolution
+    internal val attachmentSpeechDestination get() = readAloud.attachmentSpeechDestination
 
     /** Reader controls may only address speech owned by the current local account. */
-    internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
+    internal fun ownsCurrentAccountSpeech(): Boolean = readAloud.ownsCurrentAccountSpeech()
 
-    fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
-        val key = ttsAutoReadSessionKey ?: return false
-        return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
-    }
+    fun ownsTtsAutoReadSession(groupIdHex: String): Boolean = readAloud.ownsTtsAutoReadSession(groupIdHex)
 
     /** Starts read-aloud for one or more speakable messages after any required approval. */
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-    ): Boolean {
-        val started =
-            synchronized(ttsController) {
-                val previousGeneration = ttsController.state.value.messageProgressGeneration
-                val previousCallbackGeneration = ttsController.playbackCallbackGeneration()
-                val accepted =
-                    !ttsEngineNeedsAcknowledgment() && ttsController.speak(entries, locale, startSentenceIndex)
-                // A pre-playback refusal (offline-language) tears down the queue without a new message generation.
-                if (accepted ||
-                    ttsController.state.value.messageProgressGeneration != previousGeneration ||
-                    ttsController.playbackCallbackGeneration() != previousCallbackGeneration
-                ) {
-                    clearTtsPlaybackOwnership()
-                }
-                if (accepted) ttsSpeechAccountRef = activeAccountRef
-                accepted
-            }
-        if (!started) return false
-
-        // Stop private speech if its foreground service fails to provide a visible stop control.
-        val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
-        if (!foregroundStarted) stopSpeaking()
-        return foregroundStarted
-    }
+    ): Boolean = readAloud.speakAloud(entries, locale, startSentenceIndex)
 
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
     fun speakAloudAutoRead(
         groupIdHex: String,
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-    ): Boolean {
-        val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
-        val started = speakAloud(entries, locale, startSentenceIndex)
-        if (started) {
-            ttsAutoReadSessionKey = owner
-            ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
-            activeAccountRef?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
-        }
-        return started
-    }
+    ): Boolean = readAloud.speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
 
-    /**
-     * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
-     * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
-     * a revoked or cancelled request cannot clear a replacement queue's ownership.
-     * Accepting a new queue also revokes prior history/attachment source ownership.
-     */
+    /** Prepares reader text off the controller lock; see [AppReadAloud.speakAloudPrepared]. */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
-        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        startRenderedHit: PreparedRenderedHit? = null,
         isCurrent: () -> Boolean = { true },
-    ): Boolean {
-        if (ttsEngineNeedsAcknowledgment()) return false
-        val ownerAccount = activeAccountRef
-        val ownerGeneration = accountSwitchHandoff.capture()
-        var preparingSessionId: Long? = null
-        try {
-            val started =
-                ttsController.speakAsync(
-                    entries,
-                    locale,
-                    startSentenceIndex,
-                    startRenderedHit,
-                    isCurrent = {
-                        isCurrent() &&
-                            !ttsEngineNeedsAcknowledgment() &&
-                            activeAccountRef == ownerAccount &&
-                            accountSwitchHandoff.isCurrent(ownerGeneration)
-                    },
-                ) {
-                    preparingSessionId = ttsController.state.value.sessionId
-                    ttsSpeechAccountRef = ownerAccount
-                    TtsPlaybackForegroundService.start(appContext)
-                }
-            if (started) {
-                ttsSpeechAccountRef = ownerAccount
-                ttsAutoReadSessionKey = null
-                ttsHistorySession.onSessionCleared()
-            }
-            return started
-        } finally {
-            // Check and clear under the same monitor as queue starts, not against a stale Idle snapshot.
-            synchronized(ttsController) {
-                val state = ttsController.state.value
-                if (state is TtsState.Idle &&
-                    state.sessionId == preparingSessionId &&
-                    ttsSpeechAccountRef == ownerAccount
-                ) {
-                    clearTtsPlaybackOwnership()
-                }
-            }
-        }
-    }
+    ): Boolean = readAloud.speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit, isCurrent)
 
     suspend fun speakAloudAutoRead(
         groupIdHex: String,
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        startRenderedHit: PreparedRenderedHit? = null,
         backgroundPreparation: Boolean,
         canCommit: () -> Boolean = { true },
-    ): Boolean {
-        if (!canCommit()) return false
-        val ownerAccount = activeAccountRef
-        return if (!backgroundPreparation) {
-            speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
-        } else {
-            ttsAutoReadKey(ownerAccount, groupIdHex)?.let { owner ->
-                speakAloudPrepared(
-                    entries,
-                    locale,
-                    startSentenceIndex,
-                    startRenderedHit,
-                    isCurrent = canCommit,
-                ).also { started ->
-                    if (started) {
-                        ttsAutoReadSessionKey = owner
-                        ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)
-                        ownerAccount?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
-                    }
-                }
-            } ?: false
-        }
-    }
-
-    /**
-     * History paging for the read-aloud transport. The backing conversation
-     * controller is resolved per edge request, so a controller recreated by
-     * navigation keeps serving the same playback session.
-     */
-    val ttsHistorySession: TtsHistorySession by lazy {
-        TtsHistorySession(
-            controller = ttsController,
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler),
-            resolvePager = ::ttsHistoryPagerFor,
+    ): Boolean =
+        readAloud.speakAloudAutoRead(
+            groupIdHex,
+            entries,
+            locale,
+            startSentenceIndex,
+            startRenderedHit,
+            backgroundPreparation,
+            canCommit,
         )
-    }
+
+    /** History paging for the read-aloud transport. */
+    val ttsHistorySession: TtsHistorySession get() = readAloud.ttsHistorySession
 
     private fun ttsHistoryPagerFor(
         accountRef: String?,
@@ -1205,126 +1094,36 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    internal val ttsAutoReadPreferences = TtsAutoReadPreferences(appContext)
+    internal val ttsAutoReadPreferences get() = readAloud.ttsAutoReadPreferences
 
-    fun isConversationAutoRead(groupIdHex: String): Boolean {
-        val accountRef = activeAccountRef ?: return false
-        return conversationAutoReadFor(accountRef, groupIdHex)
-    }
+    fun isConversationAutoRead(groupIdHex: String): Boolean = readAloud.isConversationAutoRead(groupIdHex)
 
-    internal fun conversationAutoReadFor(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean = ttsAutoReadPreferences.isConversationAutoRead(accountRef, groupIdHex)
-
-    fun setTtsAutoReadGlobalDefault(enabled: Boolean) {
-        ttsAutoReadPreferences.setGlobalDefaultEnabled(enabled)
-        reconcileOwnedTtsAutoReadSession()
-    }
+    fun setTtsAutoReadGlobalDefault(enabled: Boolean) = readAloud.setTtsAutoReadGlobalDefault(enabled)
 
     fun setConversationAutoReadOverride(
         groupIdHex: String,
         override: TtsAutoReadOverride?,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        if (override == null) {
-            ttsAutoReadPreferences.clearConversationOverride(accountRef, groupIdHex)
-        } else {
-            ttsAutoReadPreferences.setConversationOverride(accountRef, groupIdHex, override)
-        }
-        reconcileOwnedTtsAutoReadSession()
-    }
-
-    private fun reconcileOwnedTtsAutoReadSession() {
-        val sessionKey = ttsAutoReadSessionKey ?: return
-        val separator = sessionKey.indexOf('|')
-        if (separator <= 0 || separator == sessionKey.lastIndex) return
-        val accountRef = sessionKey.substring(0, separator)
-        val groupIdHex = sessionKey.substring(separator + 1)
-        if (!conversationAutoReadFor(accountRef, groupIdHex)) {
-            stopOwnedTtsAutoReadSession()
-        }
-    }
-
-    /** Stops an owned conversation auto-read queue and revokes its account/history navigation ownership. */
-    internal fun stopOwnedTtsAutoReadSession() {
-        if (ttsAutoReadSessionKey == null) return
-        ttsController.stop()
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
-    }
+    ) = readAloud.setConversationAutoReadOverride(groupIdHex, override)
 
     /** Account removal ends any owned speech so its decrypted text stops being spoken. */
-    internal fun stopTtsForRemovedAccount(accountRef: String) {
-        val speechOwner = ttsSpeechAccountRef
-        if (speechOwner != null && speechOwner != accountRef) return
-        ttsController.stop()
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
-    }
+    internal fun stopTtsForRemovedAccount(accountRef: String) = readAloud.stopTtsForRemovedAccount(accountRef)
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */
     fun appendSpeech(
         entry: TtsSpeakableEntry,
-        locale: java.util.Locale,
-    ): Boolean {
-        // A session paged away from the live tail must not have arrivals
-        // spliced next to unrelated older history — they stay reachable
-        // through next-message paging instead.
-        if (ttsEngineNeedsAcknowledgment() || !ttsHistorySession.allowsLiveAppend()) return false
-        return ttsController.appendSpeech(entry, locale)
-    }
+        locale: Locale,
+    ): Boolean = readAloud.appendSpeech(entry, locale)
 
     /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
-    fun stopSpeaking() {
-        ttsPlaybackTrust.cancel()
-        ttsController.stop()
-        clearTtsPlaybackOwnership()
-    }
+    fun stopSpeaking(): Unit = readAloud.stopSpeaking()
 
-    fun setTtsRateOverride(rate: Float?) {
-        ttsRatePreferences.setRateOverride(rate)
-        ttsController.onSpeechRateChanged()
-    }
-
-    internal var attachedTtsHandle: TtsEngineHandle? = null
-        private set
+    fun setTtsRateOverride(rate: Float?) = readAloud.setTtsRateOverride(rate)
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
-    internal fun publishTtsResolution(resolution: TtsResolutionResult?) {
-        ttsResolution = resolution
-        val handle = resolution?.handle
-        // Reattaching the same healthy handle would stop speech and reset its current voice.
-        if (handle === attachedTtsHandle) return
-        ttsPlaybackTrust.onHandleReplaced()
-        clearTtsPlaybackOwnership()
-        ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
-        attachedTtsHandle = handle
-        if (handle != null) {
-            ttsController.attachEngine(
-                AndroidTtsSpeechEngine(
-                    textToSpeech = handle.textToSpeech,
-                    enginePackage = handle.enginePackage,
-                    selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
-                    onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
-                    requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
-                    onConnectionUncertain = { retireFailedTtsConnection(handle) },
-                ),
-                engineKey = handle.enginePackage,
-            )
-        } else {
-            ttsController.detachEngine()
-        }
-    }
+    internal fun publishTtsResolution(resolution: TtsResolutionResult?) = readAloud.publishTtsResolution(resolution)
 
-    val ttsDiscoveryComplete: Boolean
-        get() = ttsResolution != null
-    val ttsHasUsableEngine: Boolean
-        get() = ttsResolution?.hasUsableEngine == true
+    val ttsDiscoveryComplete: Boolean get() = readAloud.ttsDiscoveryComplete
+    val ttsHasUsableEngine: Boolean get() = readAloud.ttsHasUsableEngine
 
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
@@ -1659,7 +1458,6 @@ class WhiteNoiseAppState private constructor(
             maxEntries = MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES,
             lock = groupMemberSnapshotLock,
         )
-    private val conversationStateLock = Any()
     internal val longMessageCollapseState =
         LongMessageCollapseState(
             registry = accountScopedCaches,
@@ -1673,41 +1471,6 @@ class WhiteNoiseAppState private constructor(
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
             observable = true,
         )
-    private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
-
-    // A failed optimistic send can be retried by a replacement controller after
-    // navigation. Keep its one-shot acceptance cleanup beside the retained row,
-    // under the same bounded conversation-state lifecycle.
-    private val durableAcceptanceCallbacksByConversation = mutableMapOf<String, MutableMap<String, () -> Unit>>()
-    private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
-    private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-    private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-    private val optimisticSendPositionPreservesByConversation =
-        mutableMapOf<String, OptimisticSendPositionPreserves>()
-    private val retentionAtSendByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
-
-    // Canonical MDK app-event id -> local optimistic text id. MDK can accept a
-    // text intent before publishing it, so the eventual projection needs this
-    // exact bridge instead of matching identical pending texts heuristically.
-    private val acceptedPendingTextOptimisticIdsByConversation =
-        mutableMapOf<String, MutableMap<String, String>>()
-
-    // Stable client-key phase for each optimistic send. The controller keeps
-    // this beside the retained optimistic row so a replacement conversation
-    // can still distinguish cancellable pre-acceptance work from an intent
-    // already owned by MDK.
-    private val optimisticSendPhasesByConversation =
-        mutableMapOf<String, MutableMap<String, OptimisticSendPhase>>()
-    private val optimisticCancellationGenerationByConversation = mutableMapOf<String, MutableStateFlow<Long>>()
-
-    // Retained-upload bytes survive screen disposal so a user who navigates
-    // out of a chat mid-send and returns sees the pending bubble still carry
-    // its preview/filename instead of an empty placeholder. Cap (and sizeOf
-    // policy) match the controller-local version they replace.
-    private val retainedMediaUploadsByConversation = mutableMapOf<String, dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload>>()
-    private val activeUploadKeysByConversation = mutableMapOf<String, MutableSet<String>>()
-    private val pendingProjectionsAwaitingBridgeByConversation =
-        mutableMapOf<String, MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi>>()
 
     // In-flight attachment downloads, keyed by the mediaCacheKey. Routed
     // through `mutationsScope` so the FFI download continues even when the
@@ -1732,25 +1495,24 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val conversationStateRetention =
-        ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES, isProtected = inFlightMediaUploads::hasUploads)
+    private val retainedConversationStates =
+        RetainedConversationStates(
+            MAX_RETAINED_CONVERSATION_STATES,
+            isProtected = inFlightMediaUploads::hasUploads,
+            activeConversationKey = ::activeConversationStateKey,
+            closeStagedUploadSource = ::closeStagedUploadSourceOffMain,
+        )
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
     // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
-    // Transient view invalidation, bounded with the existing retained conversation state.
-    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
-
-    // Never reuse a stamp after conversation eviction or account-cache cleanup.
-    private var nativeComposerCleanupSequence = 0L
-
     /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
     internal fun nativeComposerCleanupRevision(
         accountRef: String?,
         groupIdHex: String,
-    ): Long = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0L
+    ): Long = retainedConversationStates.nativeComposerCleanupRevision(accountRef, groupIdHex)
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
@@ -1926,11 +1688,7 @@ class WhiteNoiseAppState private constructor(
             scope = mutationsScope,
             onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
                 if (nativeDraftConsumed) {
-                    synchronized(conversationStateLock) {
-                        val key = retainConversationState(accountRef, groupIdHex)
-                        nativeComposerCleanupSequence += 1
-                        nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
-                    }
+                    retainedConversationStates.recordNativeComposerCleanup(accountRef, groupIdHex)
                 } else {
                     draftHydrationRevision += 1
                 }
@@ -2697,95 +2455,57 @@ class WhiteNoiseAppState private constructor(
     internal fun optimisticMessages(
         accountRef: String?,
         groupIdHex: String,
-    ): SnapshotStateMap<String, TimelineMessage> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticMessagesByConversation.getOrPut(key) { mutableStateMapOf() }
-        }
+    ): SnapshotStateMap<String, TimelineMessage> = retainedConversationStates.optimisticMessages(accountRef, groupIdHex)
 
     internal fun durableAcceptanceCallbacks(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, () -> Unit> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            durableAcceptanceCallbacksByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, () -> Unit> = retainedConversationStates.durableAcceptanceCallbacks(accountRef, groupIdHex)
 
     internal fun projectedMessageIds(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableSet<String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            projectedMessageIdsByConversation.getOrPut(key) { mutableSetOf() }
-        }
+    ): MutableSet<String> = retainedConversationStates.projectedMessageIds(accountRef, groupIdHex)
 
     internal fun timelineOrderOverrides(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            timelineOrderOverridesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.timelineOrderOverrides(accountRef, groupIdHex)
 
     internal fun timelineTimestampOverrides(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.timelineTimestampOverrides(accountRef, groupIdHex)
 
     internal fun optimisticSendPositionPreserves(
         accountRef: String?,
         groupIdHex: String,
     ): OptimisticSendPositionPreserves =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticSendPositionPreservesByConversation.getOrPut(key) {
-                OptimisticSendPositionPreserves()
-            }
-        }
+        retainedConversationStates.optimisticSendPositionPreserves(
+            accountRef,
+            groupIdHex,
+        )
 
     internal fun retentionAtSend(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, ULong> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            retentionAtSendByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, ULong> = retainedConversationStates.retentionAtSend(accountRef, groupIdHex)
 
     internal fun acceptedPendingTextOptimisticIds(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            acceptedPendingTextOptimisticIdsByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, String> = retainedConversationStates.acceptedPendingTextOptimisticIds(accountRef, groupIdHex)
 
     internal fun optimisticSendPhases(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableMap<String, OptimisticSendPhase> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticSendPhasesByConversation.getOrPut(key) { mutableMapOf() }
-        }
+    ): MutableMap<String, OptimisticSendPhase> = retainedConversationStates.optimisticSendPhases(accountRef, groupIdHex)
 
     /** Shares retry wakeups across controllers for the same account and conversation. */
     internal fun optimisticCancellationGeneration(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableStateFlow<Long> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            optimisticCancellationGenerationByConversation.getOrPut(key) { MutableStateFlow(0L) }
-        }
+    ): MutableStateFlow<Long> = retainedConversationStates.optimisticCancellationGeneration(accountRef, groupIdHex)
 
     /** Resolves a delivered chat-list projection to the exact accepted-pending optimistic send. */
     internal fun acceptedPendingTextOptimisticId(
@@ -2793,28 +2513,21 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         confirmedMessageIdHex: String,
     ): String? =
-        synchronized(conversationStateLock) {
-            acceptedPendingTextOptimisticIdsByConversation[conversationKey(accountRef, groupIdHex)]
-                ?.get(confirmedMessageIdHex)
-        }
+        retainedConversationStates.acceptedPendingTextOptimisticId(
+            accountRef,
+            groupIdHex,
+            confirmedMessageIdHex,
+        )
 
     /** Returns the account/group retained queue whose removal callback releases private source ownership. */
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
     ): dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, RetainedMediaUpload> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            retainedMediaUploadsByConversation.getOrPut(key) {
-                dev.ipf.whitenoise.android.media.ByteSizeLruCache(
-                    maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
-                    sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
-                    onEntryRemoved = { upload -> upload.releaseSource(::closeStagedUploadSourceOffMain) },
-                    // Evicting a send whose items all live in private files frees no heap, only its retry.
-                    isEvictable = { upload -> upload.attachments.any { it.inMemoryBytes != null } },
-                )
-            }
-        }
+        retainedConversationStates.retainedMediaUploads(
+            accountRef,
+            groupIdHex,
+        )
 
     /** Deletes a released private upload snapshot on the IO pool; unlinking a large file must not block Main. */
     internal fun closeStagedUploadSourceOffMain(source: StagedUploadSource) {
@@ -2824,11 +2537,7 @@ class WhiteNoiseAppState private constructor(
     internal fun activeUploadKeys(
         accountRef: String?,
         groupIdHex: String,
-    ): MutableSet<String> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            activeUploadKeysByConversation.getOrPut(key) { mutableSetOf() }
-        }
+    ): MutableSet<String> = retainedConversationStates.activeUploadKeys(accountRef, groupIdHex)
 
     /** Captures the account-scoped media-upload lifetime for a suspended send. */
     internal fun mediaUploadSessionEpoch(): Long = mediaUploadSessionLifetime.capture()
@@ -2854,9 +2563,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         if (job != null) {
             inFlightMediaUploads.untrack(conversationKey(accountRef, groupIdHex), uploadKey, job)
-            synchronized(conversationStateLock) {
-                conversationStateRetention.prune(activeConversationStateKey()).forEach(::removeConversationState)
-            }
+            retainedConversationStates.prune()
         }
     }
 
@@ -2864,49 +2571,10 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ): MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi> =
-        synchronized(conversationStateLock) {
-            val key = retainConversationState(accountRef, groupIdHex)
-            pendingProjectionsAwaitingBridgeByConversation.getOrPut(key) { linkedMapOf() }
-        }
-
-    private fun retainConversationState(
-        accountRef: String?,
-        groupIdHex: String,
-    ): String {
-        val key = conversationKey(accountRef, groupIdHex)
-        conversationStateRetention
-            .retain(key, protectedKey = activeConversationStateKey())
-            .forEach(::removeConversationState)
-        return key
-    }
-
-    private fun promoteConversationState(
-        accountRef: String?,
-        groupIdHex: String,
-    ) {
-        val key = conversationKey(accountRef, groupIdHex)
-        conversationStateRetention
-            .promote(key, protectedKey = key)
-            .forEach(::removeConversationState)
-    }
-
-    /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
-    private fun removeConversationState(staleKey: String) {
-        nativeComposerCleanupRevisions.remove(staleKey)
-        optimisticMessagesByConversation.remove(staleKey)
-        durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
-        projectedMessageIdsByConversation.remove(staleKey)
-        timelineOrderOverridesByConversation.remove(staleKey)
-        timelineTimestampOverridesByConversation.remove(staleKey)
-        optimisticSendPositionPreservesByConversation.remove(staleKey)
-        retentionAtSendByConversation.remove(staleKey)
-        acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
-        optimisticSendPhasesByConversation.remove(staleKey)
-        optimisticCancellationGenerationByConversation.remove(staleKey)
-        retainedMediaUploadsByConversation.remove(staleKey)?.clear()
-        activeUploadKeysByConversation.remove(staleKey)
-        pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
-    }
+        retainedConversationStates.pendingProjectionsAwaitingBridge(
+            accountRef,
+            groupIdHex,
+        )
 
     private fun activeConversationStateKey(): String? =
         activeConversationGroupIdHex?.let { groupIdHex ->
@@ -2916,7 +2584,7 @@ class WhiteNoiseAppState private constructor(
     private fun conversationKey(
         accountRef: String?,
         groupIdHex: String,
-    ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+    ): String = RetainedConversationStates.key(accountRef, groupIdHex)
 
     /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
     internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
@@ -5153,44 +4821,13 @@ class WhiteNoiseAppState private constructor(
         // a cancelled upload cannot resume against an emptied retained-upload
         // map and falsely mark the bubble Failed (or publish after the switch).
         inFlightMediaUploads.cancelAll()
-        // The per-conversation maps below hold (or potentially hold)
-        // decrypted plaintext keyed by account/group. Wiping them at the
+        // The retained per-conversation send state holds (or potentially
+        // holds) decrypted plaintext keyed by account/group. Wiping them at the
         // same call site keeps account-switch and sign-out symmetric with
         // the L1 plaintext clear above; an unwiped retained-upload cache
         // would otherwise let the next signed-in account see the previous
         // account's outgoing bytes.
-        synchronized(conversationStateLock) {
-            retainedMediaUploadsByConversation.values.forEach { it.clear() }
-            retainedMediaUploadsByConversation.clear()
-            activeUploadKeysByConversation.values.forEach { it.clear() }
-            activeUploadKeysByConversation.clear()
-            pendingProjectionsAwaitingBridgeByConversation.values.forEach { it.clear() }
-            pendingProjectionsAwaitingBridgeByConversation.clear()
-            // The optimistic message map holds decrypted outgoing records
-            // (AppMessageRecordFfi plaintext); the override maps hold its
-            // ordering keys. They were previously pruned only per-key by the
-            // LRU, so a signed-out account's sent plaintext lingered in memory.
-            optimisticMessagesByConversation.values.forEach { it.clear() }
-            optimisticMessagesByConversation.clear()
-            durableAcceptanceCallbacksByConversation.values.forEach { it.clear() }
-            durableAcceptanceCallbacksByConversation.clear()
-            projectedMessageIdsByConversation.values.forEach { it.clear() }
-            projectedMessageIdsByConversation.clear()
-            timelineOrderOverridesByConversation.values.forEach { it.clear() }
-            timelineOrderOverridesByConversation.clear()
-            timelineTimestampOverridesByConversation.values.forEach { it.clear() }
-            timelineTimestampOverridesByConversation.clear()
-            optimisticSendPositionPreservesByConversation.values.forEach { it.clear() }
-            optimisticSendPositionPreservesByConversation.clear()
-            retentionAtSendByConversation.values.forEach { it.clear() }
-            retentionAtSendByConversation.clear()
-            acceptedPendingTextOptimisticIdsByConversation.values.forEach { it.clear() }
-            acceptedPendingTextOptimisticIdsByConversation.clear()
-            optimisticSendPhasesByConversation.values.forEach { it.clear() }
-            optimisticSendPhasesByConversation.clear()
-            optimisticCancellationGenerationByConversation.clear()
-            nativeComposerCleanupRevisions.clear()
-        }
+        retainedConversationStates.clearAll()
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
         // starts cold.
@@ -5995,94 +5632,11 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(APP_FONT_KEY, font.preferenceValue) }
     }
 
-    fun acknowledgeTtsTrustWarning(enginePackage: String) {
-        ttsWarningPreferences.acknowledge(enginePackage)
-    }
+    fun acknowledgeTtsTrustWarning(enginePackage: String) = readAloud.acknowledgeTtsTrustWarning(enginePackage)
 
-    fun selectTtsEngine(enginePackage: String) {
-        mutationsScope.launch {
-            selectTtsEngineLocked(enginePackage)
-        }
-    }
+    fun selectTtsEngine(enginePackage: String) = readAloud.selectTtsEngine(enginePackage)
 
-    internal suspend fun selectTtsEngineLocked(enginePackage: String) {
-        ttsRefreshMutex.withLock {
-            val current =
-                TtsEngineSelectionSnapshot(
-                    resolution = ttsResolution,
-                    selectedOverride = ttsEnginePreferences.selectedEngine(),
-                )
-            val candidate = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage) }
-            when (val outcome = adoptTtsEngineSelection(current, candidate, enginePackage)) {
-                is TtsEngineSelectionResult.Adopted -> {
-                    ttsEnginePreferences.setSelectedEngine(outcome.selectedOverride)
-                    publishTtsResolution(outcome.resolution)
-                    outcome.releasedHandles.forEach { handle -> runCatching { handle.release() } }
-                }
-                is TtsEngineSelectionResult.Retained -> {
-                    withContext(Dispatchers.IO) {
-                        candidate.handle?.let { handle -> runCatching { handle.release() } }
-                    }
-                }
-            }
-        }
-    }
-
-    suspend fun refreshTtsAvailability() =
-        ttsRefreshMutex.withLock {
-            val previousHandle = ttsResolution?.handle
-            val candidateHandles = mutableListOf<TtsEngineHandle>()
-            var adoptedHandle: TtsEngineHandle? = null
-            var replacementPublished = false
-            try {
-                val bootstrap = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage = null) }
-                bootstrap.handle?.let(candidateHandles::add)
-                val selectedOverride = ttsEnginePreferences.selectedEngine()
-                val preferredPackage =
-                    ttsEngineResolver.preferredEnginePackage(
-                        engines = bootstrap.engines,
-                        defaultPackage = bootstrap.defaultEnginePackage,
-                        selectedOverride = selectedOverride,
-                    )
-                val replacement =
-                    when {
-                        preferredPackage == null -> bootstrap.copy(handle = null)
-                        preferredPackage == bootstrap.handle?.enginePackage -> bootstrap
-                        else -> {
-                            val selected = resolveTtsOnDispatcher { ttsEngineResolver.resolve(preferredPackage) }
-                            selected.handle?.let(candidateHandles::add)
-                            if (selected.handle?.enginePackage == preferredPackage) {
-                                selected
-                            } else {
-                                bootstrap.copy(handle = null)
-                            }
-                        }
-                    }
-
-                // Same engine package resolved again: keep the ATTACHED
-                // handle, so an availability refresh (settings ON_RESUME,
-                // foreground) never swaps engines under in-flight speech.
-                // resolve() always mints a new handle, so identity alone
-                // can't provide this — the freshly resolved duplicate is
-                // released with the other unadopted candidates below.
-                val published =
-                    if (previousHandle != null && previousHandle.enginePackage == replacement.handle?.enginePackage) {
-                        replacement.copy(handle = previousHandle)
-                    } else {
-                        replacement
-                    }
-                adoptedHandle = published.handle
-                publishTtsResolution(published)
-                replacementPublished = true
-            } finally {
-                candidateHandles
-                    .filter { it !== adoptedHandle }
-                    .forEach { handle -> runCatching { handle.release() } }
-                if (replacementPublished && previousHandle !== adoptedHandle) {
-                    runCatching { previousHandle?.release() }
-                }
-            }
-        }
+    suspend fun refreshTtsAvailability() = readAloud.refreshTtsAvailability()
 
     /**
      * Toggle one cell of the active account's auto-download matrix, persist it
@@ -6663,9 +6217,7 @@ class WhiteNoiseAppState private constructor(
             suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) accountRef else null),
         )
         if (groupIdHex != null) {
-            synchronized(conversationStateLock) {
-                promoteConversationState(activeConversationAccountRef, groupIdHex)
-            }
+            retainedConversationStates.promote(activeConversationAccountRef, groupIdHex)
         }
     }
 

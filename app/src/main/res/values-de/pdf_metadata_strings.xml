@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d Seite</item>
+        <item quantity="other">PDF · %d Seiten</item>
+    </plurals>
+    <string name="composer_pdf_metadata_removed">Metadaten entfernt</string>
+    <string name="composer_pdf_metadata_removed_on_send">Metadaten werden beim Senden entfernt</string>
+    <string name="composer_pdf_metadata_signed">Signiert: Metadaten bleiben</string>
+    <string name="composer_pdf_metadata_encrypted">Geschützt: Metadaten bleiben</string>
+    <string name="composer_pdf_metadata_unsupported">Metadaten nicht entfernbar</string>
+    <string name="composer_pdf_metadata_sending_as_is">Wird mit Metadaten gesendet</string>
+    <string name="composer_pdf_metadata_dialog_title">Mit Metadaten senden?</string>
+    <string name="composer_pdf_metadata_dialog_signed">%1$s ist signiert. Das Entfernen der Metadaten würde die Signatur ungültig machen, daher kann die Datei nur unverändert gesendet werden.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">%1$s ist passwortgeschützt, daher können die Metadaten nicht entfernt werden.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise kann die Metadaten von %1$s nicht sicher entfernen.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">Die Metadaten von %1$d PDF können nicht entfernt werden: %2$s.</item>
+        <item quantity="other">Die Metadaten von %1$d PDFs können nicht entfernt werden: %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Alle in diesem Chat können dann Angaben wie den Autor, die erstellenden Apps und den Zeitpunkt der Erstellung oder Änderung sehen.</string>
+    <string name="composer_pdf_metadata_send_as_is">Unverändert senden</string>
+    <string name="media_file_pdf_metadata_kept">Dieses PDF wurde nicht gesendet, weil seine Metadaten nicht entfernt werden konnten. Sende es über das Nachrichtenfeld, um zu wählen, ob es unverändert gesendet werden soll.</string>
+</resources>

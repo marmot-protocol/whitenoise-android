@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -24,19 +23,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
-import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
+import dev.ipf.whitenoise.android.ui.common.SurfaceMotion
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
 import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Replacement page only: its source is already disposed, so Back never reverses into it. */
 @Composable
@@ -64,7 +62,7 @@ internal fun ProfileGroupOpeningPage(
     val animate = motion && !retired && !host.isEmpty
     LaunchedEffect(animate, host) {
         if (animate) {
-            progress.animateTo(1f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
+            progress.animateTo(1f, SurfaceMotion.Open.spec())
         } else if (!motion || retired) {
             progress.snapTo(1f)
         }
@@ -80,7 +78,7 @@ internal fun ProfileGroupOpeningPage(
         Modifier
             .fillMaxSize()
             .onGloballyPositioned {
-                val next = it.settingsMorphBounds(view)
+                val next = it.motionBoundsOnScreen(view)
                 if ((!host.isEmpty && host != next) || !validProfileGroupOrigin(origin, next)) retired = true
                 host = next
             }.drawWithContent {

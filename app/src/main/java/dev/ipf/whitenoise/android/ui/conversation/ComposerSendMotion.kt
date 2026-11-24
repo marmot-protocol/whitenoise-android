@@ -7,7 +7,6 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,13 +28,11 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.isSpecified
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
@@ -541,6 +538,7 @@ private fun LayoutCoordinates.visibleMotionBounds(): Rect? {
 internal fun ComposerSendMotionHost(
     motion: ComposerSendMotion,
     motionEnabled: Boolean = rememberConversationMotionEnabled(),
+    settingsMotion: ConversationSettingsMotion? = null,
     content: @Composable () -> Unit,
 ) {
     DisposableEffect(motion) { onDispose { motion.dispose() } }
@@ -550,34 +548,20 @@ internal fun ComposerSendMotionHost(
     CompositionLocalProvider(
         LocalComposerSendMotion provides motion,
         LocalConversationMotionEnabled provides motionEnabled,
+        LocalConversationSettingsMotion provides settingsMotion,
         dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionWindowCoordinates provides reactionWindow,
     ) {
-        Box(Modifier.fillMaxSize().onGloballyPositioned { reactionWindow.update() }) {
+        ConversationSettingsLayer(
+            Modifier.fillMaxSize().onGloballyPositioned { reactionWindow.update() },
+            active = settingsMotion?.transcriptActive != false,
+        ) {
             content()
             motion.Overlay()
         }
     }
 }
 
-/** Keep ink readable while the surface changes tone; interpolating opposite inks crosses zero contrast. */
-internal fun composerMotionForeground(
-    source: Color,
-    destination: Color,
-    fill: Color,
-): Color {
-    val backgroundLuminance = fill.luminance()
-
-    /** WCAG contrast ratio of [foreground], composited over the fill, against that fill. */
-    fun contrast(foreground: Color): Float {
-        val inkLuminance = foreground.compositeOver(fill).luminance()
-        return (maxOf(inkLuminance, backgroundLuminance) + TEXT_CONTRAST_OFFSET) /
-            (minOf(inkLuminance, backgroundLuminance) + TEXT_CONTRAST_OFFSET)
-    }
-    return if (contrast(source) >= contrast(destination)) source else destination
-}
-
 private const val MAX_DIAGNOSTIC_ATTEMPTS = 255
-private const val TEXT_CONTRAST_OFFSET = 0.05f
 
 /** Differing paragraph bases cannot share one text anchor without inventing another layout owner. */
 private fun TextLayoutResult.uniformParagraphDirection(): ResolvedTextDirection? {

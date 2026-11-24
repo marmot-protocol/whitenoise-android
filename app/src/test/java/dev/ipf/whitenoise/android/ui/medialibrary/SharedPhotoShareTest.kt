@@ -202,6 +202,38 @@ class SharedPhotoShareTest {
             assertNoShare()
         }
 
+    /** A photo removed after the final check read its page keeps the share sheet closed and deletes the staged set. */
+    @Test
+    fun aRemovalDuringTheFinalCheckSharesNothing() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+            val rows = (3 downTo 1).map { historyEntry(it) }
+            val source = GroupAttachmentFixture(rows)
+            val resolve = GroupAttachmentPager(source).selectedPhotoResolver { "account" }
+            val selected = attachmentLibraryTiles(rows, "account").visuals
+            // Version reads 1–2 are the activation check, 3 is the final check's baseline and 4 its recheck after
+            // projection, so the removal lands after that check read the photo's page.
+            source.beforeVersion = {
+                if (source.versionCalls == 4) {
+                    source.rows = rows - rows[0]
+                    source.removals++
+                }
+            }
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", selected, "Share", { resolve(selected) }) {
+                        AttachmentPlaintext.Bytes(bytesOf(it))
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            val removed = attachmentLibraryTiles(listOf(rows[0]), "account").visuals
+            assertEquals(removed, (failure as SharedPhotosUnavailableException).photos)
+            assertNoShare()
+        }
+
     /** One selected photo is sent as a single stream. */
     @Test
     fun aSingleSelectedPhotoIsSentAlone() =
@@ -329,20 +361,6 @@ class SharedPhotoShareTest {
         selection.clear()
         assertEquals(0, selection.count)
     }
-
-    /** Entries replaced while they were projected are projected again, so a removed photo never looks current. */
-    @Test
-    fun liveVisualsReprojectEntriesChangedDuringProjection() =
-        runTest {
-            val before = listOf(historyEntry(1), historyEntry(2))
-            val after = listOf(historyEntry(2))
-            var reads = 0
-
-            val visuals = liveAttachmentVisuals({ if (reads++ == 0) before else after }, { "account" })
-
-            assertEquals(listOf("message-2"), visuals.map { it.messageIdHex })
-            assertTrue(reads >= 3)
-        }
 
     /** The gallery's own Back ends selection mode first and only then leaves, as system Back does. */
     @Test

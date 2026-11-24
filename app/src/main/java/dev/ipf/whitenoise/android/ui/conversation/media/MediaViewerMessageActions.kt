@@ -48,11 +48,7 @@ internal class MediaViewerActionGate(
         page: MediaViewerPage,
         currentOwner: ConversationMediaViewerOwner,
         sourceController: ConversationController,
-    ): Boolean =
-        ownerIsCurrent(currentOwner) &&
-            sourceController.ownsRetainedForegroundPresentation &&
-            sourceController.boundAccountRef == owner.accountRef &&
-            sourceController.group.groupIdHex.equals(page.groupIdHex ?: owner.conversationId, ignoreCase = true)
+    ): Boolean = ownerIsCurrent(currentOwner) && owner.matchesPageSource(page, sourceController)
 
     /** Runs [action] for the page when the owner is still current. */
     fun dispatch(
@@ -64,6 +60,16 @@ internal class MediaViewerActionGate(
         if (ownerMatches && currentPage == page) action(page)
     }
 }
+
+/** The page's render binding remains valid during visual exit after new actions have been retired. */
+internal fun ConversationMediaViewerOwner.matchesPageSource(
+    page: MediaViewerPage,
+    sourceController: ConversationController,
+): Boolean =
+    accountRef != null &&
+        sourceController.ownsRetainedForegroundPresentation &&
+        sourceController.boundAccountRef == accountRef &&
+        sourceController.group.groupIdHex.equals(page.groupIdHex ?: conversationId, ignoreCase = true)
 
 /** The viewer forwards a complete native source message, never a renumbered subset of its album. */
 @Suppress("LongParameterList")

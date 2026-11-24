@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Eklerin bu cihazda ne kadar kalacağını seçer. Daha eskiler şimdi ve eskidikçe kaldırılır; birini yeniden indirmek onu tüm süre boyunca saklar. Mesajlar kalır.</string>
     <string name="explanation_privacy_storage_chat">Bu sohbet için saklanan ekleri açar.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Onayını ister, sonra bu sohbetteki tüm ekleri bu cihazdan kaldırır. Mesajlar kalır ve göndericinin kopyası hâlâ erişilebilirken ekleri yeniden indirebilirsin.</string>
-    <string name="explanation_privacy_storage_attachment">Bu eki, diğerleriyle birlikte kaldırabilmen için seçer veya seçimini kaldırır. Kaldır\'ı seçene kadar hiçbir şey kaldırılmaz.</string>
     <string name="explanation_privacy_storage_select_all">Bu listedeki tüm ekleri birlikte kaldırabilmen için seçer. Kaldır\'ı seçene kadar hiçbir şey kaldırılmaz.</string>
     <string name="explanation_privacy_storage_select_shown">Yalnızca şimdiye kadar yüklenen ekleri seçer. Kaydırdıkça daha fazlası yüklenir ve Kaldır\'ı seçene kadar hiçbir şey kaldırılmaz.</string>
     <string name="explanation_privacy_storage_clear_selection">Hiçbir şeyi kaldırmadan geçerli seçimi temizler.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Bu kişiden gelen mesaj bildirimlerini sessize alır. Yalnızca mesajlara uygulanır; teslimat ve okunmamış sayıları değişmez.</string>
     <string name="explanation_privacy_profile_system">Bu kişiden gelen bildirimler için Android ayarlarını açar; burada özel bir ses ve davranış belirleyebilirsin. Özel ayarlar bu hesaptaki tüm sohbetlerde geçerlidir.</string>
     <string name="explanation_privacy_profile_vibration">Bu kişiden gelen bildirimlerin titreşim desenini seçer.</string>
+    <string name="explanation_privacy_storage_attachment_open">Kaldırmadan önce kontrol edebilmen için bu eki açar. Onay işareti veya satıra basılı tutmak, eki diğerleriyle birlikte kaldırmak üzere seçer. Kaldır\'ı seçene kadar hiçbir şey kaldırılmaz.</string>
 </resources>

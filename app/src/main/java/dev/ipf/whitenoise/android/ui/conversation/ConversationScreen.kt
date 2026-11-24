@@ -6,14 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -31,14 +28,10 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -79,11 +72,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
@@ -191,7 +181,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -200,7 +189,6 @@ import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -280,7 +268,6 @@ import dev.ipf.whitenoise.android.ui.settings.ComposerSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsCardMorphHost
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -1461,6 +1448,12 @@ internal fun ConversationScreen(
     // the engine's mention classification, reusing the #414 per-message detection.
     val selfAccountIdHex = conversationSelfAccountIdHex
     val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }
+    val mentionsSelf: (TimelineMessage) -> Boolean = { msg ->
+        !selfAccountIdHex.isNullOrBlank() &&
+            mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
+                documentMentionsAccount(msg.record.contentTokens, selfAccountIdHex, appState::accountIdHexForMention)
+            }
+    }
     val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
         derivedStateOf {
             // Anchor on the UI read high-water mark. It advances immediately when
@@ -1469,17 +1462,28 @@ internal fun ConversationScreen(
             if (!initialTimelineAnchored || selfAccountIdHex.isNullOrBlank() || readAnchorMessageId == null) {
                 emptyList()
             } else {
-                unreadReceivedMentionIds(controller.timeline, readAnchorMessageId) { msg ->
-                    mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
-                        documentMentionsAccount(
-                            document = msg.record.contentTokens,
-                            accountIdHex = selfAccountIdHex,
-                            resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
-                        )
-                    }
-                }
+                unreadReceivedMentionIds(controller.timeline, readAnchorMessageId, mentionsSelf)
             }
         }
+    }
+    // #4030: MDK's entry count shows the control on the first frame; the loaded rows take over as they settle.
+    val mentionSeed = rememberConversationMentionJumpSeed(entryUnreadSessionIdentity, entryRow)
+    val mentionCoverage by remember(controller, mentionSeed) {
+        derivedStateOf {
+            conversationMentionCoverage(
+                initialTimelineAnchored,
+                readAnchorMessageId,
+                controller.timeline,
+                controller.hasMoreAfterTimeline,
+            )
+        }
+    }
+    val unreadMentionCount by remember(mentionSeed) {
+        derivedStateOf { mentionSeed.count(unreadMentionMessageIds, mentionCoverage) }
+    }
+    LaunchedEffect(mentionSeed) {
+        snapshotFlow { Triple(controller.timeline, readAnchorMessageId, mentionCoverage) }
+            .collect { (rows, anchor, coverage) -> mentionSeed.observe(rows, anchor, coverage, mentionsSelf) }
     }
     // Reading the raw IME inset in the body would re-subscribe and recompose
     // this (very heavy) screen on every keyboard-animation frame. Capture the
@@ -2297,8 +2301,41 @@ internal fun ConversationScreen(
             cachedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
         )
 
+    /**
+     * The oldest unread mention, waiting for entry positioning and searching past the window if needed. Null when the
+     * request was superseded or nothing was found; a search that ran out of history retires the seed.
+     */
+    suspend fun nextUnreadMentionTarget(isCurrent: () -> Boolean): String? {
+        val search =
+            mentionSeed.jumpTarget(
+                awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
+                loadedTarget = { unreadMentionMessageIds.firstOrNull() },
+            ) {
+                resolveFirstUnreadMention(
+                    readAnchorMessageId = readAnchorMessageId,
+                    firstUnreadMessageId = entryFirstUnreadMessageId,
+                    timeline = { controller.timeline },
+                    mentionsActiveAccount = mentionsSelf,
+                    loadMessage = { controller.loadUntilMessageAvailable(it) },
+                    hasMoreAfter = { controller.hasMoreAfterTimeline },
+                    loadNewer = {
+                        snapshotFlow { controller.isLoadingPage }.first { !it }
+                        isCurrent() && controller.loadNewerTimelinePage()
+                    },
+                    isCurrent = isCurrent,
+                )
+            }
+        if (!isCurrent()) return null
+        if (search !is ConversationMentionSearch.Found) {
+            if (search == ConversationMentionSearch.Exhausted) mentionSeed.retire()
+            appState.present(R.string.toast_original_message_unavailable)
+        }
+        return (search as? ConversationMentionSearch.Found)?.messageId
+    }
+
+    /** Visits the oldest unread mention, marks it read and highlights it; a later navigation supersedes it. */
     fun jumpToNextUnreadMention() {
-        val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
+        if (unreadMentionMessageIds.isEmpty() && !mentionSeed.active) return
         navigationState.searchJob?.cancel()
         navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
@@ -2306,7 +2343,7 @@ internal fun ConversationScreen(
         navigationState.navigateReplyJob =
             scope.launch {
                 tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
-                    if (!navigationRequest.isCurrent()) return@launch
+                    val targetMessageId = nextUnreadMentionTarget { navigationRequest.isCurrent() } ?: return@launch
                     val available =
                         tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
                             controller.loadUntilMessageAvailable(targetMessageId)
@@ -2349,6 +2386,7 @@ internal fun ConversationScreen(
                     // chat-list @-badge — decrement in step; advance the local read
                     // anchor so the chip's derived count updates immediately.
                     readAnchorMessageId = targetMessageId
+                    mentionSeed.visited(targetMessageId)
                     controller.markReadUpTo(targetMessageId)
                     tracedPagingSection(ConversationMentionJumpTrace.HIGHLIGHT) {
                         showTransientMessageHighlight(targetMessageId)
@@ -2798,7 +2836,8 @@ internal fun ConversationScreen(
 
         BackHandler(
             enabled =
-                !conversationSearchState.filterSheetOpen &&
+                !transcriptRoutedAway &&
+                    !conversationSearchState.filterSheetOpen &&
                     (systemBackClosesConversation || currentBackAction() != ConversationBackAction.NAVIGATE_UP),
         ) {
             scrollCoordinator.cancelForegroundRestoreForUserIntent()
@@ -3557,33 +3596,39 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    // One card morph for the transcript and both full-screen routes, so Back animates the return.
-    // The composer outline becomes the next route's cards and they fold back into it, the same
-    // container transform as Settings. Nothing travels with the closing keyboard.
+    val settingsRoute =
+        when {
+            showDetails -> ConversationSettingsRoute.Details
+            showComposerSettings -> ConversationSettingsRoute.Composer
+            else -> null
+        }
+    val routeOwner = Triple(controller, appState.activeAccountRef, appState.runtimeGeneration)
     val parentMorph = LocalSettingsCardMorph.current
     val routeMorph =
-        remember(controller, appState.runtimeGeneration, parentMorph) {
+        remember(routeOwner, parentMorph) {
             SettingsCardMorph(fullScreen = true, parent = parentMorph).apply {
                 anchor = ConversationMorphAnchor.Composer
+                captureContent = false
             }
         }
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     }
-    val transcriptRouteMotion =
-        rememberSettingsCardMorphHost(
-            morph = routeMorph,
-            target = showDetails to showComposerSettings,
-            ownerKey = controller to appState.runtimeGeneration,
-            motion = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
-            forward = transcriptRoutedAway,
-            captureContent = transcriptRoutedAway,
-        ).second
-    // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
-    val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    val settingsMotion =
+        rememberConversationSettingsMotion(
+            settingsRoute,
+            routeOwner,
+            routeMorph,
+            surfaceMotionEnabled &&
+                !routeTransitionInProgress &&
+                !routePresentationFrozen &&
+                conversationAccountRef == appState.activeAccountRef,
+        )
+    val routedAwayIme = rememberLeavingImeModifier(routeKey = settingsRoute)
     // The header opens chat details from its title and from the member shortcuts. The keyboard starts
     // closing as the composer unfolds into the details cards.
     val openDetailsFromHeader: () -> Unit = {
+        settingsMotion.launchFromComposer(captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)))
         keyboardController?.hide()
         showDetails = true
     }
@@ -3650,11 +3695,53 @@ internal fun ConversationScreen(
         onDismiss = { showHeaderTimerPicker = false },
         onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
     )
-    if (transcriptRoutedAway) {
-        if (showDetails) {
-            /** Shows group details in place of the transcript while they are open. */
-            @Composable
-            fun groupDetailsRoute() {
+    // The composer and long-message reader share a draft, including while chat settings covers it.
+    val draftAccountRef = controller.boundAccountRef
+
+    /** Loads the saved draft for the current account and group. */
+    @Composable
+    fun draftLoadEffect() {
+        LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
+            appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
+        }
+    }
+    draftLoadEffect()
+    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
+    val composerShareRevision =
+        rememberComposerShareRevision(
+            externalRevision = appState.inboundShareRevision,
+            editingMessageId = controller.editingMessageId,
+        )
+    val composerDictationRevision =
+        draftAccountRef?.let { accountRef ->
+            appState.conversationDictation.completionRevision(
+                accountRef = accountRef,
+                groupIdHex = controller.group.groupIdHex,
+            )
+        } ?: 0
+    // Capture the revision for this navigation entry. A later accepted
+    // transcript must rehydrate text/selection without being mistaken for a
+    // restored draft and reopening the IME. Re-entering the conversation gets
+    // a fresh baseline, so genuine draft restoration still focuses once.
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(
+            groupIdHex = controller.group.groupIdHex,
+            currentRevision = composerDictationRevision,
+        )
+    val composerTextState =
+        rememberComposerTextState(
+            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
+            initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+            externalRevision = composerShareRevision to composerDictationRevision,
+        )
+    // Capture the baseline during composition, before either editor can receive an input event.
+    val userTextEditRevisionOnEntry =
+        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
+
+    ConversationSettingsPage(settingsMotion, routedAwayIme) { route ->
+        when (route) {
+            ConversationSettingsRoute.Details ->
                 GroupDetailsScreen(
                     appState = appState,
                     controller = controller,
@@ -3676,20 +3763,13 @@ internal fun ConversationScreen(
                     onStartGroupWithPeer = onStartGroupWithPeer,
                     onStartGroupWithPeerMeasured = onStartGroupWithPeerMeasured,
                 )
-            }
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) { groupDetailsRoute() }
-            }
-        } else {
-            // The same full-screen editor as Settings; Back returns to this conversation.
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
-                    ComposerSettingsScreen(appState) { showComposerSettings = false }
-                }
+            ConversationSettingsRoute.Composer -> {
+                BackHandler { showComposerSettings = false }
+                ComposerSettingsScreen(appState) { showComposerSettings = false }
             }
         }
-        return
     }
+    if (!settingsMotion.keepTranscript) return
 
     val mediaViewerForwardActions = rememberMediaViewerForwardActions(controller, appState)
     val mediaViewerSessionState =
@@ -3770,33 +3850,6 @@ internal fun ConversationScreen(
             requestProfiles = composerGate == ComposerGate.COMPOSER,
         )
 
-    // #1206: one composer text state shared by the main composer and the
-    // long-message reader's composer, so in-progress text never drifts between
-    // them. Created at screen scope so both the bottom-bar composer and the
-    // per-message reader can receive the same instance.
-    val draftAccountRef = controller.boundAccountRef
-
-    /** Loads the saved draft for the current account and group. */
-    @Composable
-    fun draftLoadEffect() {
-        LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
-            appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
-        }
-    }
-    draftLoadEffect()
-    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
-    val composerShareRevision =
-        rememberComposerShareRevision(
-            externalRevision = appState.inboundShareRevision,
-            editingMessageId = controller.editingMessageId,
-        )
-    val composerDictationRevision =
-        draftAccountRef?.let { accountRef ->
-            appState.conversationDictation.completionRevision(
-                accountRef = accountRef,
-                groupIdHex = controller.group.groupIdHex,
-            )
-        } ?: 0
     val dictatedPendingSendRevision =
         draftAccountRef?.let { accountRef ->
             appState.conversationDictation.pendingSendRevision(
@@ -3821,24 +3874,6 @@ internal fun ConversationScreen(
         }
     }
     dictatedSendRevealEffect()
-    // Capture the revision for this navigation entry. A later accepted
-    // transcript must rehydrate text/selection without being mistaken for a
-    // restored draft and reopening the IME. Re-entering the conversation gets
-    // a fresh baseline, so genuine draft restoration still focuses once.
-    val composerDictationRevisionOnEntry =
-        rememberComposerDictationRevisionOnEntry(
-            groupIdHex = controller.group.groupIdHex,
-            currentRevision = composerDictationRevision,
-        )
-    val composerTextState =
-        rememberComposerTextState(
-            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
-            initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision to composerDictationRevision,
-        )
-    // Capture the baseline during composition, before either editor can receive an input event.
-    val userTextEditRevisionOnEntry =
-        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
     LaunchedEffect(controller, composerTextState) {
         var observedRevision = userTextEditRevisionOnEntry
         snapshotFlow { composerTextState.userTextEditRevision }.collect { revision ->
@@ -3856,7 +3891,6 @@ internal fun ConversationScreen(
     LaunchedEffect(controller, controller.editingMessageId, controller.replyingTo, navigationState.searchOpen) {
         scrollCoordinator.cancelForegroundRestoreForUserIntent()
     }
-    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
     // attachment sheet — the composer itself stays interactive while it's open.
@@ -3926,18 +3960,18 @@ internal fun ConversationScreen(
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
         batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
+    val presentedImeBottom = settingsMotion.outgoingImeBottom ?: displayedMenuImeBottom
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
-    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
+    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled, settingsMotion) {
         WhiteNoiseScaffold(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .then(
-                        if (displayedMenuImeBottom != null) {
+                        if (presentedImeBottom != null) {
                             Modifier
-                                .padding(bottom = with(density) { displayedMenuImeBottom.toDp() })
+                                .padding(bottom = with(density) { presentedImeBottom.toDp() })
                                 .consumeWindowInsets(WindowInsets.ime)
                         } else {
                             Modifier
@@ -4076,9 +4110,12 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (displayedMenuImeBottom ?: 0).toDp() }) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
+                            settingsMotion.launchFromComposer(
+                                captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)),
+                            )
                             keyboardController?.hide()
                             showComposerSettings = true
                         },
@@ -4241,6 +4278,7 @@ internal fun ConversationScreen(
                                                 prepared = mediaDraftState.preparedPreviews(),
                                                 preparing = mediaDraftState.isPreparing,
                                                 preparedDocuments = mediaDraftState.preparedDocuments,
+                                                pdfChoices = mediaSender.pdfChoices,
                                                 onOpenDocument = { uri ->
                                                     if (!attachmentSendClaim.isHeld && !mediaDraftState.isPreparing) {
                                                         mediaDraftState.preparedDocuments[uri]?.let { prepared ->
@@ -4279,11 +4317,14 @@ internal fun ConversationScreen(
                                 null
                             },
                         onSendAttachments = { caption, onResult ->
-                            sendStagedAttachmentsWithCaption(
-                                caption,
-                                onResult,
-                                composerTextState.captureCaptionSettlement(),
-                            )
+                            // PDFs whose metadata cannot be removed are sent as they are only once chosen (#3377).
+                            mediaSender.pdfChoices.confirmThen(pendingDocumentUris, { onResult(false) }) {
+                                sendStagedAttachmentsWithCaption(
+                                    caption,
+                                    onResult,
+                                    composerTextState.captureCaptionSettlement(),
+                                )
+                            }
                         },
                         onAfterSend = {
                             acceptedSendRevealedTranscript = true
@@ -4447,6 +4488,7 @@ internal fun ConversationScreen(
                             .fillMaxSize()
                             .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
                             .conversationRouteBodyMotion()
+                            .conversationSettingsBody(settingsMotion)
                             // The composer bottomBar owns IME padding; consume here so the
                             // transcript does not count the keyboard a second time (#895).
                             .consumeWindowInsets(WindowInsets.ime)
@@ -5025,53 +5067,13 @@ internal fun ConversationScreen(
                                         }
                                         // Jump-to-mention chip: tap visits the oldest unread
                                         // mention and marks it read, so the count steps down.
-                                        val mentionCount = unreadMentionMessageIds.size
                                         // The chip keeps its last count while it shrinks away instead of showing 0.
                                         val shownMentionCount = remember { IntArray(1) }
-                                        if (mentionCount > 0) shownMentionCount[0] = mentionCount
-                                        val mentionBadge =
-                                            shownMentionCount[0].let { if (it > 99) "99+" else it.toString() }
-                                        ConversationNavigationControl(
-                                            visible = !selectionMode && mentionCount > 0,
-                                        ) {
-                                            // The badge caps at 99+; the spoken label keeps the real count.
-                                            val jumpToMentionLabel =
-                                                stringResource(R.string.conversation_jump_to_mention) + ", " +
-                                                    pluralStringResource(
-                                                        R.plurals.unread_mentions_count,
-                                                        shownMentionCount[0],
-                                                        shownMentionCount[0],
-                                                    )
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.tertiaryContainer,
-                                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                                shadowElevation = 2.dp,
-                                                modifier =
-                                                    Modifier
-                                                        .height(34.dp)
-                                                        .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .explainOnLongPress(
-                                                            composerExplanation(
-                                                                R.string.conversation_jump_to_mention,
-                                                                R.string.explanation_conversation_jump_to_mention,
-                                                            ),
-                                                        ).clickable(role = Role.Button) { jumpToNextUnreadMention() }
-                                                        .clearAndSetSemantics {
-                                                            contentDescription = jumpToMentionLabel
-                                                        },
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                                ) {
-                                                    Text("@", style = MaterialTheme.typography.titleMedium)
-                                                    Text(
-                                                        mentionBadge,
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                    )
-                                                }
+                                        if (unreadMentionCount > 0) shownMentionCount[0] = unreadMentionCount
+                                        val showMentionJump = !selectionMode && unreadMentionCount > 0
+                                        ConversationNavigationControl(visible = showMentionJump) {
+                                            ConversationJumpToMentionButton(shownMentionCount[0]) {
+                                                jumpToNextUnreadMention()
                                             }
                                         }
                                         ConversationNavigationControl(
@@ -5426,5 +5428,5 @@ internal fun ConversationScreen(
             }
         }
     }
-    conversationOverlays()
+    if (!transcriptRoutedAway) conversationOverlays()
 }
