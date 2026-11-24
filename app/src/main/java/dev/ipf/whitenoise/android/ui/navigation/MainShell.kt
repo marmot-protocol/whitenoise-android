@@ -222,6 +222,7 @@ internal fun MainShell(
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     var sectionName by shellStateHolder.sectionState::sectionName
     var settingsDetailName by shellStateHolder.sectionState::settingsDetailName
+    var firstRunHelpRoot by rememberSaveable(appState.activeAccountRef) { mutableStateOf<SettingsDetail?>(null) }
     var settingsHomeViewport by
         rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
             mutableStateOf(SettingsHomeViewport.Top)
@@ -1835,9 +1836,12 @@ internal fun MainShell(
                                 },
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name
-                                    settingsDetailName = firstRunHelpDetail(support).name
+                                    val root = firstRunHelpDetail(support)
+                                    settingsDetailName = root.name
+                                    firstRunHelpRoot = root
                                 },
                                 onOpenSettings = {
+                                    firstRunHelpRoot = null
                                     pendingConversationOpen = null
                                     supersedePendingTtsDestinationNavigation()
                                     chatListReturnHeadSnap = resetChatListReturnHeadSnap()
@@ -1896,6 +1900,7 @@ internal fun MainShell(
                                         routingAppUpdate ||
                                         pendingTtsDestinationNavigation != null,
                                 onBackToChats = {
+                                    firstRunHelpRoot = null
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
                                     settingsHomeViewport =
@@ -1917,6 +1922,7 @@ internal fun MainShell(
                                     sectionName = MainSection.Diagnostics.name
                                 },
                                 onOpenSupportChat = { item ->
+                                    firstRunHelpRoot = null
                                     // Land in the conversation itself, not the chat list; no
                                     // list scroll state exists to snapshot from Settings.
                                     commitExplicitConversationOpen(item.group.groupIdHex)
@@ -1931,6 +1937,7 @@ internal fun MainShell(
                                         )
                                 },
                                 detail = settingsDetail,
+                                firstRunHelpRoot = firstRunHelpRoot,
                                 onDetailChange = { settingsDetailName = it?.name },
                                 homeViewport = settingsHomeViewport,
                                 onHomeViewportChange = { settingsHomeViewport = it },

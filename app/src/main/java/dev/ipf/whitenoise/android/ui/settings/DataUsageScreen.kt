@@ -202,7 +202,8 @@ internal fun DataUsageScreen(
                             value = qualityLabels.getValue(appState.mediaQuality),
                             explanation =
                                 stringResource(R.string.explanation_privacy_data_quality) + "\n\n" +
-                                    stringResource(R.string.media_quality_footer),
+                                    stringResource(R.string.media_quality_footer) + "\n\n" +
+                                    stringResource(R.string.download_quality_help),
                             leading = { SettingsLeadingIcon(R.drawable.ic_high_quality) },
                         )
                     }

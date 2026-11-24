@@ -101,7 +101,9 @@ internal fun LazyListScope.storageFreeUpItems(
                     onClick = { onOpenList(LARGEST_ATTACHMENTS_LIST) },
                     enabled = ready && hasAttachments,
                     modifier = Modifier.testTag("storage.largest"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_largest),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_largest) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = { SettingsLeadingIcon(R.drawable.ic_sort) },
                 )
             }
@@ -113,7 +115,9 @@ internal fun LazyListScope.storageFreeUpItems(
                     enabled = ready && hasAttachments,
                     busy = state.action is StorageAction.RemoveOlder,
                     modifier = Modifier.testTag("storage.remove_older"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_remove_older),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_remove_older) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }

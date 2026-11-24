@@ -107,6 +107,7 @@ internal fun SettingsScreen(
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
+    firstRunHelpRoot: SettingsDetail? = null,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -150,6 +151,7 @@ internal fun SettingsScreen(
     var shareFromWalkthrough by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     val parentOf: (SettingsDetail) -> SettingsDetail? = { target ->
         when {
+            target == firstRunHelpRoot -> null
             target == SettingsDetail.Profile && profileFromHeader -> null
             target == SettingsDetail.ShareConnect && shareFromWalkthrough -> SettingsDetail.LearnWhiteNoise
             else -> settingsDetailParent(target)
@@ -157,7 +159,9 @@ internal fun SettingsScreen(
     }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
         shareFromWalkthrough = detail == SettingsDetail.LearnWhiteNoise && destination == SettingsDetail.ShareConnect
-        if (searchOrigin != null &&
+        if (detail != null && detail == firstRunHelpRoot && destination == null) {
+            onBackToChats()
+        } else if (searchOrigin != null &&
             detail == searchOrigin.destination &&
             destination == detail?.let(parentOf)
         ) {
@@ -183,7 +187,12 @@ internal fun SettingsScreen(
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     SettingsRouteMotion(
         target = detail,
-        depth = settingsDetailDepth(detail),
+        depth =
+            if (detail == SettingsDetail.ShareConnect && shareFromWalkthrough) {
+                settingsDetailDepth(SettingsDetail.LearnWhiteNoise) + 1
+            } else {
+                settingsDetailDepth(detail)
+            },
         ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
         suppressMotion = suppressMotion,
         contentVisible = !appState.appLock.screenVisible,
