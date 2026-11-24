@@ -36,22 +36,23 @@ fun SectionHeader(
     contentPadding: PaddingValues = DefaultSectionHeaderPadding,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    val label: @Composable (Modifier) -> Unit = { labelModifier ->
+    val heading = Modifier.semantics { heading() }
+    val colour = MaterialTheme.colorScheme.onSurfaceVariant
+    val style = MaterialTheme.typography.labelLarge
+    if (trailing == null) {
+        // Heading semantics sit outside the padding so the focus bounds keep the full inset.
         Text(
             text = text,
-            modifier = labelModifier.semantics { heading() },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
+            modifier = modifier.fillMaxWidth().then(heading).padding(contentPadding),
+            color = colour,
+            style = style,
         )
-    }
-    if (trailing == null) {
-        label(modifier.fillMaxWidth().padding(contentPadding))
     } else {
         Row(
             modifier = modifier.fillMaxWidth().padding(contentPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            label(Modifier.weight(1f))
+            Text(text = text, modifier = Modifier.weight(1f).then(heading), color = colour, style = style)
             trailing()
         }
     }
