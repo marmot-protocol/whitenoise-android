@@ -30,8 +30,7 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
     val listed = readWithRetries { runCatchingCancellable { refreshAccounts() }.isSuccess }
     val active = activeAccountRef == accountRef
     val next = signOutOutcome(accounts, accountRef).nextActiveRef
-    // An unlink reported only after its copy was removed finds a loaded list without the account.
-    val gone = accountListLoaded && accounts.none { it.label == accountRef }
+    val gone = unlinkedCopyGone(listed, accountListLoaded, isListed = accounts.any { it.label == accountRef })
     if (!gone && unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
         copies.runIfCurrent(accountRef, copy) {
             presentText(
@@ -58,6 +57,17 @@ internal fun WhiteNoiseAppState.retireDeviceUnlinkedNotice(accountRef: String) {
     if (accounts.any { it.label == accountRef }) return
     accountSession.copyLifetimes.copyRemoved(accountRef) { if (toast?.unlinkedAccount == accountRef) clearToast() }
 }
+
+/**
+ * Whether an unlink was reported only after its copy had left this device, which shows as the account missing from
+ * the list. That is believed only of a list this handler re-read ([listed]) and that was published at least once
+ * ([listLoaded]). A list that could not be read may predate the account, and staying quiet then would hide the unlink.
+ */
+internal fun unlinkedCopyGone(
+    listed: Boolean,
+    listLoaded: Boolean,
+    isListed: Boolean,
+): Boolean = listed && listLoaded && !isListed
 
 /**
  * Whether the unlink needs its own notice. With nowhere to move to, the unlinked-account prompt says it itself and

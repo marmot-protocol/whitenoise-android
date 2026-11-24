@@ -45,6 +45,15 @@ class UnlinkedAccountRemovalTest {
         assertEquals(2, retired)
     }
 
+    /** A missing account means its copy is gone only on a list that was re-read and published, never on a stale one. */
+    @Test
+    fun aMissingAccountIsBelievedOnlyOfAListThatWasReRead() {
+        assertTrue(unlinkedCopyGone(listed = true, listLoaded = true, isListed = false))
+        assertFalse(unlinkedCopyGone(listed = false, listLoaded = true, isListed = false))
+        assertFalse(unlinkedCopyGone(listed = true, listLoaded = false, isListed = false))
+        assertFalse(unlinkedCopyGone(listed = true, listLoaded = true, isListed = true))
+    }
+
     /** A read that fails is tried again, and one that never succeeds stops after the last attempt. */
     @Test
     fun aFailedReadIsRetriedAFewTimes() =
