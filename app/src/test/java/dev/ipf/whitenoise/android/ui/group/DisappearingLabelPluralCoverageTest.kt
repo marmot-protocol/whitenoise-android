@@ -16,7 +16,8 @@ class DisappearingLabelPluralCoverageTest {
         val label = groupSource("DisappearingMessages.kt")
         units.forEach { unit ->
             val branchPattern = Regex("""is DisappearingLabelSpec\.$unit ->\s*([^\n]*)""")
-            val branch = branchPattern.find(label)?.groupValues?.get(1).orEmpty()
+            val groups = branchPattern.find(label)?.groupValues
+            val branch = groups?.get(1) ?: ""
             val expected = "disappearing_${unit.lowercase()}_count"
             assertTrue(
                 "$unit must resolve through R.plurals.$expected, found: $branch",
