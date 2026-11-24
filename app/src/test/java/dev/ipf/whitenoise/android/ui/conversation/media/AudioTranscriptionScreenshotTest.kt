@@ -91,11 +91,7 @@ class AudioTranscriptionScreenshotTest {
 
     /** The active disc keeps its circular feedback with large text and RTL in AMOLED. */
     @Test
-    fun pressedActiveDiscAmoledRtlLarge() = capturePressed(
-        "pressed-amoled-rtl-large-on",
-        Appearance.AMOLED_RTL,
-        completed(),
-    )
+    fun pressedOnAmoledRtlLarge() = capturePressed("pressed-amoled-rtl-large-on", Appearance.AMOLED_RTL, completed())
 
     /** Samples the quick tap, release fade and held shape without changing the fixture's toggle state. */
     private fun capturePressed(
