@@ -87,12 +87,10 @@ import dev.ipf.whitenoise.android.core.unreadNeedsMembers
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatFolderPreferences
-import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatListPinMoveResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
@@ -117,7 +115,6 @@ import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.state.setConversationMuted
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
@@ -153,7 +150,6 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
@@ -1106,8 +1102,7 @@ internal fun ChatsScreen(
             !searchActive &&
             (selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT) ==
             dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT
-    var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
-    var pendingHeadDemotion by
+    val pendingHeadDemotionState =
         remember(
             controller,
             appState.activeAccountRef,
@@ -1120,6 +1115,7 @@ internal fun ChatsScreen(
         ) {
             mutableStateOf<ChatListHeadDemotion?>(null)
         }
+    var pendingHeadDemotion by pendingHeadDemotionState
     val pendingHeadDemotionTarget =
         pendingHeadDemotion?.viewportAnchor?.let { anchor ->
             visibleItems.firstOrNull { it.id == anchor.chatId }
@@ -1278,159 +1274,28 @@ internal fun ChatsScreen(
         onDispose { actionScope.set(false) }
     }
 
-    fun archiveChats(
-        items: List<ChatListItem>,
-        archive: Boolean,
-    ) {
-        if (items.isEmpty()) return
-        val owner = controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val succeeded =
-                controller.setArchivedForOwner(
-                    groupIds = items.map { it.group.groupIdHex },
-                    archived = archive,
-                    notify = false,
-                    owner = owner,
-                )
-            if (succeeded > 0 && controller.chatListActionIsCurrent(owner)) {
-                val pluralRes =
-                    if (archive) {
-                        R.plurals.toast_chat_list_chats_archived
-                    } else {
-                        R.plurals.toast_chat_list_chats_restored
-                    }
-                appState.presentTransient(context.resources.getQuantityString(pluralRes, succeeded, succeeded))
-            }
-        }
-    }
-
-    fun openFolderPicker(items: List<ChatListItem>) {
-        folderHandoff.pickerChatIds =
-            items
-                .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
-                .takeIf { it.isNotEmpty() }
-    }
-
-    fun markChatRead(
-        item: ChatListItem,
-        unread: Boolean,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed =
-                if (unread) current?.actions?.canMarkUnread != false else current?.actions?.canMarkRead != false
-            if (current != null && allowed) {
-                if (unread) controller.markUnread(current, owner) else controller.markAllRead(current, owner)
-            }
-        }
-    }
-
-    fun toggleChatMute(
-        item: ChatListItem,
-        muted: Boolean,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed = if (muted) current?.actions?.canUnmute != false else current?.actions?.canMute != false
-            if (current != null && allowed && controller.chatListActionIsCurrent(owner)) {
-                appState.setConversationMuted(
-                    current.group.groupIdHex,
-                    !muted,
-                    onCommitted = { controller.refreshChatListActionProjection(owner) },
-                    isCurrent = { controller.chatListActionIsCurrent(owner) },
-                    completionIsCurrent = { controller.chatListActionSessionIsCurrent(owner) },
-                )
-            }
-        }
-    }
-
-    fun toggleChatPin(
-        item: ChatListItem,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        if (item.group.archived) return
-        val nextPinned = !item.pinned()
-        val headDemotion =
-            if (!nextPinned && ordinaryActiveList && visibleItems.firstOrNull()?.id == item.id) {
-                nextHeadDemotionTransactionId += 1L
-                ChatListHeadDemotion(
-                    chatId = item.id,
-                    transactionId = nextHeadDemotionTransactionId,
-                    viewportAnchor = chatListState.chatListViewportAnchor(visibleChatIds),
+    val chatListActions =
+        rememberChatListActions(
+            appState = appState,
+            controller = controller,
+            actionScope = actionScope,
+            batchScope = batchScope,
+            pinFollow = pinFollow,
+            folderHandoff = folderHandoff,
+            pendingHeadDemotion = pendingHeadDemotionState,
+            inputs =
+                ChatListActions.Inputs(
+                    context = context,
+                    resources = resources,
+                    ordinaryActiveList = ordinaryActiveList,
+                    visibleItems = visibleItems,
+                    visibleChatIds = visibleChatIds,
+                    chatListState = chatListState,
                     viewportGeneration = viewportGeneration,
-                )
-            } else {
-                null
-            }
-        if (headDemotion != null) {
-            pendingHeadDemotion = headDemotion
-        } else if (nextPinned && pendingHeadDemotion?.chatId == item.id) {
-            pendingHeadDemotion = null
-        }
-        // Captured at the gesture: a pin that commits after a folder/query/account change follows nothing.
-        val followScope = pinFollow.currentScope.takeIf { nextPinned }
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed = if (nextPinned) current?.actions?.canPin != false else current?.actions?.canUnpin != false
-            val eligible = current != null && !current.group.archived && allowed
-            val succeeded = eligible && current != null && controller.setPinned(current, nextPinned, owner)
-            if (!succeeded && pendingHeadDemotion == headDemotion) {
-                pendingHeadDemotion = null
-            }
-            if (succeeded && nextPinned && controller.chatListActionSessionIsCurrent(owner)) {
-                pinFollow.issue(followScope, setOf(item.id))
-            }
-        }
-    }
-
-    /**
-     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
-     * user when the order did not change. Selection and single-row moves share this path (#3709).
-     */
-    fun movePinnedChats(
-        ids: Set<String>,
-        delta: Int,
-        fromSelection: Boolean = true,
-    ) {
-        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
-        appState.launchMutation {
-            val result =
-                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-            // The unchanged notice describes a selection; a single row already at the end just stays put.
-            val quiet =
-                result == ChatListPinMoveResult.MOVED ||
-                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
-            if (controller.chatListActionIsCurrent(owner) && !quiet) {
-                val message =
-                    when (result) {
-                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
-                        else -> R.string.chat_batch_order_failed
-                    }
-                appState.presentTransient(resources.getString(message), kind = TransientNoticeKind.Information)
-            }
-        }
-    }
-
-    /** Moves one pinned row from its long-press menu through the complete-order path. */
-    fun movePinnedChat(
-        item: ChatListItem,
-        delta: Int,
-    ) {
-        if (pinnedIndex(item) == null) return
-        clearSelection()
-        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
-    }
+                    pinnedIndex = ::pinnedIndex,
+                    clearSelection = ::clearSelection,
+                ),
+        )
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
@@ -2053,6 +1918,8 @@ internal fun ChatsScreen(
                                 actionScope.get() && latestSwipeAdmission()
                             }
                         if (owner != null && menuActionsCurrent()) {
+                            // The action below keeps this commit's list values across the native row lookup, as before.
+                            val commitInputs = chatListActions.currentInputs()
                             appState.launchMutation {
                                 val current = controller.resolveChatListActionItem(item.group.groupIdHex, owner)
                                 val gestureCurrent =
@@ -2069,13 +1936,21 @@ internal fun ChatsScreen(
                                     val markUnread = !current.effectiveHasUnread(appState.activeAccount?.accountIdHex)
                                     when (action) {
                                         SwipeAction.ReadUnread ->
-                                            markChatRead(
+                                            chatListActions.markChatRead(
                                                 current,
                                                 unread = markUnread,
                                                 resolvedOwner = owner,
+                                                inputs = commitInputs,
                                             )
-                                        SwipeAction.MuteUnmute -> toggleChatMute(current, current.engineMuted(), owner)
-                                        SwipeAction.PinUnpin -> toggleChatPin(current, owner)
+                                        SwipeAction.MuteUnmute ->
+                                            chatListActions.toggleChatMute(
+                                                current,
+                                                current.engineMuted(),
+                                                owner,
+                                                commitInputs,
+                                            )
+                                        SwipeAction.PinUnpin ->
+                                            chatListActions.toggleChatPin(current, owner, commitInputs)
                                         else -> Unit
                                     }
                                 }
@@ -2176,9 +2051,9 @@ internal fun ChatsScreen(
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
                             // Pins below the loaded window still count; a move at the true end leaves the row in place.
                             showMovePinnedDown = pinnedIndex != null,
-                            onMarkRead = { markChatRead(item, unread = false) },
-                            onMarkUnread = { markChatRead(item, unread = true) },
-                            onAddToFolder = { openFolderPicker(listOf(item)) },
+                            onMarkRead = { chatListActions.markChatRead(item, unread = false) },
+                            onMarkUnread = { chatListActions.markChatRead(item, unread = true) },
+                            onAddToFolder = { chatListActions.openFolderPicker(listOf(item)) },
                             onExcludeFromFolder =
                                 selectedFolder?.let { folder ->
                                     {
@@ -2192,10 +2067,12 @@ internal fun ChatsScreen(
                                         }
                                     }
                                 },
-                            onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
-                            onMuteToggle = { toggleChatMute(item, muted) },
-                            onPinToggle = { toggleChatPin(item) },
-                            onMovePinned = { delta -> movePinnedChat(item, delta) },
+                            onArchiveToggle = {
+                                chatListActions.archiveChats(listOf(item), archive = !item.group.archived)
+                            },
+                            onMuteToggle = { chatListActions.toggleChatMute(item, muted) },
+                            onPinToggle = { chatListActions.toggleChatPin(item) },
+                            onMovePinned = { delta -> chatListActions.movePinnedChat(item, delta) },
                             onSelect = {
                                 clearSelection()
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
@@ -2486,11 +2363,11 @@ internal fun ChatsScreen(
                             }
                         },
                         onAddToFolder = {
-                            openFolderPicker(selectedVisibleItems)
+                            chatListActions.openFolderPicker(selectedVisibleItems)
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
+                        onMovePinned = { delta -> chatListActions.movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.
