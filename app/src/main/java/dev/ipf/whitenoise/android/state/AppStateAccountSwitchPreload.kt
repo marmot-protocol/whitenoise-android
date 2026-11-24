@@ -57,8 +57,10 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
     plan: AccountSwitchPreloadPlan,
 ): AccountSwitchLocalSnapshot? =
     try {
+        val prefetched =
+            if (plan.startupRestoration) takeStartupChatListPrefetch(accountRef)?.await() else null
         val presentedRows =
-            marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+            prefetched ?: marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                 presentedChatList(accountRef, includeArchived = true)
             }.rows
         ensureAccountSwitchRequestIsCurrent(generation)
@@ -69,7 +71,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
                 presentedRows,
                 awaitColdWorkers = plan.awaitColdAvatarWorkers,
                 onPrepared =
-                    if (plan.recordStartupAvatarPreparation) {
+                    if (plan.startupRestoration) {
                         { renderable, decoded ->
                             ensureAccountSwitchRequestIsCurrent(generation)
                             recordStartupAvatarPreparation(renderable, decoded)

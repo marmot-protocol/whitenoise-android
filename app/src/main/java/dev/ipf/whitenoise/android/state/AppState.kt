@@ -3810,10 +3810,12 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             start = { runtime ->
+                beginStartupChatListPrefetch(runtime.marmot)
                 startMarmotWithNotificationListener(runtime)
                 appStateDebug { "marmot started" }
             },
             closeAfterFailure = { runtime ->
+                abandonStartupChatListPrefetch()
                 startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                     notificationDelivery.notificationDeliveryModeMutex.withLock {
                         notificationDelivery.nativePushSyncMutex.withLock {
