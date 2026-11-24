@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.emojiSheetFieldAnchor
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -314,6 +317,7 @@ private fun DayPicker(
     }
 }
 
+/** One weekday cell: the whole cell toggles, while its circle shows the selection and the press highlight. */
 @Suppress("FunctionNaming")
 @Composable
 private fun DayToggle(
@@ -325,12 +329,20 @@ private fun DayToggle(
     modifier: Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val press = remember { MutableInteractionSource() }
     Box(
         modifier
             .heightIn(min = DayToggleTarget)
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
-            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() })
-            .semantics { contentDescription = description },
+            // The whole cell toggles, and the press highlight is drawn on the day's circle below.
+            .toggleable(
+                value = selected,
+                interactionSource = press,
+                indication = null,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            ).semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -340,7 +352,7 @@ private fun DayToggle(
             border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
             modifier = Modifier.sizeIn(minWidth = DayToggleSize, minHeight = DayToggleSize).clearAndSetSemantics {},
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(Modifier.shapedPressFeedback(press, CircleShape), contentAlignment = Alignment.Center) {
                 Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
             }
         }

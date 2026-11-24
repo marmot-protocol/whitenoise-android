@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
 
 /**
  * Hold-to-record voice button. Press → start; release → stop and review.
@@ -156,6 +157,7 @@ internal fun MicHoldButton(
                             }
                         }
                     },
+            shape = CenteredCircleShape,
         ) {
             if (recording) {
                 Icon(

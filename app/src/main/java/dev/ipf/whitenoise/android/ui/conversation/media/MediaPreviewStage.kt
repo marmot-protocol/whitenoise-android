@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 
 private const val THUMBNAIL_MAX_EDGE_PX = 256
 private val PAGE_SPACING = 24.dp
@@ -376,12 +377,19 @@ private fun MediaPreviewThumb(
     onClick: () -> Unit,
 ) {
     val positionDescription = stringResource(R.string.media_preview_position_badge, position)
+    val press = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .size(FILMSTRIP_TARGET)
-                .selectable(selected = selected, enabled = enabled, onClick = onClick)
-                .semantics { contentDescription = positionDescription }
+                // The whole target selects, and the press highlight is drawn on the rounded thumbnail below.
+                .selectable(
+                    selected = selected,
+                    interactionSource = press,
+                    indication = null,
+                    enabled = enabled,
+                    onClick = onClick,
+                ).semantics { contentDescription = positionDescription }
                 .testTag("conversation.media.thumbnail.target"),
         contentAlignment = Alignment.Center,
     ) {
@@ -394,7 +402,7 @@ private fun MediaPreviewThumb(
                     } else {
                         Modifier
                     },
-                ).clip(MaterialTheme.shapes.small)
+                ).shapedPressFeedback(press, MaterialTheme.shapes.small)
         val bitmap =
             (item as? StagedPreviewItem.Media)?.let { media ->
                 metadata?.let {

@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -406,6 +407,8 @@ internal fun MediaFileBubble(
                 .onGloballyPositioned { activationBounds[0] = it.motionBoundsOnScreen(view) }
                 .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
+                // Clipped first, so the press highlight keeps the card's rounded corners.
+                .clip(ConversationRichContentShape)
                 .combinedClickable(
                     enabled =
                         firstFrameCacheResolved &&

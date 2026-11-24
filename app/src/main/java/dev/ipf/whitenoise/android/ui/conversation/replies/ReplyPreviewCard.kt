@@ -243,7 +243,14 @@ internal fun ReplyPreviewCard(
         modifier =
             Modifier
                 .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-                .then(if (onClick != null) Modifier.clickable(role = Role.Button) { onClick() } else Modifier),
+                // Clipped first, so the press highlight keeps the card's rounded corners.
+                .then(
+                    if (onClick != null) {
+                        Modifier.clip(ConversationEmbedShape).clickable(role = Role.Button) { onClick() }
+                    } else {
+                        Modifier
+                    },
+                ),
     ) {
         Box {
             Row(

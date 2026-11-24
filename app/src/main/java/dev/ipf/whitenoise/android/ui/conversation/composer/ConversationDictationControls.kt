@@ -56,6 +56,7 @@ import dev.ipf.whitenoise.android.audio.followUpAwaitingPrevious
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.audio.supportsFollowUpCapture
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -261,6 +262,7 @@ private fun ConversationDictationActiveActions(
                         R.string.explanation_conversation_dictation_cancel,
                     ),
                 ),
+        shape = CenteredCircleShape,
     ) {
         Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
     }
@@ -279,6 +281,7 @@ private fun ConversationDictationActiveActions(
                         selected = true
                         progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
                     },
+            shape = CenteredCircleShape,
         ) {
             CircularProgressIndicator(
                 modifier =
@@ -332,6 +335,7 @@ private fun ConversationDictationPasteAction(
                         progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
                     }
                 },
+        shape = CenteredCircleShape,
     ) {
         if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
             CircularProgressIndicator(
@@ -391,6 +395,7 @@ private fun ConversationDictationDismissAction(
     IconButton(
         onClick = settleControlMorph(onClick),
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
+        shape = CenteredCircleShape,
     ) {
         Icon(
             painterResource(R.drawable.ic_close),

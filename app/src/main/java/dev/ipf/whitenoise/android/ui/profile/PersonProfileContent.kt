@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -341,7 +343,8 @@ private fun PersonProfileIdentity(
         },
         avatar = { avatarSize ->
             Box(
-                Modifier.size(avatarSize).testTag("person_profile.avatar").clickable(
+                // Clipped to the round avatar first, so the press highlight follows it.
+                Modifier.size(avatarSize).testTag("person_profile.avatar").clip(CircleShape).clickable(
                     enabled = person.avatarClickable,
                     role = Role.Button,
                     onClickLabel = stringResource(R.string.profile_view_picture),
@@ -480,7 +483,7 @@ internal fun PersonProfileBottomAction(
     val (originModifier, routeClick) =
         dev.ipf.whitenoise.android.ui.settings
             .rememberSettingsRouteClick(onClick)
-    SettingsBottomAction(modifier, color, tonalElevation = 0.dp) {
+    SettingsBottomAction(modifier, color, elevated = false) {
         WhiteNoiseButton(
             routeClick,
             Modifier

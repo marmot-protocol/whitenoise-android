@@ -46,6 +46,7 @@ internal val FloatingControlGap = 8.dp
 /** One clock for floating controls appearing, leaving and making room for each other. */
 internal const val FLOATING_CONTROL_MOTION_MILLIS = 180
 
+/** The shared floating-control clock as an animation spec, for any animated value type. */
 internal fun <T> floatingControlMotionSpec(): FiniteAnimationSpec<T> =
     tween(
         durationMillis = FLOATING_CONTROL_MOTION_MILLIS,
@@ -58,6 +59,9 @@ internal val LocalFloatingControlShown = compositionLocalOf { true }
 /**
  * Grows a floating control out of its bottom-end corner and shrinks it back there, while the stack
  * closes the gap on the same clock. Reduced motion shows and removes the control at once.
+ *
+ * The size change does not clip, because a clip would cut the control's shadow away while the stack moves
+ * (#4101). The fade and scale keep the overflow faint while the slot is still shorter than the control.
  */
 @Composable
 internal fun FloatingControlVisibility(
@@ -76,14 +80,14 @@ internal fun FloatingControlVisibility(
         enter =
             if (motionEnabled) {
                 fadeIn(spec) + scaleIn(spec, initialScale = 0.6f, transformOrigin = origin) +
-                    expandVertically(size, expandFrom = Alignment.Bottom)
+                    expandVertically(size, expandFrom = Alignment.Bottom, clip = false)
             } else {
                 EnterTransition.None
             },
         exit =
             if (motionEnabled) {
                 fadeOut(spec) + scaleOut(spec, targetScale = 0.6f, transformOrigin = origin) +
-                    shrinkVertically(size, shrinkTowards = Alignment.Bottom)
+                    shrinkVertically(size, shrinkTowards = Alignment.Bottom, clip = false)
             } else {
                 ExitTransition.None
             },

@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -441,7 +442,7 @@ private fun TimestampHoverTooltip(
             Surface(
                 modifier = Modifier.then(surface.modifier()).testTag("timestamp.hover").exposePerformanceTestTags(),
                 shape = MaterialTheme.shapes.small,
-                tonalElevation = 4.dp,
+                tonalElevation = WhiteNoiseElevation.Menu,
             ) {
                 Text(
                     hoverFrame.first,

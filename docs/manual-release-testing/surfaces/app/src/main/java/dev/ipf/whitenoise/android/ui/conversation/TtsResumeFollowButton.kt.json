@@ -9,7 +9,8 @@
         "anchor": "Icons.Default.GpsFixed",
         "test_ids": [
           "TTS-001",
-          "TTS-004"
+          "TTS-004",
+          "AXY-018"
         ]
       },
       {

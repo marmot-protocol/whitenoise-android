@@ -144,7 +144,7 @@ internal fun ProfileEditContent(
         },
         bottomBar = {
             if (editing && hasAccount) {
-                SettingsBottomAction(tonalElevation = 0.dp) {
+                SettingsBottomAction(elevated = false) {
                     ProfileSaveButton(
                         enabled = saveEnabled,
                         busy = busy,
@@ -201,6 +201,8 @@ internal fun ProfileEditContent(
                     Box(
                         Modifier
                             .size(avatarSize)
+                            // Clipped to the round avatar first, so the press highlight follows it.
+                            .clip(CircleShape)
                             .then(
                                 if (pictureUrl != null) {
                                     Modifier.clickable(

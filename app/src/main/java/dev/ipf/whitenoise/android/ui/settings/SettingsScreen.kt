@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -835,6 +837,8 @@ private fun SettingsProfileRow(
                             Modifier
                                 .size(SettingsHomeDefaults.ProfileAvatarSize)
                                 .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
+                                // Clipped to the round avatar first, so the press highlight follows it.
+                                .clip(CircleShape)
                                 .clickable(role = Role.Button, onClick = onAvatarClick)
                                 .testTag("settings.active_profile_avatar")
                                 .semantics {

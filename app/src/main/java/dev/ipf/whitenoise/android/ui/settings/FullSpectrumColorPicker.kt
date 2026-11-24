@@ -177,7 +177,9 @@ private fun ColorPresetRow(
                     Modifier
                         .explainOnLongPress(
                             Explanation(description, stringResource(R.string.explanation_appearance_color_swatch)),
-                        ).clickable { onSelect(argb) }
+                            // Clipped before the click, so the press highlight is the circle, not the square around it.
+                        ).clip(CircleShape)
+                        .clickable { onSelect(argb) }
                         .semantics {
                             role = Role.RadioButton
                             selected = selectedArgb == argb

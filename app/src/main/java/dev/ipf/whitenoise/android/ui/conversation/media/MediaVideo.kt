@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +57,8 @@ import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
@@ -552,6 +555,7 @@ internal fun MediaVideoBubble(
                 )
             }
             if (!transferShown) {
+                val discPress = remember { MutableInteractionSource() }
                 Surface(
                     color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
                     contentColor = MaterialTheme.colorScheme.inverseOnSurface,
@@ -560,7 +564,9 @@ internal fun MediaVideoBubble(
                         Modifier
                             .size(VIDEO_PLAY_DISC_SIZE)
                             .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
-                            .combinedClickable(
+                            .shapedTouchTarget(
+                                discPress,
+                                role = null,
                                 onLongClick = onLongPress,
                                 onClick = {
                                     when {
@@ -575,7 +581,7 @@ internal fun MediaVideoBubble(
                                 },
                             ),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.shapedPressFeedback(discPress, CircleShape), contentAlignment = Alignment.Center) {
                         when {
                             uploadFailed ->
                                 Icon(
@@ -584,6 +590,7 @@ internal fun MediaVideoBubble(
                                     modifier =
                                         Modifier
                                             .size(28.dp)
+                                            .clip(CircleShape)
                                             .clickable { onRetryUpload?.invoke() },
                                 )
                             uploading -> VideoUploadIndicator(uploadProgress)
@@ -607,6 +614,7 @@ internal fun MediaVideoBubble(
                                     modifier =
                                         Modifier
                                             .size(28.dp)
+                                            .clip(CircleShape)
                                             .clickable(enabled = !loading) { retryFailedPlayback() },
                                 )
                             // An accepted download that has not started yet is still a download, never Play.

@@ -35,6 +35,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -272,7 +273,8 @@ internal fun ComposerAttachmentShelfCard(
                 .height(cardHeight.dp)
                 .then(
                     if (onPreview != null) {
-                        Modifier.clickable(
+                        // Clipped first, so the press highlight keeps the card's rounded corners.
+                        Modifier.clip(CARD_SHAPE).clickable(
                             enabled = enabled,
                             role = Role.Button,
                             onClickLabel = previewLabel,

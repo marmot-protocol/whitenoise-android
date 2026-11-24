@@ -215,6 +215,8 @@ internal fun VoiceLibraryRow(
             modifier =
                 Modifier
                     .size(48.dp)
+                    // Clip first, so the press highlight is the disc rather than the square around it.
+                    .clip(CircleShape)
                     .clickable(enabled = !loading && actionReady) {
                         if (isPlayingThis) {
                             VoicePlaybackController.pause()

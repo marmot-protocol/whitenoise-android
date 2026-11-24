@@ -121,7 +121,8 @@ internal fun ComposerPdfAttachmentCard(
                 .height(PDF_CARD_HEIGHT.dp)
                 .then(
                     if (onPreview != null) {
-                        Modifier.clickable(
+                        // Clipped first, so the press highlight keeps the card's rounded corners.
+                        Modifier.clip(PDF_CARD_SHAPE).clickable(
                             enabled = enabled,
                             onClickLabel = previewLabel,
                             role = Role.Button,

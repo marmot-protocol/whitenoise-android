@@ -137,6 +137,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -1805,6 +1806,7 @@ internal fun ComposerPill(
                                                                     Modifier.clearAndSetSemantics {}
                                                                 },
                                                             ),
+                                                    shape = CenteredCircleShape,
                                                 ) {
                                                     // Swap the glyph on open (X) the way the emoji toggle swaps
                                                     // to a keyboard, so sighted users get a visual cue, not just
@@ -1967,6 +1969,7 @@ internal fun ComposerPill(
                                                         Modifier.clearAndSetSemantics {}
                                                     },
                                                 ),
+                                        shape = CenteredCircleShape,
                                     ) {
                                         // The prototype's microphone is dictation; voice notes use the waveform glyph.
                                         Icon(

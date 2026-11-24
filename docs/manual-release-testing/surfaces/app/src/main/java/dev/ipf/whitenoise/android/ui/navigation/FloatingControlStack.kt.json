@@ -9,7 +9,8 @@
         "anchor": "fun FloatingControlVisibility(",
         "test_ids": [
           "CHL-036",
-          "NAV-012"
+          "NAV-012",
+          "AXY-018"
         ]
       },
       {

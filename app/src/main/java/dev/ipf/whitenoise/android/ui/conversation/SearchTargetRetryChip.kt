@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -21,9 +20,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.MinimumTouchTarget
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val SEARCH_TARGET_RETRY_CHIP_TAG = "conversation.search_target_retry"
@@ -38,17 +40,22 @@ internal fun SearchTargetRetryChip(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Surface(onClick) clips its press highlight to the pill, where a clickable passed in through the
+    // modifier would draw a rectangle around it.
     Surface(
+        onClick = onRetry,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shadowElevation = 2.dp,
+        shadowElevation = WhiteNoiseElevation.FloatingControl,
         modifier =
             modifier
-                .heightIn(min = 48.dp)
+                .heightIn(min = MinimumTouchTarget)
                 .testTag(SEARCH_TARGET_RETRY_CHIP_TAG)
-                .clickable(role = Role.Button, onClick = onRetry)
-                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+                .semantics(mergeDescendants = true) {
+                    role = Role.Button
+                    liveRegion = LiveRegionMode.Polite
+                },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

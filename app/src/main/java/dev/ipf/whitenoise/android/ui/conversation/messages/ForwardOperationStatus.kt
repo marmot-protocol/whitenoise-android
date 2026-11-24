@@ -56,6 +56,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import java.util.Locale
 
 internal const val FORWARD_OPERATION_STATUS_TEST_TAG = "forward-operation-status"
@@ -177,7 +178,7 @@ private fun ForwardOperationStatusBar(
     modifier: Modifier,
 ) {
     Surface(
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
         modifier =
             modifier
                 .fillMaxWidth()

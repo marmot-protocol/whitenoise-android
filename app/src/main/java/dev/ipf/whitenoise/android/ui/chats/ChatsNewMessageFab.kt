@@ -61,7 +61,9 @@ import dev.ipf.whitenoise.android.ui.settings.settingsPenSource
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 import kotlinx.coroutines.CancellationException
 
 /** Only actual known-missing receiving configuration changes New Message into a recovery route. */
@@ -229,7 +231,7 @@ internal fun ChatsNewMessageFabContent(
             shape = if (morphing) RectangleShape else FloatingActionButtonDefaults.shape,
             containerColor = chatsFabContainerColor(morphing, MaterialTheme.colorScheme.surfaceContainerHigh),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
+            elevation = chatsFabElevation(morphing),
         ) {
             Icon(
                 painterResource(if (missingRelays) R.drawable.ic_warning else R.drawable.ic_edit),
@@ -273,3 +275,20 @@ private fun chatsFabContainerColor(
 ): Color = if (morphing) Color.Transparent else settledColor
 
 private val ChatFabIconSize = 24.dp
+
+/**
+ * The pen's one floating elevation, the same at rest and pressed (#4101). The morph surface that carries the
+ * pen into the composer is flat, so while [morphing] the pen casts no shadow in any state.
+ */
+@Composable
+private fun chatsFabElevation(morphing: Boolean) =
+    if (morphing) {
+        FloatingActionButtonDefaults.elevation(
+            defaultElevation = WhiteNoiseElevation.None,
+            pressedElevation = WhiteNoiseElevation.None,
+            focusedElevation = WhiteNoiseElevation.None,
+            hoveredElevation = WhiteNoiseElevation.None,
+        )
+    } else {
+        floatingControlFabElevation()
+    }

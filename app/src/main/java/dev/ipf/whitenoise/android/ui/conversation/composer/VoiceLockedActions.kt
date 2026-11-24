@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.Dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** A locked take's trailing row: delete the take, or stop it into review. Both stay enabled throughout. */
@@ -37,6 +38,7 @@ internal fun VoiceLockedActions(
                             R.string.explanation_conversation_voice_delete,
                         ),
                     ),
+            shape = CenteredCircleShape,
         ) {
             Icon(
                 painterResource(R.drawable.ic_delete),

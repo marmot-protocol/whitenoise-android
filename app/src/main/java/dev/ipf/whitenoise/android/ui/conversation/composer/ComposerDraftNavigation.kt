@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.composerDraftJumpShortcuts
+import dev.ipf.whitenoise.android.ui.common.CenteredCircleShape
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
@@ -135,6 +136,7 @@ internal fun ComposerLegacyDraftTop(
                     .explainOnLongPress(
                         composerExplanation(R.string.scroll_to_top, R.string.explanation_composer_draft_top),
                     ),
+            shape = CenteredCircleShape,
         ) {
             Icon(
                 painterResource(R.drawable.ic_jump_to_edge),

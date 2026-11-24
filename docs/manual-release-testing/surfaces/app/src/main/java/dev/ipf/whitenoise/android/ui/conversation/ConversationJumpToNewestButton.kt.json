@@ -9,7 +9,8 @@
         "anchor": "fun ConversationJumpToNewestButton(",
         "test_ids": [
           "CON-001",
-          "CHL-022"
+          "CHL-022",
+          "AXY-018"
         ]
       },
       {
