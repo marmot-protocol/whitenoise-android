@@ -34,7 +34,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt" to 1472,
         "dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt" to 800,
         "dev/ipf/whitenoise/android/state/AppReviewDemo.kt" to 773,
-        "dev/ipf/whitenoise/android/state/AppState.kt" to 8355,
+        "dev/ipf/whitenoise/android/state/AppState.kt" to 8190,
         "dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt" to 1819,
         "dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt" to 624,
         "dev/ipf/whitenoise/android/state/ChatFolderPreferences.kt" to 742,
