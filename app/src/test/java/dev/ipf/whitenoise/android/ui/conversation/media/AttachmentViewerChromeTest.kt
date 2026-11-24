@@ -130,7 +130,7 @@ class AttachmentViewerChromeTest {
         assertTrue("the rendered HTML page takes the theme's palette", themed)
         val themedBackground = "MaterialTheme.colorScheme.background.toArgb()" in viewer
         assertTrue("the WebView background follows the theme", themedBackground)
-        assertTrue("a page with its own colours keeps its canvas", "if (authorColours) document else" in viewer)
+        assertTrue("a page with its own styling keeps its canvas", "if (authorStyling) document else" in viewer)
     }
 
     /** One production source by its path below the app package, from the module or the repository root. */

@@ -72,7 +72,7 @@ internal fun DocumentAttachmentViewer(
     var sourceTab by remember(actions) { mutableStateOf(false) }
     var pendingLink by remember(actions) { mutableStateOf<String?>(null) }
     var generation by remember(actions) { mutableIntStateOf(0) }
-    var authorColours by remember(actions) { mutableStateOf(false) }
+    var authorStyling by remember(actions) { mutableStateOf(false) }
     val context = LocalContext.current
     LaunchedEffect(actions, generation) {
         if (kind != DocumentAttachmentKind.Html) return@LaunchedEffect
@@ -97,14 +97,14 @@ internal fun DocumentAttachmentViewer(
         val sanitized =
             runCatchingCancellable {
                 withContext(Dispatchers.Default) {
-                    LocalHtmlPolicy.sanitize(decoded.text).let { it to LocalHtmlPolicy.hasAuthorColours(it) }
+                    LocalHtmlPolicy.sanitize(decoded.text).let { it to LocalHtmlPolicy.hasAuthorStyling(it) }
                 }
             }
         if (actions.isCurrent()) {
             sanitized
-                .onSuccess { (document, colours) ->
+                .onSuccess { (document, styled) ->
                     html = document
-                    authorColours = colours
+                    authorStyling = styled
                 }.onFailure { error = true }
         }
     }
@@ -149,11 +149,11 @@ internal fun DocumentAttachmentViewer(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    // A page that sets its own colours keeps the dark canvas it was written against.
+                    // A page with its own styling keeps the dark canvas it was written against.
                     val palette = documentPalette()
                     LocalHtmlView(
-                        remember(document, palette, authorColours) {
-                            if (authorColours) document else LocalHtmlPolicy.themed(document, palette)
+                        remember(document, palette, authorStyling) {
+                            if (authorStyling) document else LocalHtmlPolicy.themed(document, palette)
                         },
                         Modifier.fillMaxSize(),
                         onLink = {
@@ -163,7 +163,7 @@ internal fun DocumentAttachmentViewer(
                             error = true
                         },
                         backgroundColor =
-                            if (authorColours) Color.Black.toArgb() else MaterialTheme.colorScheme.background.toArgb(),
+                            if (authorStyling) Color.Black.toArgb() else MaterialTheme.colorScheme.background.toArgb(),
                     )
                 }
             }

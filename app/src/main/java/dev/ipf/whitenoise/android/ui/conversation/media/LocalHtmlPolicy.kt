@@ -138,19 +138,18 @@ internal object LocalHtmlPolicy {
     }
 
     /**
-     * True when the sender's own CSS, in a style element or a `style` attribute, sets a text or background colour.
-     * Such a page keeps the policy's dark canvas: putting the theme's light page under sender-chosen colours could
-     * leave white text on a light background. The first style element is the policy's own header and is skipped.
+     * True when the page keeps any sender styling: a style element of its own, a non-blank `style` attribute, or
+     * inline SVG, whose `fill` and `stroke` can colour text. Such a page keeps the policy's dark canvas it was
+     * written against, because colours can hide in CSS the app does not parse (comments, escapes, variables) and a
+     * light page under sender-chosen white text would be unreadable. Only unstyled pages take the theme. The first
+     * style element is the policy's own header and is skipped.
      */
-    fun hasAuthorColours(document: LocalHtmlDocument): Boolean {
+    fun hasAuthorStyling(document: LocalHtmlDocument): Boolean {
         val parsed = Jsoup.parse(document.html)
-        val senderCss =
-            parsed.select("style").drop(1).map { it.data() } + parsed.select("[style]").map { it.attr("style") }
-        return senderCss.any(AUTHOR_COLOUR::containsMatchIn)
+        return parsed.select("style").size > 1 ||
+            parsed.select("[style]").any { it.attr("style").isNotBlank() } ||
+            parsed.select("svg").isNotEmpty()
     }
-
-    /** A CSS declaration that sets a foreground or background colour. */
-    private val AUTHOR_COLOUR = Regex("(?i)(?:^|[\\s;{])(?:color|background(?:-color)?)\\s*:")
 
     /** A packed `0xRRGGBB` colour as a CSS hex literal. */
     private fun hex(rgb: Int): String = "#%06x".format(rgb and RGB_MASK)

@@ -264,19 +264,25 @@ class LocalHtmlPolicyTest {
             assertEquals(Jsoup.parse(document.html).body().html(), themed.body().html())
         }
 
-    /** A page that sets only its own text colour keeps the dark canvas, so white text never lands on a light page. */
+    /** Any retained sender styling keeps the dark canvas, including colours a CSS matcher would miss. */
     @Test
-    fun senderColoursAreDetectedInStyleAttributesAndElements() =
+    fun senderStylingOrSvgKeepsTheOriginalCanvas() =
         runBlocking {
-            val foregroundOnly = LocalHtmlPolicy.sanitize("<p style=\"color:#fff\">white text</p>")
-            assertTrue(LocalHtmlPolicy.hasAuthorColours(foregroundOnly))
-            val styleElement = LocalHtmlPolicy.sanitize("<style>p{font-weight:bold;color:white}</style><p>text</p>")
-            assertTrue(LocalHtmlPolicy.hasAuthorColours(styleElement))
-            val background = LocalHtmlPolicy.sanitize("<div style=\"background: navy\">text</div>")
-            assertTrue(LocalHtmlPolicy.hasAuthorColours(background))
+            val styled =
+                listOf(
+                    // A comment between the property and its colon still sets white text.
+                    "<p style=\"color/**/:white\">white text</p>",
+                    "<style>p{font-weight:bold;color:white}</style><p>text</p>",
+                    "<div style=\"background: navy\">text</div>",
+                    // SVG text takes its colour from fill, not CSS colour.
+                    "<svg><text x=\"1\" y=\"10\" fill=\"white\">label</text></svg>",
+                )
+            styled.forEach { source ->
+                assertTrue(source, LocalHtmlPolicy.hasAuthorStyling(LocalHtmlPolicy.sanitize(source)))
+            }
             val plain =
-                LocalHtmlPolicy.sanitize("<h1>Notes</h1><p style=\"border-color:red;margin:4px\">color: words</p>")
-            assertFalse("the policy header and non-colour CSS do not count", LocalHtmlPolicy.hasAuthorColours(plain))
+                LocalHtmlPolicy.sanitize("<h1>Notes</h1><p>color: plain words</p><table><tr><td>a</td></tr></table>")
+            assertFalse("the policy's own header does not count", LocalHtmlPolicy.hasAuthorStyling(plain))
         }
 
     @Test fun formattingTextAndBoundedTableSpansSurvive() =
