@@ -69,7 +69,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
@@ -78,9 +77,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
@@ -112,7 +109,6 @@ import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.teamReportingAvailable
-import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
@@ -943,260 +939,28 @@ internal fun MessageBubble(
                 ),
         )
 
-    /** Captures display names and the conversation size alongside the rendered speech projection. */
-    suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
-        projectTtsSpeakableEntry(
-            message = entryRecord,
-            editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
-            senderDisplayName = appState.displayName(entryRecord.sender),
-            conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
-            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            mentionDisplayName = appState::mentionSpeechName,
+    val readAloud =
+        rememberMessageBubbleReadAloud(
+            appState = appState,
+            controller = controller,
+            inputs =
+                MessageBubbleReadAloud.Inputs(
+                    record = record,
+                    deleted = deleted,
+                    selectionMode = selectionMode,
+                    textSelectionMode = textSelectionMode,
+                    canSpeakAloud = canSpeakAloud,
+                    displayedBody = displayedBody,
+                    ttsSpeakableSource = ttsSpeakableSource,
+                    speakableProjection = speakableProjection,
+                    ttsProjectionResolver = ttsProjectionResolver,
+                    textLayouts = textLayouts,
+                    pressState = pressState,
+                    messageTextSelectionState = messageTextSelectionState,
+                    ttsLinkTapCoordinator = ttsLinkTapCoordinator,
+                    onTtsSentenceSeek = onTtsSentenceSeek,
+                ),
         )
-
-    // Speak aloud reads from this message onward: catch-up listening is the
-    // point of the action, and Stop on the transport bar is one tap. The
-    // session takes auto-read ownership so messages arriving while it speaks
-    // continue the read. Falls back to just this bubble when its record has
-    // left the loaded timeline. When text is selected or the action menu was
-    // opened from a text selection, start at the containing visible sentence.
-    // A text press retains its rendered hit; genuine gutter/edge presses retain
-    // the deterministic message-top fallback without guessing a nearby glyph.
-
-    suspend fun speakFromHereEntries(literalCode: Boolean): List<TtsSpeakableEntry> =
-        ttsSpeakFromHereCandidates(timeline = controller.timeline, selected = record)
-            .mapNotNull { entryRecord -> ttsEntry(entryRecord) }
-            .mapIndexed { index, entry ->
-                if (index == 0 && literalCode) {
-                    entry.copy(speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode)
-                } else {
-                    entry
-                }
-            }
-
-    /** Starts from the selected sentence and preserves a specific start-gate explanation. */
-    fun startSpeakAloud(
-        startRenderedHit: RenderedTextHit? = null,
-        fallbackVisibleText: String? = null,
-        fallbackVisibleOffset: Int? = null,
-        literalCode: Boolean = false,
-        press: TtsLongPressStart? = null,
-    ) {
-        if (deleted) return
-        val owner = press ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
-        val canCommit = captureTtsLongPressGuard(owner, record, controller, appState)
-        if (!canCommit()) return
-        val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
-        val locale = java.util.Locale.getDefault()
-        appState.launchMutation {
-            val entries = speakFromHereEntries(literalCode)
-            if (!canCommit() || !projectionStillCurrent()) {
-                return@launchMutation
-            }
-            if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
-                appState.present(R.string.tts_bar_error)
-                return@launchMutation
-            }
-            val fallbackSentenceIndex =
-                if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
-                    0
-                } else {
-                    speakableSentenceIndexAtVisibleOffset(
-                        visibleText = fallbackVisibleText,
-                        speakableText = entries.first().text,
-                        visibleOffset = fallbackVisibleOffset,
-                        locale = locale,
-                    )
-                }
-            if (!appState.confirmTtsPlaybackTrust(canCommit)) return@launchMutation
-            val started =
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    locale,
-                    startSentenceIndex = fallbackSentenceIndex,
-                    startRenderedHit =
-                        startRenderedHit?.let {
-                            preparedHitFromRenderedHit(entries.first(), it)
-                        },
-                    backgroundPreparation = true,
-                    canCommit = canCommit,
-                )
-            if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
-        }
-    }
-
-    /** Starts read-aloud at the selected sentence, or at the long-pressed text when nothing is selected. */
-    fun speakFromHere() {
-        val layouts = textLayouts.selectableTextLayouts.snapshot()
-        val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
-        if (!selectionActive) {
-            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)
-            return
-        }
-        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
-        val visibleOffset =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                visibleOffsetFromSelection(
-                    layouts = layouts,
-                    selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
-                )
-            }
-        val renderedHit =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                renderedTextHitFromSelection(
-                    layouts = layouts,
-                    selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
-                )
-            }
-        startSpeakAloud(
-            startRenderedHit = renderedHit,
-            fallbackVisibleText = visibleText,
-            fallbackVisibleOffset = visibleOffset,
-        )
-    }
-
-    fun seekActiveSentence(sentenceIndex: Int) {
-        when (
-            appState.ttsController.seekToSentence(
-                record.messageIdHex,
-                sentenceIndex,
-                speakableProjection?.projectionId,
-            )
-        ) {
-            TtsSeekResult.Repositioned,
-            TtsSeekResult.RepositionedAcrossMessages,
-            -> {
-                appState.ttsHistorySession.cancelPendingSeek()
-                ttsLinkTapCoordinator.cancelPendingActivation()
-                onTtsSentenceSeek(appState.ttsController.state.value)
-                return
-            }
-
-            TtsSeekResult.MessageNotInWindow -> {
-                if (appState.ttsHistorySession.requestSentenceSeek(
-                        record.messageIdHex,
-                        record.recordedAt,
-                        sentenceIndex,
-                        speakableProjection?.projectionId.orEmpty(),
-                    )
-                ) {
-                    ttsLinkTapCoordinator.cancelPendingActivation()
-                }
-            }
-            TtsSeekResult.SentenceOutOfRange,
-            TtsSeekResult.SessionInactive,
-            -> Unit
-        }
-    }
-
-    /** Seeks read-aloud to a tapped sentence through the history session when this message is not projected. */
-    fun seekRenderedSentenceOutsideCurrentProjection(
-        hit: RenderedTextHit,
-        allowOmittedLinkNeighbor: Boolean,
-    ) {
-        val account = controller.boundAccountRef
-        val owner =
-            appState.ttsHistorySession.conversationSource.value?.takeIf {
-                it.accountRef == account && it.groupIdHex == controller.group.groupIdHex
-            } ?: return
-        val runtimeGeneration = appState.runtimeGeneration
-        val expectedText = ttsSpeakableSource?.text
-        val canCommit = {
-            val live = controller.timeline.firstOrNull { it.record.messageIdHex == record.messageIdHex }
-            val source =
-                dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource(
-                    live?.record ?: record,
-                    controller.editsByTarget[record.messageIdHex]?.latestText,
-                )
-            val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == runtimeGeneration
-            val unavailable =
-                record.messageIdHex in controller.deletedMessageIds ||
-                    live?.projected?.deleted == true ||
-                    live?.projected?.invalidationStatus != null
-            sameOwner && !unavailable && source?.text == expectedText
-        }
-        if (!canCommit()) return
-        val accepted =
-            appState.ttsHistorySession.requestRenderedSentenceSeek(
-                record.messageIdHex,
-                record.recordedAt,
-                expectedSource = owner,
-                resolveTarget = {
-                    if (!canCommit()) return@requestRenderedSentenceSeek null
-                    val entry = ttsEntry(record) ?: return@requestRenderedSentenceSeek null
-                    val projection = entry.speakableProjection()
-                    dev.ipf.whitenoise.android.audio.tts.TtsRenderedSeekRequest(
-                        entry = entry,
-                        sentenceIndex = { prepared ->
-                            TtsHighlightProjectionResolver(projection, prepared)
-                                .sentenceIndexAtRenderedOffset(hit, allowOmittedLinkNeighbor)
-                        },
-                        canCommit = canCommit,
-                    )
-                },
-                onCommitted = { onTtsSentenceSeek(appState.ttsController.state.value) },
-            )
-        if (accepted) ttsLinkTapCoordinator.cancelPendingActivation()
-    }
-
-    /** Whether this conversation's read-aloud session is speaking, paused or preparing right now. */
-    fun ownsActiveReadAloud(): Boolean {
-        val activeState = appState.ttsController.state.value
-        val active =
-            activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing
-        return active && appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-    }
-
-    /** Seeks owned read-aloud to the double-tapped sentence, or starts reading there unless the tap hit a link. */
-    @Suppress("ComplexCondition", "ReturnCount")
-    fun seekSpeakAloudAt(pressInWindow: Offset) {
-        if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
-        val layouts = textLayouts.selectableTextLayouts.snapshot()
-        if (ownsActiveReadAloud()) {
-            val hit = renderedTextHitAtWindowPosition(layouts, pressInWindow)
-            val sentenceIndex =
-                hit?.let {
-                    ttsProjectionResolver?.sentenceIndexAtRenderedOffset(
-                        it,
-                        // Retain the established link double-tap coordination during playback.
-                        allowOmittedLinkNeighbor =
-                            markdownHasLinkAnnotationAt(
-                                textLayouts.markdownLinkLayouts.values,
-                                pressInWindow,
-                            ),
-                    )
-                }
-            if (sentenceIndex != null) {
-                seekActiveSentence(sentenceIndex)
-            } else if (ttsProjectionResolver == null && hit != null && !record.contentTokens.truncated) {
-                seekRenderedSentenceOutsideCurrentProjection(
-                    hit,
-                    markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow),
-                )
-            }
-            // An owned session must never be replaced merely because a hit is
-            // ambiguous, outside the queue window, or denied audio focus. A
-            // pending link remains armed and opens after its tap window.
-            return
-        }
-        // Outside playback, links retain their immediate activation and do
-        // not become a read-aloud gesture target.
-        if (markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow)) return
-        val renderedHit =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                renderedTextHitAtWindowPosition(layouts, pressInWindow)
-            } ?: return
-        startSpeakAloud(renderedHit)
-    }
 
     val sentenceActionsEnabled =
         !deleted &&
@@ -1340,9 +1104,9 @@ internal fun MessageBubble(
         val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
         when {
             pressInWindow == null -> Unit
-            canEditMessage && !ownsActiveReadAloud() ->
+            canEditMessage && !readAloud.ownsActiveReadAloud() ->
                 if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) messageActions.beginEdit()
-            else -> seekSpeakAloudAt(pressInWindow)
+            else -> readAloud.seekSpeakAloudAt(pressInWindow)
         }
     }
 
@@ -1362,7 +1126,7 @@ internal fun MessageBubble(
         when (action) {
             TtsQuickTransportAction.Pause -> appState.ttsController.pause()
             TtsQuickTransportAction.Resume -> appState.ttsController.resume()
-            TtsQuickTransportAction.StartReadingMessage -> startSpeakAloud()
+            TtsQuickTransportAction.StartReadingMessage -> readAloud.startSpeakAloud()
             TtsQuickTransportAction.Ignore -> Unit
         }
     }
@@ -2344,7 +2108,7 @@ internal fun MessageBubble(
                                         label = speakAloudLabel,
                                         systemReadAloudKeyIds = systemReadAloudKeyIds,
                                         onSpeak = {
-                                            speakFromHere()
+                                            readAloud.speakFromHere()
                                             onTextSelectionModeChange(false)
                                         },
                                     ),
@@ -2881,11 +2645,11 @@ internal fun MessageBubble(
                     onEdit = messageActions::beginEdit,
                     onCopyText = messageActions::copyMessageText,
                     onSpeak = {
-                        speakFromHere()
+                        readAloud.speakFromHere()
                         onActionMenuOpenChange(false)
                     },
                     onSpeakCodeLiterally = {
-                        startSpeakAloud(literalCode = true)
+                        readAloud.startSpeakAloud(literalCode = true)
                         onActionMenuOpenChange(false)
                     },
                     onShare = ::shareMessage,
