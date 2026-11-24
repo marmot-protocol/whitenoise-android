@@ -101,6 +101,16 @@
           "RDR-002"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "RDR-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
