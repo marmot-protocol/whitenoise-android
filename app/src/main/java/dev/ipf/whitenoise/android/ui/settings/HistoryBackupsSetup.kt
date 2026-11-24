@@ -76,11 +76,9 @@ internal fun RecoveryWordsSetupContent(
         SettingsList(modifier = Modifier.testTag("history_backups.setup")) {
             if (!setup.confirming) {
                 item(key = "words.message") {
-                    SettingsExplainer(stringResource(R.string.history_backups_reveal_warning))
+                    RecoveryWordsControls(setup.words, revealed, onToggleReveal = { revealed = !revealed })
                 }
-                item(key = "words.grid") {
-                    RecoveryWordsGrid(setup.words, revealed, onToggleReveal = { revealed = !revealed })
-                }
+                item(key = "words.grid") { RecoveryWordsGrid(setup.words, revealed) }
                 item(key = "words.actions") {
                     SetupButtons(
                         primary = stringResource(R.string.history_backups_words_written),
@@ -146,25 +144,40 @@ internal fun RecoveryWordsSetupContent(
     }
 }
 
+/** Keeps the reveal and copy actions beside the privacy warning. */
+@Suppress("FunctionNaming")
+@Composable
+private fun RecoveryWordsControls(words: List<String>, revealed: Boolean, onToggleReveal: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.history_backups_reveal_warning),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        IconButton(onClick = onToggleReveal, modifier = Modifier.testTag("history_backups.reveal_words")) {
+            Icon(
+                painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+                contentDescription = stringResource(if (revealed) R.string.hide else R.string.show),
+            )
+        }
+        if (revealed) CopyRecoveryWordsIcon(words)
+    }
+}
+
 /** The twelve words in reading order, two columns of six, numbered as the user writes them down. */
 @Suppress("FunctionNaming")
 @Composable
-private fun RecoveryWordsGrid(words: List<String>, revealed: Boolean, onToggleReveal: () -> Unit) {
+private fun RecoveryWordsGrid(words: List<String>, revealed: Boolean) {
     val half = (words.size + 1) / 2
     SettingsPanel(
         modifier = Modifier.testTag("history_backups.words"),
         destination = SettingsDetail.HistoryBackups,
         surface = "history-backups-words",
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            IconButton(onClick = onToggleReveal, modifier = Modifier.testTag("history_backups.reveal_words")) {
-                Icon(
-                    painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
-                    contentDescription = stringResource(if (revealed) R.string.hide else R.string.show),
-                )
-            }
-            if (revealed) CopyRecoveryWordsIcon(words)
-        }
         Row(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField)) {
             for (column in 0 until 2) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
