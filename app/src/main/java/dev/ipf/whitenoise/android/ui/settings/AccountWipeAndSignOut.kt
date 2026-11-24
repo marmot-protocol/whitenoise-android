@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -161,7 +163,14 @@ private fun launchAccountWipe(
     }
 }
 
-/** Stateless typed confirmation; the account screen retains input and the destructive mutation scope. */
+/**
+ * Stateless typed confirmation; the account screen retains input and the destructive mutation scope.
+ *
+ * The title scrolls with the body instead of sitting in the dialog's fixed title slot. At 200% text on a narrow
+ * phone the icon-bearing actions stack onto two rows, and with the keyboard open a fixed title would leave the
+ * scrolling body shorter than the keyword field, so the field could never be fully on screen. The title keeps the
+ * title slot's style, colour and 16 dp gap, so the dialog looks the same whenever nothing needs to scroll.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ProfileKeyWipeConfirmationDialog(
@@ -176,12 +185,17 @@ internal fun ProfileKeyWipeConfirmationDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(decorFitsSystemWindows = false),
         modifier = Modifier.systemBarsPadding().imePadding(),
-        title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                Text(
+                    stringResource(R.string.sign_out_and_wipe_confirm_title),
+                    modifier = Modifier.semantics { heading() },
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
                 Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
                 Text(
                     stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
