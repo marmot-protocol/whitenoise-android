@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_change_invite_not_sent">Приглашение не отправлено</string>
+    <string name="group_change_member_not_removed">Участник не удалён</string>
+    <string name="group_change_details_not_updated">Данные группы не обновлены</string>
+    <string name="group_change_leave_failed">Не удалось выйти из группы</string>
+    <string name="group_change_end_failed">Не удалось завершить группу</string>
+    <string name="group_change_message_not_sent">Сообщение не отправлено</string>
+    <string name="group_change_not_made">Изменение группы не выполнено</string>
+    <string name="group_change_reason_not_admin">Вы больше не администратор этой группы.</string>
+    <string name="group_change_reason_not_member">Вы больше не участник этой группы.</string>
+    <string name="group_change_reason_not_delivered">Изменение не дошло ни до одного реле группы. Проверьте подключение и повторите попытку.</string>
+    <string name="group_change_reason_refused">Реле группы отклонили изменение. Проверьте чат и повторите попытку.</string>
+    <string name="group_change_reason_not_accepted">Группа не смогла принять изменение. Проверьте чат и повторите попытку.</string>
+    <string name="group_change_reason_superseded">Одновременно в группу было внесено другое изменение. Проверьте чат и повторите попытку.</string>
+    <string name="group_change_already_done">Другое изменение в этой группе уже сделало то же, что и ваше.</string>
+    <string name="group_change_notice_detail">%1$s. %2$s</string>
+</resources>

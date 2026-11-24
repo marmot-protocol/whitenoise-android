@@ -128,29 +128,9 @@
         ]
       },
       {
-        "surface": "R.plurals.toast_chat_list_chats_archived",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.plurals.toast_chat_list_chats_archived",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.plurals.toast_chat_list_chats_deleted",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.plurals.toast_chat_list_chats_deleted",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.plurals.toast_chat_list_chats_restored",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.plurals.toast_chat_list_chats_restored",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -230,15 +210,6 @@
         "test_ids": [
           "CHL-012"
         ]
-      },
-      {
-        "surface": "Pinned move through the complete native order",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "controller.movePinnedSelection(ids, delta, owner)",
-        "test_ids": [
-          "CHL-010",
-          "CHL-012"
-        ]
       }
     ],
     "source_coverage": [
@@ -296,30 +267,6 @@
         "anchor": "R.string.pull_unread_load_failed",
         "test_ids": [
           "CHL-031"
-        ]
-      },
-      {
-        "surface": "R.string.chat_batch_order_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_batch_order_failed",
-        "test_ids": [
-          "CHL-012"
-        ]
-      },
-      {
-        "surface": "R.string.chat_batch_order_unchanged",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_batch_order_unchanged",
-        "test_ids": [
-          "CHL-012"
-        ]
-      },
-      {
-        "surface": "R.string.chat_batch_order_unconfirmed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_batch_order_unconfirmed",
-        "test_ids": [
-          "CHL-012"
         ]
       },
       {

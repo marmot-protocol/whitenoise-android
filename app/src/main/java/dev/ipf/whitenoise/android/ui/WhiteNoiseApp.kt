@@ -56,7 +56,6 @@ import dev.ipf.whitenoise.android.diagnostics.shareStartupDiagnostics
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
-import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ProductObservation
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
@@ -69,16 +68,15 @@ import dev.ipf.whitenoise.android.ui.common.ExplanationSheetHost
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.RootToastSnackbarEffect
 import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLocalProjectionScreen
-import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
-import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.common.followedPeopleFor
 import dev.ipf.whitenoise.android.ui.common.rememberExplanationHostState
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
@@ -230,7 +228,6 @@ internal fun WhiteNoiseApp(
                 presentationAllowed = { !appState.appLock.screenVisible },
             )
         }
-    val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -418,43 +415,7 @@ internal fun WhiteNoiseApp(
             appState.enableDefaultNotificationsIfReady()
         }
     }
-    val deletionRetryLabel = stringResource(R.string.retry)
-    LaunchedEffect(toast, deletionRetryLabel) {
-        if (toast != null) {
-            val deletion = toast.localDeleteNotice
-            if (toast.tier == NoticeTier.Confirmation && deletion == null && !toast.copyable) {
-                appState.presentTransient(toast.title, toast.detail)
-                appState.clearToast(toast)
-                return@LaunchedEffect
-            }
-            val result =
-                snackbarHostState.showSnackbar(
-                    ToastSnackbarVisuals(
-                        message =
-                            if (deletion != null) {
-                                toast.title.resolve(context)
-                            } else {
-                                listOfNotNull(
-                                    toast.title.resolve(context),
-                                    toast.detail?.resolve(context),
-                                ).joinToString("\n")
-                            },
-                        copyable = toast.copyable,
-                        tier = toast.tier,
-                        copyText = toast.diagnosticReport,
-                        details =
-                            deletion?.let {
-                                listOfNotNull(
-                                    toast.detail?.resolve(context),
-                                    toast.diagnosticReport,
-                                ).joinToString("\n\n")
-                            },
-                        actionLabel = deletion?.retry?.let { deletionRetryLabel },
-                    ),
-                )
-            finishLocalDeleteSnackbar(appState, toast, result)
-        }
-    }
+    RootToastSnackbarEffect(appState, snackbarHostState, retryLabel = stringResource(R.string.retry))
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
     // Snackbars time out here, at the root, so a slot that is hidden by app lock or replaced by a modal
     // cannot pause the clock and show a confirmation for its full length a second time.

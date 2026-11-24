@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -208,6 +207,9 @@ internal class MeasuredControlHandoff(
             (previous != destination || continuesSameOwner || hasLauncher) &&
             from != null
 
+    private val motionDirection: SurfaceMotion
+        get() = if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
+
     /** New placement supplies the destination; a missing endpoint never waits or revives later. */
     suspend fun animatePrepared(token: Any) {
         if (request !== token || start == null) return
@@ -220,22 +222,7 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        progress.animateTo(
-            1f,
-            tween(
-                if (previous != null && previous == closeDestination) {
-                    APP_MOTION_CLOSE_MILLIS
-                } else {
-                    APP_MOTION_OPEN_MILLIS
-                },
-                easing =
-                    if (previous != null && previous == closeDestination) {
-                        AppMotionCloseEasing
-                    } else {
-                        AppMotionOpenEasing
-                    },
-            ),
-        )
+        progress.animateTo(1f, motionDirection.spec())
         if (request === token) finish()
     }
 
@@ -324,22 +311,7 @@ internal class MeasuredControlHandoff(
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(
-            1f,
-            tween(
-                if (previous != null && previous == closeDestination) {
-                    APP_MOTION_CLOSE_MILLIS
-                } else {
-                    APP_MOTION_OPEN_MILLIS
-                },
-                easing =
-                    if (previous != null && previous == closeDestination) {
-                        AppMotionCloseEasing
-                    } else {
-                        AppMotionOpenEasing
-                    },
-            ),
-        )
+        progress.animateTo(1f, motionDirection.spec())
         start = null
         end = null
     }
@@ -518,21 +490,35 @@ private fun DrawScope.drawMorphBridge(
                 drawRoundRect(surface.fill, bounds.topLeft, bounds.size, CornerRadius(state.presentationRadius))
             }
             surface.border?.let { border ->
-                // Material's border is wholly inside the measured outer edge. Match its
-                // centerline and radius so handing chrome back cannot shift half a stroke.
-                val stroke = surface.stroke.coerceAtMost(minOf(bounds.width, bounds.height))
-                val inset = stroke / 2f
-                val strokeBounds = bounds.deflate(inset)
-                drawRoundRect(
-                    border,
-                    strokeBounds.topLeft,
-                    strokeBounds.size,
-                    CornerRadius((state.presentationRadius - inset).coerceAtLeast(0f)),
-                    style = Stroke(stroke),
-                )
+                drawControlMorphOutline(bounds, state.presentationRadius, border, surface.stroke)
             }
         }
     }
+}
+
+/**
+ * The morph's hairline edge for outer [bounds] with corner [radius]. Material's border is wholly
+ * inside the measured outer edge; matching its centerline and radius means handing chrome back
+ * cannot shift half a stroke.
+ */
+internal fun DrawScope.drawControlMorphOutline(
+    bounds: Rect,
+    radius: Float,
+    color: Color,
+    width: Float,
+    alpha: Float = 1f,
+) {
+    val stroke = width.coerceAtMost(minOf(bounds.width, bounds.height))
+    val inset = stroke / 2f
+    val strokeBounds = bounds.deflate(inset)
+    drawRoundRect(
+        color,
+        strokeBounds.topLeft,
+        strokeBounds.size,
+        CornerRadius((radius - inset).coerceAtLeast(0f)),
+        alpha = alpha,
+        style = Stroke(stroke),
+    )
 }
 
 /** Pointer, keyboard and accessibility activation all finish the same decorative transition first. */

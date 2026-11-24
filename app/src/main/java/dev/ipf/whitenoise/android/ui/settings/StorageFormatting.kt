@@ -6,8 +6,11 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GlobalAttachmentPresentation
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.globalAttachmentIsVideo
 import dev.ipf.whitenoise.android.core.globalAttachmentPresentation
 import dev.ipf.whitenoise.android.state.KeepMediaPeriod
@@ -27,6 +30,27 @@ internal fun formatStorageBytes(
 /** [formatStorageBytes] for composition. */
 @Composable
 internal fun storageBytes(bytes: Long): String = formatStorageBytes(LocalContext.current, bytes)
+
+/** "1.1 GB · 88 attachments". */
+@Composable
+internal fun storageCountAndSize(
+    count: Long,
+    bytes: Long,
+): String {
+    val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val attachments = pluralStringResource(R.plurals.storage_attachment_count, quantity, count)
+    return storageSizeDetail(storageBytes(bytes), attachments)
+}
+
+/**
+ * "150 MB · [detail]", isolated as a whole so the paragraph takes its direction from the detail's words rather than
+ * the leading size: an untranslated sentence in a right-to-left layout keeps its size in front instead of splitting.
+ */
+@Composable
+internal fun storageSizeDetail(
+    size: String,
+    detail: String,
+): String = "\u2068${stringResource(R.string.storage_size_detail, size, detail)}\u2069"
 
 /** The picker label for a Keep media window, written so it also reads inside a sentence. */
 internal val KeepMediaPeriod.labelRes: Int
@@ -101,4 +125,98 @@ private fun removedText(
         val freed = formatStorageBytes(context, freedBytes)
         context.resources.getQuantityString(R.plurals.storage_removed_freed, quantity, count, freed)
     }
+}
+
+/** Combining marks a row keeps on one letter, as the shared remote-text filter allows. */
+private const val STORAGE_NAME_MAX_MARKS = 4
+
+/** Longest file name a row keeps, long enough for any real name and short enough to bound layout work. */
+private const val STORAGE_FILE_NAME_MAX_CHARS = 120
+
+/**
+ * The sender's file name made safe to show: only the last path segment, without control, bidirectional override or
+ * other invisible characters, trimmed and bounded. Null when nothing readable is left, so the row falls back to the
+ * attachment's kind. The name comes from another device and is never trusted for layout or direction.
+ */
+internal fun storageDisplayName(raw: String): String? {
+    // The shared remote-text filter first, as the chat's file card applies it, so the name matches the chat's and a
+    // stack of combining marks is capped; then what only matters for a one-line row title.
+    val segment = raw.replace('\\', '/').substringAfterLast('/')
+    val cleaned = storageNameCodePoints(ProfileSanitizer.stripUnsafe(segment))
+    // A name of only dots, marks or spaces would draw as nothing, so it reads as no name at all.
+    val readable = cleaned.codePoints().anyMatch { it.isVisibleNameCharacter() } && !cleaned.all { it == '.' }
+    return if (readable) boundedStorageName(cleaned) else null
+}
+
+/**
+ * Keeps the code points of [segment] a name needs: controls become spaces; format characters other than the zero-width
+ * joiners that Persian, Indic scripts and emoji sequences shape with, unassigned points and blank Hangul fillers go;
+ * a letter keeps at most four combining marks; runs of spaces collapse. Whole code points are filtered, so a
+ * supplementary format character such as a Unicode tag cannot slip through as a surrogate pair.
+ */
+private fun storageNameCodePoints(segment: String): String =
+    buildString {
+        // Counted over what is kept, so a dropped filler between marks cannot reset the cap on a stack.
+        var marks = 0
+        segment.codePoints().forEach { point ->
+            val mark = Character.getType(point) in StorageNameMarkTypes
+            when {
+                Character.isISOControl(point) -> append(' ').also { marks = 0 }
+                point in StorageNameJoiners -> appendCodePoint(point)
+                Character.getType(point) in StorageNameDroppedTypes || point in StorageNameFillers -> Unit
+                mark && marks >= STORAGE_NAME_MAX_MARKS -> Unit
+                else -> appendCodePoint(point).also { marks = if (mark) marks + 1 else 0 }
+            }
+        }
+    }.replace(Regex("\\s+"), " ").trim()
+
+/** Keeps both ends of an over-long name, so it still shows how it starts and its extension. */
+private fun boundedStorageName(name: String): String {
+    if (name.length <= STORAGE_FILE_NAME_MAX_CHARS) return name
+    val half = STORAGE_FILE_NAME_MAX_CHARS / 2
+    val head = name.take(half).let { if (it.last().isHighSurrogate()) it.dropLast(1) else it }
+    val tail = name.takeLast(half).let { if (it.first().isLowSurrogate()) it.drop(1) else it }
+    return "$head…$tail"
+}
+
+/** Character types a file name never shows: invisible formatting, unassigned and lone surrogate code points. */
+private val StorageNameDroppedTypes =
+    setOf(Character.FORMAT.toInt(), Character.UNASSIGNED.toInt(), Character.SURROGATE.toInt())
+
+/** Zero-width non-joiner and joiner, kept because they change how neighbouring letters and emoji join. */
+@Suppress("MagicNumber") // Unicode code points.
+private val StorageNameJoiners = setOf(0x200C, 0x200D)
+
+/** Hangul fillers, letters that draw as blank space and could pad a name out of sight. */
+@Suppress("MagicNumber") // Unicode code points.
+private val StorageNameFillers = setOf(0x115F, 0x1160, 0x3164, 0xFFA0)
+
+/**
+ * Default-ignorable code points and blank cells that draw nothing on their own: they may stay inside a name, but a name
+ * made only of them has nothing to read.
+ */
+@Suppress("MagicNumber") // Unicode code points, named by the property they share.
+private val StorageNameInvisibles =
+    listOf(
+        0x034F..0x034F,
+        0x17B4..0x17B5,
+        0x180B..0x180F,
+        0x200C..0x200D,
+        0x2800..0x2800,
+        0xFE00..0xFE0F,
+        0xE0100..0xE01EF,
+    )
+
+/** Marks that only decorate their neighbour, so a name made of them alone draws nothing. */
+private val StorageNameMarkTypes =
+    setOf(
+        Character.NON_SPACING_MARK.toInt(),
+        Character.ENCLOSING_MARK.toInt(),
+        Character.COMBINING_SPACING_MARK.toInt(),
+    )
+
+/** A character that draws on its own: not a space, a mark or an invisible code point. */
+private fun Int.isVisibleNameCharacter(): Boolean {
+    val mark = Character.getType(this) in StorageNameMarkTypes
+    return !mark && !Character.isWhitespace(this) && StorageNameInvisibles.none { this in it }
 }

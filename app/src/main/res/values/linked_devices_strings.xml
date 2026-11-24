@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Linked devices</string>
+    <string name="linked_devices">Devices</string>
+    <string name="settings_search_alias_linked_devices">linked devices|link device</string>
+    <string name="group_account_devices_title">Linked devices</string>
     <string name="linked_devices_detail">Messages you send from a linked device appear as yours on all your linked devices.</string>
     <string name="linked_devices_this_device">This device</string>
     <string name="linked_devices_other_devices">Other devices</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">These chats can\'t take the removal from your devices. A chat admin can remove the device there.</string>
     <string name="devices_key_refresh_overdue">This device couldn\'t refresh its invitation keys. After 30 days people may stop being able to add it to new chats. Keep the app open on your devices so they can catch up.</string>
     <string name="devices_stalled">This device can no longer keep up with your other devices. Repair its link to continue.</string>
-    <string name="device_repair_confirm_again">Open Linked devices in Settings and confirm the repair again before linking.</string>
+    <string name="device_repair_confirm_again">Open Devices in Settings and confirm the repair again before linking.</string>
     <string name="device_repair_try_link_again">Link reset. Try linking again to finish the repair.</string>
     <string name="devices_repair">Repair this device\'s link</string>
     <string name="devices_repair_confirm">This removes the current link so you can link this device again. Your chats, messages, drafts and settings stay. The old link can’t be restored, even if you cancel linking.</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">Link this device to see your chats from your other devices.</string>
     <string name="link_request_default_label">New device</string>
     <string name="link_request_options">Options</string>
-    <string name="link_request_options_detail">Choose the device name and whether to share chats and their history.</string>
-    <string name="explanation_link_request_options">Opens the new device\'s name and what it receives.</string>
+    <string name="link_request_options_detail">Choose whether to share chats and their history.</string>
+    <string name="explanation_link_request_options">Opens what the new device receives.</string>
     <string name="device_move_advanced">Advanced</string>
     <string name="setup_device_link_next">After signing in, you can link this device to get chats from your other devices.</string>
     <string name="unlinked_account_remove_for">Remove %1$s from this device</string>

@@ -19,8 +19,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
-import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentVideoMetadata
-import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentVideoMetadataInPlace
+import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentMetadata
+import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentMetadataInPlace
 import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.scrubVideoMetadata
@@ -51,6 +51,9 @@ internal enum class DocumentReadFailure {
 
     /** A video file whose private metadata could not be removed. It is refused, never sent as-is (#3376). */
     VIDEO_METADATA,
+
+    /** A PDF whose metadata stays, which nobody chose to send as it is (#3377). */
+    PDF_METADATA,
 }
 
 /** The visual album read for one send. [videoMetadataRefused] reports a video refused for its private metadata. */
@@ -343,10 +346,10 @@ internal class ConversationAttachmentReader(
                 }
                 BoundedDocumentRead.Empty -> state.failures += DocumentReadFailure.EMPTY
                 BoundedDocumentRead.Unreadable -> state.failures += DocumentReadFailure.UNREADABLE
-                // Content decides: a video container loses its private metadata in place first, an uncleanable
-                // video reported as video is refused, and every other document stays byte-for-byte.
+                // Content decides: a video container or a PDF loses its private metadata in place first, an
+                // uncleanable video reported as video is refused, and every other document stays byte-for-byte.
                 is BoundedDocumentRead.Success ->
-                    if (!removeDocumentVideoMetadataInPlace(mediaType, read.bytes)) {
+                    if (!removeDocumentMetadataInPlace(mediaType, read.bytes)) {
                         state.failures += DocumentReadFailure.VIDEO_METADATA
                     } else {
                         state.totalBytes += read.bytes.size
@@ -379,7 +382,7 @@ internal class ConversationAttachmentReader(
             budget?.stage(
                 declaredSize,
                 state.checkCancellation,
-                accept = { source -> source.removeDocumentVideoMetadata(mediaType).also { metadataRemoved = it } },
+                accept = { source -> source.removeDocumentMetadata(mediaType).also { metadataRemoved = it } },
             ) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {

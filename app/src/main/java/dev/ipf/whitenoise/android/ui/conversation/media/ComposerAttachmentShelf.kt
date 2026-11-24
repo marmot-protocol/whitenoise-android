@@ -139,10 +139,14 @@ internal fun ComposerAttachmentShelf(
     preparing: Boolean = false,
     preparedDocuments: Map<Uri, DraftPreparedPhoto> = emptyMap(),
     onOpenDocument: (Uri) -> Unit = {},
+    pdfChoices: ComposerPdfMetadataChoices? = null,
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
     val hasVisual = items.any { it is StagedPreviewItem.Media }
+    val pdfRenderer = rememberComposerPdfPageRenderer()
+    val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
+    if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata)
     Column(Modifier.fillMaxWidth()) {
         LazyRow(
             modifier =
@@ -167,6 +171,7 @@ internal fun ComposerAttachmentShelf(
                     prepared = prepared,
                     enabled = enabled,
                     document = preparedDocuments[item.uri],
+                    pdfs = pdfs,
                     onPreview =
                         when {
                             item is StagedPreviewItem.Media -> ({ onPreview(index) })
@@ -190,6 +195,12 @@ internal fun ComposerAttachmentShelf(
     }
 }
 
+/** The shelf's PDF state and first-page renderer, present when the composer tracks PDF metadata choices. */
+internal class ComposerShelfPdfs(
+    val choices: ComposerPdfMetadataChoices,
+    val renderer: ComposerPdfPageRenderer,
+)
+
 /** One shelf entry: decodes its own thumbnail or animation, then hands the prototype card its geometry. */
 @Composable
 @Suppress("LongParameterList")
@@ -202,6 +213,7 @@ private fun ComposerAttachmentShelfItem(
     onPreview: (() -> Unit)?,
     onRemove: () -> Unit,
     document: DraftPreparedPhoto? = null,
+    pdfs: ComposerShelfPdfs? = null,
 ) {
     val media = item as? StagedPreviewItem.Media
     val bitmap =
@@ -214,6 +226,12 @@ private fun ComposerAttachmentShelfItem(
     val label =
         document?.attachment?.fileName ?: metadata?.displayName ?: item.uri.lastPathSegment
             ?: stringResource(R.string.reply_media_document)
+    val pdfMediaType = document?.attachment?.mediaType.orEmpty()
+    if (media == null && pdfs != null && documentAttachmentKind(pdfMediaType, label) == DocumentAttachmentKind.Pdf) {
+        val tag = Modifier.testTag("conversation.composer.attachment.$index")
+        ComposerPdfShelfItem(item.uri, label, document, pdfs.choices, pdfs.renderer, onPreview, onRemove, tag, enabled)
+        return
+    }
     ComposerAttachmentShelfCard(
         label = label,
         enabled = enabled,

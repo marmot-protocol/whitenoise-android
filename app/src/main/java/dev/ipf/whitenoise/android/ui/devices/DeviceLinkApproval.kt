@@ -128,11 +128,11 @@ internal fun rememberApprovalDraft() =
     )
 
 /**
- * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
- * gets the default name unless the user enters one, and joins the account's chats with their history
- * (both on, as MDK offers them). Options opens the name and the two choices for anyone who wants to change them,
- * and a name over MDK's limit keeps them open. The choices stay as entered if a submission fails. [onLink]
- * receives them; [onDecline] is Not now and [onClose] leaves without answering.
+ * A link request as the approving device shows it. While MDK shows the code, the new device's name is on the step
+ * itself, so the user sees what it will be called before linking, and an empty field shows the default it gets.
+ * Link device stays one tap: the device joins the account's chats with their history (both on, as MDK offers them),
+ * and Options opens those two choices for anyone who wants to change them. The choices stay as entered if a
+ * submission fails. [onLink] receives them, [onDecline] is Not now and [onClose] leaves without answering.
  */
 @Composable
 internal fun DeviceLinkRequestContent(
@@ -145,7 +145,7 @@ internal fun DeviceLinkRequestContent(
     draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
 ) {
     val label = draft.label
-    // MDK requires a name. The approving device supplies the default when the field is empty.
+    // MDK requires a name. The approving device supplies the default, shown in the empty field.
     val placeholder = stringResource(R.string.link_request_default_label)
     val name =
         label.text
@@ -170,23 +170,27 @@ internal fun DeviceLinkRequestContent(
         },
     ) {
         if (state is DeviceLinkPromptStateFfi.Comparing) {
-            DeviceLinkOptionsRow(onToggle = { draft.optionsOpen = !draft.optionsOpen })
-        }
-        if (state is DeviceLinkPromptStateFfi.Comparing && (draft.optionsOpen || !nameFits)) {
-            DeviceLinkChoiceFields(
+            DeviceLinkNameField(
                 label = label,
+                placeholder = placeholder,
                 tooLong = stringResource(R.string.link_request_label_too_long).takeUnless { nameFits },
-                addToAllChats = draft.addToAllChats,
-                bringHistory = draft.bringHistory,
                 enabled = running == null,
-                onAddToAllChats = { draft.addToAllChats = it },
-                onBringHistory = { draft.bringHistory = it },
             )
+            DeviceLinkOptionsRow(onToggle = { draft.optionsOpen = !draft.optionsOpen })
+            if (draft.optionsOpen) {
+                DeviceLinkSharingChoices(
+                    addToAllChats = draft.addToAllChats,
+                    bringHistory = draft.bringHistory,
+                    enabled = running == null,
+                    onAddToAllChats = { draft.addToAllChats = it },
+                    onBringHistory = { draft.bringHistory = it },
+                )
+            }
         }
     }
 }
 
-/** The row that opens and closes the approving user's choices, saying what applies while they stay closed. */
+/** The row that opens and closes the two sharing choices, saying what they cover while they stay closed. */
 @Composable
 private fun DeviceLinkOptionsRow(onToggle: () -> Unit) {
     SettingsGroup {
@@ -205,19 +209,15 @@ private fun DeviceLinkOptionsRow(onToggle: () -> Unit) {
 }
 
 /**
- * The approving user's choices: the new device's name, whether it joins the account's chats and whether it
- * receives their history. [tooLong] is the message for a name over MDK's limit, or null when the name fits.
+ * The new device's name. Empty, it shows [placeholder], the name the device gets when the user enters none.
+ * [tooLong] is the message for a name over MDK's limit, or null when the name fits.
  */
-@Suppress("LongParameterList") // One flat set of field values and their two change callbacks.
 @Composable
-private fun DeviceLinkChoiceFields(
+private fun DeviceLinkNameField(
     label: TextFieldState,
+    placeholder: String,
     tooLong: String?,
-    addToAllChats: Boolean,
-    bringHistory: Boolean,
     enabled: Boolean,
-    onAddToAllChats: (Boolean) -> Unit,
-    onBringHistory: (Boolean) -> Unit,
 ) {
     WhiteNoiseTextField(
         state = label,
@@ -228,10 +228,24 @@ private fun DeviceLinkChoiceFields(
                 .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
                 .testTag(DEVICE_LINK_LABEL_TAG),
         label = { Text(stringResource(R.string.link_request_label)) },
+        placeholder = { Text(placeholder) },
+        // A name of only spaces is sent as the default, so the field empties and shows that default.
+        inputTransformation = { if (length > 0 && asCharSequence().isBlank()) replace(0, length, "") },
         supportingText = tooLong?.let { message -> { Text(message) } },
         errorMessage = tooLong,
         lineLimits = TextFieldLineLimits.SingleLine,
     )
+}
+
+/** The approving user's two choices: whether the new device joins the account's chats and gets their history. */
+@Composable
+private fun DeviceLinkSharingChoices(
+    addToAllChats: Boolean,
+    bringHistory: Boolean,
+    enabled: Boolean,
+    onAddToAllChats: (Boolean) -> Unit,
+    onBringHistory: (Boolean) -> Unit,
+) {
     SettingsGroup {
         row("add_to_chats") { context ->
             SettingsSwitch(

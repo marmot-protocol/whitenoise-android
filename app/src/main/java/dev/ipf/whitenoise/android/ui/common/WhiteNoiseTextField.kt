@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -40,6 +42,9 @@ import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Container fill a hosting surface hands to its fields, for example the lowest surface inside settings. */
 val LocalWhiteNoiseTextFieldContainerColor = staticCompositionLocalOf { Color.Unspecified }
+
+/** Lets an adjacent control align with the secure input surface below its label and above its help text. */
+internal val WhiteNoiseSecureInputCenter = HorizontalAlignmentLine(::minOf)
 
 private object WhiteNoiseTextFieldDefaults {
     /** Material's standard content inset for input, supporting text, and leading icon artwork. */
@@ -165,7 +170,8 @@ internal fun WhiteNoiseTextField(
 
 /**
  * Password variant of [WhiteNoiseTextField]: same 28 dp container, above label and inset, single line, obfuscated
- * input that reveals the last typed character.
+ * input that reveals the last typed character. [containerModifier] applies to the input surface alone, excluding its
+ * label and supporting text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -186,6 +192,7 @@ internal fun WhiteNoiseSecureTextField(
     textObfuscationMode: TextObfuscationMode = TextObfuscationMode.RevealLastTyped,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onKeyboardAction: KeyboardActionHandler? = null,
+    containerModifier: Modifier = Modifier,
 ) {
     val isError = errorMessage != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -236,12 +243,22 @@ internal fun WhiteNoiseSecureTextField(
                             isError = isError,
                             interactionSource = interactionSource,
                             colors = colors,
+                            modifier = containerModifier.reportSecureInputCenter(),
                         )
                     },
                 ),
         )
     }
 }
+
+/** Reports the measured surface center through Material's field decoration to its parent row. */
+private fun Modifier.reportSecureInputCenter(): Modifier =
+    layout { measurable, constraints ->
+        val field = measurable.measure(constraints)
+        layout(field.width, field.height, mapOf(WhiteNoiseSecureInputCenter to field.height / 2)) {
+            field.placeRelative(0, 0)
+        }
+    }
 
 /** Resolve state colors from the active palette, including existing AMOLED contrast. */
 @Composable
@@ -268,11 +285,13 @@ private fun WhiteNoiseTextFieldContainer(
     isError: Boolean,
     interactionSource: MutableInteractionSource,
     colors: TextFieldColors,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextFieldDefaults.Container(
         enabled = enabled,
         isError = isError,
         interactionSource = interactionSource,
+        modifier = modifier,
         colors = colors,
         shape = WhiteNoiseTextFieldDefaults.Shape,
         focusedBorderThickness = WhiteNoiseTextFieldDefaults.StateRingWidth,

@@ -20,8 +20,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isJoiningChats
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
 @Suppress("FunctionNaming")

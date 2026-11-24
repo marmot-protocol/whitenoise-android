@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -45,7 +46,6 @@ import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteEndpoint
 import dev.ipf.whitenoise.android.ui.settings.drawRouteContour
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -76,6 +76,7 @@ internal fun AnimatedAlertDialog(
     border: BorderStroke? = null,
 ) {
     val density = LocalDensity.current
+    val appWindowWidth = LocalWindowInfo.current.containerDpSize.width
     val measured = source != null && rememberSystemAnimationsEnabled()
     var nativeWidth by remember(source) { mutableStateOf<Dp?>(null) }
     var destination by remember(source) { mutableStateOf(Rect.Zero) }
@@ -143,8 +144,15 @@ internal fun AnimatedAlertDialog(
             confirmButton(surface)
         },
         modifier =
-            (if (measured) Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f } else surface.modifier())
-                .then(surface.inputModifier())
+            Modifier
+                .dialogWidthBounds(appWindowWidth)
+                .then(
+                    if (measured) {
+                        Modifier.graphicsLayer { alpha = if (presentationReady) 1f else 0f }
+                    } else {
+                        surface.modifier()
+                    },
+                ).then(surface.inputModifier())
                 .then(
                     if (measured && sourceCurrent && nativeWidth != null) {
                         Modifier.requiredWidth(nativeWidth!!)
@@ -154,7 +162,7 @@ internal fun AnimatedAlertDialog(
                 ).onGloballyPositioned { coordinates ->
                     if (measured) {
                         if (nativeWidth == null) nativeWidth = with(density) { coordinates.size.width.toDp() }
-                        dialogView?.let { destination = coordinates.settingsMorphBounds(it) }
+                        dialogView?.let { destination = coordinates.motionBoundsOnScreen(it) }
                         if (sourceCurrent && source != null && !source.isCurrent()) {
                             sourceCurrent = false
                             surface.invalidateSource()
@@ -212,12 +220,13 @@ internal fun AnimatedBasicAlertDialog(
     dismissEnabled: () -> Boolean = { true },
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
+    val appWindowWidth = LocalWindowInfo.current.containerDpSize.width
     val surface =
         rememberPopupSurfaceMotion(true, onDismissRequest, ownerKey = ownerKey, dismissEnabled = dismissEnabled)
     if (!surface.visible) return
     androidx.compose.material3.BasicAlertDialog(
         onDismissRequest = surface.dismiss,
-        modifier = surface.modifier().then(surface.inputModifier()),
+        modifier = Modifier.dialogWidthBounds(appWindowWidth).then(surface.modifier()).then(surface.inputModifier()),
     ) {
         DialogWindowMotion(surface.presence)
         content(surface)
@@ -250,7 +259,7 @@ internal class PopupSourceActivation private constructor(
             direction: LayoutDirection,
         ): PopupSourceActivation? {
             if (coordinates == null || !coordinates.isAttached) return null
-            val bounds = coordinates.settingsMorphBounds(view)
+            val bounds = coordinates.motionBoundsOnScreen(view)
             if (bounds.isEmpty ||
                 !listOf(bounds.left, bounds.top, bounds.right, bounds.bottom).all { it.isFinite() }
             ) {
@@ -343,5 +352,5 @@ private fun sourceWindowIsCurrent(
     view.isAttachedToWindow &&
         view.windowToken == windowToken &&
         coordinates.isAttached &&
-        coordinates.settingsMorphBounds(view) == bounds &&
+        coordinates.motionBoundsOnScreen(view) == bounds &&
         android.graphics.Rect().also { view.getWindowVisibleDisplayFrame(it) } == windowBounds

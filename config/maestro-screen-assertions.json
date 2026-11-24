@@ -5648,6 +5648,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+      "symbol": "CivilDatePickerDialog",
+      "bindings": [
+        {
+          "case": "presentation-extra-media-date-jump",
+          "selector": {
+            "text": "Cancel"
+          },
+          "scope": "Actual Jump to date calendar opens on loaded media days and hands the chosen day over once; no attachment history read or grid movement.",
+          "entry_assertion": {
+            "text": "Show"
+          },
+          "opened_by": {
+            "text": "Jump to date"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
       "symbol": "OnboardingSavedAccountActions",
       "bindings": [
@@ -6429,14 +6448,14 @@
         {
           "case": "advanced-gestures",
           "selector": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           },
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
             "id": "gestures.MessageLeft"
           },
           "entry_assertion": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           }
         }
       ]
@@ -7190,6 +7209,44 @@
         }
       ],
       "remaining": "Exercise the permission review and disconnect dialogs with a paired account, and confirm disconnect keeps the account on the device (ONB-029)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialogContent",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
     }
   ]
 }

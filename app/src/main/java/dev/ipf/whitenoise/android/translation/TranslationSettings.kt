@@ -30,7 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsSearchRowReveal
 
@@ -130,7 +130,7 @@ internal fun TranslationChatSettingsDialog(
     val currentOverride = remember(revision) { preferences.override(account, group) }
     val effectiveTarget = remember(revision) { preferences.effective(account, group).target }
     val context = LocalContext.current
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.translation_automatic)) },
         text = {

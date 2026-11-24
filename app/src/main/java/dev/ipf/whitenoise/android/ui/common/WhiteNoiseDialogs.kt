@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -56,13 +55,6 @@ private object ChoiceDialogDefaults {
     /** Supporting copy sits one form-field gap beneath the choices. */
     val SupportingTopSpacing = 16.dp
 
-    /**
-     * Material's BasicAlertDialog only bounds the surface to 280–560 dp, so filling content would reach
-     * both screen edges on a 360 dp phone. A 312 dp surface (264 dp of content inside the 24 dp dialog
-     * inset) keeps the customary 24 dp side margins.
-     */
-    val ContentMaxWidth = 264.dp
-
     /** AMOLED has no tonal surfaces, so the selected row uses a faint content-colour wash instead. */
     const val AmoledSelectionAlpha = 0.16f
 }
@@ -86,14 +78,13 @@ internal fun <T> ChoiceDialog(
     supportingText: String? = null,
     subtitle: (T) -> String? = { null },
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = modifier.exposePerformanceTestTags(),
+        modifier = modifier,
         title = { Text(title) },
         text = {
             Column(
                 Modifier
-                    .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
                     .fadingVerticalScroll(rememberScrollState()),
             ) {
@@ -198,8 +189,8 @@ internal fun Modifier.whiteNoiseDialogSelection(selected: Boolean): Modifier =
     clip(MaterialTheme.shapes.large).background(if (selected) dialogSelectionColor() else Color.Transparent)
 
 /**
- * The selected choice fill. AlertDialog already sits on `surfaceContainerHigh`, so the tonal fill is one
- * step higher; the black AMOLED canvas has no tonal steps and uses a faint content wash instead.
+ * The selected choice fill. App dialogs and sheets sit on `surfaceContainerLow`, so the tonal fill is the highest
+ * container; the black AMOLED canvas has no tonal steps and uses a faint content wash instead.
  */
 @Composable
 private fun dialogSelectionColor(): Color =
@@ -275,14 +266,12 @@ internal fun SpeechChoiceDialog(
     choices: List<SpeechChoice>,
     onDismiss: () -> Unit,
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.exposePerformanceTestTags(),
         title = { Text(title) },
         text = {
             Column(
                 Modifier
-                    .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
                     .heightIn(max = SpeechChoiceDialogMaxHeight)
                     .fadingVerticalScroll(rememberScrollState())

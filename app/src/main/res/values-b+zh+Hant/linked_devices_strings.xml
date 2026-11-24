@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">已連結裝置</string>
+    <string name="linked_devices">裝置</string>
+    <string name="settings_search_alias_linked_devices">已連結裝置|連結裝置</string>
+    <string name="group_account_devices_title">已連結裝置</string>
     <string name="linked_devices_detail">從連結裝置傳送的訊息，在你所有的連結裝置上都會顯示為你傳送的訊息。</string>
     <string name="linked_devices_this_device">此裝置</string>
     <string name="linked_devices_other_devices">其他裝置</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">這些聊天無法接受來自你裝置的移除操作。聊天管理員可以在那裡移除該裝置。</string>
     <string name="devices_key_refresh_overdue">此裝置無法更新其邀請金鑰。30 天後，可能無法再將它加入新聊天。請在你的裝置上保持應用程式開啟，以便它們同步。</string>
     <string name="devices_stalled">此裝置已無法與你的其他裝置保持同步。請修復其連結以繼續。</string>
-    <string name="device_repair_confirm_again">請在設定中打開「已連結的裝置」，再次確認修復後再連結此裝置。</string>
+    <string name="device_repair_confirm_again">請在設定中打開「裝置」，再次確認修復後再連結此裝置。</string>
     <string name="device_repair_try_link_again">連結已重設。請嘗試重新連結裝置以完成修復。</string>
     <string name="devices_repair">修復此裝置的連結</string>
     <string name="devices_repair_confirm">這會移除目前的連結，讓你重新連結這部裝置。聊天、訊息、草稿和設定都會保留。即使取消重新連結，也無法恢復原本的連結。</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">連結此裝置，即可看到你其他裝置上的聊天。</string>
     <string name="link_request_default_label">新裝置</string>
     <string name="link_request_options">選項</string>
-    <string name="link_request_options_detail">選擇裝置名稱，並決定是否分享聊天及其歷史訊息。</string>
-    <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
+    <string name="link_request_options_detail">選擇是否分享聊天及其歷史訊息。</string>
+    <string name="explanation_link_request_options">開啟新裝置接收的內容。</string>
     <string name="device_move_advanced">進階</string>
     <string name="setup_device_link_next">登入後，你可以連結這部裝置，接收其他裝置上的聊天。</string>
     <string name="unlinked_account_remove_for">從此裝置移除 %1$s</string>

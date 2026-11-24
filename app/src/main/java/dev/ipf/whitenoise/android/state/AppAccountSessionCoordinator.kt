@@ -119,6 +119,9 @@ internal class AppAccountSessionCoordinator(
     /** One selection receipt authority, also consumed by the facade's native projection adapters. */
     val handoff = AccountSwitchLocalSnapshotHandoff()
 
+    /** Outdates work begun for an account's copy once that copy is removed from this device. */
+    val copyLifetimes = AccountCopyLifetimes()
+
     /** UI cancellation only abandons the wait; the existing mutation scope retains the single bootstrap. */
     suspend fun bootstrapAttempt(start: suspend () -> Unit): Deferred<Unit> =
         withContext(stateDispatcher) {

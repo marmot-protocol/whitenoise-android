@@ -19,8 +19,8 @@ import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /*
  * Outside batch and text selection a message row is one screen-reader stop (#3603). Android maps a

@@ -477,7 +477,6 @@ private fun ConversationController.updatePendingSendStage(
 }
 
 /** Settle a manual text retry without republishing an uncertain delivery. */
-@Suppress("LongMethod") // Each failure classification owns different cleanup and user-visible recovery state.
 internal fun ConversationController.handleFailedSendRetryFailure(
     throwable: Throwable,
     key: String,
@@ -489,15 +488,10 @@ internal fun ConversationController.handleFailedSendRetryFailure(
     retryTrace: PerformanceTrace?,
 ) {
     if (throwable is OptimisticSendCancelledException) {
-        discardedDuringRetry.remove(key)
-        removeCancelledOptimisticSend(key, tempId)
-        trimCancelledSendTombstones()
+        discardCancelledSendAttempt(key, tempId)
         return
     }
-    if (throwable is CancellationException && optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
-        discardedDuringRetry.remove(key)
-        trimCancelledSendTombstones()
-    }
+    retireCancelledSendTombstone(throwable, key)
     throwable.rethrowIfCancellation()
     if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
     when {
@@ -511,19 +505,10 @@ internal fun ConversationController.handleFailedSendRetryFailure(
             markActiveAccountRemovedFromMembers(account)
         }
         isAmbiguousRelayDeliveryError(throwable) -> {
-            if (optimisticSendPhases[key] == OptimisticSendPhase.PRE_ACCEPTANCE) {
-                optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
-            }
             // Publication may already have reached a relay. Keep the
             // existing row Pending; another high-level send could mint a
             // duplicate event.
-            sendTrace(
-                retryTrace,
-                PerformancePhase.DELIVERY_UNCERTAIN,
-                result = PerformanceResult.PENDING,
-                layer = PerformanceLayer.TRANSPORT,
-            )
-            appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
+            markTextDeliveryUncertain(key, tempId, retryTrace)
             publishTimelineFromIndexes()
         }
         optimisticSendIsMdkOwnedOrUnknown(key) -> {
@@ -538,13 +523,7 @@ internal fun ConversationController.handleFailedSendRetryFailure(
                     timelineOrder = order,
                 )
             failOptimisticChatListPreview(tempId)
-            suppressProjectedTimelineItems(
-                unpublishedProjectionIdsMatchingMessage(
-                    timelineRecords = timelineRecords,
-                    message = refreshedRecord,
-                    activeAccountIdHex = conversationAccountIdHex,
-                ),
-            )
+            suppressUnpublishedCopiesOf(refreshedRecord)
             publishTimelineFromIndexes()
             appState.pendingSendDiagnostics.forget(tempId)
             presentSendFailure(appState, throwable, sendFailureAttempt(key))
