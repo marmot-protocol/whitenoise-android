@@ -246,7 +246,6 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.AccountKeys,
         SettingsDetail.Relays,
         -> SettingsDetail.Account
-        SettingsDetail.HistoryBackups -> SettingsDetail.Data
         SettingsDetail.ActionColor,
         SettingsDetail.ChatBubbleColors,
         -> SettingsDetail.Appearance
@@ -292,5 +291,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Data,
         SettingsDetail.AiAgents,
         -> null
-        SettingsDetail.ManageStorage -> SettingsDetail.Data
+        SettingsDetail.HistoryBackups,
+        SettingsDetail.ManageStorage,
+        -> SettingsDetail.Data
     }
