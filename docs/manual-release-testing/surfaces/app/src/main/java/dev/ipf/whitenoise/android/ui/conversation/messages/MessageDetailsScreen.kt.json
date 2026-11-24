@@ -88,14 +88,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "MSG-001"
-        ]
-      },
-      {
         "surface": "string:message_copy_id",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "R.string.message_copy_id",

@@ -16,14 +16,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "SET-022"
-        ]
-      },
-      {
         "surface": "string:donate_open_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
         "anchor": "R.string.donate_open_failed",

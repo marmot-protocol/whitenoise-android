@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+  "legacy_sha256": "78074a9402e7d6c2c6bd11767d1dd8ad8697d7591912865d85c6ec48d12ea026",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "fun WhiteNoiseTopBar(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseTopBarNavigationButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "fun WhiteNoiseTopBarNavigationButton(",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+  "legacy_sha256": "f3c18ad3a281aa2bc0f5360dd06e6dcca46fb255c0fc5aefdf915d9483531c28",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EditHistoryDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "fun EditHistoryDialog(",
+        "test_ids": [
+          "MSG-007",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "EditHistoryVersionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "fun EditHistoryVersionRow(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.conversation_edit_revision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "R.string.conversation_edit_revision",
+        "test_ids": [
+          "MSG-007",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "R.string.edit_history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "R.string.edit_history",
+        "test_ids": [
+          "MSG-007",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "R.string.edit_history_original",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": "R.string.edit_history_original",
+        "test_ids": [
+          "MSG-007",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: EditHistory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
