@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_MESSAGE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
@@ -195,7 +196,10 @@ class DetailsSurfacePolishScreenshotTest {
         selfProfile: UserProfileMetadataFfi? = null,
     ) {
         val appState = appState(profileHex = SELF_HEX.takeIf { selfProfile != null }, profile = selfProfile)
-        if (selfProfile != null) appState.presentDiscoveredProfile(SELF_NPUB, selfProfile)
+        if (selfProfile != null) {
+            appState.withGroupReviewActorNpub(SELF_HEX, SELF_NPUB)
+            appState.presentDiscoveredProfile(SELF_NPUB, selfProfile)
+        }
         val controller =
             ConversationController(
                 appState = appState,

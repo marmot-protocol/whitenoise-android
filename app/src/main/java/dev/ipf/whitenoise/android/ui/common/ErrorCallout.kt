@@ -33,7 +33,6 @@ internal fun ErrorCallout(
     onRetry: (() -> Unit)? = null,
     onDismiss: (() -> Unit)? = null,
     messageModifier: Modifier = Modifier,
-    copyModifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
     WhiteNoiseCallout(
@@ -51,7 +50,6 @@ internal fun ErrorCallout(
                     if (report != null) {
                         IconButton(
                             onClick = { clipboard.setText(AnnotatedString(report)) },
-                            modifier = copyModifier,
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_content_copy),

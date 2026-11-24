@@ -1284,9 +1284,9 @@ internal fun GroupDetailsScreen(
                     }
                 },
                 onDismiss = abandonment::dismiss,
+                appState = appState,
                 // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
                 error = controller.lastMutationError.takeIf { abandonment.attempted },
-                identity = { GroupActingAccountIdentity(appState, target.accountRef) },
                 confirmEnabled = mutationOwnerCurrent,
             )
         }

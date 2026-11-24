@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -23,11 +24,14 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
@@ -161,9 +165,9 @@ internal fun GroupAbandonmentDialog(
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    appState: WhiteNoiseAppState,
     error: ErrorPresentation? = null,
-    identity: (@Composable () -> Unit)? = null,
-) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, error, identity)
+) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, appState, error)
 
 /**
  * The same confirmation for the chat list's bulk action: every reviewed chat of the one acting account, captured
@@ -176,14 +180,14 @@ internal fun GroupAbandonmentDialog(
     targets: List<GroupAbandonmentTarget>,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    identity: (@Composable () -> Unit)? = null,
+    appState: WhiteNoiseAppState,
     confirmEnabled: Boolean = true,
 ) = GroupAbandonmentReviewDialog(
     targets,
     GroupAbandonmentStatus.Review,
     onConfirm,
     onDismiss,
-    identity = identity,
+    appState,
     confirmEnabled = confirmEnabled,
 )
 
@@ -195,12 +199,14 @@ internal fun GroupAbandonmentReviewDialog(
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    appState: WhiteNoiseAppState,
     error: ErrorPresentation? = null,
-    identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
 ) {
     val running = status == GroupAbandonmentStatus.Running
     val failed = status == GroupAbandonmentStatus.Failed
+    val report = error?.report.takeIf { failed }
+    val clipboard = LocalClipboardManager.current
     val anyDm = targets.any { it.isDm }
     val titleRes =
         when {
@@ -220,7 +226,7 @@ internal fun GroupAbandonmentReviewDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("group.abandon.dialog"),
         title = { Text(stringResource(titleRes)) },
-        text = { GroupAbandonmentBody(targets, failed, error, identity) },
+        text = { GroupAbandonmentBody(targets, failed, error, appState) },
         icon = if (running) ({ CircularProgressIndicator() }) else null,
         confirmButton = {
             TextButton(
@@ -231,6 +237,12 @@ internal fun GroupAbandonmentReviewDialog(
             ) { Text(stringResource(confirmLabel)) }
         },
         dismissButton = {
+            if (report != null) {
+                TextButton(
+                    onClick = { clipboard.setText(AnnotatedString(report)) },
+                    modifier = Modifier.testTag("group.abandon.error.copy"),
+                ) { Text(stringResource(R.string.copy)) }
+            }
             TextButton(onClick = dismiss, modifier = Modifier.testTag("group.abandon.cancel")) {
                 Text(stringResource(if (failed) R.string.close else R.string.cancel))
             }
@@ -245,21 +257,23 @@ private fun GroupAbandonmentBody(
     targets: List<GroupAbandonmentTarget>,
     failed: Boolean,
     error: ErrorPresentation?,
-    identity: (@Composable () -> Unit)?,
+    appState: WhiteNoiseAppState,
 ) {
-    val style = MaterialTheme.typography.bodyMedium
+    val style = MaterialTheme.typography.titleSmall
     val color = MaterialTheme.colorScheme.onSurface
     Column(
         Modifier.fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.testTag("group.abandon.identity"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            targets.forEach { target ->
-                val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
-                Text(stringResource(identity, target.conversationTitle), style = style, color = color)
+        Column(Modifier.testTag("group.abandon.identity")) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                targets.forEach { target ->
+                    val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
+                    EmojiLabel(stringResource(identity, target.conversationTitle), style = style, color = color)
+                }
             }
+            targets.firstOrNull()?.let { GroupActingAccountIdentity(appState, it.accountRef, showRole = true) }
         }
-        identity?.invoke()
         if (targets.any { it.isDm }) Text(stringResource(R.string.chat_abandon_dialog_message))
         if (targets.any { !it.isDm }) Text(stringResource(R.string.group_reset_dialog_message))
         if (failed) GroupAbandonmentFailure(targets.all { it.isDm }, error)
@@ -268,7 +282,7 @@ private fun GroupAbandonmentBody(
 
 /**
  * A readable, announced failure. The journal keeps any committed cleanup, so a retry never replays the forget. With
- * an [error], its selectable detail and a Copy action for the privacy-safe report stay inside the dialog.
+ * an [error], its selectable detail stays in the body. The footer keeps the privacy-safe report accessible.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -281,10 +295,9 @@ private fun GroupAbandonmentFailure(
     ErrorCallout(
         title = stringResource(summary),
         message = error?.let { stringResource(R.string.latest_group_error, it.message.resolve(context)) },
-        report = error?.report,
+        report = null,
         modifier = Modifier.testTag("group.abandon.error").semantics { liveRegion = LiveRegionMode.Polite },
         messageModifier = Modifier.testTag("group.abandon.error.detail"),
-        copyModifier = Modifier.testTag("group.abandon.error.copy"),
     )
 }
 

@@ -92,7 +92,10 @@ class GroupAbandonmentCoverageTest {
             "abandonment.targets(actingAccount, controller.group.groupIdHex)" in screen,
         )
         val dialog = source("ui/group/GroupDetailsResetControl.kt")
-        assertTrue("the dialog uses the shared review identity", "identity?.invoke()" in dialog)
+        assertTrue(
+            "the dialog uses the captured account's shared review identity",
+            "GroupActingAccountIdentity(appState, it.accountRef" in dialog,
+        )
         assertTrue("the dialog names the conversation", "target.conversationTitle" in dialog)
         assertTrue("confirm is disabled while the forget runs", "enabled = !running" in dialog)
         val chatHost = source("ui/chats/ChatAbandonment.kt")

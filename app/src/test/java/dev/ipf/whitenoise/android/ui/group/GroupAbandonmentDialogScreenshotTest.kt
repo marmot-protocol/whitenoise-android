@@ -9,17 +9,21 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -27,12 +31,12 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.chats.newchat.GROUP_REVIEW_ACTOR_HEX
 import dev.ipf.whitenoise.android.ui.chats.newchat.GROUP_REVIEW_ACTOR_NPUB
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,11 +72,29 @@ class GroupAbandonmentDialogScreenshotTest {
     /** A group reset review on AMOLED, keeping the group wording of the same forget. */
     @Test fun groupReviewAmoled() = capture("group_review_amoled", GROUP, dark = true, amoled = true)
 
+    @Test
+    fun groupReviewLargeRtl() =
+        capture("group_review_large_rtl", GROUP, dark = true, amoled = true, scale = 2f, rtl = true)
+
     /** A long-named direct chat at 200% text in RTL keeps every line and both actions reachable. */
     @Test fun dmReviewLargeRtl() = capture("dm_review_large_rtl", LONG_DM, scale = 2f, rtl = true)
 
     /** A failed direct-chat attempt shows its readable error and a retry in the light theme. */
     @Test fun dmFailedLight() = capture("dm_failed_light", DM, status = FAILED)
+
+    @Test
+    fun dmFailedLargeRtl() {
+        capture("dm_failed_large_rtl", DM, status = FAILED, dark = true, scale = 2f, rtl = true)
+        val detail = composeRule.onNodeWithTag("group.abandon.error.detail", useUnmergedTree = true)
+        val initialBottom = detail.getUnclippedBoundsInRoot().bottom
+        composeRule.onNodeWithTag("group.abandon.error").performScrollTo()
+        val bottom = detail.assertIsDisplayed().getUnclippedBoundsInRoot().bottom
+        val copy = composeRule.onNodeWithTag("group.abandon.error.copy").assertIsDisplayed()
+        assertTrue(bottom < initialBottom)
+        assertTrue(bottom < copy.getUnclippedBoundsInRoot().top)
+        composeRule.onNodeWithTag("group.abandon.cancel").assertIsDisplayed()
+        composeRule.onNodeWithTag("group.abandon.confirm").assertIsDisplayed()
+    }
 
     /** A failed group reset in the dark theme. */
     @Test fun groupFailedDark() = capture("group_failed_dark", GROUP, status = FAILED, dark = true)
@@ -148,7 +170,7 @@ class GroupAbandonmentDialogScreenshotTest {
                     listOf(DM, GROUP),
                     onConfirm = { confirms++ },
                     onDismiss = {},
-                    identity = { GroupActingAccountIdentity(reviewState, DM.accountRef) },
+                    appState = reviewState,
                 )
             }
         }
@@ -156,7 +178,7 @@ class GroupAbandonmentDialogScreenshotTest {
         listOf(
             app.getString(R.string.abandon_identity_chat, DM.conversationTitle),
             app.getString(R.string.abandon_identity_group, GROUP.conversationTitle),
-        ).forEach { composeRule.onNodeWithText(it).assertExists() }
+        ).forEach { composeRule.onAllNodesWithText(it).assertCountEquals(1) }
         composeRule.onAllNodesWithTag("group.action.acting_account").assertCountEquals(1)
         composeRule.onNodeWithTag("group.abandon.confirm").performClick()
         composeRule.waitForIdle()
@@ -173,7 +195,9 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(R.string.delete_from_device, groupAbandonmentBatchLabel(listOf(true)))
         val groups = listOf(GROUP, GROUP.copy(groupIdHex = "group-books", conversationTitle = "Book club"))
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) { GroupAbandonmentDialog(groups, onConfirm = {}, onDismiss = {}) }
+            WhiteNoiseTheme(darkTheme = false) {
+                GroupAbandonmentDialog(groups, onConfirm = {}, onDismiss = {}, appState = reviewState)
+            }
         }
         composeRule.onNodeWithText(app.getString(R.string.chats_abandon_dialog_title)).assertIsDisplayed()
         composeRule
@@ -189,9 +213,18 @@ class GroupAbandonmentDialogScreenshotTest {
         render(DM, GroupAbandonmentStatus.Review, onConfirm = { confirms++ }, onDismiss = { dismissals++ })
         composeRule.onNodeWithText(app.getString(R.string.chat_abandon_dialog_title)).assertIsDisplayed()
         val chat = app.getString(R.string.abandon_identity_chat, DM.conversationTitle)
-        composeRule.onNodeWithText(chat).assertIsDisplayed()
+        val targetBounds = composeRule.onNodeWithText(chat).assertIsDisplayed().getUnclippedBoundsInRoot()
         val role = app.getString(R.string.group_action_acting_account)
-        composeRule.onNodeWithContentDescription("$role, $GROUP_REVIEW_ACTOR_NPUB").assertIsDisplayed()
+        val roleBounds =
+            composeRule.onNodeWithText(role, useUnmergedTree = true).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertEquals(targetBounds.left, roleBounds.left)
+        assertTrue(roleBounds.top - targetBounds.bottom <= 18.dp)
+        val account = composeRule.onNodeWithContentDescription("$role, $GROUP_REVIEW_ACTOR_NPUB").assertIsDisplayed()
+        val accountBounds = account.getUnclippedBoundsInRoot()
+        assertTrue(accountBounds.bottom - accountBounds.top >= 48.dp)
+        account.performClick()
+        val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
+        assertEquals(GROUP_REVIEW_ACTOR_NPUB, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
         composeRule
             .onNodeWithTag("group.abandon.confirm")
             .assertTextEquals(app.getString(R.string.delete_group_confirm))
@@ -208,27 +241,42 @@ class GroupAbandonmentDialogScreenshotTest {
         var confirms = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                GroupAbandonmentDialog(DM, status.value, onConfirm = { confirms++ }, onDismiss = {})
+                GroupAbandonmentDialog(
+                    DM,
+                    status.value,
+                    onConfirm = { confirms++ },
+                    onDismiss = {},
+                    appState = reviewState,
+                )
             }
         }
         composeRule.onNodeWithTag("group.abandon.confirm").assertIsNotEnabled()
         status.value = GroupAbandonmentStatus.Failed
         composeRule.onNodeWithTag("group.abandon.error").assertIsDisplayed()
+        composeRule.onNodeWithTag("group.abandon.error.copy").assertDoesNotExist()
         composeRule.onNodeWithTag("group.abandon.confirm").assertIsEnabled().performClick()
         composeRule.waitForIdle()
         assertEquals(1, confirms)
     }
 
-    /** A failed attempt keeps the error's detail and its Copy action inside the dialog, which copies the report. */
+    /** The detail scrolls in the body and Copy shares the footer with Close and Retry. */
     @Test
     fun failedReviewOwnsTheErrorDetailAndCopy() {
         render(DM, FAILED, error = ERROR)
         val detail = app.getString(R.string.latest_group_error, ERROR_MESSAGE)
         composeRule.onNode(hasText(detail) and hasAnyAncestor(isDialog())).assertIsDisplayed()
-        composeRule
-            .onNode(hasTestTag("group.abandon.error.copy") and hasAnyAncestor(isDialog()))
-            .assertIsDisplayed()
-            .performClick()
+        val callout = composeRule.onNodeWithTag("group.abandon.error").getUnclippedBoundsInRoot()
+        val close = composeRule.onNodeWithTag("group.abandon.cancel").getUnclippedBoundsInRoot()
+        val retry = composeRule.onNodeWithTag("group.abandon.confirm").getUnclippedBoundsInRoot()
+        val copy =
+            composeRule
+                .onNode(hasTestTag("group.abandon.error.copy") and hasAnyAncestor(isDialog()))
+                .assertIsDisplayed()
+        val copyBounds = copy.getUnclippedBoundsInRoot()
+        assertTrue(copyBounds.top >= callout.bottom)
+        assertEquals(close.top, copyBounds.top)
+        assertEquals(retry.top, copyBounds.top)
+        copy.performClick()
         val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
         assertEquals(
             ERROR.report,
@@ -277,13 +325,14 @@ class GroupAbandonmentDialogScreenshotTest {
                         listOf(DM, GROUP),
                         onConfirm = {},
                         onDismiss = {},
-                        identity = { GroupActingAccountIdentity(reviewState, DM.accountRef) },
+                        appState = reviewState,
                     )
                 }
             }
         }
         composeRule.waitForIdle()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_abandon_bulk_mixed_$name.png")
+        if (large) assertResetWarningAndActionsReachable()
     }
 
     /** Composes the sole-admin gate under the requested appearance and records its window. */
@@ -320,6 +369,16 @@ class GroupAbandonmentDialogScreenshotTest {
         val error = ERROR.takeIf { status == FAILED }
         render(target, status, dark = dark, amoled = amoled, scale = scale, rtl = rtl, error = error)
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_abandon_$name.png")
+        if (scale > 1f && !target.isDm) assertResetWarningAndActionsReachable()
+    }
+
+    private fun assertResetWarningAndActionsReachable() {
+        composeRule
+            .onNodeWithText(app.getString(R.string.group_reset_dialog_message))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("group.abandon.confirm").assertIsDisplayed()
+        composeRule.onNodeWithTag("group.abandon.cancel").assertIsDisplayed()
     }
 
     /** Sets the dialog content with its appearance and callbacks. */
@@ -341,12 +400,12 @@ class GroupAbandonmentDialogScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     GroupAbandonmentDialog(
-                        target,
-                        status,
-                        onConfirm,
-                        onDismiss,
-                        error,
-                        identity = { GroupActingAccountIdentity(reviewState, target.accountRef) },
+                        target = target,
+                        status = status,
+                        onConfirm = onConfirm,
+                        onDismiss = onDismiss,
+                        appState = reviewState,
+                        error = error,
                     )
                 }
             }
