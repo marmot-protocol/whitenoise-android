@@ -85,7 +85,7 @@
     <string name="refresh">Yenile</string>
     <string name="retry">Tekrar dene</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
-    <string name="sign_in">Giriş Yap</string>
+    <string name="sign_in">Giriş yap</string>
     <string name="sign_in_secret_key_help">Bu cihazda mevcut bir kimliği kullanmak için Nostr gizli anahtarınızı girin.</string>
     <string name="nostr_nsec">Özel anahtarınızı girin</string>
     <string name="back">Geri dön</string>
@@ -1614,11 +1614,11 @@
     <string name="toast_amber_sign_in_cancelled">Amber girişi iptal edildi</string>
     <string name="onboarding_sign_up">Kayıt ol</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
-    <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş Yap\'a dokunun.</string>
-    <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş yap\'a dokunun.</string>
     <string name="sign_in_error_setup_unexpected_state">Beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Hiçbir şey değiştirilmedi.</string>
     <string name="sign_in_error_setup_recovery_declined">Kurtarma iptal edildi. Hiçbir şey değiştirilmedi.</string>
-    <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş yap\'a dokunun.</string>
     <string name="sign_in_error_setup_recovery_unexpected_state">Kurtarmadan sonra beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Kurtarmanın bir kısmı zaten uygulanmış olabilir.</string>
     <string name="sign_in_recovery_title">Bu hesap kurtarılsın mı?</string>
     <string name="sign_in_recovery_message">Kurulum tamamlanmadı. Kurtarma işlemi bunu temizler ve yeniden oturum açmayı dener. Daha önce yayımlanmış davet anahtarları rölelerde kalabilir.</string>

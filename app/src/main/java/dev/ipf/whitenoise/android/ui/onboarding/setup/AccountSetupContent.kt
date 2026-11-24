@@ -3,6 +3,8 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +30,7 @@ import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 /** Lifecycle-aware route; the process-owned controller survives Activity recreation and signer handoff. */
@@ -102,22 +105,23 @@ internal fun AccountSetupContent(
         }
     }
     BackHandler(onBack = back)
-    val pinned =
-        SetupPinnedCallbacks(
-            onAction = onAction,
-            onEdit = onEdit,
-            onSaveEditor = { edited ->
-                onEditorChange(edited)
-                onSaveEditor()
-            },
-            onDismissEditor = onDismissEditor,
-            onReconnect = onReconnect,
-            onOpenChats = onOpenChats,
-            onRemoveRelay = onRemoveRelay,
+    val actions: @Composable ColumnScope.() -> Unit = {
+        SetupPinnedActions(
+            state,
+            fields,
+            onAction,
+            onEdit,
+            onEditorChange,
+            onSaveEditor,
+            onDismissEditor,
+            onReconnect,
+            onOpenChats,
+            onRemoveRelay,
         )
-    SetupPage(stringResource(R.string.setup_title), back, actions = { SetupPinnedActions(state, fields, pinned) }) {
+    }
+    SetupPage(stringResource(R.string.setup_title), back, actions.takeIf { state.hasPinnedActions }) {
         SetupStageProgress(state)
-        SetupErrors(state)
+        SetupErrors(state, onReconnect)
         when (state.setupSurface()) {
             SetupSurface.Editor -> {
                 val editor = checkNotNull(state.editor)
@@ -205,9 +209,15 @@ private fun SetupDirectRelayRemoval(state: AccountSetupState) {
 internal val AccountSetupState.checklistInspectionStep: OnboardingStepFfi?
     get() = currentStep?.takeIf { !busy }?.step
 
-/** Separates connection failure from a decision that became stale; Resume is pinned with the other actions. */
+/**
+ * Separates connection failure from a decision that became stale. Resume is pinned with the other actions, except in
+ * the editor, where it stays here so the keyboard keeps room for the field being edited.
+ */
 @Composable
-private fun SetupErrors(state: AccountSetupState) {
+private fun SetupErrors(
+    state: AccountSetupState,
+    onReconnect: () -> Unit,
+) {
     if (state.showsSetupFailure) {
         WhiteNoiseCallout(
             text = stringResource(if (state.staleDecision) R.string.setup_stale else R.string.setup_retry_help),
@@ -215,6 +225,13 @@ private fun SetupErrors(state: AccountSetupState) {
             icon = R.drawable.ic_error,
             isError = true,
         )
+        if (state.editor != null && state.snapshot?.ready != true) {
+            WhiteNoiseOutlinedButton(
+                onClick = onReconnect,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth().testTag("setup-resume-checks"),
+            ) { Text(stringResource(R.string.setup_resume_checks)) }
+        }
     }
 }
 

@@ -28,13 +28,14 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * The shared onboarding page: a top bar, a scrolling column bounded to [OnboardingMaxContentWidth] with
- * 16 dp margins, and [actions] pinned above the navigation bar and keyboard at the same width.
+ * 16 dp margins, and [actions] pinned above the navigation bar and keyboard at the same width. Without actions the
+ * column itself clears the navigation bar and keyboard, so no empty action band remains.
  */
 @Composable
 internal fun OnboardingPinnedActionPage(
     title: String,
     onBack: () -> Unit,
-    actions: @Composable ColumnScope.() -> Unit,
+    actions: (@Composable ColumnScope.() -> Unit)?,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -42,10 +43,14 @@ internal fun OnboardingPinnedActionPage(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = { WhiteNoiseTopBar(title, onBack = onBack) },
-        bottomBar = { OnboardingPinnedActions(actions) },
+        bottomBar = { if (actions != null) OnboardingPinnedActions(actions) },
     ) { padding ->
         Box(
-            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .then(if (actions == null) Modifier.navigationBarsPadding().imePadding() else Modifier),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(

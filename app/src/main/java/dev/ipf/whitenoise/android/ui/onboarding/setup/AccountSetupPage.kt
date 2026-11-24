@@ -24,7 +24,7 @@ import dev.ipf.whitenoise.android.ui.onboarding.OnboardingPinnedActionPage
 internal fun SetupPage(
     title: String,
     onBack: () -> Unit,
-    actions: @Composable ColumnScope.() -> Unit,
+    actions: (@Composable ColumnScope.() -> Unit)?,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     OnboardingPinnedActionPage(title = title, onBack = onBack, actions = actions, content = content)
@@ -58,59 +58,73 @@ internal fun AccountSetupState.setupSurface(): SetupSurface {
     }
 }
 
-/** Callbacks the pinned setup actions dispatch; each one is the same owner call the inline actions used. */
-internal class SetupPinnedCallbacks(
-    val onAction: (SetupRequest) -> Unit,
-    val onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
-    val onSaveEditor: (SetupEditor) -> Unit,
-    val onDismissEditor: () -> Unit,
-    val onReconnect: () -> Unit,
-    val onOpenChats: () -> Unit,
-    val onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
-)
-
 /**
- * The pinned actions for the current surface: Resume after a failure, the editor's save and cancel, Open chats once
- * setup is ready, or the native decision's direct removal and offered actions.
+ * The pinned actions for the current surface: the editor's save and cancel, Open chats once setup is ready, or the
+ * native decision's direct removal and offered actions. Resume joins them after a failure outside the editor and is
+ * filled only when no decision action is pinned beside it.
  */
+@Suppress("LongParameterList")
 @Composable
 internal fun SetupPinnedActions(
     state: AccountSetupState,
     fields: SetupEditorFields?,
-    callbacks: SetupPinnedCallbacks,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+    onEditorChange: (SetupEditor) -> Unit,
+    onSaveEditor: () -> Unit,
+    onDismissEditor: () -> Unit,
+    onReconnect: () -> Unit,
+    onOpenChats: () -> Unit,
+    onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
 ) {
     val surface = state.setupSurface()
-    SetupResumeAction(state, primary = surface != SetupSurface.Editor, callbacks.onReconnect)
+    val decisionActions = surface == SetupSurface.Decision && state.pinsDecisionActions
+    if (surface != SetupSurface.Editor) SetupResumeAction(state, primary = !decisionActions, onReconnect)
     when (surface) {
         SetupSurface.Editor -> {
             val editor = checkNotNull(state.editor)
-            val current = checkNotNull(fields).current(editor)
+            val editorFields = checkNotNull(fields)
             SetupEditorActions(
                 editor,
                 state.busy,
-                editor.action != OnboardingActionFfi.EDIT_RELAYS || current.canReviewRelayEdit,
-                onSave = { callbacks.onSaveEditor(fields.current(editor)) },
-                onDismiss = callbacks.onDismissEditor,
+                editor.action != OnboardingActionFfi.EDIT_RELAYS || editorFields.current(editor).canReviewRelayEdit,
+                onSave = {
+                    onEditorChange(editorFields.current(editor))
+                    onSaveEditor()
+                },
+                onDismiss = onDismissEditor,
             )
         }
         SetupSurface.Ready ->
             WhiteNoiseButton(
-                onClick = callbacks.onOpenChats,
+                onClick = onOpenChats,
                 enabled = state.snapshot?.cancellationPending == false && !state.busy,
                 modifier = Modifier.fillMaxWidth().testTag("setup-open-chats"),
             ) { Text(stringResource(R.string.setup_open_chats)) }
         SetupSurface.Progress -> Unit
         SetupSurface.Decision -> {
-            val step = state.currentStep ?: return
-            SetupDirectRelayRemovalAction(state, callbacks.onRemoveRelay)
-            val blockedByFailure = state.error || state.staleDecision || state.optionalMetadataPending
-            val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
-            if (!blockedByFailure && (!state.disconnected || reconnectOffered)) {
-                SetupActionButtons(state, callbacks.onAction, callbacks.onEdit)
-            }
+            SetupDirectRelayRemovalAction(state, onRemoveRelay)
+            if (state.offersDecisionActions) SetupActionButtons(state, onAction, onEdit)
         }
     }
 }
+
+/** Whether the surface pins anything; a running check without a failure leaves no empty action bar. */
+internal val AccountSetupState.hasPinnedActions: Boolean
+    get() = setupSurface() != SetupSurface.Progress || showsSetupFailure
+
+/** The current decision's offered actions show unless a failure or a lost signer without Reconnect blocks them. */
+private val AccountSetupState.offersDecisionActions: Boolean
+    get() {
+        val step = currentStep ?: return false
+        val blockedByFailure = error || staleDecision || optionalMetadataPending
+        val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
+        return !blockedByFailure && (!disconnected || reconnectOffered)
+    }
+
+/** The decision pins its own buttons: offered actions, or the direct removal of one exact relay. */
+private val AccountSetupState.pinsDecisionActions: Boolean
+    get() = offersDecisionActions || (snapshot != null && currentStep != null && directRemovalEndpoint() != null)
 
 /** Resume is the way forward after a failure or a lost connection until setup is ready. */
 @Composable
