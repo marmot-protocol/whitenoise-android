@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
@@ -47,7 +48,7 @@ internal fun ShareChatPickerPreview(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
@@ -103,7 +104,7 @@ internal fun ChatPickerSendingAccountRow(
         onClick = { if (multipleAccounts) onOpenSelector() },
         enabled = multipleAccounts,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier.testTag(testTag),
     ) {

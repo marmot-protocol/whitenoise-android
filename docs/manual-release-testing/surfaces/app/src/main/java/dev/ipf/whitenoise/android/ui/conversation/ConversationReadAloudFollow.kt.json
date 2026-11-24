@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadAloudFollow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Read-aloud follow suspended by direct drags, text selection and range selection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadAloudFollow.kt",
+        "anchor": "fun suspendForDirectDrag(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "Read-aloud Resume follow reveals the current passage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadAloudFollow.kt",
+        "anchor": "fun revealCurrentPassage(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

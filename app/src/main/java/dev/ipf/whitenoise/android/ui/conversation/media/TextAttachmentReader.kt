@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -592,7 +593,7 @@ private fun TextAttachmentTruncatedNotice(onOpenExternal: (() -> Unit)?) {
     Surface(
         color = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radii.lg),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(

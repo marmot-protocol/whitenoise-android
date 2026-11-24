@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Container fill a hosting surface hands to its fields, for example the lowest surface inside settings. */
@@ -54,7 +55,7 @@ private object WhiteNoiseTextFieldDefaults {
     val AboveLabelAdditionalStartInset = 12.dp
 
     /** Keep the approved 28 dp form geometry local; production extra-large is currently 24 dp. */
-    val Shape = RoundedCornerShape(28.dp)
+    val Shape = RoundedCornerShape(Radii.xxl)
 
     /** A full-shape state ring replaces a persistent resting outline. */
     val StateRingWidth = 2.dp
