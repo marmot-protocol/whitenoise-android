@@ -9,7 +9,7 @@ import org.junit.Test
 
 /** Every app dialog reaches its window through the shared dialog surface, which keeps off the window edges. */
 class DialogSurfaceCoverageTest {
-    /** Only the shared base names the raw alert dialog, so no feature dialog can drop its colours, outline or width. */
+    /** The raw alert dialog has one caller, `WhiteNoiseAlertDialog`, so no feature dialog can drop its styling. */
     @Test
     fun onlyTheSharedBaseUsesTheRawAlertDialog() {
         assertEquals(
@@ -17,19 +17,42 @@ class DialogSurfaceCoverageTest {
             setOf(RAW_DIALOGS_SOURCE, SHARED_DIALOGS_SOURCE),
             mainSourcesNaming("AnimatedAlertDialog"),
         )
-        assertTrue(
-            "WhiteNoiseAlertDialog must be the one shared caller of the raw alert dialog",
-            "AnimatedAlertDialog(" in sharedDialogs().functionBody("WhiteNoiseAlertDialog"),
+        assertEquals(
+            "the raw dialog's own file must not call it",
+            0,
+            callCount(appModuleSource("src/main/java/$APP/$RAW_DIALOGS_SOURCE"), "AnimatedAlertDialog"),
+        )
+        assertEquals(
+            "the shared dialog file must call the raw alert dialog exactly once",
+            1,
+            callCount(sharedDialogs(), "AnimatedAlertDialog"),
+        )
+        assertEquals(
+            "that one call must be WhiteNoiseAlertDialog's",
+            1,
+            callCount(sharedDialogs().functionBody("WhiteNoiseAlertDialog"), "AnimatedAlertDialog"),
         )
     }
 
-    /** Custom-body dialogs may only leave the list below as they move onto the shared surface; none may join it. */
+    /**
+     * Custom-body dialog calls are pinned per file and can only go down: a new call anywhere fails, and a dialog that
+     * moves onto the shared surface lowers its file's count here in the same change.
+     */
     @Test
-    fun customBodyDialogsOnlyShrink() {
-        val unexpected = mainSourcesNaming("AnimatedBasicAlertDialog") - CUSTOM_BODY_DIALOG_SOURCES
+    fun customBodyDialogCallsOnlyShrink() {
+        val unexpected = mainSourcesNaming("AnimatedBasicAlertDialog") - CUSTOM_BODY_DIALOG_CALLS.keys
         assertTrue(
             "new custom-body dialogs must sit on the shared dialog surface: $unexpected",
             unexpected.isEmpty(),
+        )
+        val actual =
+            CUSTOM_BODY_DIALOG_CALLS.keys.associateWith { path ->
+                callCount(appModuleSource("src/main/java/$APP/$path"), "AnimatedBasicAlertDialog")
+            }
+        assertEquals(
+            "custom-body dialog calls per file changed; lower a count when a dialog moves, never raise one",
+            CUSTOM_BODY_DIALOG_CALLS,
+            actual,
         )
     }
 
@@ -61,6 +84,12 @@ class DialogSurfaceCoverageTest {
             .toSet()
     }
 
+    /** Calls of [function] in [source], qualified or not, leaving out its own declaration. */
+    private fun callCount(
+        source: String,
+        function: String,
+    ): Int = Regex("""(?<![\w])(?<!fun )${Regex.escape(function)}\s*\(""").findAll(source).count()
+
     /** The shared dialog components' source. */
     private fun sharedDialogs(): String = appModuleSource("src/main/java/$APP/$SHARED_DIALOGS_SOURCE")
 
@@ -69,14 +98,14 @@ class DialogSurfaceCoverageTest {
         const val RAW_DIALOGS_SOURCE = "ui/common/AnimatedAlertDialog.kt"
         const val SHARED_DIALOGS_SOURCE = "ui/common/WhiteNoiseDialogs.kt"
 
-        /** Remove a source here once its dialog moves onto the shared surface. */
-        val CUSTOM_BODY_DIALOG_SOURCES =
-            setOf(
-                RAW_DIALOGS_SOURCE,
-                SHARED_DIALOGS_SOURCE,
-                "ui/conversation/messages/MessageDeleteDialog.kt",
-                "ui/settings/TtsRatePicker.kt",
-                "ui/settings/UsageDiagnosticsUi.kt",
+        /** `AnimatedBasicAlertDialog` calls per file; lower a count once its dialog moves onto the shared surface. */
+        val CUSTOM_BODY_DIALOG_CALLS =
+            mapOf(
+                RAW_DIALOGS_SOURCE to 0,
+                SHARED_DIALOGS_SOURCE to 0,
+                "ui/conversation/messages/MessageDeleteDialog.kt" to 2,
+                "ui/settings/TtsRatePicker.kt" to 1,
+                "ui/settings/UsageDiagnosticsUi.kt" to 1,
             )
     }
 }
