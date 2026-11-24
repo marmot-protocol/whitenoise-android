@@ -64,8 +64,15 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
         .filter { match ->
             val open = match.groups[2]!!.range.first
             val close = closingBracket(open)
+            // `clickable(…) { … }` ends at its trailing lambda, so the chain continues after that.
+            val callEnd =
+                if (match.groupValues[2] == "(") {
+                    trailingLambda.matchAt(this, close + 1)?.let { closingBracket(it.range.last) } ?: close
+                } else {
+                    close
+                }
             !noIndication.containsMatchIn(substring(open + 1, close)) &&
-                chainAfter(close).any { (name, args) ->
+                chainAfter(callEnd).any { (name, args) ->
                     (name == "clip" && "RectangleShape" !in args) || (name == "then" && args.hasShapedClip())
                 }
         }.map { CLICK_BEFORE_CLIP to it.range.first }

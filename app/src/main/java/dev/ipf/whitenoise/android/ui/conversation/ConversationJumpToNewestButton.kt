@@ -9,12 +9,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.text
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
-import dev.ipf.whitenoise.android.ui.common.unreadBadgeLabel
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlDisc
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -52,15 +50,14 @@ internal fun ConversationJumpToNewestButton(
         badge =
             if (unreadIncomingCount > 0) {
                 {
-                    // The shared unread badge. Its own description would repeat the count the label already
-                    // speaks, so only its visible label joins the control, as before. Content-width and
-                    // unbounded, so `999+` hangs past the disc at large text instead of clipping.
-                    val badgeLabel = unreadBadgeLabel(unreadIncomingCount)
+                    // The shared unread badge. The control's label already speaks the full count, so the badge
+                    // is its own node, hidden from accessibility services, and adds nothing to that label.
+                    // Content-width and unbounded, so `999+` hangs past the disc at large text instead of clipping.
                     Box(
                         Modifier
                             .align(Alignment.TopEnd)
                             .wrapContentWidth(Alignment.End, unbounded = true)
-                            .clearAndSetSemantics { text = AnnotatedString(badgeLabel) },
+                            .semantics(mergeDescendants = true) { hideFromAccessibility() },
                     ) {
                         UnreadCountBadge(unreadCount = unreadIncomingCount.toULong())
                     }

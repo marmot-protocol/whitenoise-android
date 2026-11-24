@@ -108,25 +108,28 @@ class FloatingControlDiscTest {
         composeRule.onNodeWithContentDescription("Resume following", substring = true).assertMinimumTouchTarget()
     }
 
-    /** The 34 dp mention pill sits inside a 48 dp target, which a tap reaches. */
+    /** The 34 dp mention pill sits inside a 48 dp target, which a tap reaches even above the pill. */
     @Test
     fun mentionPillHasA48DpTarget() {
         var clicks = 0
         show { ConversationJumpToMentionButton(count = 2) { clicks++ } }
-        composeRule
-            .onNodeWithContentDescription("mention", substring = true, ignoreCase = true)
-            .assertMinimumTouchTarget()
-            .performClick()
-        composeRule.runOnIdle { assertEquals(1, clicks) }
+        val target = composeRule.onNodeWithContentDescription("mention", substring = true, ignoreCase = true)
+        target.assertMinimumTouchTarget().performClick()
+        // Above the 34 dp pill, inside the 48 dp target.
+        target.performTouchInput { click(Offset(centerX, 1f)) }
+        composeRule.runOnIdle { assertEquals(2, clicks) }
     }
 
-    /** The search retry chip keeps its 48 dp height as a clickable Surface. */
+    /** The search retry pill is 34 dp inside a 48 dp target, which a tap reaches even below the pill. */
     @Test
     fun retryChipHasA48DpTarget() {
         var retries = 0
         show { SearchTargetRetryChip(onRetry = { retries++ }) }
-        composeRule.onNodeWithTag(SEARCH_TARGET_RETRY_CHIP_TAG).assertMinimumTouchTarget().performClick()
-        composeRule.runOnIdle { assertEquals(1, retries) }
+        val target = composeRule.onNodeWithTag(SEARCH_TARGET_RETRY_CHIP_TAG)
+        target.assertMinimumTouchTarget().performClick()
+        // Below the 34 dp pill, inside the 48 dp target.
+        target.performTouchInput { click(Offset(centerX, height - 1f)) }
+        composeRule.runOnIdle { assertEquals(2, retries) }
     }
 
     /** Asserts this node is at least 48 dp in both directions. */

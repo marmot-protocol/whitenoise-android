@@ -79,13 +79,18 @@ class ShapedTouchFeedbackCoverageTest {
         assertEquals(listOf(STRETCHED_ICON_BUTTON), shapedTouchFindings(stretchedIconButton).map(::kind))
     }
 
-    /** The patterns found in review: card modifiers, a clip after the click in `then`, fills and bare glyphs. */
+    /**
+     * The patterns found in review: card modifiers, a clip after the click (in `then`, or after a click's
+     * trailing lambda), fills and bare glyphs.
+     */
     @Test
     fun scannerFindsTheReviewedHoles() {
         val cases =
             mapOf(
                 "Card(modifier = Modifier.clickable { go() }) {}" to SHAPED_SURFACE,
                 "Box(Modifier.size(40.dp).clickable { go() }.then(Modifier.clip(CircleShape)))" to CLICK_BEFORE_CLIP,
+                "Box(Modifier.clickable(enabled = true) { go() }.clip(CircleShape))" to CLICK_BEFORE_CLIP,
+                "Box(Modifier.clickable(onClick = go).clip(CircleShape))" to CLICK_BEFORE_CLIP,
                 "Box(Modifier.size(40.dp).background(c, CircleShape).clickable { go() })" to CLICK_OVER_SHAPED_FILL,
                 "IconButton(onClick = go, modifier = Modifier.requiredSize(36.dp, 48.dp)) {}" to STRETCHED_ICON_BUTTON,
                 "Icon(p, null, Modifier.size(28.dp).clickable { retry() })" to BARE_GLYPH,
