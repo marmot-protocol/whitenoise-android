@@ -52,21 +52,14 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
-import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
+import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryPager
 import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
-import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
-import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.DateFormatPreference
@@ -942,7 +935,6 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var bootstrapCompleted = false
-    internal val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
     val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
@@ -973,203 +965,101 @@ class WhiteNoiseAppState private constructor(
     internal val chatMutePreferences = ChatMutePreferences(appContext)
     internal val chatMuteOwner = ChatMuteOwner()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
-    internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
-    internal val ttsPlaybackTrust = TtsPlaybackTrustConsent(this) { attachedTtsHandle }
+    internal val readAloud: AppReadAloud =
+        AppReadAloud(
+            appContext,
+            object : AppReadAloudHost {
+                override val activeAccountRef: String? get() = this@WhiteNoiseAppState.activeAccountRef
+                override val accountSwitchHandoff: AccountSwitchLocalSnapshotHandoff
+                    get() = this@WhiteNoiseAppState.accountSwitchHandoff
+                override val mutationsScope: CoroutineScope get() = this@WhiteNoiseAppState.mutationsScope
+                override val appLockScreenVisible: Boolean get() = appLock.screenVisible
+
+                override fun createHistoryScope(): CoroutineScope =
+                    CoroutineScope(
+                        SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler,
+                    )
+
+                override fun createAutoReadContinuation() = createTtsAutoReadContinuation(this@WhiteNoiseAppState)
+
+                override fun historyPager(
+                    accountRef: String?,
+                    groupIdHex: String,
+                ): TtsHistoryPager? = ttsHistoryPagerFor(accountRef, groupIdHex)
+            },
+        )
+    internal val ttsPlaybackTrust get() = readAloud.ttsPlaybackTrust
 
     /** Reports whether the connected engine still requires playback consent. */
-    internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
+    internal fun ttsEngineNeedsAcknowledgment(): Boolean = readAloud.ttsEngineNeedsAcknowledgment()
 
     /** Checks engine consent and the playback owner before any text can be sent. */
-    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(current)
+    @Suppress("MaxLineLength")
+    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = readAloud.confirmTtsPlaybackTrust(current)
 
-    internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
-    internal val ttsVoicePreferences = TtsVoicePreferences(appContext)
-    internal val ttsEngineResolver =
-        TtsEngineResolver(appContext, selectedVoice = ttsVoicePreferences::selectedVoice)
-    internal val ttsRatePreferences = TtsRatePreferences(appContext)
-    internal val ttsMediaMixPreferences = TtsMediaMixPreferences(appContext)
-
-    // Process-wide read-aloud playback: survives navigation between chats and
-    // back to the chat list, matching VoicePlaybackController's lifetime.
-    val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
+    internal val ttsVoicePreferences get() = readAloud.ttsVoicePreferences
+    internal val ttsRatePreferences get() = readAloud.ttsRatePreferences
+    internal val ttsMediaMixPreferences get() = readAloud.ttsMediaMixPreferences
+    val ttsController: TtsController get() = readAloud.ttsController
     private val conversationDictationMediaHandoff by lazy {
         createConversationDictationMediaHandoff(ttsController, appContext) {
             conversationDictation.interruptForAudioFocusLoss()
         }
     }
-    var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
-        private set
-    var ttsVoiceResolution by mutableStateOf(TtsVoiceResolution.Empty)
-        private set
-
-    // The (account, conversation) pair that owns the current auto-read
-    // session, or null when speech is manual or idle. Live continuation
-    // appends only for the owner: a manual Speak aloud replaces the queue and
-    // ends the session; another chat's — or another ACCOUNT'S view of the
-    // same group — must never extend it.
-    internal var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
-    private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
-
-    // Manual speech deliberately has no auto-read session key, but it still
-    // owns decrypted text that must stop when its account is removed.
-    internal var ttsSpeechAccountRef: String? = null
-    internal val attachmentSpeechDestination =
-        MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
+    val ttsResolution: TtsResolutionResult? get() = readAloud.ttsResolution
+    val ttsVoiceResolution: TtsVoiceResolution get() = readAloud.ttsVoiceResolution
+    internal val attachmentSpeechDestination get() = readAloud.attachmentSpeechDestination
 
     /** Reader controls may only address speech owned by the current local account. */
-    internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
+    internal fun ownsCurrentAccountSpeech(): Boolean = readAloud.ownsCurrentAccountSpeech()
 
-    fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
-        val key = ttsAutoReadSessionKey ?: return false
-        return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
-    }
+    fun ownsTtsAutoReadSession(groupIdHex: String): Boolean = readAloud.ownsTtsAutoReadSession(groupIdHex)
 
     /** Starts read-aloud for one or more speakable messages after any required approval. */
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-    ): Boolean {
-        val started =
-            synchronized(ttsController) {
-                val previousGeneration = ttsController.state.value.messageProgressGeneration
-                val previousCallbackGeneration = ttsController.playbackCallbackGeneration()
-                val accepted =
-                    !ttsEngineNeedsAcknowledgment() && ttsController.speak(entries, locale, startSentenceIndex)
-                // A pre-playback refusal (offline-language) tears down the queue without a new message generation.
-                if (accepted ||
-                    ttsController.state.value.messageProgressGeneration != previousGeneration ||
-                    ttsController.playbackCallbackGeneration() != previousCallbackGeneration
-                ) {
-                    clearTtsPlaybackOwnership()
-                }
-                if (accepted) ttsSpeechAccountRef = activeAccountRef
-                accepted
-            }
-        if (!started) return false
-
-        // Stop private speech if its foreground service fails to provide a visible stop control.
-        val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
-        if (!foregroundStarted) stopSpeaking()
-        return foregroundStarted
-    }
+    ): Boolean = readAloud.speakAloud(entries, locale, startSentenceIndex)
 
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
     fun speakAloudAutoRead(
         groupIdHex: String,
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-    ): Boolean {
-        val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
-        val started = speakAloud(entries, locale, startSentenceIndex)
-        if (started) {
-            ttsAutoReadSessionKey = owner
-            ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
-            activeAccountRef?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
-        }
-        return started
-    }
+    ): Boolean = readAloud.speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
 
-    /**
-     * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
-     * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
-     * a revoked or cancelled request cannot clear a replacement queue's ownership.
-     * Accepting a new queue also revokes prior history/attachment source ownership.
-     */
+    /** Prepares reader text off the controller lock; see [AppReadAloud.speakAloudPrepared]. */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
-        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        startRenderedHit: PreparedRenderedHit? = null,
         isCurrent: () -> Boolean = { true },
-    ): Boolean {
-        if (ttsEngineNeedsAcknowledgment()) return false
-        val ownerAccount = activeAccountRef
-        val ownerGeneration = accountSwitchHandoff.capture()
-        var preparingSessionId: Long? = null
-        try {
-            val started =
-                ttsController.speakAsync(
-                    entries,
-                    locale,
-                    startSentenceIndex,
-                    startRenderedHit,
-                    isCurrent = {
-                        isCurrent() &&
-                            !ttsEngineNeedsAcknowledgment() &&
-                            activeAccountRef == ownerAccount &&
-                            accountSwitchHandoff.isCurrent(ownerGeneration)
-                    },
-                ) {
-                    preparingSessionId = ttsController.state.value.sessionId
-                    ttsSpeechAccountRef = ownerAccount
-                    TtsPlaybackForegroundService.start(appContext)
-                }
-            if (started) {
-                ttsSpeechAccountRef = ownerAccount
-                ttsAutoReadSessionKey = null
-                ttsHistorySession.onSessionCleared()
-            }
-            return started
-        } finally {
-            // Check and clear under the same monitor as queue starts, not against a stale Idle snapshot.
-            synchronized(ttsController) {
-                val state = ttsController.state.value
-                if (state is TtsState.Idle &&
-                    state.sessionId == preparingSessionId &&
-                    ttsSpeechAccountRef == ownerAccount
-                ) {
-                    clearTtsPlaybackOwnership()
-                }
-            }
-        }
-    }
+    ): Boolean = readAloud.speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit, isCurrent)
 
     suspend fun speakAloudAutoRead(
         groupIdHex: String,
         entries: List<TtsSpeakableEntry>,
-        locale: java.util.Locale,
+        locale: Locale,
         startSentenceIndex: Int = 0,
-        startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        startRenderedHit: PreparedRenderedHit? = null,
         backgroundPreparation: Boolean,
         canCommit: () -> Boolean = { true },
-    ): Boolean {
-        if (!canCommit()) return false
-        val ownerAccount = activeAccountRef
-        return if (!backgroundPreparation) {
-            speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
-        } else {
-            ttsAutoReadKey(ownerAccount, groupIdHex)?.let { owner ->
-                speakAloudPrepared(
-                    entries,
-                    locale,
-                    startSentenceIndex,
-                    startRenderedHit,
-                    isCurrent = canCommit,
-                ).also { started ->
-                    if (started) {
-                        ttsAutoReadSessionKey = owner
-                        ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)
-                        ownerAccount?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
-                    }
-                }
-            } ?: false
-        }
-    }
-
-    /**
-     * History paging for the read-aloud transport. The backing conversation
-     * controller is resolved per edge request, so a controller recreated by
-     * navigation keeps serving the same playback session.
-     */
-    val ttsHistorySession: TtsHistorySession by lazy {
-        TtsHistorySession(
-            controller = ttsController,
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler),
-            resolvePager = ::ttsHistoryPagerFor,
+    ): Boolean =
+        readAloud.speakAloudAutoRead(
+            groupIdHex,
+            entries,
+            locale,
+            startSentenceIndex,
+            startRenderedHit,
+            backgroundPreparation,
+            canCommit,
         )
-    }
+
+    /** History paging for the read-aloud transport. */
+    val ttsHistorySession: TtsHistorySession get() = readAloud.ttsHistorySession
 
     private fun ttsHistoryPagerFor(
         accountRef: String?,
@@ -1206,126 +1096,36 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    internal val ttsAutoReadPreferences = TtsAutoReadPreferences(appContext)
+    internal val ttsAutoReadPreferences get() = readAloud.ttsAutoReadPreferences
 
-    fun isConversationAutoRead(groupIdHex: String): Boolean {
-        val accountRef = activeAccountRef ?: return false
-        return conversationAutoReadFor(accountRef, groupIdHex)
-    }
+    fun isConversationAutoRead(groupIdHex: String): Boolean = readAloud.isConversationAutoRead(groupIdHex)
 
-    internal fun conversationAutoReadFor(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean = ttsAutoReadPreferences.isConversationAutoRead(accountRef, groupIdHex)
-
-    fun setTtsAutoReadGlobalDefault(enabled: Boolean) {
-        ttsAutoReadPreferences.setGlobalDefaultEnabled(enabled)
-        reconcileOwnedTtsAutoReadSession()
-    }
+    fun setTtsAutoReadGlobalDefault(enabled: Boolean) = readAloud.setTtsAutoReadGlobalDefault(enabled)
 
     fun setConversationAutoReadOverride(
         groupIdHex: String,
         override: TtsAutoReadOverride?,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        if (override == null) {
-            ttsAutoReadPreferences.clearConversationOverride(accountRef, groupIdHex)
-        } else {
-            ttsAutoReadPreferences.setConversationOverride(accountRef, groupIdHex, override)
-        }
-        reconcileOwnedTtsAutoReadSession()
-    }
-
-    private fun reconcileOwnedTtsAutoReadSession() {
-        val sessionKey = ttsAutoReadSessionKey ?: return
-        val separator = sessionKey.indexOf('|')
-        if (separator <= 0 || separator == sessionKey.lastIndex) return
-        val accountRef = sessionKey.substring(0, separator)
-        val groupIdHex = sessionKey.substring(separator + 1)
-        if (!conversationAutoReadFor(accountRef, groupIdHex)) {
-            stopOwnedTtsAutoReadSession()
-        }
-    }
-
-    /** Stops an owned conversation auto-read queue and revokes its account/history navigation ownership. */
-    internal fun stopOwnedTtsAutoReadSession() {
-        if (ttsAutoReadSessionKey == null) return
-        ttsController.stop()
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
-    }
+    ) = readAloud.setConversationAutoReadOverride(groupIdHex, override)
 
     /** Account removal ends any owned speech so its decrypted text stops being spoken. */
-    internal fun stopTtsForRemovedAccount(accountRef: String) {
-        val speechOwner = ttsSpeechAccountRef
-        if (speechOwner != null && speechOwner != accountRef) return
-        ttsController.stop()
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
-    }
+    internal fun stopTtsForRemovedAccount(accountRef: String) = readAloud.stopTtsForRemovedAccount(accountRef)
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */
     fun appendSpeech(
         entry: TtsSpeakableEntry,
-        locale: java.util.Locale,
-    ): Boolean {
-        // A session paged away from the live tail must not have arrivals
-        // spliced next to unrelated older history — they stay reachable
-        // through next-message paging instead.
-        if (ttsEngineNeedsAcknowledgment() || !ttsHistorySession.allowsLiveAppend()) return false
-        return ttsController.appendSpeech(entry, locale)
-    }
+        locale: Locale,
+    ): Boolean = readAloud.appendSpeech(entry, locale)
 
     /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
-    fun stopSpeaking() {
-        ttsPlaybackTrust.cancel()
-        ttsController.stop()
-        clearTtsPlaybackOwnership()
-    }
+    fun stopSpeaking(): Unit = readAloud.stopSpeaking()
 
-    fun setTtsRateOverride(rate: Float?) {
-        ttsRatePreferences.setRateOverride(rate)
-        ttsController.onSpeechRateChanged()
-    }
-
-    internal var attachedTtsHandle: TtsEngineHandle? = null
-        private set
+    fun setTtsRateOverride(rate: Float?) = readAloud.setTtsRateOverride(rate)
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
-    internal fun publishTtsResolution(resolution: TtsResolutionResult?) {
-        ttsResolution = resolution
-        val handle = resolution?.handle
-        // Reattaching the same healthy handle would stop speech and reset its current voice.
-        if (handle === attachedTtsHandle) return
-        ttsPlaybackTrust.onHandleReplaced()
-        clearTtsPlaybackOwnership()
-        ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
-        attachedTtsHandle = handle
-        if (handle != null) {
-            ttsController.attachEngine(
-                AndroidTtsSpeechEngine(
-                    textToSpeech = handle.textToSpeech,
-                    enginePackage = handle.enginePackage,
-                    selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
-                    onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
-                    requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
-                    onConnectionUncertain = { retireFailedTtsConnection(handle) },
-                ),
-                engineKey = handle.enginePackage,
-            )
-        } else {
-            ttsController.detachEngine()
-        }
-    }
+    internal fun publishTtsResolution(resolution: TtsResolutionResult?) = readAloud.publishTtsResolution(resolution)
 
-    val ttsDiscoveryComplete: Boolean
-        get() = ttsResolution != null
-    val ttsHasUsableEngine: Boolean
-        get() = ttsResolution?.hasUsableEngine == true
+    val ttsDiscoveryComplete: Boolean get() = readAloud.ttsDiscoveryComplete
+    val ttsHasUsableEngine: Boolean get() = readAloud.ttsHasUsableEngine
 
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
@@ -5834,94 +5634,11 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(APP_FONT_KEY, font.preferenceValue) }
     }
 
-    fun acknowledgeTtsTrustWarning(enginePackage: String) {
-        ttsWarningPreferences.acknowledge(enginePackage)
-    }
+    fun acknowledgeTtsTrustWarning(enginePackage: String) = readAloud.acknowledgeTtsTrustWarning(enginePackage)
 
-    fun selectTtsEngine(enginePackage: String) {
-        mutationsScope.launch {
-            selectTtsEngineLocked(enginePackage)
-        }
-    }
+    fun selectTtsEngine(enginePackage: String) = readAloud.selectTtsEngine(enginePackage)
 
-    internal suspend fun selectTtsEngineLocked(enginePackage: String) {
-        ttsRefreshMutex.withLock {
-            val current =
-                TtsEngineSelectionSnapshot(
-                    resolution = ttsResolution,
-                    selectedOverride = ttsEnginePreferences.selectedEngine(),
-                )
-            val candidate = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage) }
-            when (val outcome = adoptTtsEngineSelection(current, candidate, enginePackage)) {
-                is TtsEngineSelectionResult.Adopted -> {
-                    ttsEnginePreferences.setSelectedEngine(outcome.selectedOverride)
-                    publishTtsResolution(outcome.resolution)
-                    outcome.releasedHandles.forEach { handle -> runCatching { handle.release() } }
-                }
-                is TtsEngineSelectionResult.Retained -> {
-                    withContext(Dispatchers.IO) {
-                        candidate.handle?.let { handle -> runCatching { handle.release() } }
-                    }
-                }
-            }
-        }
-    }
-
-    suspend fun refreshTtsAvailability() =
-        ttsRefreshMutex.withLock {
-            val previousHandle = ttsResolution?.handle
-            val candidateHandles = mutableListOf<TtsEngineHandle>()
-            var adoptedHandle: TtsEngineHandle? = null
-            var replacementPublished = false
-            try {
-                val bootstrap = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage = null) }
-                bootstrap.handle?.let(candidateHandles::add)
-                val selectedOverride = ttsEnginePreferences.selectedEngine()
-                val preferredPackage =
-                    ttsEngineResolver.preferredEnginePackage(
-                        engines = bootstrap.engines,
-                        defaultPackage = bootstrap.defaultEnginePackage,
-                        selectedOverride = selectedOverride,
-                    )
-                val replacement =
-                    when {
-                        preferredPackage == null -> bootstrap.copy(handle = null)
-                        preferredPackage == bootstrap.handle?.enginePackage -> bootstrap
-                        else -> {
-                            val selected = resolveTtsOnDispatcher { ttsEngineResolver.resolve(preferredPackage) }
-                            selected.handle?.let(candidateHandles::add)
-                            if (selected.handle?.enginePackage == preferredPackage) {
-                                selected
-                            } else {
-                                bootstrap.copy(handle = null)
-                            }
-                        }
-                    }
-
-                // Same engine package resolved again: keep the ATTACHED
-                // handle, so an availability refresh (settings ON_RESUME,
-                // foreground) never swaps engines under in-flight speech.
-                // resolve() always mints a new handle, so identity alone
-                // can't provide this — the freshly resolved duplicate is
-                // released with the other unadopted candidates below.
-                val published =
-                    if (previousHandle != null && previousHandle.enginePackage == replacement.handle?.enginePackage) {
-                        replacement.copy(handle = previousHandle)
-                    } else {
-                        replacement
-                    }
-                adoptedHandle = published.handle
-                publishTtsResolution(published)
-                replacementPublished = true
-            } finally {
-                candidateHandles
-                    .filter { it !== adoptedHandle }
-                    .forEach { handle -> runCatching { handle.release() } }
-                if (replacementPublished && previousHandle !== adoptedHandle) {
-                    runCatching { previousHandle?.release() }
-                }
-            }
-        }
+    suspend fun refreshTtsAvailability() = readAloud.refreshTtsAvailability()
 
     /**
      * Toggle one cell of the active account's auto-download matrix, persist it

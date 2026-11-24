@@ -272,6 +272,17 @@
             <sha256 value="95787b6625214e9c8ebefcfcce33f40579de00ea69445ef9c59a1190235a0d5e" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.camera.featurecombinationquery" name="featurecombinationquery" version="1.7.0">
+         <artifact name="featurecombinationquery-1.7.0.aar">
+            <sha256 value="0414dcf4d92a4a5fbb57ea7557e8edc90c25527a083f84ee49d7b0a6558b347e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="featurecombinationquery-1.7.0.module">
+            <sha256 value="270f0afe30d49e534e31ce9fa72cfa796ce76d5064a624abce3d0c763270a441" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="featurecombinationquery-1.7.0.pom">
+            <sha256 value="e4449118e8cdceab35ee04993e09f4c7dc290c02fbff96e31a27a76867eb259e" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.camera.viewfinder" name="viewfinder-core" version="1.5.1">
          <artifact name="viewfinder-core-1.5.1.aar">
             <sha256 value="31179ed5509e4d6d8d667efb91a039cac897b2bfd800d4c6e0b5bed376b4fa69" origin="Independent official supplier audit" />
@@ -294,6 +305,17 @@
             <sha256 value="ddfd3664652ba5f0a401f0b08250664c11b86aefbae558f26a52aab138858ba0" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.camera" name="camera-camera2-pipe" version="1.7.0">
+         <artifact name="camera-camera2-pipe-1.7.0.aar">
+            <sha256 value="804466f35c15cd1e649981b2af51cee23125608bd8d08cdfbde0e65ba18beaee" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-camera2-pipe-1.7.0.module">
+            <sha256 value="f9cf9eb1e099219740dad0f2a41ad91e24c494cf76b6e257f226ec4b81308736" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-camera2-pipe-1.7.0.pom">
+            <sha256 value="d359d1f9814911335ceeca8209dacde89174b8a49f78eaf7e9d28b9fb1ee1395" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.camera" name="camera-camera2" version="1.6.1">
          <artifact name="camera-camera2-1.6.1.aar">
             <sha256 value="10d8f0102468d10a311fdf73695fc29a6a69a738bb0445fbcffd9b9c037cb36b" origin="Independent official supplier audit" />
@@ -303,6 +325,28 @@
          </artifact>
          <artifact name="camera-camera2-1.6.1.pom">
             <sha256 value="6fc5db84500614f88010b7ef3f517a71d394782389a990dc234f340f848c20b3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.camera" name="camera-camera2" version="1.7.0">
+         <artifact name="camera-camera2-1.7.0.aar">
+            <sha256 value="c5d6196f5b62165bae422871f640499947d3ee80b85e91a6f258c1aa8a06b184" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-camera2-1.7.0.module">
+            <sha256 value="f8f2200996674db1de76522700cd4233d90796d670e267c736e22d4a20460b91" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-camera2-1.7.0.pom">
+            <sha256 value="f7b1bcb7d2f8b04fe0029e20545265e35f52a501767eb217e7684feb97b3f11f" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.camera" name="camera-common" version="1.7.0">
+         <artifact name="camera-common-1.7.0.aar">
+            <sha256 value="8e6eb6127087e778d50b2c5295a0944bae98db5aea544d5284307d40e18863c5" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-common-1.7.0.module">
+            <sha256 value="e6a2ca69da48aa089b1ee45d9f46cab08057cdaef920f3072070490b10a0032a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-common-1.7.0.pom">
+            <sha256 value="19968b1cbea0e3f246d8f192363dfa6e01f90717c61e8930630d8d789ba2446b" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.camera" name="camera-core" version="1.6.1">
@@ -316,6 +360,17 @@
             <sha256 value="6f573cb03b5eb52e91b8dd54be1395f74ffcbe181189cca01c26bbdc0e49971d" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.camera" name="camera-core" version="1.7.0">
+         <artifact name="camera-core-1.7.0.aar">
+            <sha256 value="049523079931c0e65438f8ce91fa29de0c2736ef80e76f624afbcba50738b159" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-core-1.7.0.module">
+            <sha256 value="416373e4e0ff2d8479deb331e7097252fb07a1170599f47ce6963abb18428025" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-core-1.7.0.pom">
+            <sha256 value="5e69bb7a610a526bdbe0fa0bbd69b4bad5932a0dd955fa455b6eb498ad75fcb8" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.camera" name="camera-lifecycle" version="1.6.1">
          <artifact name="camera-lifecycle-1.6.1.aar">
             <sha256 value="ad622734db25c8e0ad3dfdc57b00ea478c421aaa7e75fb75d334f1988d7aece0" origin="Independent official supplier audit" />
@@ -325,6 +380,17 @@
          </artifact>
          <artifact name="camera-lifecycle-1.6.1.pom">
             <sha256 value="11d06c48fb13cf82eb78c3c08e0d32b03b6c706aebac3a4d1d38d9f6c81ed855" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.camera" name="camera-lifecycle" version="1.7.0">
+         <artifact name="camera-lifecycle-1.7.0.aar">
+            <sha256 value="129ae5d3384fd63d67a85bbda971a1dc0e1a83f123404d855ab515d762eeed59" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-lifecycle-1.7.0.module">
+            <sha256 value="bac7670bc54ea844f31b51a5d846b7fa8f377eb0bb1ecf60f5586af8748688ed" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-lifecycle-1.7.0.pom">
+            <sha256 value="610d9af6974ee48deccb8f3c123987bf126774261b9826a421f3269d4329c5fe" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.camera" name="camera-video" version="1.6.1">
@@ -338,6 +404,17 @@
             <sha256 value="0d99e0864dfb9917f5490604bea3b8176cc67bb179acddf4172e2dc9db01b22f" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.camera" name="camera-video" version="1.7.0">
+         <artifact name="camera-video-1.7.0.aar">
+            <sha256 value="161422da5644c65d60b6136eb86ec3dbc82efbd1012042d2b9ed3bc0ea57f309" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-video-1.7.0.module">
+            <sha256 value="7e635b1180c89323dcb5ae4d9b65f015e5496fa33a189ddba63eb4faf8720621" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-video-1.7.0.pom">
+            <sha256 value="523944b5a82a0237b7027193159fbe48f5decd779694895f78000a67e8745208" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.camera" name="camera-view" version="1.6.1">
          <artifact name="camera-view-1.6.1.aar">
             <sha256 value="8ef4cfed417712ef4a6f76fd02d48ce0be75a678fcbb551965b3acd59a140da5" origin="Independent official supplier audit" />
@@ -347,6 +424,17 @@
          </artifact>
          <artifact name="camera-view-1.6.1.pom">
             <sha256 value="f2ef17a7673ab491de3402a5722d509c503492d7d35b3f9a519271d069812a14" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.camera" name="camera-view" version="1.7.0">
+         <artifact name="camera-view-1.7.0.aar">
+            <sha256 value="d21b9f168e8172f8d5b031f8ac820224f1750a7d64d788e89362d2cd392a41b5" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-view-1.7.0.module">
+            <sha256 value="3a6039065058cb98cfb12268bc95f724b4074a9af98cc6f1cd4f1b36b64cea7d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="camera-view-1.7.0.pom">
+            <sha256 value="1b62ceea09e15901deefa8e2a35fd2e3d790c41a6a1f8873a540d305cf0448f3" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.collection" name="collection-jvm" version="1.4.2">

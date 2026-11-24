@@ -205,6 +205,7 @@ class HistoryBackupsScreenshotTest {
         assertFalse(restoreFieldContains("orbit"))
     }
 
+    /** Checks whether the restore field still contains the supplied word. */
     private fun restoreFieldContains(word: String): Boolean =
         compose
             .onNodeWithTag("history_backups.restore_words")

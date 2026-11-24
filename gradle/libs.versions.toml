@@ -26,7 +26,7 @@ emoji2 = "1.7.0"
 coroutines = "1.11.0"
 jna = "5.19.1"
 zxing = "3.5.4"
-cameraX = "1.6.1"
+cameraX = "1.7.0"
 ktlint = "1.5.0"
 ktlintGradle = "14.2.0"
 # Detekt 2 supports this project's Kotlin 2.4 / AGP 9 built-in Kotlin stack.

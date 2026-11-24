@@ -75,7 +75,7 @@ class TtsAutoReadWiringCoverageTest {
     @Test
     fun processOwnedLiveContinuationUsesNativeWindowsAndRejectsReplacedSessions() {
         val body = source("state/TtsAutoReadContinuation.kt")
-        val app = source("state/AppState.kt")
+        val app = source("state/AppReadAloud.kt")
 
         assertTrue(
             "both auto-read starts must attach their own native continuation",
@@ -190,9 +190,9 @@ class TtsAutoReadWiringCoverageTest {
         // Resume (TtsController.resume) cannot reach a new connection: handle replacement stops the queue, so a
         // Paused session never survives onto an unapproved engine. Nothing to gate there.
         assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
-        val appState = source("state/AppState.kt")
-        val replaceEngine = appState.functionBody("publishTtsResolution")
-        val ownership = source("state/AppStateTtsPlaybackOwnership.kt").functionBody("clearTtsPlaybackOwnership")
+        val readAloud = source("state/AppReadAloud.kt")
+        val replaceEngine = readAloud.functionBody("publishTtsResolution")
+        val ownership = readAloud.functionBody("clearTtsPlaybackOwnership")
         val released = replaceEngine.indexOf("clearTtsPlaybackOwnership()")
         assertTrue(released in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
         assertTrue("ttsAutoReadSessionKey = null" in ownership)
@@ -233,7 +233,7 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun asynchronousSpeechOwnershipUsesTheAccountCapturedBeforePreparation() {
-        val source = source("state/AppState.kt")
+        val source = source("state/AppReadAloud.kt")
 
         assertTrue(
             "both asynchronous manual-speech ownership writes must use the captured account",

@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.AppReadAloud
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -862,10 +863,10 @@ private fun MutableList<ConversationController>.addByIdentity(controller: Conver
 
 /** Makes the injected local engine visible through the same AppState capability gate as production discovery. */
 private fun WhiteNoiseAppState.forceUsableTtsResolutionForDelayedRosterTest() {
-    val delegateField = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
+    val delegateField = AppReadAloud::class.java.getDeclaredField("ttsResolution\$delegate")
     delegateField.isAccessible = true
     @Suppress("UNCHECKED_CAST")
-    val delegate = delegateField.get(this) as MutableState<TtsResolutionResult?>
+    val delegate = delegateField.get(readAloud) as MutableState<TtsResolutionResult?>
     delegate.value =
         TtsResolutionResult(
             status = TextToSpeech.SUCCESS,

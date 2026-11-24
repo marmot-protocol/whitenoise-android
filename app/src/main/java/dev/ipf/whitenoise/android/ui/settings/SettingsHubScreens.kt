@@ -65,7 +65,7 @@ internal fun AccountScreen(
 }
 
 /**
- * The Account hub's connected group; the Profile row carries the live readiness summary. The Linked devices row is
+ * The Account hub's connected group; the Profile row carries the live readiness summary. The Devices row is
  * present only when [onOpenLinkedDevices] is given.
  */
 @Suppress("FunctionNaming", "LongMethod")
@@ -129,7 +129,7 @@ internal fun AccountHubGroup(
                     explanation = stringResource(R.string.explanation_linked_devices_hub),
                     onClick = onOpenLinkedDevices,
                     modifier = Modifier.testTag("settings.account.linked_devices"),
-                    leading = { SettingsLeadingIcon(R.drawable.ic_device) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_devices) },
                 )
             }
         }
