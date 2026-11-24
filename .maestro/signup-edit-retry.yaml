@@ -14,9 +14,9 @@ name: signup-edit-retry
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
@@ -96,6 +96,6 @@ name: signup-edit-retry
     direction: DOWN
 - assertVisible: "Edited after offline failure"
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signup-edit-retry

@@ -665,7 +665,7 @@
     <string name="link_confirm_title">Harici bağlantıyı aç?</string>
     <string name="link_confirm_open">Aç</string>
     <string name="camera_access_required">QR kodlarını taramak için cihaz ayarlarınızda kamera erişimini etkinleştirin.</string>
-    <string name="allow_camera">Kameraya İzin Ver</string>
+    <string name="allow_camera">Kameraya izin ver</string>
     <string name="camera_lifecycle_unavailable">Tarayıcıda bir hata oluştu. Lütfen tekrar deneyin.</string>
     <string name="camera_unavailable">Tarayıcıda bir hata oluştu. Lütfen tekrar deneyin.</string>
     <string name="preview">Önizleme</string>
@@ -1605,14 +1605,14 @@
     <string name="collapse_long_messages_subtitle">Bu sohbetteki uzun mesajların önizlemesini gösterir.</string>
     <string name="search_members">Üye ara</string>
     <string name="recent_chats">Son sohbetler</string>
-    <string name="onboarding_login">Giriş Yap</string>
+    <string name="onboarding_login">Giriş yap</string>
     <string name="onboarding_login_with_amber">Amber ile giriş yap</string>
     <string name="onboarding_continue_as">%1$s olarak devam et</string>
     <string name="onboarding_offline_setup_message">İnternet bağlantısı yok. Wi-Fi, mobil veri veya başka bir ağ üzerinden bağlanıp tekrar deneyin.</string>
     <string name="toast_couldnt_login_amber">Amber ile giriş yapılamadı</string>
     <string name="amber_identity_already_added">Bu hesap White Noise uygulamasına zaten eklenmiş. Hesap değiştiriciden seçin.</string>
     <string name="toast_amber_sign_in_cancelled">Amber girişi iptal edildi</string>
-    <string name="onboarding_sign_up">Kayıt Ol</string>
+    <string name="onboarding_sign_up">Kayıt ol</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
     <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş Yap\'a dokunun.</string>
     <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş Yap\'a dokunun.</string>
@@ -2265,8 +2265,8 @@
     <string name="signup_profile_incomplete_title">Profil değişiklikleri tamamlanmadı</string>
     <string name="signup_leave_profile_detail">Kimliğiniz korunacak. Bu profil değişiklikleri eksik olabilir; profilinizi daha sonra düzenleyebilirsiniz.</string>
     <string name="signup_continue_without_profile">Bu değişiklikler olmadan devam et</string>
-    <string name="qr_camera_access_needed">Kamera Erişimi Gerekiyor</string>
-    <string name="qr_private_key_permission_detail">Özel Anahtar QR kodunu taramak için kamera erişimine izin verin.</string>
+    <string name="qr_camera_access_needed">Kamera erişimi gerekiyor</string>
+    <string name="qr_private_key_permission_detail">Özel anahtar QR kodunu taramak için kamera erişimine izin verin.</string>
     <string name="qr_turn_flashlight_on">El fenerini aç</string>
     <string name="qr_turn_flashlight_off">El fenerini kapat</string>
     <string name="startup_loading_message">White Noise başlatılıyor…</string>

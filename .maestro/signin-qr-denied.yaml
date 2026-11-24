@@ -14,9 +14,9 @@ name: signin-qr-denied
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - tapOn: "Private key"
 - inputText: "not-a-key"
 - hideKeyboard
@@ -32,8 +32,8 @@ name: signin-qr-denied
       visible: "Don't allow"
     commands:
       - tapOn: "Don't allow"
-- assertVisible: "Camera Access Needed"
-- assertVisible: "Allow camera access to scan a Private Key QR code."
+- assertVisible: "Camera access needed"
+- assertVisible: "Allow camera access to scan a private key QR code."
 - assertVisible: "Close"
 - tapOn: "Close"
 - assertVisible: "Private key"
@@ -55,14 +55,14 @@ name: signin-qr-denied
       visible: "Don't allow"
     commands:
       - tapOn: "Don't allow"
-- assertVisible: "Camera Access Needed"
-- assertVisible: "Allow camera access to scan a Private Key QR code."
+- assertVisible: "Camera access needed"
+- assertVisible: "Allow camera access to scan a private key QR code."
 - assertVisible: "Close"
 - tapOn: "Close"
 - tapOn:
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signin-qr-denied

@@ -3,23 +3,23 @@ name: presentation-surface-addprofile-signin
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    text: Sign In
+    text: Sign in
 - assertVisible:
-    text: Sign Up
-- tapOn: Sign In
-- assertVisible: Sign In
+    text: Sign up
+- tapOn: Sign in
+- assertVisible: Sign in
 - assertVisible:
     enabled: false
     containsChild:
-      text: Sign In
+      text: Sign in
 - tapOn:
     enabled: false
     containsChild:
-      text: Sign In
-- assertVisible: Sign In
+      text: Sign in
+- assertVisible: Sign in
 - tapOn: Back
 - assertVisible:
-    text: Sign Up
+    text: Sign up
 - tapOn: Back
 - assertVisible:
     id: presentation.complete

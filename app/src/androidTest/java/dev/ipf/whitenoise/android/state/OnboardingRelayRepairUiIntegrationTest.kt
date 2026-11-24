@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
@@ -19,6 +18,7 @@ import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.onboarding.scrollToIfScrollable
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.MarmotAccountSetupClient
@@ -108,20 +108,20 @@ class OnboardingRelayRepairUiIntegrationTest {
                 compose.onAllNodesWithTag("setup-action-USE_RECOMMENDED_RELAYS").fetchSemanticsNodes().size == 1 &&
                 compose.onAllNodesWithTag("setup-action-EDIT_RELAYS").fetchSemanticsNodes().size == 1
         }
-        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").scrollToIfScrollable().assertIsDisplayed()
         compose
             .onNodeWithTag("setup-action-EDIT_RELAYS")
-            .performScrollTo()
+            .scrollToIfScrollable()
             .assertIsDisplayed()
             .performClick()
         compose.waitUntil(30_000L) { setup.state.value.editor != null && !setup.state.value.busy }
         compose.onNodeWithTag("setup-editor-save").assertIsNotEnabled()
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        compose.onNodeWithText(cancelLabel).performScrollTo().performClick()
+        compose.onNodeWithText(cancelLabel).scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) { setup.state.value.editor == null && !setup.state.value.busy }
         assertNull(requireNotNull(native.onboardingSnapshot(account)).proposal)
-        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("setup-action-EDIT_RELAYS").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").scrollToIfScrollable().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-EDIT_RELAYS").scrollToIfScrollable().assertIsDisplayed()
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
         compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performClick()
         compose.waitUntil(30_000L) {
@@ -136,7 +136,7 @@ class OnboardingRelayRepairUiIntegrationTest {
                     ?.relayRepair,
             )
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        compose.onNodeWithTag("setup-action-APPROVE_REPAIR").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-APPROVE_REPAIR").scrollToIfScrollable().performClick()
         awaitIdle(setup)
         assertTrue("The controller must surface native errors", !setup.state.value.error)
         assertEquals(1, relay.publicationAttempts(RELAY_LIST).size)
