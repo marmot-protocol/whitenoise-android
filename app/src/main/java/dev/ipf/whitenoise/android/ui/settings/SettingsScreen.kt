@@ -902,30 +902,6 @@ internal fun SettingsHubSection(
     }
 }
 
-/** Sign out as the last group: a destructive link that opens the production sign-out sheet. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SignOutGroup(onSignOut: () -> Unit) {
-    SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
-        row("sign_out") { context ->
-            SettingsLink(
-                context = context,
-                title = stringResource(R.string.sign_out),
-                explanation = stringResource(R.string.explanation_account_keys_sign_out),
-                onClick = onSignOut,
-                destructive = true,
-                leading = {
-                    SettingsLeadingIcon(
-                        R.drawable.ic_settings_logout,
-                        tint = MaterialTheme.colorScheme.error,
-                        testTag = "settings.icon.sign_out",
-                    )
-                },
-            )
-        }
-    }
-}
-
 /** Sizes the Settings home fixes independently of the row components. */
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
