@@ -208,6 +208,15 @@
           "SCR-004",
           "MED-056"
         ]
+      },
+      {
+        "surface": "R.string.text_attachment_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.text_attachment_loading",
+        "test_ids": [
+          "MED-001",
+          "MED-056"
+        ]
       }
     ]
   },

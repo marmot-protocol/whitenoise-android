@@ -55,7 +55,12 @@ internal fun StartupFailureScreen(
             message = error.message.resolve(context),
             selectableMessage = true,
             messageModifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            primary = if (error.retryable) StateAction(stringResource(R.string.retry), onRetry, testTag = STARTUP_RETRY_TEST_TAG) else null,
+            primary =
+                if (error.retryable) {
+                    StateAction(stringResource(R.string.retry), onRetry, testTag = STARTUP_RETRY_TEST_TAG)
+                } else {
+                    null
+                },
             secondary =
                 StateAction(
                     stringResource(R.string.copy),

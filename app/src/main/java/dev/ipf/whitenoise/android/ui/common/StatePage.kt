@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "LongParameterList") // Compose state primitives take one slot per part.
+@file:Suppress("FunctionNaming", "LongParameterList", "MatchingDeclarationName") // Compose state primitives.
 
 package dev.ipf.whitenoise.android.ui.common
 
@@ -109,7 +109,9 @@ internal fun StateContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
-        icon?.let { Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(WhiteNoiseSpacing.StateIcon)) }
+        icon?.let {
+            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(WhiteNoiseSpacing.StateIcon))
+        }
         title?.let {
             Text(
                 it,
@@ -152,7 +154,10 @@ internal fun StateContent(
     }
 }
 
-private fun StateAction.modifier(): Modifier = Modifier.fillMaxWidth().let { if (testTag != null) it.testTag(testTag) else it }
+private fun StateAction.modifier(): Modifier {
+    val width = Modifier.fillMaxWidth()
+    return if (testTag != null) width.testTag(testTag) else width
+}
 
 @Composable
 private fun ActionLabel(action: StateAction) {

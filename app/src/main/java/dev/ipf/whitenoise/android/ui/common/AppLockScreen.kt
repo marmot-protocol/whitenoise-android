@@ -48,7 +48,11 @@ internal fun AppLockScreen(
                 progressLabel = stringResource(R.string.app_unlock_checking).takeIf { evaluating },
                 progressLabelModifier = Modifier.testTag("app.lock.checking"),
                 primary =
-                    if (evaluating) null else StateAction(stringResource(R.string.app_unlock), onRetry, testTag = "app.unlock"),
+                    if (evaluating) {
+                        null
+                    } else {
+                        StateAction(stringResource(R.string.app_unlock), onRetry, testTag = "app.unlock")
+                    },
                 extra = {
                     error?.let {
                         Text(
