@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.MinimumTouchTarget
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -25,6 +26,8 @@ internal fun TtsResumeFollowButton(
         contentDescription = resumeFollowLabel,
         onClick = onClick,
         modifier = modifier,
+        // Resume following always took a full 48 dp slot in the stack, so it keeps it and does not move.
+        slot = MinimumTouchTarget,
         targetModifier =
             Modifier.explainOnLongPress(
                 composerExplanation(

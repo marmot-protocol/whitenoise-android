@@ -266,8 +266,9 @@ internal fun ConversationJumpToMentionButton(
         stringResource(R.string.conversation_jump_to_mention) + ", " +
             pluralStringResource(R.plurals.unread_mentions_count, count, count)
     val press = remember { MutableInteractionSource() }
-    // The pill keeps its 34 dp place in the stack while its 48 dp touch target reaches into the gaps around
-    // it, and the highlight is drawn on the pill.
+    // The pill keeps its 34 dp place in the stack while its 48 dp touch target reaches 7 dp into the 8 dp gaps
+    // around it, overlapping a neighbouring disc's 3 dp overhang by 2 dp, where the later control in the stack
+    // wins. The highlight is drawn on the pill.
     Box(
         modifier =
             Modifier

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
@@ -78,8 +78,10 @@ fun AccountAvatarButton(
         } else {
             "$openSettingsDescription, $title"
         }
-    IconButton(
+    // A slot button, so the composer's 36 by 48 dp identity slot keeps a round highlight and its whole touch area.
+    SlotIconButton(
         onClick = onClick,
+        highlightMax = touchTargetSize,
         modifier =
             modifier
                 .size(touchTargetSize)

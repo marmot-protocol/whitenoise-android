@@ -33,6 +33,7 @@ private val shapedFill = Regex("""\.(background|border)\s*\(""")
 private val shapeName = Regex("""CircleShape|PillShape|RoundedCornerShape|CutCornerShape|shapes\.\w+|\w+Shape\b""")
 private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
+private val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
 private const val DECLARATION_LOOKBEHIND = 12
@@ -92,7 +93,8 @@ private fun shapedContainerClicks(
     return if (clickableOverload || shape == null || "RectangleShape" in shape) {
         emptyList()
     } else {
-        args.undecoratedClicks().map { SHAPED_SURFACE to start + it }
+        // A clip before the click only shapes the highlight like the Surface when it uses the Surface's shape.
+        args.undecoratedClicks(matching = named["shape"]?.trim()).map { SHAPED_SURFACE to start + it }
     }
 }
 
@@ -123,16 +125,64 @@ private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
 /**
  * Rule 5: a transparent icon button given a width, a height or two sizes, or taking its size from its caller's
  * modifier in the composer, whose slots are narrower than they are tall. Its one shape clips the highlight
- * and the touch area together, so it draws a capsule or loses taps; a slot like that takes [SlotIconButton].
+ * and the touch area together, so it draws a capsule or loses taps, and a slot like that takes
+ * [SlotIconButton].
  */
 private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
     (calls("IconButton") + calls("IconToggleButton"))
         .filter { (_, args) ->
-            val modifier = topLevelNamedArguments(args)["modifier"]?.trim().orEmpty()
+            val modifier = modifierArgument(args)
             val sized = twoArgumentSize.containsMatchIn(args) || oneSideSize.containsMatchIn(args)
             val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
             sized || slotSized
         }.map { (start, _) -> STRETCHED_ICON_BUTTON to start }
+
+/** The `modifier` an icon button call receives, named or as its second positional argument. */
+private fun modifierArgument(args: String): String =
+    topLevelNamedArguments(args)["modifier"]?.trim()
+        ?: topLevelArguments(args)
+            .filterNot { namedArgument.containsMatchIn(it) }
+            .getOrNull(1)
+            ?.trim()
+            .orEmpty()
+
+/**
+ * The functions in [source] that wrap a transparent icon button and pass their caller's `modifier` straight
+ * to it, so the caller decides its size. Each name maps to nothing more: a call of it is checked for a size.
+ */
+internal fun passThroughIconButtonWrappers(source: String): Set<String> {
+    val code = blankCommentsAndStrings(source)
+    return (code.calls("IconButton") + code.calls("IconToggleButton"))
+        .filter { (_, args) -> modifierArgument(args).startsWith("modifier") }
+        .mapNotNull { (start, _) ->
+            enclosingFunction
+                .findAll(code.substring(0, start))
+                .lastOrNull()
+                ?.groupValues
+                ?.get(1)
+        }.toSet()
+}
+
+/**
+ * Rule 5, across files: a call that hands one of [wrappers] (see [passThroughIconButtonWrappers]) a width, a
+ * height or two sizes, so the icon button inside it stretches into a capsule. Reported as "<kind> @<line>".
+ */
+internal fun stretchedWrapperCalls(
+    source: String,
+    wrappers: Set<String>,
+): List<String> {
+    val code = blankCommentsAndStrings(source)
+    return wrappers.flatMap { name ->
+        code
+            .calls(name)
+            .filter { (start, args) ->
+                val nameStart = start - 1 - name.length
+                val before = code.substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
+                !declaration.containsMatchIn(before) &&
+                    (twoArgumentSize.containsMatchIn(args) || oneSideSize.containsMatchIn(args))
+            }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
+    }
+}
 
 /** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
 private fun String.clicksOverShapedFills(): List<Pair<String, Int>> =
@@ -170,22 +220,29 @@ private fun String.chainBefore(end: Int): String {
     return substring(index + 1, end)
 }
 
-/** Offsets, within this argument text, of click modifiers that draw their own highlight before any clip. */
-private fun String.undecoratedClicks(): List<Int> =
+/**
+ * Offsets, within this argument text, of click modifiers that draw their own highlight before a clip that
+ * shapes it — any clip that is not a rectangle, or, given [matching], one to that very shape.
+ */
+private fun String.undecoratedClicks(matching: String? = null): List<Int> =
     clickModifier
         .findAll(this)
         .filter { match ->
             val open = match.groups[2]!!.range.first
             !noIndication.containsMatchIn(substring(open + 1, closingBracket(open))) &&
-                !substring(0, match.range.first).hasShapedClip()
+                !substring(0, match.range.first).hasShapedClip(matching)
         }.map { it.range.first }
         .toList()
 
-/** Whether this text clips to a shape other than a rectangle, which then shapes a later click's highlight. */
-private fun String.hasShapedClip(): Boolean =
+/**
+ * Whether this text clips to a shape other than a rectangle, which then shapes a later click's highlight,
+ * and, given [matching], to that shape.
+ */
+private fun String.hasShapedClip(matching: String? = null): Boolean =
     clipCall.findAll(this).any { match ->
         val open = match.range.last
-        "RectangleShape" !in substring(open + 1, closingBracket(open))
+        val clip = substring(open + 1, closingBracket(open)).trim()
+        "RectangleShape" !in clip && (matching == null || clip == matching)
     }
 
 /** Each call of [name] as (offset of its argument text, argument text), not counting longer names. */
@@ -213,8 +270,8 @@ private fun String.chainAfter(close: Int): List<Pair<String, String>> {
     }
 }
 
-/** The top-level named arguments of a call's argument text, by name. */
-private fun topLevelNamedArguments(args: String): Map<String, String> {
+/** The top-level arguments of a call's argument text, in order. */
+private fun topLevelArguments(args: String): List<String> {
     val parts = mutableListOf<String>()
     var depth = 0
     var start = 0
@@ -226,6 +283,12 @@ private fun topLevelNamedArguments(args: String): Map<String, String> {
         }
     }
     parts += args.substring(start)
+    return parts.filter { it.isNotBlank() }
+}
+
+/** The top-level named arguments of a call's argument text, by name. */
+private fun topLevelNamedArguments(args: String): Map<String, String> {
+    val parts = topLevelArguments(args)
     return parts
         .mapNotNull { part -> namedArgument.find(part)?.let { it.groupValues[1] to part.substring(it.range.last + 1) } }
         .toMap()

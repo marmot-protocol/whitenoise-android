@@ -33,14 +33,16 @@ class ShapedTouchFeedbackCoverageTest {
     @Test
     fun pressFeedbackFollowsTheVisibleShape() {
         val root = appModuleFile(UI_ROOT)
-        val found =
+        val sources =
             root
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
-                .flatMap { file ->
-                    val path = file.relativeTo(root).invariantSeparatorsPath
-                    shapedTouchFindings(file.readText(), path).map { "$path: $it" }
-                }.toList()
+                .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
+        val wrappers = sources.values.flatMap(::passThroughIconButtonWrappers).toSet()
+        val found =
+            sources.flatMap { (path, source) ->
+                (shapedTouchFindings(source, path) + stretchedWrapperCalls(source, wrappers)).map { "$path: $it" }
+            }
         val counted = found.groupingBy { it.substringBefore(" @") }.eachCount()
         assertEquals(
             "Press feedback must follow the visible shape. Use Surface(onClick = …), clip before the click, " +
@@ -95,6 +97,43 @@ class ShapedTouchFeedbackCoverageTest {
             shapedTouchFindings(slotSized, "conversation/composer/Toolbar.kt").map(::kind),
         )
         assertEquals(emptyList<String>(), shapedTouchFindings(slotSized, "settings/Row.kt"))
+        val positional = "IconButton(go, modifier) {}"
+        assertEquals(
+            listOf(STRETCHED_ICON_BUTTON),
+            shapedTouchFindings(positional, "conversation/composer/Toolbar.kt").map(::kind),
+        )
+    }
+
+    /** A clip only excuses a click on a shaped Surface when it clips to the Surface's own shape. */
+    @Test
+    fun aClipOfAnotherShapeDoesNotExcuseTheClick() {
+        val mismatched =
+            "Surface(shape = CircleShape, modifier = Modifier.clip(RoundedCornerShape(2.dp)).clickable { go() }) {}"
+        val matched = "Surface(shape = CircleShape, modifier = Modifier.clip(CircleShape).clickable { go() }) {}"
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(mismatched).map(::kind))
+        assertEquals(emptyList<String>(), shapedTouchFindings(matched))
+    }
+
+    /**
+     * A wrapper that hands its caller's modifier to an icon button is found in one file, and a call that sizes it
+     * as a slot that may not be square is found in another — the shape of the emoji and paste buttons on master.
+     */
+    @Test
+    fun aSlotSizedCallOfAPassThroughWrapperIsFound() {
+        val wrapper =
+            """
+            @Composable
+            internal fun PasteButton(onPaste: () -> Unit, modifier: Modifier = Modifier) {
+                IconButton(onClick = onPaste, modifier = modifier.onGloballyPositioned { }) { Icon() }
+            }
+            """.trimIndent()
+        val caller = "PasteButton(onPaste = go, modifier = Modifier.width(40.dp).height(48.dp))"
+        val square = "PasteButton(onPaste = go, modifier = Modifier.size(48.dp))"
+        val wrappers = passThroughIconButtonWrappers(wrapper)
+        assertEquals(setOf("PasteButton"), wrappers)
+        assertEquals(listOf(STRETCHED_ICON_BUTTON), stretchedWrapperCalls(caller, wrappers).map(::kind))
+        assertEquals(emptyList<String>(), stretchedWrapperCalls(square, wrappers))
+        assertEquals(emptyList<String>(), stretchedWrapperCalls(wrapper, wrappers))
     }
 
     /** A rectangular clip before the click does not count as shaping it, so the square highlight is still found. */

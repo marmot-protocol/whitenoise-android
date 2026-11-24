@@ -5,10 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertTouchWidthIsEqualTo
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -102,7 +104,7 @@ class ChatFolderPillsBehaviorTest {
         assertEquals("folder-1", selected)
     }
 
-    /** Current edit and manage callbacks keep exact folder selection, and the manage button takes a 48 dp touch. */
+    /** Current edit and manage callbacks keep exact folder selection, and the manage button is full size. */
     @Test fun currentEditAndManageCallbacksKeepExactFolderSelection() {
         var latest by mutableStateOf(false)
         var selected: String? = "folder-0"
@@ -128,6 +130,9 @@ class ChatFolderPillsBehaviorTest {
         composeRule.onNodeWithTag("chats.folders").performScrollToIndex(2)
         composeRule
             .onNodeWithTag("chats.manageFolders")
+            // The button itself is Material's 40 dp, not the 32 dp it was squeezed to, inside a 48 dp touch.
+            .assertWidthIsAtLeast(40.dp)
+            .assertHeightIsAtLeast(40.dp)
             .assertTouchWidthIsEqualTo(48.dp)
             .assertTouchHeightIsEqualTo(48.dp)
             .performClick()

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
@@ -44,6 +45,9 @@ internal val FloatingControlSlot = 42.dp
 
 internal const val FLOATING_CONTROL_DISC_TAG = "floating_control.disc"
 
+/** Tags the slot a floating disc takes in its stack, as opposed to its larger touch target. */
+internal const val FLOATING_CONTROL_SLOT_TAG = "floating_control.slot"
+
 /** The colour roles every floating disc shares. */
 internal object FloatingControlColors {
     /** The container of a floating disc. */
@@ -61,8 +65,8 @@ internal object FloatingControlColors {
  * and its 48 dp touch target overhangs that slot. The press highlight is clipped to the disc, and the disc
  * casts the [WhiteNoiseElevation.FloatingControl] shadow at rest and pressed. [badge] hangs from the slot's
  * top end corner and adds nothing to the control's own description, so describe the count in
- * [contentDescription] instead. [modifier] places the slot, and [targetModifier] adds gestures or semantics
- * to the full 48 dp target.
+ * [contentDescription] instead. [modifier] places the [slot], and [targetModifier] adds gestures or semantics
+ * to the full 48 dp target. A control that always had a larger slot passes it, so it keeps its place.
  */
 @Composable
 internal fun FloatingControlDisc(
@@ -70,6 +74,7 @@ internal fun FloatingControlDisc(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    slot: Dp = FloatingControlSlot,
     targetModifier: Modifier = Modifier,
     iconModifier: Modifier = Modifier,
     container: Color = FloatingControlColors.container,
@@ -78,11 +83,11 @@ internal fun FloatingControlDisc(
 ) {
     val press = remember { MutableInteractionSource() }
     // The outer box is the slot the stack places, and the target inside it reaches past the slot's edges.
-    Box(modifier) {
+    Box(modifier.testTag(FLOATING_CONTROL_SLOT_TAG)) {
         Box(
             modifier =
                 Modifier
-                    .touchTargetOverhang(FloatingControlSlot, FloatingControlSlot)
+                    .touchTargetOverhang(slot, slot)
                     .then(targetModifier)
                     .semantics { this.contentDescription = contentDescription }
                     .shapedTouchTarget(press, onClick = onClick),
