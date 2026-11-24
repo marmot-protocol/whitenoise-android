@@ -63,6 +63,14 @@
         "test_ids": [
           "RDR-001"
         ]
+      },
+      {
+        "surface": "Nostr reader Close control",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.drawable.ic_close",
+        "test_ids": [
+          "RDR-001"
+        ]
       }
     ],
     "source_coverage": [

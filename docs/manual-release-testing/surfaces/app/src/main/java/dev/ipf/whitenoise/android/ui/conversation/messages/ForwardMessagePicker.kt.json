@@ -142,6 +142,23 @@
         "test_ids": [
           "MSG-010"
         ]
+      },
+      {
+        "surface": "Forward picker Close on the shared top bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "navigation = WhiteNoiseTopBarNavigation.Close",
+        "test_ids": [
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Forward sending profile beside Close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "navigationAccessory = {",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ],
     "source_coverage": [

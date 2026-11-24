@@ -168,7 +168,10 @@ internal fun NostrEventReaderScreen(
     }
 }
 
-/** Keeps Back, copy, and external-open controls distinct from links in the reader body. */
+/**
+ * Keeps Close, copy, and external-open controls distinct from links in the reader body. The reader is a viewer
+ * that returns to the message it opened from, so it leads with an X labelled Close, like the media viewers.
+ */
 @Composable
 private fun NostrEventReaderHeader(
     card: NostrEventCardModel,
@@ -182,7 +185,7 @@ private fun NostrEventReaderHeader(
     ) {
         IconButton(onClick = onDismiss) {
             Icon(
-                painterResource(R.drawable.ic_arrow_back),
+                painterResource(R.drawable.ic_close),
                 contentDescription = stringResource(R.string.close),
             )
         }

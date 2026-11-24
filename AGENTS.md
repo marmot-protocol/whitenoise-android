@@ -73,6 +73,7 @@ Follow [code structure](docs/code-structure.md) and the ownership maps for the
 - New code goes in a topic file in the owning package, never at the end of a file over 600 lines.
 - Split an oversized file as a pure move first.
 - Never raise or add an entry in `SourceFileSizeBaseline.kt`.
+- Page chrome (top bar, scaffold, back arrow or X) follows [UI patterns](docs/ui-patterns.md).
 
 ## Task guides
 

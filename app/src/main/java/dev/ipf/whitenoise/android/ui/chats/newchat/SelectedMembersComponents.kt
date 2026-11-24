@@ -20,11 +20,10 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,11 +50,11 @@ import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
@@ -191,33 +190,25 @@ internal fun SelectedMembersReviewScreen(
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     startingAs: StartingAccount? = null,
 ) {
-    Scaffold(
+    WhiteNoiseScaffold(
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
-            // App banners sit below this screen's bar rather than over it (#3312).
-            Column {
-                TopAppBar(
-                    actions = { StartingAccountIndicator(startingAs) },
-                    title = {
-                        Column {
-                            Text(stringResource(R.string.review_selection))
-                            Text(
-                                pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack, enabled = !busy) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                )
-                TopNoticeSlot()
-            }
+            WhiteNoiseTopBar(
+                title = stringResource(R.string.review_selection),
+                onBack = onBack,
+                navigationEnabled = !busy,
+                titleContent = {
+                    Column {
+                        Text(stringResource(R.string.review_selection))
+                        Text(
+                            pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                actions = { StartingAccountIndicator(startingAs) },
+            )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -247,7 +238,7 @@ internal fun SelectedMembersReviewScreen(
         },
     ) { padding ->
         WhiteNoiseLazyColumn(
-            modifier = Modifier.fillMaxWidth().nativePageBody(padding).padding(padding),
+            modifier = Modifier.fillMaxWidth().padding(padding),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->

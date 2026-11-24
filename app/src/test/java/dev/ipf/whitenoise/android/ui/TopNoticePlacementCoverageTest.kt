@@ -117,8 +117,16 @@ class TopNoticePlacementCoverageTest {
 
         val startup = mainSource("ui/common/StartupScreens.kt")
         assertTrue("a bar-less startup surface relies on the root slot", "topNoticeSlot = false" in startup)
+
+        val sharePicker = mainSource("ui/share/ShareChatPickerFullScreen.kt").functionBody("ShareChatPickerScaffold")
+        assertTrue("topNoticeSlot = false" in sharePicker)
+        val shareBar = sharePicker.indexOf("WhiteNoiseTopBar(")
+        val shareSlot = sharePicker.indexOf("TopNoticeSlot()")
+        val shareSnackbars = sharePicker.indexOf("WhiteNoiseSnackbarHost(")
+        assertTrue("the share picker's slot sits under its bar, above its snackbars", shareBar in 0 until shareSlot)
+        assertTrue("the share picker's snackbars follow its slot", shareSlot < shareSnackbars)
         val optOuts = mainSources().count { (_, source) -> "topNoticeSlot = false" in source }
-        assertEquals("a new opt-out needs a reviewed replacement slot", 3, optOuts)
+        assertEquals("a new opt-out needs a reviewed replacement slot", 4, optOuts)
     }
 
     /**
@@ -250,7 +258,10 @@ class TopNoticePlacementCoverageTest {
         /** The reviewed opt-out: a reason is required, so a bare marker never passes. */
         val PLAIN_SCAFFOLD_OPT_OUT = Regex("""// top-notice-slot opt-out: \S.*""")
 
-        /** The plain scaffolds with a top bar known at the time of writing, so a broken search cannot pass. */
-        const val MIN_PLAIN_SCAFFOLD_TOP_BARS = 11
+        /**
+         * The plain scaffolds with a top bar known at the time of writing, so a broken search cannot pass. Ordinary
+         * pages moved onto WhiteNoiseScaffold in #4054, so lower this when another one moves.
+         */
+        const val MIN_PLAIN_SCAFFOLD_TOP_BARS = 5
     }
 }
