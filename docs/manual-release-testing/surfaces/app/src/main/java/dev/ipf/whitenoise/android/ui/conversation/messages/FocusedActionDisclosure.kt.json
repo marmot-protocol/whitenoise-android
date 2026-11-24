@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "Rows",
+        "surface": "Grid",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
-        "anchor": "fun Rows(",
+        "anchor": "fun Grid(",
         "test_ids": [
           "MSG-050"
         ]

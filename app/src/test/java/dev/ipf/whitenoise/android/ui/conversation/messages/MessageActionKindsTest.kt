@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -105,5 +106,25 @@ class MessageActionKindsTest {
             receivedMedia + null,
             visibleMessageActions(receivedMedia + null, ::isFirstLevelMessageAction, showAll = true),
         )
+    }
+
+    /** More actions sits beside the last action when its column can widen for it, and starts a row otherwise. */
+    @Test
+    fun theDisclosureTakesTheNextFreeSlot() {
+        val five = listOf(100.dp, 80.dp, 100.dp, 80.dp, 100.dp)
+
+        val roomy = focusedActionGridColumns(five, 120.dp, firstLevelCount = 3, availableWidth = 328.dp)
+        assertEquals(listOf(100.dp, 120.dp), roomy.widths)
+        assertTrue("it pairs with the last action", roomy.disclosurePairs)
+
+        val narrow = focusedActionGridColumns(five, 120.dp, firstLevelCount = 3, availableWidth = 200.dp)
+        assertEquals("the actions keep two columns", listOf(100.dp, 80.dp), narrow.widths)
+        assertFalse("and the disclosure starts the next row", narrow.disclosurePairs)
+
+        val even = focusedActionGridColumns(five + 80.dp, 120.dp, firstLevelCount = 4, availableWidth = 328.dp)
+        assertEquals("a disclosure that always starts a row widens nothing", listOf(100.dp, 80.dp), even.widths)
+
+        val oneColumn = focusedActionGridColumns(five, 120.dp, firstLevelCount = 3, availableWidth = 150.dp)
+        assertEquals("one column holds the disclosure", listOf(120.dp), oneColumn.widths)
     }
 }

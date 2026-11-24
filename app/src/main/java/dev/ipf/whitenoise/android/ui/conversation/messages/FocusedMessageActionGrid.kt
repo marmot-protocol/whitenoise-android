@@ -21,6 +21,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,11 +56,11 @@ private val FocusedActionCellVerticalPadding = 8.dp
  * never reserves an equal share that forces a longer label to wrap. When two such columns do not fit the
  * width the stack offers, the actions become one column up to that full width before any label wraps.
  *
- * Actions that are not [FocusedMessageAction.firstLevel] wait behind a More actions row under the grid
- * until [showingAll]; [onShowingAllChange] toggles it (#4077). The grid is laid out for the full set in
- * both states, so opening it only grows the panel downward: hidden cells fade into their slots, hidden rows
- * unfold beneath the first level and the row below them glides down with the panel's edge. The row stays
- * the menu's last child, so a screen reader keeps its focus on it while the grid above changes.
+ * Actions that are not [FocusedMessageAction.firstLevel] wait behind a More actions cell, always the
+ * grid's last, until [showingAll]; [onShowingAllChange] toggles it (#4077). Columns are sized for both
+ * states, so opening the full set keeps every first-level action in place: the panel grows, the hidden
+ * actions fade into the slots after the first level and the disclosure glides to the end of the grid as
+ * Fewer actions. The disclosure keeps one identity throughout, so a screen reader keeps its focus on it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +71,7 @@ internal fun FocusedActionMenu(
 ) {
     val hasMore = hasMoreMessageActions(actions, FocusedMessageAction::firstLevel)
     val laidOut = if (hasMore) actions.sortedBy { !it.firstLevel } else actions
+    val firstLevelCount = if (hasMore) laidOut.count(FocusedMessageAction::firstLevel) else laidOut.size
     val disclosure = if (hasMore) focusedActionDisclosure(showingAll) { onShowingAllChange(!showingAll) } else null
     val cellWidths = rememberOneLineActionCellWidths(laidOut + focusedActionDisclosureLabels(disclosure))
     val actionCellHeight = rememberActionCellHeight(laidOut)
@@ -80,45 +82,44 @@ internal fun FocusedActionMenu(
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
         BoxWithConstraints {
-            val panelWidth = maxWidth
-            val columnWidths = messageActionColumnWidths(cellWidths.take(laidOut.size), panelWidth)
-            val rows = laidOut.chunked(columnWidths.size)
-            // Rows holding only hidden actions follow the first level, and unfold together as one sheet.
-            val (shownRows, hiddenRows) =
-                if (hasMore) rows.partition { it.any(FocusedMessageAction::firstLevel) } else rows to emptyList()
-            val actionRow: @Composable (List<FocusedMessageAction>) -> Unit = { rowActions ->
-                Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                    rowActions.forEachIndexed { column, action ->
+            val actionWidths = cellWidths.take(laidOut.size)
+            val disclosureWidth = cellWidths.drop(laidOut.size).maxOrNull()
+            val grid = focusedActionGridColumns(actionWidths, disclosureWidth, firstLevelCount, maxWidth)
+            val columnWidths = grid.widths
+            val columns = columnWidths.size
+            val disclosurePairs = grid.disclosurePairs
+            reveal.Grid(columnWidths, lastMayPair = disclosure == null || disclosurePairs) {
+                laidOut.forEachIndexed { index, action ->
+                    key(action.label) {
                         val cell: @Composable () -> Unit = {
                             FocusedActionCell(
                                 action = action,
                                 minimumHeight = actionCellHeight,
-                                modifier = Modifier.width(columnWidths[column]),
+                                modifier = Modifier.width(columnWidths[index % columns]),
                             )
                         }
-                        if (hasMore && !action.firstLevel) reveal.Cell(showingAll, cell) else cell()
+                        val hiddenRow = index / columns - firstLevelCount / columns
+                        if (index >= firstLevelCount) reveal.Cell(showingAll, hiddenRow, cell) else cell()
                     }
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                shownRows.forEach { actionRow(it) }
-                if (hiddenRows.isNotEmpty()) {
-                    reveal.Rows(showingAll) {
-                        Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                            hiddenRows.forEach { actionRow(it) }
-                        }
+                if (disclosure != null && disclosureWidth != null) {
+                    val slot = if (showingAll) laidOut.size else firstLevelCount
+                    key(FOCUSED_ACTION_DISCLOSURE_TEST_TAG) {
+                        FocusedActionCell(
+                            action = disclosure,
+                            minimumHeight = actionCellHeight,
+                            modifier =
+                                reveal
+                                    .glide(this)
+                                    .width(
+                                        if (slot % columns == 1 && disclosurePairs) {
+                                            columnWidths[1]
+                                        } else {
+                                            maxOf(columnWidths[0], disclosureWidth)
+                                        },
+                                    ).testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
+                        )
                     }
-                }
-                if (disclosure != null) {
-                    val gridWidth = columnWidths.reduce { total, width -> total + messageActionColumnGap + width }
-                    FocusedActionCell(
-                        action = disclosure,
-                        minimumHeight = actionCellHeight,
-                        modifier =
-                            Modifier
-                                .width(minOf(maxOf(gridWidth, cellWidths.takeLast(2).max()), panelWidth))
-                                .testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
-                    )
                 }
             }
         }

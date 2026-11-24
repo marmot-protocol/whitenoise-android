@@ -66,9 +66,10 @@ class MessageActionMenuLayoutTest {
     }
 
     /**
-     * The maximum menu's first level pairs the common actions into two label-sized columns, with
-     * More actions under them (#4077). The grid is laid out for the full set, so opening it keeps every
-     * first-level action in place and the panel's width, and only adds the rest beneath, ending with Delete.
+     * The maximum menu's first level pairs the common actions into two label-sized columns and ends with
+     * More actions in the next free slot (#4077). Opening the full set keeps every first-level action and
+     * the panel's columns in place, adds the rest after them with Delete last, and moves the disclosure to
+     * the end as Fewer actions.
      */
     @Test
     fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
@@ -87,9 +88,9 @@ class MessageActionMenuLayoutTest {
         assertTrue("and sit in different columns", edit.left > reply.left)
         assertEquals("a column keeps one width", reply.width, copy.width, 0.5f)
         assertEquals("the left column stays aligned", reply.left, save.left, 0.5f)
-        assertTrue("More actions follows the first level", more.top > save.top)
-        assertEquals("across the grid's width", reply.left, more.left, 0.5f)
-        assertEquals(edit.right, more.right, 0.5f)
+        assertEquals("More actions takes the slot beside Save", save.top, more.top, 0.5f)
+        assertEquals("in the second column", edit.left, more.left, 0.5f)
+        assertEquals(edit.width, more.width, 0.5f)
 
         showAllActions()
         val offset = bounds("Reply").top - reply.top
@@ -101,11 +102,11 @@ class MessageActionMenuLayoutTest {
         assertEquals("Keep on screen takes the slot beside Save", save.top + offset, bounds("Keep on screen").top, 0.5f)
         val info = bounds("Info")
         val delete = bounds("Delete")
-        assertEquals("delete ends the grid beside the last action", info.top, delete.top, 0.5f)
+        assertEquals("delete ends the actions beside the last one", info.top, delete.top, 0.5f)
         assertTrue("with delete on the right", delete.left > info.left)
         val fewer = bounds("Fewer actions")
-        assertTrue("Fewer actions closes the grid", fewer.top > delete.top)
-        assertEquals("the panel keeps its width", more.width, fewer.width, 0.5f)
+        assertTrue("Fewer actions is the last cell", fewer.top > delete.top)
+        assertEquals("in the next free slot", info.left, fewer.left, 0.5f)
     }
 
     /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
