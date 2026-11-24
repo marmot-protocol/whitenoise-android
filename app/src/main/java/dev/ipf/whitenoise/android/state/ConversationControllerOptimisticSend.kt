@@ -11,8 +11,11 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceSendStage
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -164,6 +167,115 @@ internal fun ConversationController.recordOptimisticSendAcceptance(
         } else {
             OptimisticSendPhase.SETTLED
         }
+}
+
+/**
+ * Ends a send attempt the user cancelled before admission: the row and its presentation go, the in-flight
+ * discard mark is released and the cancelled-send tombstones stay bounded.
+ */
+internal fun ConversationController.discardCancelledSendAttempt(
+    optimisticKey: String,
+    tempId: String,
+) {
+    discardedDuringRetry.remove(optimisticKey)
+    removeCancelledOptimisticSend(optimisticKey, tempId)
+    trimCancelledSendTombstones()
+}
+
+/** A coroutine cancellation of a send the user already cancelled releases its discard mark before rethrowing. */
+internal fun ConversationController.retireCancelledSendTombstone(
+    throwable: Throwable,
+    optimisticKey: String,
+) {
+    if (throwable is CancellationException && optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {
+        discardedDuringRetry.remove(optimisticKey)
+        trimCancelledSendTombstones()
+    }
+}
+
+/**
+ * Records that a text send's publication may already have reached a relay. Its row stays Pending until an
+ * authoritative projection or MDK convergence settles it; publishing again could mint a duplicate event.
+ */
+internal fun ConversationController.markTextDeliveryUncertain(
+    optimisticKey: String,
+    tempId: String,
+    trace: PerformanceTrace?,
+) {
+    if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
+        optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
+    }
+    sendTrace(
+        trace,
+        PerformancePhase.DELIVERY_UNCERTAIN,
+        result = PerformanceResult.PENDING,
+        layer = PerformanceLayer.TRANSPORT,
+    )
+    appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
+}
+
+/** Hides this installation's unpublished projected copies of a failed send behind its Failed row. */
+internal fun ConversationController.suppressUnpublishedCopiesOf(message: AppMessageRecordFfi) {
+    suppressProjectedTimelineItems(
+        unpublishedProjectionIdsMatchingMessage(
+            timelineRecords = timelineRecords,
+            message = message,
+            activeAccountIdHex = conversationAccountIdHex,
+        ),
+    )
+}
+
+/**
+ * Applies a successful text admission to the optimistic row [optimisticKey], shared by the first send and a
+ * manual retry: reconciles the row with [summary], hands any pending edit to the confirmed id, records send
+ * diagnostics, settles the chat-list preview once MDK published, and publishes the timeline.
+ */
+internal fun ConversationController.settleAcceptedTextSend(
+    summary: SendSummaryFfi,
+    optimisticKey: String,
+    tempId: String,
+    optimisticRecord: AppMessageRecordFfi,
+    timelineOrder: ULong,
+): SuccessfulTextSendReconciliation {
+    val reconciliation =
+        reconcileSuccessfulTextSend(
+            summaryMessageIds = summary.messageIds,
+            acceptDisposition = summary.acceptDisposition,
+            optimisticKey = optimisticKey,
+            tempId = tempId,
+            optimisticRecord = optimisticRecord,
+            optimisticMessages = optimisticMessages,
+            messageById = messageById,
+            projectedMessageIds = projectedMessageIds,
+            timelineOrder = timelineOrder,
+            acceptedPendingTextOptimisticIdsByMessageId = acceptedPendingTextOptimisticIds,
+        )
+    handoffPendingMessageEdit(
+        tempId,
+        reconciliation.confirmedId,
+        ready = !reconciliation.acceptedPending && !reconciliation.awaitingEcho,
+    )
+    appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
+    appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
+    // MDK drains durable submissions and schedules convergence. A host recovery
+    // call here would hold the group commit lock across network maintenance,
+    // preventing the next message from even reaching durable admission.
+    if (reconciliation.awaitingProjection) {
+        appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
+    }
+    if (!reconciliation.acceptedPending) {
+        transferRetentionAtSend(tempId, reconciliation.confirmedId)
+        appState.commitOptimisticSentPreview(
+            accountRef = conversationAccountRef,
+            groupIdHex = group.groupIdHex,
+            optimisticMessageIdHex = tempId,
+            confirmedMessageIdHex = reconciliation.confirmedId,
+        )
+        invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
+            .forEach(::removeProjectedRecord)
+    }
+    publishTimelineFromIndexes()
+    return reconciliation
 }
 
 internal fun ConversationController.optimisticSendIsMdkOwnedOrUnknown(optimisticKey: String): Boolean =
