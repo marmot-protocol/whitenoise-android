@@ -6,7 +6,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsAtLeast
@@ -99,6 +103,15 @@ class FloatingControlDiscTest {
     fun chatListJumpToTopHasA48DpTarget() {
         show { ChatListJumpToTopButton(onClick = {}) }
         composeRule.onNodeWithContentDescription("Scroll to top").assertMinimumTouchTarget()
+    }
+
+    /** The chat list's jump-to-top control keeps the button role of the FAB it replaced. */
+    @Test
+    fun chatListJumpToTopIsAButton() {
+        show { ChatListJumpToTopButton(onClick = {}) }
+        composeRule
+            .onNodeWithContentDescription("Scroll to top")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 
     /** Resume following keeps the full 48 dp slot it always had in the stack, so its disc does not move. */

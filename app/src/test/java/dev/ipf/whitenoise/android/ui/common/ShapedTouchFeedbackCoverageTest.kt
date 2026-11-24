@@ -98,6 +98,7 @@ class ShapedTouchFeedbackCoverageTest {
                 "Box(Modifier.clickable(onClick = go).clip(CircleShape))" to CLICK_BEFORE_CLIP,
                 "Box(Modifier.size(40.dp).background(c, CircleShape).clickable { go() })" to CLICK_OVER_SHAPED_FILL,
                 "IconButton(onClick = go, modifier = Modifier.requiredSize(36.dp, 48.dp)) {}" to STRETCHED_ICON_BUTTON,
+                "IconToggleButton(on, { go() }, Modifier.width(36.dp).height(48.dp)) {}" to STRETCHED_ICON_BUTTON,
                 "Icon(p, null, Modifier.size(28.dp).clickable { retry() })" to BARE_GLYPH,
             )
         cases.forEach { (source, kind) -> assertEquals(source, listOf(kind), shapedTouchFindings(source).map(::kind)) }

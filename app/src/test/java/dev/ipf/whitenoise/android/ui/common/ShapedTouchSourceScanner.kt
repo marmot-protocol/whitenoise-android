@@ -147,21 +147,33 @@ private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
  * [SlotIconButton].
  */
 private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
-    (calls("IconButton") + calls("IconToggleButton"))
+    iconButtonCalls()
         .filter { (_, args) ->
-            val modifier = modifierArgument(args)
+            val modifier = args
             // Only the button's own modifier sizes it, never a sized child in its `content`.
             val sized = twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
             val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
             sized || slotSized
         }.map { (start, _) -> STRETCHED_ICON_BUTTON to start }
 
-/** The `modifier` an icon button call receives, named or as its second positional argument. */
-private fun modifierArgument(args: String): String =
+/**
+ * Each `IconButton` and `IconToggleButton` call in this text, with the `modifier` it receives. The modifier is
+ * the second positional argument of `IconButton(onClick, modifier)` and the third of
+ * `IconToggleButton(checked, onCheckedChange, modifier)`.
+ */
+private fun String.iconButtonCalls(): List<Pair<Int, String>> =
+    calls("IconButton").map { (start, args) -> start to modifierArgument(args, position = 1) } +
+        calls("IconToggleButton").map { (start, args) -> start to modifierArgument(args, position = 2) }
+
+/** The `modifier` a call receives, named or as its positional argument at [position]. */
+private fun modifierArgument(
+    args: String,
+    position: Int,
+): String =
     topLevelNamedArguments(args)["modifier"]?.trim()
         ?: topLevelArguments(args)
             .filterNot { namedArgument.containsMatchIn(it) }
-            .getOrNull(1)
+            .getOrNull(position)
             ?.trim()
             .orEmpty()
 
@@ -171,8 +183,9 @@ private fun modifierArgument(args: String): String =
  */
 internal fun passThroughIconButtonWrappers(source: String): Map<String, Set<Int>> {
     val code = blankCommentsAndStrings(source)
-    return (code.calls("IconButton") + code.calls("IconToggleButton"))
-        .filter { (_, args) -> modifierArgument(args).startsWith("modifier") }
+    return code
+        .iconButtonCalls()
+        .filter { (_, modifier) -> modifier.startsWith("modifier") }
         .mapNotNull { (start, _) -> code.functionContaining(start) }
         .mapNotNull { (name, parameters) ->
             parameterList(parameters)

@@ -7,7 +7,7 @@ import java.io.File
 class ChatsScreenScrollControlAccessibilityCoverageTest {
     /**
      * The scroll-to-top control keeps the button semantics of the FAB it replaced: it is the shared floating
-     * disc, whose touch target is a button by default.
+     * disc, and `FloatingControlDiscTest.chatListJumpToTopIsAButton` asserts the composed node's button role.
      */
     @Test
     fun scrollToTopControlIsExposedAsButton() {
@@ -16,18 +16,8 @@ class ChatsScreenScrollControlAccessibilityCoverageTest {
                 start = "internal fun ChatListJumpToTopButton(",
                 end = "internal val JUMP_TO_TOP_END_INSET",
             )
-        val disc = appSource("ui/navigation/FloatingControlDisc.kt")
-        val shapedTouch = appSource("ui/common/ShapedTouch.kt")
 
         assertTrue("scroll-to-top must be the shared floating disc", "FloatingControlDisc(" in scrollControl)
-        assertTrue(
-            "the disc must not override its target's role",
-            ".shapedTouchTarget(press, onClick = onClick)" in disc,
-        )
-        assertTrue(
-            "scroll-to-top control must retain button semantics from the replaced FAB",
-            "role: Role? = Role.Button" in shapedTouch,
-        )
     }
 
     /** Reads a main source below `ui/`'s package root from the module or repository working directory. */
