@@ -5,7 +5,6 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -124,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
@@ -163,13 +160,12 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 @Composable
 internal fun GroupDetailsLocalDeleteControl(
@@ -2440,35 +2436,12 @@ private fun GroupMutationErrorBanner(
     error: ErrorPresentation,
     onDismiss: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    val message = error.message.resolve(context)
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(R.drawable.ic_error), contentDescription = null)
-            SelectionContainer(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.latest_group_error, message),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
-                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = stringResource(R.string.copy))
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
-            }
-        }
-    }
+    ErrorCallout(
+        message = stringResource(R.string.latest_group_error, error.message.resolve(context)),
+        report = error.report,
+        onDismiss = onDismiss,
+    )
 }
 
 private sealed class DetailsConfirm {

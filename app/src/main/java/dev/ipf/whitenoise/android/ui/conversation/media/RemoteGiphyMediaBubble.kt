@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -57,12 +55,16 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
+import dev.ipf.whitenoise.android.ui.common.rememberTransientNoticeOf
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.editedLabelTarget
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
+import java.util.Locale
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,8 +73,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.util.Locale
-import kotlin.coroutines.resume
 
 internal const val GIPHY_MAX_BODY_BYTES = GIPHY_MAX_MEDIA_BYTES
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024
@@ -258,13 +258,13 @@ internal fun RemoteGiphyMediaCard(
     animationSource: InlineAnimationSource? = null,
 ) {
     val attribution = media.attribution?.let { "via GIPHY · $it" } ?: stringResource(R.string.giphy_attribution)
-    val context = LocalContext.current
+    val noAppToOpen = rememberTransientNoticeOf(R.string.media_no_app_to_open, TransientNoticeKind.Information)
     val uriHandler = LocalUriHandler.current
     val openMedia = {
         try {
             uriHandler.openUri(media.url)
         } catch (_: IllegalArgumentException) {
-            Toast.makeText(context, R.string.media_no_app_to_open, Toast.LENGTH_SHORT).show()
+            noAppToOpen()
         }
     }
     Surface(

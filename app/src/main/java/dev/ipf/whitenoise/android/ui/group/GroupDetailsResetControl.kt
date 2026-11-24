@@ -3,18 +3,10 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,24 +16,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
+import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
  * The reviewed target of a local abandonment, captured when its confirmation opens so the acting account and the
@@ -290,46 +280,16 @@ private fun GroupAbandonmentFailure(
     isDm: Boolean,
     error: ErrorPresentation?,
 ) {
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth().testTag("group.abandon.error"),
-    ) {
-        Row(
-            Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite },
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(R.drawable.ic_error), contentDescription = null)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
-                Text(stringResource(summary), style = MaterialTheme.typography.bodySmall)
-                if (error != null) {
-                    SelectionContainer(Modifier.testTag("group.abandon.error.detail")) {
-                        Text(
-                            stringResource(R.string.latest_group_error, error.message.resolve(context)),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-            if (error != null) {
-                IconButton(
-                    onClick = { clipboard.setText(AnnotatedString(error.report)) },
-                    modifier = Modifier.testTag("group.abandon.error.copy"),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_content_copy),
-                        contentDescription = stringResource(R.string.copy),
-                    )
-                }
-            }
-        }
-    }
+    val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
+    ErrorCallout(
+        title = stringResource(summary),
+        message = error?.let { stringResource(R.string.latest_group_error, it.message.resolve(context)) },
+        report = error?.report,
+        modifier = Modifier.testTag("group.abandon.error").semantics { liveRegion = LiveRegionMode.Polite },
+        messageModifier = Modifier.testTag("group.abandon.error.detail"),
+        copyModifier = Modifier.testTag("group.abandon.error.copy"),
+    )
 }
 
 /**
@@ -344,21 +304,16 @@ internal fun GroupLeaveBlockedNotice(
     onAbandon: () -> Unit,
 ) {
     val hint = if (isDm) R.string.leave_blocked_abandon_hint_dm else R.string.leave_blocked_abandon_hint_group
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth().testTag("chat_info.leave_blocked"),
+    WhiteNoiseCallout(
+        text = stringResource(hint),
+        modifier = Modifier.testTag("chat_info.leave_blocked"),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
-            TextButton(
-                onClick = onAbandon,
-                enabled = enabled,
-                modifier = Modifier.align(Alignment.End).testTag("chat_info.leave_blocked.abandon"),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
-        }
+        TextButton(
+            onClick = onAbandon,
+            enabled = enabled,
+            modifier = Modifier.align(Alignment.End).testTag("chat_info.leave_blocked.abandon"),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
     }
 }
 

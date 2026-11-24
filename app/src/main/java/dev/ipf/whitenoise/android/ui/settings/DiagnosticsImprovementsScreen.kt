@@ -46,8 +46,8 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * Diagnostics & Improvements: the native usage receipt and the independent audit-log choice as two switches, the
@@ -296,11 +296,10 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
                 Text(stringResource(R.string.usage_diagnostics_loading), style = MaterialTheme.typography.bodySmall)
             }
             if (state.failed) {
-                Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-                TextButton(
-                    enabled = !state.busy,
-                    onClick = { appState.launchMutation { appState.retryUsageDiagnostics() } },
-                ) { Text(stringResource(R.string.retry)) }
+                UsageDiagnosticsFailure(
+                    busy = state.busy,
+                    retry = { appState.launchMutation { appState.retryUsageDiagnostics() } },
+                )
             }
         }
     }

@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
@@ -563,9 +564,10 @@ internal fun SmartFolderConditionDialog(
                                 },
                             ) { Text(stringResource(R.string.smart_folder_add_key)) }
                             if (invalidKey) {
-                                Text(
-                                    stringResource(R.string.smart_folder_invalid_key),
-                                    color = MaterialTheme.colorScheme.error,
+                                WhiteNoiseCallout(
+                                    text = stringResource(R.string.smart_folder_invalid_key),
+                                    icon = R.drawable.ic_error,
+                                    isError = true,
                                 )
                             }
                         }

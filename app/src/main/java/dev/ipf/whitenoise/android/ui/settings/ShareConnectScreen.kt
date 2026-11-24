@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -512,15 +513,14 @@ private fun ShareProfileContent(
                 style = MaterialTheme.typography.bodyLarge,
             )
             if (scanInvalid) {
-                Text(
+                WhiteNoiseCallout(
                     text = stringResource(R.string.error_not_white_noise_profile_qr),
                     modifier =
                         Modifier
                             .padding(top = WhiteNoiseSpacing.Related)
                             .widthIn(max = ShareConnectDefaults.ErrorMaxWidth),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
+                    icon = R.drawable.ic_error,
+                    isError = true,
                 )
             }
         }
