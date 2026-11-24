@@ -2184,7 +2184,9 @@ internal fun ConversationScreen(
                     }
                     return@programmaticJump
                 }
-                if (skipIfFullyVisible && layoutInfo.isItemFullyVisible(targetIndex)) {
+                if (skipIfFullyVisible &&
+                    layoutInfo.isItemFullyVisible(targetIndex, timelineViewport.senderGapMeasurements::get)
+                ) {
                     return@programmaticJump
                 }
                 val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size

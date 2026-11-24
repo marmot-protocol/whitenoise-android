@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,6 +72,37 @@ class ConversationSenderGapMeasurementsTest {
         compose.runOnIdle {
             assertFalse(list.layoutInfo.visibleItemsInfo.any { it.key == firstKey })
             assertEquals(0, measurements[firstKey])
+        }
+    }
+
+    @Test
+    fun replyTargetStaysInPlaceWhenOnlyItsGapIsClipped() {
+        val measurements = ConversationSenderGapMeasurements()
+        val list = LazyListState()
+        val key = "presentation:target"
+        val gap = 6.dp
+        var height by mutableStateOf(44.dp)
+        compose.setContent {
+            LazyColumn(modifier = Modifier.height(height), state = list, reverseLayout = true) {
+                item(key = key) {
+                    Spacer(
+                        Modifier
+                            .fillMaxWidth()
+                            .measureConversationSenderGap(measurements, key, gap)
+                            .padding(top = gap)
+                            .height(40.dp),
+                    )
+                }
+            }
+        }
+
+        compose.runOnIdle {
+            assertFalse(list.layoutInfo.isItemFullyVisible(0) { 0 })
+            assertTrue(list.layoutInfo.isItemFullyVisible(0, measurements::get))
+            height = 39.dp
+        }
+        compose.runOnIdle {
+            assertFalse(list.layoutInfo.isItemFullyVisible(0, measurements::get))
         }
     }
 }

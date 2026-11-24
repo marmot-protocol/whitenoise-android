@@ -31,10 +31,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.TimelineMessage
 
-/** Checks the complete measured row against the usable lazy-list viewport. */
-internal fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
+/** Checks the reversed row's content against the reading viewport, excluding its decorative sender gap. */
+internal fun LazyListLayoutInfo.isItemFullyVisible(
+    index: Int,
+    leadingSenderGapPx: (Any) -> Int,
+): Boolean {
     val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
-    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
+    val contentSize = item.size - leadingSenderGapPx(item.key).coerceIn(0, item.size)
+    return item.offset >= viewportStartOffset && item.offset + contentSize <= viewportEndOffset
 }
 
 /** Separates the one native list's paint area from the measured foreground composer's reading occlusion. */

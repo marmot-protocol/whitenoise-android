@@ -115,12 +115,14 @@ internal class AudioTranscriptionToggleState(
         value: Boolean,
     ) = scope(provided).setShown(messageIdHex, value)
 
+    /** Returns the cached transcript for this recording while the message's transcript is shown. */
     fun completedText(
         provided: VoiceTranscriptionScope?,
         index: Int,
         epoch: ULong,
     ): String? = scope(provided).result(voicePlaybackKey(messageIdHex, index, epoch))?.text.takeIf { requested(provided) }
 
+    /** Offers the menu action once a recording is ready, using the same request as the side disc. */
     fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? = if (enabled) ({ setRequested(provided, true) }) else null
 
     fun register(

@@ -187,11 +187,32 @@ class AudioTranscriptionScreenshotTest {
 
     /** The production frame: the player on top, the transcript, then the time, all in one bubble. */
     @Test
-    fun completedInBubbleLight() = capture("bubble-light", completed(), inlineMedia = true)
+    fun completedInBubbleLight() = capture("bubble-light", completed(), placement = TranscriptPlacement.SEPARATE_FOOTER)
 
     @Test
     fun completedInBubbleAmoledRtlLarge() {
-        capture("bubble-amoled-rtl-large", completed(), Appearance.AMOLED_RTL, inlineMedia = true)
+        capture("bubble-amoled-rtl-large", completed(), Appearance.AMOLED_RTL, TranscriptPlacement.SEPARATE_FOOTER)
+    }
+
+    @Test
+    fun completedWithFooterLight() = captureFooter("footer-light", Appearance.LIGHT)
+
+    @Test
+    fun completedWithFooterDark() = captureFooter("footer-dark", Appearance.DARK)
+
+    @Test
+    fun completedWithFooterAmoledRtlLarge() = captureFooter("footer-amoled-rtl-large", Appearance.AMOLED_RTL)
+
+    private fun captureFooter(
+        name: String,
+        appearance: Appearance,
+    ) {
+        val transcript =
+            AudioTranscriptUi(
+                AudioTranscriptPhase.COMPLETE,
+                "The train leaves at ten. I will meet you by the station roundabout.",
+            )
+        capture(name, transcript, appearance, TranscriptPlacement.SHARED_FOOTER)
     }
 
     /** Automatic mode shows a transcript that is already known at once, with the disc on and no tap. */
@@ -325,7 +346,7 @@ class AudioTranscriptionScreenshotTest {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     IncomingVoiceMessage(
                         state = if (shown.value) completed() else null,
-                        inlineMedia = true,
+                        placement = TranscriptPlacement.SEPARATE_FOOTER,
                         onToggle = { shown.value = it },
                     )
                 }
@@ -371,7 +392,7 @@ class AudioTranscriptionScreenshotTest {
         name: String,
         state: AudioTranscriptUi?,
         appearance: Appearance = Appearance.LIGHT,
-        inlineMedia: Boolean = false,
+        placement: TranscriptPlacement = TranscriptPlacement.BODY,
     ) {
         val amoledRtl = appearance == Appearance.AMOLED_RTL
         val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -383,7 +404,7 @@ class AudioTranscriptionScreenshotTest {
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     Surface(modifier = Modifier.width(360.dp).testTag(FRAME)) {
-                        IncomingVoiceMessage(state, inlineMedia = inlineMedia)
+                        IncomingVoiceMessage(state, placement = placement)
                     }
                 }
             }
@@ -391,6 +412,10 @@ class AudioTranscriptionScreenshotTest {
         val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsDisplayed()
         if (state == null) disc.assertIsOff() else disc.assertIsOn()
         composeRule.onNode(isDialog()).assertDoesNotExist()
+        if (placement == TranscriptPlacement.SHARED_FOOTER) {
+            composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertIsDisplayed()
+            composeRule.onNodeWithText(VOICE_TIMESTAMP).assertIsDisplayed()
+        }
         composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-$name.png")
     }
 
@@ -398,7 +423,7 @@ class AudioTranscriptionScreenshotTest {
     @Composable
     private fun IncomingVoiceMessage(
         state: AudioTranscriptUi?,
-        inlineMedia: Boolean = false,
+        placement: TranscriptPlacement = TranscriptPlacement.BODY,
         onToggle: (Boolean) -> Unit = {},
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -412,7 +437,9 @@ class AudioTranscriptionScreenshotTest {
                 onClick = {},
             )
             Column(modifier = Modifier.weight(1f, fill = false).alignBy(MessageBubbleBottomAlignmentLine)) {
-                if (inlineMedia) {
+                if (placement != TranscriptPlacement.BODY) {
+                    val sharedFooter = placement == TranscriptPlacement.SHARED_FOOTER
+                    val footerTranscript = state?.takeIf { sharedFooter && it.phase == AudioTranscriptPhase.COMPLETE }?.text
                     MediaCaptionFrame(
                         presentation = messageBubblePresentation(deleted = false, mine = false),
                         highlighted = false,
@@ -420,17 +447,14 @@ class AudioTranscriptionScreenshotTest {
                         mentionedSelf = false,
                         mentionedYouLabel = "Mentioned you",
                         alignEnd = false,
-                        media = { VoiceAndTranscript(state) },
+                        contentModifier = Modifier.animateTranscriptFooter(sharedFooter),
+                        media = { VoiceAndTranscript(state.takeIf { footerTranscript == null }) },
                         caption = {
-                            MessageInlineFooter(
-                                timeText = "10:24",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                showStatus = false,
-                                status = MessageStatus.Received,
-                                editedLabel = null,
-                                onEditedClick = null,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            if (footerTranscript != null) {
+                                AudioTranscriptWithFooter(footerTranscript) { VoiceTimestamp() }
+                            } else {
+                                VoiceTimestamp(Modifier.fillMaxWidth())
+                            }
                         },
                     )
                 } else {
@@ -461,6 +485,19 @@ class AudioTranscriptionScreenshotTest {
     }
 
     @Composable
+    private fun VoiceTimestamp(modifier: Modifier = Modifier) {
+        MessageInlineFooter(
+            timeText = VOICE_TIMESTAMP,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            showStatus = false,
+            status = MessageStatus.Received,
+            editedLabel = null,
+            onEditedClick = null,
+            modifier = modifier,
+        )
+    }
+
+    @Composable
     private fun VoiceAndTranscript(state: AudioTranscriptUi?) {
         VoiceAttachmentContent(
             loading = false,
@@ -488,10 +525,13 @@ class AudioTranscriptionScreenshotTest {
 
     private enum class Appearance { LIGHT, DARK, AMOLED_RTL }
 
+    private enum class TranscriptPlacement { BODY, SEPARATE_FOOTER, SHARED_FOOTER }
+
     private companion object {
         const val FRAME = "audio.transcription.frame"
         const val MESSAGE = "m1"
         const val ATTACHMENT = "m1:0:1"
+        const val VOICE_TIMESTAMP = "10:24"
         const val TIMEOUT_MS = 10_000L
     }
 }
