@@ -521,13 +521,19 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
     }
 
-    /** The expiry order lists optimistic rows first, so an optimistic row shadowing the read anchor defers a poll. */
+    /** The expiry order prefers an optimistic row by raw id before display ordering, deferring a newer poll. */
     @Test
-    fun expiryOrderPutsOptimisticRowsFirst() {
+    fun expiryOrderPrefersOptimisticCopyOfAnchor() {
         val poll = checkNotNull(applyExpiringPage(seconds = 300, direction = "received").projected)
         val anchorId = "aa".repeat(32)
         val anchor =
-            poll.copy(messageIdHex = anchorId, sourceMessageIdHex = anchorId, poll = null, retentionExpiresAt = null)
+            poll.copy(
+                messageIdHex = anchorId,
+                sourceMessageIdHex = anchorId,
+                timelineAt = poll.timelineAt - 2uL,
+                poll = null,
+                retentionExpiresAt = null,
+            )
         applyPage(poll, anchor)
         markRead(anchorId)
         // Projected order is poll then anchor, so the poll is already read and its engine deadline applies.
@@ -537,10 +543,14 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         )
 
         val optimistic = votedPoll()
-        val shadow = optimistic.copy(id = "optimistic-anchor", record = optimistic.record.copy(messageIdHex = anchorId))
+        val shadow =
+            optimistic.copy(
+                id = "optimistic-anchor",
+                record = optimistic.record.copy(messageIdHex = anchorId, recordedAt = poll.timelineAt - 1uL),
+            )
         pollState.optimisticMessages("personal", pollController.group.groupIdHex)[shadow.id] = shadow
 
-        // With the shadow first, the anchor now precedes the poll, so the poll is unread and its deadline deferred.
+        // With the shadow replacing the projected anchor before ordering, it precedes the poll and defers expiry.
         assertEquals(RetainedRowWatch.Waiting(60_000L, null), pollController.watchRetainedRow(poll.messageIdHex, null))
     }
 
