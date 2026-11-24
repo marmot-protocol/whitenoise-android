@@ -94,7 +94,7 @@ class GroupAbandonmentCoverageTest {
         val dialog = source("ui/group/GroupDetailsResetControl.kt")
         assertTrue("the dialog names the acting account", "R.string.abandon_identity_account" in dialog)
         assertTrue("the dialog names the conversation", "target.conversationTitle" in dialog)
-        assertTrue("confirm is disabled while the forget runs", "enabled = !running" in dialog)
+        assertTrue("confirm is disabled while the forget runs", "confirmEnabled = !running" in dialog)
         val chatHost = source("ui/chats/ChatAbandonment.kt")
         assertEquals("every surface shares one confirmation", 3, sharedDialogUses())
         val wrappers =

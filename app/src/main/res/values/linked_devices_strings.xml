@@ -100,7 +100,6 @@
     <string name="device_detail_add_to_chats_detail">Your devices may add this one to the chats this account is in. Turning this off doesn\'t take it out of chats it already joined.</string>
     <string name="device_detail_bring_history_detail">Applies to chats this device is added to from now on. It doesn\'t send history for chats it already joined.</string>
     <string name="device_detail_remove">Remove device</string>
-    <string name="device_detail_remove_title">Remove device?</string>
     <string name="device_detail_remove_detail">Removes this device from your linked devices and from every chat. The account is signed out there.</string>
     <string name="device_detail_remove_confirm">Remove %1$s? It will be unlinked and signed out. Your other devices will remove it from chats where they can.</string>
     <string name="device_action_busy">Your devices are still applying an earlier change. Try again in a moment.</string>

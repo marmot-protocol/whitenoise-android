@@ -488,7 +488,7 @@ internal fun RelayDetailsScreen(
     }
     if (removeDialog) {
         ConfirmDialog(
-            title = stringResource(R.string.remove_named_relay_question, relay.name),
+            title = stringResource(R.string.remove_named_relay, relay.name),
             message = stringResource(R.string.relay_remove_detail),
             confirmLabel = stringResource(R.string.remove),
             onConfirm = {
