@@ -50,6 +50,7 @@ internal object WarmResumeTrace {
             openTraceCookies[key] = cookie
             Trace.beginAsyncSection(TRACE_SECTION, cookie)
         }
+        WarmResumeInputTrace.foregroundStarted(activityToken, foregroundEpoch)
     }
 
     @Synchronized
@@ -59,6 +60,7 @@ internal object WarmResumeTrace {
     ) {
         marker(activityToken, "foreground-stopped", "epoch=$foregroundEpoch")
         completeTrace(activityToken, foregroundEpoch)
+        WarmResumeInputTrace.foregroundStopped(activityToken, foregroundEpoch)
     }
 
     fun lifecycle(
@@ -137,6 +139,12 @@ internal object WarmResumeTrace {
         imeRequested: Boolean? = null,
         imeObserved: Boolean? = null,
     ) {
+        when (phase) {
+            WarmResumeConversationPhase.InputReceived,
+            WarmResumeConversationPhase.NavigationRequested,
+            -> WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.Conversation)
+            else -> Unit
+        }
         if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
         Log.i(
             TAG,

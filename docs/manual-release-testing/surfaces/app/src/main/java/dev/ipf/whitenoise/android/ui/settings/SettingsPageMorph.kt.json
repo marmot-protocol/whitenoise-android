@@ -9,7 +9,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
         "anchor": "fun ContentDrawScope.draw(",
         "test_ids": [
-          "SET-039"
+          "SET-039",
+          "SET-070"
         ]
       }
     ]

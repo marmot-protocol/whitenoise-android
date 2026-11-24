@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.graphics.Picture
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -25,10 +24,10 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 
 internal const val COMPOSER_ACCESSORY_ENTRANCE_MILLIS = 180
 internal const val COMPOSER_ACCESSORY_EXIT_MILLIS = 150
-private val ComposerAccessoryExitEasing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 private const val COMPOSER_ACCESSORY_START_SCALE = 0.96f
 
 /** Bottom-centre origin so the accessory rises out of the composer edge. */
@@ -119,7 +118,7 @@ internal fun rememberComposerAccessoryExit(
         exit.exiting = true
         try {
             exit.progress.snapTo(1f)
-            exit.progress.animateTo(0f, tween(COMPOSER_ACCESSORY_EXIT_MILLIS, easing = ComposerAccessoryExitEasing))
+            exit.progress.animateTo(0f, tween(COMPOSER_ACCESSORY_EXIT_MILLIS, easing = AppMotionCloseEasing))
         } finally {
             exit.clear()
         }

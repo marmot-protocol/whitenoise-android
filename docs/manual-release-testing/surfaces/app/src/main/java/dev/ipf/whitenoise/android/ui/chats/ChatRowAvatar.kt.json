@@ -1,0 +1,38 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowAvatar.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatRowAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowAvatar.kt",
+        "anchor": "fun ChatRowAvatar(",
+        "test_ids": [
+          "CHL-006",
+          "PRO-012"
+        ]
+      },
+      {
+        "surface": "ChatRowAvatarMarkers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowAvatar.kt",
+        "anchor": "fun ChatRowAvatarMarkers(",
+        "test_ids": [
+          "CHL-006",
+          "PRO-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Followed-person badge announced on a direct chat row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowAvatar.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "AXY-001",
+          "PRO-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

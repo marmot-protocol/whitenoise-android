@@ -11,11 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.hasAnyAncestor
@@ -65,6 +67,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -122,7 +125,7 @@ class ConversationMediaViewerProductionPathTest {
         var parentVisible by mutableStateOf(true)
         var viewerVisible by mutableStateOf(true)
         val events = mutableListOf<String>()
-        val bytes = rendererFixturePngBytes()
+        val bytes = rendererFixturePngBytes(android.graphics.Color.GREEN)
         val lifecycle = ViewerPageTestLifecycleOwner()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
@@ -171,6 +174,13 @@ class ConversationMediaViewerProductionPathTest {
             }
         }
         composeRule.awaitViewerImageWorkIdle()
+        val viewerDialog = composeRule.onAllNodes(isDialog()).onLast()
+
+        fun photoGreen(): Float {
+            val pixels = viewerDialog.captureToImage().toPixelMap()
+            return pixels[pixels.width / 2, pixels.height / 2].green
+        }
+        composeRule.waitUntil(5_000) { photoGreen() > .9f }
         composeRule.mainClock.autoAdvance = false
         val captureFolder =
             if (!invalidate && System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
@@ -183,9 +193,10 @@ class ConversationMediaViewerProductionPathTest {
                 .captureScreenRoboImage(java.io.File(it, "source.png").path)
         }
         composeRule.onAllNodes(hasText("Maya") and hasAnyAncestor(isDialog())).onLast().performClick()
-        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(32)
         composeRule.runOnIdle { assertEquals(emptyList<String>(), events) }
         composeRule.onAllNodes(isDialog()).assertCountEquals(2)
+        assertTrue("Retiring actions must leave the photo mounted", photoGreen() > .4f)
         if (invalidate) {
             composeRule.runOnIdle { fixture.appState.wipeInProgress = true }
             composeRule.mainClock.advanceTimeByFrame()
@@ -304,8 +315,9 @@ class ConversationMediaViewerProductionPathTest {
      * Encodes a small static source for the positive image path without involving attachment download or network
      * state.
      */
-    private fun rendererFixturePngBytes(): ByteArray {
+    private fun rendererFixturePngBytes(color: Int = android.graphics.Color.TRANSPARENT): ByteArray {
         val bitmap = android.graphics.Bitmap.createBitmap(20, 10, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(color)
         return java.io
             .ByteArrayOutputStream()
             .also { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }

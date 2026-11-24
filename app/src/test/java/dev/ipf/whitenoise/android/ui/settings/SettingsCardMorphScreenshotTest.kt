@@ -169,11 +169,11 @@ class SettingsCardMorphScreenshotTest {
         assertNativeHeader(settled, early)
         assertNativeHeader(settled, mid)
         if (!amoled) {
-            assertTrue(
-                "Borderless entry must render its native body immediately",
+            // Borderless themes move the body (a container from the row, or a slide back) instead of cutting.
+            assertFalse(
+                "Borderless route must move instead of cutting",
                 early.asAndroidBitmap().sameAs(settled.asAndroidBitmap()),
             )
-            assertTrue("Borderless body must stay settled", mid.asAndroidBitmap().sameAs(settled.asAndroidBitmap()))
         }
     }
 

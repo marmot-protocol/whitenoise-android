@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.share.ForeignContentSource
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.ui.conversation.nostr.sweepOrphanedNostrVideoFiles
 import java.io.File
 
 // Persist a multi-pick selection across rotation / process death. Empty list
@@ -174,6 +175,7 @@ internal fun sweepStaleSharedMedia(
     // Run on its own so a failure above cannot leave hundreds of MiB of plaintext behind.
     runCatching { sweepOrphanedUploadSources(context.cacheDir) }
     runCatching { sweepOrphanedDocumentReaderFiles(context.cacheDir) }
+    runCatching { sweepOrphanedNostrVideoFiles(context.cacheDir) }
 }
 
 /** Files in `shared_media` older than this are considered safe to delete —

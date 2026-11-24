@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
@@ -33,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -175,6 +177,91 @@ class MediaViewerWindowAdmissionTest {
         assertEquals(0f, mediaViewerContentAlpha(true, 0.5f, available), 0f)
         assertEquals(1, reads)
         assertEquals(1f, mediaViewerContentAlpha(true, 0.5f) { false }, 0f)
+    }
+
+    /** Samples both directions around the old fractional-alpha overlap on the real draw path. */
+    @Test
+    fun photoTravelDrawsExactlyOneImageThroughTheHandoff() {
+        val registry = MediaViewerThumbnailRegistry()
+        val attachment = ConversationMediaViewerAttachmentId("drawn-photo", 0)
+        var open by mutableStateOf(false)
+        var closing by mutableStateOf(false)
+        var dismissCount = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    MediaViewerThumbnailHost(registry) {
+                        Box(
+                            Modifier
+                                .size(72.dp)
+                                .mediaViewerThumbnail(attachment.messageIdHex, 0, 0uL)
+                                .background(Color.Red),
+                        )
+                    }
+                    if (open) {
+                        Box(Modifier.fillMaxSize().background(Color.Black)) {
+                            MediaViewerMotion(
+                                registry = registry,
+                                opening = attachment,
+                                selected = attachment,
+                                closing = closing,
+                                onClosed = { dismissCount++ },
+                                attachmentAspectRatio = 4f / 3f,
+                            ) { modifier ->
+                                Box(Modifier.fillMaxSize().then(modifier).background(Color.Green))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        flushInitialNativeDraw()
+        assertNotNull(registry.find(attachment))
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnIdle { open = true }
+            flushQueuedComposition()
+            assertEquals(Color.Red, opaquePhotoOwner())
+            val opening = samplePhotoHandoff()
+            assertTrue(Color.Red in opening)
+            assertEquals(Color.Green, opening.last())
+
+            composeRule.runOnIdle { closing = true }
+            flushQueuedComposition()
+            val returning = samplePhotoHandoff()
+            assertTrue(Color.Red in returning)
+            assertEquals(Color.Red, returning.last())
+            composeRule.runOnIdle { assertEquals(1, dismissCount) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun samplePhotoHandoff(): List<Color> =
+        List(22) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            opaquePhotoOwner()
+        }
+
+    private fun opaquePhotoOwner(): Color {
+        val pixels = composeRule.onRoot().captureToImage().toPixelMap()
+        var hasCrop = false
+        var hasPager = false
+        var hasOpaqueImageInk = false
+        for (y in 0 until pixels.height step 8) {
+            for (x in 0 until pixels.width step 8) {
+                val pixel = pixels[x, y]
+                if (pixel.blue < .1f) {
+                    hasCrop = hasCrop || pixel.red > .1f
+                    hasPager = hasPager || pixel.green > .1f
+                    hasOpaqueImageInk = hasOpaqueImageInk || pixel == Color.Red || pixel == Color.Green
+                }
+            }
+        }
+        assertTrue("One image must paint each frame", hasCrop xor hasPager)
+        assertTrue("The image must stay opaque", hasOpaqueImageInk)
+        return if (hasCrop) Color.Red else Color.Green
     }
 
     /** Robolectric may compose/layout without drawing until a screenshot is requested. The

@@ -121,10 +121,8 @@ import dev.ipf.whitenoise.android.state.setConversationMuted
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -1157,8 +1155,9 @@ internal fun ChatsScreen(
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
-    val penFlight = remember { NewMessagePenFlight() }
-    var newChatFlowOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var newChatFlowLaunch by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<NewMessageFlowLaunch?>(null)
+    }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1664,19 +1663,15 @@ internal fun ChatsScreen(
             }
         }
     }
-    // Keep a new chat-list head flush at the top when live activity reorders
-    // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
-    // previous head by key, leaving the promoted row above or clipped by the
-    // viewport.
-    //
-    // Two paths, both via [ChatListHeadSnap]:
-    //   - Return from a conversation: if the head changed while the list was
-    //     off-screen, snap regardless of the restored scroll index (#1313).
-    //   - Active on-list reader: animate the one-row correction only from the
-    //     true top so both keyed rows move together; never yank a deeper reader
-    //     or interrupt active scrolling (#541 / #1651).
-    // Keyed on `showArchived` so the tracked head resets alongside
-    // `chatListState` on a view swap.
+    val resumeBaseline = rememberChatListResumeBaseline()
+    // Keep a new chat-list head flush at the top when live activity reorders keyed items (issues #541 / #1313 /
+    // #1651). LazyColumn otherwise pins the previous head by key, leaving the promoted row above or clipped by the
+    // viewport. Two paths, both via [ChatListHeadSnap] (background returns: ChatListResumeBaseline):
+    //   - Return from a conversation: if the head changed while the list was off-screen, snap regardless of the
+    //     restored scroll index (#1313).
+    //   - Active on-list reader: animate the one-row correction only from the true top so both keyed rows move
+    //     together; never yank a deeper reader or interrupt active scrolling (#541 / #1651).
+    // Keyed on `showArchived` so the tracked head resets alongside `chatListState` on a view swap.
     val activeHeadId = visibleItems.firstOrNull()?.id.takeIf { ordinaryActiveList }
     val activeReturnHead = chatListReturnHead(visibleItems).takeIf { ordinaryActiveList }
     LaunchedEffect(conversationReturnHead, activeReturnHead, ordinaryActiveList) {
@@ -1719,6 +1714,7 @@ internal fun ChatsScreen(
             if (inProgress && !headScrollCorrectionInProgress) programmaticViewportGeneration += 1L
             headScrollCorrectionInProgress = inProgress
         },
+        resumeBaseline = resumeBaseline,
     )
     val headReorderInProgress =
         rememberChatListHeadReorderGate(
@@ -1726,6 +1722,7 @@ internal fun ChatsScreen(
             datasetKey = chatListDatasetKey,
             isActiveList = ordinaryActiveList,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
+            resumeBaseline = resumeBaseline,
         )
     SideEffect { pinFollow.currentScope = ChatPinFollowScope(chatListDatasetKey, userGestureGeneration) }
     val unpinnedVisibleIds =
@@ -1766,6 +1763,7 @@ internal fun ChatsScreen(
             pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
             datasetKey = chatListDatasetKey,
             headPromotionEligible = headPromotionMotionEligible,
+            resumeBaseline = resumeBaseline,
         )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
@@ -1773,6 +1771,7 @@ internal fun ChatsScreen(
             pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
             leadingItemCount = leadingChatListItemCount.takeUnless { searchActive } ?: 0,
             placementDurationMillis = rowPlacementDurationMillis,
+            resumeEpoch = resumeBaseline.epoch,
         )
     val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
@@ -1845,7 +1844,8 @@ internal fun ChatsScreen(
                     .takeIf { showPlaybackTransport },
         ) {
             dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog(
-                origin = newChatFlowOrigin,
+                origin = newChatFlowLaunch?.origin,
+                penMotion = newChatFlowLaunch?.pen,
                 ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
                 properties =
                     androidx.compose.ui.window.DialogProperties(
@@ -1854,25 +1854,25 @@ internal fun ChatsScreen(
                     ),
                 onDismissRequest = {
                     showNewChatFlow = false
+                    newChatFlowLaunch = null
                     onGroupCreateFlowSuperseded()
                 },
             ) {
-                LaunchedEffect(penFlight.origin) { penFlight.fly() }
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    NewChatFlowHost(
-                        appState = appState,
-                        onOpenConversation = { item, justCreated ->
-                            showNewChatFlow = false
-                            onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                        },
-                        onClose = dismiss,
-                        onGroupCreateSubmitted = onGroupCreateSubmitted,
-                        onGroupCreateCompletedOpen = { item, requestToken ->
-                            showNewChatFlow = false
-                            onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                        },
-                    )
-                }
+                NewChatFlowHost(
+                    appState = appState,
+                    onOpenConversation = { item, justCreated ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                    },
+                    onClose = dismiss,
+                    onGroupCreateSubmitted = onGroupCreateSubmitted,
+                    onGroupCreateCompletedOpen = { item, requestToken ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                    },
+                )
             }
         }
     }
@@ -2543,13 +2543,14 @@ internal fun ChatsScreen(
                 visible = !searchOpen && !selectionMode,
                 motionEnabled = rememberSystemAnimationsEnabled(),
             ) {
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    ChatsNewMessageFab(
-                        appState,
-                        openNewMessageFlow,
-                        onNewMessageOrigin = { newChatFlowOrigin = it },
-                    )
-                }
+                ChatsNewMessageFab(
+                    appState,
+                    openNewMessageFlow,
+                    onNewMessageOrigin = { pen ->
+                        newChatFlowLaunch = pen?.let { NewMessageFlowLaunch(it.origin, it) }
+                    },
+                    hidePen = { showNewChatFlow && newChatFlowLaunch?.pen?.drawsSource?.invoke() == true },
+                )
             }
         },
     ) { padding ->
@@ -2828,7 +2829,9 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
+                                EmptyChats(appState, onCreate = openNewMessageFlow) {
+                                    newChatFlowLaunch = NewMessageFlowLaunch(it)
+                                }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -3086,12 +3089,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
 
 private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"
-
-internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_KEY = "chat-list-search-groups-header"
-internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY = "chat-list-search-messages-header"
-internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_TAG = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY
-internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY
-
-// Debounce before global message results read their first MDK page (#1944). Sits inside the existing
-// 250–300 ms chat-list input debounce band so a fast typist doesn't trigger a query per keystroke.
-internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L

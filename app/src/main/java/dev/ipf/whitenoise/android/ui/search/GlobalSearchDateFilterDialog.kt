@@ -5,13 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,14 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchCustomRangeValidation
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
-import dev.ipf.whitenoise.android.search.civilDateFromPickerUtcMillis
-import dev.ipf.whitenoise.android.search.pickerUtcMillisForCivilDate
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
-import dev.ipf.whitenoise.android.ui.common.AnimatedDatePickerDialog
+import dev.ipf.whitenoise.android.ui.common.CivilDatePickerDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -274,7 +267,6 @@ private fun GlobalSearchDatePresetRow(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
 private fun GlobalSearchCivilDatePickerDialog(
@@ -284,41 +276,14 @@ private fun GlobalSearchCivilDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
 ) {
-    val dateState =
-        rememberDatePickerState(
-            initialSelectedDateMillis = pickerUtcMillisForCivilDate(initialDate),
-            selectableDates =
-                object : SelectableDates {
-                    override fun isSelectableDate(utcTimeMillis: Long): Boolean = true
-                },
-        )
-    AnimatedDatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                enabled = dateState.selectedDateMillis != null && acceptsInput,
-                modifier = Modifier.testTag(confirmTag),
-                onClick = {
-                    dateState.selectedDateMillis?.let { selectedDateMillis ->
-                        val selected = civilDateFromPickerUtcMillis(selectedDateMillis)
-                        close { onConfirm(selected) }
-                    }
-                },
-            ) { Text(stringResource(R.string.next)) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    ) {
-        Column {
-            Text(
-                text = stringResource(titleRes),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-            )
-            DatePicker(state = dateState)
-        }
-    }
+    CivilDatePickerDialog(
+        title = stringResource(titleRes),
+        initialDate = initialDate,
+        confirmLabel = stringResource(R.string.next),
+        confirmTag = confirmTag,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
 }
 
 private data class GlobalSearchDatePresetOption(

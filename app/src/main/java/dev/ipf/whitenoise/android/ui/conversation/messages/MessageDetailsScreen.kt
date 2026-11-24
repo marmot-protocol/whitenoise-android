@@ -490,6 +490,7 @@ private fun MessageDeliverySection(
                             size = DeliveryAvatarSize,
                             pictureUrl = senderAvatarUrl,
                             pictureDomain = AvatarImageLoader.publicProfiles(),
+                            followedAccount = senderSeed,
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -506,6 +507,7 @@ private fun MessageDeliverySection(
                                 size = DeliveryAvatarSize,
                                 pictureUrl = recipient.avatarUrl,
                                 pictureDomain = AvatarImageLoader.publicProfiles(),
+                                followedAccount = recipient.seed,
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

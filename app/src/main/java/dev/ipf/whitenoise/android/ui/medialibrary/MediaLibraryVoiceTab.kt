@@ -294,5 +294,6 @@ private fun SenderAvatar(
         size = 36.dp,
         pictureUrl = appState.contactAvatarSource(sender),
         pictureDomain = AvatarImageLoader.publicProfiles(),
+        followedAccount = sender,
     )
 }

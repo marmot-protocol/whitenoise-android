@@ -22,20 +22,22 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.ceil
 
-/** Compatibility facade for existing rectangle-only launchers. */
+/** Retains the rectangle reported by a launcher without an outlined row. */
 @Composable
 internal fun rememberSettingsRouteClick(onClick: () -> Unit) = rememberSettingsRouteClick(null, null, onClick)
 
 /** Capture the actual activating row, including its scrolled position, before navigation changes it. */
 @Composable
 // Reject missing route owners before installing the attached-origin callback.
-@Suppress("ReturnCount")
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
 internal fun rememberSettingsRouteClick(
     context: SettingsRowContext?,
     routeKey: Any?,
@@ -58,8 +60,8 @@ internal fun rememberSettingsRouteClick(
     return Modifier
         .onGloballyPositioned {
             val rect = it.fullSettingsMorphBounds(view)
-            val visible = it.settingsMorphBounds(view)
-            bounds[0] = rect.takeUnless { visible.isEmpty } ?: Rect.Zero
+            val visible = it.motionBoundsOnScreen(view)
+            bounds[0] = rect.takeUnless { visible.isEmpty }?.takeUnless { it.isEmpty } ?: Rect.Zero
             if (context != null && !rect.isEmpty) {
                 val destination = checkNotNull(routeKey)
                 val shape = context.shapes.shape
@@ -98,15 +100,6 @@ internal fun rememberSettingsRouteClick(
     }
 }
 
-/** Controls inside popup windows and their destination host share screen coordinates. */
-internal fun LayoutCoordinates.settingsMorphBounds(view: View): Rect {
-    val screen = IntArray(2)
-    val window = IntArray(2)
-    view.getLocationOnScreen(screen)
-    view.getLocationInWindow(window)
-    return boundsInWindow().translate(Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat()))
-}
-
 /** A caller declares the actual native group; absent outlines never acquire synthetic chrome. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,6 +112,7 @@ internal fun rememberSettingsNativeSurface(
     horizontalInset: Dp = 0.dp,
     registrationToken: Any? = null,
     strokeColor: Color = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
+    onMeasured: ((SurfaceMorphCard?) -> Unit)? = null,
 ): Pair<Modifier, () -> Boolean> {
     val morph = LocalSettingsCardMorph.current
     val page = morph?.page
@@ -130,12 +124,17 @@ internal fun rememberSettingsNativeSurface(
     val viewport = LocalSettingsNativeViewport.current
     val identity = LocalSettingsSearchItemKey.current to surface
     val width = with(density) { ceil(1.dp.toPx()) }
-    DisposableEffect(page, token) { onDispose { page?.removeDestination(token) } }
-    if (page == null) return Modifier to { false }
+    DisposableEffect(page, token, onMeasured) {
+        onDispose {
+            page?.removeDestination(token)
+            onMeasured?.invoke(null)
+        }
+    }
+    if (page == null && onMeasured == null) return Modifier to { false }
     val modifier =
         Modifier.onGloballyPositioned { coordinates ->
             // boundsInWindow clips tall content; layout size and local origin retain the true perimeter.
-            val clipped = coordinates.settingsMorphBounds(view)
+            val clipped = coordinates.motionBoundsOnScreen(view)
             val local = coordinates.localToWindow(Offset.Zero)
             val windowBounds = coordinates.boundsInWindow()
             val offset = clipped.topLeft - windowBounds.topLeft
@@ -152,8 +151,7 @@ internal fun rememberSettingsNativeSurface(
                     is Outline.Rounded -> native.roundRect
                     else -> RoundRect(Rect(Offset.Zero, rect.size))
                 }
-            page.reportDestination(
-                token,
+            val endpoint =
                 SettingsRouteEndpoint(
                     identity,
                     destination ?: token,
@@ -167,8 +165,9 @@ internal fun rememberSettingsNativeSurface(
                     strokeWidth = width,
                     viewportToken = viewport,
                     rtl = direction == androidx.compose.ui.unit.LayoutDirection.Rtl,
-                ),
-            )
+                )
+            page?.reportDestination(token, endpoint)
+            onMeasured?.invoke(endpoint.bubbleCard())
         }
     return modifier to { false }
 }
@@ -215,7 +214,7 @@ internal fun rememberSettingsNativeRow(
 
 /** Layout origin and size retain a partially clipped row's actual bottom and seam. */
 private fun LayoutCoordinates.fullSettingsMorphBounds(view: View): Rect {
-    val clipped = settingsMorphBounds(view)
+    val clipped = motionBoundsOnScreen(view)
     val offset = clipped.topLeft - boundsInWindow().topLeft
     return Rect(
         localToWindow(Offset.Zero) + offset,
