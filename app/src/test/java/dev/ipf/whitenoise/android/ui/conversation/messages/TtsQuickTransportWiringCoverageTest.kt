@@ -95,7 +95,7 @@ class TtsQuickTransportWiringCoverageTest {
         )
         assertTrue(
             "starting must go through the same path the message action uses",
-            "TtsQuickTransportAction.StartReadingMessage -> startSpeakAloud()" in body,
+            "TtsQuickTransportAction.StartReadingMessage -> readAloud.startSpeakAloud()" in body,
         )
         assertTrue(
             "an ignored gesture must do nothing at all",
