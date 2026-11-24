@@ -149,6 +149,30 @@
         "test_ids": [
           "SET-072"
         ]
+      },
+      {
+        "surface": "R.string.done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-072"
+        ]
+      },
+      {
+        "surface": "R.string.hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.hide",
+        "test_ids": [
+          "SET-072"
+        ]
+      },
+      {
+        "surface": "R.string.show",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.show",
+        "test_ids": [
+          "SET-072"
+        ]
       }
     ]
   },

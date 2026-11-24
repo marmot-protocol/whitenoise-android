@@ -846,6 +846,14 @@
         "test_ids": [
           "SET-071"
         ]
+      },
+      {
+        "surface": "R.string.data_usage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.data_usage_title",
+        "test_ids": [
+          "SET-072"
+        ]
       }
     ]
   }
