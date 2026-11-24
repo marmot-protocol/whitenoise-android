@@ -231,10 +231,8 @@ class MessageActionLabelWidthCoverageTest {
                 }
             }
         }
-        composeRule.waitForIdle()
         // Measure the full action set, whose longest labels wait behind More actions (#4077).
-        composeRule.onNodeWithText("More actions", substring = false).performScrollTo().performClick()
-        composeRule.waitForIdle()
+        composeRule.messageAction("Select text")
     }
 
     private companion object {

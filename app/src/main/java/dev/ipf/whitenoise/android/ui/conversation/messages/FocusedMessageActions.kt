@@ -242,11 +242,11 @@ internal fun FocusedMessageActions(
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
     // Back from the full action set returns to the first level instead of closing the menu (#4077).
-    var showingAllActions by rememberSaveable { mutableStateOf(false) }
+    val showingAllActions = rememberSaveable { mutableStateOf(false) }
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
-        consumeBack = { showingAllActions.also { showingAllActions = false } },
+        consumeBack = showingAllActions::collapseFullActionSet,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
         animateWindowContent = false,
         scrimModifier =
@@ -425,7 +425,7 @@ internal fun FocusedMessageActions(
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(terminalActions, showingAllActions) { showingAllActions = it }
+                    FocusedActionMenu(terminalActions, showingAllActions.value) { showingAllActions.value = it }
                 }
             }
         }

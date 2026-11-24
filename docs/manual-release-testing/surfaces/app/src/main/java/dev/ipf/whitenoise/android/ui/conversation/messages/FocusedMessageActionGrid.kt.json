@@ -55,6 +55,40 @@
           "MSG-050"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:more_message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "R.string.more_message_actions",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:fewer_message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "R.string.fewer_message_actions",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:explanation_message_action_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "R.string.explanation_message_action_more",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:explanation_message_action_fewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "R.string.explanation_message_action_fewer",
+        "test_ids": [
+          "MSG-050"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

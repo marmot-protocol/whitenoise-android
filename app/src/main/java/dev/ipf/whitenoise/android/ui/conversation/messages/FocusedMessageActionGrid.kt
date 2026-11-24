@@ -22,6 +22,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,7 +88,8 @@ internal fun FocusedActionMenu(
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
         BoxWithConstraints {
-            val columnWidths = messageActionColumnWidths(cellWidths.take(visibleActions.size), maxWidth)
+            val panelWidth = maxWidth
+            val columnWidths = messageActionColumnWidths(cellWidths.take(visibleActions.size), panelWidth)
             Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
                 visibleActions.chunked(columnWidths.size).forEach { rowActions ->
                     Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
@@ -107,7 +109,7 @@ internal fun FocusedActionMenu(
                         minimumHeight = actionCellHeight,
                         modifier =
                             Modifier
-                                .width(minOf(maxOf(gridWidth, cellWidths.last()), maxWidth))
+                                .width(minOf(maxOf(gridWidth, cellWidths.last()), panelWidth))
                                 .testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
                     )
                 }
@@ -149,6 +151,15 @@ private fun focusedActionDisclosure(
 }
 
 internal const val FOCUSED_ACTION_DISCLOSURE_TEST_TAG = "focused-action-disclosure"
+
+/** Back from the full action set: returns to the first level and reports Back handled, or reports it unhandled. */
+internal fun MutableState<Boolean>.collapseFullActionSet(): Boolean =
+    if (value) {
+        value = false
+        true
+    } else {
+        false
+    }
 
 // The chevron points down to open the full set and up to return from it.
 private const val DISCLOSURE_OPEN_ROTATION = 180f
