@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -167,15 +168,37 @@ private suspend fun ConversationController.keepDraftFiles(
     retained: RetainedMediaUpload,
 ) {
     val directory = uploadSourcesDirectory(appState.appContext.cacheDir)
-    // A copy that cannot even start must not replace the upload failure the bubble reports.
-    val copies =
-        runCatching {
-            appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                copyDraftFiles(account, group.groupIdHex, retained.attachments, directory)
-            }
-        }.getOrNull() ?: return
-    retained.adoptDraftCopies(copies, appState::closeStagedUploadSourceOffMain)
+    retained.keepDraftCopies(appState::closeStagedUploadSourceOffMain) { copies ->
+        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+            copyDraftFiles(account, group.groupIdHex, retained.attachments, directory, copies)
+        }
+    }
 }
+
+/**
+ * Admits [retained]'s uploaded [references] under the commit lock its caller holds. When MDK refuses a send of stored
+ * draft files for a stale epoch, its Retry must upload the files again, so the send copies them out of the draft before
+ * the lock is released and another send of this chat can clear the draft.
+ */
+internal suspend fun ConversationController.admitRetainedMedia(
+    account: String,
+    references: List<MediaAttachmentReferenceFfi>,
+    retained: RetainedMediaUpload,
+    token: String,
+): SendSummaryFfi =
+    try {
+        appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
+            publishRetainedMedia(account, group.groupIdHex, references, retained, token)
+        }
+    } catch (
+        @Suppress("TooGenericExceptionCaught") failure: Throwable,
+    ) {
+        // The same refusal makes the Retry drop the references and upload again, see forgetUploadAfter.
+        if (retained.isDraftStored && !retained.ownsDraftCopies && isStaleMediaReferenceEpoch(failure)) {
+            keepDraftFiles(account, retained)
+        }
+        throw failure
+    }
 
 /**
  * Uploads the private copies a failed send of stored draft files owns, as a file upload under the same lock, cancel,

@@ -5,11 +5,9 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.whitenoise.android.ui.conversation.DRAFT_FILE_READ_CHUNK_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
-import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import dev.ipf.whitenoise.android.ui.conversation.media.prepareStagingDirectory
 import dev.ipf.whitenoise.android.ui.conversation.replaceWithDraftFileBody
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
@@ -18,35 +16,68 @@ import java.util.UUID
 private const val MAX_DRAFT_COPY_FOLLOWS = 8
 
 /**
- * Copies each stored draft file in [attachments] out of the selected draft into a private file under [directory], so a
- * send whose upload failed owns its files whatever the draft does next, a new attachment or an unrelated send that
- * clears it included. Returns the copies by draft id, or null, leaving none behind, when any file is no longer in the
- * draft or cannot be copied; the send then keeps uploading from the draft.
+ * Private copies of a failed send's stored draft files, by draft id. Each is registered before anything is written to
+ * it, so a copy cancelled at any point, even as its finished file returns from the IO pool, still has this one owner.
  */
-@Suppress("ReturnCount") // Each refusal ends the copy early, and the finally block deletes what was made.
+internal class DraftFileCopies {
+    private val copies = linkedMapOf<String, StagedUploadSource>()
+
+    /** Records [source] as the copy of draft file [id], before the copy writes it. */
+    @Synchronized
+    fun register(
+        id: String,
+        source: StagedUploadSource,
+    ) {
+        copies[id] = source
+    }
+
+    /** Hands every copy registered so far to the caller and keeps none. */
+    @Synchronized
+    fun take(): Map<String, StagedUploadSource> = LinkedHashMap(copies).also { copies.clear() }
+}
+
+/**
+ * Gives this send private copies of its stored draft files, made by [copy] into the holder it is passed, so a send
+ * whose upload failed owns its files whatever the draft does next, a new attachment or an unrelated send that clears it
+ * included. The send adopts them only when [copy] reports every one copied. Any it did not adopt, after a refusal, a
+ * failure or a cancellation, the return from [copy] included, goes to [closeStaged]; the send then keeps uploading from
+ * the draft.
+ */
+internal suspend fun RetainedMediaUpload.keepDraftCopies(
+    closeStaged: (StagedUploadSource) -> Unit,
+    copy: suspend (DraftFileCopies) -> Boolean,
+) {
+    val copies = DraftFileCopies()
+    try {
+        // A copy that cannot even start must not replace the upload failure the bubble reports.
+        if (runCatchingCancellable { copy(copies) }.getOrDefault(false)) adoptDraftCopies(copies.take(), closeStaged)
+    } finally {
+        copies.take().values.forEach(closeStaged)
+    }
+}
+
+/**
+ * Copies each stored draft file in [attachments] out of the selected draft into a private file under [directory],
+ * registering each in [into] before writing it. Reports whether every file was copied: false when any file is no
+ * longer in the draft or cannot be copied, and the files already registered are the caller's to delete.
+ */
+@Suppress("ReturnCount") // Each refusal ends the copy early, and the caller deletes what was made.
 internal suspend fun MarmotInterface.copyDraftFiles(
     account: String,
     group: String,
     attachments: List<PendingAttachment>,
     directory: File,
-): Map<String, StagedUploadSource>? {
-    val copies = linkedMapOf<String, StagedUploadSource>()
-    var complete = false
-    try {
-        val ready =
-            withContext(Dispatchers.IO) { runCatching { prepareStagingDirectory(directory) }.getOrDefault(false) }
-        if (!ready) return null
-        for (stored in attachments.mapNotNull { it.draftFile }) {
-            val target = File(directory, "draft-copy-${UUID.randomUUID()}")
-            val copy = DraftFileCopy(this, account, group, stored)
-            if (!withContext(Dispatchers.IO) { copy.into(target) }) return null
-            copies[stored.attachmentId] = StagedUploadSource(target, stored.byteCount)
-        }
-        complete = true
-        return copies
-    } finally {
-        if (!complete) withContext(NonCancellable + Dispatchers.IO) { copies.values.forEach { it.closeQuietly() } }
+    into: DraftFileCopies,
+): Boolean {
+    val ready = withContext(Dispatchers.IO) { runCatching { prepareStagingDirectory(directory) }.getOrDefault(false) }
+    if (!ready) return false
+    for (stored in attachments.mapNotNull { it.draftFile }) {
+        val target = File(directory, "draft-copy-${UUID.randomUUID()}")
+        val copy = DraftFileCopy(this, account, group, stored)
+        into.register(stored.attachmentId, StagedUploadSource(target, stored.byteCount))
+        if (!withContext(Dispatchers.IO) { copy.into(target) }) return false
     }
+    return true
 }
 
 /** One stored draft file read out under whichever selected revision still holds it. */

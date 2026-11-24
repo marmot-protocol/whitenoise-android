@@ -246,15 +246,7 @@ internal suspend fun ConversationController.performMediaUpload(
                                 requireOptimisticSendNotCancelled(key)
                                 val accepted =
                                     mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
-                                        ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                            publishRetainedMedia(
-                                                account,
-                                                group.groupIdHex,
-                                                references,
-                                                retained,
-                                                tempId,
-                                            )
-                                        }
+                                        ?: admitRetainedMedia(account, references, retained, tempId)
                                 recordOptimisticSendAcceptance(key, accepted)
                                 accepted
                             }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }

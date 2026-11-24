@@ -41,7 +41,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/state/ChatsController.kt" to 2152,
         "dev/ipf/whitenoise/android/state/ChatsControllerOptimisticPreview.kt" to 643,
         "dev/ipf/whitenoise/android/state/ConversationController.kt" to 3473,
-        "dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt" to 670,
+        "dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt" to 662,
         "dev/ipf/whitenoise/android/state/ConversationControllerProjection.kt" to 627,
         "dev/ipf/whitenoise/android/state/DraftStore.kt" to 752,
         "dev/ipf/whitenoise/android/state/MessageForwarding.kt" to 903,
