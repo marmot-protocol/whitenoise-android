@@ -40,7 +40,10 @@ class SectionHeaderTest {
             }
         }
 
-        composeRule.onNodeWithTag("action").assertIsDisplayed().assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Heading))
+        composeRule
+            .onNodeWithTag("action")
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Heading))
         composeRule.onNodeWithText("Recent").assertIsDisplayed().assert(isHeading)
     }
 }

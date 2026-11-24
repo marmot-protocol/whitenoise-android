@@ -176,13 +176,9 @@ internal fun MessageDetailsScreen(
                 ) {
                     MessageDetailsContentCard(contentText, attachmentLabels)
                     MessageFactsSection(record, status, mine, senderNpub, onCopy)
-                    if (reactions.isNotEmpty()) {
-                        MessageCardGroup(stringResource(R.string.reactions)) { MessageReactionsSection(reactions) }
-                    }
+                    if (reactions.isNotEmpty()) MessageReactionsSection(reactions)
                     if (reports != null) {
-                        MessageCardGroup(stringResource(R.string.message_reports_section)) {
-                            MessageReportsSection(reports, reporterName, canDismissReports, onDismissReport)
-                        }
+                        MessageReportsSection(reports, reporterName, canDismissReports, onDismissReport)
                     }
                     MessageDeliverySection(mine, status, senderDisplayName, record.sender, senderAvatarUrl, recipients)
                 }
@@ -358,6 +354,11 @@ private fun FactRow(
 /** Reactions with their counts. */
 @Composable
 private fun MessageReactionsSection(reactions: List<ReactionTally>) {
+    MessageCardGroup(stringResource(R.string.reactions)) { MessageReactionsCard(reactions) }
+}
+
+@Composable
+private fun MessageReactionsCard(reactions: List<ReactionTally>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         border = amoledOutlineBorder(),
@@ -392,6 +393,18 @@ private fun MessageReactionsSection(reactions: List<ReactionTally>) {
  */
 @Composable
 private fun MessageReportsSection(
+    reports: List<ContentReportFfi>,
+    reporterName: (String) -> String,
+    canDismiss: Boolean,
+    onDismiss: (ContentReportFfi) -> Unit,
+) {
+    MessageCardGroup(stringResource(R.string.message_reports_section)) {
+        MessageReportsCard(reports, reporterName, canDismiss, onDismiss)
+    }
+}
+
+@Composable
+private fun MessageReportsCard(
     reports: List<ContentReportFfi>,
     reporterName: (String) -> String,
     canDismiss: Boolean,
