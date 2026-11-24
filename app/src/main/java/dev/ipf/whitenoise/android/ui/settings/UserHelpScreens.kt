@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -156,8 +157,11 @@ private fun LearnWalkthroughFooter(
                 Box(Modifier.size(width = width, height = 6.dp).background(color, CircleShape))
             }
         }
-        WhiteNoiseButton(onContinue, Modifier.fillMaxWidth()) {
-            Text(stringResource(if (currentTopic == LearnTopic.entries.last()) R.string.done else R.string.next))
+        key(currentTopic) {
+            WhiteNoiseButton(onContinue, Modifier.fillMaxWidth()) {
+                val label = if (currentTopic == LearnTopic.entries.last()) R.string.done else R.string.next
+                Text(stringResource(label))
+            }
         }
     }
 }
