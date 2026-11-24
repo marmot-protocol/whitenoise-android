@@ -44,14 +44,15 @@ internal fun IdentityHeader(
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
+        val width = maxWidth
         val margin = WhiteNoiseSpacing.CompactScreenMargin - outerInset
-        val avatarSize = identityAvatarSize(maxWidth + outerInset * 2)
+        val avatarSize = identityAvatarSize(width + outerInset * 2)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = margin),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
-            top(maxWidth - margin * 2)
+            top(width - margin * 2)
             avatar(avatarSize)
             content()
         }

@@ -132,11 +132,11 @@ private fun groupedPublicKeyText(
 
 /**
  * The one public-key presentation of an identity screen: profile, direct-chat details, Share & Connect and the QR
- * sheet. The key starts short, and a tap copies the complete key and expands it in place into monospace groups of five for
- * comparison (#3321, #3565). It stays expanded while the screen shows this key; later taps copy again. The copy glyph
- * turns into a check while [copied]. Text and glyph are one button, so the key has a single accessible Copy public
- * key action, and its spoken value is always the canonical contiguous [npub]. A reference that is not a complete
- * npub is shown whole as inert text with no copy action, so an unresolved value is never handed out.
+ * sheet. The key starts short, and a tap copies the complete key and expands it in place into monospace groups of five
+ * for comparison (#3321, #3565). It stays expanded while the screen shows this key; later taps copy again. The copy
+ * glyph turns into a check while [copied]. Text and glyph are one button, so the key has a single accessible Copy
+ * public key action, and its spoken value is always the canonical contiguous [npub]. A reference that is not a
+ * complete npub is shown whole as inert text with no copy action, so an unresolved value is never handed out.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable

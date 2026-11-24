@@ -237,7 +237,7 @@ private fun SettingsToggleRow(
                     settingsRow = Unit
                 },
         enabled = editable,
-        leadingContent = settingsLeadingSlot(leading, editable, destructive),
+        leadingContent = settingsLeadingSlot(leading, editable),
         supportingContent = subtitle?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = { SettingsRowTrailing(busy) { control(editable) } },
         colors = settingsRowColors(context),
