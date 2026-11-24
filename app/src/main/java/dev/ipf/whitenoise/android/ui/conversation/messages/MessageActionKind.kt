@@ -59,7 +59,7 @@ internal fun messageActionKinds(
     canInfo: Boolean = true,
     canReport: Boolean = false,
 ): List<MessageActionKind> =
-    // Keep on screen leads so it remains in the first row of a two-column menu.
+    // Keep on screen leads the actions behind More actions, so it opens the full set's first new row.
     listOf(
         MessageActionKind.KeepOnScreen to canKeepOnScreen,
         MessageActionKind.ShowLess to canShowLess,
@@ -81,12 +81,11 @@ internal fun messageActionKinds(
 
 /**
  * The long-press menu's first level, in display order (#4077). Reactions sit above it; every other
- * available action, Delete included, waits behind More actions. Keep on screen and Show less stay
- * here because they act on how a long message is shown, which is why it was pressed.
+ * available action, Keep on screen and Delete included, waits behind More actions. Show less stays here
+ * because collapsing an expanded long message is often why it was pressed.
  */
 private val firstLevelMessageActionKinds =
     listOf(
-        MessageActionKind.KeepOnScreen,
         MessageActionKind.ShowLess,
         MessageActionKind.Reply,
         MessageActionKind.Edit,

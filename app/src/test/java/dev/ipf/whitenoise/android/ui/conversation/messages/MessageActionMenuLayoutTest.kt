@@ -67,39 +67,45 @@ class MessageActionMenuLayoutTest {
 
     /**
      * The maximum menu's first level pairs the common actions into two label-sized columns, with
-     * More actions under them (#4077). The full set keeps that first level in place and ends with Delete.
+     * More actions under them (#4077). The grid is laid out for the full set, so opening it keeps every
+     * first-level action in place and the panel's width, and only adds the rest beneath, ending with Delete.
      */
     @Test
     fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
         renderMenu(fontScale = 1f)
 
-        val keepOnScreen = bounds("Keep on screen")
         val reply = bounds("Reply")
         val edit = bounds("Edit")
         val copy = bounds("Copy")
         val save = bounds("Save")
         val more = bounds("More actions")
-        listOf("Select text", "Share", "Read Aloud", "Select", "Info", "Delete").forEach {
+        listOf("Keep on screen", "Select text", "Share", "Read Aloud", "Select", "Info", "Delete").forEach {
             composeRule.onNodeWithText(it, substring = false).assertDoesNotExist()
         }
 
-        assertEquals("the first two actions share a row", keepOnScreen.top, reply.top, 0.5f)
-        assertTrue("and sit in different columns", reply.left > keepOnScreen.left)
-        assertEquals("a column keeps one width", keepOnScreen.width, edit.width, 0.5f)
-        assertEquals("the left column stays aligned", keepOnScreen.left, edit.left, 0.5f)
-        assertEquals("and the row below pairs in order", edit.top, copy.top, 0.5f)
+        assertEquals("the first two actions share a row", reply.top, edit.top, 0.5f)
+        assertTrue("and sit in different columns", edit.left > reply.left)
+        assertEquals("a column keeps one width", reply.width, copy.width, 0.5f)
+        assertEquals("the left column stays aligned", reply.left, save.left, 0.5f)
         assertTrue("More actions follows the first level", more.top > save.top)
-        assertEquals("across the grid's width", keepOnScreen.left, more.left, 0.5f)
-        assertEquals(save.right, more.right, 0.5f)
+        assertEquals("across the grid's width", reply.left, more.left, 0.5f)
+        assertEquals(edit.right, more.right, 0.5f)
 
         showAllActions()
-        assertEquals("the first level keeps its column", keepOnScreen.left, bounds("Keep on screen").left, 0.5f)
-        assertEquals("and its row order", bounds("Keep on screen").top, bounds("Reply").top, 0.5f)
+        val offset = bounds("Reply").top - reply.top
+        listOf("Reply" to reply, "Edit" to edit, "Copy" to copy, "Save" to save).forEach { (label, before) ->
+            val after = bounds(label)
+            assertEquals("$label keeps its column", before.left, after.left, 0.5f)
+            assertEquals("$label keeps its row", before.top + offset, after.top, 0.5f)
+        }
+        assertEquals("Keep on screen takes the slot beside Save", save.top + offset, bounds("Keep on screen").top, 0.5f)
         val info = bounds("Info")
         val delete = bounds("Delete")
         assertEquals("delete ends the grid beside the last action", info.top, delete.top, 0.5f)
         assertTrue("with delete on the right", delete.left > info.left)
-        assertTrue("Fewer actions closes the grid", bounds("Fewer actions").top > delete.top)
+        val fewer = bounds("Fewer actions")
+        assertTrue("Fewer actions closes the grid", fewer.top > delete.top)
+        assertEquals("the panel keeps its width", more.width, fewer.width, 0.5f)
     }
 
     /** A tap on the stack's empty padding dismisses the actions like the scrim does. */
@@ -149,7 +155,7 @@ class MessageActionMenuLayoutTest {
         renderMenu(fontScale = 2f, literalCode = true)
         showAllActions()
 
-        assertTrue(bounds("Reply").top > bounds("Keep on screen").top)
+        assertTrue(bounds("Keep on screen").top > bounds("Reply").top)
         assertEquals(bounds("Reply").left, bounds("Keep on screen").left, 0.5f)
         // At this font the column scrolls, so a row further down the list is composed but
         // unmeasured until it is scrolled to. Reachability is the claim worth pinning.

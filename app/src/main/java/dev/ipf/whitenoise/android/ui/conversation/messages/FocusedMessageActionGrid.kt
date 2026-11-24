@@ -16,21 +16,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -39,14 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private val FocusedActionCellHorizontalPadding = 12.dp
-private val FocusedActionIconSize = 24.dp
+internal val FocusedActionIconSize = 24.dp
 private val FocusedActionIconGap = 8.dp
 private val FocusedActionLabelSlack = 2.dp
 private val FocusedActionCellChrome =
@@ -63,8 +56,10 @@ private val FocusedActionCellVerticalPadding = 8.dp
  * width the stack offers, the actions become one column up to that full width before any label wraps.
  *
  * Actions that are not [FocusedMessageAction.firstLevel] wait behind a More actions row under the grid
- * until [showingAll]; [onShowingAllChange] toggles it. The row stays the menu's last child in both states,
- * so a screen reader keeps its focus on it while the grid above changes (#4077).
+ * until [showingAll]; [onShowingAllChange] toggles it (#4077). The grid is laid out for the full set in
+ * both states, so opening it only grows the panel downward: hidden cells fade into their slots, hidden rows
+ * unfold beneath the first level and the row below them glides down with the panel's edge. The row stays
+ * the menu's last child, so a screen reader keeps its focus on it while the grid above changes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,15 +68,12 @@ internal fun FocusedActionMenu(
     showingAll: Boolean = true,
     onShowingAllChange: (Boolean) -> Unit = {},
 ) {
-    val disclosure =
-        if (hasMoreMessageActions(actions, FocusedMessageAction::firstLevel)) {
-            focusedActionDisclosure(showingAll) { onShowingAllChange(!showingAll) }
-        } else {
-            null
-        }
-    val visibleActions = visibleMessageActions(actions, FocusedMessageAction::firstLevel, showingAll)
-    val cellWidths = rememberOneLineActionCellWidths(visibleActions + listOfNotNull(disclosure))
-    val actionCellHeight = rememberActionCellHeight(visibleActions)
+    val hasMore = hasMoreMessageActions(actions, FocusedMessageAction::firstLevel)
+    val laidOut = if (hasMore) actions.sortedBy { !it.firstLevel } else actions
+    val disclosure = if (hasMore) focusedActionDisclosure(showingAll) { onShowingAllChange(!showingAll) } else null
+    val cellWidths = rememberOneLineActionCellWidths(laidOut + focusedActionDisclosureLabels(disclosure))
+    val actionCellHeight = rememberActionCellHeight(laidOut)
+    val reveal = rememberFocusedActionReveal()
     DropdownMenuGroup(
         shapes = MenuDefaults.groupShapes(),
         border = amoledOutlineBorder(),
@@ -89,18 +81,25 @@ internal fun FocusedActionMenu(
     ) {
         BoxWithConstraints {
             val panelWidth = maxWidth
-            val columnWidths = messageActionColumnWidths(cellWidths.take(visibleActions.size), panelWidth)
+            val columnWidths = messageActionColumnWidths(cellWidths.take(laidOut.size), panelWidth)
             Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                visibleActions.chunked(columnWidths.size).forEach { rowActions ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
-                        rowActions.forEachIndexed { column, action ->
-                            FocusedActionCell(
-                                action = action,
-                                minimumHeight = actionCellHeight,
-                                modifier = Modifier.width(columnWidths[column]),
-                            )
+                laidOut.chunked(columnWidths.size).forEach { rowActions ->
+                    val row: @Composable () -> Unit = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
+                            rowActions.forEachIndexed { column, action ->
+                                val cell: @Composable () -> Unit = {
+                                    FocusedActionCell(
+                                        action = action,
+                                        minimumHeight = actionCellHeight,
+                                        modifier = Modifier.width(columnWidths[column]),
+                                    )
+                                }
+                                if (hasMore && !action.firstLevel) reveal.Cell(showingAll, cell) else cell()
+                            }
                         }
                     }
+                    val hiddenRow = hasMore && rowActions.none(FocusedMessageAction::firstLevel)
+                    if (hiddenRow) reveal.Row(showingAll, row) else row()
                 }
                 if (disclosure != null) {
                     val gridWidth = columnWidths.reduce { total, width -> total + messageActionColumnGap + width }
@@ -109,7 +108,7 @@ internal fun FocusedActionMenu(
                         minimumHeight = actionCellHeight,
                         modifier =
                             Modifier
-                                .width(minOf(maxOf(gridWidth, cellWidths.last()), panelWidth))
+                                .width(minOf(maxOf(gridWidth, cellWidths.takeLast(2).max()), panelWidth))
                                 .testTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG),
                     )
                 }
@@ -117,52 +116,6 @@ internal fun FocusedActionMenu(
         }
     }
 }
-
-/** The row that shows every action, or returns to the first level once they are shown. */
-@Composable
-private fun focusedActionDisclosure(
-    showingAll: Boolean,
-    onToggle: () -> Unit,
-): FocusedMessageAction {
-    val label = stringResource(if (showingAll) R.string.fewer_message_actions else R.string.more_message_actions)
-    val explanation =
-        stringResource(
-            if (showingAll) R.string.explanation_message_action_fewer else R.string.explanation_message_action_more,
-        )
-    return FocusedMessageAction(
-        label = label,
-        supportingLabel = null,
-        enabled = true,
-        destructive = false,
-        icon = {
-            Icon(
-                painter = painterResource(R.drawable.ic_expand_more),
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .size(FocusedActionIconSize)
-                        .rotate(if (showingAll) DISCLOSURE_OPEN_ROTATION else 0f),
-            )
-        },
-        onClick = onToggle,
-        explanation = Explanation(label, explanation),
-        dismissBeforeActivation = false,
-    )
-}
-
-internal const val FOCUSED_ACTION_DISCLOSURE_TEST_TAG = "focused-action-disclosure"
-
-/** Back from the full action set: returns to the first level and reports Back handled, or reports it unhandled. */
-internal fun MutableState<Boolean>.collapseFullActionSet(): Boolean =
-    if (value) {
-        value = false
-        true
-    } else {
-        false
-    }
-
-// The chevron points down to open the full set and up to return from it.
-private const val DISCLOSURE_OPEN_ROTATION = 180f
 
 /**
  * Each action's cell width with its whole label on one line, in the label's real typography.

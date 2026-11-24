@@ -51,7 +51,6 @@ class MessageActionKindsTest {
             )
         assertEquals(
             listOf(
-                MessageActionKind.KeepOnScreen,
                 MessageActionKind.ShowLess,
                 MessageActionKind.Reply,
                 MessageActionKind.Edit,
@@ -62,6 +61,7 @@ class MessageActionKindsTest {
         )
         assertEquals(
             listOf(
+                MessageActionKind.KeepOnScreen,
                 MessageActionKind.SelectText,
                 MessageActionKind.Translate,
                 MessageActionKind.Speak,
@@ -70,6 +70,7 @@ class MessageActionKindsTest {
             ),
             sentLongText.filterNot(::isFirstLevelMessageAction),
         )
+        assertFalse("Keep on screen waits too", isFirstLevelMessageAction(MessageActionKind.KeepOnScreen))
         assertFalse("Delete waits behind More actions", isFirstLevelMessageAction(null))
     }
 

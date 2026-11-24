@@ -105,8 +105,18 @@ class FocusedMessageActionDisclosureTest {
     @Config(qualifiers = "en-rUS-w360dp-h480dp-mdpi")
     fun theDisclosureStaysReachableAtLargeTextInAShortWindow() {
         render(
-            first = listOf("Keep on screen", "Reply", "Edit", "Copy", "Forward", "Save"),
-            more = listOf("Select text", "Share", "Translate", "Read aloud", "Select", "Info", "Delete"),
+            first = listOf("Reply", "Edit", "Copy", "Forward", "Save"),
+            more =
+                listOf(
+                    "Keep on screen",
+                    "Select text",
+                    "Share",
+                    "Translate",
+                    "Read aloud",
+                    "Select",
+                    "Info",
+                    "Delete",
+                ),
             fontScale = 2f,
         )
         rule
