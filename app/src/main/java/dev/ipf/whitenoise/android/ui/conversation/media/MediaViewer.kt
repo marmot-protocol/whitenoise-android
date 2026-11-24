@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +78,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
+import dev.ipf.whitenoise.android.ui.common.StateContent
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
@@ -88,6 +88,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -999,14 +1000,11 @@ internal fun MediaViewerFrame(
                 Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Column(
-                    Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.group_preparing_photo))
-                }
+                StateContent(
+                    modifier = Modifier.padding(WhiteNoiseSpacing.Section),
+                    progress = true,
+                    progressLabel = stringResource(R.string.group_preparing_photo),
+                )
             }
         }
         SnackbarHost(

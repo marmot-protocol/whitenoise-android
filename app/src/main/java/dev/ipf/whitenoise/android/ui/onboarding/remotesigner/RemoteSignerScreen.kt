@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +32,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.StateContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
@@ -212,16 +212,14 @@ private fun RemoteSignerProgress(
     title: String,
     detail: String?,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .testTag("remote_signer.progress")
-            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CircularProgressIndicator()
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        detail?.let { RemoteSignerReviewSupporting(it) }
-    }
+    StateContent(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag("remote_signer.progress")
+                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        title = title,
+        message = detail,
+        progress = true,
+    )
 }
