@@ -39,8 +39,9 @@ class ComposerNoticesScreenshotTest {
 
     /** Large text in RTL keeps every notice readable. */
     @Test
-    fun composerNoticesLargeTextRtl() =
+    fun composerNoticesLargeTextRtl() {
         capture("composer_notices_large_rtl", darkTheme = false, fontScale = 2f, rtl = true)
+    }
 
     private fun capture(
         name: String,
