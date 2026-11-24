@@ -395,7 +395,7 @@ internal fun ForwardMessagePickerContent(
                                         IconButton(onClick = closeSearch) {
                                             Icon(
                                                 painterResource(R.drawable.ic_close),
-                                                stringResource(R.string.close),
+                                                stringResource(R.string.conversation_search_close),
                                             )
                                         }
                                     },

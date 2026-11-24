@@ -8,11 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
 import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import kotlinx.coroutines.launch
@@ -182,7 +179,7 @@ private fun NostrEventReaderHeader(
         onClose = onDismiss,
         modifier = Modifier.nativePageHeader(),
         // The parent pads the system bars; this adds only a side or top cutout it leaves uncovered.
-        windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        windowInsets = AttachmentViewerChromeDefaults.topInsets(),
         actions = {
             if (onCopyReference != null && onOpenExternal != null) {
                 EventCardActions(

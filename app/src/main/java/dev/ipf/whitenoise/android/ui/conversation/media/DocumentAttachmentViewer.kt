@@ -267,7 +267,7 @@ internal fun DocumentViewerFrame(
 
 /** The rendered HTML page's colours from the theme, so the page matches the viewer frame around it. */
 @Composable
-private fun documentPalette(): LocalHtmlPalette {
+internal fun documentPalette(): LocalHtmlPalette {
     val colors = MaterialTheme.colorScheme
     return LocalHtmlPalette(
         background = colors.background.toArgb(),

@@ -92,9 +92,9 @@
         ]
       },
       {
-        "surface": "Forward picker close: R.string.close",
+        "surface": "Forward search close: R.string.conversation_search_close",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.close",
+        "anchor": "R.string.conversation_search_close",
         "test_ids": [
           "MSG-010",
           "PRO-008"

@@ -43,7 +43,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -93,6 +92,7 @@ import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerTitle
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -320,10 +320,7 @@ internal fun PhotoEditorScreen(
     }
 }
 
-/**
- * The editor's viewer chrome: Close, the title with history and quality beside it, Save, then the existing More
- * menu. The existing holder owns save acceptance.
- */
+/** The editor's viewer chrome: Close, title with history and quality, Save, then the existing More menu. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongMethod", "LongParameterList")
@@ -345,7 +342,7 @@ private fun PhotoEditorTopBar(
         title = stringResource(R.string.photo_editor_title),
         onClose = onCancel,
         closeEnabled = !saving,
-        windowInsets = TopAppBarDefaults.windowInsets,
+        windowInsets = AttachmentViewerChromeDefaults.topInsets(),
         titleContent = {
             // The title slot receives only the width left after Close, More and Save, so the
             // history and quality actions sit here to give up the title's space before their own.

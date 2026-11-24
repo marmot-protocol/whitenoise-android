@@ -114,10 +114,11 @@ internal object LocalHtmlPolicy {
 
     /**
      * Recolours a sanitized document's own style header with [palette], leaving the sender's markup and styles
-     * untouched. The header is found by [HEADER_STYLE_START], whose quote a sender cannot reproduce before it: the
-     * only sender text serialized ahead of the header is the root element's attribute values, where jsoup escapes
-     * `"` as `&quot;`. Replacements stay inside that one style element, and the new values are formatted here from
-     * integers, so no sender text reaches the page and the parse does not change.
+     * untouched. The header is found by [HEADER_STYLE_START]. The only sender text serialized ahead of it is the root
+     * element's attribute values, and jsoup escapes `<` and `>` there (`&lt;`, `&gt;`), so a sender value cannot
+     * spell `><style>` even where the attribute's own opening quote supplies the `"`. A test pins that escaping.
+     * Replacements stay inside that one style element, and the new values are formatted here from integers, so no
+     * sender text reaches the page and the parse does not change.
      */
     fun themed(
         document: LocalHtmlDocument,

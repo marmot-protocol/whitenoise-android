@@ -249,7 +249,10 @@ class LocalHtmlPolicyTest {
     @Test
     fun themedIgnoresHeaderRulesSpelledInRootAttributes() =
         runBlocking {
-            val sender = "<html lang=\"body{background:#000;color:#eee;\" dir=\"a{color:#8ac7ff}\"><p>text</p></html>"
+            // The dir value forges the header's own opening, using the attribute's quote as its first character.
+            val sender =
+                "<html lang=\"body{background:#000;color:#eee;\" dir=\"><style>a{color:#8ac7ff}\">" +
+                    "<p>\"><style>body{background:#000;color:#eee;}</p></html>"
             val document = LocalHtmlPolicy.sanitize(sender)
             val palette = LocalHtmlPalette(background = 0xF7F7F7, text = 0x1A1A1A, link = 0x123456, border = 0xABCDEF)
             val themed = Jsoup.parse(LocalHtmlPolicy.themed(document, palette).html)
@@ -258,6 +261,7 @@ class LocalHtmlPolicyTest {
             val header = themed.head().selectFirst("style")!!.data()
             assertTrue("body{background:#f7f7f7;color:#1a1a1a;" in header)
             assertTrue("a{color:#123456}" in header)
+            assertEquals(Jsoup.parse(document.html).body().html(), themed.body().html())
         }
 
     @Test fun formattingTextAndBoundedTableSpansSurvive() =

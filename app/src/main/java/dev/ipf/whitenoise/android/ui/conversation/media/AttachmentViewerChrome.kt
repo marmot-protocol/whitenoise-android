@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
@@ -42,6 +45,13 @@ internal object AttachmentViewerChromeDefaults {
     /** Over edge-to-edge media the chrome is the themed background under a heavy scrim, so media shows through. */
     @Composable
     fun overlayColor(): Color = MaterialTheme.colorScheme.background.copy(alpha = ScrimAlpha.HEAVY)
+
+    /**
+     * Pads the chrome clear of the status bar and of top and side display cutouts. Insets an ancestor already
+     * padded are skipped, so inside a parent that pads the system bars this adds only an uncovered cutout.
+     */
+    @Composable
+    fun topInsets(): WindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
 }
 
 /**

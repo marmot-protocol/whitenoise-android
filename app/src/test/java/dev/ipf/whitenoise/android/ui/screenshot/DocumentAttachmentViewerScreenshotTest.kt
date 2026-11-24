@@ -37,10 +37,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.DocumentLoading
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentViewerError
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentViewerFrame
-import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlPalette
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlPolicy
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlView
 import dev.ipf.whitenoise.android.ui.conversation.media.PdfPageImage
+import dev.ipf.whitenoise.android.ui.conversation.media.documentPalette
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -123,20 +123,12 @@ class DocumentAttachmentViewerScreenshotTest {
                     LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
                 }
             }
-        val colors = MaterialTheme.colorScheme
-        val palette =
-            LocalHtmlPalette(
-                background = colors.background.toArgb(),
-                text = colors.onBackground.toArgb(),
-                link = colors.primary.toArgb(),
-                border = colors.outline.toArgb(),
-            )
         LocalHtmlView(
-            LocalHtmlPolicy.themed(document, palette),
+            LocalHtmlPolicy.themed(document, documentPalette()),
             Modifier.fillMaxSize(),
             {},
             {},
-            backgroundColor = colors.background.toArgb(),
+            backgroundColor = MaterialTheme.colorScheme.background.toArgb(),
         )
     }
 

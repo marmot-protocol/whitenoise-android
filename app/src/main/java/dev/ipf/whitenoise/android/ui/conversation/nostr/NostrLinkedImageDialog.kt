@@ -3,11 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -19,6 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
 
 /**
  * Created only by a user's media-link action, including its normal labelled-link confirmation. It leads with the
@@ -45,7 +42,7 @@ internal fun NostrLinkedImageDialog(
                     title = stringResource(R.string.attachment_type_image),
                     onClose = dismiss,
                     // The parent pads the system bars; this adds only a cutout it leaves uncovered.
-                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    windowInsets = AttachmentViewerChromeDefaults.topInsets(),
                 )
                 NostrEventImagePane(
                     url = url,
