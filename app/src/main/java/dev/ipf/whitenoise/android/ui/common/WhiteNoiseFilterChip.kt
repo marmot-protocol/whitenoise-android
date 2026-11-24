@@ -4,14 +4,13 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ChipColors
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SelectableChipColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -107,7 +106,7 @@ internal fun WhiteNoiseFilterChip(
 }
 
 @Composable
-private fun whiteNoiseFilterChipColors(): ChipColors =
+private fun whiteNoiseFilterChipColors(): SelectableChipColors =
     FilterChipDefaults.filterChipColors(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         labelColor = MaterialTheme.colorScheme.onSurface,

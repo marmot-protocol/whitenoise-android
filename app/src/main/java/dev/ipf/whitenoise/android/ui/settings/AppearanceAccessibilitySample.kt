@@ -27,7 +27,6 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-
 /** Synthetic sample; the screen retains simulation state without writing app or system preferences. */
 @Composable
 @Suppress("FunctionNaming")
