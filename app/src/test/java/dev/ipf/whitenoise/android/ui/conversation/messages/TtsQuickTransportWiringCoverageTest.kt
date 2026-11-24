@@ -119,6 +119,37 @@ class TtsQuickTransportWiringCoverageTest {
         assertFalse("the row must not subscribe to playback state", "collectAsState" in body)
     }
 
+    @Test
+    fun theReadAloudHolderReadsPlaybackOnlyWhenAnEntryPointRuns() {
+        // The bubble's read-aloud starts and seeks live in MessageBubbleReadAloud. Like the swipe resolver, they
+        // must read playback state when they run, never subscribe to it while the bubble composes.
+        val holder = source("ui/conversation/messages/MessageBubbleReadAloud.kt")
+        val stateRead = "ttsController.state"
+        val entryPoints =
+            listOf(
+                "startSpeakAloud",
+                "speakFromHere",
+                "seekSpeakAloudAt",
+                "seekActiveSentence",
+                "seekRenderedSentenceOutsideCurrentProjection",
+                "ownsActiveReadAloud",
+            ).map { holder.functionBody(it) }
+
+        assertFalse("the holder must not subscribe to playback state", "collectAsState" in holder)
+        assertFalse(
+            "remembering the holder must not read playback state",
+            stateRead in holder.functionBody("rememberMessageBubbleReadAloud"),
+        )
+        assertTrue(
+            "owning the active session must be resolved from the current value",
+            "appState.ttsController.state.value" in holder.functionBody("ownsActiveReadAloud"),
+        )
+        assertTrue(
+            "every playback state read must sit inside a start, seek or ownership method",
+            holder.split(stateRead).size - 1 == entryPoints.sumOf { it.split(stateRead).size - 1 },
+        )
+    }
+
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
