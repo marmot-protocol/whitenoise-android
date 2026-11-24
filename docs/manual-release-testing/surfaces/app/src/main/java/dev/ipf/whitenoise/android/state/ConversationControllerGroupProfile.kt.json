@@ -46,6 +46,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.edit_group_info_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "R.string.edit_group_info_title",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ]
   },
