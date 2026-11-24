@@ -2006,7 +2006,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
       "symbol": "NostrVideoPlayerDialog",
       "bindings": [
         {
@@ -2014,7 +2014,7 @@
           "selector": {
             "text": "Couldn’t play this video\\."
           },
-          "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
+          "scope": "Refused non-HTTPS video source failure and Close; no successful playback claim.",
           "entry_assertion": {
             "text": "Couldn’t play this video\\."
           },
@@ -5643,6 +5643,25 @@
           },
           "opened_by": {
             "text": "File actions"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+      "symbol": "CivilDatePickerDialog",
+      "bindings": [
+        {
+          "case": "presentation-extra-media-date-jump",
+          "selector": {
+            "text": "Cancel"
+          },
+          "scope": "Actual Jump to date calendar opens on loaded media days and hands the chosen day over once; no attachment history read or grid movement.",
+          "entry_assertion": {
+            "text": "Show"
+          },
+          "opened_by": {
+            "text": "Jump to date"
           }
         }
       ]

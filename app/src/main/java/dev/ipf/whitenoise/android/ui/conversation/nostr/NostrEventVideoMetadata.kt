@@ -12,7 +12,10 @@ internal data class NostrEventVideoMetadata(
     val duration: String?,
 )
 
-/** The first author-ordered playable video variant. NIP-71 weights variants equally. */
+/**
+ * The first author-ordered playable video variant. NIP-71 weights variants equally. HLS playlists are skipped: the
+ * isolated player reads one downloaded file and never expands a playlist, so a later file variant is chosen instead.
+ */
 internal fun NostrEvent.videoMetadata(): NostrEventVideoMetadata? =
     tags
         .asSequence()
@@ -28,7 +31,10 @@ internal fun NostrEvent.videoMetadata(): NostrEventVideoMetadata? =
                     ?.trim()
                     ?.lowercase(Locale.ROOT)
             val url = properties["url"]?.firstOrNull()?.let(::safeNostrMediaUrl)
-            val playable = mimeType.isPlayableVideoMimeType() && (mimeType != null || kind in VIDEO_EVENT_KINDS)
+            val playable =
+                mimeType.isPlayableVideoMimeType() &&
+                    (mimeType != null || kind in VIDEO_EVENT_KINDS) &&
+                    url?.let(::isPlaylistUrl) != true
             if (url == null || !playable) {
                 null
             } else {
@@ -43,8 +49,15 @@ internal fun NostrEvent.videoMetadata(): NostrEventVideoMetadata? =
 
 private fun String?.isPlayableVideoMimeType(): Boolean {
     if (this == null) return true
-    return startsWith("video/") || this in PLAYLIST_VIDEO_MIME_TYPES
+    return startsWith("video/") && this !in PLAYLIST_VIDEO_MIME_TYPES
 }
+
+/** An `.m3u8` path names an HLS playlist, which in-app playback refuses whatever type the author declared. */
+internal fun isPlaylistUrl(url: String): Boolean =
+    runCatching { URI(url).path }
+        .getOrNull()
+        .orEmpty()
+        .endsWith(".m3u8", ignoreCase = true)
 
 /** Each `name value` field's values in author order. A repeated name appends in place, so a long tag stays linear. */
 internal fun imetaProperties(tag: List<String>): Map<String, List<String>> {
@@ -81,6 +94,10 @@ private val PLAYLIST_VIDEO_MIME_TYPES =
         "application/mpegurl",
         "application/vnd.apple.mpegurl",
         "application/x-mpegurl",
+        "audio/mpegurl",
+        "audio/x-mpegurl",
+        "video/mpegurl",
+        "video/x-mpegurl",
     )
 
 private val VIDEO_EVENT_KINDS = setOf(21, 22, 34_235, 34_236)

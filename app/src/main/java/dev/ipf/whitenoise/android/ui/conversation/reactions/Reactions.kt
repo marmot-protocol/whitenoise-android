@@ -44,9 +44,9 @@ import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /** Keeps a reactor-sheet filter while its emoji remains present in the live participant list. */
@@ -302,6 +302,7 @@ private fun ReactionParticipantRow(
             seed = participant.sender,
             size = 48.dp,
             pictureUrl = appState.contactAvatarSource(participant.sender),
+            followedAccount = participant.sender,
         )
     }
     val trailing: @Composable () -> Unit = {

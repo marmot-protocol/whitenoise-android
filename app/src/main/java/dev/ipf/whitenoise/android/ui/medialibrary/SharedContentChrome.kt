@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -127,6 +128,7 @@ internal fun SharedContentScaffold(
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
     selectionBar: (@Composable () -> Unit)? = null,
+    filterRowAction: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     SettingsScaffold(title = stringResource(category.titleRes), onBack = onBack) {
@@ -134,18 +136,21 @@ internal fun SharedContentScaffold(
             if (selectionBar != null) {
                 selectionBar()
             } else if (category == SharedContentCategory.Media) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    SharedVisualFilter.entries.forEach { value ->
-                        FilterChip(
-                            selected = filter == value,
-                            onClick = { onFilter(value) },
-                            label = { Text(stringResource(value.titleRes)) },
-                            modifier = Modifier.testTag("shared.filter.${value.name}"),
-                        )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SharedVisualFilter.entries.forEach { value ->
+                            FilterChip(
+                                selected = filter == value,
+                                onClick = { onFilter(value) },
+                                label = { Text(stringResource(value.titleRes)) },
+                                modifier = Modifier.testTag("shared.filter.${value.name}"),
+                            )
+                        }
                     }
+                    filterRowAction()
                 }
             }
             if (loading) {

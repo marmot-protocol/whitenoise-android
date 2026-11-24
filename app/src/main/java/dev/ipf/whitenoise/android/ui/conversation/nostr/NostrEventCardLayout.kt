@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 
 /** A ceiling, never reserved space; follow the current window and keyboard target. */
 @OptIn(ExperimentalLayoutApi::class)

@@ -133,6 +133,7 @@ import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
@@ -1494,7 +1495,7 @@ internal fun GroupDetailsScreen(
                                 // The title actually shown decides: a member titled by their own key copies it (#3565).
                                 val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
                                 val profileLaunch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         appState.presentProfile(profileNpub, origin = origin)
                                     }
                                 ChatInfoMemberCard(
@@ -1512,6 +1513,7 @@ internal fun GroupDetailsScreen(
                                         publicKeyInTitle = true,
                                         avatarSeed = member.memberIdHex,
                                         avatarUrl = controller.memberAvatarUrl(member),
+                                        followedAccount = member.memberIdHex,
                                         modifier =
                                             if (index == 0) {
                                                 profileLaunch.first.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
@@ -1641,6 +1643,7 @@ internal fun GroupDetailsScreen(
                                             picture = encryptedGroupAvatar,
                                             groupAnimation = groupAvatar.groupAnimation,
                                             pictureDomain = groupAvatar.pictureDomain,
+                                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                                         )
                                     }
                                     Text(
@@ -1714,6 +1717,7 @@ internal fun GroupDetailsScreen(
                             groupAnimation = groupAvatar.groupAnimation,
                             archived = controller.presentedArchived,
                             readLocalBytes = groupAvatar.readOriginalBytes,
+                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                             // A group's URL picture decodes single-use, a direct chat's peer picture
                             // in the public profiles.
                             pictureDomain = groupAvatar.pictureDomain,
@@ -1754,7 +1758,7 @@ internal fun GroupDetailsScreen(
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
                             row("start_group") { rowContext ->
                                 val launch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         val candidate =
                                             RecipientSearch.Candidate(
                                                 dmPeerAccountIdHex,

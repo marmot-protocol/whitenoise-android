@@ -101,7 +101,6 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.FormatStyle
-import java.util.Calendar
 import java.util.Locale
 
 // Walk the loaded timeline once and project image/video tiles, newest first.
@@ -300,37 +299,6 @@ private fun TimelineMessage.toSharedMediaTile(
     isVideo = MediaReferenceSupport.isVideoMedia(reference),
 )
 
-// Month bucketing keyed off the local-time calendar so the separators match
-// what the user sees on each message. `recordedAt` is epoch SECONDS.
-internal fun monthKeyForMedia(
-    recordedAtSeconds: ULong,
-    zone: ZoneId = mediaMonthGroupingZone,
-): Int {
-    val date = IdentityFormatter.clampedLocalDate(recordedAtSeconds, zone)
-    // monthLabel() decodes the month with Calendar.MONTH (0-based).
-    return date.year * 100 + (date.monthValue - 1)
-}
-
-// Group already-newest-first items by calendar month, preserving order so
-// section headers read newest → oldest. Runs during tile projection on a
-// background dispatcher — composition only renders the pre-built sections.
-
-/** Groups items into month sections by their recorded time, newest first. */
-internal fun <T> groupIntoMonthSections(
-    items: List<T>,
-    recordedAtOf: (T) -> ULong,
-): List<MediaMonthSection<T>> {
-    if (items.isEmpty()) return emptyList()
-    val sections = LinkedHashMap<Int, ArrayList<T>>()
-    for (item in items) {
-        val key = monthKeyForMedia(recordedAtOf(item))
-        sections.getOrPut(key) { ArrayList() }.add(item)
-    }
-    return sections.map { (key, bucket) -> MediaMonthSection(key, bucket) }
-}
-
-private val mediaMonthGroupingZone: ZoneId = ZoneId.systemDefault()
-
 internal enum class SharedMediaFallbackType {
     Generic,
     Voice,
@@ -455,6 +423,7 @@ private fun MediaLibraryContent(
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val photoShare = rememberSharedPhotoShare(tiles, controller, appState, liveVisuals)
+    var pendingDay by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
@@ -496,18 +465,29 @@ private fun MediaLibraryContent(
             SharedVisualFilter.Images -> tiles.imageSections
             SharedVisualFilter.Videos -> tiles.videoSections
         }
+    val gridState =
+        when (filter) {
+            SharedVisualFilter.All -> allGridState
+            SharedVisualFilter.Images -> imagesGridState
+            SharedVisualFilter.Videos -> videosGridState
+        }
+    // A refresh restores its pages one at a time, so a chosen day waits for the whole range to return.
+    val jumpReady = !tiles.isLoading && paging?.loading != true
+    MediaDateJumpEffect(pendingDay, sections, gridState, jumpReady) { pendingDay = null }
     SharedContentScaffold(
         category = category,
         filter = filter,
         onFilter = {
             photoShare.exit()
             filter = it
+            pendingDay = null
         },
         onBack = photoShare.backOr(onBack),
         loading = tiles.isLoading,
         paging = paging,
         onLoadMore = onLoadMore,
         selectionBar = photoShare.selectionBar(tiles.isLoading),
+        filterRowAction = { MediaDateJumpAction(sections, gridState, jumpReady) { pendingDay = it } },
     ) {
         val selectedEmpty =
             when (category) {
@@ -521,20 +501,11 @@ private fun MediaLibraryContent(
         } else {
             when (category) {
                 SharedContentCategory.Media ->
-                    MediaTileGrid(
-                        sections = sections,
-                        gridState =
-                            when (filter) {
-                                SharedVisualFilter.All -> allGridState
-                                SharedVisualFilter.Images -> imagesGridState
-                                SharedVisualFilter.Videos -> videosGridState
-                            },
-                        controller = controller,
-                        appState = appState,
-                        emptyLabel = stringResource(R.string.shared_content_empty),
-                        share = photoShare,
-                        onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
-                    )
+                    MediaTileGrid(sections, gridState, stringResource(R.string.shared_content_empty)) { tile ->
+                        SharedMediaGridTile(tile, controller, appState, photoShare) {
+                            viewerSelection.select(it.messageIdHex, it.attachmentIndex)
+                        }
+                    }
                 SharedContentCategory.Links ->
                     UrlLibraryTab(
                         tiles = tiles,
@@ -957,18 +928,4 @@ private fun relativeTimestamp(
         timeStyle = if (sameDay) FormatStyle.SHORT else null,
         withoutYear = IdentityFormatter.isCurrentYear(recordedAtSeconds, zone),
     )
-}
-
-// Localized month/year header for a [monthKeyForMedia] key.
-internal fun monthLabel(key: Int): String {
-    val year = key / 100
-    val month = key % 100
-    val cal = Calendar.getInstance()
-    cal.set(Calendar.YEAR, year)
-    cal.set(Calendar.MONTH, month)
-    cal.set(Calendar.DAY_OF_MONTH, 1)
-    val monthName =
-        cal.getDisplayName(Calendar.MONTH, Calendar.LONG, java.util.Locale.getDefault())
-            ?: (month + 1).toString()
-    return "$monthName $year"
 }
