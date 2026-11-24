@@ -104,16 +104,15 @@ internal fun rememberStoredAttachmentThumbnail(
             val current = { appState.activeAccountRef == account && appState.runtimeGeneration == generation }
             if (!current()) return@withPermit
             value = StoredThumbnail(thumbhash = reference.thumbhash)
-            cache?.set(key, value)
             val video = kind == StoredAttachmentKind.Video
             val bitmap =
                 runCatchingCancellable {
                     decodeStoredThumbnail(appState, context, account, attachment, reference, video)
                 }.getOrNull()
-            bitmap?.takeIf { current() }?.let {
-                value = value.copy(bitmap = it.asImageBitmap())
-                cache?.set(key, value)
-            }
+            bitmap?.takeIf { current() }?.let { value = value.copy(bitmap = it.asImageBitmap()) }
+            // Kept only once the attempt finished, thumbhash alone included: a row cancelled mid-decode tries again
+            // when it scrolls back rather than settling for its placeholder.
+            if (current()) cache?.set(key, value)
         }
     }
     val hash = rememberThumbhashImage(loaded.thumbhash)

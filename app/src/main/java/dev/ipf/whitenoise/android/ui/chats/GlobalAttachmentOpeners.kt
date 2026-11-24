@@ -107,6 +107,12 @@ internal class GlobalAttachmentOpener(
     /** Opens the item's message instead, when no controller can own the item. */
     var onViewInChat: (GlobalAttachmentItem) -> Unit = {}
 
+    /**
+     * Set by callers that open only copies already on the device: a file whose copy is gone by the time it opens is
+     * reported here instead of being downloaded. Null keeps the library's download-on-first-tap.
+     */
+    var onMissingFile: ((GlobalAttachmentItem) -> Unit)? = null
+
     private val controllers = mutableMapOf<String, ConversationController>()
     private var closed = false
 
@@ -163,7 +169,8 @@ internal class GlobalAttachmentOpener(
         val index = item.attachmentIndex
         val fetch = suspend { materializeDocumentFile(context, controller, message, index, reference, retained = null) }
         if (!controller.hasCachedAttachmentAfterHydration(item.messageIdHex, item.attachmentIndex)) {
-            downloadLibraryFile(appState) { fetch() }
+            val missing = onMissingFile
+            if (missing != null) missing(item) else downloadLibraryFile(appState) { fetch() }
             return
         }
         val file =

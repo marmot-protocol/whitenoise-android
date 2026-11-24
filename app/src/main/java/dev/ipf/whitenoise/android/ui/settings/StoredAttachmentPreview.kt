@@ -34,6 +34,8 @@ internal fun rememberStoredAttachmentPreview(appState: WhiteNoiseAppState): (Sto
     var shown by remember(account) { mutableStateOf<List<GlobalAttachmentItem>>(emptyList()) }
     val unavailable = { _: GlobalAttachmentItem -> appState.present(R.string.storage_open_failed) }
     val opener = rememberGlobalAttachmentOpener(appState, account, chats, shown, unavailable)
+    // A copy removed between the check below and the open is reported, never downloaded again.
+    opener?.onMissingFile = unavailable
     opener?.let { GlobalAttachmentViewerHost(it, appState, shown, loading = false, onGoToMessage = null) }
     val scope = rememberCoroutineScope()
     val pending = remember(account) { arrayOfNulls<Job>(1) }

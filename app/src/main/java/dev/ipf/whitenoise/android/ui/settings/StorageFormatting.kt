@@ -127,6 +127,9 @@ private fun removedText(
     }
 }
 
+/** Combining marks a row keeps on one letter, as the shared remote-text filter allows. */
+private const val STORAGE_NAME_MAX_MARKS = 4
+
 /** Longest file name a row keeps, long enough for any real name and short enough to bound layout work. */
 private const val STORAGE_FILE_NAME_MAX_CHARS = 120
 
@@ -148,17 +151,21 @@ internal fun storageDisplayName(raw: String): String? {
 /**
  * Keeps the code points of [segment] a name needs: controls become spaces; format characters other than the zero-width
  * joiners that Persian, Indic scripts and emoji sequences shape with, unassigned points and blank Hangul fillers go;
- * runs of spaces collapse. Whole code points are filtered, so a supplementary format character such as a Unicode tag
- * cannot slip through as a surrogate pair.
+ * a letter keeps at most four combining marks; runs of spaces collapse. Whole code points are filtered, so a
+ * supplementary format character such as a Unicode tag cannot slip through as a surrogate pair.
  */
 private fun storageNameCodePoints(segment: String): String =
     buildString {
+        // Counted over what is kept, so a dropped filler between marks cannot reset the cap on a stack.
+        var marks = 0
         segment.codePoints().forEach { point ->
+            val mark = Character.getType(point) in StorageNameMarkTypes
             when {
-                Character.isISOControl(point) -> append(' ')
+                Character.isISOControl(point) -> append(' ').also { marks = 0 }
                 point in StorageNameJoiners -> appendCodePoint(point)
                 Character.getType(point) in StorageNameDroppedTypes || point in StorageNameFillers -> Unit
-                else -> appendCodePoint(point)
+                mark && marks >= STORAGE_NAME_MAX_MARKS -> Unit
+                else -> appendCodePoint(point).also { marks = if (mark) marks + 1 else 0 }
             }
         }
     }.replace(Regex("\\s+"), " ").trim()

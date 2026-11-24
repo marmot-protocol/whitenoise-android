@@ -34,6 +34,8 @@ class StorageUsagePresentationTest {
     /** A stack of combining marks is capped as in the chat, so a name cannot draw a tall glyph tower over the row. */
     @Test fun combiningMarkStacksAreCapped() {
         assertEquals("a" + "\u0301".repeat(4) + ".pdf", storageDisplayName("a" + "\u0301".repeat(40) + ".pdf"))
+        val filled = "a" + ("\u0301".repeat(4) + "\u3164").repeat(10) + ".pdf"
+        assertEquals("a" + "\u0301".repeat(4) + ".pdf", storageDisplayName(filled))
     }
 
     /** Nothing readable left falls back to the attachment's kind. */
