@@ -181,7 +181,7 @@ class MessageMultiSelectCoverageTest {
     fun messageBubbleUsesOneGuardForBothDeleteMutations() {
         val state = source("messages/MessageBubbleState.kt")
         val source =
-            source("messages/MessageBubble.kt")
+            source("messages/MessageBubbleActions.kt")
                 .substringAfter("fun requestDelete()")
                 .substringBefore("fun reactWithEmoji")
 
