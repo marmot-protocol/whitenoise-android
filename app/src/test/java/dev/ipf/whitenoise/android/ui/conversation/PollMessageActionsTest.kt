@@ -109,9 +109,11 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule
             .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        // Open the full set first so a hidden Forward or Read Aloud row would be found.
+        val info = composeRule.messageAction("Info")
         composeRule.onNodeWithText("Forward").assertDoesNotExist()
-        composeRule.onNodeWithText("Speak aloud").assertDoesNotExist()
-        composeRule.messageAction("Info").performClick()
+        composeRule.onNodeWithText("Read Aloud").assertDoesNotExist()
+        info.performClick()
         composeRule.onNodeWithTag(MESSAGE_DETAILS_TAG).assertExists()
         composeRule.onNodeWithText("private-envelope", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Poll").assertExists()
