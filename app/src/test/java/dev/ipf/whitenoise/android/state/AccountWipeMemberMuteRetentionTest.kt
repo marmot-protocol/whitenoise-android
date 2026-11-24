@@ -466,8 +466,9 @@ class AccountWipeMemberMuteRetentionTest {
             savedUnlinked = true
             val state = appState(active = SURVIVING_ACCOUNT)
             val handlers = Job()
+            val scope = CoroutineScope(handlers)
 
-            state.presentEventNotices(MarmotEventFfi.DeviceUnlinked("id", WIPED_ACCOUNT), CoroutineScope(handlers))
+            state.presentEventNotices(MarmotEventFfi.DeviceUnlinked("id", WIPED_ACCOUNT), marmot, scope, scope)
             assertTrue(state.removeUnlinkedAccount(WIPED_ACCOUNT))
             withTimeout(PAUSED_READ_TIMEOUT_MS) {
                 while (handlers.children.any()) {

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Verknüpfte Geräte</string>
+    <string name="linked_devices">Geräte</string>
+    <string name="settings_search_alias_linked_devices">verknüpfte Geräte|Gerät verknüpfen</string>
+    <string name="group_account_devices_title">Verknüpfte Geräte</string>
     <string name="linked_devices_detail">Nachrichten, die du von einem verknüpften Gerät sendest, erscheinen auf allen deinen verknüpften Geräten als deine Nachrichten.</string>
     <string name="linked_devices_this_device">Dieses Gerät</string>
     <string name="linked_devices_other_devices">Andere Geräte</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Diese Chats können die Entfernung nicht von deinen Geräten übernehmen. Ein Chat-Admin kann das Gerät dort entfernen.</string>
     <string name="devices_key_refresh_overdue">Dieses Gerät konnte seine Einladungsschlüssel nicht erneuern. Nach 30 Tagen kann es möglicherweise nicht mehr zu neuen Chats hinzugefügt werden. Lass die App auf deinen Geräten geöffnet, damit sie aufholen können.</string>
     <string name="devices_stalled">Dieses Gerät kann mit deinen anderen Geräten nicht mehr Schritt halten. Repariere seine Verknüpfung, um fortzufahren.</string>
-    <string name="device_repair_confirm_again">Öffne in den Einstellungen die verknüpften Geräte und bestätige die Reparatur erneut, bevor du das Gerät verknüpfst.</string>
+    <string name="device_repair_confirm_again">Öffne in den Einstellungen „Geräte“ und bestätige die Reparatur erneut, bevor du das Gerät verknüpfst.</string>
     <string name="device_repair_try_link_again">Verknüpfung zurückgesetzt. Verknüpfe das Gerät erneut, um die Reparatur abzuschließen.</string>
     <string name="devices_repair">Verknüpfung dieses Geräts reparieren</string>
     <string name="devices_repair_confirm">Die aktuelle Verknüpfung wird entfernt, damit du dieses Gerät erneut verknüpfen kannst. Deine Chats, Nachrichten, Entwürfe und Einstellungen bleiben erhalten. Die alte Verknüpfung lässt sich auch dann nicht wiederherstellen, wenn du den Vorgang abbrichst.</string>

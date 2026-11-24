@@ -45,7 +45,7 @@ class MessageMultiSelectCoverageTest {
         // Selection hides the jump controls one by one through their exit motion; pagination never adds an overlay.
         assertTrue(screenSource.contains("if (transcriptReadyToReveal)"))
         assertTrue(screenSource.contains("visible = !selectionMode && ttsFollowHandle.showResumeAction"))
-        assertTrue(screenSource.contains("visible = !selectionMode && mentionCount > 0"))
+        assertTrue(screenSource.contains("val showMentionJump = !selectionMode && unreadMentionCount > 0"))
         assertTrue(screenSource.contains("visible = !selectionMode && !nearBottom"))
     }
 

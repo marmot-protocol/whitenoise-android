@@ -25,7 +25,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Geometry only, owned by one retained native page, never by an account or an avatar. */
 internal class NativePageBody {
@@ -53,7 +52,7 @@ internal fun Modifier.nativePageBody(padding: PaddingValues = PaddingValues()): 
     val view = LocalView.current
     val density = LocalDensity.current
     return onGloballyPositioned {
-        val bounds = it.settingsMorphBounds(view)
+        val bounds = it.motionBoundsOnScreen(view)
         body.bounds =
             with(density) {
                 Rect(
@@ -71,14 +70,14 @@ internal fun Modifier.nativePageBody(padding: PaddingValues = PaddingValues()): 
 internal fun Modifier.nativePageHeader(): Modifier {
     val body = LocalNativePageBody.current ?: return this
     val view = LocalView.current
-    return onGloballyPositioned { body.header = it.settingsMorphBounds(view) }
+    return onGloballyPositioned { body.header = it.motionBoundsOnScreen(view) }
 }
 
 @Composable
 internal fun Modifier.nativePageFooter(): Modifier {
     val body = LocalNativePageBody.current ?: return this
     val view = LocalView.current
-    return onGloballyPositioned { body.footer = it.settingsMorphBounds(view) }
+    return onGloballyPositioned { body.footer = it.motionBoundsOnScreen(view) }
 }
 
 /** Shared container geometry; native text never enters a container transform. */

@@ -48,10 +48,10 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */

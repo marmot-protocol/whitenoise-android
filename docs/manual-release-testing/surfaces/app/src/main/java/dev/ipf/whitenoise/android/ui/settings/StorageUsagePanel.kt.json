@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "StorageLegendLine",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
-        "anchor": "fun StorageLegendLine(",
-        "test_ids": [
-          "SET-047"
-        ]
-      },
-      {
         "surface": "StorageLegendRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
         "anchor": "fun StorageLegendRow(",
@@ -23,6 +15,14 @@
         "surface": "StorageUsageBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
         "anchor": "fun StorageUsageBar(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "StorageUsageHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageUsageHeader(",
         "test_ids": [
           "SET-047"
         ]
@@ -78,9 +78,33 @@
         ]
       },
       {
+        "surface": "string:storage_highlight_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_highlight_share",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_highlight_shared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_highlight_shared",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
         "surface": "string:storage_pictures",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
         "anchor": "R.string.storage_pictures",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_share_under_one",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_share_under_one",
         "test_ids": [
           "SET-047"
         ]

@@ -146,6 +146,10 @@ data class ToastMessage(
     // recovery of that same send can retire it (#2666).
     val sendAttempt: SendFailureAttempt? = null,
     val localDeleteNotice: LocalDeleteNotice? = null,
+    // The account and ID of the group change this notice reports, so two
+    // changes with the same wording are two toasts, each seen before it is
+    // acknowledged.
+    val groupChangeKey: String? = null,
     // The account this notice says was unlinked, so removing that account retires it.
     val unlinkedAccount: String? = null,
 )

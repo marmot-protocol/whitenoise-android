@@ -58,11 +58,11 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 @OptIn(ExperimentalFoundationApi::class)
 internal fun Modifier.chatListSelectionRowClickable(
@@ -269,7 +269,7 @@ internal fun ChatRow(
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .testTag("chat.row.${item.id}")
-                .onGloballyPositioned { activatingBounds[0] = it.settingsMorphBounds(view) },
+                .onGloballyPositioned { activatingBounds[0] = it.motionBoundsOnScreen(view) },
         onClick = {
             if (!selectionMode && routeOrigin != null) {
                 routeOrigin.activate(item.group.groupIdHex, activatingBounds[0], onClick)

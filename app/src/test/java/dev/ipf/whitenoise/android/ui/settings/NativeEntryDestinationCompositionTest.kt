@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupCreationPerson
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupRecipientActions
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupRecipientContent
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.profile.AddAccountSheetContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -108,7 +109,7 @@ class NativeEntryDestinationCompositionTest {
                         Modifier
                             .fillMaxSize()
                             .onGloballyPositioned {
-                                host = it.settingsMorphBounds(view)
+                                host = it.motionBoundsOnScreen(view)
                                 source =
                                     SettingsContour(
                                         sourceBounds,

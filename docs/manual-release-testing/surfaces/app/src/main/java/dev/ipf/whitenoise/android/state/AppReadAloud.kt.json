@@ -1,0 +1,42 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Removing the speaking account stops its read-aloud and auto-read session",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt",
+        "anchor": "internal fun stopTtsForRemovedAccount(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "Prepared attachment speech account-switch ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt",
+        "anchor": "suspend fun speakAloudPrepared(",
+        "test_ids": [
+          "MED-010",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "Turning off a chat's auto-read stops only that chat's session",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt",
+        "anchor": "private fun reconcileOwnedTtsAutoReadSession()",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "Read-aloud engine selection and availability refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt",
+        "anchor": "internal suspend fun selectTtsEngineLocked(",
+        "test_ids": [
+          "TTS-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

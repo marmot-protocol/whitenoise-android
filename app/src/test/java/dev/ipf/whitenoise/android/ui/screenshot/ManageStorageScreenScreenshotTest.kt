@@ -1,11 +1,18 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -19,6 +26,7 @@ import dev.ipf.whitenoise.android.state.StorageUsage
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.settings.LocalStorageChatTitles
 import dev.ipf.whitenoise.android.ui.settings.ManageStorageActions
 import dev.ipf.whitenoise.android.ui.settings.ManageStorageContent
@@ -64,6 +72,22 @@ class ManageStorageScreenScreenshotTest {
         overview("manage_storage_rtl_large_font", Populated, darkTheme = false, fontScale = 2f, rtl = true)
     }
 
+    /** Tapping a legend row highlights its category: the header names its size and share, other segments fade. */
+    @Test
+    @Config(qualifiers = "w360dp-h1500dp-mdpi")
+    fun overviewHighlighted() =
+        overview("manage_storage_highlighted", Populated, darkTheme = false) {
+            composeRule.onAllNodesWithTag("storage.legend")[0].performClick()
+        }
+
+    /** The highlight in the dark theme, on a smaller category. */
+    @Test
+    @Config(qualifiers = "w360dp-h1500dp-mdpi")
+    fun overviewHighlightedDark() =
+        overview("manage_storage_highlighted_dark", Populated, darkTheme = true) {
+            composeRule.onAllNodesWithTag("storage.legend")[1].performClick()
+        }
+
     /** Before the first figures: Calculating over a pulsing track, actions disabled. */
     @Test
     fun overviewLoading() = overview("manage_storage_loading", ManageStorageUiState(), darkTheme = false)
@@ -80,6 +104,16 @@ class ManageStorageScreenScreenshotTest {
     @Test
     fun chatAttachmentsDark() = attachments("manage_storage_chat_dark", groupIdHex = DESIGN, darkTheme = true)
 
+    /**
+     * One chat's list right to left at double text size, with a long name, a right-to-left name and an untranslated
+     * size line, so name isolation, the middle ellipsis and the Remove all subtitle keep their order.
+     */
+    @Test
+    fun chatAttachmentsRtlLargeFont() {
+        val rows = RtlRows + LargestRows.filter { it.groupIdHex == DESIGN }
+        attachments("manage_storage_chat_rtl_large_font", DESIGN, darkTheme = false, rows, fontScale = 2f, rtl = true)
+    }
+
     /** Records the overview for [state]. */
     @Suppress("LongParameterList")
     private fun overview(
@@ -89,29 +123,36 @@ class ManageStorageScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         rtl: Boolean = false,
+        interact: () -> Unit = {},
     ) {
         val appState = testAppState(name)
         render(darkTheme, amoled, fontScale, rtl) {
             ManageStorageContent(appState, state, onBack = {}, actions = ManageStorageActions({}, {}, {}, {}))
         }
+        interact()
+        composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** Records an attachment list, account-wide when [groupIdHex] is null, with two rows selected. */
+    @Suppress("LongParameterList")
     private fun attachments(
         name: String,
         groupIdHex: String?,
         darkTheme: Boolean,
+        rows: List<StoredAttachment> = LargestRows.filter { groupIdHex == null || it.groupIdHex == groupIdHex },
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
         val appState = testAppState(name)
-        val rows = if (groupIdHex == null) LargestRows else LargestRows.filter { it.groupIdHex == groupIdHex }
         val list =
             StoredAttachmentsUiState(
                 items = rows,
                 complete = true,
                 selected = if (groupIdHex == null) rows.take(2).mapTo(HashSet()) { it.key } else emptySet(),
             )
-        render(darkTheme) {
+        seedThumbnails(appState, rows)
+        render(darkTheme, fontScale = fontScale, rtl = rtl) {
             StoredAttachmentsContent(
                 appState = appState,
                 storage = Populated,
@@ -122,6 +163,41 @@ class ManageStorageScreenScreenshotTest {
             )
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /**
+     * Gives the video and the photo among [rows] a decoded thumbnail, as a session that already showed them would hold,
+     * so the list draws real previews beside the kind glyphs of the file and the voice note.
+     */
+    private fun seedThumbnails(
+        appState: WhiteNoiseAppState,
+        rows: List<StoredAttachment>,
+    ) {
+        val tones =
+            mapOf(
+                "video/mp4" to Pair(0xFF35506B.toInt(), 0xFFE0A458.toInt()),
+                "image/jpeg" to Pair(0xFF4F7A4A.toInt(), 0xFFF2E3B3.toInt()),
+            )
+        composeRule.runOnUiThread {
+            rows.filter { it.mediaType in tones && it.fileName.isNotEmpty() }.forEach { row ->
+                val (top, bottom) = tones.getValue(row.mediaType)
+                val key = mediaCacheKey(ACCOUNT_REF, row.groupIdHex, row.messageIdHex, row.attachmentIndex)
+                appState.cacheMediaThumbnail(key, gradient(top, bottom))
+            }
+        }
+    }
+
+    /** A small vertical two-tone picture standing in for decoded media. */
+    private fun gradient(
+        top: Int,
+        bottom: Int,
+    ): Bitmap {
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val edge = size.toFloat()
+        val paint = Paint().apply { shader = LinearGradient(0f, 0f, 0f, edge, top, bottom, Shader.TileMode.CLAMP) }
+        Canvas(bitmap).drawRect(0f, 0f, edge, edge, paint)
+        return bitmap
     }
 
     /** Sets [content] in the app theme with fixed chat titles. */
@@ -195,21 +271,39 @@ class ManageStorageScreenScreenshotTest {
                 keepMedia = KeepMediaPeriod.ThirtyDays,
             )
 
+        /** Noon UTC on fixed days, so the dates read the same in any test time zone. */
+        const val MAR_14_2026 = 1_773_489_600L
+        const val SEP_2_2025 = 1_756_814_400L
+        const val JAN_20_2026 = 1_768_910_400L
+        const val OCT_30_2026 = 1_793_361_600L
+
         val LargestRows =
             listOf(
-                stored(DESIGN, "m1", 412 * MB, "video/mp4"),
-                stored(FAMILY, "m2", 188 * MB, "video/mp4"),
-                stored(DESIGN, "m3", 64 * MB, "application/pdf"),
-                stored(ANA, "m4", 12 * MB, "image/jpeg"),
-                stored(DESIGN, "m5", 3 * MB, "audio/ogg"),
+                stored(DESIGN, "m1", 412 * MB, "video/mp4", "Offsite recap - full session recording.mp4", MAR_14_2026),
+                stored(FAMILY, "m2", 188 * MB, "video/mp4", "", SEP_2_2025),
+                stored(DESIGN, "m3", 64 * MB, "application/pdf", "Q3 roadmap.pdf", JAN_20_2026),
+                stored(ANA, "m4", 12 * MB, "image/jpeg", "IMG_2041.jpg", OCT_30_2026),
+                stored(DESIGN, "m5", 3 * MB, "audio/ogg", "voice-note.ogg", 0),
             )
 
-        /** A retained attachment received at a fixed instant, so relative times stay stable. */
+        /** A right-to-left name in the design chat, "third quarter report.pdf" in Arabic. */
+        const val ARABIC_REPORT =
+            "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0631\u0628\u0639 " +
+                "\u0627\u0644\u062B\u0627\u0644\u062B.pdf"
+        val RtlRows = listOf(stored(DESIGN, "m6", 2 * MB, "application/pdf", ARABIC_REPORT, JAN_20_2026))
+
+        /** A retained attachment named [fileName] and received at [receivedAt], zero when unknown. */
+        @Suppress("LongParameterList")
         fun stored(
             group: String,
             message: String,
             bytes: Long,
             type: String,
-        ) = StoredAttachment(group, message.padEnd(64, '0'), message.padEnd(64, '0'), 0, bytes, type, 0)
+            fileName: String,
+            receivedAt: Long,
+        ): StoredAttachment {
+            val id = message.padEnd(64, '0')
+            return StoredAttachment(group, id, id, 0, bytes, type, receivedAt, fileName)
+        }
     }
 }
