@@ -115,8 +115,9 @@ def audit_metadata(metadata, review):
             raise ValueError('Reviewed metadata disappeared: ' + coordinate + '/' + name)
         return None, None
     for _ in range(12):
-        if len(seeds) > 1200:
-            raise ValueError('Metadata ancestry exceeds review bounds')
+        # Captures retain prior versions alongside the current selections.
+        if len(seeds) > 1500:
+            raise ValueError(f'Metadata ancestry exceeds review bounds: {len(seeds)} coordinates')
         jobs = [(coordinate, extension) for coordinate in sorted(pending) for extension in ['pom', 'module']
                 if (coordinate, extension) not in attempted]
         if not jobs:
