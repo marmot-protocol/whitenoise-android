@@ -135,8 +135,9 @@ internal fun ChatListUnreadPullSurface(
                 ) {
                     Row(
                         Modifier
-                            .shapedPressFeedback(press, CircleShape)
+                            // The outline is drawn outside the highlight's clip, so it keeps its full width.
                             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), CircleShape)
+                            .shapedPressFeedback(press, CircleShape)
                             .heightIn(min = 32.dp)
                             .padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,

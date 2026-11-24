@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
 import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import java.util.Locale
 
@@ -170,16 +172,17 @@ private fun ColorPresetRow(
     ) {
         tonalBubbleColorPresets().forEach { argb ->
             val description = stringResource(R.string.color_swatch_description, formatColorHex(argb))
+            val press = remember { MutableInteractionSource() }
             ColorSwatch(
                 argb = argb,
                 selected = selectedArgb == argb,
-                // Clipped before the click, so the press highlight is the circle, not the square around it.
+                // The swatch draws the press highlight inside its own circle, not on the square around it.
+                pressSource = press,
                 modifier =
                     Modifier
                         .explainOnLongPress(
                             Explanation(description, stringResource(R.string.explanation_appearance_color_swatch)),
-                        ).clip(CircleShape)
-                        .clickable { onSelect(argb) }
+                        ).clickable(interactionSource = press, indication = null) { onSelect(argb) }
                         .semantics {
                             role = Role.RadioButton
                             selected = selectedArgb == argb
@@ -190,18 +193,23 @@ private fun ColorPresetRow(
     }
 }
 
-/** One 48 dp circle; the selected preset carries a 3 dp on-surface ring, the rest a 1 dp outline. */
+/**
+ * One 48 dp circle; the selected preset carries a 3 dp on-surface ring, the rest a 1 dp outline. Given
+ * [pressSource], it draws that press highlight inside its own circle, so the ring is not clipped twice.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun ColorSwatch(
     argb: Long,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    pressSource: MutableInteractionSource? = null,
 ) {
     Box(
         modifier
             .size(ColorPickerDefaults.SwatchSize)
             .clip(CircleShape)
+            .then(if (pressSource != null) Modifier.pressFeedbackInsideClip(pressSource) else Modifier)
             .background(colorFromArgb(argb), CircleShape)
             .border(
                 if (selected) ColorPickerDefaults.SelectedRing else ColorPickerDefaults.RestingRing,

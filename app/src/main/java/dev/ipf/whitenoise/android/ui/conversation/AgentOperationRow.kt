@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.theme.Radii
@@ -270,14 +272,17 @@ internal fun AgentOperationChip(
             },
         )
     val messageActionsLabel = stringResource(R.string.message_actions)
+    val cardPress = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .then(
                     if (operation.canExpand || onRequestDelete != null) {
-                        // Clipped first, so the press highlight keeps the card's rounded corners.
-                        Modifier.clip(AgentOperationCardShape).combinedClickable(
+                        // The highlight is drawn inside the Surface's clip, so the outline is not clipped twice.
+                        Modifier.combinedClickable(
+                            interactionSource = cardPress,
+                            indication = null,
                             onClickLabel = toggleLabel.takeIf { operation.canExpand },
                             onLongClickLabel = messageActionsLabel.takeIf { onRequestDelete != null },
                             role = Role.Button,
@@ -294,7 +299,7 @@ internal fun AgentOperationChip(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.pressFeedbackInsideClip(cardPress).padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             AgentOperationHeader(

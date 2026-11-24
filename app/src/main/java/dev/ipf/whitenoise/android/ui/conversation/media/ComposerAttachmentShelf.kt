@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +36,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
@@ -266,6 +267,7 @@ internal fun ComposerAttachmentShelfCard(
         animation?.takeIf { it.intrinsicHeight > 0 }?.let { it.intrinsicWidth.toFloat() / it.intrinsicHeight }
             ?: bitmap?.let { it.width.toFloat() / it.height } ?: DEFAULT_ASPECT_RATIO
     val (cardWidth, cardHeight) = composerAttachmentCardSize(kind, ratio)
+    val press = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
@@ -273,8 +275,10 @@ internal fun ComposerAttachmentShelfCard(
                 .height(cardHeight.dp)
                 .then(
                     if (onPreview != null) {
-                        // Clipped first, so the press highlight keeps the card's rounded corners.
-                        Modifier.clip(CARD_SHAPE).clickable(
+                        // The highlight is drawn inside the Surface's clip, so the outline is not clipped twice.
+                        Modifier.clickable(
+                            interactionSource = press,
+                            indication = null,
                             enabled = enabled,
                             role = Role.Button,
                             onClickLabel = previewLabel,
@@ -288,7 +292,7 @@ internal fun ComposerAttachmentShelfCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Box {
+        Box(Modifier.pressFeedbackInsideClip(press)) {
             if (visual) {
                 ComposerAttachmentVisual(label, bitmap, animation, video, gif)
             } else {

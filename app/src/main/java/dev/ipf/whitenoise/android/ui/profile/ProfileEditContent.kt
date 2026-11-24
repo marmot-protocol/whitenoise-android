@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberRecoverableAvatar
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -198,14 +200,15 @@ internal fun ProfileEditContent(
                     }
                 },
                 avatar = { avatarSize ->
+                    val avatarPress = remember { MutableInteractionSource() }
                     Box(
                         Modifier
                             .size(avatarSize)
-                            // Clipped to the round avatar first, so the press highlight follows it.
-                            .clip(CircleShape)
                             .then(
                                 if (pictureUrl != null) {
                                     Modifier.clickable(
+                                        interactionSource = avatarPress,
+                                        indication = null,
                                         role = Role.Button,
                                         onClick = onOpenPicture,
                                     )
@@ -221,6 +224,9 @@ internal fun ProfileEditContent(
                                 Modifier.align(Alignment.Center).testTag(PROFILE_HERO_LOADING_TAG),
                             )
                         }
+                        // The highlight is drawn over the round avatar, which clips itself, so nothing is clipped
+                        // twice.
+                        Box(Modifier.matchParentSize().shapedPressFeedback(avatarPress, CircleShape))
                     }
                 },
             ) {

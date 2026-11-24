@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.util.Log
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,7 +18,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +53,7 @@ import dev.ipf.whitenoise.android.state.performAttachmentUserAction
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import kotlinx.coroutines.flow.first
 
@@ -398,6 +400,7 @@ internal fun MediaFileBubble(
         }
     }
 
+    val cardPress = remember { MutableInteractionSource() }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationMediaTileShape,
@@ -407,9 +410,10 @@ internal fun MediaFileBubble(
                 .onGloballyPositioned { activationBounds[0] = it.motionBoundsOnScreen(view) }
                 .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
-                // Clipped first, so the press highlight keeps the card's rounded corners.
-                .clip(ConversationRichContentShape)
+                // No highlight here: it is drawn inside the Surface's clip, so the outline is not clipped twice.
                 .combinedClickable(
+                    interactionSource = cardPress,
+                    indication = null,
                     enabled =
                         firstFrameCacheResolved &&
                             canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
@@ -453,23 +457,25 @@ internal fun MediaFileBubble(
                     },
                 ),
     ) {
-        MediaFileBubbleContent(
-            reference = reference,
-            presentation = presentation,
-            transferState = transferState,
-            timestampText = timestampText,
-            showStatus = showStatus,
-            status = status,
-            footerWarningText = footerWarningText,
-            openPending = opening,
-            nativeProgress = presentationProgress.takeUnless { heldUntilDelivered },
-            cancellationState = cancellationState,
-            // A held own card has no native transfer to cancel.
-            onCancelTransfer =
-                {
-                    controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
-                }.takeUnless { heldUntilDelivered },
-        )
+        Box(Modifier.pressFeedbackInsideClip(cardPress), propagateMinConstraints = true) {
+            MediaFileBubbleContent(
+                reference = reference,
+                presentation = presentation,
+                transferState = transferState,
+                timestampText = timestampText,
+                showStatus = showStatus,
+                status = status,
+                footerWarningText = footerWarningText,
+                openPending = opening,
+                nativeProgress = presentationProgress.takeUnless { heldUntilDelivered },
+                cancellationState = cancellationState,
+                // A held own card has no native transfer to cancel.
+                onCancelTransfer =
+                    {
+                        controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
+                    }.takeUnless { heldUntilDelivered },
+            )
+        }
     }
     if (readerOpen && documentKind != null) {
         val actions =

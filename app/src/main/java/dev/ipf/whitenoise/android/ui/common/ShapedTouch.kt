@@ -94,6 +94,16 @@ internal fun Modifier.shapedPressFeedback(
 ): Modifier = clip(shape).indication(interactionSource, ripple())
 
 /**
+ * Draws the press highlight of [interactionSource] on content that already sits inside its shape's clip, such
+ * as a Surface's content. Clipping again there would thin the Surface's antialiased outline, so this draws the
+ * highlight without a clip of its own. Pair it with a click that has `indication = null`.
+ */
+internal fun Modifier.pressFeedbackInsideClip(interactionSource: MutableInteractionSource): Modifier {
+    val highlight = ripple()
+    return indication(interactionSource, highlight)
+}
+
+/**
  * A circle as wide as the shorter side, centred in its bounds. [SlotIconButton] draws its highlight and fill
  * on it, so a slot that is not square still shows a round highlight. Don't hand it to an `IconButton`: that
  * clip also limits where the button takes touches.

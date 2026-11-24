@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.replies
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.MARKDOWN_PREVIEW_MAX_LENGTH
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -235,6 +237,7 @@ internal fun ReplyPreviewCard(
     val resolvedContentColor = secondaryColor ?: contentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
     val resolvedSurfaceContentColor = contentColor ?: MaterialTheme.colorScheme.onSurface
     val quoteEndPadding = if (onDismiss == null) 12.dp else 48.dp
+    val press = remember { MutableInteractionSource() }
     Surface(
         color = resolvedContainerColor,
         contentColor = resolvedSurfaceContentColor,
@@ -246,13 +249,19 @@ internal fun ReplyPreviewCard(
                 // Clipped first, so the press highlight keeps the card's rounded corners.
                 .then(
                     if (onClick != null) {
-                        Modifier.clip(ConversationEmbedShape).clickable(role = Role.Button) { onClick() }
+                        Modifier.clickable(
+                            interactionSource = press,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onClick,
+                        )
                     } else {
                         Modifier
                     },
                 ),
     ) {
-        Box {
+        // The highlight is drawn inside the Surface's own clip, so the card's outline is not clipped twice.
+        Box(Modifier.pressFeedbackInsideClip(press)) {
             Row(
                 modifier =
                     Modifier
