@@ -14,6 +14,7 @@ internal fun File.motionOwnerSource(): String {
                     "ConversationMessageDragSelection.kt",
                     "ConversationReadAloudFollow.kt",
                 )
+            "ChatsScreen.kt" -> listOf("ChatListActions.kt")
             "ConversationMediaDraft.kt" -> listOf("ConversationMediaDraftPhotos.kt")
             "SettingsScreen.kt" -> listOf("SettingsAppUpdates.kt")
             "AccountKeysScreen.kt" -> listOf("ProfileKeyClipboard.kt")
