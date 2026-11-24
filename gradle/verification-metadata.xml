@@ -499,6 +499,17 @@
             <sha256 value="0e12fc515b33ede942f2e0881960a9d36fd4392ad3e5a8b82118e54306713234" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.animation" name="animation-android" version="1.13.0">
+         <artifact name="animation-android-1.13.0.module">
+            <sha256 value="37043920b39dc94d435729b259d42f405ff3bede5d410c6b4ab898afcb818675" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-android-1.13.0.pom">
+            <sha256 value="5e428062db7536949ec167cbd6df9cdcc1dcf20b933f44cd8aea867de2276c70" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation.aar">
+            <sha256 value="2ee220773b320285f19ae6234c01912e46aaf10eda55a7099875e4f9f22ce873" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.animation" name="animation-android" version="1.13.0-beta01">
          <artifact name="animation-android-1.13.0-beta01.module">
             <sha256 value="ebf54b4e63bacc609e79a62993f9cf3aed0b2ae0e2c17fc5feda7736c460d7e2" origin="Independent official supplier audit" />
@@ -530,6 +541,17 @@
          </artifact>
          <artifact name="animation.aar">
             <sha256 value="195962951cc645c256fce1eb7d95a43b271a318019ecc98343afb58926fc0d80" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.animation" name="animation-core-android" version="1.13.0">
+         <artifact name="animation-core-android-1.13.0.module">
+            <sha256 value="f78cb7a2eea4087b23defc026f5c6bfbc26046fdc03861e12e8961aead6f399e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-core-android-1.13.0.pom">
+            <sha256 value="976ed8b2da24d7b56b1ebe5a2504bcc89c15a68cdc0461b3b7910d1e91283f58" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-core.aar">
+            <sha256 value="2b8fc2beedd30bff72faeb44515110ad5c0b651304dcf5b25fc61f251d589b79" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.animation" name="animation-core-android" version="1.13.0-beta01">
@@ -565,6 +587,17 @@
             <sha256 value="a975c379a3b59894a869067fe7d471fd55d8fa3af067c04aa026c9fca2be9133" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.animation" name="animation-core-jvmstubs" version="1.13.0">
+         <artifact name="animation-core-jvmstubs-1.13.0.jar">
+            <sha256 value="7886c29b04e9bb00a6d6fe71920ce1f6c966ff8d878028760b2f318bd4baa52e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-core-jvmstubs-1.13.0.module">
+            <sha256 value="613e85bf11e0f3db0783121514c4726a8c84aafe8893e7965a57e3a5295ca7f0" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-core-jvmstubs-1.13.0.pom">
+            <sha256 value="e535ab841acd4c2e7d73d9e35794710568b8413dc1ff5d688acccd6872d79867" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.animation" name="animation-core-jvmstubs" version="1.13.0-beta01">
          <artifact name="animation-core-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="7886c29b04e9bb00a6d6fe71920ce1f6c966ff8d878028760b2f318bd4baa52e" origin="Independent official supplier audit" />
@@ -598,6 +631,14 @@
             <sha256 value="23a2459254a09597930e5e8544fbc02ee83b1dbe129a532d5681bac5b3222df0" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.animation" name="animation-core" version="1.13.0">
+         <artifact name="animation-core-1.13.0.module">
+            <sha256 value="a0a4857892e6e30cd40c2e3dc3778a06bc45b6287f72bd8e3b16f1cf5910e1d9" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-core-1.13.0.pom">
+            <sha256 value="6aad2431a38ac27d9875c7b5265dfba3ae67d1ce5055f4493f507144eb5684c4" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.animation" name="animation-core" version="1.13.0-beta01">
          <artifact name="animation-core-1.13.0-beta01.module">
             <sha256 value="4598a3ea45e1b827df2bad909a7cfe7d818c891a62633b68c5efa15534c1cc4b" origin="Independent official supplier audit" />
@@ -620,6 +661,17 @@
          </artifact>
          <artifact name="animation-core-1.13.0-rc01.pom">
             <sha256 value="c4e7d1f2b425ec5690c0f2ec38e2d13c19af889f3211ce6850209cba5f8548e7" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.animation" name="animation-jvmstubs" version="1.13.0">
+         <artifact name="animation-jvmstubs-1.13.0.jar">
+            <sha256 value="96f888a252b7b9ca5cb134d781d878c18d7ab745717eb3a79ede7a8996227b42" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-jvmstubs-1.13.0.module">
+            <sha256 value="ed322053b3d1f9b605aded527a1277183124d39d017323f72c9a9a969ebca385" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-jvmstubs-1.13.0.pom">
+            <sha256 value="4648c6d80e14cbecb658d1c55e1b43ee850c08740be74238a3cef0efa28e9fcf" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.animation" name="animation-jvmstubs" version="1.13.0-beta01">
@@ -655,6 +707,14 @@
             <sha256 value="8f3f159cbb434519ba86ca0888acce0b44b0efe10e4ae8ec4afac3e8e7329380" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.animation" name="animation" version="1.13.0">
+         <artifact name="animation-1.13.0.module">
+            <sha256 value="64a0108f15d5a623be6d07a6656716807a025780eb928eaf237cb408356d162a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="animation-1.13.0.pom">
+            <sha256 value="ba58646b8122980a7df6490d9942cb789e8713c652da09817892ab6594e3aa5e" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.animation" name="animation" version="1.13.0-beta01">
          <artifact name="animation-1.13.0-beta01.module">
             <sha256 value="ff2901966f2dc270442b669b9f02961acb67295358e385e28801aa49a05a42a9" origin="Independent official supplier audit" />
@@ -677,6 +737,17 @@
          </artifact>
          <artifact name="animation-1.13.0-rc01.pom">
             <sha256 value="ca1ddea7401c0054a21add98b00863374944ccca20f76c8559915aa22375b0dc" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.foundation" name="foundation-android" version="1.13.0">
+         <artifact name="foundation-android-1.13.0.module">
+            <sha256 value="1d5df192526272fd669f91bc4a1bfcbe7dfcd16dd65920942bde140b58722180" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-android-1.13.0.pom">
+            <sha256 value="6019dd70bd3373eea78d1767b2d31c2a6d5fdcb64218c9e639e8d6f255f76412" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation.aar">
+            <sha256 value="9c97dbb937321607311a081ac095551f160293b78624df51129e17b25b627f2c" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.foundation" name="foundation-android" version="1.13.0-beta01">
@@ -712,6 +783,17 @@
             <sha256 value="61a91dbac1eb8eb950f28a99c160866018462c7fdba0060cf1425a14494e725e" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.foundation" name="foundation-jvmstubs" version="1.13.0">
+         <artifact name="foundation-jvmstubs-1.13.0.jar">
+            <sha256 value="e06e3577215bc905f0ed7f267569a5e1508a2fa09352b9eee91a0feb909f3f53" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-jvmstubs-1.13.0.module">
+            <sha256 value="e5d7d1959a451d1a334efa77d0f356f85c51e5092c1951993b854445761ca322" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-jvmstubs-1.13.0.pom">
+            <sha256 value="a3d83022d4ecb5768465bf4483007623a70ba402124f5fc97221c710c727dc2b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.foundation" name="foundation-jvmstubs" version="1.13.0-beta01">
          <artifact name="foundation-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="41d3b01b89e870affe2b87d0e3875d45dbdf2be851ad76a1f0327debfbf60601" origin="Independent official supplier audit" />
@@ -743,6 +825,17 @@
          </artifact>
          <artifact name="foundation-jvmstubs-1.13.0-rc01.pom">
             <sha256 value="1dd5a2ce67b7077b1495a57b197582ac2a1694d785449e7be98fc498d9b7bd2b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.foundation" name="foundation-layout-android" version="1.13.0">
+         <artifact name="foundation-layout-android-1.13.0.module">
+            <sha256 value="93c3fb6bdc77924b2eb8ed8bcc2322510cdb79f4794b79fde6cac294c7bd48ed" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-layout-android-1.13.0.pom">
+            <sha256 value="c23307d737014010e1d39894f17d8958692164024b35f1abbd8353dd1f6e3e91" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-layout.aar">
+            <sha256 value="32d2dd25683e8b18fd88370241072acab1cf275646e37cfb6b7677f52e107975" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.foundation" name="foundation-layout-android" version="1.13.0-beta01">
@@ -778,6 +871,17 @@
             <sha256 value="250e06eabb3c7fb5583e537a976ffc9e65191516d4d49d0665fcf56acbab67de" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.foundation" name="foundation-layout-jvmstubs" version="1.13.0">
+         <artifact name="foundation-layout-jvmstubs-1.13.0.jar">
+            <sha256 value="ca5234e91721aeb1d225eab445fb1b582181183a674156665def80b11d0522d1" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-layout-jvmstubs-1.13.0.module">
+            <sha256 value="3b8e37749c6a433d43f0ffb2a82bdd84a32dc1542e42b19b8d641ff058bf4c0c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-layout-jvmstubs-1.13.0.pom">
+            <sha256 value="d7c769966466faaf618e39a6818c45ee47769bfc572a55b959927b4139d52033" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.foundation" name="foundation-layout-jvmstubs" version="1.13.0-beta01">
          <artifact name="foundation-layout-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="ca5234e91721aeb1d225eab445fb1b582181183a674156665def80b11d0522d1" origin="Independent official supplier audit" />
@@ -811,6 +915,14 @@
             <sha256 value="6d3c0053c8b12bd5a21daa2cdf9f5ffa5a3f582cbc2898ccb9b4e0a33402424a" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.foundation" name="foundation-layout" version="1.13.0">
+         <artifact name="foundation-layout-1.13.0.module">
+            <sha256 value="df1eb0cff4903380ac2b773dce7428e45b551f93d6c1c63017e57a0befe599a6" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-layout-1.13.0.pom">
+            <sha256 value="a2ebfbbfaf9a95dbc5cb82f0d113ea632cbb58d05d96be3c7c0f7ea9c6995bc1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.foundation" name="foundation-layout" version="1.13.0-beta01">
          <artifact name="foundation-layout-1.13.0-beta01.module">
             <sha256 value="c0d44a494388d53642b81f6712b80c70ac62fb39e0283c8763d7dbf30d1047cc" origin="Independent official supplier audit" />
@@ -833,6 +945,14 @@
          </artifact>
          <artifact name="foundation-layout-1.13.0-rc01.pom">
             <sha256 value="23d0e3262ada0d8e1a5cb21a7903e57fa18075212e8588942d5876b3dfd504dd" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.foundation" name="foundation" version="1.13.0">
+         <artifact name="foundation-1.13.0.module">
+            <sha256 value="5ac0755b07e39c2dfa330f2401e1f507e16e7523cc054a1420f3f6f0b4582965" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="foundation-1.13.0.pom">
+            <sha256 value="64f118a9666d72703901a7bdf03197d2cde49fff1f36d2be6762fe636cf30a72" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.foundation" name="foundation" version="1.13.0-beta01">
@@ -868,6 +988,17 @@
          </artifact>
          <artifact name="material3.aar">
             <sha256 value="bf09d0c5bd06d33d828c44dd04a537e76528ef2476bb4d802a329a83cb0a618b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.material3" name="material3-jvmstubs" version="1.5.0">
+         <artifact name="material3-jvmstubs-1.5.0.jar">
+            <sha256 value="dc15c9ef07c15efe6e806de2a2db2f1f804310464dd5cc09e739cc45c09f48e3" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material3-jvmstubs-1.5.0.module">
+            <sha256 value="bf90d2d2094840a10a55445d4c7f71933c4306cebe4bdf0aa4911dbfc12760f4" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material3-jvmstubs-1.5.0.pom">
+            <sha256 value="04b681387dde512f2f921fbaea8d8b763800fd06bee8275b9c0882807dd89c73" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.material3" name="material3-jvmstubs" version="1.5.0-beta01">
@@ -912,6 +1043,17 @@
          </artifact>
          <artifact name="material3-ripple.aar">
             <sha256 value="11774f26246f933ec39413c13dc6de5de2f09beaa397d38658c78cef00dc9aa5" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.material3" name="material3-ripple-jvmstubs" version="1.5.0">
+         <artifact name="material3-ripple-jvmstubs-1.5.0.jar">
+            <sha256 value="fa1fe9c5ce4dfbc92f7675efc83be1bd8c6583897e14637efc7afe66a830242a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material3-ripple-jvmstubs-1.5.0.module">
+            <sha256 value="c7b729e7eb80d48363ed02a57b27147354253b81569be83949cb086d376db8fe" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material3-ripple-jvmstubs-1.5.0.pom">
+            <sha256 value="df93147cd5bbe08b6d16f12684735bbc5b91ce610a90670a5a1cc9fa2e908ef3" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.material3" name="material3-ripple-jvmstubs" version="1.5.0-beta01">
@@ -963,6 +1105,17 @@
             <sha256 value="3bbbaff9a9b03ea5303a330b18aa8b4c2e60b27a64c358b3811668e5d084527d" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.material" name="material-ripple-android" version="1.13.0">
+         <artifact name="material-ripple-android-1.13.0.module">
+            <sha256 value="6870c4df9e4d42bb2154da4883a76e60b8a6e321988a33e1d8af070e467cf237" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material-ripple-android-1.13.0.pom">
+            <sha256 value="69b21ef04b5fdf9e8f4d24e078e918ab1c8bb919ca1021b2b75e0a922740ae76" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material-ripple.aar">
+            <sha256 value="c031c2416a283f8a7f58a969149c4247250237a194218fee4a9ff56cbd250cc2" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.material" name="material-ripple-android" version="1.13.0-beta01">
          <artifact name="material-ripple-android-1.13.0-beta01.module">
             <sha256 value="70d95c415eb126e18832250d3c9fe0243eca83063fdf28eaf449ac73eedf467d" origin="Independent official supplier audit" />
@@ -994,6 +1147,17 @@
          </artifact>
          <artifact name="material-ripple.aar">
             <sha256 value="dc23fc9ebbe0dfc8b77b1d24136cc91c3ec369b59f83876c5265e4bae028c946" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.material" name="material-ripple-jvmstubs" version="1.13.0">
+         <artifact name="material-ripple-jvmstubs-1.13.0.jar">
+            <sha256 value="477f36b0ea29b0fca6af868361dedb38e17f8b68d3a93e5c8d5a837fdb493602" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material-ripple-jvmstubs-1.13.0.module">
+            <sha256 value="44b6d55fac0c3c709ec5c8d572c1c7311e7a9c63c2c661dbc55d34405373d8df" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material-ripple-jvmstubs-1.13.0.pom">
+            <sha256 value="53951b9383f0b4fddbe010a99a408c58261dbe570136fc7473020e2688e4a188" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.material" name="material-ripple-jvmstubs" version="1.13.0-beta01">
@@ -1029,6 +1193,14 @@
             <sha256 value="d9213b39870ef4f5574c703f36f46c1f4ca2db875e06c2ce425eeba5cb700382" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.material" name="material-ripple" version="1.13.0">
+         <artifact name="material-ripple-1.13.0.module">
+            <sha256 value="eb7e208077ff5b08493eb718513adb4b70c1a42003be0d00150bf10d2b72e31b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="material-ripple-1.13.0.pom">
+            <sha256 value="cdd26f7c8959e09cc2554cf34b7379e96da741a2b7d4dd2b650122f0497d3026" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.material" name="material-ripple" version="1.13.0-beta01">
          <artifact name="material-ripple-1.13.0-beta01.module">
             <sha256 value="637360f445cfb58d78482d0387311b49924452620766adc4388a57ec0439b7a6" origin="Independent official supplier audit" />
@@ -1051,6 +1223,17 @@
          </artifact>
          <artifact name="material-ripple-1.13.0-rc01.pom">
             <sha256 value="754542aabfcf8f7faa97c55c7b7a66f4437995aef0f6a7a3e16552585acc045b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.runtime" name="runtime-android" version="1.13.0">
+         <artifact name="runtime-android-1.13.0.module">
+            <sha256 value="0957e5dfa605d1e51e49becc8d14e06ca8610f66fb59d66686fd05b81c1f0ebc" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-android-1.13.0.pom">
+            <sha256 value="198f605b3af41e662c4430b0cce896063dc183f9b6cd2be912f3134f3456911d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime.aar">
+            <sha256 value="39caa686185abd9b3366c04eb4691eb38828af9469d5df1cd6455b89d3b43bd3" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.runtime" name="runtime-android" version="1.13.0-beta01">
@@ -1086,6 +1269,17 @@
             <sha256 value="7b8684fb0ebb7d0c60c9cc4bfa60a2fab70684d30f1fd42d0e7588922ceca685" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-annotation-android" version="1.13.0">
+         <artifact name="runtime-annotation-android-1.13.0.module">
+            <sha256 value="1595af90bd86d5f4bde2cab57a2f8bb00b647c57fc2967dcd04644835e7460c6" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-annotation-android-1.13.0.pom">
+            <sha256 value="c3771c6abc8a379c536ed93151b96ef392880529318ba446e2bcb673a3e36f33" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-annotation.aar">
+            <sha256 value="e2a54a464a34924dd824d54c4208cc69b3765adc981ad773bdc11297b1ce0781" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-annotation-android" version="1.13.0-beta01">
          <artifact name="runtime-annotation-android-1.13.0-beta01.module">
             <sha256 value="59b0b153662621effefeeb19abc0ae80f6c5b3dbd1dd261a86f355ffb6cd7aeb" origin="Independent official supplier audit" />
@@ -1117,6 +1311,17 @@
          </artifact>
          <artifact name="runtime-annotation.aar">
             <sha256 value="ce27bc1a8078c336d4204534070d967ae1e1bd4930e7052209334c16d4bef536" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.runtime" name="runtime-annotation-jvm" version="1.13.0">
+         <artifact name="runtime-annotation-jvm-1.13.0.jar">
+            <sha256 value="d5afbc509919492ddfbb7dddd480a0fbcb5ed1e641a2c3fb52d17d1789921b89" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-annotation-jvm-1.13.0.module">
+            <sha256 value="3204fa140db4b60ba2a07a6ce109158a29e53c9c258211ad266db3042ede821d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-annotation-jvm-1.13.0.pom">
+            <sha256 value="69e47e236978c69f96b5f71b0f7d56330f18e59f0452b30925bd51863772ce42" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.runtime" name="runtime-annotation-jvm" version="1.13.0-beta01">
@@ -1152,6 +1357,14 @@
             <sha256 value="a74d4df07209ec7bc8148402a6935e95aa08450d4a771341bae4aedbb902e65a" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-annotation" version="1.13.0">
+         <artifact name="runtime-annotation-1.13.0.module">
+            <sha256 value="bc7e012e2d1d21df343f5792cd4330a172fe849d09ced26f4c337212edb64c1f" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-annotation-1.13.0.pom">
+            <sha256 value="ca9a029e8287cad29a81b9dcba5b79fb699717d49ac709e429d4e0c30d740ec5" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-annotation" version="1.13.0-beta01">
          <artifact name="runtime-annotation-1.13.0-beta01.module">
             <sha256 value="7bb31d8d2025dc43e735a314c495a6c5e260d05de57138fdafddf00182757275" origin="Independent official supplier audit" />
@@ -1174,6 +1387,17 @@
          </artifact>
          <artifact name="runtime-annotation-1.13.0-rc01.pom">
             <sha256 value="c842f79640d0c86713e70795543370aadc058da6c2518699174a1e63065ae60d" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.runtime" name="runtime-desktop" version="1.13.0">
+         <artifact name="runtime-desktop-1.13.0.jar">
+            <sha256 value="b40c6e62669a9e7408183d7f3485531c51e873cd8cdfbde6df9494097f27c16d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-desktop-1.13.0.module">
+            <sha256 value="5f4b0fc5c8947480b662c5ed2be4605babee94b595dddaf775dc840e9fb7c72e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-desktop-1.13.0.pom">
+            <sha256 value="af13adbf3fab4d6d86f20ce527ac2e0617b5a33f2c8772b1d6bd9046e48a8978" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.runtime" name="runtime-desktop" version="1.13.0-beta01">
@@ -1209,6 +1433,17 @@
             <sha256 value="efa3d4f3a00cb36d56cd1e8fecd599d0f741cff75df554a2f33bb0977e6b329a" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-retain-android" version="1.13.0">
+         <artifact name="runtime-retain-android-1.13.0.module">
+            <sha256 value="3cd9d53f11f113501c0b917e9d729f61616bfd1d9c7d2db53781835ad4845965" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-retain-android-1.13.0.pom">
+            <sha256 value="f578f5cc96ae38054f059c76d685aa290ba6d4967afb50df046104b7133fa5ee" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-retain.aar">
+            <sha256 value="cdd5001eaf098540aa7bf8d8b0b52c6d0f34deb116cdbd1eb6ef5bb02fa95c0b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-retain-android" version="1.13.0-beta01">
          <artifact name="runtime-retain-android-1.13.0-beta01.module">
             <sha256 value="50ff50e6a350ba87c855428cf1ce2e5d28b227d52d27d8e9c3c88e292cfbce96" origin="Independent official supplier audit" />
@@ -1240,6 +1475,17 @@
          </artifact>
          <artifact name="runtime-retain.aar">
             <sha256 value="2f16dfadde48c558b02c172cb5e678851ee8f7a808c0015184721e8109c7bbc1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.runtime" name="runtime-retain-desktop" version="1.13.0">
+         <artifact name="runtime-retain-desktop-1.13.0.jar">
+            <sha256 value="7bdca5d4fb5eeb8940ef2105da33a3e50624e4a1460e27f78b04cd9d98261f28" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-retain-desktop-1.13.0.module">
+            <sha256 value="d89c06c354788a582b955904a9cec9ea5bda3ef2490a552ae96bf2d19140eb8a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-retain-desktop-1.13.0.pom">
+            <sha256 value="cdcb0e0288a1de97e0904e89941b85be2cc3ba080c508e1558c3c9c71d7df00e" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.runtime" name="runtime-retain-desktop" version="1.13.0-beta01">
@@ -1275,6 +1521,14 @@
             <sha256 value="af9e670859d899978fdf5b80e1ca8dd84e1f7ce5b16428d6cb935dc92f9c01b5" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-retain" version="1.13.0">
+         <artifact name="runtime-retain-1.13.0.module">
+            <sha256 value="954de08fd6cbc1bd24709982c43200c97a25120360ab294c89ce3f6a91ac2e65" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-retain-1.13.0.pom">
+            <sha256 value="dcbe14622385f6eefd56babe04212250068d2b98f3089595f0182291f051e96b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-retain" version="1.13.0-beta01">
          <artifact name="runtime-retain-1.13.0-beta01.module">
             <sha256 value="3a2b6ff6c4ef75827727e497fe2712aca21ca0f04d8aa533ae842835a7bbfdbd" origin="Independent official supplier audit" />
@@ -1297,6 +1551,17 @@
          </artifact>
          <artifact name="runtime-retain-1.13.0-rc01.pom">
             <sha256 value="24760557e0d30f6353a6b27780db4230ef28048a232663f68ba7640a9ab14a45" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.runtime" name="runtime-saveable-android" version="1.13.0">
+         <artifact name="runtime-saveable-android-1.13.0.module">
+            <sha256 value="102934d3676da6467f101017f333cca98c3941a944133813a329ad605611a20a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-saveable-android-1.13.0.pom">
+            <sha256 value="5b53fdc38da095f236bd3ffb0bf98c806021bef0bef3817dc4811e854ebee5a5" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-saveable.aar">
+            <sha256 value="b4adce846e4c5c5f557cb727897a329a46b8293d772b9f2f1be6e860b016ae49" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.runtime" name="runtime-saveable-android" version="1.13.0-beta01">
@@ -1332,6 +1597,17 @@
             <sha256 value="2ff5f2b15ded9aa84e1445ac1a4a2637196942912e745742b790231387c269e8" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-saveable-desktop" version="1.13.0">
+         <artifact name="runtime-saveable-desktop-1.13.0.jar">
+            <sha256 value="9e3c5b17c993b10bc082c277c5074b632e57701cbec2ea8b8aac6a98896bf7aa" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-saveable-desktop-1.13.0.module">
+            <sha256 value="9b6684e12cc0aa87412dc466d9b7109a0abd6aafcc5f11cd49cd00d16bb5b79c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-saveable-desktop-1.13.0.pom">
+            <sha256 value="875b00064e0e6327709189264c728628c9a210eb6afbf6fa3c3878a50ad371f1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-saveable-desktop" version="1.13.0-beta01">
          <artifact name="runtime-saveable-desktop-1.13.0-beta01.jar">
             <sha256 value="9e3c5b17c993b10bc082c277c5074b632e57701cbec2ea8b8aac6a98896bf7aa" origin="Independent official supplier audit" />
@@ -1365,6 +1641,14 @@
             <sha256 value="a6a97fceb9a5042f99be7f39766adfec6e0d2da634da130bd7ace90a4fad9821" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime-saveable" version="1.13.0">
+         <artifact name="runtime-saveable-1.13.0.module">
+            <sha256 value="bb20db478d9f8dda52c5299c9e4757c35fa01621038ad1207b2284bcec9ca2bd" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-saveable-1.13.0.pom">
+            <sha256 value="a67a15049da3211edf71c95dcf961d21e64ab0cfdb1d04f2c963539f43007449" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime-saveable" version="1.13.0-beta01">
          <artifact name="runtime-saveable-1.13.0-beta01.module">
             <sha256 value="14856cff047939996c04532cb3c0bf96d9dd967319f171a329768ba6a8bef9d3" origin="Independent official supplier audit" />
@@ -1389,6 +1673,14 @@
             <sha256 value="cb04456075b028b68421dc989dde3e80eefdcf5ec1fcca3c825564f2e7ed0aa2" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.runtime" name="runtime" version="1.13.0">
+         <artifact name="runtime-1.13.0.module">
+            <sha256 value="83d5433270be9dbd258a702dcb982d6cec903c1c26116b13f9d829a48017145c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="runtime-1.13.0.pom">
+            <sha256 value="8ead5c294ad89b5f5d04190a5fd28c6de7493a36043d94c2e66bfdb1ef8cba7c" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.runtime" name="runtime" version="1.13.0-beta01">
          <artifact name="runtime-1.13.0-beta01.module">
             <sha256 value="c7d353162830b5fc94fd41ec41db0c2c739d096bb3188cdc6b247b5313dd5638" origin="Independent official supplier audit" />
@@ -1411,6 +1703,17 @@
          </artifact>
          <artifact name="runtime-1.13.0-rc01.pom">
             <sha256 value="efe4f1bcbdc4f8ed6b452996f83e70cece8233f0dbffbab2cad1807dfeaf2c52" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-android" version="1.13.0">
+         <artifact name="ui-android-1.13.0.module">
+            <sha256 value="5d20fe85fad09461bd896de901152894ccc8e23360792583990770e78bb9512c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-android-1.13.0.pom">
+            <sha256 value="df44b540314b4b22bc9cee75713ce4d86778faa6e4254d31acbd57295f7d01a7" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui.aar">
+            <sha256 value="b5d23c05886f9c441e3cb004f8ac4614f96e9c1901795742bd9ddb5b8bad1b61" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-android" version="1.13.0-beta01">
@@ -1446,6 +1749,17 @@
             <sha256 value="59821c8a1198b0e48cefb2a36c22eaa7bf086ef0073ac1ba40d6f352ae939a00" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-geometry-android" version="1.13.0">
+         <artifact name="ui-geometry-android-1.13.0.module">
+            <sha256 value="15db4fe2114e988a9ee65242f4065ccd3ce53840f40842c79483c984395b0e77" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-geometry-android-1.13.0.pom">
+            <sha256 value="f95e472f1ff9e230aee3ee527eb48cf3d445fc4218c9dde94582834e403f329b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-geometry.aar">
+            <sha256 value="d86f77f8f78b27c50755753d3e68bf4215c7071f9ee9ce6d3335f30b91eb0b18" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-geometry-android" version="1.13.0-beta01">
          <artifact name="ui-geometry-android-1.13.0-beta01.module">
             <sha256 value="4a195f10f93940a681ca78427f17a680c8a15464845b7107a7dcfa73f80349b0" origin="Independent official supplier audit" />
@@ -1477,6 +1791,17 @@
          </artifact>
          <artifact name="ui-geometry.aar">
             <sha256 value="13a014fa64c502ff5a619dc415608540ad61458c39deecd7820dcaa7bb3599cf" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-geometry-jvmstubs" version="1.13.0">
+         <artifact name="ui-geometry-jvmstubs-1.13.0.jar">
+            <sha256 value="f40fb32db4cdd702e3ec702df5303f2aa9009a5b6cb67622658b6b5475a300e3" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-geometry-jvmstubs-1.13.0.module">
+            <sha256 value="7649deeedc02ec4d83e59b0045b70fc966914e888769ee2b4d7d71bb617984c1" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-geometry-jvmstubs-1.13.0.pom">
+            <sha256 value="5fc1d74eb086ebaa35350cfe8af443e01bc0d124742fc55f17743e19acc1d5fc" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-geometry-jvmstubs" version="1.13.0-beta01">
@@ -1512,6 +1837,14 @@
             <sha256 value="7d781023a611415b08ffebedde22f00f455ceb6a9ba8659e8cfa8f46de3c9f03" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-geometry" version="1.13.0">
+         <artifact name="ui-geometry-1.13.0.module">
+            <sha256 value="66d029dddbda786222119bc53f37b4ae727cbb402e125ce20b8e710aa59357fc" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-geometry-1.13.0.pom">
+            <sha256 value="681040c19d54dbf83027fef8e91d4fa315e17f09c898d4f9ac66ab72edd82e32" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-geometry" version="1.13.0-beta01">
          <artifact name="ui-geometry-1.13.0-beta01.module">
             <sha256 value="19ef01a5261e3a1b42061242bfaea9fe408b74dbc2002dda62a314aa72772712" origin="Independent official supplier audit" />
@@ -1534,6 +1867,17 @@
          </artifact>
          <artifact name="ui-geometry-1.13.0-rc01.pom">
             <sha256 value="aebb503fe2fc228f2955816c0ed4fa4b5215e5568086b129168ce2f9047e8582" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-graphics-android" version="1.13.0">
+         <artifact name="ui-graphics-android-1.13.0.module">
+            <sha256 value="a8e12c0c39ed01743bfadcbbcf8e4a7bbb295216031490ba1ce7ad3268ecd709" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-graphics-android-1.13.0.pom">
+            <sha256 value="264d4f5638b771a77fa1451733c4c6c338a82d3a20eb7410bedfee61132684c2" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-graphics.aar">
+            <sha256 value="4b0db977082ad677338f471a2b97776162e7fcbf578c74a55af712c843cc5917" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-graphics-android" version="1.13.0-beta01">
@@ -1569,6 +1913,17 @@
             <sha256 value="86e710a38ec7d40022aa22b3b12ab05e54706875be3c0b00dc3078ae4417fcf5" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-graphics-jvmstubs" version="1.13.0">
+         <artifact name="ui-graphics-jvmstubs-1.13.0.jar">
+            <sha256 value="e1f91694b06b387a56ca46c7864f78897015734ace07710c4bfa3cb7b9232d07" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-graphics-jvmstubs-1.13.0.module">
+            <sha256 value="79523b93c0943acfddba995dddc81cd811171107a96565d4227282ba67902a2d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-graphics-jvmstubs-1.13.0.pom">
+            <sha256 value="211f735e5b6fd6c60a3acf0e0802d12b9af238d330253df576638615c8d2aee1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-graphics-jvmstubs" version="1.13.0-beta01">
          <artifact name="ui-graphics-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="e1f91694b06b387a56ca46c7864f78897015734ace07710c4bfa3cb7b9232d07" origin="Independent official supplier audit" />
@@ -1602,6 +1957,14 @@
             <sha256 value="2e3439f231bd0e87deb2f821b05b078d7fe1f97eb3e98da5e6c7fab32dd279f1" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-graphics" version="1.13.0">
+         <artifact name="ui-graphics-1.13.0.module">
+            <sha256 value="2d3bb491d378e317b6992af48ef4b770bd58ee16e727daea8735dc96c6b5d396" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-graphics-1.13.0.pom">
+            <sha256 value="bc0822cbf614a42f94e1e8f5d4dccc413f2cc73b7c130145ae2811d615fdaec6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-graphics" version="1.13.0-beta01">
          <artifact name="ui-graphics-1.13.0-beta01.module">
             <sha256 value="1ab654a118c50f7213617a21635f5bd192f2edd2af62501cc781b69e3cb767f5" origin="Independent official supplier audit" />
@@ -1624,6 +1987,17 @@
          </artifact>
          <artifact name="ui-graphics-1.13.0-rc01.pom">
             <sha256 value="82bccacab3e4a33e4cfa2d09168da179228fe963e5f36c5992de7058af533230" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-jvmstubs" version="1.13.0">
+         <artifact name="ui-jvmstubs-1.13.0.jar">
+            <sha256 value="f152c09eda7cac26324d038c3e035a5d42fe256ddfde11799feb7a817bae25c0" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-jvmstubs-1.13.0.module">
+            <sha256 value="57721ab0f5a34ca1b25d238840c637d72aee9e5e8ce00fefe715a65821e81aa8" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-jvmstubs-1.13.0.pom">
+            <sha256 value="7dede42bb740ff6efa82282b2ae9d5cbe513e283c03030e3aa7baaca1d9e26ea" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-jvmstubs" version="1.13.0-beta01">
@@ -1659,6 +2033,17 @@
             <sha256 value="ee4a34dd47aa9101dfd7986cb520f0e2573cf97afd870508279846ff3674f279" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-test-android" version="1.13.0">
+         <artifact name="ui-test-android-1.13.0.module">
+            <sha256 value="91b23c7d944834a5450d7f7a36cc72e1d21d014cdd3ee3e529c12c68f3016c86" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-android-1.13.0.pom">
+            <sha256 value="4baf8c44c67da66d15d8ff103bfa7a31556f8f7a5828f1eb922248abb12c5d61" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test.aar">
+            <sha256 value="ba4f5f4ba9366d2faf7967c7a603b0e2738636f8d744cb40393e47033d96bb90" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-test-android" version="1.13.0-beta01">
          <artifact name="ui-test-android-1.13.0-beta01.module">
             <sha256 value="6a03ac910be00e3db20c03c6b3e5b70a3488b8a9ac8aebc02cb27d34f30c6b72" origin="Independent official supplier audit" />
@@ -1690,6 +2075,17 @@
          </artifact>
          <artifact name="ui-test.aar">
             <sha256 value="b2eb181220cc924a67f41f46f36501c079364e3cc35de3c4ae3a07c67c0c577e" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-test-junit4-android" version="1.13.0">
+         <artifact name="ui-test-junit4-android-1.13.0.module">
+            <sha256 value="bace60b2f3116dcb782ca632eab99baa5104a8cc9b84a1bebbf00e550517a2ae" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-junit4-android-1.13.0.pom">
+            <sha256 value="ce5a30381f6d3c914d59ddc91cba1c544a3f10df4ef30a177b4e4827888cbe8e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-junit4.aar">
+            <sha256 value="4d5201f0b946b0e01099b6476403515418abf04cd213a48a7c1f7f334fcd2cd9" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-test-junit4-android" version="1.13.0-beta01">
@@ -1725,6 +2121,14 @@
             <sha256 value="ef7cbc4969041c9e856c7bfa5aeb65d40ba387a3a017a194c7c0716bd9140876" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-test-junit4" version="1.13.0">
+         <artifact name="ui-test-junit4-1.13.0.module">
+            <sha256 value="e66398c7ec36ace50d03312c51dd37067669e2f52e2eaaa5a6d0f4b6082f5b63" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-junit4-1.13.0.pom">
+            <sha256 value="d8700ace4ed85f3cfc1a6d9db5ee23df102ab246eeb869d151232dd4bf405722" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-test-junit4" version="1.13.0-beta01">
          <artifact name="ui-test-junit4-1.13.0-beta01.module">
             <sha256 value="21077d14fc363aad13328ddc2a7b277ceec62bba2fb26c12915c749816e67e02" origin="Independent official supplier audit" />
@@ -1747,6 +2151,17 @@
          </artifact>
          <artifact name="ui-test-junit4-1.13.0-rc01.pom">
             <sha256 value="0a5444d0c4716b034ca423fd8c56e647bd11497877af410d4280c526b8dd47d9" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-test-manifest" version="1.13.0">
+         <artifact name="ui-test-manifest-1.13.0.aar">
+            <sha256 value="9bf0cb5807e0da75d387917c3e8d9f46fcb5fea9efa0e85bf20a077e359f9fe4" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-manifest-1.13.0.module">
+            <sha256 value="b66f17f2c581c139c8866b410d183765d6538bc8e0ed8d45ce062e7b25e07f8d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-manifest-1.13.0.pom">
+            <sha256 value="31e6f756d36dedbb580c22606dd2bb20d683b55c56fe13b566684f66561eff05" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-test-manifest" version="1.13.0-beta01">
@@ -1782,6 +2197,14 @@
             <sha256 value="6ffb139ed0c15fbfa7aac97c4c77385aba6f2fbfd3fa338dd47d935b6c5c3181" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-test" version="1.13.0">
+         <artifact name="ui-test-1.13.0.module">
+            <sha256 value="48362808d4f1924afd13f14568f43eb88d60fc4c74cefab949d23dded61f0853" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-test-1.13.0.pom">
+            <sha256 value="ea7edfb2a2eacf2dd3b15e073789bcc448269756ba14751383481dd0997d9b00" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-test" version="1.13.0-beta01">
          <artifact name="ui-test-1.13.0-beta01.module">
             <sha256 value="fbf9ca48bd598988f07774cfbd48472109f31642485aa75b9c99933688023667" origin="Independent official supplier audit" />
@@ -1804,6 +2227,17 @@
          </artifact>
          <artifact name="ui-test-1.13.0-rc01.pom">
             <sha256 value="f244dddf87990b0d765636f196ca609aa6ae16ec2ab6763d2c2bad648e5c3456" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-text-android" version="1.13.0">
+         <artifact name="ui-text-android-1.13.0.module">
+            <sha256 value="be098523359ddb82bd56319f69030460532b4af98c9734bb629724e3e015740f" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-text-android-1.13.0.pom">
+            <sha256 value="7153495bff64b8b9ddbecc0b490d0f34d2c5747515fc93b505be22254928b03c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-text.aar">
+            <sha256 value="da7a21ac01fde97c5377926719e8731ee4035e30a9bde77fae8ec56d1a09d115" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-text-android" version="1.13.0-beta01">
@@ -1839,6 +2273,17 @@
             <sha256 value="e9201883e4c1bbbd8bc7215ab5bb09d0eecd62c95c3e6e6bb646ce8c57fdc0e6" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-text-jvmstubs" version="1.13.0">
+         <artifact name="ui-text-jvmstubs-1.13.0.jar">
+            <sha256 value="948278558b8751cd1e07b8d34a3730e6293b5caa3487d1cd7317721978b4f4af" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-text-jvmstubs-1.13.0.module">
+            <sha256 value="4603429bc686e16a82e13f677e19c129cc8acc0640cf7db0730f2bd35bf8c882" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-text-jvmstubs-1.13.0.pom">
+            <sha256 value="5a9d788a7135fac826d41059c31cf3ad47385c927c17bcdcc1bc938937d8cccc" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-text-jvmstubs" version="1.13.0-beta01">
          <artifact name="ui-text-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="948278558b8751cd1e07b8d34a3730e6293b5caa3487d1cd7317721978b4f4af" origin="Independent official supplier audit" />
@@ -1872,6 +2317,14 @@
             <sha256 value="cc6e5dd03c01f6d03d787c55c569a9a01d3f28d4d93c9e7a452e7f57cf15b74a" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-text" version="1.13.0">
+         <artifact name="ui-text-1.13.0.module">
+            <sha256 value="8cb375a67534f70231d015f105f1477739069f1062e59b640821c4b31d3a5c65" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-text-1.13.0.pom">
+            <sha256 value="cde2bc572598d70958bd8886a319fd1f6f4365a0ed0fb069cddb4f724cf60dae" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-text" version="1.13.0-beta01">
          <artifact name="ui-text-1.13.0-beta01.module">
             <sha256 value="21cde1cb286bdb53fc68c4c5e4ebb9181b55f91e5185961314dfa8f6c732b364" origin="Independent official supplier audit" />
@@ -1894,6 +2347,17 @@
          </artifact>
          <artifact name="ui-text-1.13.0-rc01.pom">
             <sha256 value="81cad8e25a1c0835ed64fbaf0cfe23807f99ece6b4e4523bdf9498007551179f" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-tooling-android" version="1.13.0">
+         <artifact name="ui-tooling-android-1.13.0.module">
+            <sha256 value="f84c00c4246b7a10ed5c6546f7018c0ac2d2729533187ab45ae63cb65a09d90a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-android-1.13.0.pom">
+            <sha256 value="0a060c1eb9fc933bf3380851cedfb1282e48fc4a9e44bae0aed36f35234841c1" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling.aar">
+            <sha256 value="ad04a7cd352aa7733bf90f8c06d98b4a097e44b827cea2dfd91827e819cc7107" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-tooling-android" version="1.13.0-beta01">
@@ -1929,6 +2393,17 @@
             <sha256 value="215be0277e3cedf2692794137653522c1d714fc9ff4ba06d6f343594e0505ae1" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-tooling-data-android" version="1.13.0">
+         <artifact name="ui-tooling-data-android-1.13.0.module">
+            <sha256 value="59e2fea80d421179e560724a5e3dff9ed38ea9a33a55c8aaeb7fa6be4e7eff75" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-data-android-1.13.0.pom">
+            <sha256 value="0050e285b90b0008242f5ab9d504a5766e90ef330ed4c2df57739edf357f35d3" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-data.aar">
+            <sha256 value="50502529511d4a78e1aa28497a96891ffc38009a3e6576f84e6bfe8527d85ed7" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-tooling-data-android" version="1.13.0-beta01">
          <artifact name="ui-tooling-data-android-1.13.0-beta01.module">
             <sha256 value="dbdeca7c7c34ff48827617d4dcf7926533c4bc1edee1d390fb49b2e0701ae4f5" origin="Independent official supplier audit" />
@@ -1962,6 +2437,14 @@
             <sha256 value="f6142283ea4f9fc7ef97af161fff24ccc6dd22d8ef5cdd2d889cb15b99d76d14" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-tooling-data" version="1.13.0">
+         <artifact name="ui-tooling-data-1.13.0.module">
+            <sha256 value="1191f59d1bdacff681f6ae93c73d45bdd66c1036ac87295481122daa2a12c9e7" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-data-1.13.0.pom">
+            <sha256 value="16471ea88979351ef195c0891c30e96cc7d382d778f6a7da9d305580b998af5c" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-tooling-data" version="1.13.0-beta01">
          <artifact name="ui-tooling-data-1.13.0-beta01.module">
             <sha256 value="a495043a393c93052b0557bb5246542c9b40fcdae0e9c658f400e84db2412601" origin="Independent official supplier audit" />
@@ -1984,6 +2467,17 @@
          </artifact>
          <artifact name="ui-tooling-data-1.13.0-rc01.pom">
             <sha256 value="7c2d7e456da70a3d160dbf9f6e57ade6dfbd2dd6cf6a09d4c5eb2a0da06b92e8" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-tooling-preview-android" version="1.13.0">
+         <artifact name="ui-tooling-preview-android-1.13.0.module">
+            <sha256 value="f049765d29516a24bb99fa41d6a02ba75d481e8fe162f9060751bb8c9110ef86" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-preview-android-1.13.0.pom">
+            <sha256 value="d7c7ef38c935c623eee91730cd1c4a026ba24ad3076aea2c5e588c3e981d2af5" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-preview.aar">
+            <sha256 value="898124443aca4ad75450b1f0ed03244a3cc340f028631eb2b827b41dd8fbe6a6" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-tooling-preview-android" version="1.13.0-beta01">
@@ -2019,6 +2513,17 @@
             <sha256 value="7b611a2cf0c2f666cc19e8cadabcc0e308ab4f47ab65503d0973511eef9f546e" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-tooling-preview-jvmstubs" version="1.13.0">
+         <artifact name="ui-tooling-preview-jvmstubs-1.13.0.jar">
+            <sha256 value="bf36b728e32af19737b4befd9aae1d5f645c5ae7de4cf8ef79adec84d84fd49b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-preview-jvmstubs-1.13.0.module">
+            <sha256 value="31cbdb280a74c023253806ff5a857a7bfec9c3f7327edd7e705688ce93f63326" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-preview-jvmstubs-1.13.0.pom">
+            <sha256 value="41b32b5cd4dc52f1e573e6629c900224debd5bafbd0744799be965c28bc3679d" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-tooling-preview-jvmstubs" version="1.13.0-beta01">
          <artifact name="ui-tooling-preview-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="bf36b728e32af19737b4befd9aae1d5f645c5ae7de4cf8ef79adec84d84fd49b" origin="Independent official supplier audit" />
@@ -2052,6 +2557,14 @@
             <sha256 value="9c6812f6949c00f0beb7b3924286bfdc277f214cd6ed060f0f532e5c6db28402" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-tooling-preview" version="1.13.0">
+         <artifact name="ui-tooling-preview-1.13.0.module">
+            <sha256 value="5307ff1ec869b7eab97c85c4300450fb4812180734cd999eb0946d848c437b93" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-preview-1.13.0.pom">
+            <sha256 value="393f32c4c392b4153aa2a25463f44ec6d4dfb9713b2c79eb54cc8ef69cdfd303" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-tooling-preview" version="1.13.0-beta01">
          <artifact name="ui-tooling-preview-1.13.0-beta01.module">
             <sha256 value="34c5f16cfe37ca1bcb2956952c5f88faf1864f09910edea4a9282f8a22845223" origin="Independent official supplier audit" />
@@ -2076,6 +2589,14 @@
             <sha256 value="6cfd6c4437b013f91a245d1cb2ec9fb4a90c7b7dbc441251eda45df48e9637d5" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-tooling" version="1.13.0">
+         <artifact name="ui-tooling-1.13.0.module">
+            <sha256 value="4ea30363c768b3a017b5dd7cf7c720ea1c044f6a81fd1d0e330569c622478e38" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-tooling-1.13.0.pom">
+            <sha256 value="53951520116bb6d789f9e7953eb3944959e46f3a5ba4d5d727f4e8b0a6f3fc43" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-tooling" version="1.13.0-beta01">
          <artifact name="ui-tooling-1.13.0-beta01.module">
             <sha256 value="e2ad8718ce5708a64952fb2ec947f6c3c5352e049ca399dc7e7fb0dadc8200b4" origin="Independent official supplier audit" />
@@ -2098,6 +2619,17 @@
          </artifact>
          <artifact name="ui-tooling-1.13.0-rc01.pom">
             <sha256 value="cfadbe41a714b2500d615a2b31f222199f2cfcfe54ff029a3909c614db25c29e" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-unit-android" version="1.13.0">
+         <artifact name="ui-unit-android-1.13.0.module">
+            <sha256 value="54b6f55f088bdfea00fe53548058d55e7cb1b6991a5928e4f83d8fdecc5329ca" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-unit-android-1.13.0.pom">
+            <sha256 value="ca15c0262488a192fc2a5cb2848427cc5efb8a6a565d7b027110b7614ef50b70" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-unit.aar">
+            <sha256 value="51dbb2719c5ffca99fb96afc7531b22225a69d2c455677558a4c6a89f40fe70e" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-unit-android" version="1.13.0-beta01">
@@ -2133,6 +2665,17 @@
             <sha256 value="579cbb2c958f1538328c4026754aee8fc3d5a1bdb1efe21c61d39e12f5364440" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-unit-jvmstubs" version="1.13.0">
+         <artifact name="ui-unit-jvmstubs-1.13.0.jar">
+            <sha256 value="b9b5044438477ca90e3d961bce072be62a91f100e44cf2f396dd71a3ad7d9737" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-unit-jvmstubs-1.13.0.module">
+            <sha256 value="848403a56f92c60cb2ab0a0bf0a2070f079ff78fa7e389b8c7a16d035aa747d4" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-unit-jvmstubs-1.13.0.pom">
+            <sha256 value="ff44761a91626ae5259f2c79cae4af0b461621d1e392189168a7d3d254b03e40" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-unit-jvmstubs" version="1.13.0-beta01">
          <artifact name="ui-unit-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="b9b5044438477ca90e3d961bce072be62a91f100e44cf2f396dd71a3ad7d9737" origin="Independent official supplier audit" />
@@ -2166,6 +2709,14 @@
             <sha256 value="a18ad13b8783c720b59d2cb47f3489f7c3f0c6c391f6a85732c7c495dda2b43b" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-unit" version="1.13.0">
+         <artifact name="ui-unit-1.13.0.module">
+            <sha256 value="f4b658b8eefbf7baf77044d70933de40787cc336fd6b67ad2325e3bf0f9bfc64" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-unit-1.13.0.pom">
+            <sha256 value="1eca963da0d8a5905e0c54f01189c6cfee7595a3efaba6cd702e5ae9bde3a4af" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-unit" version="1.13.0-beta01">
          <artifact name="ui-unit-1.13.0-beta01.module">
             <sha256 value="da155a799826609b5e75db0cb8047b2529d786b519a957a6768277d5908412e9" origin="Independent official supplier audit" />
@@ -2188,6 +2739,17 @@
          </artifact>
          <artifact name="ui-unit-1.13.0-rc01.pom">
             <sha256 value="06155c14787e99ff885ac098331e844fc9c7632a8695e8118ff0400fd67798e1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui-util-android" version="1.13.0">
+         <artifact name="ui-util-android-1.13.0.module">
+            <sha256 value="53dfd8977cf9f6ad78394fe7eb25f750e136ccc9cfa6345bde84ac9f7307e522" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-util-android-1.13.0.pom">
+            <sha256 value="4258949a2e23422bfb93d97a4b27f39f5c619b61cbdb6e05377d4954f56a8da1" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-util.aar">
+            <sha256 value="ef6862049e8eafc4e478e295aee38e015e11f6e35e3026c5ff45cdd626879f34" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui-util-android" version="1.13.0-beta01">
@@ -2223,6 +2785,17 @@
             <sha256 value="3bdd29dbf58895b6e2595b11aef7ef07457eadd9797168652843ed75696aa705" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-util-jvmstubs" version="1.13.0">
+         <artifact name="ui-util-jvmstubs-1.13.0.jar">
+            <sha256 value="9526b90729e261934c56ba44d9f37ca4372c96fce183440513099375aa09681f" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-util-jvmstubs-1.13.0.module">
+            <sha256 value="629335501783fa76f650cdf33fd696e5a1a53e20ac2e509c12dd076f3cde4e64" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-util-jvmstubs-1.13.0.pom">
+            <sha256 value="1989e51306c157f4f9d4c077a33ea54a580284e08c241923812e4e91d4efd43f" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-util-jvmstubs" version="1.13.0-beta01">
          <artifact name="ui-util-jvmstubs-1.13.0-beta01.jar">
             <sha256 value="9526b90729e261934c56ba44d9f37ca4372c96fce183440513099375aa09681f" origin="Independent official supplier audit" />
@@ -2256,6 +2829,14 @@
             <sha256 value="f9c54b74d7627de95b916ffc724208ea91b94d9e13aab116f1f0d8fd62b47892" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.compose.ui" name="ui-util" version="1.13.0">
+         <artifact name="ui-util-1.13.0.module">
+            <sha256 value="f37eb02eafa8fa52cd48a2c647b76cb126be32006b82e597952a56b8588643ad" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-util-1.13.0.pom">
+            <sha256 value="88a9e1a1106188a4dc62d7d9766f82a89c2210c1f856aa95c8e97b1772ac2a86" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.compose.ui" name="ui-util" version="1.13.0-beta01">
          <artifact name="ui-util-1.13.0-beta01.module">
             <sha256 value="16d36078457b877417eec9dd3cbac340d081182a00060b2786b83b03cd5705ee" origin="Independent official supplier audit" />
@@ -2278,6 +2859,14 @@
          </artifact>
          <artifact name="ui-util-1.13.0-rc01.pom">
             <sha256 value="b7eeef4214de1a512d3f41b2b6212498b59f8ba8e7a3e815d13f6490ea6991c8" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose.ui" name="ui" version="1.13.0">
+         <artifact name="ui-1.13.0.module">
+            <sha256 value="f3e8d26ac2586d72f44b2b45ef9a20a85948e13a054fb998b466573e34dd1a59" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="ui-1.13.0.pom">
+            <sha256 value="fa7995baf349c4d4d07acd1390a70920d49b6c654c8fd91ee6e3a2e550df00e8" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.compose.ui" name="ui" version="1.13.0-beta01">
@@ -2317,6 +2906,11 @@
       <component group="androidx.compose" name="compose-bom-beta" version="2026.11.00">
          <artifact name="compose-bom-beta-2026.11.00.pom">
             <sha256 value="684a7604013af250251f5cc850e8b59a529eb9a0109d9eae3846bdddedc334a6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.compose" name="compose-bom-beta" version="2026.11.01">
+         <artifact name="compose-bom-beta-2026.11.01.pom">
+            <sha256 value="589fcb4031d70aa3963bab0b0913ff774590ab54d94641f7eced90a7700312b6" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.concurrent" name="concurrent-futures-ktx" version="1.1.0">
