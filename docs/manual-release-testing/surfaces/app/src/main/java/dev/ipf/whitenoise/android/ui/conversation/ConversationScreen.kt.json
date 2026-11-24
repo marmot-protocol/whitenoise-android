@@ -237,14 +237,6 @@
         ]
       },
       {
-        "surface": "Reversed conversation physical-edge selection and post-scroll endpoint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "fun messageDragSelectionEffects()",
-        "test_ids": [
-          "MSG-004"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "surface": "Message collapse retires deferred foreground correction before viewport settlement",
         "anchor": "onBeforeBodyCollapse = {",

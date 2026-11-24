@@ -20,10 +20,9 @@ import androidx.compose.ui.semantics.selected
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchCustomRangeValidation
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.CivilDatePickerDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.time.Instant
 import java.time.LocalDate
@@ -152,9 +151,8 @@ private fun GlobalSearchDatePresetDialog(
     zoneId: () -> ZoneId,
 ) {
     var stagedSelection by remember(selection) { mutableStateOf(selection) }
-    AnimatedAlertDialog(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
+    WhiteNoiseAlertDialog(
+        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.global_search_date_filter_title)) },
         text = {
@@ -217,9 +215,8 @@ private fun GlobalSearchCustomRangeReviewDialog(
             zoneId = stage.snapshottedZoneId,
         )
     val validation = customSelection.validateCustomRange()
-    AnimatedAlertDialog(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
+    WhiteNoiseAlertDialog(
+        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.global_search_date_custom)) },
         text = {

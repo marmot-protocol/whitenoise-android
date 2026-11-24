@@ -10,7 +10,8 @@
         "test_ids": [
           "SET-006",
           "SET-007",
-          "SET-008"
+          "SET-008",
+          "SET-032"
         ]
       },
       {
@@ -36,7 +37,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
         "anchor": "fun WhiteNoiseAlertDialog(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-006"
         ]
       },
       {
