@@ -472,7 +472,9 @@ class AccountWipeMemberMuteRetentionTest {
             val attempted = body.indexOf(attempt)
             val guarded = body.indexOf("} finally {", attempted)
             assertTrue(attempted >= 0 && guarded > attempted)
-            assertTrue(body.indexOf(retire) > guarded)
+            // Neither finally body nests a block, so its first closing brace ends it.
+            val finallyBody = body.substring(guarded + "} finally {".length).substringBefore("}")
+            assertTrue(retire in finallyBody)
         }
     }
 
