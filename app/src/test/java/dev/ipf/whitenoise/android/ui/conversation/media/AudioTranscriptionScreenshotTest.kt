@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isOff
@@ -80,6 +82,19 @@ class AudioTranscriptionScreenshotTest {
 
     @Test
     fun idleLight() = capture("idle-light", null)
+
+    @Test
+    fun shortTranscriptSharesItsLastLineWithTheTimestamp() {
+        composeRule.setContent {
+            AudioTranscriptWithFooter("Hello") {
+                Text("12:34", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        val transcript = composeRule.onNodeWithText("Hello").getUnclippedBoundsInRoot()
+        val timestamp = composeRule.onNodeWithText("12:34").getUnclippedBoundsInRoot()
+        assertTrue(transcript.right < timestamp.left)
+        assertTrue(timestamp.top < transcript.bottom && timestamp.bottom > transcript.top)
+    }
 
     /** An edge tap in the wide gutter toggles the action, while its press state stays inside the disc. */
     @Test

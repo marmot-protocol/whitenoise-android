@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptWithFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggleState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.GiphyMessageFooter
@@ -157,6 +158,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     hasCaption: Boolean = false,
     expandNarrowVisualToStandardWidth: Boolean = false,
     audioTranscription: AudioTranscriptionToggleState? = null,
+    transcriptFooterAttachment: Int? = null,
 ) {
     if (sharedLocation != null) {
         val shareContext = LocalContext.current
@@ -308,6 +310,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
                     audioTranscription = audioTranscription,
+                    completedTranscriptInFooter = entry.index == transcriptFooterAttachment,
                 )
             }
         }
@@ -504,6 +507,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onExpand: () -> Unit,
     onExpandAt: ((Rect?) -> Unit)? = null,
     statusContainerColor: Color? = null,
+    completedTranscript: String? = null,
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
     val recoveryInFooter = showTimestamp && showOuterMetadata
@@ -894,6 +898,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 selectableMessageBody()
             }
         }
+    } else if (completedTranscript != null) {
+        AudioTranscriptWithFooter(completedTranscript, inlineFooter)
     } else if (hasInlineFooter && (showOuterMetadata || invalidationWarning != null)) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             inlineFooter()

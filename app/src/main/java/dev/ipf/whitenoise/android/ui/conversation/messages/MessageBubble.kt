@@ -146,8 +146,11 @@ import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceTranscription
+import dev.ipf.whitenoise.android.ui.conversation.media.animateTranscriptFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberReceivedAudioTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
@@ -555,16 +558,8 @@ internal fun MessageBubble(
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
-    // A received voice message's side transcribe disc drives every recording in this bubble.
-    val audioTranscription =
-        if (mine) {
-            null
-        } else {
-            remember(record.messageIdHex) {
-                dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState(record.messageIdHex)
-            }
-        }
+    val audioTranscription = rememberReceivedAudioTranscription(record.messageIdHex, mine)
+    val voiceTranscription = LocalVoiceTranscription.current
     val translationSource =
         dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
             messageId = record.messageIdHex,
@@ -2245,6 +2240,14 @@ internal fun MessageBubble(
                     }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val footerVoice =
+                    bubbleMedia.audio.lastOrNull()?.takeIf {
+                        !mine && !deleted && !bodyOrWarningInsideBubble && !fileFooterInCard && remoteGiphyMedia == null
+                    }
+                val completedTranscript =
+                    footerVoice?.let { voice ->
+                        audioTranscription?.completedText(voiceTranscription, voice.index, voice.value.sourceEpoch)
+                    }
                 val soleCaptionedVisual =
                     if (bubbleMedia.hasConfirmedMedia) {
                         bubbleMedia.visuals.singleOrNull()?.value.takeIf {
@@ -2607,7 +2610,8 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
-                                contentModifier = textSelectionBoundsModifier,
+                                contentModifier =
+                                    textSelectionBoundsModifier.animateTranscriptFooter(footerVoice != null),
                                 media = {
                                     LookaheadScope {
                                         Column(
@@ -2729,14 +2733,12 @@ internal fun MessageBubble(
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                                 audioTranscription = audioTranscription,
+                                                transcriptFooterAttachment = footerVoice?.index,
                                             )
                                         }
                                     }
                                 },
                             ) {
-                                // No caption: the footer (time/status) for audio,
-                                // file, or multi-visual media still needs a home —
-                                // and so does the failed-send retry row.
                                 BubbleBodyFooterAndRetry(
                                     item = item,
                                     record = record,
@@ -2775,6 +2777,7 @@ internal fun MessageBubble(
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
+                                    completedTranscript = completedTranscript,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = expandBody,
@@ -2936,6 +2939,7 @@ internal fun MessageBubble(
                             translationNoticeOpen = true
                         }
                     },
+                    onTranscribe = audioTranscription?.takeUnless { deleted }?.menuAction(voiceTranscription),
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = !deleted && speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
@@ -3091,7 +3095,8 @@ internal fun MessageBubble(
                             } else {
                                 null
                             }
-                        if (visiblePoll != null || (hasMedia && !bodyOrWarningInsideBubble)) {
+                        val mediaOnly = hasMedia && !bodyOrWarningInsideBubble && completedTranscript == null
+                        if (visiblePoll != null || mediaOnly) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
@@ -3142,6 +3147,7 @@ internal fun MessageBubble(
                                 mine = mine,
                                 text =
                                     bodyTextToRender
+                                        ?: completedTranscript
                                         ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
                                 document = displayedMarkdownDocument,
                                 time = rememberedMessageBubbleTime(record.recordedAt),

@@ -1704,6 +1704,7 @@
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
     <string name="voice_message_recording_failed">Couldn\'t record voice message</string>
     <string name="voice_message_microphone_busy">The microphone is in use by another app. Close it there and try again.</string>
+    <string name="explanation_message_action_transcribe">Turn this recording into text on this device.</string>
     <string name="transcribe_audio">Transcribe</string>
     <string name="audio_transcription_working">Transcribing the recording on this device…</string>
     <!-- Small label above a voice message transcript generated on this device. -->
