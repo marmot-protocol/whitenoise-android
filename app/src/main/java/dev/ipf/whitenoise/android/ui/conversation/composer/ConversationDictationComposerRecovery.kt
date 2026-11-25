@@ -19,7 +19,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationTranslation
 import dev.ipf.whitenoise.android.audio.queueDictation
-import dev.ipf.whitenoise.android.audio.requestFreshComposerStart
 
 /** Dictate starts a fresh attempt after safe local settlement, with no recovery decision pop-ups. */
 @Composable
@@ -44,7 +43,7 @@ internal fun rememberComposerDictationAction(
                 groupIdHex,
                 draft,
                 replyToMessageIdHex,
-                translation(),
+                outgoingTranslation = translation(),
             )
         }
     }

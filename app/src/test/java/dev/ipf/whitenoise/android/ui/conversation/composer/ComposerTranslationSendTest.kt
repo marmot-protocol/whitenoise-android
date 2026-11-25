@@ -27,7 +27,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -53,6 +52,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 /** Drives the real composer Send paths with translate mode on, so only a ready translation can leave. */
 @RunWith(RobolectricTestRunner::class)
@@ -347,25 +347,24 @@ class ComposerTranslationSendTest {
         platform: TestDictationPlatform,
         editor: ComposerTextState,
         sendTranscript: suspend (ConversationDictationSendRequest) -> Boolean = { false },
-    ) =
-        ConversationDictationController(
-            platform = platform,
-            readDraft = { _, _ ->
-                ConversationDictationDraftSnapshot(editor.valueState.value, editor.contentGeneration)
-            },
-            writeDraft = { _, _, revision, value ->
-                if (revision != editor.contentGeneration) {
-                    null
-                } else {
-                    editor.updateValue(value)
-                    editor.contentGeneration
-                }
-            },
-            disclosureAccepted = { true },
-            markDisclosureAccepted = {},
-            targetValidationScope = scope,
-            sendTranscriptIfOriginUnchanged = sendTranscript,
-        )
+    ) = ConversationDictationController(
+        platform = platform,
+        readDraft = { _, _ ->
+            ConversationDictationDraftSnapshot(editor.valueState.value, editor.contentGeneration)
+        },
+        writeDraft = { _, _, revision, value ->
+            if (revision != editor.contentGeneration) {
+                null
+            } else {
+                editor.updateValue(value)
+                editor.contentGeneration
+            }
+        },
+        disclosureAccepted = { true },
+        markDisclosureAccepted = {},
+        targetValidationScope = scope,
+        sendTranscriptIfOriginUnchanged = sendTranscript,
+    )
 
     /** Grants permission and hands out a recognizer session that does nothing. */
     private class TestDictationPlatform : ConversationDictationPlatform {
@@ -379,11 +378,9 @@ class ComposerTranslationSendTest {
         override fun recognitionAvailable() = true
 
         /** Returns a session whose controls are no-ops. */
-        override fun createSession(
-            listener: ConversationDictationRecognitionListener,
-        ): ConversationDictationRecognitionSession {
+        override fun createSession(listener: ConversationDictationRecognitionListener): RecognitionSession {
             this.listener = listener
-            return object : ConversationDictationRecognitionSession {
+            return object : RecognitionSession {
                 /** Starts nothing. */
                 override fun start() = Unit
 
