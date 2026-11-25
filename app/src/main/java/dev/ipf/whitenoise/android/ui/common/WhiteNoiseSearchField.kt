@@ -97,12 +97,14 @@ fun WhiteNoiseCompactSearchField(
     onClear: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val textColor =
+        MaterialTheme.colorScheme.onSurface.let { if (enabled) it else it.copy(alpha = DISABLED_TEXT_ALPHA) }
     BasicTextField(
         state = state,
         enabled = enabled,
         modifier = modifier.heightIn(min = SearchFieldMinHeight),
         lineLimits = TextFieldLineLimits.SingleLine,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = textColor),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = keyboardOptions,
         interactionSource = interactionSource,
@@ -193,3 +195,4 @@ private fun CompactSearchDecoration(
 }
 
 private val SearchFieldMinHeight = 48.dp
+private const val DISABLED_TEXT_ALPHA = 0.38f
