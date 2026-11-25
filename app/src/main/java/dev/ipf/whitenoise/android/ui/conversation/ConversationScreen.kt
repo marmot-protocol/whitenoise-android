@@ -274,7 +274,9 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
         hasMoreBefore = hasMoreBefore,
         loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
-        rawWindowMessageIds = timeline.map { it.record.messageIdHex },
+        rawWindowMessageIds =
+            timelineSubscription?.latestInstalledWindow()?.page?.messages?.map { it.messageIdHex }
+                ?: timeline.map { it.record.messageIdHex },
     )
 
 private val InitialTimelineBackfillNoProgressError =
@@ -2132,6 +2134,7 @@ internal fun ConversationScreen(
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val seededTailAlignmentReady =
         firstFrameSeed.anchorTailImmediately &&
+            canSeedConversationTail(renderedTimeline.isNotEmpty(), controller.hasMoreBefore) &&
             (!navigationState.seedTailAwaitingAuthoritative || controller.hasPublishedAuthoritativeTimeline)
     SeededConversationAnchorBaselineEffect(
         enabled = seededTailAlignmentReady,
@@ -2167,28 +2170,19 @@ internal fun ConversationScreen(
     @Composable
     @Suppress("CyclomaticComplexMethod")
     fun initialBackfillEffect() {
-        // Edit and background agent events can fill a raw subscription page
-        // while offering no row for the initial anchor. Page backward before the
-        // transcript is revealed; the pure coordinator stops on renderable content,
-        // exhaustion, failure, no progress, cancellation, or controller replacement.
+        // Edit and background agent events can fill the window without an anchor.
+        // Wait for other paging inside the effect so our own page cannot restart it.
         LaunchedEffect(
             controller,
             navigationState.initialTimelineLoadStarted,
-            controller.isLoading,
-            controller.isLoadingPage,
+            controller.timeline.isEmpty(),
             latestTimelineItemId,
             navigationState.initialTimelineBackfillRetryGeneration,
         ) {
+            snapshotFlow { controller.isLoading || controller.isLoadingPage }.first { !it }
             val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
-            val timelineCannotBackfill =
-                !navigationState.initialTimelineLoadStarted ||
-                    controller.group.pendingConfirmation ||
-                    controller.timeline.isEmpty()
-            if (
-                hasEstablishedInitialPosition ||
-                timelineCannotBackfill ||
-                renderedTimeline.isNotEmpty()
-            ) {
+            val timelineCannotBackfill = !navigationState.initialTimelineLoadStarted || controller.group.pendingConfirmation
+            if (hasEstablishedInitialPosition || timelineCannotBackfill || renderedTimeline.isNotEmpty()) {
                 if (renderedTimeline.isNotEmpty()) {
                     navigationState.initialTimelineBackfillNoProgress = false
                 }
@@ -4558,7 +4552,7 @@ internal fun ConversationScreen(
                                             }
                                         }
                                         ConversationNavigationControl(
-                                            visible = !selectionMode && !nearBottom,
+                                            visible = !selectionMode && (!nearBottom || controller.hasMoreAfterTimeline),
                                         ) {
                                             ConversationJumpToNewestButton(
                                                 unreadIncomingCount = unreadIncomingCount,

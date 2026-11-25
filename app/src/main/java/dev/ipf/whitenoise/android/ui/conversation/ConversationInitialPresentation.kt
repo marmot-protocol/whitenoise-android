@@ -34,13 +34,14 @@ internal fun conversationFirstFrameSeedPresentation(
 ): ConversationFirstFrameSeedPresentation {
     val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
     val anchorTailImmediately =
-        shouldAnchorConversationTailOnFirstFrame(
-            entryUnreadCount = entryUnreadCount,
-            projectionAvailable = projectionAvailable,
-            hasScrollRestore = hasScrollRestore,
-            hasFocusedDestination = hasFocusedDestination,
-            notificationOpenRequestId = notificationOpenRequestId,
-        )
+        canSeedConversationTail(rendered.isNotEmpty(), controller.hasMoreBefore) &&
+            shouldAnchorConversationTailOnFirstFrame(
+                entryUnreadCount = entryUnreadCount,
+                projectionAvailable = projectionAvailable,
+                hasScrollRestore = hasScrollRestore,
+                hasFocusedDestination = hasFocusedDestination,
+                notificationOpenRequestId = notificationOpenRequestId,
+            )
     return ConversationFirstFrameSeedPresentation(
         anchorTailImmediately = anchorTailImmediately,
         // Start on the real keyed tail row. Compose then keeps that message key
@@ -57,6 +58,12 @@ internal data class ConversationFirstFrameSeedPresentation(
     val latestTimelineId: String?,
     val awaitingAuthoritativeTimeline: Boolean,
 )
+
+/** Defers the initial tail if the loaded window has no row to show but older history is available. */
+internal fun canSeedConversationTail(
+    hasRenderableRows: Boolean,
+    hasMoreBefore: Boolean,
+): Boolean = hasRenderableRows || !hasMoreBefore
 
 /** Allows immediate tail ownership only when no unread, restore, focus, or notification owner wins. */
 internal fun shouldAnchorConversationTailOnFirstFrame(

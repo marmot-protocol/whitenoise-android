@@ -15,9 +15,9 @@ class ConversationInitialTimelineBackfillTest {
             val windows =
                 ArrayDeque(
                     listOf(
-                        snapshot(ids = listOf("latest-agent-event"), hasMore = true),
-                        snapshot(ids = listOf("older-agent-event"), hasMore = true),
-                        snapshot(ids = listOf("oldest-agent-event"), hasMore = true),
+                        snapshot(ids = listOf("agent-5", "agent-6"), hasMore = true),
+                        snapshot(ids = listOf("agent-3", "agent-4"), hasMore = true),
+                        snapshot(ids = listOf("agent-1", "agent-2"), hasMore = true),
                         snapshot(ids = listOf("message"), hasMore = false, renderable = true),
                     ),
                 )
@@ -35,7 +35,7 @@ class ConversationInitialTimelineBackfillTest {
                 )
 
             assertEquals(ConversationInitialTimelineBackfillResult.Renderable, result)
-            assertEquals(listOf("latest-agent-event", "older-agent-event", "oldest-agent-event"), anchors)
+            assertEquals(listOf("agent-5", "agent-3", "agent-1"), anchors)
         }
 
     @Test
