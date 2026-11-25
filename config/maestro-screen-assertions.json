@@ -1191,16 +1191,16 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-      "symbol": "TtsSentenceMenu",
+      "symbol": "TtsMessageMenu",
       "bindings": [
         {
           "case": "presentation-selection-transport-rate",
           "selector": {
-            "text": "Next sentence"
+            "text": "Next message"
           },
-          "scope": "Paused transport fixture opens More options, dismisses with Back, and dispatches both sentence callbacks on selection.",
+          "scope": "Paused transport fixture opens More options, dismisses with Back, and dispatches both message callbacks on selection.",
           "entry_assertion": {
-            "text": "Previous sentence"
+            "text": "Previous message"
           },
           "opened_by": {
             "text": "More options"

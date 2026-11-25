@@ -88,10 +88,10 @@ private fun TransportSelection(fixture: MaestroPresentationFixture) {
         activeRate = 1f,
         onPause = {},
         onResume = {},
-        onPreviousSentence = { fixture.record("previous-sentence") },
-        onNextSentence = { fixture.record("next-sentence") },
-        onPreviousMessage = {},
-        onNextMessage = {},
+        onPreviousSentence = {},
+        onNextSentence = {},
+        onPreviousMessage = { fixture.record("previous-message") },
+        onNextMessage = { fixture.record("next-message") },
         onRateSelected = {
             check(it == null)
             fixture.finish("default-selected")

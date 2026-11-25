@@ -37,15 +37,14 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.SkipNext
-import dev.ipf.whitenoise.android.ui.icons.filled.SkipPrevious
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 
 internal const val TTS_TRANSPORT_BODY_TAG = "tts-transport-body"
 
 /**
  * Shared read-aloud controls hosted by the app shell, normal chat-list flow,
  * or the modal text reader, on the same one-row strip as the voice player.
- * Message steps stay on the row and sentence steps sit under More options.
+ * Sentence steps stay on the row and message steps sit under More options.
  * The row scrolls horizontally only when large text leaves no room. No scrub
  * gesture, since the framework offers no utterance-internal seek.
  */
@@ -93,7 +92,7 @@ internal fun TtsTransportBar(
 
 /**
  * Compact read-aloud body on the shared [PlaybackStrip]: play/pause, the remaining-time or status line,
- * previous and next message, the speech rate, sentence steps under More options, and stop. A pending or failed
+ * previous and next sentence, the speech rate, message steps under More options, and stop. A pending or failed
  * history edge adds one announced status line under the row while it applies.
  */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -146,17 +145,17 @@ internal fun TtsTransportBarContent(
         info = { PlaybackStripInfo(title = null) { TtsStatusText(isError, isPreparing, remainingSeconds) } },
         actions = {
             TtsNavigationButton(
-                onClick = onPreviousMessage,
+                onClick = onPreviousSentence,
                 enabled = navigationEnabled,
-                label = R.string.tts_bar_previous_message,
-                explanation = R.string.explanation_conversation_tts_previous_message,
-            ) { Icon(Icons.Default.SkipPrevious, stringResource(R.string.tts_bar_previous_message)) }
+                label = R.string.tts_bar_skip_previous,
+                explanation = R.string.explanation_conversation_tts_previous_sentence,
+            ) { Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.tts_bar_skip_previous)) }
             TtsNavigationButton(
-                onClick = onNextMessage,
+                onClick = onNextSentence,
                 enabled = navigationEnabled,
-                label = R.string.tts_bar_next_message,
-                explanation = R.string.explanation_conversation_tts_next_message,
-            ) { Icon(Icons.Default.SkipNext, stringResource(R.string.tts_bar_next_message)) }
+                label = R.string.tts_bar_skip_next,
+                explanation = R.string.explanation_conversation_tts_next_sentence,
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.tts_bar_skip_next)) }
             if (!isError) {
                 TtsTransportRatePicker(
                     rateOverride = rateOverride,
@@ -164,10 +163,10 @@ internal fun TtsTransportBarContent(
                     onRateSelected = onRateSelected,
                 )
             }
-            TtsSentenceMenu(
+            TtsMessageMenu(
                 enabled = navigationEnabled,
-                onPreviousSentence = onPreviousSentence,
-                onNextSentence = onNextSentence,
+                onPreviousMessage = onPreviousMessage,
+                onNextMessage = onNextMessage,
             )
             PlaybackStripCloseButton(stringResource(R.string.tts_bar_stop), onStop)
         },
@@ -217,13 +216,13 @@ private fun TtsNavigationButton(
     )
 }
 
-/** Sentence steps are finer navigation; a labelled menu names them instead of two bare arrows. */
+/** Message jumps are available from the read-aloud strip’s More options menu. */
 @Suppress("FunctionNaming")
 @Composable
-private fun TtsSentenceMenu(
+private fun TtsMessageMenu(
     enabled: Boolean,
-    onPreviousSentence: () -> Unit,
-    onNextSentence: () -> Unit,
+    onPreviousMessage: () -> Unit,
+    onNextMessage: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -236,26 +235,26 @@ private fun TtsSentenceMenu(
             items =
                 listOf(
                     WhiteNoiseMenuItem(
-                        label = stringResource(R.string.tts_bar_skip_previous),
-                        onClick = onPreviousSentence,
+                        label = stringResource(R.string.tts_bar_previous_message),
+                        onClick = onPreviousMessage,
                         enabled = enabled,
                         modifier =
                             Modifier.explainOnLongPress(
                                 composerExplanation(
-                                    R.string.tts_bar_skip_previous,
-                                    R.string.explanation_conversation_tts_previous_sentence,
+                                    R.string.tts_bar_previous_message,
+                                    R.string.explanation_conversation_tts_previous_message,
                                 ),
                             ),
                     ),
                     WhiteNoiseMenuItem(
-                        label = stringResource(R.string.tts_bar_skip_next),
-                        onClick = onNextSentence,
+                        label = stringResource(R.string.tts_bar_next_message),
+                        onClick = onNextMessage,
                         enabled = enabled,
                         modifier =
                             Modifier.explainOnLongPress(
                                 composerExplanation(
-                                    R.string.tts_bar_skip_next,
-                                    R.string.explanation_conversation_tts_next_sentence,
+                                    R.string.tts_bar_next_message,
+                                    R.string.explanation_conversation_tts_next_message,
                                 ),
                             ),
                     ),

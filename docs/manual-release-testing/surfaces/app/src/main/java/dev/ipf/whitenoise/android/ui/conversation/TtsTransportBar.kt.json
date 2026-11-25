@@ -81,9 +81,9 @@
         ]
       },
       {
-        "surface": "TtsSentenceMenu",
+        "surface": "TtsMessageMenu",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "fun TtsSentenceMenu(",
+        "anchor": "fun TtsMessageMenu(",
         "test_ids": [
           "TTS-001"
         ]

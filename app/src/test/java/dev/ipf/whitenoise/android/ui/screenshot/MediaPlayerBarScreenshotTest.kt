@@ -14,12 +14,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.audio.tts.TtsError
@@ -80,6 +86,21 @@ class MediaPlayerBarScreenshotTest {
 
     @Test
     fun speechInChatListAmoled() = inChatList("media_player_bar_speech_chat_list_amoled", dark = true, voice = false)
+
+    @Test
+    fun speechMessageMenuAmoled() {
+        composeRule.setContent {
+            Themed(dark = true, amoled = true, fontScale = 1f, rtl = false) {
+                Surface(color = MaterialTheme.colorScheme.background) { Speech(speaking()) }
+            }
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.tts_bar_previous_message)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.tts_bar_next_message)).assertIsDisplayed()
+        composeRule
+            .onNode(isPopup())
+            .captureRoboImage("src/test/snapshots/media_player_bar_speech_message_menu_amoled.png")
+    }
 
     private fun sheet(
         name: String,
