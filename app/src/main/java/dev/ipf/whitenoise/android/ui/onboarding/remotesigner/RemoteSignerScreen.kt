@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -109,11 +110,11 @@ private fun ColumnScope.RemoteSignerBody(
         RemoteSignerStep.SigningIn, RemoteSignerStep.Done ->
             RemoteSignerProgress(stringResource(R.string.remote_signer_signing_in), null)
         is RemoteSignerStep.Failed ->
-            Text(
-                stringResource(step.failure.messageRes),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
+            WhiteNoiseCallout(
+                text = stringResource(step.failure.messageRes),
                 modifier = Modifier.testTag("remote_signer.error").semantics { liveRegion = LiveRegionMode.Polite },
+                icon = R.drawable.ic_error,
+                isError = true,
             )
     }
 }

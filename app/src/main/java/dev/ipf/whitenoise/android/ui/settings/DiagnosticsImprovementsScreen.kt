@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -264,8 +265,8 @@ internal fun DiagnosticsImprovementsScreen(
 }
 
 /**
- * The collection scope, exporter readiness and any read or save failure as settings explainers; only the failure
- * and its Retry keep their own error colour and button at the same content line.
+ * The collection scope, exporter readiness and loading state as settings explainers; a read or save failure keeps
+ * its error callout and Retry, inset to the same content line.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -287,12 +288,11 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
             SettingsExplainer(stringResource(R.string.usage_diagnostics_loading))
         }
         if (state.failed) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)) {
-                Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-                TextButton(
-                    enabled = !state.busy,
-                    onClick = { appState.launchMutation { appState.retryUsageDiagnostics() } },
-                ) { Text(stringResource(R.string.retry)) }
+            Box(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)) {
+                UsageDiagnosticsFailure(
+                    busy = state.busy,
+                    retry = { appState.launchMutation { appState.retryUsageDiagnostics() } },
+                )
             }
         }
     }
