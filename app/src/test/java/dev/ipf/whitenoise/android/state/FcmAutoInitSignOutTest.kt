@@ -1,17 +1,23 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
+import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Signing out the last signed-in account turns Firebase auto-init off (#4081), even though the native
- * account list keeps a signed-out entry for that account.
+ * Signing out or wiping the last signed-in account turns Firebase auto-init off (#4081), even though the
+ * native account list keeps a signed-out entry after a sign-out, and a selection in flight cannot undo it.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -29,6 +35,45 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
             assertTrue("the signed-out entry must remain listed", engineSignedOut)
             assertEquals(false, platform.autoInitWrites.lastOrNull())
             assertTrue("sign-out must never enable auto-init", true !in platform.autoInitWrites)
+        }
+
+    /**
+     * A Push selection still in flight when the last signer is wiped cannot turn auto-init back on, read a
+     * token or keep one. The owner is captured before the wipe, as the selection captured it.
+     */
+    @Test
+    fun selectionResumedAfterLastSignerWipeLeavesAutoInitOffWithoutToken() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val tokenReads = AtomicInteger()
+            val store = PushTokenStore.create(context)
+            val state =
+                appState(
+                    pushTokenStore = store,
+                    nativePushFallbackPlatform = platform,
+                    pushServerConfigProvider = { PushServerConfig("0".repeat(64), null) },
+                    fcmTokenReader = {
+                        tokenReads.incrementAndGet()
+                        "late-token"
+                    },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            val delivery = state.notificationDelivery
+            val selectionOwner =
+                checkNotNull(
+                    delivery.captureNotificationDeliveryModeOwner(delivery.notificationDeliveryModeIntent.capture()),
+                ) { "the signed-in signer must own delivery before the wipe" }
+
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+            assertEquals(false, platform.autoInitWrites.lastOrNull())
+            platform.autoInitWrites.clear()
+
+            assertFalse(delivery.selectFcmDelivery(selectionOwner))
+
+            val writes = platform.autoInitWrites.toList()
+            assertTrue("a wiped owner must not turn auto-init on: $writes", true !in writes)
+            assertEquals(0, tokenReads.get())
+            assertNull(store.lastToken())
         }
 
     /** A remaining signed-in signer keeps auto-init and the token for the next sync to decide. */

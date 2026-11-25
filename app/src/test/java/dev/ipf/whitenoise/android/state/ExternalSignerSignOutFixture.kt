@@ -12,7 +12,9 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
+import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
@@ -207,8 +209,8 @@ internal abstract class ExternalSignerSignOutFixture {
 
     /**
      * Installs the scripted native runtime into a real app state using the supplied preference-failure context
-     * and, when given, a scripted push token store in place of the Keystore-backed default and a recording
-     * push platform in place of the Android one.
+     * and, when given, a scripted push token store in place of the Keystore-backed default, a recording
+     * push platform in place of the Android one, and native-push capability and token seams.
      */
     protected fun appState(
         ownerContext: Context = context,
@@ -216,6 +218,11 @@ internal abstract class ExternalSignerSignOutFixture {
         marmotIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(ownerContext),
+        pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+        fcmTokenReader: (suspend () -> String?)? = null,
+        nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
+            nativePushCapabilityForContext(ownerContext.applicationContext, it)
+        },
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -227,6 +234,9 @@ internal abstract class ExternalSignerSignOutFixture {
             marmotIoDispatcher = marmotIoDispatcher,
             profileReader = profileReader,
             nativePushFallbackPlatform = nativePushFallbackPlatform,
+            pushServerConfigProvider = pushServerConfigProvider,
+            fcmTokenReader = fcmTokenReader,
+            nativePushCapabilityResolver = nativePushCapabilityResolver,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")

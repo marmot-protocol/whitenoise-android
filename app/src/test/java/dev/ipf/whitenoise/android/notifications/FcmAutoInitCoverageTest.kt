@@ -131,6 +131,21 @@ class FcmAutoInitCoverageTest {
         assertTrue(settle.contains("throw cancelled"))
     }
 
+    /** The selection reads its token under the sync lock, and only while its owner still owns delivery. */
+    @Test
+    fun selectionTokenReadIsFencedByOwnership() {
+        val selection = appModuleSource(SELECTION)
+        val fenced = selection.functionBody("fetchFcmTokenForOwner")
+        val fetch = appModuleSource(SYNC).functionBody("fetchFcmTokenOrNull")
+
+        assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
+        assertTrue(fenced.contains("nativePushSyncMutex.withLock"))
+        assertTrue(fenced.contains("tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) }"))
+        val ownerCheck = fetch.indexOf("if (!tokenOwnerIsCurrent()) return null")
+        val autoInitWrite = fetch.indexOf("applyFcmAutoInit")
+        assertTrue("the owner check must precede the auto-init write", ownerCheck in 0 until autoInitWrite)
+    }
+
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
     @Test
     fun fcmSelectionOwnsAutoInitThroughRegistration() {

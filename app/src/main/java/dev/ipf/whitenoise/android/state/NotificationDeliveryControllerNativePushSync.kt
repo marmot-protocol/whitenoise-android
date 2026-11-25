@@ -232,13 +232,18 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
     }
 }
 
-/** Turns Firebase auto-init on, then fetches and retains a non-blank FCM token when push is available. */
+/**
+ * Turns Firebase auto-init on, then fetches and retains a non-blank FCM token when push is available.
+ * A caller whose owner is no longer current gets null before auto-init is touched, and its token is not kept.
+ */
+@Suppress("ReturnCount")
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     expectedCallbackToken: String? = null,
     tokenOwnerIsCurrent: () -> Boolean = { true },
 ): String? {
     val rotation = pushTokenRotationSequence.get()
     if (!nativePushCapability().isAvailable) return null
+    if (!tokenOwnerIsCurrent()) return null
     // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
     applyFcmAutoInit(enabled = true)
     val token =

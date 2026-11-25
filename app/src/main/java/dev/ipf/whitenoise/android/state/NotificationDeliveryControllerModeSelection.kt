@@ -92,7 +92,7 @@ private suspend fun NotificationDeliveryController.selectFcmTransport(
     val persistentStopAttempted = AtomicBoolean(false)
     return try {
         if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
-        val token = fetchFcmTokenOrNull() ?: return false
+        val token = fetchFcmTokenForOwner(owner) ?: return false
         val registered = enableNativeDeliveryForAccounts(owner, config, token, previous)
         if (!registered) {
             rollbackNativePushMode(owner, previous)
@@ -134,6 +134,17 @@ private suspend fun NotificationDeliveryController.selectFcmTransport(
         false
     }
 }
+
+/**
+ * Reads the selection's token under the native sync lock while [owner] still owns delivery. A wipe ends
+ * ownership before it takes this lock to turn auto-init off, so a selection resumed after a wipe or an
+ * account change neither turns auto-init back on nor keeps a token.
+ */
+@Suppress("MaxLineLength")
+private suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner: NotificationDeliveryModeOwner): String? =
+    nativePushSyncMutex.withLock {
+        fetchFcmTokenOrNull(tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) })
+    }
 
 /** Drops [owner]'s queued native-push disable, reporting whether it was cleared while the owner stays current. */
 @Suppress("MaxLineLength")
