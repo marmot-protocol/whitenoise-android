@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,12 +38,14 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import dev.ipf.whitenoise.android.ui.conversation.ChatsReturnShortcut
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import dev.ipf.whitenoise.android.ui.navigation.TwoPaneChatFrame
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -207,6 +210,44 @@ class HardwareShortcutCompositionTest {
         assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
         assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
         assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
+    }
+
+    /**
+     * The Share user picker is drawn in the conversation's window, so it holds every shortcut: Ctrl+N and Ctrl+F
+     * never leave the compact conversation behind it, and Ctrl+Shift+F never opens search under it. Once it closes,
+     * the conversation's shortcuts work again.
+     */
+    @Test
+    fun sharePickerOverACompactConversationHoldsEveryShortcut() {
+        var pickerOpen by mutableStateOf(true)
+        var exits = 0
+        val appState = emptyAppState()
+        setRoutedContent {
+            TwoPaneChatFrame(twoPane = false, listPane = {}) {
+                ChatsReturnShortcut(available = true) { exits++ }
+                Own(HardwareShortcutCommand.ConversationSearch)
+                if (pickerOpen) {
+                    ContactPickerScreen(
+                        appState = appState,
+                        title = "Share user",
+                        selected = remember { mutableStateListOf() },
+                        onBack = { pickerOpen = false },
+                        onConfirm = {},
+                    )
+                }
+            }
+        }
+
+        assertFalse(press(KeyEvent.KEYCODE_N, CTRL))
+        assertFalse(press(KeyEvent.KEYCODE_F, CTRL))
+        assertFalse(press(KeyEvent.KEYCODE_F, CTRL or SHIFT))
+        assertEquals(0, exits)
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.ConversationSearch).intValue)
+
+        pickerOpen = false
+        composeRule.waitForIdle()
+        assertTrue(press(KeyEvent.KEYCODE_F, CTRL))
+        assertEquals(1, exits)
     }
 
     /**
