@@ -343,15 +343,6 @@
         ]
       },
       {
-        "surface": "string:save",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
-        "anchor": "R.string.save",
-        "test_ids": [
-          "PRO-001",
-          "PRO-002"
-        ]
-      },
-      {
         "surface": "string:toast_couldnt_prepare_image",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
         "anchor": "R.string.toast_couldnt_prepare_image",
