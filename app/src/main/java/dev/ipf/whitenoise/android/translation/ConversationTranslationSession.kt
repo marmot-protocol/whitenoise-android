@@ -20,11 +20,13 @@ internal data class TranslationSource(
     val text: String,
     val target: String,
     val revision: String = "",
+    val incomingRecordedAt: ULong? = null,
 )
 
 internal data class TranslationRendition(
     val text: String,
     val showTranslation: Boolean = true,
+    val sourceLanguage: String? = null,
 )
 
 internal val LocalConversationTranslation = staticCompositionLocalOf<ConversationTranslationSession?> { null }
@@ -34,6 +36,7 @@ internal class ConversationTranslationSession(
     private val scope: CoroutineScope,
     private val engine: suspend () -> TranslationEngine,
     private val ownerCurrent: () -> Boolean,
+    private val detectIncoming: suspend (String) -> String? = { null },
 ) {
     val renditions = mutableStateMapOf<TranslationSource, TranslationRendition>()
     var failure by mutableStateOf<TranslationFailure?>(null)
@@ -77,7 +80,7 @@ internal class ConversationTranslationSession(
     private suspend fun publishRendition(
         source: TranslationSource,
         generation: Long,
-        text: String,
+        rendition: TranslationRendition,
     ) {
         if (!currentRequest(source, generation)) return
         if (renditions.size >= MAX_RENDITIONS) {
@@ -86,7 +89,7 @@ internal class ConversationTranslationSession(
                 renditions.remove(oldest)
             }
         }
-        renditions[source] = TranslationRendition(text)
+        renditions[source] = rendition
         renditionOrder.add(source)
     }
 
@@ -99,7 +102,9 @@ internal class ConversationTranslationSession(
             slots.withPermit {
                 if (requestGeneration != epoch || !ownerCurrent()) return@withPermit
                 val translated = translateWithPrivacyGate(engine(), source.text, from, source.target)
-                publishRendition(source, requestGeneration, translated)
+                if (!currentRequest(source, requestGeneration)) return@withPermit
+                val language = source.incomingRecordedAt?.let { identifyIncoming(source.text) }
+                publishRendition(source, requestGeneration, TranslationRendition(translated, sourceLanguage = language))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -116,6 +121,37 @@ internal class ConversationTranslationSession(
     }
 
     fun isCurrent(): Boolean = ownerCurrent()
+
+    private suspend fun identifyIncoming(text: String): String? =
+        try {
+            detectIncoming(text)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A missing suggestion must never replace a successful incoming translation with an error.
+            null
+        }
+
+    /** Use matching live results only. A reply can name an older message, while chat-wide evidence must be recent. */
+    fun suggestedTarget(
+        replyId: String?,
+        nowSeconds: ULong = (System.currentTimeMillis() / 1_000).toULong(),
+    ): String? {
+        if (!ownerCurrent()) return null
+        val recent = (nowSeconds - minOf(nowSeconds, SUGGESTION_MAX_AGE_SECONDS))..nowSeconds
+        val translatedIncoming = renditions.entries.filter { it.key.incomingRecordedAt != null }
+        val replyLanguage =
+            translatedIncoming.mapNotNull { (source, rendition) ->
+                rendition.sourceLanguage.takeIf { source.messageId == replyId }
+            }.distinct().singleOrNull()
+        val language =
+            replyLanguage ?: translatedIncoming.mapNotNull { (source, rendition) ->
+                rendition.sourceLanguage.takeIf {
+                    source.incomingRecordedAt != null && source.incomingRecordedAt in recent
+                }
+            }.distinct().singleOrNull()
+        return language?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+    }
 
     fun isPending(source: TranslationSource): Boolean = source in pending
 
@@ -146,5 +182,6 @@ internal class ConversationTranslationSession(
     private companion object {
         const val MAX_PENDING_REQUESTS = 16
         const val MAX_RENDITIONS = 64
+        const val SUGGESTION_MAX_AGE_SECONDS = 24uL * 60uL * 60uL
     }
 }

@@ -73,6 +73,7 @@ internal class ComposerTranslationState(
     private val settleMillis: Long = TYPING_SETTLE_MS,
     private val noticeAccepted: () -> Boolean = { true },
     private val onNoticeAccepted: () -> Unit = {},
+    private val suggestedTarget: () -> String? = { null },
 ) {
     /** True while the translation line is shown and Send delivers only its current translation. */
     var active by mutableStateOf(false)
@@ -86,8 +87,10 @@ internal class ComposerTranslationState(
     var consentRequestId by mutableLongStateOf(0L)
         private set
 
-    /** The saved outgoing language, or null until the person chooses one from the catalog. */
-    var target by mutableStateOf(initialTarget?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget))
+    private var savedTarget = initialTarget?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+
+    /** The selected or suggested outgoing language for the current compose session. */
+    var target by mutableStateOf(savedTarget)
         private set
 
     /** The latest translation, which Send may use only while it still matches the editor and target. */
@@ -145,9 +148,11 @@ internal class ComposerTranslationState(
 
     /** Saves [code] as this chat's outgoing language and retranslates the current text. */
     fun selectTarget(code: String) {
-        if (!OfflineTranslatorLanguageCatalog.supportsTarget(code) || code == target) return
-        target = code
+        if (!OfflineTranslatorLanguageCatalog.supportsTarget(code) || code == savedTarget) return
+        savedTarget = code
         onTargetSaved(code)
+        if (code == target) return
+        target = code
         invalidate()
     }
 
@@ -200,6 +205,7 @@ internal class ComposerTranslationState(
 
     /** Turns translate mode on and asks the composer for its current text. */
     private fun open() {
+        target = savedTarget ?: suggestedTarget()?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
         active = true
         invalidate()
     }
@@ -252,6 +258,7 @@ internal fun rememberComposerTranslation(
     appState: WhiteNoiseAppState,
     account: String?,
     group: String?,
+    replyId: String? = null,
 ): ComposerTranslationState? {
     if (account.isNullOrBlank() || group.isNullOrBlank()) return null
     val context = LocalContext.current
@@ -259,6 +266,8 @@ internal fun rememberComposerTranslation(
     val scope = rememberCoroutineScope()
     val preferences = rememberTranslationPreferences()
     val runtime = appState.runtimeGeneration
+    val session by rememberUpdatedState(LocalConversationTranslation.current)
+    val currentReplyId by rememberUpdatedState(replyId)
     val state =
         remember(account, group, runtime) {
             ComposerTranslationState(
@@ -269,6 +278,7 @@ internal fun rememberComposerTranslation(
                 onTargetSaved = { preferences.setOutgoingTarget(account, group, it) },
                 noticeAccepted = preferences::providerNoticeAccepted,
                 onNoticeAccepted = preferences::acceptProviderNotice,
+                suggestedTarget = { session?.suggestedTarget(currentReplyId) },
             )
         }
     LaunchedEffect(state, appState.appLock.screenVisible) { state.invalidate() }
@@ -313,25 +323,29 @@ internal fun ComposerTranslationPreview(
     state: ComposerTranslationState,
     text: String,
     modifier: Modifier = Modifier,
+    dictating: Boolean = false,
 ) {
     val context = LocalContext.current
     val choices = rememberTranslationLanguageChoices(allowDetection = false)
     var choosing by remember(state) { mutableStateOf(false) }
     val target = state.target
-    LaunchedEffect(state, state.active, target) { if (state.active && target == null) choosing = true }
+    LaunchedEffect(state, state.active, target, dictating) {
+        if (!dictating && state.active && target == null) choosing = true
+    }
     val title = stringResource(R.string.translation_target_language)
     ComposerTranslationBar(
         targetLabel = choices.label(target.orEmpty()),
         // A blank draft has nothing to send yet, so the line keeps showing where its translation will appear.
-        outgoing = state.outgoingFor(text)?.takeIf(String::isNotBlank),
-        pending = state.pending,
-        failure = state.failure,
+        outgoing = if (dictating) null else state.outgoingFor(text)?.takeIf(String::isNotBlank),
+        pending = !dictating && state.pending,
+        failure = state.failure.takeUnless { dictating },
         onChooseLanguage = { choosing = true },
         onRetry = state::invalidate,
         onOpenEngine = { openOfflineTranslator(context) },
         modifier = modifier,
+        canChooseLanguage = !dictating,
     )
-    if (choosing) {
+    if (choosing && !dictating) {
         TranslationLanguagePickerSheet(
             title = title,
             choices = choices,
@@ -360,6 +374,7 @@ internal fun ComposerTranslationBar(
     onRetry: () -> Unit,
     onOpenEngine: () -> Boolean,
     modifier: Modifier = Modifier,
+    canChooseLanguage: Boolean = true,
 ) {
     Column(modifier.fillMaxWidth().testTag("composer.translation")) {
         // Top-aligned with no button frame, so the line starts as close to the composer edge as typed text does.
@@ -368,7 +383,7 @@ internal fun ComposerTranslationBar(
                 // Capped so a long language name cannot squeeze out the outgoing text.
                 Modifier
                     .widthIn(max = LANGUAGE_SELECTOR_MAX_WIDTH)
-                    .clickable(role = Role.Button, onClick = onChooseLanguage)
+                    .clickable(enabled = canChooseLanguage, role = Role.Button, onClick = onChooseLanguage)
                     .testTag("composer.translation.language"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

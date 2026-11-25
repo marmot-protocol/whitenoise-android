@@ -63,6 +63,7 @@ internal fun rememberMessageTranslationSource(
     automaticEligible: Boolean,
     selectedTarget: String? = null,
     sourceRevision: String = "",
+    incomingRecordedAt: ULong? = null,
 ): TranslationSource? {
     val session = LocalConversationTranslation.current
     val preferences = LocalTranslationPreferences.current
@@ -70,10 +71,10 @@ internal fun rememberMessageTranslationSource(
     val choice = account?.let { preferences?.effective(it, group) }
     val target = selectedTarget ?: choice?.target
     val source =
-        remember(messageId, text, target, sourceRevision, account, group, choice != null) {
+        remember(messageId, text, target, sourceRevision, account, group, choice != null, incomingRecordedAt) {
             choice
                 ?.takeIf { text.isNotBlank() && text.length <= MAX_TRANSLATION_TEXT }
-                ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision) }
+                ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision, incomingRecordedAt) }
         }
     // Session epoch, failure and capacity are watched inside the effect rather than keyed in composition: every
     // bubble reads this, and one source's removal would otherwise recompose every visible message.

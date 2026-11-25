@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
@@ -37,6 +38,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -47,6 +49,7 @@ import java.text.Normalizer
 
 private val LanguageRowMinHeight = 48.dp
 private val CheckSize = 24.dp
+private val LanguageFlagFontSize = 18.sp
 private const val SHEET_HEIGHT_SHARE = 0.88f
 private const val ROWS_ABOVE_SELECTED = 2
 private val CombiningMarks = Regex("\\p{Mn}+")
@@ -126,6 +129,7 @@ internal fun TranslationLanguagePickerSheet(
                 itemsIndexed(visible, key = { _, code -> code }) { _, code ->
                     TranslationLanguageRow(
                         label = choices.label(code),
+                        flag = translationLanguageFlag(code),
                         selected = code == selected,
                         onClick = { onSelect(code) },
                         modifier = Modifier.testTag("translation.language.$code"),
@@ -136,10 +140,11 @@ internal fun TranslationLanguagePickerSheet(
     }
 }
 
-/** A full-width sheet row at least 48 dp tall: the language name and, on the current one, a check mark. */
+/** The decorative cue sits beside the localized name, with a check mark on the current choice. */
 @Composable
 private fun TranslationLanguageRow(
     label: String,
+    flag: String?,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -153,6 +158,19 @@ private fun TranslationLanguageRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
+        val flagWidth = with(LocalDensity.current) { LanguageFlagFontSize.toDp() }.coerceAtLeast(CheckSize)
+        Box(Modifier.width(flagWidth).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+            if (flag == null) {
+                Icon(
+                    painterResource(R.drawable.ic_language),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(flag, fontSize = LanguageFlagFontSize, maxLines = 1)
+            }
+        }
         Text(
             label,
             modifier = Modifier.weight(1f),

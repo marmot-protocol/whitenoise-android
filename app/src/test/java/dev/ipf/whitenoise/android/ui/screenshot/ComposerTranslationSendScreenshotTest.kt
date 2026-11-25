@@ -146,8 +146,9 @@ class ComposerTranslationSendScreenshotTest {
     ) {
         val names =
             linkedMapOf(
-                "ar" to "Arabic",
-                "zh" to "Chinese",
+                "" to "Detect language",
+                "zh" to "Chinese (Simplified)",
+                "zh_hant" to "Chinese (Traditional)",
                 "nl" to "Dutch",
                 "en" to "English",
                 "fr" to "French",
@@ -161,7 +162,7 @@ class ComposerTranslationSendScreenshotTest {
                 TranslationLanguagePickerSheet(
                     title = "Target language",
                     choices = TranslationLanguageChoices(names.keys.toList()) { names.getValue(it) },
-                    selected = "de",
+                    selected = if (query.isEmpty()) "zh_hant" else "de",
                     onDismiss = {},
                     onSelect = {},
                 )

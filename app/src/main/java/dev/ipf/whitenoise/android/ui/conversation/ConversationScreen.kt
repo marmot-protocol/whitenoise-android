@@ -3153,7 +3153,10 @@ internal fun ConversationScreen(
                 captureContent = false
             }
         }
-    CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+    CompositionLocalProvider(
+        LocalSettingsCardMorph provides routeMorph,
+        dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
+    ) {
         WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     }
     val settingsMotion =
@@ -4004,7 +4007,6 @@ internal fun ConversationScreen(
         ) { padding ->
             val reactionArtwork = remember(appState, controller) { conversationReactionArtwork(appState, controller) }
             CompositionLocalProvider(
-                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,

@@ -344,7 +344,7 @@ internal fun ComposerBar(
     appState: WhiteNoiseAppState? = null,
     // Translate mode for this draft; tests supply their own state to drive Send without the offline engine.
     composerTranslation: ComposerTranslationState? =
-        appState?.let { rememberComposerTranslation(it, draftAccountRef, draftGroupIdHex) },
+        appState?.let { rememberComposerTranslation(it, draftAccountRef, draftGroupIdHex, replyingTo?.messageIdHex) },
     onCustomizeToolbar: (() -> Unit)? = null,
     // Group @-mention picker (#414): candidates the picker filters over, and
     // whether this conversation is a group (the picker is suppressed in DMs —
@@ -489,8 +489,6 @@ internal fun ComposerBar(
         }
     // The pill's animated editing progress, shared so the trailing action centers with the resting row.
     var editingProgressSource by remember { mutableStateOf<State<Float>?>(null) }
-    val trailingActionAlignment =
-        remember { ComposerActionRowAlignment(Alignment.End) { editingProgressSource?.value ?: 0f } }
     // These two mirror measurements that are republished only when they change.
     // A new window shape alone may not change them, so it must not reset them.
     var composerUsesMultilineControls by
@@ -504,6 +502,13 @@ internal fun ComposerBar(
         }
     var extraComposerControlsHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
     var measuredComposerAccessoryHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
+    val (leadingRecordingAlignment, trailingActionAlignment) =
+        remember(density, draftKey, draftAccountRef, draftGroupIdHex) {
+            val topInset = { with(density) { measuredComposerAccessoryHeight.roundToPx() } }
+            val progress = { editingProgressSource?.value ?: 0f }
+            ComposerActionRowAlignment(Alignment.Start, topInset, progress) to
+                ComposerActionRowAlignment(Alignment.End, topInset, progress)
+        }
     var automaticComposerHeightPx by
         remember(
             draftKey,
@@ -1314,7 +1319,7 @@ internal fun ComposerBar(
                 }
                 // The translation line sits above the typed line, after any reply or attachment preview.
                 val accessoryContent: (@Composable () -> Unit)? =
-                    if (activeTranslation != null && !dictationInComposer) {
+                    if (activeTranslation != null) {
                         {
                             Column {
                                 baseAccessoryContent?.invoke()
@@ -1322,6 +1327,7 @@ internal fun ComposerBar(
                                     activeTranslation,
                                     text,
                                     Modifier.padding(start = 12.dp, end = 8.dp, bottom = 4.dp),
+                                    dictating = dictationInComposer,
                                 )
                             }
                         }
@@ -1507,13 +1513,7 @@ internal fun ComposerBar(
                             ComposerShortcutSide.Left
                         }
                 val recordingActionAlignment =
-                    if (lockedVoiceAtStart) {
-                        remember {
-                            ComposerActionRowAlignment(Alignment.Start) { editingProgressSource?.value ?: 0f }
-                        }
-                    } else {
-                        trailingActionAlignment
-                    }
+                    if (lockedVoiceAtStart) leadingRecordingAlignment else trailingActionAlignment
                 val toolbarRuntime = appState?.runtimeGeneration
                 // Receiving draft content does not acquire a recording or send transaction.
                 val canReceiveComposerContent: () -> Boolean = {
@@ -1855,7 +1855,6 @@ internal fun ComposerBar(
                                         measuredComposerAccessoryHeight
                                 ).coerceAtLeast(editorLineHeight).roundToPx()
                             },
-                        actionRowAccessoryHeightPx = with(density) { measuredComposerAccessoryHeight.roundToPx() },
                         compactMeasurementReservesTrailingAction = false,
                         // The emoji pane is an input surface like the keyboard it replaces. Opening it
                         // clears editor focus, which alone would fold an empty draft to the resting row

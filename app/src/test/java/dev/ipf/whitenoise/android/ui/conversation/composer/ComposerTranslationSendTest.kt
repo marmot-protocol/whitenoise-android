@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.translation.ComposerTranslationState
@@ -170,17 +171,25 @@ class ComposerTranslationSendTest {
             platform.listener.onReady()
             editor.updateValue(TextFieldValue("Hello there", TextRange(DRAFT.length)))
         }
-        composeRule.onNodeWithTag("composer.translation").assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.translation").assertExists()
+        composeRule.onNodeWithTag("composer.translation.language").assertIsNotEnabled()
+        composeRule
+            .onNodeWithTag("composer.translation.afterDictation")
+            .captureRoboImage("src/test/snapshots/composer_translation_during_dictation.png")
         composeRule.runOnIdle {
             assertTrue(translation.active)
             assertEquals(1, calls)
             editor.updateValue(TextFieldValue(DRAFT, TextRange(DRAFT.length)))
             controller.paste()
+        }
+        composeRule.onNodeWithTag("composer.translation").assertExists()
+        composeRule.runOnIdle {
             platform.listener.onResult("dictated")
             assertEquals("Hello dictated", editor.valueState.value.text)
             assertEquals(ConversationDictationState.Idle, controller.state)
         }
         awaitMain { translation.outgoingFor("Hello dictated") == "de:Hello dictated" }
+        composeRule.onNodeWithTag("composer.translation.language").assertIsEnabled()
         composeRule
             .onNodeWithTag("composer.translation.afterDictation")
             .captureRoboImage("src/test/snapshots/composer_translation_after_dictation_paste.png")
@@ -188,6 +197,37 @@ class ComposerTranslationSendTest {
             editor.updateValue(TextFieldValue("Hello dictated later"))
         }
         awaitMain { translation.outgoingFor("Hello dictated later") == "de:Hello dictated later" }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun voiceNoteStaysAlignedBelowTheTranslationRow() {
+        val voice =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = scope,
+                onPermissionRequest = { true },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+            )
+        try {
+            render(translateMode(), textState = ComposerTextState(TextFieldValue()), voice = voice)
+            val microphone =
+                composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                    .fetchSemanticsNode().boundsInRoot
+            val emoji =
+                composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+                    .fetchSemanticsNode().boundsInRoot
+            val translation = composeRule.onNodeWithTag("composer.translation").fetchSemanticsNode().boundsInRoot
+            assertEquals(emoji.center.y, microphone.center.y, 1f)
+            assertTrue(microphone.top >= translation.bottom)
+            composeRule
+                .onNodeWithTag("composer.translation.afterDictation")
+                .captureRoboImage("src/test/snapshots/composer_translation_voice_note.png")
+        } finally {
+            voice.release()
+        }
     }
 
     /** Turning Translate on after Paste starts with the text already in the editor. */
@@ -299,6 +339,7 @@ class ComposerTranslationSendTest {
         attachments: Boolean = false,
         dictationController: ConversationDictationController? = null,
         textState: ComposerTextState = ComposerTextState(TextFieldValue(DRAFT)),
+        voice: VoiceRecordingController? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -318,6 +359,7 @@ class ComposerTranslationSendTest {
                             done(true)
                         },
                         dictationController = dictationController,
+                        voiceRecordingController = voice,
                         dictationAccountRef = ACCOUNT,
                         dictationGroupIdHex = GROUP,
                         composerTranslation = translation,
