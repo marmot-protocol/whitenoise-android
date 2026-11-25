@@ -10,7 +10,8 @@ filters the PR precheck unit shards run. This script has three modes:
 * --gradle-test-args: print the filters as `--tests` arguments, one per line, for
   the PR precheck unit shards to pass to Gradle.
 * --results SUMMARY [SUMMARY ...]: after a verification run, require that Roborazzi
-  compared every PNG committed under app/src/test/snapshots/ in at least one summary
+  compared every PNG committed under app/src/test/snapshots/ (subdirectories included,
+  matched by relative path) in at least one summary
   (sharded runs pass one per shard), so a golden whose owner is no longer
   selected fails instead of silently going unverified.
 """
@@ -133,23 +134,36 @@ def gradle_test_args(registry_text):
     return args
 
 
+def golden_relative_path(path, snapshots_dir):
+    """Return a golden's POSIX path below the snapshots directory, or None outside it."""
+    parts, anchor = Path(path).parts, snapshots_dir.parts
+    for start in range(len(parts) - len(anchor) - 1, -1, -1):
+        if parts[start:start + len(anchor)] == anchor:
+            return Path(*parts[start + len(anchor):]).as_posix()
+    return None
+
+
 def compared_goldens(summary, snapshots_dir):
-    """Return committed-golden file names that a Roborazzi results summary compared."""
+    """Return the committed-golden paths, relative to the snapshots directory, a summary compared."""
     compared = set()
     for result in summary.get('results', []):
-        golden = Path(result.get('golden_file_path', ''))
-        if result.get('type') in COMPARED_TYPES and golden.parent.parts[-4:] == snapshots_dir.parts[-4:]:
-            compared.add(golden.name)
+        if result.get('type') not in COMPARED_TYPES:
+            continue
+        relative = golden_relative_path(result.get('golden_file_path', ''), snapshots_dir)
+        if relative:
+            compared.add(relative)
     return compared
 
 
 def results_problems(root, *summaries):
     """Report committed PNG goldens that no summary from a verification run compared.
 
+    Goldens are matched by their path below the snapshots directory, including subdirectories,
+    so a nested golden never counts as compared because a same-named one elsewhere was.
     Sharded CI runs write one summary per shard, so a golden counts once any shard compared it.
     """
     snapshots = root / SNAPSHOTS
-    committed = {path.name for path in snapshots.glob('*.png')}
+    committed = {path.relative_to(snapshots).as_posix() for path in snapshots.rglob('*.png')}
     if not committed:
         return [f'no committed goldens found under {SNAPSHOTS}']
     compared = set()
