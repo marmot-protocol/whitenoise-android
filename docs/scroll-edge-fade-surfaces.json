@@ -715,7 +715,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",
@@ -785,7 +785,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",

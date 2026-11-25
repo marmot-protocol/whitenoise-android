@@ -28,7 +28,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -255,7 +254,7 @@ internal fun TextAttachmentReaderScreen(
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
                 TextAttachmentReaderTopBar(
-                    onDismiss = onBack,
+                    onDismiss = onDismiss,
                     onOpenExternal = onOpenExternal,
                     onSave = onSave,
                     onShare = onShare,
@@ -315,9 +314,9 @@ internal fun TextAttachmentReaderScreen(
 }
 
 /**
- * Keeps the prototype titled navigation with read-aloud, Copy and Share as visible icons (#3385). Share sends the
- * original file to another app (#3331) and is unavailable while a share is still being prepared, while Save and Open
- * externally stay in the overflow.
+ * The reader's viewer chrome: Close, the title, and read-aloud, Copy and Share as visible icons (#3385). Share sends
+ * the original file to another app (#3331) and is unavailable while a share is still being prepared, while Save and
+ * Open externally stay in the overflow. Close always leaves the reader, even with a selection active.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -334,19 +333,10 @@ private fun TextAttachmentReaderTopBar(
     canRead: Boolean,
 ) {
     var more by remember { mutableStateOf(false) }
-    TopAppBar(
-        title = {
-            Text(
-                stringResource(R.string.text_attachment_reader_title),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onDismiss) {
-                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
-            }
-        },
+    AttachmentViewerChrome(
+        title = stringResource(R.string.text_attachment_reader_title),
+        onClose = onDismiss,
+        windowInsets = AttachmentViewerChromeDefaults.topInsets(),
         actions = {
             if (onReadAloud != null) {
                 IconButton(onClick = onReadAloud, enabled = canRead) {
@@ -367,34 +357,39 @@ private fun TextAttachmentReaderTopBar(
                     Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
                 }
             }
-            if (onSave != null || onOpenExternal != null) {
-                Box {
-                    IconButton(onClick = { more = true }) {
-                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
-                    }
-                    WhiteNoiseDropdownMenu(
-                        expanded = more,
-                        onDismissRequest = { more = false },
-                        items =
-                            listOfNotNull(
-                                onSave?.let {
-                                    WhiteNoiseMenuItem(
-                                        label = stringResource(R.string.save),
-                                        icon = R.drawable.ic_download,
-                                        onClick = it,
-                                    )
-                                },
-                                onOpenExternal?.let {
-                                    WhiteNoiseMenuItem(
-                                        label = stringResource(R.string.text_attachment_open_external),
-                                        onClick = it,
-                                    )
-                                },
-                            ),
-                    )
-                }
-            }
         },
+        overflow =
+            if (onSave != null || onOpenExternal != null) {
+                {
+                    Box {
+                        IconButton(onClick = { more = true }) {
+                            Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+                        }
+                        WhiteNoiseDropdownMenu(
+                            expanded = more,
+                            onDismissRequest = { more = false },
+                            items =
+                                listOfNotNull(
+                                    onSave?.let {
+                                        WhiteNoiseMenuItem(
+                                            label = stringResource(R.string.save),
+                                            icon = R.drawable.ic_download,
+                                            onClick = it,
+                                        )
+                                    },
+                                    onOpenExternal?.let {
+                                        WhiteNoiseMenuItem(
+                                            label = stringResource(R.string.text_attachment_open_external),
+                                            onClick = it,
+                                        )
+                                    },
+                                ),
+                        )
+                    }
+                }
+            } else {
+                null
+            },
     )
 }
 
