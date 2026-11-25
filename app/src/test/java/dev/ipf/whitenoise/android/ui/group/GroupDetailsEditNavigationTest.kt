@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -132,6 +133,28 @@ class GroupDetailsEditNavigationTest {
             assertTrue(first.right <= second.left)
         }
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
+    }
+
+    /** Chat Info retains the disappearing-messages editor for authorized admins and keeps it disabled for non-admins. */
+    @Test
+    fun chatInfoDisappearingActionOpensEditorOnlyForAuthorizedAdmin() {
+        val fixture = controller(group())
+        render(fixture)
+        val disappearing = composeRule.onNodeWithContentDescription(context.getString(R.string.disappearing))
+        disappearing.assertIsDisplayed().assertIsEnabled().performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingPresetTag(300L)).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_ACTION_TAG).assertIsEnabled()
+
+        // Picking the current Off duration closes the sheet cleanly before switching to a non-admin role.
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertDoesNotExist()
+
+        composeRule.runOnIdle { fixture.controller.applyGroupStateForTest(group(admin = false)) }
+        disappearing.assertIsDisplayed().assertIsNotEnabled().performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_PICKER_TAG).assertDoesNotExist()
     }
 
     /** The real details and add-members destinations survive Activity saved-state restoration together. */
