@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -174,6 +177,28 @@ class DetailsSurfacePolishScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_details_all_admin_transfer_amoled.png")
     }
 
+    @Test
+    fun transferAdminPickerLight() = captureTransferAdmin("transfer_admin_picker_light.png")
+
+    @Test
+    fun transferAdminPickerLargeRtlAmoled() =
+        captureTransferAdmin("transfer_admin_picker_large_rtl_amoled.png", largeRtl = true)
+
+    private fun captureTransferAdmin(
+        snapshot: String,
+        largeRtl: Boolean = false,
+    ) {
+        renderGroupDetails(
+            group = group(admin = true),
+            members = groupMembers(),
+            darkTheme = largeRtl,
+            amoled = largeRtl,
+            largeRtl = largeRtl,
+        )
+        composeRule.onNodeWithTag("chat_info.transfer_admin").performScrollTo().performClick()
+        composeRule.onNode(isDialog()).assertIsDisplayed().captureRoboImage("src/test/snapshots/$snapshot")
+    }
+
     /** Renders the details screen and records the full viewport once every asynchronous row settled. */
     private fun captureGroupDetails(
         snapshot: String,
@@ -194,6 +219,7 @@ class DetailsSurfacePolishScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean = false,
         selfProfile: UserProfileMetadataFfi? = null,
+        largeRtl: Boolean = false,
     ) {
         val appState = appState(profileHex = SELF_HEX.takeIf { selfProfile != null }, profile = selfProfile)
         if (selfProfile != null) {
@@ -208,14 +234,17 @@ class DetailsSurfacePolishScreenshotTest {
             )
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                GroupDetailsScreen(
-                    appState = appState,
-                    controller = controller,
-                    onBack = {},
-                    onLeft = {},
-                    onOpenSearch = {},
-                )
+            val direction = if (largeRtl) LayoutDirection.Rtl else LocalLayoutDirection.current
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
+                    GroupDetailsScreen(
+                        appState = appState,
+                        controller = controller,
+                        onBack = {},
+                        onLeft = {},
+                        onOpenSearch = {},
+                    )
+                }
             }
         }
         composeRule.waitForIdle()
