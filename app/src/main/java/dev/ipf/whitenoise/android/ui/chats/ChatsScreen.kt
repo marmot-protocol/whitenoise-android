@@ -6,18 +6,14 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -27,12 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,7 +36,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,16 +53,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
@@ -120,17 +105,13 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
-import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
-import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -139,10 +120,8 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
-import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
-import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -232,6 +211,7 @@ internal fun ChatsScreen(
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -262,9 +242,11 @@ internal fun ChatsScreen(
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     // #2925: a Select all bound to MDK's complete view; null for loaded-window selections.
-    var completeSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
-        mutableStateOf<ChatListCompleteSelection?>(null)
-    }
+    val completeSelectionState =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<ChatListCompleteSelection?>(null)
+        }
+    var completeSelection by completeSelectionState
     var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatDeparture?>(null)
     }
@@ -983,7 +965,8 @@ internal fun ChatsScreen(
             }
         }
     }
-    var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
+    val programmaticViewportGenerationState = remember(chatListState) { mutableLongStateOf(0L) }
+    var programmaticViewportGeneration by programmaticViewportGenerationState
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
     val completeSearchSections =
         rememberCompleteChatSearchSections(
@@ -1340,99 +1323,28 @@ internal fun ChatsScreen(
     )
     GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
-    val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
-    var chatListWindowTop by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var chatListHeightPx by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var dragAnchorChatId by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    var dragPointerWindowY by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
-
-    @Suppress("ReturnCount") // Guard clauses keep invalid live-list gesture state explicit.
-    fun updateChatDragSelection(pointerWindowY: Float): Boolean {
-        val anchorId = dragAnchorChatId ?: return false
-        val pointerY = pointerWindowY - chatListWindowTop
-        val endpointId =
-            dragSelectionEndpoint(
-                chatListState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
-                    val id = visible.key as? String
-                    id
-                        ?.takeIf(visibleChatIds::contains)
-                        ?.let {
-                            DragSelectionVisibleItem(
-                                key = it,
-                                start = visible.offset.toFloat(),
-                                end = (visible.offset + visible.size).toFloat(),
-                            )
-                        }
-                },
-                pointerY,
-            ) ?: return false
-        if (endpointId == anchorId && selectedChatIds.isEmpty()) return false
-        completeSelection = null
-        val next =
-            anchoredDragSelection(
-                orderedIds = orderedVisibleChatIds,
-                eligibleIds = visibleChatIds,
-                anchorId = anchorId,
-                endpointId = endpointId,
-            )
-        selectedChatIds.clear()
-        selectedChatIds.addAll(next)
-        return true
-    }
-
-    fun finishChatDrag(clearSelection: Boolean) {
-        dragAnchorChatId = null
-        dragPointerWindowY = null
-        if (clearSelection) {
-            completeSelection = null
-            selectedChatIds.clear()
+    val chatDragSelection =
+        rememberChatListDragSelection(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            selectedChatIds = selectedChatIds,
+            completeSelection = completeSelectionState,
+        )
+    // Row drag callbacks and drag effects keep their composition's values; remembered so unchanged ones keep identity.
+    val chatDragInputs =
+        remember(chatListState, visibleChatIds, orderedVisibleChatIds) {
+            ChatListDragSelection.Inputs(chatListState, visibleChatIds, orderedVisibleChatIds)
         }
-    }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
-        finishChatDrag(clearSelection = true)
+        chatDragSelection.finishChatDrag(clearSelection = true)
         actionSheetChatId = null
     }
-    LaunchedEffect(chatListDatasetKey) {
-        if (dragAnchorChatId != null) finishChatDrag(clearSelection = true)
-    }
-    LaunchedEffect(visibleChatIds) {
-        val anchorId = dragAnchorChatId ?: return@LaunchedEffect
-        if (anchorId !in visibleChatIds) finishChatDrag(clearSelection = true)
-    }
-
-    LaunchedEffect(dragAnchorChatId, chatListState) {
-        var autoScrollActive = false
-        while (dragAnchorChatId != null) {
-            withFrameNanos { }
-            val pointerWindowY = dragPointerWindowY ?: continue
-            val pointerY = pointerWindowY - chatListWindowTop
-            val scrollDelta =
-                dragSelectionAutoScrollDelta(
-                    pointerY = pointerY,
-                    viewportStart = 0f,
-                    viewportEnd = chatListHeightPx,
-                    edgeThreshold = dragEdgeThresholdPx,
-                    maxStep = dragMaxScrollStepPx,
-                )
-            if (scrollDelta != 0f) {
-                if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
-                    programmaticViewportGeneration += 1L
-                }
-                autoScrollActive = true
-                chatListState.scrollBy(scrollDelta)
-                updateChatDragSelection(pointerWindowY)
-            } else {
-                autoScrollActive = false
-            }
-        }
-    }
+    chatDragSelection.chatDragSelectionEffects(
+        datasetKey = chatListDatasetKey,
+        inputs = chatDragInputs,
+        programmaticViewportGenerationState = programmaticViewportGenerationState,
+    )
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
@@ -1896,7 +1808,7 @@ internal fun ChatsScreen(
                 val swipeEnabled =
                     chatListInteractionsEnabled &&
                         !selectionMode &&
-                        dragAnchorChatId == null &&
+                        chatDragSelection.dragAnchorChatId == null &&
                         actionSheetChatId == null
                 val latestSwipeAdmission by rememberUpdatedState<() -> Boolean> {
                     val visible = rowId in visibleChatIds && item.group.groupIdHex !in leavingAndDeleting
@@ -1998,21 +1910,20 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                dragAnchorChatId = rowId
-                                dragPointerWindowY = pointerWindowY
+                                chatDragSelection.startChatDrag(rowId, pointerWindowY)
                             }
                         },
                         onDragSelection = { pointerWindowY ->
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                dragPointerWindowY = pointerWindowY
-                                updateChatDragSelection(pointerWindowY)
+                                chatDragSelection.moveChatDragPointer(pointerWindowY)
+                                chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)
                             } else {
                                 false
                             }
                         },
                         onDragSelectionEnd = {
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                finishChatDrag(clearSelection = false)
+                                chatDragSelection.finishChatDrag(clearSelection = false)
                             }
                             heldMenuToken[1] = null
                         },
@@ -2020,11 +1931,11 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                finishChatDrag(clearSelection = true)
+                                chatDragSelection.finishChatDrag(clearSelection = true)
                             }
                             heldMenuToken[1] = null
                         },
-                        rangeDragActive = dragAnchorChatId == rowId,
+                        rangeDragActive = chatDragSelection.dragAnchorChatId == rowId,
                         onToggleSelection = {
                             if (menuActionsCurrent()) {
                                 // A row choice made while Select all resolves supersedes that pending read.
@@ -2599,10 +2510,7 @@ internal fun ChatsScreen(
                                             .chatListEdgeFade(chatListState, motion = edgeFadeMotion)
                                             .then(folderArrival)
                                             .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                            .onGloballyPositioned { coordinates ->
-                                                chatListWindowTop = coordinates.positionInWindow().y
-                                                chatListHeightPx = coordinates.size.height.toFloat()
-                                            },
+                                            .onGloballyPositioned(chatDragSelection::updateListBounds),
                                     state = chatListState,
                                 ) {
                                     controller.error
@@ -2623,9 +2531,9 @@ internal fun ChatsScreen(
                                                 key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
                                                 contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
                                             ) {
-                                                ChatListSearchSectionHeader(
-                                                    title = stringResource(R.string.chat_list_filter_groups),
-                                                    testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                SectionHeader(
+                                                    text = stringResource(R.string.chat_list_filter_groups),
+                                                    modifier = Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG),
                                                 )
                                             }
                                         }
@@ -2706,9 +2614,18 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) {
-                                    newChatFlowLaunch = NewMessageFlowLaunch(it)
-                                }
+                                EmptyChats(
+                                    appState,
+                                    onCreate = openNewMessageFlow,
+                                    onFirstRunHelp =
+                                        onFirstRunHelp.takeIf {
+                                            controller.error == null &&
+                                                controller.archivedItems.isEmpty() &&
+                                                selectedFolderId == null &&
+                                                !searchOpen &&
+                                                !searchActive
+                                        },
+                                ) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2884,73 +2801,6 @@ internal fun ChatsScreen(
     }
 }
 
-/**
- * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
- * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
- * it never overlaps either of them.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopControl(
-    visible: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier) {
-        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-        FloatingControlVisibility(
-            visible = visible,
-            motionEnabled = rememberSystemAnimationsEnabled(),
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-        ) {
-            ChatListJumpToTopButton(onClick = onClick)
-        }
-    }
-}
-
-/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-    Box(
-        modifier =
-            modifier
-                .size(42.dp)
-                .semantics { contentDescription = scrollToTopLabel }
-                .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_edge),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
-// 19 + 42 / 2 == 16 + 48 / 2.
-internal val JUMP_TO_TOP_END_INSET = 19.dp
-
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back
 // to HIDE — the 3–4 dead band gives hysteresis so a quick scroll wiggle near
@@ -2964,5 +2814,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
-
-private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"

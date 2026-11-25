@@ -9,7 +9,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -86,27 +85,17 @@ internal fun GroupDetailsConfirmation(
     ownerKey: Any? = Unit,
 ) {
     if (model is GroupDetailsConfirmationState.StepDownSoleAdmin) {
-        WhiteNoiseAlertDialog(
+        ConfirmDialog(
+            title = stringResource(R.string.sole_admin_leave_blocked_title),
+            message = stringResource(R.string.sole_admin_transfer_hint),
+            confirmLabel = stringResource(R.string.transfer_admin),
+            onConfirm = model.onConfirm,
+            onDismiss = onDismiss,
             modifier = Modifier.exposePerformanceTestTags(),
-            onDismissRequest = onDismiss,
             ownerKey = ownerKey,
-            title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
-            text = {
-                Column(Modifier.fadingVerticalScroll(rememberScrollState()), Arrangement.spacedBy(16.dp)) {
-                    Text(stringResource(R.string.sole_admin_transfer_hint))
-                    identity?.invoke()
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { close(model.onConfirm) },
-                    enabled = confirmEnabled,
-                    modifier = Modifier.testTag("group.details.confirm"),
-                ) {
-                    Text(stringResource(R.string.transfer_admin))
-                }
-            },
-            dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
+            identity = identity,
+            confirmEnabled = confirmEnabled,
+            confirmTag = "group.details.confirm",
         )
         return
     }

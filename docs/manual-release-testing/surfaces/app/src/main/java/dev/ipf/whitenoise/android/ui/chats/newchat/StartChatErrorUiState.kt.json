@@ -14,6 +14,16 @@
           "ACC-017"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Confirmed missing inbox flag enables recipient guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorUiState.kt",
+        "anchor": "val missingInbox:",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
     ]
   }
 }

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +29,7 @@ import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
@@ -431,18 +431,15 @@ private fun NotificationProfileDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
+    ConfirmDialog(
         modifier = Modifier.testTag("notification-profile.delete-dialog"),
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notification_profile_delete_confirm_title, name)) },
-        text = { Text(stringResource(R.string.notification_profile_delete_confirm_body)) },
-        confirmButton = {
-            TextButton(
-                modifier = Modifier.testTag("notification-profile.delete-confirm"),
-                onClick = { close(onConfirm) },
-            ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-        },
-        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
+        title = stringResource(R.string.notification_profile_delete_confirm_title, name),
+        message = stringResource(R.string.notification_profile_delete_confirm_body),
+        confirmLabel = stringResource(R.string.delete),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
+        confirmTag = "notification-profile.delete-confirm",
     )
 }
 

@@ -1072,7 +1072,7 @@
     <string name="notification_background_on">Фоновое соединение включено.</string>
     <string name="notification_background_off">Фоновое соединение отключено.</string>
     <string name="notification_categories_detail">Android задаёт звук, вибрацию и важность для каждой категории.</string>
-    <string name="chat_with_support">Чат с поддержкой</string>
+    <string name="chat_with_support">Написать команде White Noise</string>
     <string name="theme">Тема</string>
     <string name="theme_system">Системная</string>
     <string name="theme_light">Светлая</string>
@@ -2233,6 +2233,7 @@
     <string name="setup_finding_retired_relay">Это реле выведено из эксплуатации.</string>
     <string name="setup_finding_unsafe_relay">Этот адрес реле небезопасен для использования.</string>
     <string name="setup_finding_unreachable">Не удалось связаться с этим реле.</string>
+    <string name="setup_relay_timeout_title">Ретранслятор не ответил вовремя</string>
     <string name="setup_finding_timed_out">Время ожидания проверки истекло.</string>
     <string name="setup_finding_authentication_required">Это реле требует аутентификации.</string>
     <string name="setup_finding_payment_required">Это реле требует оплаты.</string>
@@ -2336,7 +2337,7 @@
     <string name="app_unlock_checking">Проверка защиты приложения…</string>
     <string name="support_contact_title">Поддержка White Noise</string>
     <string name="support_contact_subtitle">Вопросы, проблемы и предложения</string>
-    <string name="support_contact_explainer">Задайте вопрос, сообщите о проблеме или предложите идею.</string>
+    <string name="support_contact_explainer">Задайте вопрос, сообщите о проблеме или поделитесь отзывом с разработчиками White Noise.</string>
     <string name="support_relays_attention">Ретрансляторы профиля требуют внимания</string>
     <string name="support_open_relays">Открыть ретрансляторы</string>
     <string name="support_relays_review">Проверьте список ретрансляторов для получения сообщений этого профиля.</string>
@@ -2397,6 +2398,14 @@
     <string name="new_message_no_results_detail">Проверьте правильность написания или попробуйте другой поиск.</string>
     <string name="new_message_chat_created">Чат создан</string>
     <string name="new_message_open_chat">Открыть чат</string>
+    <string name="group_setup_customize">Настроить группу</string>
+    <string name="group_setup_hide_customization">Скрыть настройки группы</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">Выбран %d участник</item>
+        <item quantity="few">Выбрано %d участника</item>
+        <item quantity="many">Выбрано %d участников</item>
+        <item quantity="other">Выбрано %d участников</item>
+    </plurals>
     <string name="group_setup_title">Настроить группу</string>
     <string name="group_create_action">Создать группу</string>
     <string name="group_add_photo">Добавить фото</string>
@@ -2543,6 +2552,8 @@
     <string name="error_invalid_key_package_for">Не удалось проверить опубликованный ключ чата для %1$s. Попросите обновить White Noise и опубликовать новый ключ чата, затем повторите попытку.</string>
     <string name="error_incompatible_key_package">Ключ чата этого пользователя несовместим. Попросите его обновить и открыть White Noise, затем попробуйте снова.</string>
     <string name="error_incompatible_key_package_for">Ключ чата пользователя %1$s несовместим. Попросите этого пользователя обновить и открыть White Noise, затем попробуйте снова.</string>
+    <string name="new_message_copy_inbox_instructions">Скопировать инструкцию</string>
+    <string name="new_message_inbox_instructions">Не удалось начать чат с вами в White Noise. Проверьте, пожалуйста, входящие ретрансляторы в настройках White Noise и дайте мне знать, когда можно попробовать снова.</string>
     <string name="error_missing_member_inbox">Нет пригодного входящего ретранслятора для этого человека. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_missing_member_inbox_for">Нет пригодного входящего ретранслятора для %1$s. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_invite_welcome_too_large">Это приглашение слишком велико для входящих ретрансляторов получателя. Попросите добавить входящий ретранслятор, который принимает сообщения большего размера.</string>

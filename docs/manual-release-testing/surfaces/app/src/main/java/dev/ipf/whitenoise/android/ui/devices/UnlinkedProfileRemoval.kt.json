@@ -52,14 +52,6 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "SET-066"
-        ]
-      },
-      {
         "surface": "Linked devices: R.string.toast_wipe_outcome_unconfirmed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
         "anchor": "R.string.toast_wipe_outcome_unconfirmed",

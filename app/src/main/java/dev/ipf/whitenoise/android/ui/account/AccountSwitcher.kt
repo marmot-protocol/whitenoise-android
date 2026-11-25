@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 internal const val ACTIVE_ACCOUNT_UNREAD_DOT_TAG = "active-account-unread-dot"
 
@@ -52,7 +53,7 @@ fun AccountAvatarButton(
     title: String,
     seed: String,
     pictureUrl: String?,
-    size: Dp = 40.dp,
+    size: Dp = WhiteNoiseSizes.AvatarCompact,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     // Per-account unread dot (#592, #805): a small accent dot on the active

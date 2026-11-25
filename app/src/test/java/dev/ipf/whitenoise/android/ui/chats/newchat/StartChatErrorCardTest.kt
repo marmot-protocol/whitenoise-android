@@ -74,7 +74,7 @@ class StartChatErrorCardTest {
     }
 
     @Test
-    fun missingInboxShowsSettingsGuidanceWithoutShare() {
+    fun missingInboxCopiesRecipientInstructionsWithoutDiagnosticOrShare() {
         val error =
             startChatErrorUiState(
                 npub = "npub1alice",
@@ -83,14 +83,42 @@ class StartChatErrorCardTest {
                 recipientName = "Alice",
                 displayName = { "Alice" },
             )
+        var copied: String? = null
+        var retries = 0
         assertFalse(error.invitation)
+        assertFalse(error.copyable)
         assertEquals(AppText.Resource(R.string.error_missing_member_inbox_for, listOf("Alice")), error.detail)
         composeRule.setContent {
-            StartChatErrorCard(error, onRetry = {}, onInvite = {}, onCopy = {})
+            StartChatErrorCard(error, onRetry = { retries++ }, onInvite = {}, onCopy = { copied = it })
         }
         composeRule.onNodeWithText(context.getString(R.string.error_missing_member_inbox_for, "Alice")).assertExists()
-        composeRule.onNodeWithText(context.getString(R.string.retry)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.new_message_copy_inbox_instructions)).performClick()
+        assertEquals(context.getString(R.string.new_message_inbox_instructions), copied)
+        assertEquals(0, retries)
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        assertEquals(1, retries)
         composeRule.onNodeWithText(context.getString(R.string.share)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.copy)).assertDoesNotExist()
+    }
+
+    @Test
+    fun incompleteLookupOffersRetryWithoutInboxInstructions() {
+        val error =
+            startChatErrorUiState(
+                "npub1alice",
+                "alice",
+                MarmotKitException.DirectoryLookupIncomplete("alice"),
+                "Alice",
+                { "Alice" },
+            )
+        var retries = 0
+        composeRule.setContent {
+            StartChatErrorCard(error, onRetry = { retries++ }, onInvite = {}, onCopy = {})
+        }
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.new_message_copy_inbox_instructions)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.share)).assertDoesNotExist()
+        assertEquals(1, retries)
     }
 
     @Test

@@ -925,10 +925,10 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
       "calls": {
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 1
       },
       "family": "group",
-      "policy": "Scroll the abandonment identities, consequences and failure, and the sole-admin gate's explanation, while Cancel and the destructive action stay reachable at large text sizes.",
+      "policy": "Scroll the abandonment identities, consequences and failure while Cancel, Copy and the destructive action stay reachable at large text sizes.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
@@ -2101,12 +2101,14 @@
         "fadingVerticalScroll": 1
       },
       "family": "common",
-      "policy": "ordinary",
+      "policy": "Scroll the message and body slot (the sole-admin explanation and other confirmation bodies) while Cancel and the confirm action stay reachable at large text sizes.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
         "SCR-003",
-        "SCR-004"
+        "SCR-004",
+        "GRP-010",
+        "GRP-033"
       ]
     },
     {
@@ -2126,7 +2128,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
       "calls": {
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 1
       },
       "family": "group",
       "policy": "ordinary",
@@ -2262,7 +2264,21 @@
         "SCR-003",
         "SCR-004"
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }
