@@ -366,6 +366,64 @@ class NotificationChannelCleanupRegressionTest {
         assertEquals(3, failingPrefs.commitAttempts)
     }
 
+    /** Unaccounted channel detection covers vibration variants, unscoped shortcuts, other owners, and prefs errors. */
+    @Test
+    fun hasUnaccountedConversationChannelsHandlesEdgeCasesAndFailsClosedOnLookupError() {
+        assertFalse(hasUnaccountedConversationNotificationChannels(context, "account-a", emptySet()))
+
+        val otherShortcutId = checkNotNull(conversationShortcutId("account-b", "group-vib"))
+        convChannel(NotificationChannelSpec.GROUP_MESSAGES, otherShortcutId, "Other Vib Chat", doublePattern)
+        assertTrue(hasUnaccountedConversationNotificationChannels(context, "account-a", emptySet()))
+
+        // An unscoped legacy shortcut carries no account scope and must remain unaccounted.
+        val shortcutBuilder =
+            ShortcutInfoCompat
+                .Builder(context, otherShortcutId)
+                .setShortLabel("Other Vib Chat")
+                .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                .setIntent(buildShareShortcutIntent(context))
+                .setLongLived(true)
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcutBuilder.build())
+        assertTrue(hasUnaccountedConversationNotificationChannels(context, "account-a", emptySet()))
+
+        // A scoped shortcut for another account accounts for the channel.
+        val scope = checkNotNull(conversationShortcutAccountScope("account-b"))
+        val scopedShortcut =
+            ShortcutInfoCompat
+                .Builder(context, otherShortcutId)
+                .setShortLabel("Other Vib Chat")
+                .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                .setIntent(buildShareShortcutIntent(context))
+                .setLongLived(true)
+                .setExtras(conversationShortcutAccountScopeExtras(scope))
+                .build()
+        ShortcutManagerCompat.pushDynamicShortcut(context, scopedShortcut)
+        assertFalse(hasUnaccountedConversationNotificationChannels(context, "account-a", emptySet()))
+
+        // Without shortcuts, an owner record for another account still accounts for the channel.
+        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        assertTrue(recordConversationChannelOwners(context, "account-b", listOf(otherShortcutId)))
+        assertFalse(hasUnaccountedConversationNotificationChannels(context, "account-a", emptySet()))
+
+        // A failing prefs.all read must fail closed without throwing.
+        val throwingContext =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences {
+                    val delegate = super.getSharedPreferences(name, mode)
+                    if (name != CONVERSATION_CHANNEL_OWNERS_PREFS) return delegate
+                    return object : SharedPreferences by delegate {
+                        override fun getAll(): MutableMap<String, *> = error("injected owner-store read failure")
+                    }
+                }
+            }
+        assertTrue(hasUnaccountedConversationNotificationChannels(throwingContext, "account-a", emptySet()))
+    }
+
     /** Returns the hashed conversation-channel owner store cleanup reads and writes. */
     private fun ownerPrefs(): SharedPreferences {
         val name = "whitenoise.conversation_channel_owners"

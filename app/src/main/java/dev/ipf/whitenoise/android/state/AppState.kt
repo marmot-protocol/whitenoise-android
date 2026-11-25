@@ -5039,7 +5039,10 @@ class WhiteNoiseAppState private constructor(
         completed: (OwnedSignOutCompletion) -> Unit,
     ): OwnedSignOutCompletion {
         val draftsSaved = draftWriter.flushAccount(request.requested)
-        val knownGroupIds = captureAccountKnownGroupIds(request.requested)
+        val includeUnscopedLegacy = accounts.none { it.label != request.requested && it.isSignedInSigningAccount() }
+        val knownGroupIds =
+            captureAccountKnownGroupIds(request.requested, includeUnscopedLegacy)
+                ?: return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(request.requested) {
@@ -5250,11 +5253,16 @@ class WhiteNoiseAppState private constructor(
         wipedRef: String,
         wipedShareAccount: String? = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex,
     ): AccountWipeCompletion? {
+        val inView = activeAccountRef
+        val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
+        val includeUnscopedLegacy =
+            retireSession && accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() }
+        val knownGroupIds = captureAccountKnownGroupIds(wipedRef, includeUnscopedLegacy) ?: return null
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
                 admitted = true
-                finishRevokedAccountWipe(wipedRef, wipedShareAccount)
+                finishRevokedAccountWipe(wipedRef, wipedShareAccount, knownGroupIds)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5268,11 +5276,11 @@ class WhiteNoiseAppState private constructor(
     private suspend fun finishRevokedAccountWipe(
         wipedRef: String,
         wipedShareAccount: String?,
+        knownGroupIds: Set<String>,
     ): AccountWipeCompletion? {
         val inView = activeAccountRef
         val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
-        val knownGroupIds = captureAccountKnownGroupIds(wipedRef)
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         receivedVoiceTranscripts.forgetAccount(wipedRef)
         releaseCaptureOwners(wipedRef)

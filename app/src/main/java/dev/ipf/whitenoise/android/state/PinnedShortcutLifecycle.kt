@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.hasUnaccountedConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
@@ -14,6 +15,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
 private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
+private const val SIGN_OUT_OWNER_SAVE_ATTEMPTS = 3
+
+/** Captured departing-account group inventory together with whether every native listing succeeded. */
+private data class AccountGroupInventory(
+    val groupIds: Set<String>,
+    val nativeInventoryComplete: Boolean,
+)
 
 /** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
 internal fun WhiteNoiseAppState.pinnedShortcutLockDecision(): PinnedShortcutLockDecision =
@@ -121,42 +129,80 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
  * Captures the departing account's known group ids before native sign-out or wipe revokes them,
  * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
  * another account remains signed in. Pending local-delete journal groups are included, since journal
- * replay no longer runs for an account once it has signed out. The capture is saved to the channel owner
- * store before returning, so a process death before Android cleanup cannot lose it.
+ * replay no longer runs for an account once it has signed out.
+ *
+ * Returns null before native revocation when native inventory remained incomplete while
+ * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
+ * the departing ownership record could not be durably saved after retries.
  */
-internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: String): Set<String> {
-    val groupIds = readAccountKnownGroupIds(accountRef)
-    val recorded =
-        withContext(Dispatchers.IO) { recordDepartingConversationChannelOwners(appContext, accountRef, groupIds) }
-    if (!recorded) appStateDebug { "sign-out channel capture could not be saved for a restart" }
-    return groupIds
+internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
+    accountRef: String,
+    includeUnscopedLegacy: Boolean = accounts.none { it.label != accountRef && it.isSignedInSigningAccount() },
+): Set<String>? {
+    val inventory = readAccountKnownGroupIds(accountRef)
+    val groupIds = inventory.groupIds
+    val unaccountedChannelRisk =
+        !inventory.nativeInventoryComplete &&
+            !includeUnscopedLegacy &&
+            withContext(Dispatchers.IO) {
+                hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
+            }
+    return when {
+        unaccountedChannelRisk -> {
+            appStateDebug { "sign-out channel capture incomplete with unaccounted conversation channels" }
+            null
+        }
+        !retrySignOutOwnerSave {
+            withContext(Dispatchers.IO) { recordDepartingConversationChannelOwners(appContext, accountRef, groupIds) }
+        } -> {
+            appStateDebug { "sign-out channel capture could not be saved before native revocation" }
+            null
+        }
+        else -> groupIds
+    }
+}
+
+/** Retries durable owner-record persistence before native revocation commits. */
+private suspend fun retrySignOutOwnerSave(save: suspend () -> Boolean): Boolean {
+    repeat(SIGN_OUT_OWNER_SAVE_ATTEMPTS) { attempt ->
+        if (save()) return true
+        if (attempt + 1 < SIGN_OUT_OWNER_SAVE_ATTEMPTS) yield()
+    }
+    return false
 }
 
 /** Reads every group id the account's channels may be named after, retrying transient native reads before fallback. */
-private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): Set<String> =
-    buildSet {
-        readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
-            .forEach { row -> add(row.groupIdHex) }
+private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
+    val chats = readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
+    val quarantined =
         readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }
-            .forEach { group -> add(group.groupIdHex) }
-        // Retain already-mounted active/archived chats if native listing fails on a degraded store.
-        boundChats(accountRef)?.let { controller ->
-            controller.items.forEach { item -> add(item.group.groupIdHex) }
-            controller.archivedItems.forEach { item -> add(item.group.groupIdHex) }
+    val groupIds =
+        buildSet {
+            chats?.forEach { row -> add(row.groupIdHex) }
+            quarantined?.forEach { group -> add(group.groupIdHex) }
+            // Retain already-mounted active/archived chats if native listing fails on a degraded store.
+            boundChats(accountRef)?.let { controller ->
+                controller.items.forEach { item -> add(item.group.groupIdHex) }
+                controller.archivedItems.forEach { item -> add(item.group.groupIdHex) }
+            }
+            runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
+                .getOrDefault(emptySet())
+                .forEach(::add)
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
+            }.getOrDefault(emptySet()).forEach(::add)
         }
-        runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
-            .getOrDefault(emptySet())
-            .forEach(::add)
-        runCatchingCancellable {
-            withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
-        }.getOrDefault(emptySet()).forEach(::add)
-    }
+    return AccountGroupInventory(
+        groupIds = groupIds,
+        nativeInventoryComplete = chats != null && quarantined != null,
+    )
+}
 
-/** Retries transient native inventory reads before sign-out revocation without trapping a broken account. */
+/** Retries transient native inventory reads before sign-out revocation, returning null if every attempt fails. */
 private suspend fun <T> readGroupInventoryWithRetry(
     label: String,
     read: suspend () -> List<T>,
-): List<T> {
+): List<T>? {
     var lastFailure: Throwable? = null
     repeat(SIGN_OUT_GROUP_READ_ATTEMPTS) { attempt ->
         val result = runCatchingCancellable { read() }
@@ -165,7 +211,7 @@ private suspend fun <T> readGroupInventoryWithRetry(
         if (attempt + 1 < SIGN_OUT_GROUP_READ_ATTEMPTS) yield()
     }
     lastFailure?.let { appStateDebug(it) { "sign-out channel capture could not list $label" } }
-    return emptyList()
+    return null
 }
 
 /**

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -23,6 +24,67 @@ internal fun recordDepartingConversationChannelOwners(
     val shortcutIds = groupChannelShortcutIds(accountRef, groupIds).mapTo(HashSet(), ::canonicalConversationShortcutId)
     return recordConversationChannelOwners(context, accountRef, shortcutIds)
 }
+
+/**
+ * Reports whether Android currently holds any `:conv:` notification channel that neither belongs to
+ * an existing account owner record or scoped shortcut nor is covered by [accountRef]'s captured
+ * [knownGroupIds]. Returns true when channel enumeration or ownership lookup fails so an incomplete
+ * native inventory never silently strands an upgrade-era channel title in multi-account mode.
+ */
+internal fun hasUnaccountedConversationNotificationChannels(
+    context: Context,
+    accountRef: String,
+    knownGroupIds: Collection<String>,
+): Boolean =
+    synchronized(UserEventNotificationGroup.mutationLock) {
+        runCatching {
+            val appContext = context.applicationContext
+            val manager = appContext.getSystemService(NotificationManager::class.java)
+            val convShortcutIds = manager?.notificationChannels?.mapNotNull(::conversationChannelShortcutId)
+            when {
+                convShortcutIds == null -> true
+                convShortcutIds.isEmpty() -> false
+                else -> {
+                    val ownerEntries =
+                        appContext
+                            .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+                            .all
+                    val accountedIds =
+                        accountedConversationShortcutIds(appContext, ownerEntries, accountRef, knownGroupIds)
+                    convShortcutIds.any { it !in accountedIds }
+                }
+            }
+        }.getOrDefault(true)
+    }
+
+/** Collects every `:conv:` shortcut id already owned by an account record, scoped shortcut, or capture set. */
+private fun accountedConversationShortcutIds(
+    appContext: Context,
+    ownerEntries: Map<String, *>,
+    accountRef: String,
+    knownGroupIds: Collection<String>,
+): Set<String> =
+    buildSet {
+        ownerEntries.forEach { (key, value) ->
+            if (key != LEGACY_SWEEP_PENDING_KEY) {
+                (value as? Set<*>)
+                    ?.filterIsInstance<String>()
+                    ?.flatMapTo(this, ::channelShortcutIdsFromShortcutId)
+            }
+        }
+        addAll(groupChannelShortcutIds(accountRef, knownGroupIds))
+        runCatching {
+            val flags =
+                ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                    ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                    ShortcutManagerCompat.FLAG_MATCH_PINNED
+            ShortcutManagerCompat.getShortcuts(appContext, flags)
+        }.getOrDefault(emptyList())
+            .filter { shortcut ->
+                val scope = shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA)
+                !scope.isNullOrBlank() && isConversationShortcutId(shortcut.id)
+            }.flatMapTo(this) { channelShortcutIdsFromShortcutId(it.id) }
+    }
 
 /**
  * Retains conversation-channel owner records only for [retainedAccountRefs], retrying channel cleanup for

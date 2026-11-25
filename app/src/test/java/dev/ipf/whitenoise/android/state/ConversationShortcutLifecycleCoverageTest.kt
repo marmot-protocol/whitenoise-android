@@ -186,8 +186,22 @@ class ConversationShortcutLifecycleCoverageTest {
             "captureAccountKnownGroupIds must save the departing account's channel owners",
             "recordDepartingConversationChannelOwners(appContext, accountRef, groupIds)" in capture,
         )
-        assertCapturedBefore(appState.functionBody("revokeAndFinishSignOutLocked"), "withRevokedPinnedTarget(")
-        assertCapturedBefore(appState.functionBody("finishRevokedAccountWipe"), "signOutAndWipe(wipedRef)")
+        assertTrue(
+            "captureAccountKnownGroupIds must guard incomplete multi-account reads against unowned :conv: channels",
+            "hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)" in capture,
+        )
+        val signOutBody = appState.functionBody("revokeAndFinishSignOutLocked")
+        val wipeBody = appState.functionBody("signOutAndWipeActiveAccountLocked")
+        assertCapturedBefore(signOutBody, "withRevokedPinnedTarget(")
+        assertCapturedBefore(wipeBody, "withRevokedPinnedTarget(")
+        assertTrue(
+            "revokeAndFinishSignOutLocked must abort before native work when channel capture fails",
+            "?: return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)" in signOutBody,
+        )
+        assertTrue(
+            "signOutAndWipeActiveAccountLocked must abort before revocation when channel capture fails",
+            "captureAccountKnownGroupIds(wipedRef, includeUnscopedLegacy) ?: return null" in wipeBody,
+        )
     }
 
     /** Asserts [body] captures the departing account's groups before [nativeCall]. */
