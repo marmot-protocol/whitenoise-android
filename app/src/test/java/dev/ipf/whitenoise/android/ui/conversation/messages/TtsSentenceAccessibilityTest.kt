@@ -166,3 +166,5 @@ class TtsSentenceAccessibilityTest {
         assertEquals(listOf(choice), selected)
     }
 }
+
+// Probe comment for the precheck lane.
