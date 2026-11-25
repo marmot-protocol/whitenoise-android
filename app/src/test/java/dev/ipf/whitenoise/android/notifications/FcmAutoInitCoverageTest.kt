@@ -135,7 +135,10 @@ class FcmAutoInitCoverageTest {
     @Test
     fun selectionTokenReadIsFencedByOwnership() {
         val selection = appModuleSource(SELECTION)
-        val fenced = selection.functionBody("fetchFcmTokenForOwner")
+        val declaration = "fun NotificationDeliveryController.fetchFcmTokenForOwner("
+        assertTrue("missing $declaration", selection.contains(declaration))
+        // ktlint keeps this function expression-bodied, so functionBody would return its first lambda instead.
+        val fenced = selection.substringAfter(declaration).substringBefore("\n\n")
         val fetch = appModuleSource(SYNC).functionBody("fetchFcmTokenOrNull")
 
         assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
