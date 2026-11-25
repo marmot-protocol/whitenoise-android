@@ -25,7 +25,7 @@ import org.junit.Test
  * 7. a click modifier on a bare `Icon`, whose highlight is a square around the glyph.
  *
  * A click passes when an earlier clip in its own modifier chain is not a rectangle, or when it turns its own
- * highlight off (`indication = null`) and a modifier watching the same interaction source draws the press.
+ * highlight off (`indication = null`) and that control draws the press from the same source binding.
  * Audited exceptions live in [allowed] with the reason, and the counts are exact, so a fixed site has to
  * leave the list.
  */
@@ -152,6 +152,104 @@ class ShapedTouchFeedbackCoverageTest {
         assertEquals(emptyList<String>(), shapedTouchFindings(handedIn))
         val handedElsewhere = handedIn.replace("pressFeedbackInsideClip(pressSource)", "pressFeedbackInsideClip(other)")
         assertEquals(listOf(ROUND_COMPONENT), shapedTouchFindings(handedElsewhere).map(::kind))
+    }
+
+    /** Reusing a variable name in another composable does not supply this control's missing feedback. */
+    @Test
+    fun aReplacementInAnotherComposableDoesNotExcuseTheClick() {
+        val source =
+            """
+            fun Broken() {
+                val press = remember { MutableInteractionSource() }
+                Surface(shape = CircleShape, modifier = Modifier.clickable(
+                    interactionSource = press, indication = null, onClick = go)) {}
+            }
+            fun Working() {
+                val press = remember { MutableInteractionSource() }
+                Surface(shape = CircleShape, modifier = Modifier.clickable(
+                    interactionSource = press, indication = null, onClick = go)) {
+                    Box(Modifier.pressFeedbackInsideClip(press))
+                }
+            }
+            """.trimIndent()
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(source).map(::kind))
+    }
+
+    /** Even a shared source only excuses the control whose own content draws its feedback. */
+    @Test
+    fun aReplacementInASiblingControlDoesNotExcuseTheClick() {
+        val source =
+            """
+            val press = remember { MutableInteractionSource() }
+            Surface(shape = CircleShape, modifier = Modifier.clickable(
+                interactionSource = press, indication = null, onClick = go)) {
+                Box(Modifier.pressFeedbackInsideClip(press))
+            }
+            Surface(shape = CircleShape, modifier = Modifier.clickable(
+                interactionSource = press, indication = null, onClick = go)) {}
+            """.trimIndent()
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(source).map(::kind))
+    }
+
+    /** A child that shadows the parent's source cannot draw the parent's press, despite using the same name. */
+    @Test
+    fun aShadowedChildSourceDoesNotReplaceTheParentSource() {
+        val source =
+            """
+            val press = remember { MutableInteractionSource() }
+            Surface(shape = CircleShape, modifier = Modifier.clickable(
+                interactionSource = press, indication = null, onClick = go)) {
+                val press = remember { MutableInteractionSource() }
+                Box(Modifier.pressFeedbackInsideClip(press))
+            }
+            """.trimIndent()
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(source).map(::kind))
+    }
+
+    /** A named hand-off must be drawn by that component, not an unrelated function with the same parameter. */
+    @Test
+    fun aReplacementInAnUnrelatedFunctionDoesNotValidateTheHandOff() {
+        val source =
+            """
+            val press = remember { MutableInteractionSource() }
+            ColorSwatch(pressSource = press, modifier = Modifier.clickable(
+                interactionSource = press, indication = null, onClick = go))
+            fun Other(pressSource: MutableInteractionSource) {
+                Box(Modifier.pressFeedbackInsideClip(pressSource))
+            }
+            fun ColorSwatch(pressSource: MutableInteractionSource, modifier: Modifier) {
+                Box(modifier.clip(CircleShape))
+            }
+            """.trimIndent()
+        assertEquals(listOf(ROUND_COMPONENT), shapedTouchFindings(source).map(::kind))
+    }
+
+    /** An overload or a member with the same name cannot prove which implementation draws this hand-off. */
+    @Test
+    fun aNamedHandOffRequiresOneUnambiguousComponent() {
+        val call =
+            "ColorSwatch(pressSource = press, modifier = Modifier.clickable(" +
+                "interactionSource = press, indication = null, onClick = go))"
+        val overloads =
+            """
+            fun ColorSwatch(pressSource: MutableInteractionSource, modifier: Modifier) {
+                Box(modifier.clip(CircleShape))
+            }
+            fun ColorSwatch(pressSource: MutableInteractionSource, modifier: Modifier, enabled: Boolean) {
+                Box(Modifier.pressFeedbackInsideClip(pressSource))
+            }
+            """.trimIndent()
+        val member =
+            """
+            class OtherPalette {
+                fun ColorSwatch(pressSource: MutableInteractionSource, modifier: Modifier) {
+                    Box(Modifier.pressFeedbackInsideClip(pressSource))
+                }
+            }
+            """.trimIndent()
+        for (implementation in listOf(overloads, member)) {
+            assertEquals(listOf(ROUND_COMPONENT), shapedTouchFindings("$call\n$implementation").map(::kind))
+        }
     }
 
     /** A clip only excuses a click on a shaped Surface or card when it clips to that container's own shape. */
@@ -346,7 +444,7 @@ class ShapedTouchFeedbackCoverageTest {
                 Surface(shape = CircleShape) { Box(Modifier.shapedPressFeedback(press, CircleShape)) }
             }
             Box(Modifier.clickable(interactionSource = press, indication = null, onClick = go)) {
-                Box(Modifier.clip(CircleShape))
+                Box(Modifier.shapedPressFeedback(press, CircleShape))
             }
             Box(Modifier.clip(CircleShape).clickable { go() }) { Avatar(title) }
             SlotIconButton(onClick = go, modifier = Modifier.width(40.dp).height(48.dp)) {}

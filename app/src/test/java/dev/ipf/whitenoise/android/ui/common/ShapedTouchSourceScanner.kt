@@ -20,8 +20,6 @@ private const val COMPOSER_PACKAGE = "conversation/composer/"
 
 private val clickModifier =
     Regex("""\.(clickable|combinedClickable|toggleable|selectable|triStateToggleable)\s*([({])""")
-private val noIndication = Regex("""indication\s*=\s*null""")
-private val replacementIndication = Regex("""\.(indication|pressFeedbackInsideClip|shapedPressFeedback)\s*\(""")
 private val thenOpen = Regex("""\.\s*then\s*$""")
 private val chainedCall = Regex("""\s*\.\s*(\w+)\s*([({])""")
 private val trailingLambda = Regex("""[ \t]*\{""")
@@ -45,7 +43,7 @@ private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
 private val modifierParameter = Regex("""^\s*(@\w+\s+)*modifier\s*:""")
 private val leadingName = Regex("""^\s*(\w+)""")
-private val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
+internal val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
 private const val DECLARATION_LOOKBEHIND = 12
@@ -59,11 +57,11 @@ internal fun shapedTouchFindings(
     path: String = "",
 ): List<String> {
     val code = blankCommentsAndStrings(source)
-    val drawn = code.indicatedSources()
+    val feedback = ShapedTouchIndications(code)
     return (
-        code.clicksBeforeClip(drawn) + code.clicksInShapedSurfaces(drawn) +
-            code.clickableBoxesAroundRoundChildren(drawn) + code.clicksOnRoundComponents(drawn) +
-            code.stretchedIconButtons(path) + code.clicksOverShapedFills(drawn) + code.clicksOnBareGlyphs(drawn)
+        code.clicksBeforeClip(feedback) + code.clicksInShapedSurfaces(feedback) +
+            code.clickableBoxesAroundRoundChildren(feedback) + code.clicksOnRoundComponents(feedback) +
+            code.stretchedIconButtons(path) + code.clicksOverShapedFills(feedback) + code.clicksOnBareGlyphs(feedback)
     ).sortedBy { it.second }.map { (kind, offset) -> "$kind @${code.lineAt(offset)}" }
 }
 
@@ -71,7 +69,7 @@ internal fun shapedTouchFindings(
  * Rule 2: a click modifier with its own highlight, followed in the same chain by a clip that is not a
  * rectangle, directly or inside `.then(…)`.
  */
-private fun String.clicksBeforeClip(drawn: Set<String>): List<Pair<String, Int>> =
+private fun String.clicksBeforeClip(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     clickModifier
         .findAll(this)
         .filter { match ->
@@ -84,7 +82,7 @@ private fun String.clicksBeforeClip(drawn: Set<String>): List<Pair<String, Int>>
                 } else {
                     close
                 }
-            !substring(open + 1, close).hasReplacedIndication(drawn) &&
+            !feedback.replaces(match.range.first, substring(open + 1, close)) &&
                 chainAfter(callEnd).any { (name, args) ->
                     (name == "clip" && "RectangleShape" !in args) || (name == "then" && args.hasShapedClip())
                 }
@@ -95,17 +93,17 @@ private fun String.clicksBeforeClip(drawn: Set<String>): List<Pair<String, Int>>
  * Rule 1: a click modifier in the `modifier` of a non-clickable Surface whose shape is not a rectangle, or
  * of a non-clickable card, whose default shape is rounded.
  */
-private fun String.clicksInShapedSurfaces(drawn: Set<String>): List<Pair<String, Int>> =
-    calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null, drawn) } +
+private fun String.clicksInShapedSurfaces(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
+    calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null, feedback) } +
         cardDefaultShapes.flatMap { (card, defaultShape) ->
-            calls(card).flatMap { shapedContainerClicks(it, defaultShape, drawn) }
+            calls(card).flatMap { shapedContainerClicks(it, defaultShape, feedback) }
         }
 
 /** The click modifiers in one shaped container call's `modifier`, unless it is clickable itself or rectangular. */
 private fun shapedContainerClicks(
     call: Pair<Int, String>,
     defaultShape: String?,
-    drawn: Set<String>,
+    feedback: ShapedTouchIndications,
 ): List<Pair<String, Int>> {
     val (start, args) = call
     val named = topLevelNamedArguments(args)
@@ -116,24 +114,25 @@ private fun shapedContainerClicks(
     } else {
         // A clip before the click only shapes the highlight like the container when it uses the container's own
         // shape, which for a card with none named is its default.
-        args.undecoratedClicks(drawn, matching = shape.trim()).map { SHAPED_SURFACE to start + it }
+        val clicks = args.undecoratedClicks(feedback, offset = start + 1, matching = shape.trim())
+        clicks.map { SHAPED_SURFACE to start + it }
     }
 }
 
 /** Rule 3: a clickable Box whose content draws a round or rounded shape without a shaped highlight. */
-private fun String.clickableBoxesAroundRoundChildren(drawn: Set<String>): List<Pair<String, Int>> =
+private fun String.clickableBoxesAroundRoundChildren(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     calls("Box").flatMap { (start, args) ->
         val lambda = trailingLambda.matchAt(this, start + args.length + 1)
         val body = lambda?.let { substring(it.range.last + 1, closingBracket(it.range.last)) }
         if (body != null && roundChild.containsMatchIn(body)) {
-            args.undecoratedClicks(drawn).map { ROUND_CHILD to start + it }
+            args.undecoratedClicks(feedback, offset = start + 1).map { ROUND_CHILD to start + it }
         } else {
             emptyList()
         }
     }
 
 /** Rule 4: a click modifier passed to an avatar or swatch, which clips itself only inside. */
-private fun String.clicksOnRoundComponents(drawn: Set<String>): List<Pair<String, Int>> =
+private fun String.clicksOnRoundComponents(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     roundComponentCall
         .findAll(this)
         .filterNot { match ->
@@ -142,7 +141,7 @@ private fun String.clicksOnRoundComponents(drawn: Set<String>): List<Pair<String
         }.flatMap { match ->
             val open = match.range.last
             val args = substring(open + 1, closingBracket(open))
-            args.undecoratedClicks(drawn).map { ROUND_COMPONENT to open + 1 + it }
+            args.undecoratedClicks(feedback, offset = open + 1).map { ROUND_COMPONENT to open + 1 + it }
         }.toList()
 
 /**
@@ -252,7 +251,7 @@ private fun String.localBinding(name: String): String? {
 }
 
 /** Whether no brace closes the block open at [from] before the end of this text. */
-private fun String.blockStaysOpen(from: Int): Boolean {
+internal fun String.blockStaysOpen(from: Int): Boolean {
     var depth = 0
     for (index in from until length) {
         when (this[index]) {
@@ -264,7 +263,7 @@ private fun String.blockStaysOpen(from: Int): Boolean {
 }
 
 /** The expression starting at [start]: up to a line break outside brackets that no `.` call continues. */
-private fun String.initializerFrom(start: Int): String {
+internal fun String.initializerFrom(start: Int): String {
     var depth = 0
     var index = start
     while (index < length && !endsStatementAt(index, depth)) {
@@ -323,13 +322,13 @@ private fun String.functionContaining(offset: Int): Pair<String, String>? =
         }.lastOrNull()
 
 /** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
-private fun String.clicksOverShapedFills(drawn: Set<String>): List<Pair<String, Int>> =
+private fun String.clicksOverShapedFills(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     clickModifier
         .findAll(this)
         .filter { match ->
             val open = match.groups[2]!!.range.first
             val before = ownChainBefore(match.range.first)
-            !substring(open + 1, closingBracket(open)).hasReplacedIndication(drawn) &&
+            !feedback.replaces(match.range.first, substring(open + 1, closingBracket(open))) &&
                 !before.hasShapedClip() &&
                 shapedFill.findAll(before).any { fill ->
                     val fillArgs = before.substring(fill.range.last + 1, before.closingBracket(fill.range.last))
@@ -339,8 +338,11 @@ private fun String.clicksOverShapedFills(drawn: Set<String>): List<Pair<String, 
         .toList()
 
 /** Rule 7: a click modifier on a bare Icon, whose highlight is a square around a glyph unless it is clipped. */
-private fun String.clicksOnBareGlyphs(drawn: Set<String>): List<Pair<String, Int>> =
-    calls("Icon").flatMap { (start, args) -> args.undecoratedClicks(drawn).map { BARE_GLYPH to start + it } }
+private fun String.clicksOnBareGlyphs(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
+    calls("Icon").flatMap { (start, args) ->
+        val clicks = args.undecoratedClicks(feedback, offset = start + 1)
+        clicks.map { BARE_GLYPH to start + it }
+    }
 
 /** The modifier chain that ends at [end]: back to the start of its argument or assignment. */
 private fun String.chainBefore(end: Int): String {
@@ -369,50 +371,20 @@ private fun String.ownChainBefore(end: Int): String {
 }
 
 /**
- * The interaction sources whose press a modifier other than the click draws: the first argument of each
- * `indication`, [pressFeedbackInsideClip] or [shapedPressFeedback] call in this text, and each source handed
- * by name to a parameter that one of those watches, as a swatch's `pressSource = press`.
- */
-private fun String.indicatedSources(): Set<String> {
-    val watched =
-        replacementIndication
-            .findAll(this)
-            .mapNotNull { match ->
-                val open = match.range.last
-                topLevelArguments(substring(open + 1, closingBracket(open))).firstOrNull()?.trim()
-            }.toSet()
-    val handedIn =
-        watched.flatMap { parameter ->
-            Regex("""(?<![\w.])${Regex.escape(parameter)}\s*=(?!=)\s*(\w+)\s*[,)\n]""")
-                .findAll(this)
-                .map { it.groupValues[1] }
-                .toList()
-        }
-    return watched + handedIn
-}
-
-/**
- * Whether this click's argument text turns its own highlight off (`indication = null`) and hands its
- * `interactionSource` to one of [drawn], which then draws the press in its place. A click with no highlight
- * at all, or one whose replacement watches another source, does not count.
- */
-private fun String.hasReplacedIndication(drawn: Set<String>): Boolean =
-    noIndication.containsMatchIn(this) && topLevelNamedArguments(this)["interactionSource"]?.trim() in drawn
-
-/**
  * Offsets, within this argument text, of click modifiers whose highlight no shaped clip earlier in their own
  * chain shapes — any clip that is not a rectangle, or, given [matching], one to that very shape — and that no
- * modifier watching their interaction source replaces (see [hasReplacedIndication]).
+ * modifier watching their interaction source replaces (see [ShapedTouchIndications]).
  */
 private fun String.undecoratedClicks(
-    drawn: Set<String>,
+    feedback: ShapedTouchIndications,
+    offset: Int,
     matching: String? = null,
 ): List<Int> =
     clickModifier
         .findAll(this)
         .filter { match ->
             val open = match.groups[2]!!.range.first
-            !substring(open + 1, closingBracket(open)).hasReplacedIndication(drawn) &&
+            !feedback.replaces(offset + match.range.first, substring(open + 1, closingBracket(open))) &&
                 !ownChainBefore(match.range.first).hasShapedClip(matching)
         }.map { it.range.first }
         .toList()
@@ -454,7 +426,7 @@ private fun String.chainAfter(close: Int): List<Pair<String, String>> {
 }
 
 /** The top-level arguments of a call's argument text, in order. */
-private fun topLevelArguments(args: String): List<String> {
+internal fun topLevelArguments(args: String): List<String> {
     val parts = mutableListOf<String>()
     var depth = 0
     var start = 0
@@ -470,7 +442,7 @@ private fun topLevelArguments(args: String): List<String> {
 }
 
 /** The top-level named arguments of a call's argument text, by name. */
-private fun topLevelNamedArguments(args: String): Map<String, String> {
+internal fun topLevelNamedArguments(args: String): Map<String, String> {
     val parts = topLevelArguments(args)
     return parts
         .mapNotNull { part -> namedArgument.find(part)?.let { it.groupValues[1] to part.substring(it.range.last + 1) } }
@@ -478,7 +450,7 @@ private fun topLevelNamedArguments(args: String): Map<String, String> {
 }
 
 /** The index of the bracket that closes the one at [open], or the end of the text when it never closes. */
-private fun String.closingBracket(open: Int): Int {
+internal fun String.closingBracket(open: Int): Int {
     var depth = 0
     for (index in open until length) {
         when (this[index]) {
