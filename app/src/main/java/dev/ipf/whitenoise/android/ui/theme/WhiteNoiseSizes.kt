@@ -17,6 +17,9 @@ object WhiteNoiseSizes {
     val ProgressPage: Dp = 48.dp
     val ProgressPageStroke: Dp = 4.dp
 
+    /** Avatar in dense rows, chips and overlapping stacks. */
+    val AvatarSmall: Dp = 32.dp
+
     /** Avatar in search results and compact lists. */
     val AvatarCompact: Dp = 40.dp
 

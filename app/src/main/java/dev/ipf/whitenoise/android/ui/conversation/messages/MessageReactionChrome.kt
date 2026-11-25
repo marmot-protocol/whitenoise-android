@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import kotlin.math.roundToInt
 
 internal val MessageBubbleBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
@@ -64,12 +65,12 @@ internal fun RowScope.MessageSenderAvatarSlot(
     Box(
         modifier =
             Modifier
-                .size(30.dp)
+                .size(WhiteNoiseSizes.AvatarSmall)
                 .then(avatarAlignment),
     ) {
         if (showSenderAvatar) {
             // [seed] is the sender's key; the clip shapes the profile ripple, so the followed badge sits outside it.
-            FollowedPersonAvatarFrame(seed, 30.dp) {
+            FollowedPersonAvatarFrame(seed, WhiteNoiseSizes.AvatarSmall) {
                 Box(
                     modifier =
                         Modifier
@@ -80,7 +81,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
                     Avatar(
                         title = title,
                         seed = seed,
-                        size = 30.dp,
+                        size = WhiteNoiseSizes.AvatarSmall,
                         pictureUrl =
                             pictureUrl.takeIf {
                                 picture == null ||
