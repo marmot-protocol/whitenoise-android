@@ -519,6 +519,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Retains the setup wake across real background transitions, excluding configuration-only stops. */
     override fun onStop() {
         if (::appState.isInitialized) {
             foregroundHostReady.cancel()

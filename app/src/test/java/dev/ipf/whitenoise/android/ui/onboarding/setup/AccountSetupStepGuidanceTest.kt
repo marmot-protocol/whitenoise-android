@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -42,7 +43,19 @@ class AccountSetupStepGuidanceTest {
         assertEquals(R.string.setup_problem_save_record_changed, state.stepGuidance()?.problem)
     }
 
-    /** An approved change no relay accepted keeps the pending notice and pins only Try again. */
+    /** A declaration refused before publication keeps Try again without blaming a relay check. */
+    @Test fun refusedDeclarationReportsOnlyTheSaveOutcome() {
+        val snapshot =
+            refusedSaveSnapshot(OnboardingIssueFfi.RECORD_CHANGED, OnboardingCheckPurposeFfi.DECLARATION_VALIDATION)
+        val state = AccountSetupState(snapshot = snapshot)
+        assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
+        assertEquals(
+            AccountSetupStepGuidance(R.string.setup_problem_save_not_published, R.string.setup_next_retry),
+            state.stepGuidance(),
+        )
+    }
+
+    /** An approved change whose publication did not finish keeps the pending notice and pins only Try again. */
     @Test fun refusedPublicationPinsOnlyRetry() {
         val state = AccountSetupState(snapshot = refusedPublicationSnapshot())
         assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
@@ -82,7 +95,7 @@ class AccountSetupStepGuidanceTest {
             state.decisionButtons(),
         )
         assertEquals(
-            AccountSetupStepGuidance(R.string.setup_problem_missing, R.string.setup_next_review),
+            AccountSetupStepGuidance(null, R.string.setup_next_review),
             state.stepGuidance(),
         )
     }

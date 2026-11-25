@@ -38,6 +38,7 @@ internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): A
 internal val AccountSetupState.blocksSetupActions: Boolean
     get() = error || staleDecision || optionalMetadataPending
 
+/** Pins a pending approval, reconnect or other native decision ahead of ordinary relay choices. */
 private fun AccountSetupState.preferredAction(offered: List<OnboardingActionFfi>): OnboardingActionFfi? {
     val snapshot = checkNotNull(snapshot)
     val step = checkNotNull(currentStep)

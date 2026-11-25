@@ -50,7 +50,10 @@ internal fun inboxDiscoveryIncompleteSnapshot(): OnboardingSnapshotFfi =
     )
 
 /** Save was refused: the relay answered the check but not the freshness re-check, so the proposal was dropped. */
-internal fun refusedSaveSnapshot(issue: OnboardingIssueFfi = OnboardingIssueFfi.UNREACHABLE): OnboardingSnapshotFfi =
+internal fun refusedSaveSnapshot(
+    issue: OnboardingIssueFfi = OnboardingIssueFfi.UNREACHABLE,
+    purpose: OnboardingCheckPurposeFfi = OnboardingCheckPurposeFfi.SOURCE_FRESHNESS,
+): OnboardingSnapshotFfi =
     failedStep(
         OnboardingStepFfi.INBOX_RELAYS,
         listOf(
@@ -63,7 +66,7 @@ internal fun refusedSaveSnapshot(issue: OnboardingIssueFfi = OnboardingIssueFfi.
                 issue,
                 FLAKY_RELAY.takeIf { issue != OnboardingIssueFfi.RECORD_CHANGED },
                 context = OnboardingFindingContextFfi.REPAIR_APPROVAL,
-                purpose = OnboardingCheckPurposeFfi.SOURCE_FRESHNESS,
+                purpose = purpose,
                 outcome = OnboardingCheckOutcomeFfi.FAILURE,
             ),
         ),

@@ -151,6 +151,7 @@ internal class MarmotAccountSetupClient(
         }
     }
 
+    /** Rechecks both the native checkpoint and the signer, which can change since the route mounted. */
     override suspend fun retryFailedCheck(
         request: SetupRequest,
         stillAllowed: () -> Boolean,
@@ -158,7 +159,10 @@ internal class MarmotAccountSetupClient(
         withLifetime {
             withContext(Dispatchers.IO) {
                 val latest = marmot.onboardingSnapshot(account)
-                if (latest?.allowsAutomaticRetry(account, request) == true && stillAllowed()) {
+                if (latest?.allowsAutomaticRetry(account, request) == true &&
+                    marmot.signsLocallyForSetup(account) &&
+                    stillAllowed()
+                ) {
                     defaults.advance(marmot.retryOnboardingStep(account, request.step))
                 } else {
                     latest

@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** What went wrong on the current step, in plain words, and the pinned action that can move it forward. */
 internal data class AccountSetupStepGuidance(
@@ -79,6 +80,7 @@ private fun AccountSetupState.stepProblem(
         proposal != null ->
             R.string.setup_problem_publication_failed.takeIf { OnboardingIssueFfi.PUBLICATION_FAILED in issues }
         newerRecord -> R.string.setup_problem_save_record_changed
+        atSave.any { it.isRepairDeclarationRefusal } -> R.string.setup_problem_save_not_published
         atSave.isNotEmpty() -> R.string.setup_problem_save_refused
         step.step == OnboardingStepFfi.KEY_PACKAGE ->
             R.string.setup_problem_keys_failed.takeIf { step.status == OnboardingStatusFfi.RETRYABLE_FAILURE }
@@ -89,6 +91,7 @@ private fun AccountSetupState.stepProblem(
     }
 }
 
+/** Describes an incomplete relay check from the native issues. */
 @StringRes
 private fun relayCheckFailure(issues: Set<OnboardingIssueFfi>): Int =
     when {
@@ -101,11 +104,11 @@ private fun relayCheckFailure(issues: Set<OnboardingIssueFfi>): Int =
         else -> R.string.setup_problem_check_failed
     }
 
+/** Explains an unusable list while the finding itself describes a missing or retired relay. */
 @StringRes
 private fun relayInputProblem(issues: Set<OnboardingIssueFfi>): Int? =
     when {
         OnboardingIssueFfi.RETIRED_RELAY in issues -> null
-        OnboardingIssueFfi.MISSING in issues -> R.string.setup_problem_missing
         issues.any { it in unusableListIssues } -> R.string.setup_problem_unusable
         else -> null
     }
@@ -144,12 +147,13 @@ internal fun SetupStepExplanation(state: AccountSetupState) {
         )
     }
     state.stepGuidance()?.let { guidance ->
-        listOfNotNull(guidance.problem, guidance.next).forEach {
-            Text(
-                stringResource(it),
-                modifier = Modifier.testTag("setup-step-guidance"),
-                style = MaterialTheme.typography.bodyLarge,
-            )
+        Column(
+            modifier = Modifier.testTag("setup-step-guidance"),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            listOfNotNull(guidance.problem, guidance.next).forEach {
+                Text(stringResource(it), style = MaterialTheme.typography.bodyLarge)
+            }
         }
     }
 }

@@ -276,8 +276,10 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { proposal ->
             if (OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
+                val publicationExplained = state.stepGuidance()?.problem == R.string.setup_problem_publication_failed
                 step.findings.distinct().forEach { finding ->
-                    SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
+                    val summarized = publicationExplained && finding.issue == OnboardingIssueFfi.PUBLICATION_FAILED
+                    SetupFindingContent(finding, showTitle = !summarized && !snapshot.deviceNoticeCovers(step.step, finding))
                 }
             }
             SetupProposalContent(proposal, step.findings)

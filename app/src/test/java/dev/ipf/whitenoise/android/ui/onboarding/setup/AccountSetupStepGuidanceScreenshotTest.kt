@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -39,7 +40,7 @@ class AccountSetupStepGuidanceScreenshotTest {
 
     /** The explanation and both pinned actions stay readable mirrored at double text size. */
     @Test
-    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    @Config(qualifiers = "en-w320dp-h820dp-mdpi")
     fun inboxDiscoveryIncompleteNarrowRtlLarge() =
         capture(
             "inbox_discovery_incomplete_narrow_rtl_large_amoled",
@@ -47,6 +48,7 @@ class AccountSetupStepGuidanceScreenshotTest {
             amoled = true,
             rtl = true,
             fontScale = 2f,
+            scrollTo = "setup-step-guidance",
         )
 
     /** Save was refused at the final check: nothing published, Try again is the only pinned action. */
@@ -57,7 +59,7 @@ class AccountSetupStepGuidanceScreenshotTest {
             amoled = true,
         )
 
-    /** An approved change no relay accepted stays pending with Try again. */
+    /** An approved change whose publication did not finish stays pending with Try again. */
     @Test fun refusedPublicationAmoled() =
         capture(
             "refused_publication_amoled",
@@ -110,7 +112,7 @@ class AccountSetupStepGuidanceScreenshotTest {
         }
         if (scrollTo != null) {
             composeRule.mainClock.autoAdvance = true
-            composeRule.onNodeWithTag(scrollTo).performScrollTo()
+            composeRule.onNodeWithTag(scrollTo).performScrollTo().assertIsDisplayed()
             composeRule.mainClock.autoAdvance = false
         }
         composeRule.mainClock.advanceTimeByFrame()

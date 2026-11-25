@@ -110,14 +110,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_problem_missing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupStepGuidance.kt",
-        "anchor": "R.string.setup_problem_missing",
-        "test_ids": [
-          "ONB-030"
-        ]
-      },
-      {
         "surface": "R.string.setup_problem_no_usable_route",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupStepGuidance.kt",
         "anchor": "R.string.setup_problem_no_usable_route",
@@ -129,6 +121,14 @@
         "surface": "R.string.setup_problem_publication_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupStepGuidance.kt",
         "anchor": "R.string.setup_problem_publication_failed",
+        "test_ids": [
+          "ONB-030"
+        ]
+      },
+      {
+        "surface": "R.string.setup_problem_save_not_published",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupStepGuidance.kt",
+        "anchor": "R.string.setup_problem_save_not_published",
         "test_ids": [
           "ONB-030"
         ]

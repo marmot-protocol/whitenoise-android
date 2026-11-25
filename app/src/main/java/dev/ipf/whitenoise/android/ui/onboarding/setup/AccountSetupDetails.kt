@@ -249,7 +249,7 @@ internal fun SetupFindingContent(
                 )
             }
             SetupFindingEvidence(finding)
-            if (showTitle) {
+            if (showTitle && !finding.isRepairDeclarationRefusal) {
                 Text(
                     stringResource(setupFindingTitle(finding.issue)),
                     style = MaterialTheme.typography.bodyMedium,
