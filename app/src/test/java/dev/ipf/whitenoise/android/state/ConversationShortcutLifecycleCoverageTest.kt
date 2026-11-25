@@ -266,6 +266,26 @@ class ConversationShortcutLifecycleCoverageTest {
         )
     }
 
+    /** Conversation notification settings must capture its write guard before suspending on routing.settings. */
+    @Test
+    fun conversationNotificationSettingsCapturesWriteGuardBeforeSuspending() {
+        val screenSource =
+            appModuleSource(
+                "src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+            )
+        val guardAt = screenSource.indexOf("captureConversationChannelWriteGuard(")
+        val settingsAt = screenSource.indexOf("routing.settings(descriptor)")
+
+        assertTrue(
+            "expected captureConversationChannelWriteGuard and routing.settings",
+            guardAt >= 0 && settingsAt >= 0,
+        )
+        assertTrue(
+            "ConversationNotificationSettingsScreen must capture the write guard before suspending on routing.settings",
+            guardAt < settingsAt,
+        )
+    }
+
     private fun appStateSection(
         startMarker: String,
         endMarker: String,

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.app.NotificationManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -326,6 +327,45 @@ class NotificationChannelCleanupRegressionTest {
         assertFalse(ownerPrefs().contains(sha256Hex("account-a")))
     }
 
+    /**
+     * When Android updates SharedPreferences memory before a disk write fails, a subsequent call with
+     * the same shortcut ids must not treat the uncommitted in-memory set as durably saved.
+     */
+    @Test
+    fun failedOwnerCommitDoesNotSatisfyLaterFastPathAndRetriesOnNextCall() {
+        val shortcutId = checkNotNull(conversationShortcutId("account-a", "group-uncommitted"))
+        val failingPrefs = MemoryRetainingFailingCommitPrefs(ownerPrefs())
+        val failingContext =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences =
+                    if (name == CONVERSATION_CHANNEL_OWNERS_PREFS) {
+                        failingPrefs
+                    } else {
+                        super.getSharedPreferences(name, mode)
+                    }
+            }
+
+        assertFalse(recordConversationChannelOwners(failingContext, "account-a", listOf(shortcutId)))
+        assertEquals(1, failingPrefs.commitAttempts)
+        assertTrue(failingPrefs.getStringSet(sha256Hex("account-a"), emptySet()).orEmpty().contains(shortcutId))
+
+        // Memory already has the id, yet the second call must still attempt commit and report false.
+        assertFalse(recordConversationChannelOwners(failingContext, "account-a", listOf(shortcutId)))
+        assertEquals(2, failingPrefs.commitAttempts)
+
+        // Once disk writes recover, retry commits durably and only then activates the fast path.
+        failingPrefs.failCommits = false
+        assertTrue(recordConversationChannelOwners(failingContext, "account-a", listOf(shortcutId)))
+        assertEquals(3, failingPrefs.commitAttempts)
+        assertTrue(recordConversationChannelOwners(failingContext, "account-a", listOf(shortcutId)))
+        assertEquals(3, failingPrefs.commitAttempts)
+    }
+
     /** Returns the hashed conversation-channel owner store cleanup reads and writes. */
     private fun ownerPrefs(): SharedPreferences {
         val name = "whitenoise.conversation_channel_owners"
@@ -391,6 +431,34 @@ class NotificationChannelCleanupRegressionTest {
                     "Channel ${channel.id} still exposed '$forbidden'",
                     labelText.contains(forbidden, ignoreCase = true),
                 )
+            }
+        }
+    }
+
+    /** Simulates Android committing set mutations into memory even when the synchronous disk flush fails. */
+    private class MemoryRetainingFailingCommitPrefs(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        var failCommits: Boolean = true
+        var commitAttempts: Int = 0
+
+        override fun edit(): SharedPreferences.Editor {
+            val editor = delegate.edit()
+            return object : SharedPreferences.Editor by editor {
+                override fun putStringSet(
+                    key: String?,
+                    values: MutableSet<String>?,
+                ): SharedPreferences.Editor = apply { editor.putStringSet(key, values) }
+
+                override fun remove(key: String?): SharedPreferences.Editor = apply { editor.remove(key) }
+
+                override fun clear(): SharedPreferences.Editor = apply { editor.clear() }
+
+                override fun commit(): Boolean {
+                    commitAttempts += 1
+                    val written = editor.commit()
+                    return !failCommits && written
+                }
             }
         }
     }

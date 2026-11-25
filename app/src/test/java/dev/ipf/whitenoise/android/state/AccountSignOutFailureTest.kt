@@ -1,7 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
+import android.content.Context
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
+import dev.ipf.marmotkit.AppQuarantinedGroupFfi
 import dev.ipf.marmotkit.RelayFailureFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_CHANNEL_OWNERS_PREFS
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.sha256Hex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -15,6 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Native acknowledgement loss must never masquerade as durable local sign-out. */
 @RunWith(RobolectricTestRunner::class)
@@ -138,6 +145,71 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             assertNull(state.activeAccountRef)
             assertEquals(AppPhase.Onboarding, state.phase)
             assertTrue(state.accounts.single().signedOut)
+        }
+
+    /** Transient chat-list and quarantined-group read errors are retried before native sign-out revocation. */
+    @Test
+    fun captureAccountKnownGroupIdsRetriesTransientNativeReadsAndSavesOwners() =
+        runBlocking {
+            val chatGroup = "aa".repeat(16)
+            val quarantinedGroup = "bb".repeat(16)
+            val chatAttempts = AtomicInteger(0)
+            val quarantinedAttempts = AtomicInteger(0)
+            chatListReply = {
+                if (chatAttempts.incrementAndGet() == 1) error("transient chatList lock")
+                listOf(chatRow(chatGroup))
+            }
+            quarantinedGroupsReply = {
+                if (quarantinedAttempts.incrementAndGet() == 1) error("transient quarantinedGroups lock")
+                listOf(
+                    AppQuarantinedGroupFfi(
+                        quarantinedGroup,
+                        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED,
+                    ),
+                )
+            }
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            val state = appState()
+
+            val captured = state.captureAccountKnownGroupIds(accountRef)
+
+            assertEquals(2, chatAttempts.get())
+            assertEquals(2, quarantinedAttempts.get())
+            assertTrue(chatGroup in captured)
+            assertTrue(quarantinedGroup in captured)
+            val stored = ownerPrefs.getStringSet(sha256Hex(accountRef), emptySet()).orEmpty()
+            assertTrue(checkNotNull(conversationShortcutId(accountRef, chatGroup)) in stored)
+            assertTrue(checkNotNull(conversationShortcutId(accountRef, quarantinedGroup)) in stored)
+        }
+
+    /** Permanent inventory read errors still capture mounted chats and never trap sign-out on a degraded store. */
+    @Test
+    fun permanentInventoryReadFailureUsesMountedChatsWithoutBlockingSignOut() =
+        runBlocking {
+            val mountedGroup = "cc".repeat(16)
+            val chatAttempts = AtomicInteger(0)
+            chatListReply = {
+                chatAttempts.incrementAndGet()
+                error("corrupted chat table")
+            }
+            quarantinedGroupsReply = { error("corrupted quarantine table") }
+            val state = appState()
+            val controller = ChatsController(state, accountRef) { _, _ -> emptyList() }
+            try {
+                state.chatsController = controller
+                controller.setChatListVisible(false)
+                controller.applyChatListRow(chatRow(mountedGroup))
+                controller.setChatListVisible(true)
+
+                val captured = state.captureAccountKnownGroupIds(accountRef)
+
+                assertEquals(3, chatAttempts.get())
+                assertTrue(mountedGroup in captured)
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            } finally {
+                controller.onCleared()
+            }
         }
 
     /** Pump the actual app-owned UI mutation rather than substituting a direct completion mapper. */

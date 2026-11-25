@@ -78,6 +78,8 @@ internal abstract class ExternalSignerSignOutFixture {
     protected var createdIdentity: AccountSummaryFfi? = null
     protected val createdIdentityCalls = AtomicInteger(0)
     protected var createdPolicyFailure: Throwable? = null
+    protected var chatListReply: (() -> List<dev.ipf.marmotkit.ChatListRowFfi>)? = null
+    protected var quarantinedGroupsReply: (() -> List<dev.ipf.marmotkit.AppQuarantinedGroupFfi>)? = null
 
     /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     protected fun externalSignerAccount(
@@ -161,7 +163,21 @@ internal abstract class ExternalSignerSignOutFixture {
                     setupRecoverCalls.incrementAndGet()
                     error("Stale recovery must never reach native mutation")
                 }
-                "accountUnreadSummary", "chatList" -> emptyList<Any>()
+                "accountUnreadSummary" -> emptyList<Any>()
+                "chatList" ->
+                    chatListReply?.let { reply ->
+                        runCatching(reply).fold(
+                            onSuccess = { it },
+                            onFailure = ::suspendFailure,
+                        )
+                    } ?: emptyList<Any>()
+                "quarantinedGroups" ->
+                    quarantinedGroupsReply?.let { reply ->
+                        runCatching(reply).fold(
+                            onSuccess = { it },
+                            onFailure = ::suspendFailure,
+                        )
+                    } ?: suspendFailure(UnsupportedOperationException("Unexpected Marmot call: ${method.name}"))
                 "toString" -> "ExternalSignerSignOutMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()

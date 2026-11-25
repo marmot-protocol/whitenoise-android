@@ -11,6 +11,9 @@ import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChann
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+
+private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
 
 /** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
 internal fun WhiteNoiseAppState.pinnedShortcutLockDecision(): PinnedShortcutLockDecision =
@@ -44,7 +47,7 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     withContext(Dispatchers.IO) {
         synchronized(UserEventNotificationGroup.mutationLock) {
             // Channels go first so shortcut removal cannot soft-delete one with its private name intact. If they
-            // fail, shortcuts stay, relabeled, until the journal retry, which redoes channels before shortcuts.
+            // fail, revoke credentials and relabel shortcuts until the journal retry deletes channels first.
             val channelsResult =
                 runCatching {
                     check(deleteConversationNotificationChannels(appContext, accountRef, groupIdHex)) {
@@ -55,9 +58,11 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
                 if (channelsResult.isSuccess) {
                     runCatching { PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex) }
                 } else {
+                    val revocationResult =
+                        runCatching { PinnedConversationTokens.create(appContext).revokeGroup(accountRef, groupIdHex) }
                     runCatching { PinnedConversationShortcuts(appContext).relabelGroup(accountRef, groupIdHex) }
                         .onFailure { appStateDebug(it) { "conversation shortcut relabel failed" } }
-                    Result.success(Unit)
+                    revocationResult
                 }
             forgetNotificationConversationShortcut(accountRef, groupIdHex)
             shortcutsResult.getOrThrow()
@@ -127,20 +132,18 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: 
     return groupIds
 }
 
-/** Reads every group id the account's channels may be named after, logging reads that fail. */
+/** Reads every group id the account's channels may be named after, retrying transient native reads before fallback. */
 private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): Set<String> =
     buildSet {
-        // A failed read here cannot be retried after revocation; log it so a lingering channel is traceable.
-        runCatchingCancellable {
-            marmotIo { chatList(accountRef, includeArchived = true) }
-        }.onFailure { appStateDebug(it) { "sign-out channel capture could not list chats" } }
-            .getOrDefault(emptyList())
+        readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
             .forEach { row -> add(row.groupIdHex) }
-        runCatchingCancellable {
-            marmotIo { quarantinedGroups(accountRef) }
-        }.onFailure { appStateDebug(it) { "sign-out channel capture could not list quarantined groups" } }
-            .getOrDefault(emptyList())
+        readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }
             .forEach { group -> add(group.groupIdHex) }
+        // Retain already-mounted active/archived chats if native listing fails on a degraded store.
+        boundChats(accountRef)?.let { controller ->
+            controller.items.forEach { item -> add(item.group.groupIdHex) }
+            controller.archivedItems.forEach { item -> add(item.group.groupIdHex) }
+        }
         runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
             .getOrDefault(emptySet())
             .forEach(::add)
@@ -148,6 +151,22 @@ private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: Stri
             withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
         }.getOrDefault(emptySet()).forEach(::add)
     }
+
+/** Retries transient native inventory reads before sign-out revocation without trapping a broken account. */
+private suspend fun <T> readGroupInventoryWithRetry(
+    label: String,
+    read: suspend () -> List<T>,
+): List<T> {
+    var lastFailure: Throwable? = null
+    repeat(SIGN_OUT_GROUP_READ_ATTEMPTS) { attempt ->
+        val result = runCatchingCancellable { read() }
+        if (result.isSuccess) return result.getOrDefault(emptyList())
+        lastFailure = result.exceptionOrNull()
+        if (attempt + 1 < SIGN_OUT_GROUP_READ_ATTEMPTS) yield()
+    }
+    lastFailure?.let { appStateDebug(it) { "sign-out channel capture could not list $label" } }
+    return emptyList()
+}
 
 /**
  * Captures live account ownership, credential revocation, and channel-cleanup epochs before a

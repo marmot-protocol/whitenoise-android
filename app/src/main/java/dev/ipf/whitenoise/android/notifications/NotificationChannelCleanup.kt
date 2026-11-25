@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.pm.ShortcutInfoCompat
 import dev.ipf.whitenoise.android.R
+import java.util.WeakHashMap
 
 /*
  * Destructive cleanup of app-owned Android notification channels.
@@ -24,6 +25,14 @@ internal const val LEGACY_SWEEP_PENDING_KEY = "legacy_conversation_sweep_pending
 internal const val CONVERSATION_CHANNEL_OWNERS_PREFS = "whitenoise.conversation_channel_owners"
 private const val CONVERSATION_CHANNEL_INFIX = ":conv:"
 private const val VIBRATION_SUFFIX_MARKER = ":vibration:"
+
+/** Tracks owner keys whose latest in-memory mutation has not yet been durably committed to disk. */
+private object UncommittedChannelOwners {
+    private val byContext = WeakHashMap<Context, MutableSet<String>>()
+
+    /** Returns the mutable uncommitted-key set for [appContext] under `UserEventNotificationGroup.mutationLock`. */
+    fun keys(appContext: Context): MutableSet<String> = byContext.getOrPut(appContext) { mutableSetOf() }
+}
 
 /**
  * Returns the fixed-width `profile_messages_v1:<sha256(account)>.` prefix for [accountRef], or null
@@ -76,9 +85,18 @@ internal fun recordConversationChannelOwners(
         runCatching {
             val appContext = context.applicationContext
             val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            val uncommitted = UncommittedChannelOwners.keys(appContext)
             val owned = prefs.getStringSet(ownerKey, emptySet()).orEmpty()
-            // Every routed post lands here, so skip the synchronous commit once the links are stored.
-            owned.containsAll(shortcutIds) || prefs.edit().putStringSet(ownerKey, owned + shortcutIds).commit()
+            // Every routed post lands here, so skip the synchronous commit once the links are durably stored.
+            if (ownerKey !in uncommitted && owned.containsAll(shortcutIds)) {
+                true
+            } else {
+                uncommitted.add(ownerKey)
+                val editor = prefs.edit().putStringSet(ownerKey, owned + shortcutIds)
+                val committed = editor.commit()
+                if (committed) uncommitted.remove(ownerKey)
+                committed
+            }
         }.getOrDefault(false)
     }
 }
@@ -116,7 +134,9 @@ internal fun deleteConversationNotificationChannels(
                         }
                 val editor = prefs.edit()
                 if (remaining.isEmpty()) editor.remove(ownerKey) else editor.putStringSet(ownerKey, remaining)
-                editor.commit()
+                val uncommitted = UncommittedChannelOwners.keys(appContext)
+                uncommitted.add(ownerKey)
+                if (editor.commit()) uncommitted.remove(ownerKey)
             }
         }
         allMatchedDeleted
@@ -173,6 +193,7 @@ internal fun deleteAccountNotificationChannels(
             }
         if (prefs != null) {
             updateOwnerStoreAfterAccountCleanup(
+                appContext = appContext,
                 prefs = prefs,
                 accountRef = accountRef,
                 includeUnscopedLegacy = includeUnscopedLegacy,
@@ -184,7 +205,10 @@ internal fun deleteAccountNotificationChannels(
     }
 
 /** Updates or retains the departed account's owner record based on whether channel cleanup succeeded. */
+@Suppress("LongParameterList")
+// Persisting or clearing the owner record under mutationLock requires context, prefs, and cleanup flags together.
 private fun updateOwnerStoreAfterAccountCleanup(
+    appContext: Context,
     prefs: SharedPreferences,
     accountRef: String,
     includeUnscopedLegacy: Boolean,
@@ -193,15 +217,23 @@ private fun updateOwnerStoreAfterAccountCleanup(
 ) {
     runCatching {
         val ownerKey = channelOwnerAccountHash(accountRef)
+        val uncommitted = UncommittedChannelOwners.keys(appContext)
         when {
-            allMatchedDeleted && includeUnscopedLegacy -> prefs.edit().clear().commit()
-            allMatchedDeleted && ownerKey != null -> prefs.edit().remove(ownerKey).commit()
+            allMatchedDeleted && includeUnscopedLegacy -> {
+                val editor = prefs.edit().clear()
+                if (editor.commit()) uncommitted.clear()
+            }
+            allMatchedDeleted && ownerKey != null -> {
+                val editor = prefs.edit().remove(ownerKey)
+                if (editor.commit()) uncommitted.remove(ownerKey)
+            }
             !allMatchedDeleted && ownerKey != null -> {
                 val canonicalLeaving = leavingShortcutIds.mapTo(mutableSetOf(), ::canonicalConversationShortcutId)
                 val editor = prefs.edit().putStringSet(ownerKey, canonicalLeaving)
                 // A failed last-signer sweep cannot record ownerless legacy channels; retention retries it.
                 if (includeUnscopedLegacy) editor.putStringSet(LEGACY_SWEEP_PENDING_KEY, emptySet())
-                editor.commit()
+                uncommitted.add(ownerKey)
+                if (editor.commit()) uncommitted.remove(ownerKey)
             }
         }
     }
@@ -239,7 +271,9 @@ internal fun pruneStaleAccountChannelsAndOwners(
         } else {
             val editor = prefs.edit()
             clearedKeys.forEach(editor::remove)
-            editor.commit()
+            val saved = editor.commit()
+            if (saved) UncommittedChannelOwners.keys(appContext).removeAll(clearedKeys)
+            saved
         }
     return allCleared && committed
 }

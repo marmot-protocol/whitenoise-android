@@ -12,7 +12,9 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.FailingDeleteNotificationManager
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.setPinnedConversationTestKey
 import dev.ipf.whitenoise.android.share.buildShareShortcutIntent
 import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
@@ -36,6 +38,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.crypto.spec.SecretKeySpec
 
 /** Exercises the actual controller, platform journal and privacy-safe notice boundary. */
 @RunWith(RobolectricTestRunner::class)
@@ -579,6 +582,66 @@ class LocalGroupDeleteControllerTest {
                 )
                 assertTrue(manager.notificationChannels.none { it.id.contains(":conv:") })
             } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * If channel cleanup fails during `removePinnedConversationShortcuts`, launcher tokens for the
+     * removed group are still durably revoked and visible shortcuts are relabeled while the call throws
+     * so the delete journal retains its retry.
+     */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun removePinnedConversationShortcutsRevokesTokensWhenChannelCleanupFails() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            setPinnedConversationTestKey(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val tokens = PinnedConversationTokens.create(context)
+                val capability = requireNotNull(tokens.issue(ACCOUNT, GROUP))
+                assertTrue(tokens.isValid(capability))
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Journal Retry Chat",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                ShortcutManagerCompat.pushDynamicShortcut(
+                    context,
+                    ShortcutInfoCompat
+                        .Builder(context, shortcutId)
+                        .setShortLabel("Secret Journal Retry Chat")
+                        .setIntent(buildShareShortcutIntent(context))
+                        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                        .setLongLived(true)
+                        .build(),
+                )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+
+                val result = runCatching { fixture.state.removePinnedConversationShortcuts(ACCOUNT, GROUP) }
+
+                assertTrue(result.isFailure)
+                assertFalse(
+                    "Launcher token must be revoked even when channel cleanup fails",
+                    tokens.isValid(capability),
+                )
+                assertNotNull(manager.getNotificationChannel(channelId))
+                val kept = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
+                assertEquals(context.getString(R.string.app_name), kept.shortLabel.toString())
+            } finally {
+                setPinnedConversationTestKey(null)
+                FailingDeleteNotificationManager.reset()
                 Dispatchers.resetMain()
             }
         }

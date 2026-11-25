@@ -228,6 +228,12 @@ private fun NotificationCategoriesSection(
             if (descriptor == null || accountRef == null) {
                 emptyList()
             } else {
+                val writeAllowed =
+                    appState.captureConversationChannelWriteGuard(
+                        accountRef,
+                        groupIdHex,
+                        descriptor.shortcutId,
+                    )
                 val resolved = withContext(Dispatchers.Default) { routing.settings(descriptor) }
                 val requestedParents =
                     resolved
@@ -245,12 +251,7 @@ private fun NotificationCategoriesSection(
                                 conversationAvatarUrl = conversationAvatarUrl,
                                 primaryVibrationPattern = descriptor.primaryVibrationPattern,
                                 requestedParents = requestedParents,
-                                isWriteAllowed =
-                                    appState.captureConversationChannelWriteGuard(
-                                        accountRef,
-                                        groupIdHex,
-                                        descriptor.shortcutId,
-                                    ),
+                                isWriteAllowed = writeAllowed,
                             ),
                     )
                 resolved.map { setting -> setting.withPreparation(preparation) }
