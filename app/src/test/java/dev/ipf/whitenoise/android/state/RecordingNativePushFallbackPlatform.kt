@@ -20,6 +20,9 @@ internal class RecordingNativePushFallbackPlatform(
     val starts = CopyOnWriteArrayList<Long>()
     private val firstStart = CompletableDeferred<Unit>()
     val stops = AtomicInteger()
+
+    /** Every Firebase auto-init write, in call order. */
+    val autoInitWrites = CopyOnWriteArrayList<Boolean>()
     private val persistCallCount = AtomicInteger()
     private val clearCallCount = AtomicInteger()
 
@@ -72,5 +75,10 @@ internal class RecordingNativePushFallbackPlatform(
         val result = clearResults.removeFirstOrNull() ?: true
         val recorded = PushTokenStore.create(context).recordPendingClear(accountRef)
         return result && recorded
+    }
+
+    /** Records the write instead of touching the Firebase SDK. */
+    override fun setFcmAutoInitEnabled(enabled: Boolean) {
+        autoInitWrites += enabled
     }
 }

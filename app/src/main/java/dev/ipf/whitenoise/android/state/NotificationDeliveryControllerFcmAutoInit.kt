@@ -1,0 +1,34 @@
+package dev.ipf.whitenoise.android.state
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Stops at the first account with native push on, and a failed read only counts when no account needs it. */
+internal suspend fun NotificationDeliveryController.nativePushDemand(accountRefs: List<String>): NativePushDemand {
+    val pendingDisables = withContext(pushWakeStorageDispatcher) { pushTokenStore.pendingDisables() }
+    var unreadable = false
+    for (account in accountRefs) {
+        val settings = runCatchingCancellable { host.marmotIo { notificationSettings(account) } }.getOrNull()
+        when {
+            settings == null -> unreadable = true
+            settings.nativePushEnabled && account !in pendingDisables -> return NativePushDemand.Required
+        }
+    }
+    return if (unreadable) NativePushDemand.Unknown else NativePushDemand.None
+}
+
+/**
+ * Acknowledges a sync in which no account needs native delivery, and turns Firebase auto-init off so
+ * the SDK stops refreshing a token nobody registers. A selection in flight owns auto-init instead.
+ */
+internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePush(isCurrent: () -> Boolean): Boolean {
+    if (!notificationDeliveryModeBusy) applyFcmAutoInit(enabled = false)
+    return withContext(pushWakeStorageDispatcher) {
+        pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = isCurrent)
+    }
+}
+
+/** Applies Firebase auto-init off Main, a no-op in builds without Firebase. */
+internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Boolean) {
+    withContext(Dispatchers.IO) { nativePushFallbackPlatform.setFcmAutoInitEnabled(enabled) }
+}

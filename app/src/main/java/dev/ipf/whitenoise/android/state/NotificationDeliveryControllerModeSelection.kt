@@ -237,7 +237,7 @@ internal suspend fun NotificationDeliveryController.establishPersistentMode(mode
     }
 }
 
-/** Disables native delivery for every captured signed-in account behind the acknowledged service. */
+/** Disables native delivery for every captured signed-in account, then Firebase auto-init, behind the service. */
 @Suppress("ReturnCount")
 private suspend fun NotificationDeliveryController.disableNativePushForPersistentDelivery(
     modeOwner: NotificationDeliveryModeOwner,
@@ -266,6 +266,8 @@ private suspend fun NotificationDeliveryController.disableNativePushForPersisten
             clearPushRegistrationForNotificationDeliveryOwnerLocked(modeOwner, account)
             if (!ownsNotificationDeliveryMode(modeOwner)) return@withLock false
         }
+        // Every signed-in account left native push, so Firebase must stop refreshing its token.
+        applyFcmAutoInit(enabled = false)
         true
     }
 }

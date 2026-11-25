@@ -68,11 +68,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
         if (marmotRuntime == null) return false
         host.refreshAccounts()
         accountRefs = host.nativePushAccountRefs()
-        if (accountRefs.isEmpty()) {
-            return withContext(pushWakeStorageDispatcher) {
-                pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = operationIsCurrent)
-            }
-        }
+        if (accountRefs.isEmpty()) return completeSyncWithoutNativePush(operationIsCurrent)
     }
     val config = pushServerConfigProvider()
     val capability = nativePushCapability(config)
@@ -83,13 +79,22 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     return syncNativePushRegistrationForAccountsLocked(accountRefs, config, freshCallbackToken, operationIsCurrent)
 }
 
-/** The caller holds the sync mutex through every account and the atomic pending-marker acknowledgement. */
+/**
+ * The caller holds the sync mutex through every account and the atomic pending-marker acknowledgement.
+ * No token is read unless at least one account still needs native delivery (#4081).
+ */
+@Suppress("ReturnCount")
 private suspend fun NotificationDeliveryController.syncNativePushRegistrationForAccountsLocked(
     accountRefs: List<String>,
     config: PushServerConfig,
     freshCallbackToken: String?,
     operationIsCurrent: () -> Boolean,
 ): Boolean {
+    when (nativePushDemand(accountRefs)) {
+        NativePushDemand.Unknown -> return false
+        NativePushDemand.None -> return completeSyncWithoutNativePush(operationIsCurrent)
+        NativePushDemand.Required -> Unit
+    }
     val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false
     val tokenIsCurrent: suspend () -> Boolean = {
         operationIsCurrent() &&
@@ -105,6 +110,17 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
         withContext(pushWakeStorageDispatcher) {
             pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
         }
+}
+
+/**
+ * Whether any captured account still needs an FCM token, as far as its settings could be read. Firebase
+ * auto-init follows this demand (#4081): the manifest keeps it off, the token fetch turns it on, and a
+ * sync or Local selection that leaves no account on native push turns it off.
+ */
+internal enum class NativePushDemand {
+    Required,
+    None,
+    Unknown,
 }
 
 /** Only this invocation's fresh callback can replace a failed SDK acquisition. */
@@ -200,13 +216,15 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
     }
 }
 
-/** Fetches and retains a non-blank FCM token only when every push prerequisite is available. */
+/** Turns Firebase auto-init on, then fetches and retains a non-blank FCM token when push is available. */
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     expectedCallbackToken: String? = null,
     tokenOwnerIsCurrent: () -> Boolean = { true },
 ): String? {
     val rotation = pushTokenRotationSequence.get()
     if (!nativePushCapability().isAvailable) return null
+    // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
+    applyFcmAutoInit(enabled = true)
     val token =
         runCatchingCancellable {
             val reader: suspend () -> String? = fcmTokenReaderOverride ?: this::readFcmTokenFromSdk
