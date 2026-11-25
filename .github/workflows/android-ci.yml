@@ -10,8 +10,9 @@ name: Android CI
 # separate workflow (see issue #247). Merge groups and full-matrix pull requests also
 # build both shipping R8 variants, unsigned, and fail on their post-R8 DEX method budgets.
 #
-# Activated queue mode uses compile/style/security PR prechecks and full
-# integration suites. Unset/unknown modes preserve prior PR validation.
+# Activated queue mode uses compile/style/security PR prechecks, which also verify
+# the Zapstore screenshot goldens, and full integration suites. Unset/unknown modes
+# preserve prior PR validation.
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
 # nightly and dispatch run stays full (docs/ci-request-policy.md), and so does every
 # master push except one of a commit its merge group already validated, which reuses that
@@ -837,7 +838,8 @@ jobs:
           retention-days: 14
   # Prechecks compile every test source set here. Full runs compile main and unit-test
   # sources once per flavor and hand the new build-cache entries to the four unit shards,
-  # which would otherwise each repeat the same 5-7 minute compilation.
+  # which would otherwise each repeat the same 5-7 minute compilation. Prechecks hand
+  # Zapstore's entries to its screenshot shards the same way.
   compile-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
@@ -913,7 +915,7 @@ jobs:
 
       # Only entries written by this compilation; the shards already restore the master cache.
       - name: Package new build-cache entries
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         shell: bash
         run: |
           cd ~/.gradle/caches/build-cache-1
@@ -922,7 +924,7 @@ jobs:
           tar -tf "$RUNNER_TEMP/unit-compile-cache.tar" | wc -l
 
       - name: Share compiled outputs with the unit shards
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: unit-compile-cache-${{ matrix.flavor }}
@@ -1088,10 +1090,12 @@ jobs:
   # top-level name hashes to its index (see ciTestShard in build.gradle.kts) and takes
   # its compiled sources from compile-tests' build-cache entries, so it runs about a
   # quarter of the suite without recompiling. The coverage job below merges every
-  # shard's screenshot summary and Kover binary report.
+  # shard's screenshot summary and Kover binary report. PR prechecks run only the tests
+  # that own committed goldens (config/screenshot-baseline-owners.txt), so a screenshot
+  # mismatch fails the PR instead of the merge group; coverage stays at integration.
   tests:
     needs: [changes, compile-tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -1179,21 +1183,27 @@ jobs:
 
       # Shard 0 also compiles androidTest sources on full runs and, for Zapstore, writes
       # the Kover artifact that names the class directories the coverage job needs.
+      # Prechecks select only the registered golden owners and skip Kover.
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
         env:
           CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
+          CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
         run: |
           extra_tasks=()
+          test_filters=()
           if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "$CI_FULL_MATRIX" == true ]]; then
             extra_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
           fi
-          if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
+          if [[ "$CI_PRECHECK" == true ]]; then
+            mapfile -t test_filters < <(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)
+            (( ${#test_filters[@]} > 0 )) || { echo "The screenshot owner registry selected no tests" >&2; exit 1; }
+          elif [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
             extra_tasks+=(:app:koverGenerateArtifactDevZapstoreDebug)
           fi
           python3 scripts/run_unit_tests_with_diagnostics.py -- \
-            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
+            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest "${test_filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
 
       # Upload before later gates: a timed-out child must not lose its actual PNGs.
@@ -1233,7 +1243,7 @@ jobs:
           retention-days: 7
 
       - name: Upload shard coverage data
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-binary-Zapstore-${{ matrix.shard }}
@@ -1242,11 +1252,11 @@ jobs:
           retention-days: 3
 
       - name: Pack Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         run: python3 scripts/kover_class_outputs.py pack app/build/kover/devZapstoreDebug.artifact build/kover-classes.tar
 
       - name: Upload Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-classes-Zapstore
@@ -1691,7 +1701,7 @@ jobs:
                 elif .key == "compose-compiler" then .value.result == (if $campaigns == "false" then "skipped" else "success" end)
                 elif .key == "static-analysis" then .value.result == (if $lint == "true" then "success" else "skipped" end)
                 else .value.result == "skipped" end)
-              elif $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              elif $precheck and (.key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)

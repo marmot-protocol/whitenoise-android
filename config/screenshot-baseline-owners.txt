@@ -4,8 +4,9 @@
 # must have a registered owner; every capturing class must be selected or declared
 # `diagnostic:` when it owns no committed golden. The tooling validator checks
 # ownership, and both full-unit CI suites verify and prove every golden compared.
-# CI runs the complete suites, not these filters. Mixed-purpose classes list only
-# their golden-producing methods to support focused local regeneration.
+# Full CI runs the complete suites; PR prechecks run only these filters to verify
+# the Zapstore goldens. Mixed-purpose classes list only their golden-producing
+# methods, which also supports focused local regeneration.
 
 *ScreenshotTest
 

@@ -2,13 +2,13 @@
 """Keep every committed Roborazzi golden owned by the curated screenshot CI selection.
 
 The registry in config/screenshot-baseline-owners.txt lists the Gradle `--tests`
-filters the "Curated screenshot verification" job runs. This script has three modes:
+filters the PR precheck unit shards run. This script has three modes:
 
 * no arguments: static consistency check for the tooling job. Every registry filter
   must resolve to an existing capturing test, and every unit-test class that calls
   captureRoboImage must be selected (or declared `diagnostic:`).
 * --gradle-test-args: print the filters as `--tests` arguments, one per line, for
-  the screenshot job to pass to Gradle.
+  the PR precheck unit shards to pass to Gradle.
 * --results SUMMARY [SUMMARY ...]: after a verification run, require that Roborazzi
   compared every PNG committed under app/src/test/snapshots/ in at least one summary
   (sharded runs pass one per shard), so a golden whose owner is no longer

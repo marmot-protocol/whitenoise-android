@@ -12,11 +12,13 @@ import time
 import unittest
 
 from scripts.check_fuzz_pr_triggers import pr_paths
+from scripts.check_screenshot_baseline_owners import gradle_test_args
 from scripts.check_runtime_listener_coverage import OWNER, check_coverage
 from scripts.select_instrumented_lanes import matches
 
 
-WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / '.github/workflows/android-ci.yml'
 PR_PRIMARY_MATRIX = (
     "        flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '[\"Zapstore\"]' "
     "|| '[\"Zapstore\", \"Play\"]') }}\n"
@@ -367,7 +369,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.tooling_contracts)
 
     def test_full_suite_compares_every_committed_golden(self):
-        """Both full suites must prove complete golden coverage without filters."""
+        """Both full suites must prove complete golden coverage without filters (see the precheck test)."""
         self.assertIn(PR_PRIMARY_MATRIX, self.tests_job)
         self.assertNotIn('verifyRoborazziDev', self.workflow)
         self.assertNotIn('--tests ', self.tests_job)
@@ -1148,7 +1150,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def precheck_outcomes(self, draft='false'):
         outcomes = self.successful_outcomes(draft=draft)
         outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
-        for job in ('tests', 'coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
+        for job in ('coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
             outcomes[job]['result'] = 'skipped'
         return outcomes
 
@@ -1267,7 +1269,9 @@ class AndroidCiGateTest(unittest.TestCase):
                 self.assertEqual(len(tasks), 6 if android_test else 4, precheck)
                 self.assertEqual(any('AndroidTest' in task for task in tasks), android_test, precheck)
         upload = self.named_step(self.compile_tests, 'Share compiled outputs with the unit shards')
-        self.assertIn("needs.changes.outputs.precheck != 'true'", upload)
+        shared = "(needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')"
+        self.assertIn(shared, upload)
+        self.assertIn(shared, self.named_step(self.compile_tests, 'Package new build-cache entries'))
         self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', upload)
         self.assertIn('retention-days: 1', upload)
         self.assertIn('overwrite: true', upload)
@@ -1302,13 +1306,60 @@ class AndroidCiGateTest(unittest.TestCase):
         precheck = tooling.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
         self.assertNotIn('assemble', precheck)
         self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
-        for job in (self.static_analysis, self.tests_job, self.secondary, self.compose_compiler):
+        for job in (self.static_analysis, self.secondary, self.compose_compiler):
             self.assertIn("needs.changes.outputs.precheck != 'true'", job.split('    steps:', 1)[0])
+        # Prechecks run the Zapstore screenshot shards; coverage stays at integration.
+        self.assertNotIn('precheck', self.tests_job.split('    steps:', 1)[0])
+        self.assertIn("needs.changes.outputs.precheck != 'true'", self.coverage.split('    steps:', 1)[0])
         self.assertIn("cancel-in-progress: ${{ github.event_name != 'merge_group' }}", self.workflow)
         for name in ('Upload reports', 'Upload Gradle timing reports',
                      'Verify selected dependency security floors'):
             self.named_step(self.compile_tests, name)
         self.assertIn('android-ci-reports-compile-tests-${{ matrix.flavor }}', self.compile_tests)
+
+    def run_recorded_step(self, job, step_name, flavor, precheck, full, shard='0'):
+        """Run one workflow step with a Gradle wrapper that prints its arguments."""
+        step = self.named_step(job, step_name)
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        script = script.replace('${{ matrix.flavor }}', flavor)
+        with tempfile.TemporaryDirectory() as directory:
+            wrapper = Path(directory) / 'gradlew'
+            wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
+            wrapper.chmod(0o755)
+            for relative in ('scripts/run_unit_tests_with_diagnostics.py',
+                             'scripts/check_screenshot_baseline_owners.py',
+                             'config/screenshot-baseline-owners.txt'):
+                copy = Path(directory) / relative
+                copy.parent.mkdir(exist_ok=True)
+                copy.write_bytes((ROOT / relative).read_bytes())
+            result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
+                cwd=directory, capture_output=True, text=True,
+                env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
+                     'ORG_GRADLE_PROJECT_ciTestShard': shard,
+                     'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.splitlines()
+
+    def test_precheck_unit_shards_verify_only_registered_golden_owners(self):
+        """PR prechecks catch screenshot mismatches before the queue; full suites stay unfiltered."""
+        registry = (ROOT / 'config/screenshot-baseline-owners.txt').read_text()
+        expected = gradle_test_args(registry)
+        for shard in ('0', '3'):
+            arguments = self.run_recorded_step(self.tests_job, 'Unit tests', 'Zapstore', 'true', 'false', shard)
+            task = arguments.index(':app:testDevZapstoreDebugUnitTest')
+            self.assertEqual(arguments[task + 1:task + 1 + len(expected)], expected)
+            self.assertEqual(arguments.count('--tests'), expected.count('--tests'))
+            self.assertIn('-Proborazzi.test.verify=true', arguments)
+            self.assertFalse([argument for argument in arguments if 'kover' in argument.lower()], shard)
+        for flavor, full in (('Zapstore', 'false'), ('Zapstore', 'true'), ('Play', 'true')):
+            arguments = self.run_recorded_step(self.tests_job, 'Unit tests', flavor, 'false', full)
+            self.assertNotIn('--tests', arguments, (flavor, full))
+            self.assertEqual('Zapstore' == flavor, ':app:koverGenerateArtifactDevZapstoreDebug' in arguments)
+        for name in ('Upload shard coverage data', 'Pack Kover class directories', 'Upload Kover class directories'):
+            self.assertIn("needs.changes.outputs.precheck != 'true'", self.named_step(self.tests_job, name))
+        upload = self.named_step(self.tests_job, 'Upload reports')
+        self.assertIn('if: always()', upload)
+        self.assertIn('app/build/outputs/roborazzi/', upload)
 
     def test_instrumented_compile_tasks_have_one_owner_per_mode(self):
         """Execute real task selectors with a recording wrapper, never Android tooling."""
@@ -1319,26 +1370,10 @@ class AndroidCiGateTest(unittest.TestCase):
                 (self.tests_job, 'Unit tests', 'Zapstore'),
                 (self.tests_job, 'Unit tests', 'Play'),
             ):
-                if precheck == 'true' and job == self.tests_job:
+                if precheck == 'true' and job == self.tests_job and flavor == 'Play':
                     continue
-                step = self.named_step(job, step_name)
-                script = textwrap.dedent(step.split('        run: |\n', 1)[1])
-                script = script.replace('${{ matrix.flavor }}', flavor)
-                with tempfile.TemporaryDirectory() as directory:
-                    wrapper = Path(directory) / 'gradlew'
-                    wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
-                    wrapper.chmod(0o755)
-                    diagnostics = Path(directory) / 'scripts/run_unit_tests_with_diagnostics.py'
-                    diagnostics.parent.mkdir()
-                    diagnostics.write_bytes(Path(__file__).with_name('run_unit_tests_with_diagnostics.py').read_bytes())
-                    result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
-                        cwd=directory, capture_output=True, text=True,
-                        env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
-                             'ORG_GRADLE_PROJECT_ciTestShard': '0',
-                             'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    owners.extend(argument for argument in result.stdout.splitlines()
-                                  if argument.endswith('AndroidTestKotlin'))
+                arguments = self.run_recorded_step(job, step_name, flavor, precheck, full)
+                owners.extend(argument for argument in arguments if argument.endswith('AndroidTestKotlin'))
             expected = ([] if precheck == 'true' else
                         [':app:compileDevZapstoreDebugAndroidTestKotlin'] if full == 'false' else
                         [':app:compileDevZapstoreDebugAndroidTestKotlin',

@@ -88,13 +88,16 @@ Play main, unit-test and Android-test sources. Separate per-flavor runners use
 one active Gradle worker and the existing configured heaps. Tooling owns benchmark
 source compilation in prechecks and benchmark assembly in full runs.
 In prechecks, including drafts, the isolated compile matrix compiles all three
-source sets. In full and legacy runs it compiles main and unit-test sources only
-and passes the new build-cache entries to that flavor's unit shards, which then
-reuse them instead of recompiling. Legacy PR lanes retain Zapstore and Play
+source sets. In full and legacy runs it compiles main and unit-test sources only.
+It passes the new build-cache entries to that flavor's unit shards, which then
+reuse them instead of recompiling; prechecks pass only Zapstore's. Legacy PR lanes retain Zapstore and Play
 Android-test Kotlin compilation; full suite runners compile Android-test Kotlin
-for their own flavor. PR prechecks defer
-full unit/golden execution, Kover, Android lint, baseline packaging and the
-separate Play parity job to integration CI. Complete suites remain the unit of
+for their own flavor. PR prechecks, including drafts, run the four Zapstore unit
+shards with only the golden-owning tests from
+`config/screenshot-baseline-owners.txt` and `-Proborazzi.test.verify=true`, so a
+screenshot mismatch fails the PR instead of ejecting it from the queue. They defer
+the remaining unit tests, the every-golden-compared proof, Kover, Android lint,
+baseline packaging and the separate Play parity job to integration CI. Complete suites remain the unit of
 integration testing. Required source regressions and
 baseline review remain unchanged. Drafts have the same precheck cost but retain
 the distinct draft aggregate context and require readiness before queue admission.
@@ -147,7 +150,8 @@ The aggregate validates the explicit `precheck`, `full` or `legacy-pr` mode and
 the complete expected job set. `legacy-pr` retains the earlier primary-flavor
 suite; `full` identifies the complete two-flavor core matrix. Only
 the named precheck, docs, supplemental or legacy draft skips are accepted.
-Queue core suite jobs must succeed; precheck-only compiler runners must skip. A green PR precheck admits source for integration. Merge qualification requires
+Queue core suite jobs must succeed; in a precheck the screenshot shards must
+succeed and coverage, static analysis and the secondary variant must skip. A green PR precheck admits source for integration. Merge qualification requires
 successful current integration CI and independent authorization.
 Activation, failure recovery and rollback are specified in the
 [serial queue contract](android-serial-merge-queue.md#pr-precheck-activation).

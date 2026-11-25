@@ -91,7 +91,8 @@ for their machine; agents run CI-covered checks on GitHub.
 The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
 describes the opt-in `ANDROID_CI_MODE=merge-queue` mode. Ordinary PRs then use
 separate Zapstore and Play main/unit/Android-test Kotlin/Java compile jobs plus
-style, tooling and security checks. Full suites, goldens, Kover, lint and baseline
+style, tooling and security checks, and verify Zapstore screenshot goldens by
+running only their registered owner tests. Full suites, Kover, lint and baseline
 packaging run at integration. Every merge group runs the full core matrix;
 `ci:full`, risky inputs or unknown classification evidence also select it on PRs.
 Activation remains gated on native queue enforcement, independent integration
@@ -267,9 +268,10 @@ test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs the complete dev-debug unit suite with `-Proborazzi.test.verify=true`:
 ordinary pull requests run Zapstore only, and the merge queue, master pushes and
-full-matrix runs also run Play.
-The committed-baseline owner registry in `config/screenshot-baseline-owners.txt`
-remains a static coverage contract and provides focused local regeneration filters.
+full-matrix runs also run Play. In the merge-queue precheck mode, pull requests
+verify Zapstore goldens by running only the tests listed in the committed-baseline
+owner registry, `config/screenshot-baseline-owners.txt`. The registry is also a
+static coverage contract and provides focused local regeneration filters.
 Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
 owns committed baselines lists its golden-producing methods there.
 `scripts/check_screenshot_baseline_owners.py` fails the tooling job when a capturing
