@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -30,7 +30,7 @@ class MediaBubbleAspectRatioTest {
     /** Media inside a bubble keeps the prototype's own 10 dp corners whether or not a caption follows. */
     @Test
     fun mediaInsideABubbleKeepsItsOwnRoundedCorners() {
-        assertEquals(RoundedCornerShape(10.dp), ConversationRichContentShape)
+        assertEquals(RoundedCornerShape(10.dp), ConversationMediaTileShape)
     }
 
     /** A landscape photo fills the 256 dp frame width and derives its height; a portrait keeps the frame height. */
