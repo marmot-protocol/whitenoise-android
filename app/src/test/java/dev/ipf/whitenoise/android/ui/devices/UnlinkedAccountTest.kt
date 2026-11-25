@@ -155,13 +155,20 @@ class UnlinkedAccountTest {
     fun theRemovalQuestionRemovesOnlyOnConfirmation() {
         var removals = 0
         var cancels = 0
+        val open = mutableStateOf(true)
         compose.setContent {
-            WhiteNoiseTheme { UnlinkedProfileRemovalDialog(onRemove = { removals++ }, onCancel = { cancels++ }) }
+            WhiteNoiseTheme {
+                if (open.value) UnlinkedProfileRemovalDialog(onRemove = { removals++ }, onCancel = { cancels++ })
+            }
         }
 
         compose.onNodeWithText(context.getString(R.string.unlinked_account_remove_detail)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.cancel)).performClick()
         compose.runOnIdle { assertEquals(0 to 1, removals to cancels) }
+        // Cancel closes the dialog, so the question is asked again before confirming.
+        compose.runOnIdle { open.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { open.value = true }
         compose.onNodeWithTag(UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG).performClick()
         compose.runOnIdle { assertEquals(1, removals) }
     }

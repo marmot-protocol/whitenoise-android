@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
@@ -350,15 +351,13 @@ internal fun GroupSoleAdminLeaveDialog(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
+    ConfirmDialog(
+        onDismiss = onDismiss,
         modifier = Modifier.testTag("chat_info.sole_admin_leave"),
-        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-        text = {
-            Column(
-                Modifier.fadingVerticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+        title = stringResource(R.string.confirm_leave_sole_admin_title),
+        message = null,
+        identity = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, groupName))
                 Text(
                     stringResource(
@@ -368,17 +367,11 @@ internal fun GroupSoleAdminLeaveDialog(
                 identity?.invoke()
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = onAbandon,
-                modifier = Modifier.testTag("chat_info.sole_admin_leave.abandon"),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat_info.sole_admin_leave.cancel")) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
+        confirmLabel = stringResource(groupAbandonmentActionLabel(isDm)),
+        onConfirm = onAbandon,
+        closeOnConfirm = false,
+        destructive = true,
+        confirmTag = "chat_info.sole_admin_leave.abandon",
+        cancelTag = "chat_info.sole_admin_leave.cancel",
     )
 }

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -241,13 +242,20 @@ class DeviceManagementContentTest {
     fun repairHappensOnlyAfterItsExplanation() {
         var repairs = 0
         var dismissals = 0
+        val open = mutableStateOf(true)
         compose.setContent {
-            WhiteNoiseTheme { RepairDeviceLinkDialog(onRepair = { repairs++ }, onDismiss = { dismissals++ }) }
+            WhiteNoiseTheme {
+                if (open.value) RepairDeviceLinkDialog(onRepair = { repairs++ }, onDismiss = { dismissals++ })
+            }
         }
 
         compose.onNodeWithText(context.getString(R.string.devices_repair_confirm)).assertExists()
         compose.onNodeWithText(context.getString(R.string.cancel)).performClick()
         compose.runOnIdle { assertEquals(0 to 1, repairs to dismissals) }
+        // Cancel closes the dialog, so the question is asked again before confirming.
+        compose.runOnIdle { open.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { open.value = true }
         compose.onNodeWithTag(LINKED_DEVICES_REPAIR_CONFIRM_TAG).performClick()
         compose.runOnIdle { assertEquals(1, repairs) }
     }
