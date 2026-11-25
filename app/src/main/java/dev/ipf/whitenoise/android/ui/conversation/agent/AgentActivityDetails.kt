@@ -34,7 +34,6 @@ import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentItemState
 import dev.ipf.whitenoise.android.core.formatAgentOperationArguments
 
-
 /** The opened part of an activity line: output, diffs, a plan, thinking or error details. */
 @Composable
 internal fun AgentActivityDetails(

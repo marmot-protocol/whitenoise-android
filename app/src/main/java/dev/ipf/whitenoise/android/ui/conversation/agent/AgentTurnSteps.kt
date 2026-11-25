@@ -10,12 +10,12 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AgentItemFfi
 import dev.ipf.marmotkit.AgentItemStateFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import org.json.JSONObject
 
@@ -150,6 +150,7 @@ internal val LocalAgentTurnSteps = compositionLocalOf { AgentTurnSteps.None }
 internal fun rememberAgentTurnSteps(
     timeline: List<TimelineMessage>,
     conversationKey: Any,
+    unreadBoundaryId: String? = null,
 ): AgentTurnSteps {
     val opened =
         rememberSaveable(
@@ -157,15 +158,11 @@ internal fun rememberAgentTurnSteps(
             saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() }),
         ) { mutableStateListOf<String>() }
     val requests = remember(conversationKey) { mutableStateMapOf<String, AgentRequestStatus>() }
-    return remember(timeline, opened, requests) {
-        val rows = timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val steps = agentTurnStepRows(rows)
-        AgentTurnSteps(steps, opened, if (steps.isEmpty()) emptyList() else rows, requests)
+    return remember(timeline, opened, requests, unreadBoundaryId) {
+        val steps = agentTurnStepRows(timeline, unreadBoundaryId)
+        AgentTurnSteps(steps, opened, if (steps.isEmpty()) emptyList() else timeline, requests)
     }
 }
-
-private fun List<String>.toMutableStateList(): SnapshotStateList<String> =
-    mutableStateListOf<String>().also { it.addAll(this) }
 
 /**
  * Lets a shown row draw over the list spacing that folded rows beside it leave, so a closed turn reads
@@ -191,21 +188,28 @@ internal fun Modifier.overlapFoldedAgentRows(
 
 /**
  * Maps each foldable step row to the row of its turn: the turn item from the same agent with the same
- * turn id. A step whose turn row is not loaded stays visible. Reads only MDK's projected fields, and
- * parses fields JSON for notices alone, so it is cheap on every timeline update.
+ * turn id. A step whose turn row is not loaded or carries the unread divider stays visible.
+ * Reads MDK's projected fields and parses fields JSON only for notices.
  */
-internal fun agentTurnStepRows(timeline: List<TimelineMessage>): Map<String, String> {
-    val items = timeline.mapNotNull { row -> row.projected?.agentItem?.takeIf { it.turn != null }?.let { row to it } }
+internal fun agentTurnStepRows(
+    timeline: List<TimelineMessage>,
+    unreadBoundaryId: String? = null,
+): Map<String, String> {
+    val items =
+        timeline.mapNotNull { row ->
+            val projected = row.projected ?: return@mapNotNull null
+            val item = projected.agentItem ?: return@mapNotNull null
+            if (projected.deleted || item.turn == null) null else row to item
+        }
     val turnRows =
         items
             .filter { (_, item) -> item.itemType == TURN_TYPE }
             .associate { (row, item) -> turnKey(row, item) to row.record.messageIdHex }
     return items
-        .filter { (_, item) -> item.foldsUnderTurn() }
+        .filter { (row, item) -> row.record.messageIdHex != unreadBoundaryId && item.foldsUnderTurn() }
         .mapNotNull { (row, item) ->
             turnRows[turnKey(row, item)]?.let { turnRow -> row.record.messageIdHex to turnRow }
-        }
-        .toMap()
+        }.toMap()
 }
 
 private fun turnKey(
@@ -225,8 +229,10 @@ private fun AgentItemFfi.foldsUnderTurn(): Boolean =
             else -> false
         }
 
-private fun noticeKind(fieldsJson: String): String? =
-    runCatching { JSONObject(fieldsJson).optJSONObject("body")?.optString("kind") }.getOrNull()
+private fun noticeKind(fieldsJson: String): String? {
+    val body = runCatching { JSONObject(fieldsJson).optJSONObject("body") }.getOrNull()
+    return body?.optString("kind")
+}
 
 private const val TURN_TYPE = "turn"
 private val VISIBLE_NOTICE_KINDS = setOf("refused", "warning")

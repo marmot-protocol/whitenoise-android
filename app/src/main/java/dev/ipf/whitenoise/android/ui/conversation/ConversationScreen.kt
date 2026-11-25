@@ -2536,6 +2536,7 @@ internal fun ConversationScreen(
     }
     searchBackAndPagingEffects()
     var entryUnreadDividerRetired by remember(entryUnreadSessionIdentity) { mutableStateOf(false) }
+    val unreadBoundaryId = entryFirstUnreadMessageId.takeUnless { entryUnreadDividerRetired }
     LaunchedEffect(controller, entryFirstUnreadMessageId, controller.timeline) {
         if (hasSentMessageAfterUnreadBoundary(controller.timeline, entryFirstUnreadMessageId)) {
             entryUnreadDividerRetired = true
@@ -4012,7 +4013,7 @@ internal fun ConversationScreen(
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,
-                LocalAgentTurnSteps provides rememberAgentTurnSteps(controller.timeline, chat.id),
+                LocalAgentTurnSteps provides rememberAgentTurnSteps(renderedTimeline, controller, unreadBoundaryId),
                 // Bubbles mark their own matches while search is open, so a hit is obvious on any
                 // bubble colour rather than only on the one the jump happened to land on.
                 LocalConversationSearchMarking provides
@@ -4249,10 +4250,7 @@ internal fun ConversationScreen(
                                         // Pool layouts by category so Compose can reuse
                                         // structurally similar rows across scroll.
                                         contentType = { _, item ->
-                                            when {
-                                                MessageProjector.isGroupSystem(item.record) -> "groupSystem"
-                                                else -> "message"
-                                            }
+                                            if (MessageProjector.isGroupSystem(item.record)) "system" else "message"
                                         },
                                     ) { index, item ->
                                         val messageId = item.record.messageIdHex

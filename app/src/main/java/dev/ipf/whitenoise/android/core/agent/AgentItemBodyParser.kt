@@ -28,7 +28,6 @@ internal object AgentItemBodyParser {
         }
     }
 
-
     private fun tool(body: JSONObject): AgentItemBody.Tool =
         AgentItemBody.Tool(
             kind = AgentToolKind.parse(body.stringOrNull("kind")),
@@ -124,7 +123,7 @@ internal object AgentItemBodyParser {
                         label = setting.optString("label"),
                         value = setting.stringOrNull("value"),
                     )
-                }
+                },
         )
 
     private fun JSONArray?.objects(): List<JSONObject> {

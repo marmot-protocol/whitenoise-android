@@ -95,6 +95,8 @@ class AgentItemTimelineTest {
         val foldedTypes = rows.filter { it.record.messageIdHex in folded }.map { read(it)!!.body.typeName() }
         assertEquals(listOf("tool", "tool", "plan"), foldedTypes)
         assertTrue(folded.values.all { it == turnRow })
+        val unreadBoundary = folded.keys.first()
+        assertEquals(folded - unreadBoundary, agentTurnStepRows(rows, unreadBoundary))
         // The answered question, the session and the agent's words stay in the transcript.
         assertTrue(rows.filter { read(it)?.body is AgentItemBody.Question }.none { it.record.messageIdHex in folded })
         assertTrue(rows.filter { it.projected?.agentItem == null }.none { it.record.messageIdHex in folded })
