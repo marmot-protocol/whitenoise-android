@@ -48,11 +48,14 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** How far the strip slides as it arrives from the microphone or leaves toward the cancel side. */
 private const val HALF_TURN_DEGREES = 180f
 private val VoiceStripSlide = 12.dp
+private val VoiceStatusDotSize = 12.dp
 
 /** The armed trash grows by this factor so the cancel target reads before release. */
 private const val VOICE_TRASH_ARMED_SCALE = 1.2f
@@ -84,7 +87,7 @@ internal fun RecordingStripLeading(
                         ((1f - enter) * micSide + leaving * controller.hold.cancelDirection) * VoiceStripSlide.toPx()
                 }.clip(RoundedCornerShape(Radii.xl))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = Dimens.spaceMd, vertical = WhiteNoiseSpacing.Related),
     ) {
         Row(
             modifier =
@@ -94,7 +97,7 @@ internal fun RecordingStripLeading(
                         translationX = if (controller.isRecording) controller.hold.dragOffsetPx else settle.value
                     },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
             RecordingStripStatus(controller)
             RecordingStripMiddle()
@@ -162,7 +165,7 @@ private fun RecordingStripTrash(armed: Boolean) {
         tint = tint,
         modifier =
             Modifier
-                .size(22.dp)
+                .size(24.dp)
                 .testTag("composer.voice.trash")
                 .graphicsLayer {
                     scaleX = scale
@@ -184,11 +187,11 @@ private fun RecordingStripDot(controller: VoiceRecordingController) {
         label = "voice-dot-color",
     )
     Crossfade(targetState = closing, animationSpec = voiceTween(open = false), label = "voice-dot-closing") {
-        Box(Modifier.size(10.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(VoiceStatusDotSize), contentAlignment = Alignment.Center) {
             if (it) {
                 // The take is stopped and the encoder is closing it; review opens next.
                 VoiceSendingIndicator(
-                    size = 10.dp,
+                    size = VoiceStatusDotSize,
                     strokeWidth = 1.5.dp,
                     modifier = Modifier.testTag("composer.voice.closing"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -196,7 +199,7 @@ private fun RecordingStripDot(controller: VoiceRecordingController) {
             } else {
                 Box(
                     Modifier
-                        .size(10.dp)
+                        .size(VoiceStatusDotSize)
                         .graphicsLayer {
                             val scale = if (paused || !controller.isRecording) 1f else pulseScale
                             scaleX = scale
@@ -232,7 +235,10 @@ private fun RecordingStripTrailing(controller: VoiceRecordingController) {
             else -> StripTrailing.Hint
         }
     Crossfade(targetState = mode, animationSpec = voiceTween(open = false), label = "voice-strip-trailing") {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
             when (it) {
                 StripTrailing.Hint -> RecordingStripHint(controller)
                 StripTrailing.Controls ->
@@ -251,7 +257,7 @@ private fun RecordingStripHint(controller: VoiceRecordingController) {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         modifier = Modifier.graphicsLayer { alpha = 1f - controller.hold.cancelProgress },
     ) {
         Icon(
@@ -259,7 +265,7 @@ private fun RecordingStripHint(controller: VoiceRecordingController) {
             contentDescription = null,
             tint = hint,
             modifier =
-                Modifier.size(14.dp).graphicsLayer {
+                Modifier.size(16.dp).graphicsLayer {
                     // The arrow mirrors with the layout; turn it when the cancel side is the other one.
                     val pointsLeft = !rtl
                     val cancelLeft = controller.hold.cancelDirection < 0f
