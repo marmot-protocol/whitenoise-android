@@ -116,7 +116,7 @@ jobs:
           BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
           GIT_NO_REPLACE_OBJECTS: '1'
-        run: python3 -I scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+        run: python3 -I scripts/check_ci_changes.py --event "$CI_EVENT" --base "$(git rev-parse "$HEAD_SHA^")" --head "$HEAD_SHA"
 
       # Identical content never needs validating twice: a ready-for-review run on a tree that
       # passed the draft lane, and a master push of the commit the queue already validated.
