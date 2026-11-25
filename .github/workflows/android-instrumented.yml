@@ -173,6 +173,14 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/medialibrary/AccountAttachmentLibraryFfiIntegrationTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsImeTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyWipeConfirmationAndroidTest.kt'
+      # The wipe confirmation's 200% RTL keyboard geometry depends on its own layout, its action labels and the
+      # shared dialog width and renderers; Robolectric gives dialog windows the full screen, so only the emulator
+      # sees the narrowed window.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogWidthBounds.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatListContinuityAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderFadeFrameProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt'

@@ -2092,7 +2092,6 @@ internal fun GroupDetailsScreen(
                                                     R.drawable.ic_archive
                                                 },
                                             inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                                            destructive = false,
                                         )
                                     },
                                 )
@@ -2274,7 +2273,6 @@ internal fun GroupDetailsScreen(
                                                     icon = R.drawable.ic_admin_panel_settings,
                                                     inProgress =
                                                         activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                                                    destructive = false,
                                                 )
                                             },
                                         )

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -58,10 +60,12 @@ class ProfileEditSaveButtonTest {
                     enabled = !busy.value && state.canSave(ACCOUNT_A, current.value),
                     busy = busy.value,
                     onSave = {},
+                    modifier = Modifier.testTag("standalone.save"),
                 )
             }
         }
-        val saveButton = composeRule.onNodeWithText(app.getString(R.string.save))
+        // Progress swaps the label, so the button is found by tag.
+        val saveButton = composeRule.onNodeWithTag("standalone.save")
 
         saveButton.assertIsNotEnabled()
         composeRule.runOnIdle { state.completeLoad(ACCOUNT_A, loaded) }

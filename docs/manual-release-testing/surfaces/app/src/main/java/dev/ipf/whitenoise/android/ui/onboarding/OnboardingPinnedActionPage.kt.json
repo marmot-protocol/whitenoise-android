@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "OnboardingPinnedActionPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
+        "anchor": "fun OnboardingPinnedActionPage(",
+        "test_ids": [
+          "ONB-004",
+          "ONB-013"
+        ]
+      },
+      {
+        "surface": "OnboardingPinnedActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
+        "anchor": "fun OnboardingPinnedActions(",
+        "test_ids": [
+          "ONB-004",
+          "ONB-013"
+        ]
+      },
+      {
+        "surface": "OnboardingActionColumn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
+        "anchor": "fun OnboardingActionColumn(",
+        "test_ids": [
+          "ONB-004",
+          "ONB-013"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: OnboardingPinnedActionPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

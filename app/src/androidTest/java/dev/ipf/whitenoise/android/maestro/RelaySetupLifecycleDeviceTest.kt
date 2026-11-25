@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.onboarding.scrollToIfScrollable
 import dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -180,7 +181,7 @@ class RelaySetupLifecycleDeviceTest {
     ) {
         importToRelayStep(context, app)
         val setup = requireNotNull(app.accountSetup.controller)
-        compose.onNodeWithText("Fix relay setup").performScrollTo().performClick()
+        compose.onNodeWithText("Fix relay setup").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) {
             !setup.state.value.busy &&
                 setup.state.value.snapshot
@@ -204,7 +205,7 @@ class RelaySetupLifecycleDeviceTest {
         compose.waitForIdle()
         assertEquals(setup.account, app.accountSetup.controller?.account)
         assertEquals(preview.proposal, requireNotNull(native.onboardingSnapshot(setup.account)).proposal)
-        compose.onNodeWithTag("setup-later").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-later").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) { app.accountSetup.controller == null }
         assertTrue(relay.publicationAttempts(10002).isEmpty())
         // The production account-selection path reopens the retained native checkpoint.
@@ -216,7 +217,7 @@ class RelaySetupLifecycleDeviceTest {
                 ?.busy == false
         }
         compose.onNodeWithTag("setup-step-RELAYS").performScrollTo().performClick()
-        compose.onNodeWithTag("setup-action-CANCEL_REPAIR").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-CANCEL_REPAIR").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) {
             app.accountSetup.controller
                 ?.state
@@ -252,7 +253,7 @@ class RelaySetupLifecycleDeviceTest {
                     ?.step == OnboardingStepFfi.PROFILE
         }
         compose.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
-        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) {
             !setup.state.value.busy &&
                 setup.state.value.currentStep
@@ -282,7 +283,7 @@ class RelaySetupLifecycleDeviceTest {
         }
         compose.onNodeWithTag("setup-step-RELAYS").performScrollTo().performClick()
         compose.onNodeWithText("Save changes").assertIsDisplayed()
-        compose.onNodeWithTag("setup-action-CANCEL_REPAIR").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-CANCEL_REPAIR").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) {
             app.accountSetup.controller
                 ?.state
@@ -324,7 +325,7 @@ class RelaySetupLifecycleDeviceTest {
         }
         val setup = requireNotNull(app.accountSetup.controller)
         compose.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
-        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").scrollToIfScrollable().performClick()
         compose.waitUntil(60_000L) { !setup.state.value.busy }
         val snapshot = requireNotNull(native.onboardingSnapshot(setup.account))
         for (step in listOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)) {
@@ -349,7 +350,7 @@ class RelaySetupLifecycleDeviceTest {
     ) {
         val setup = requireNotNull(app.accountSetup.controller)
         seedMixedDeclarations(context, relay)
-        compose.onNodeWithText("Save changes").performScrollTo().performClick()
+        compose.onNodeWithText("Save changes").scrollToIfScrollable().performClick()
         compose.waitUntil(30_000L) { !setup.state.value.busy }
         val snapshot = requireNotNull(native.onboardingSnapshot(setup.account))
         assertNull(snapshot.proposal)
@@ -424,7 +425,7 @@ class RelaySetupLifecycleDeviceTest {
                     ?.proposal != null
         }
         relay.rejectedPublicationKinds = setOf(10002)
-        compose.onNodeWithText("Save changes").performScrollTo().performClick()
+        compose.onNodeWithText("Save changes").scrollToIfScrollable().performClick()
         compose.waitUntil(60_000L) { !setup.state.value.busy && relay.publicationAttempts(10002).isNotEmpty() }
         val rejected = requireNotNull(native.onboardingSnapshot(account))
         assertTrue(!rejected.ready)
@@ -434,7 +435,7 @@ class RelaySetupLifecycleDeviceTest {
         assertTrue(attempts.all { it.getString("id") == signedId })
         relay.rejectedPublicationKinds = emptySet()
         relay.authAfterPublicationKinds = setOf(10002)
-        compose.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-RETRY").scrollToIfScrollable().performClick()
         compose.waitUntil(60_000L) { !setup.state.value.busy && relay.recordedEvents(10002).isNotEmpty() }
         assertEquals(signedId, relay.recordedEvents(10002).single().getString("id"))
         assertTrue(relay.publicationAttempts(10002).all { it.getString("id") == signedId })
@@ -444,7 +445,7 @@ class RelaySetupLifecycleDeviceTest {
         val publishedCount = relay.publicationAttempts(10002).size
         relay.authAfterPublicationKinds = emptySet()
         relay.authRequiredKinds = emptySet()
-        compose.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-RETRY").scrollToIfScrollable().performClick()
         compose.waitUntil(60_000L) { !setup.state.value.busy }
         val recovered = requireNotNull(native.onboardingSnapshot(account))
         assertEquals(OnboardingStatusFfi.PASSED, recovered.steps.single { it.step == OnboardingStepFfi.RELAYS }.status)

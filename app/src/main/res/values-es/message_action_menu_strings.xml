@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="more_message_actions">Más acciones</string>
+    <string name="fewer_message_actions">Menos acciones</string>
+    <string name="explanation_message_action_more">Muestra todas las acciones de este mensaje.</string>
+    <string name="explanation_message_action_fewer">Vuelve a mostrar solo las acciones más comunes.</string>
+    <string name="message_actions_all_shown">Se muestran todas las acciones</string>
+    <string name="message_actions_common_shown">Se muestran las acciones comunes</string>
+</resources>

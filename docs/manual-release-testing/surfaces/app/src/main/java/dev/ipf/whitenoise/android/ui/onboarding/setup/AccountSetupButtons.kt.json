@@ -4,16 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "SetupActionButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
-        "anchor": "fun SetupActionButton(",
-        "test_ids": [
-          "ONB-013",
-          "ONB-016",
-          "ONB-021"
-        ]
-      },
-      {
         "surface": "SetupActionButtons",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
         "anchor": "fun SetupActionButtons(",
@@ -67,6 +57,25 @@
         "surface": "SetupAlternativeActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
         "anchor": "fun SetupAlternativeActions(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "SetupDestructiveContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun SetupDestructiveContent(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-016",
+          "ONB-017",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "SetupButtonIconGap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun SetupButtonIconGap(",
         "test_ids": [
           "ONB-017"
         ]

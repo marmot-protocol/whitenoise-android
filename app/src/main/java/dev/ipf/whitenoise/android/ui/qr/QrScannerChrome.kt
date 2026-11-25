@@ -14,13 +14,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,9 +51,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private val SCANNER_PERMISSION_BACKGROUND = Color(0xFF202020)
 
@@ -186,7 +186,10 @@ internal fun ScannerErrorDialog(
     )
 }
 
-/** Prototype permission card keeps its recovery action reachable at large font sizes. */
+/**
+ * The permission card uses the theme's raised surface, the AMOLED outline and the shared task button, and keeps its
+ * recovery action reachable at large font sizes.
+ */
 @Composable
 private fun ScannerRecoveryCard(
     title: String,
@@ -199,8 +202,9 @@ private fun ScannerRecoveryCard(
         Surface(
             modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
+            border = amoledOutlineBorder(),
         ) {
             Column(
                 modifier = Modifier.fadingVerticalScroll(rememberScrollState()).padding(WhiteNoiseSpacing.Section),
@@ -209,9 +213,10 @@ private fun ScannerRecoveryCard(
             ) {
                 Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
                 Text(detail, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-                Button(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp).testTag("qr_scanner.recovery")) {
-                    Text(action)
-                }
+                WhiteNoiseButton(
+                    onClick = onAction,
+                    modifier = Modifier.fillMaxWidth().testTag("qr_scanner.recovery"),
+                ) { Text(action) }
             }
         }
     }

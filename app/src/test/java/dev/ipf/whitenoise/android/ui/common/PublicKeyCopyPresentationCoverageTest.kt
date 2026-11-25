@@ -653,6 +653,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val CALL_SITES =
             listOf(
                 "ui/profile/PersonProfileContent.kt" to """CopyablePublicKey\(\s*npub = person\.publicKey,""",
+                "ui/group/GroupDetailsHeader.kt" to """CopyablePublicKey\(\s*npub = copyValue,""",
                 "ui/search/GlobalPersonRow.kt" to """PublicKeyCopyText\(\s*IdentityFormatter\.short\(npub""",
                 "ui/account/ProfileSwitcherSheet.kt" to
                     """PublicKeyCopyText\(\s*shortNpub\(account\.accountIdHex\),\s*npub\(account\.accountIdHex\)""",

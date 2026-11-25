@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -80,15 +81,14 @@ class ChatBubbleColorsScreenBehaviorTest {
         }
     }
 
-    /** The overflow menu's reset clears both drafts; Save then removes the stored colours. */
+    /** The inline Reset below the pickers clears both drafts; Save then removes the stored colours. */
     @Test
-    fun menuResetClearsBothSides() {
+    fun inlineResetClearsBothSides() {
         appState.updateGlobalBubbleColor(BubbleTheme.Light, BubbleSide.Mine, 0xFFB91C1CL)
         appState.updateGlobalBubbleColor(BubbleTheme.Light, BubbleSide.Other, 0xFF6D28D9L)
         show()
         composeRule.onNode(swatch("#B91C1C", "mine")).assertIsSelected()
-        composeRule.onNodeWithTag("bubble_colors.menu").performClick()
-        composeRule.onNodeWithText("Reset to default").performClick()
+        composeRule.onNodeWithTag("bubble_colors.reset").performScrollTo().performClick()
         composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
         composeRule.runOnIdle {
             assertNull(appState.globalBubbleColorArgb(BubbleTheme.Light, BubbleSide.Mine))
@@ -96,17 +96,20 @@ class ChatBubbleColorsScreenBehaviorTest {
         }
     }
 
-    /** A chat override starts from the account defaults with no overflow; a draft brings the per-chat reset. */
+    /** A chat override starts from the account defaults with no Reset; a draft brings the per-chat Reset. */
     @Test
     fun chatOverrideInheritsDefaultsAndShowsResetOnlyWithADraft() {
         appState.updateGlobalBubbleColor(BubbleTheme.Light, BubbleSide.Mine, 0xFFB91C1CL)
         show(groupIdHex = "group-1")
         composeRule.onNode(swatch("#B91C1C", "mine")).assertIsSelected()
-        composeRule.onNodeWithTag("bubble_colors.menu").assertDoesNotExist()
+        composeRule.onNodeWithTag("bubble_colors.reset").assertDoesNotExist()
         composeRule.onNode(swatch("#0E7490", "other")).performScrollTo().performClick()
-        composeRule.onNodeWithTag("bubble_colors.menu").performClick()
-        composeRule.onNodeWithText("Reset to global colors").performClick()
-        composeRule.onNodeWithTag("bubble_colors.menu").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("bubble_colors.reset")
+            .performScrollTo()
+            .assertTextEquals("Reset to global colors")
+            .performClick()
+        composeRule.onNodeWithTag("bubble_colors.reset").assertDoesNotExist()
         composeRule.onNodeWithTag("bubble_colors.save").assertIsNotEnabled()
     }
 
@@ -173,8 +176,7 @@ class ChatBubbleColorsScreenBehaviorTest {
 
         composeRule.onNode(swatch("#B91C1C", "mine")).assertIsSelected()
         composeRule.onNode(swatch("#15803D", "other")).assertIsSelected()
-        composeRule.onNodeWithTag("bubble_colors.menu").performClick()
-        composeRule.onNodeWithText("Reset to global colors").performClick()
+        composeRule.onNodeWithTag("bubble_colors.reset").performScrollTo().performClick()
         composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
 
         composeRule.runOnIdle {

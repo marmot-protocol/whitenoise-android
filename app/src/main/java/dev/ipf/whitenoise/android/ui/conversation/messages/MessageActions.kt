@@ -163,7 +163,7 @@ internal fun MessageActionMenu(
                 canSave = canSave,
                 canInfo = canInfo,
                 canReport = canReport,
-            )
+            ).let(::messageActionMenuOrder)
         }
     val labeledActions: List<Pair<MessageActionKind?, String>> =
         buildList {
@@ -190,6 +190,7 @@ internal fun MessageActionMenu(
                 // Forward transfers ownership to a picker above the still-open menu.
                 dismissBeforeActivation = kind != MessageActionKind.Forward,
                 destructive = kind == null,
+                firstLevel = isFirstLevelMessageAction(kind),
                 icon = { MessageActionIcon(kind) },
                 explanation = Explanation(label, stringResource(messageActionExplanationRes(kind))),
                 onClick = {

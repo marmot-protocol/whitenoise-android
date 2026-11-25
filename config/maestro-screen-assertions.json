@@ -2826,14 +2826,14 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         }
@@ -2846,22 +2846,22 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         }
@@ -3100,7 +3100,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
@@ -3141,7 +3141,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
@@ -3545,7 +3545,7 @@
           "selector": {
             "id": "bubble_colors.mine.picker"
           },
-          "scope": "Save both colors, Reset to default through overflow, Save and reopen with both brand defaults under their own picker ancestors. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup remains required."
+          "scope": "Save both colors, inline Reset to default, Save and reopen with both brand defaults under their own picker ancestors. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup remains required."
         },
         {
           "case": "preferences-bubble-colors-cancel",
@@ -3594,7 +3594,7 @@
           "selector": {
             "id": "bubble_colors.mine.picker"
           },
-          "scope": "Invalidate both bubble fields, Reset through overflow and verify both default payloads. Change only mine to valid: enabled Save proves both stale invalid flags cleared. Back/reopen retains both defaults. UI reopening only; no process-death or cross-account proof. Generation-private preference cleanup remains required."
+          "scope": "Invalidate both bubble fields, inline Reset and verify both default payloads. Change only mine to valid: enabled Save proves both stale invalid flags cleared. Back/reopen retains both defaults. UI reopening only; no process-death or cross-account proof. Generation-private preference cleanup remains required."
         }
       ]
     },
@@ -5686,38 +5686,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
-      "symbol": "SignInKeyField",
-      "bindings": [
-        {
-          "case": "presentation-modal-scan-invalid",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
-          }
-        },
-        {
-          "case": "presentation-modal-scan-public",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
-          }
-        }
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
       "symbol": "SignInContent",
       "bindings": [
@@ -6086,25 +6054,6 @@
           },
           "opened_by": {
             "text": "Export Private Key"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-      "symbol": "ChatBubbleColorEditor",
-      "bindings": [
-        {
-          "case": "preferences-bubble-colors-reset",
-          "selector": {
-            "text": "Reset to default"
-          },
-          "scope": "Actual bubble color overflow Reset is opened and dispatched; subsequent Save/reopen asserts scoped default values with generation-private cleanup.",
-          "entry_assertion": {
-            "text": "Reset to default"
-          },
-          "opened_by": {
-            "id": "bubble_colors.menu"
           }
         }
       ]
@@ -6485,9 +6434,9 @@
           "selector": {
             "text": "German"
           },
-          "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
+          "scope": "Audited production owner and distinctive asserted child; Translate settings opens it from its Target language link row. Controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
-            "text": "Target language: English"
+            "id": "translation.target"
           },
           "entry_assertion": {
             "text": "Search languages"
@@ -6552,6 +6501,19 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
       "symbol": "TranslationLanguagePickerSheet",
       "bindings": [
+        {
+          "case": "settings-translation",
+          "selector": {
+            "text": "German"
+          },
+          "scope": "Translate settings' Target language row opens the production language sheet and its distinctive search field and German choice are asserted; real engine and launcher proof remain separately qualified.",
+          "opened_by": {
+            "id": "translation.target"
+          },
+          "entry_assertion": {
+            "text": "Search languages"
+          }
+        },
         {
           "case": "presentation-modal-translation-composer",
           "selector": {

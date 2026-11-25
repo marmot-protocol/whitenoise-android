@@ -104,7 +104,7 @@ class KeyPackagesDeletionFlowTest {
         )
         waitForLoads(1, loads)
 
-        composeRule.onNodeWithText(context.getString(R.string.refresh)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.refresh)).performClick()
         waitForLoads(2, loads)
 
         composeRule.onNodeWithText(IdentityFormatter.short(target.keyPackageId)).assertExists()
@@ -131,7 +131,7 @@ class KeyPackagesDeletionFlowTest {
 
         inventory = listOf(refreshed)
         failRelayHistory = true
-        composeRule.onNodeWithText(context.getString(R.string.refresh)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.refresh)).performClick()
 
         composeRule.onNodeWithText(IdentityFormatter.short(refreshed.keyPackageId)).assertExists()
         composeRule.onNodeWithText(IdentityFormatter.short(initial.keyPackageId)).assertDoesNotExist()
