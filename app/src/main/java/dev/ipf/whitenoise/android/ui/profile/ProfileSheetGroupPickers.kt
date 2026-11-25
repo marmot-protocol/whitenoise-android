@@ -165,7 +165,8 @@ internal fun ProfileAddToGroupsContent(
                                 value = query,
                                 onValueChange = { query = it },
                                 placeholder = stringResource(R.string.forward_search_chats),
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                                modifier =
+                                    Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceMd),
                             )
                         }
                     }

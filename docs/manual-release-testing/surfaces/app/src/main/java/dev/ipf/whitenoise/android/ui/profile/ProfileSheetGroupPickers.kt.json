@@ -43,7 +43,8 @@
         "anchor": "fun ProfileAddToGroupsContent(",
         "test_ids": [
           "ACC-002",
-          "GRP-034"
+          "GRP-034",
+          "NCH-001"
         ]
       },
       {
