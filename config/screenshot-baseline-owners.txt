@@ -4,8 +4,10 @@
 # must have a registered owner; every capturing class must be selected or declared
 # `diagnostic:` when it owns no committed golden. The tooling validator checks
 # ownership, and both full-unit CI suites verify and prove every golden compared.
-# CI runs the complete suites, not these filters. Mixed-purpose classes list only
-# their golden-producing methods to support focused local regeneration.
+# Full CI runs the complete suites; PR prechecks run only these filters to verify
+# the Zapstore goldens and fail if any committed golden goes uncompared, so a
+# missing method fails the PR. Mixed-purpose classes list only their
+# golden-producing methods, which also supports focused local regeneration.
 
 *ScreenshotTest
 
@@ -48,6 +50,7 @@
 *.ComposerAttachmentMenuTest.nativeCommandSurfaceMatchesPrototypeAndRetainsAdditionalSources
 *.ComposerAttachmentMenuTest.raisedAttachmentButtonKeepsPollReachableByTouchScrolling
 *.ComposerAttachmentMenuTest.raisedAttachmentButtonKeepsPollReachableWithLargeRtlText
+*.ComposerAttachmentMenuTest.unpinnedTextActionsFollowSourcesAndDismissOnce
 *.ComposerAttachmentShelfTest.utilityShelfKeepsFilenameAndRemovalAtLargeTextInRtl
 *.ComposerAttachmentShelfTest.visualShelfUsesPrototypeCardGeometryAndIndependentActions
 *.ComposerAttachmentShelfTest.supportedDocumentsOpenAndRemovalDoesNotOpen
@@ -60,6 +63,11 @@
 *.ComposerCompactResizeTargetsTest.downwardEntryReachesAllTrailingActionsRtl
 *.ComposerCompactResizeTargetsTest.downwardEntrySkipsLeadingVoiceOnlyLtr
 *.ComposerCompactResizeTargetsTest.downwardEntrySkipsLeadingVoiceOnlyRtl
+*.ComposerCompactResizeTargetsTest.compactRowWithRoomShowsTheTopJump
+*.ComposerCompactResizeTargetsTest.doubleFontCompactRowKeepsCoreToolsAtBottomLtr
+*.ComposerCompactResizeTargetsTest.doubleFontCompactRowKeepsCoreToolsAtBottomRtl
+*.ComposerCompactResizeTargetsTest.doubleFontCompactRowKeepsCoreToolsAtTopLtr
+*.ComposerCompactResizeTargetsTest.doubleFontCompactRowKeepsCoreToolsAtTopRtl
 *.ComposerEmojiLibraryActionsTest.paneActionsLight
 *.ComposerEmojiLibraryActionsTest.paneActionsLargeRtlDark
 *.ComposerEmojiPaneEditingLayoutCoverageTest
@@ -129,6 +137,7 @@
 *.MediaPreviewThemeTest
 *.MessageActionMenuLayoutTest.literalCodeMenuIsAccessibleWithLargeRtlText
 *.MessageActionMenuLayoutTest.shareActionHasDeterministicMenuPresentation
+*.MessageActionMenuLayoutTest.showLessDispatchesFromTheAccessibleMenu
 *.MessageBubbleEditedMarkdownTest.activeEditedMarkdownKeepsMarkdownWhileHighlighting
 *.MessageBubbleEditedMarkdownTest.editedMarkdownStaysRenderedDuringTextSelection
 *.MessageBubbleEditedMarkdownTest.normalEditedMarkdownRendersWithoutActiveTts
@@ -153,6 +162,7 @@
 *.TimelineRowTwoMemberGroupChromeTest.twoMemberNamedGroupCompactRtlAmoledLargeFont
 *.TranscriptEdgeFadeRenderTest.aTranscriptParkedMidHistoryDissolvesAtBothEdges
 *.TtsSentenceAccessibilityTest.duplicateOriginalTextChoosesTheSecondRevisionScopedSentence
+*.TtsSentenceAccessibilityTest.chooserPagesOnToSentencesBeyondTheFirstPage
 *.TtsTrustWarningScreenshotTest.readAloudTrustWarningAmoled
 *.VoiceReviewRecoveryTest.finalizedReviewRecreationShowsUnavailableNoticeAndExplicitRecordAgain
 
@@ -165,6 +175,7 @@
 *.ComposerDragAndReadingTest.narrowLargeRtlDraftRetainsUsableMinimumAndTopAction
 *.ComposerDragAndReadingTest.narrowEditedDraftKeepsNavigationAndCancelUsable
 *.ComposerDraftJumpShortcutTest.jumpsShareTheToolbarRowAndFollowTheScrollEdges
+*.ComposerDraftJumpShortcutTest.arrangementPreviewShowsBothJumps
 *.GroupDetailsNotificationControlsTest
 
 *.GroupMemberIdentitySearchUiTest.seeAllFindsPublicIdentityWithoutMetadataAndClearRestoresRoster
