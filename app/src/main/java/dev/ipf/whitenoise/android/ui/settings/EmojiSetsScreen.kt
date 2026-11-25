@@ -287,7 +287,7 @@ private fun EmojiSetPreview(
         }
         items(set.emoji, key = { it.shortcode }) { emoji ->
             Column(
-                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
                 verticalArrangement = Arrangement.spacedBy(EmojiSetEntrySpacing),
             ) {
                 Text(":${emoji.shortcode}:", style = MaterialTheme.typography.bodyLarge)
