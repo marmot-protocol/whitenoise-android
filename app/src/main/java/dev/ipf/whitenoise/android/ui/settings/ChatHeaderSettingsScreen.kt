@@ -43,6 +43,7 @@ internal fun ChatHeaderSettingsContent(
         HeaderShortcut.entries.filter {
             it != HeaderShortcut.ReadAloud || readAloudAvailable || it in shortcuts
         }
+    val orderingHint = stringResource(R.string.header_shortcuts_hint)
     SettingsScaffold(title = stringResource(R.string.header_shortcuts_title), onBack = onBack) {
         SettingsList {
             item(key = "search.ChatHeaderSettings.1") {
@@ -57,15 +58,12 @@ internal fun ChatHeaderSettingsContent(
                                 checked,
                                 { onToggle(shortcut) },
                                 modifier = Modifier.testTag("chatHeader.${shortcutRow.key}"),
-                                explanation = stringResource(shortcutRow.explanationRes),
+                                explanation = stringResource(shortcutRow.explanationRes) + "\n\n" + orderingHint,
                                 leading = { SettingsLeadingIcon(shortcutRow.iconRes) },
                             )
                         }
                     }
                 }
-            }
-            item(key = "search.ChatHeaderSettings.2") {
-                SettingsCallout(text = stringResource(R.string.header_shortcuts_hint))
             }
         }
     }

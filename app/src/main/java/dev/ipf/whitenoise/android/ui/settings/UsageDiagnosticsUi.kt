@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -34,9 +36,9 @@ import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
 import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -98,11 +100,10 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
         Text(stringResource(R.string.usage_diagnostics_loading), style = MaterialTheme.typography.bodySmall)
     }
     if (state.failed) {
-        Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-        TextButton(
-            enabled = !state.busy,
-            onClick = { appState.launchMutation { appState.retryUsageDiagnostics() } },
-        ) { Text(stringResource(R.string.retry)) }
+        UsageDiagnosticsFailure(
+            busy = state.busy,
+            retry = { appState.launchMutation { appState.retryUsageDiagnostics() } },
+        )
     }
 }
 
@@ -192,9 +193,8 @@ private fun DiagnosticsCloseFailure(
     retry: () -> Unit,
 ) {
     if (failed) {
-        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
-            Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-            TextButton(enabled = !busy, onClick = retry) { Text(stringResource(R.string.retry)) }
+        Box(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+            UsageDiagnosticsFailure(busy = busy, retry = retry)
         }
     }
 }
@@ -215,7 +215,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
             .padding(bottom = WhiteNoiseSpacing.Section)
             .fadingVerticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
@@ -303,7 +303,29 @@ private fun IndependentAuditLogChoice(
         },
     )
     if (failed) {
-        Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
+        WhiteNoiseCallout(
+            text = stringResource(R.string.usage_diagnostics_error),
+            icon = R.drawable.ic_error,
+            isError = true,
+        )
+    }
+}
+
+/** The failed usage-diagnostics read or save, with the Retry that re-runs it. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun UsageDiagnosticsFailure(
+    busy: Boolean,
+    retry: () -> Unit,
+) {
+    WhiteNoiseCallout(
+        text = stringResource(R.string.usage_diagnostics_error),
+        icon = R.drawable.ic_error,
+        isError = true,
+    ) {
+        TextButton(enabled = !busy, onClick = retry, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.retry))
+        }
     }
 }
 

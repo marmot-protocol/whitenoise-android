@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.os.Build
-import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -64,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.rememberCopyConfirmation
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -202,13 +200,17 @@ internal fun SettingsList(
 /** Section label above a settings group at the 32 dp heading line, announced as a heading. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsSection(title: String) {
+internal fun SettingsSection(
+    title: String,
+    explanation: String? = null,
+) {
     Text(
         text = title,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .semantics { heading() }
+                .explainOnLongPress(explanation?.let { Explanation(title, it) })
                 .padding(
                     start = WhiteNoiseSpacing.SettingsSectionInset,
                     end = WhiteNoiseSpacing.SettingsSectionInset,
@@ -243,7 +245,7 @@ internal fun SettingsExplainer(text: String) {
 @Composable
 internal fun SettingsVersionFooter(versionName: String) {
     val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
+    val confirmCopied = rememberCopyConfirmation()
     val copyLabel = stringResource(R.string.copy)
     Box(
         modifier =
@@ -261,9 +263,7 @@ internal fun SettingsVersionFooter(versionName: String) {
                             ),
                         ),
                     )
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-                    }
+                    confirmCopied()
                 }.padding(WhiteNoiseSpacing.CompactScreenMargin)
                 .testTag("settings.version_footer"),
         contentAlignment = Alignment.Center,

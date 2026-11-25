@@ -165,7 +165,6 @@ internal fun DataUsageScreen(
                     }
                 }
             }
-            item(key = "search.DataUsage.3") { SettingsExplainer(stringResource(R.string.download_rules_help)) }
             item(key = "search.DataUsage.4") { SettingsSection(stringResource(R.string.download_queue)) }
             item(key = "search.DataUsage.5") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.queue")) {
@@ -201,15 +200,14 @@ internal fun DataUsageScreen(
                             title = stringResource(R.string.download_quality),
                             onClick = { qualityPicker = true },
                             value = qualityLabels.getValue(appState.mediaQuality),
-                            explanation = stringResource(R.string.explanation_privacy_data_quality),
+                            explanation =
+                                stringResource(R.string.explanation_privacy_data_quality) + "\n\n" +
+                                    stringResource(R.string.media_quality_footer) + "\n\n" +
+                                    stringResource(R.string.download_quality_help),
                             leading = { SettingsLeadingIcon(R.drawable.ic_high_quality) },
                         )
                     }
                 }
-            }
-            item(key = "search.DataUsage.8") {
-                SettingsExplainer(stringResource(R.string.download_quality_help))
-                SettingsExplainer(stringResource(R.string.media_quality_footer))
             }
             item(key = "search.DataUsage.9") {
                 SettingsGroup {

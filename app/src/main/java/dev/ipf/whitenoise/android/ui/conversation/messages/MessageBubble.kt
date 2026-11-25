@@ -494,19 +494,23 @@ internal fun MessageBubble(
         }
     }
 
-    /** Registers the plain-text leaf for selection once both its layout and its position are known. */
-    fun reportPlainTextLayoutIfReady() {
-        val layoutResult = textLayouts.plainTextLayoutTracker.layoutResult ?: return
-        val coordinates = textLayouts.plainTextLayoutTracker.coordinates ?: return
-        textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
-    }
+    val textSelection =
+        rememberMessageBubbleTextSelection(
+            textLayouts = textLayouts,
+            inputs =
+                MessageBubbleTextSelection.Inputs(
+                    deleted = deleted,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                ),
+        )
 
     val composerSendMotion = LocalComposerSendMotion.current
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
             composerSendMotion?.destinationText(item.presentationId, coordinates)
             textLayouts.plainTextLayoutTracker.coordinates = coordinates
-            reportPlainTextLayoutIfReady()
+            textSelection.reportPlainTextLayoutIfReady()
         }
     val textSelectionBoundsModifier =
         if (textSelectionMode) {
@@ -1003,15 +1007,6 @@ internal fun MessageBubble(
             }
         }
 
-    /** Enters text selection for this message with a cleared layout registry, closing the action menu. */
-    fun beginTextSelection() {
-        if (deleted) return
-        textLayouts.selectableTextLayouts.clear()
-        textLayouts.textSelectionSeeded = false
-        onActionMenuOpenChange(false)
-        onTextSelectionModeChange(true)
-    }
-
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
     val bubbleMedia = rememberBubbleMedia(messageAttachments, pendingAttachmentsForRecord)
     val mediaCaption =
@@ -1079,18 +1074,6 @@ internal fun MessageBubble(
             record.sticker == null
 
     /**
-     * Whether a press lands on this bubble's rendered text rather than a link, the row's empty width or its
-     * chrome, so a double tap there may edit without stealing a link's own activation.
-     */
-    fun ordinaryTextHitAt(pressInWindow: Offset): Boolean =
-        !markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow) &&
-            renderedTextHitAtWindowPosition(
-                textLayouts.selectableTextLayouts.snapshot(),
-                pressInWindow,
-                requireTextLineHit = true,
-            ) != null
-
-    /**
      * Double-tapping the ordinary text of your own editable message opens it for editing (#3388). While this
      * conversation's read-aloud session is active the same gesture keeps seeking there, and other messages seek or
      * start read-aloud as before.
@@ -1100,7 +1083,9 @@ internal fun MessageBubble(
         when {
             pressInWindow == null -> Unit
             canEditMessage && !readAloud.ownsActiveReadAloud() ->
-                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) messageActions.beginEdit()
+                if (recentPressesOnLink.none { it } && textSelection.ordinaryTextHitAt(pressInWindow)) {
+                    messageActions.beginEdit()
+                }
             else -> readAloud.seekSpeakAloudAt(pressInWindow)
         }
     }
@@ -2088,7 +2073,7 @@ internal fun MessageBubble(
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
                     composerSendMotion?.destinationLayout(item.presentationId, it)
                     textLayouts.plainTextLayoutTracker.layoutResult = it
-                    reportPlainTextLayoutIfReady()
+                    textSelection.reportPlainTextLayoutIfReady()
                 }
 
                 /** Wraps the message text in a selection container while text selection mode is active. */
@@ -2652,7 +2637,7 @@ internal fun MessageBubble(
                     },
                     onShare = ::shareMessage,
                     onSave = ::saveAttachments,
-                    onSelectText = ::beginTextSelection,
+                    onSelectText = textSelection::beginTextSelection,
                     onForward = messageActions::beginForward,
                     onSelect = {
                         if (batchSelectable && !actionsReadOnly) {

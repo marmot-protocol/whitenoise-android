@@ -296,11 +296,10 @@ private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
                 Text(stringResource(R.string.usage_diagnostics_loading), style = MaterialTheme.typography.bodySmall)
             }
             if (state.failed) {
-                Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-                TextButton(
-                    enabled = !state.busy,
-                    onClick = { appState.launchMutation { appState.retryUsageDiagnostics() } },
-                ) { Text(stringResource(R.string.retry)) }
+                UsageDiagnosticsFailure(
+                    busy = state.busy,
+                    retry = { appState.launchMutation { appState.retryUsageDiagnostics() } },
+                )
             }
         }
     }

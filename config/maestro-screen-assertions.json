@@ -5198,11 +5198,11 @@
         {
           "case": "presentation-modal-departure-review-abandon",
           "selector": {
-            "text": "Abandon the selected chats on this device\\?"
+            "text": "Abandon chats on this device\\?"
           },
           "scope": "Actual bulk abandonment review with group, direct chat and acting-account identities, Cancel/Back/reopen and bounded confirm; the batch progress and native forget remain separate.",
           "entry_assertion": {
-            "text": "Abandon the selected chats on this device\\?"
+            "text": "Abandon chats on this device\\?"
           },
           "visible_on_entry": true
         }
@@ -5548,11 +5548,11 @@
         {
           "case": "presentation-modal-group-control-reset",
           "selector": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "scope": "Actual reset dialog Cancel/Back/reopen and bounded reset dispatch; direct/invitation/busy guards have separate cases, no history or encryption deletion.",
           "entry_assertion": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "opened_by": {
             "text": "Reset and wait for a new invite"
@@ -5567,11 +5567,11 @@
         {
           "case": "presentation-modal-group-control-reset",
           "selector": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "scope": "The shared single-chat abandonment review opened from the group reset control; the same reset fixture covers its Cancel/Back/reopen and bounded confirm dispatch, no history or encryption deletion.",
           "entry_assertion": {
-            "text": "Reset this group on this device\\?"
+            "text": "Reset this group\\?"
           },
           "opened_by": {
             "text": "Reset and wait for a new invite"
@@ -7174,6 +7174,22 @@
         }
       ],
       "remaining": "Video mode, recording, the microphone prompt and a real capture need a camera-backed emulator; ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "symbol": "LearnWhiteNoiseScreen",
+      "bindings": [
+        {
+          "case": "settings-help-support",
+          "selector": {
+            "text": "Share your profile"
+          },
+          "scope": "Help hub navigation to the first visible control.",
+          "opened_by": {
+            "text": "Learn White Noise"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",

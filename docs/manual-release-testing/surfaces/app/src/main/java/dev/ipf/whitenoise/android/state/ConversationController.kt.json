@@ -306,14 +306,6 @@
         ]
       },
       {
-        "surface": "Reviewed group action context: R.string.edit_group_info_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.edit_group_info_title",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.group_action_add_members",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.group_action_add_members",

@@ -1,10 +1,17 @@
-# Serial Android merge queue
+# Android merge queue
 
-A serial GitHub merge queue tests the reviewed PR against the current `master`
-while preserving the source heads of remaining PRs. Up to five reviewed
-PRs can queue: one active front and four waiting entries. One candidate is built
-and merged at a time. After a merge, the next front needs fresh qualification
-against its new base and integration commit while keeping its source head.
+The GitHub merge queue on `master` builds up to three entries at once and merges
+one at a time (squash, `ALLGREEN`, minimum one entry, no grouping wait, 120-minute
+check timeout). Each entry is tested on top of `master` and every entry ahead of
+it, so it is the combination that must pass. When an entry fails or no longer
+merges cleanly, it leaves the queue and the entries behind it rebuild without
+it. Its author rebases, fixes and requeues it.
+
+Most queue failures come from PRs that passed alone but clash with what lands
+ahead of them: textual conflicts, screenshot baselines made stale by a shared
+UI change, and the source file size ratchet. Before queueing, rebase onto the
+current `master`, re-record affected screenshots and check the combination with
+the entries already queued. Queue overlapping UI series one PR at a time.
 
 ## CI contract
 
@@ -29,6 +36,10 @@ The existing required aggregate check remains
 `Compile, test, ktlint, detekt, Android lint`.
 
 ## Authorization contract
+
+The serial authorization below is not active. The live ruleset requires only
+the Android aggregate check, and the policy's serial configuration (one entry
+built at a time) no longer matches the queue. The text records the design.
 
 `scripts/whitenoise_android_serial_queue.py` is the pure policy used by the
 external watchdog. It computes the next action; the adapter supplies
