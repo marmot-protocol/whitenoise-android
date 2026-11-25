@@ -269,9 +269,7 @@ internal class AccountSetupCoordinator(
                         onCancelled = { app.launchMutation { if (generation == token) later() } },
                         // Only new recoveries count; the current generation is the network this screen opened on.
                         connectivityRestored = app.validatedConnectivityRecoveryGeneration.drop(1),
-                        automaticRetryAllowed = {
-                            app.appInForeground && !app.appLock.screenVisible && !app.appLock.evaluationPending
-                        },
+                        automaticRetryAllowed = { app.appLock.foregroundWorkAllowed },
                     )
                 if (app.phase == AppPhase.Bootstrapping) onPhaseChange(AppPhase.Onboarding)
             }

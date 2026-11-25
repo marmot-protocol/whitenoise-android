@@ -41,7 +41,7 @@ internal interface AccountSetupClient {
     /** Dispatches a user decision with its reviewed proposal data and revision. */
     suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi?
 
-    /** Rechecks the exact failed checkpoint and serializes the automatic retry with other native setup commands. */
+    /** Rechecks the failed checkpoint and foreground eligibility before issuing a serialized native retry. */
     suspend fun retryFailedCheck(
         request: SetupRequest,
         stillAllowed: () -> Boolean,
@@ -156,11 +156,13 @@ internal class MarmotAccountSetupClient(
         stillAllowed: () -> Boolean,
     ): OnboardingSnapshotFfi? =
         withLifetime {
-            val latest = snapshot()
-            if (stillAllowed() && latest?.allowsAutomaticRetry(account, request) == true) {
-                withContext(Dispatchers.IO) { defaults.advance(marmot.retryOnboardingStep(account, request.step)) }
-            } else {
-                latest
+            withContext(Dispatchers.IO) {
+                val latest = marmot.onboardingSnapshot(account)
+                if (latest?.allowsAutomaticRetry(account, request) == true && stillAllowed()) {
+                    defaults.advance(marmot.retryOnboardingStep(account, request.step))
+                } else {
+                    latest
+                }
             }
         }
 

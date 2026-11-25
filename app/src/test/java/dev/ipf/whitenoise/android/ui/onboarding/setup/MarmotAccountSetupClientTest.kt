@@ -120,6 +120,29 @@ class MarmotAccountSetupClientTest {
             assertEquals(listOf("reattach-signer", "retryOnboardingStep"), calls)
         }
 
+    /** Rechecks foreground eligibility after dispatching to IO and before entering native retry. */
+    @Test
+    fun automaticRetryChecksEligibilityOnTheNativeDispatcher() =
+        runTest {
+            val caller = Thread.currentThread()
+            val failed = inboxDiscoveryIncompleteSnapshot()
+            val request = checkNotNull(AccountSetupState(snapshot = failed).retryableCheckRequest())
+            val calls = mutableListOf<String>()
+            val marmot = nativeBoundary(failed) { name, _ -> calls += name }
+            val client = MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}
+
+            val result = client.retryFailedCheck(request) {
+                assertTrue(Thread.currentThread() !== caller)
+                false
+            }
+            assertEquals(failed, result)
+            assertEquals(listOf("onboardingSnapshot"), calls)
+            calls.clear()
+
+            client.retryFailedCheck(request) { true }
+            assertEquals(listOf("onboardingSnapshot", "retryOnboardingStep"), calls)
+        }
+
     /** Checks that native approval receives the revision the user actually reviewed. */
     @Test
     fun approvalForwardsTheRenderedProposalRevision() =
@@ -209,11 +232,15 @@ class MarmotAccountSetupClientTest {
         }
 
     /** Builds a strict proxy that records the native method and arguments under test. */
-    private fun nativeBoundary(onCall: (String, Array<out Any?>) -> Unit): MarmotInterface {
+    private fun nativeBoundary(
+        snapshot: OnboardingSnapshotFfi =
+            setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)),
+        onCall: (String, Array<out Any?>) -> Unit,
+    ): MarmotInterface {
         val nativeType = MarmotInterface::class.java
         return Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { _, method, arguments ->
             onCall(method.name.substringBefore('-'), arguments.orEmpty())
-            setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
+            snapshot
         } as MarmotInterface
     }
 }
