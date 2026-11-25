@@ -8,15 +8,15 @@ import kotlinx.coroutines.withContext
 /** Stops at the first account with native push on, and a failed read only counts when no account needs it. */
 internal suspend fun NotificationDeliveryController.nativePushDemand(accountRefs: List<String>): NativePushDemand {
     val pendingDisables = withContext(pushWakeStorageDispatcher) { pushTokenStore.pendingDisables() }
-    var unreadable = false
+    val unreadAccounts = mutableListOf<String>()
     for (account in accountRefs) {
         val settings = runCatchingCancellable { host.marmotIo { notificationSettings(account) } }.getOrNull()
         when {
-            settings == null -> unreadable = true
+            settings == null -> unreadAccounts += account
             settings.nativePushEnabled && account !in pendingDisables -> return NativePushDemand.Required
         }
     }
-    return if (unreadable) NativePushDemand.Unknown else NativePushDemand.None
+    return if (unreadAccounts.isEmpty()) NativePushDemand.None else NativePushDemand.Unknown
 }
 
 /**

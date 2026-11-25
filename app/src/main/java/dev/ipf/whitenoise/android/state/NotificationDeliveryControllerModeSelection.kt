@@ -72,13 +72,10 @@ internal suspend fun NotificationDeliveryController.selectFcmDelivery(
     owner: NotificationDeliveryModeOwner,
     explicit: Boolean = false,
 ): Boolean {
-    var selected = false
-    try {
-        selected = selectFcmTransport(owner, explicit)
-        return selected
-    } finally {
-        if (!selected) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
-    }
+    // runCatching also holds a cancellation, so the settle runs before getOrThrow rethrows it.
+    val selected = runCatching { selectFcmTransport(owner, explicit) }
+    if (selected.getOrNull() != true) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
+    return selected.getOrThrow()
 }
 
 /** Registers every notification-enabled account before the device-wide persistent path is stopped. */
