@@ -31,9 +31,9 @@ import kotlin.math.floor
  * calls the same handler as its chat details action. A null handler hides its button: [muteControl] and
  * [readAloudOn] while the chat's account is not the active one (and [readAloudOn] without a usable speech
  * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Buttons
- * use the composer's compact pitch, so their 48dp touch targets overlap the same way and more fit beside the
- * title. Only the first [capacity] buttons that can show appear, so the chat name always keeps its room; see
- * [headerShortcutCapacity].
+ * use the composer's compact 36 dp pitch, so more fit beside the title, and each takes taps across its own
+ * 36 by 48 dp cell rather than a full 48 dp square. Only the first [capacity] buttons that can show appear,
+ * so the chat name always keeps its room; see [headerShortcutCapacity].
  */
 @Composable
 internal fun RowScope.ConversationHeaderShortcuts(

@@ -21,6 +21,8 @@ private const val COMPOSER_PACKAGE = "conversation/composer/"
 private val clickModifier =
     Regex("""\.(clickable|combinedClickable|toggleable|selectable|triStateToggleable)\s*([({])""")
 private val noIndication = Regex("""indication\s*=\s*null""")
+private val replacementIndication = Regex("""\.(indication|pressFeedbackInsideClip|shapedPressFeedback)\s*\(""")
+private val thenOpen = Regex("""\.\s*then\s*$""")
 private val chainedCall = Regex("""\s*\.\s*(\w+)\s*([({])""")
 private val trailingLambda = Regex("""[ \t]*\{""")
 private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
@@ -57,10 +59,11 @@ internal fun shapedTouchFindings(
     path: String = "",
 ): List<String> {
     val code = blankCommentsAndStrings(source)
+    val drawn = code.indicatedSources()
     return (
-        code.clicksBeforeClip() + code.clicksInShapedSurfaces() + code.clickableBoxesAroundRoundChildren() +
-            code.clicksOnRoundComponents() + code.stretchedIconButtons(path) + code.clicksOverShapedFills() +
-            code.clicksOnBareGlyphs()
+        code.clicksBeforeClip(drawn) + code.clicksInShapedSurfaces(drawn) +
+            code.clickableBoxesAroundRoundChildren(drawn) + code.clicksOnRoundComponents(drawn) +
+            code.stretchedIconButtons(path) + code.clicksOverShapedFills(drawn) + code.clicksOnBareGlyphs(drawn)
     ).sortedBy { it.second }.map { (kind, offset) -> "$kind @${code.lineAt(offset)}" }
 }
 
@@ -68,7 +71,7 @@ internal fun shapedTouchFindings(
  * Rule 2: a click modifier with its own highlight, followed in the same chain by a clip that is not a
  * rectangle, directly or inside `.then(…)`.
  */
-private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
+private fun String.clicksBeforeClip(drawn: Set<String>): List<Pair<String, Int>> =
     clickModifier
         .findAll(this)
         .filter { match ->
@@ -81,7 +84,7 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
                 } else {
                     close
                 }
-            !noIndication.containsMatchIn(substring(open + 1, close)) &&
+            !substring(open + 1, close).hasReplacedIndication(drawn) &&
                 chainAfter(callEnd).any { (name, args) ->
                     (name == "clip" && "RectangleShape" !in args) || (name == "then" && args.hasShapedClip())
                 }
@@ -92,16 +95,17 @@ private fun String.clicksBeforeClip(): List<Pair<String, Int>> =
  * Rule 1: a click modifier in the `modifier` of a non-clickable Surface whose shape is not a rectangle, or
  * of a non-clickable card, whose default shape is rounded.
  */
-private fun String.clicksInShapedSurfaces(): List<Pair<String, Int>> =
-    calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null) } +
+private fun String.clicksInShapedSurfaces(drawn: Set<String>): List<Pair<String, Int>> =
+    calls("Surface").flatMap { shapedContainerClicks(it, defaultShape = null, drawn) } +
         cardDefaultShapes.flatMap { (card, defaultShape) ->
-            calls(card).flatMap { shapedContainerClicks(it, defaultShape) }
+            calls(card).flatMap { shapedContainerClicks(it, defaultShape, drawn) }
         }
 
 /** The click modifiers in one shaped container call's `modifier`, unless it is clickable itself or rectangular. */
 private fun shapedContainerClicks(
     call: Pair<Int, String>,
     defaultShape: String?,
+    drawn: Set<String>,
 ): List<Pair<String, Int>> {
     val (start, args) = call
     val named = topLevelNamedArguments(args)
@@ -112,24 +116,24 @@ private fun shapedContainerClicks(
     } else {
         // A clip before the click only shapes the highlight like the container when it uses the container's own
         // shape, which for a card with none named is its default.
-        args.undecoratedClicks(matching = shape.trim()).map { SHAPED_SURFACE to start + it }
+        args.undecoratedClicks(drawn, matching = shape.trim()).map { SHAPED_SURFACE to start + it }
     }
 }
 
 /** Rule 3: a clickable Box whose content draws a round or rounded shape without a shaped highlight. */
-private fun String.clickableBoxesAroundRoundChildren(): List<Pair<String, Int>> =
+private fun String.clickableBoxesAroundRoundChildren(drawn: Set<String>): List<Pair<String, Int>> =
     calls("Box").flatMap { (start, args) ->
         val lambda = trailingLambda.matchAt(this, start + args.length + 1)
         val body = lambda?.let { substring(it.range.last + 1, closingBracket(it.range.last)) }
         if (body != null && roundChild.containsMatchIn(body)) {
-            args.undecoratedClicks().map { ROUND_CHILD to start + it }
+            args.undecoratedClicks(drawn).map { ROUND_CHILD to start + it }
         } else {
             emptyList()
         }
     }
 
 /** Rule 4: a click modifier passed to an avatar or swatch, which clips itself only inside. */
-private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
+private fun String.clicksOnRoundComponents(drawn: Set<String>): List<Pair<String, Int>> =
     roundComponentCall
         .findAll(this)
         .filterNot { match ->
@@ -137,7 +141,8 @@ private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
             declaration.containsMatchIn(substring(maxOf(0, name - DECLARATION_LOOKBEHIND), name))
         }.flatMap { match ->
             val open = match.range.last
-            substring(open + 1, closingBracket(open)).undecoratedClicks().map { ROUND_COMPONENT to open + 1 + it }
+            val args = substring(open + 1, closingBracket(open))
+            args.undecoratedClicks(drawn).map { ROUND_COMPONENT to open + 1 + it }
         }.toList()
 
 /**
@@ -318,13 +323,13 @@ private fun String.functionContaining(offset: Int): Pair<String, String>? =
         }.lastOrNull()
 
 /** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
-private fun String.clicksOverShapedFills(): List<Pair<String, Int>> =
+private fun String.clicksOverShapedFills(drawn: Set<String>): List<Pair<String, Int>> =
     clickModifier
         .findAll(this)
         .filter { match ->
             val open = match.groups[2]!!.range.first
-            val before = chainBefore(match.range.first)
-            !noIndication.containsMatchIn(substring(open + 1, closingBracket(open))) &&
+            val before = ownChainBefore(match.range.first)
+            !substring(open + 1, closingBracket(open)).hasReplacedIndication(drawn) &&
                 !before.hasShapedClip() &&
                 shapedFill.findAll(before).any { fill ->
                     val fillArgs = before.substring(fill.range.last + 1, before.closingBracket(fill.range.last))
@@ -334,8 +339,8 @@ private fun String.clicksOverShapedFills(): List<Pair<String, Int>> =
         .toList()
 
 /** Rule 7: a click modifier on a bare Icon, whose highlight is a square around a glyph unless it is clipped. */
-private fun String.clicksOnBareGlyphs(): List<Pair<String, Int>> =
-    calls("Icon").flatMap { (start, args) -> args.undecoratedClicks().map { BARE_GLYPH to start + it } }
+private fun String.clicksOnBareGlyphs(drawn: Set<String>): List<Pair<String, Int>> =
+    calls("Icon").flatMap { (start, args) -> args.undecoratedClicks(drawn).map { BARE_GLYPH to start + it } }
 
 /** The modifier chain that ends at [end]: back to the start of its argument or assignment. */
 private fun String.chainBefore(end: Int): String {
@@ -354,16 +359,61 @@ private fun String.chainBefore(end: Int): String {
 }
 
 /**
- * Offsets, within this argument text, of click modifiers that draw their own highlight before a clip that
- * shapes it — any clip that is not a rectangle, or, given [matching], one to that very shape.
+ * The modifier chain that ends at [end], as [chainBefore], continued out of each `.then(…)` it sits in, so a
+ * clip earlier in the outer chain counts and one in a sibling argument or a content lambda does not.
  */
-private fun String.undecoratedClicks(matching: String? = null): List<Int> =
+private fun String.ownChainBefore(end: Int): String {
+    val start = end - chainBefore(end).length
+    val then = if (start > 0 && this[start - 1] == '(') thenOpen.find(substring(0, start - 1)) else null
+    return if (then == null) substring(start, end) else ownChainBefore(then.range.first) + substring(start, end)
+}
+
+/**
+ * The interaction sources whose press a modifier other than the click draws: the first argument of each
+ * `indication`, [pressFeedbackInsideClip] or [shapedPressFeedback] call in this text, and each source handed
+ * by name to a parameter that one of those watches, as a swatch's `pressSource = press`.
+ */
+private fun String.indicatedSources(): Set<String> {
+    val watched =
+        replacementIndication
+            .findAll(this)
+            .mapNotNull { match ->
+                val open = match.range.last
+                topLevelArguments(substring(open + 1, closingBracket(open))).firstOrNull()?.trim()
+            }.toSet()
+    val handedIn =
+        watched.flatMap { parameter ->
+            Regex("""(?<![\w.])${Regex.escape(parameter)}\s*=(?!=)\s*(\w+)\s*[,)\n]""")
+                .findAll(this)
+                .map { it.groupValues[1] }
+                .toList()
+        }
+    return watched + handedIn
+}
+
+/**
+ * Whether this click's argument text turns its own highlight off (`indication = null`) and hands its
+ * `interactionSource` to one of [drawn], which then draws the press in its place. A click with no highlight
+ * at all, or one whose replacement watches another source, does not count.
+ */
+private fun String.hasReplacedIndication(drawn: Set<String>): Boolean =
+    noIndication.containsMatchIn(this) && topLevelNamedArguments(this)["interactionSource"]?.trim() in drawn
+
+/**
+ * Offsets, within this argument text, of click modifiers whose highlight no shaped clip earlier in their own
+ * chain shapes — any clip that is not a rectangle, or, given [matching], one to that very shape — and that no
+ * modifier watching their interaction source replaces (see [hasReplacedIndication]).
+ */
+private fun String.undecoratedClicks(
+    drawn: Set<String>,
+    matching: String? = null,
+): List<Int> =
     clickModifier
         .findAll(this)
         .filter { match ->
             val open = match.groups[2]!!.range.first
-            !noIndication.containsMatchIn(substring(open + 1, closingBracket(open))) &&
-                !substring(0, match.range.first).hasShapedClip(matching)
+            !substring(open + 1, closingBracket(open)).hasReplacedIndication(drawn) &&
+                !ownChainBefore(match.range.first).hasShapedClip(matching)
         }.map { it.range.first }
         .toList()
 

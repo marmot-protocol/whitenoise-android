@@ -24,9 +24,10 @@ import org.junit.Test
  * 6. a click modifier after a round `background` or `border` in the same chain, with no clip,
  * 7. a click modifier on a bare `Icon`, whose highlight is a square around the glyph.
  *
- * A click that draws no highlight of its own (`indication = null`) or comes after a clip that is not a
- * rectangle passes. Audited exceptions live in [allowed] with the reason, and the counts are exact, so a
- * fixed site has to leave the list.
+ * A click passes when an earlier clip in its own modifier chain is not a rectangle, or when it turns its own
+ * highlight off (`indication = null`) and a modifier watching the same interaction source draws the press.
+ * Audited exceptions live in [allowed] with the reason, and the counts are exact, so a fixed site has to
+ * leave the list.
  */
 class ShapedTouchFeedbackCoverageTest {
     /** Every UI source passes the shape rules apart from the audited exceptions. */
@@ -118,6 +119,39 @@ class ShapedTouchFeedbackCoverageTest {
             listOf(STRETCHED_ICON_BUTTON),
             shapedTouchFindings(positional, "conversation/composer/Toolbar.kt").map(::kind),
         )
+    }
+
+    /**
+     * Only a clip in the click's own modifier chain shapes its highlight, never one in a content lambda or
+     * another argument, and `indication = null` passes only when a modifier watching the same interaction
+     * source draws the press instead.
+     */
+    @Test
+    fun onlyTheClicksOwnChainAndAMatchingIndicationExcuseIt() {
+        val clipInContent =
+            "Surface(shape = CircleShape, content = { Box(Modifier.clip(CircleShape)) }, " +
+                "modifier = Modifier.clickable { go() })"
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(clipInContent).map(::kind))
+        val clipInThen = "Box(Modifier.clip(CircleShape).then(Modifier.clickable { go() })) { Avatar() }"
+        assertEquals(emptyList<String>(), shapedTouchFindings(clipInThen))
+        val click = "Modifier.clickable(interactionSource = press, indication = null) { go() }"
+        val noReplacement = "Surface(shape = CircleShape, modifier = $click)"
+        val otherSource = "$noReplacement { Box(Modifier.pressFeedbackInsideClip(other)) }"
+        val sameSource = "$noReplacement { Box(Modifier.pressFeedbackInsideClip(press)) }"
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(noReplacement).map(::kind))
+        assertEquals(listOf(SHAPED_SURFACE), shapedTouchFindings(otherSource).map(::kind))
+        assertEquals(emptyList<String>(), shapedTouchFindings(sameSource))
+        // A source handed to a round component's parameter counts when that parameter is the one drawn.
+        val handedIn =
+            """
+            ColorSwatch(pressSource = press, modifier = $click)
+            fun ColorSwatch(pressSource: MutableInteractionSource, modifier: Modifier) {
+                Box(modifier.clip(CircleShape).pressFeedbackInsideClip(pressSource))
+            }
+            """.trimIndent()
+        assertEquals(emptyList<String>(), shapedTouchFindings(handedIn))
+        val handedElsewhere = handedIn.replace("pressFeedbackInsideClip(pressSource)", "pressFeedbackInsideClip(other)")
+        assertEquals(listOf(ROUND_COMPONENT), shapedTouchFindings(handedElsewhere).map(::kind))
     }
 
     /** A clip only excuses a click on a shaped Surface or card when it clips to that container's own shape. */
