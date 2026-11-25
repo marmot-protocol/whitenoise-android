@@ -342,31 +342,47 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
-    /** A sync that finds native push unavailable turns auto-init off and reads no token, even for a Push account. */
+    /** A sync without the native-push capability turns auto-init off once no account uses Push. */
     @Test
-    fun unavailableCapabilitySyncTurnsAutoInitOff() =
-        runBlocking {
-            val platform = RecordingNativePushFallbackPlatform(context)
-            val tokenReads = CopyOnWriteArrayList<Unit>()
-            val unavailable = NativePushCapability.GooglePlayServicesUnavailable
-            val fixture =
-                fixture(platform, nativeEnabled = true, capability = unavailable) {
-                    tokenReads += Unit
-                    TOKEN
-                }
-            try {
-                fixture.bootstrap()
-                platform.autoInitWrites.clear()
-
-                fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() }
-
-                assertEquals(false, platform.autoInitWrites.firstOrNull())
-                assertFalse(true in platform.autoInitWrites)
-                assertTrue(tokenReads.isEmpty())
-            } finally {
-                fixture.close()
-            }
+    fun unavailableCapabilitySyncTurnsAutoInitOffWithoutPushAccounts() =
+        assertUnavailableCapabilitySync(nativeEnabled = false) { writes ->
+            assertEquals(listOf(false), writes.distinct())
         }
+
+    /** While a Push account still waits for the persistent fallback, the sync leaves auto-init alone. */
+    @Test
+    fun unavailableCapabilitySyncKeepsAutoInitForPendingPushAccount() =
+        assertUnavailableCapabilitySync(nativeEnabled = true) { writes ->
+            assertTrue("a pending Push account must keep auto-init: $writes", writes.isEmpty())
+        }
+
+    /** Runs one sync with native push unavailable and checks its auto-init writes and that it read no token. */
+    private fun assertUnavailableCapabilitySync(
+        nativeEnabled: Boolean,
+        assertWrites: (List<Boolean>) -> Unit,
+    ) = runBlocking {
+        val platform = RecordingNativePushFallbackPlatform(context)
+        val tokenReads = CopyOnWriteArrayList<Unit>()
+        val unavailable = NativePushCapability.GooglePlayServicesUnavailable
+        // The fallback service is never acknowledged here, so a Push account stays on native push.
+        val fixture =
+            fixture(platform, nativeEnabled = nativeEnabled, capability = unavailable) {
+                tokenReads += Unit
+                TOKEN
+            }
+        try {
+            fixture.bootstrap()
+            platform.autoInitWrites.clear()
+
+            fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() }
+
+            assertEquals(nativeEnabled, fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+            assertWrites(platform.autoInitWrites.toList())
+            assertTrue(tokenReads.isEmpty())
+        } finally {
+            fixture.close()
+        }
+    }
 
     /** A settings read failure with no account known to need push neither reads a token nor flips auto-init. */
     @Test

@@ -73,9 +73,10 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     val config = pushServerConfigProvider()
     val capability = nativePushCapability(config)
     if (!capability.isAvailable) {
-        // No token can be read without the capability, so Firebase must not keep refreshing one.
-        applyFcmAutoInit(enabled = false)
-        return reconcileUnavailableNativePushFallback(capability, accountRefs)
+        val reconciled = reconcileUnavailableNativePushFallback(capability, accountRefs)
+        // Once the fallback has moved every account off native push, Firebase must stop refreshing a token.
+        if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+        return reconciled
     }
     config ?: return false
     if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
