@@ -165,7 +165,9 @@ internal fun DictationProviderSheet(
                                         .explainOnLongPress(
                                             Explanation(
                                                 engine,
-                                                stringResource(R.string.explanation_appearance_dictation_provider_engine),
+                                                stringResource(
+                                                    R.string.explanation_appearance_dictation_provider_engine,
+                                                ),
                                             ),
                                         ),
                             )
