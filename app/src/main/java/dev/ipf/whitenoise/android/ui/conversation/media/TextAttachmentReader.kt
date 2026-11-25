@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.content.ClipData
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,8 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -62,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
@@ -101,7 +99,7 @@ internal fun TextAttachmentReaderDialog(
         mutableStateOf<TextAttachmentReaderState>(TextAttachmentReaderState.Loading)
     }
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboard.current
+    val clipboard = rememberClipboardCopier()
     val speechState by appState.ttsController.state.collectAsState()
     var speechRequested by remember(actions) { mutableStateOf(false) }
     var entry by remember(actions, state) { mutableStateOf<TtsSpeakableEntry?>(null) }
@@ -186,10 +184,7 @@ internal fun TextAttachmentReaderDialog(
             onDismiss = dismiss,
             onRetry = { loadGeneration += 1 },
             onCopy = { value ->
-                scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("text attachment", value)))
-                    appState.present(R.string.copied)
-                }
+                clipboard.copy(value, "text attachment")
             },
             onReadAloud = if (speechContext != null) ({ preview -> start(preview) }) else null,
             onSave = if (actions.canSave) ({ scope.launch { actions.save() } }) else null,

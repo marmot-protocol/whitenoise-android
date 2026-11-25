@@ -32,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -42,7 +41,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -127,7 +126,7 @@ internal fun ShareConnectScreen(
         )
     val link = remember(npub) { ProfileLink.parse(npub) }
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val shareProfileTitle = stringResource(R.string.share_profile)
     var copied by rememberSaveable(accountIdHex) { mutableStateOf(false) }
     var scannerSession by remember(accountIdHex, runtime) { mutableStateOf<Long?>(null) }
@@ -221,8 +220,7 @@ internal fun ShareConnectScreen(
         },
         onCopy = copy@{
             if (!ownsScreen()) return@copy
-            clipboard.setText(AnnotatedString(npub))
-            copied = true
+            if (clipboard.copy(npub)) copied = true
         },
         onOpenScanner = {
             if (ownsScreen() && scannerSession == null) {

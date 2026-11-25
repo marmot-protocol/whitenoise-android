@@ -23,11 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NoticeTier
@@ -148,12 +146,12 @@ fun SwipeDismissibleSnackbar(
             // Error/diagnostic toasts flagged copyable at their emit site get
             // a discoverable Copy affordance and a separate Dismiss control.
             // SelectionContainer still permits long-press copy (issues #543, #796).
-            val clipboard = LocalClipboardManager.current
+            val clipboard = rememberClipboardCopier()
             val copyText = requireNotNull((data.visuals as ToastSnackbarVisuals).copyText)
             Snackbar(
                 modifier = Modifier.snackbarSurfaceBoundary(),
                 action = {
-                    IconButton(onClick = { clipboard.setText(AnnotatedString(copyText)) }) {
+                    IconButton(onClick = { clipboard.copy(copyText) }) {
                         Icon(
                             painterResource(R.drawable.ic_content_copy),
                             contentDescription = stringResource(R.string.copy),

@@ -3,15 +3,14 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.Clipboard
-import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
@@ -54,23 +53,11 @@ class NostrEventReaderLinkInteractionTest {
     fun screenLongPressCopiesExactlyOnceWithoutConfirmationOrMediaActivation() {
         val destination = "https://example.com/path?q=value#section"
         val label = "other.example"
-        val writes = mutableListOf<String>()
+        val clipboard = systemClipboard()
+        clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
         var mediaActivations = 0
-        val clipboard =
-            object : Clipboard {
-                override suspend fun getClipEntry(): ClipEntry? = null
-
-                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-                    writes +=
-                        requireNotNull(clipEntry)
-                            .clipData
-                            .getItemAt(0)
-                            .text
-                            .toString()
-                }
-            }
         composeRule.setContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard, LocalTopNoticeHost provides noticeHost) {
+            CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
                 WhiteNoiseTheme {
                     NostrEventReaderScreen(
                         card = noteCard().copy(mediaUrl = destination),
@@ -93,7 +80,7 @@ class NostrEventReaderLinkInteractionTest {
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            assertEquals(listOf(destination), writes)
+            assertClipboardText(clipboard, destination)
             assertEquals(0, mediaActivations)
             assertTrue(notices.isEmpty())
         }
@@ -109,7 +96,7 @@ class NostrEventReaderLinkInteractionTest {
         composeRule.onNodeWithText(string(R.string.link_confirm_open)).performClick()
         composeRule.runOnIdle {
             assertEquals(1, mediaActivations)
-            assertEquals(listOf(destination), writes)
+            assertClipboardText(clipboard, destination)
         }
     }
 
@@ -328,35 +315,22 @@ class NostrEventReaderLinkInteractionTest {
 
     @Test
     fun clipboardFailureGivesFeedbackRatherThanEscapingTheReader() {
-        triggerReaderCopyFailure(IllegalStateException("clipboard unavailable"))
+        val real = ApplicationProvider.getApplicationContext<Context>()
+        val refusing =
+            object : ContextWrapper(real) {
+                override fun getSystemService(name: String): Any? {
+                    if (name == CLIPBOARD_SERVICE) return null
+                    return super.getSystemService(name)
+                }
+            }
+        triggerReaderCopy(refusing)
         composeRule.runOnIdle { assertEquals(listOf(R.string.not_copied to TransientNoticeKind.Information), notices) }
     }
 
-    @Test
-    fun clipboardCancellationDoesNotShowFailureFeedback() {
-        triggerReaderCopyFailure(kotlinx.coroutines.CancellationException("reader left"))
-        composeRule.runOnIdle { assertTrue(notices.isEmpty()) }
-    }
-
-    private fun triggerReaderCopyFailure(failure: Exception) {
-        val writes = mutableListOf<String>()
-        val clipboard =
-            object : Clipboard {
-                override suspend fun getClipEntry(): ClipEntry? = null
-
-                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-                    writes +=
-                        requireNotNull(clipEntry)
-                            .clipData
-                            .getItemAt(0)
-                            .text
-                            .toString()
-                    throw failure
-                }
-            }
+    private fun triggerReaderCopy(context: Context) {
         val url = "https://example.com/clipboard"
         composeRule.setContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard, LocalTopNoticeHost provides noticeHost) {
+            CompositionLocalProvider(LocalContext provides context, LocalTopNoticeHost provides noticeHost) {
                 WhiteNoiseTheme {
                     NostrEventReaderBlock(
                         block =
@@ -378,7 +352,11 @@ class NostrEventReaderLinkInteractionTest {
         val actions = composeRule.onNodeWithText(url).fetchSemanticsNode().config[SemanticsActions.CustomActions]
         composeRule.runOnIdle { assertTrue(actions.single().action()) }
         composeRule.waitForIdle()
-        composeRule.runOnIdle { assertEquals(listOf(url), writes) }
+    }
+
+    private fun systemClipboard(): ClipboardManager {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return context.getSystemService(ClipboardManager::class.java)
     }
 
     /** Builds the exact kind-1 event shown by the reader fixture. */

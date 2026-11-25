@@ -17,7 +17,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,7 +26,7 @@ import dev.ipf.whitenoise.android.R
 internal fun CopyableValueRow(
     label: String,
     value: String,
-    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    clipboard: ClipboardCopier,
     displayValue: String = value,
     modifier: Modifier = Modifier,
 ) {
@@ -43,7 +42,7 @@ internal fun CopyableValueRow(
                 onClickLabel = copyLabel,
                 role = Role.Button,
             ) {
-                clipboard.setText(AnnotatedString(value))
+                clipboard.copy(value)
             }.semantics(mergeDescendants = true) {
                 contentDescription = "$label, $value"
             },
