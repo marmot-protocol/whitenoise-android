@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/FrozenGroupComposerNotice.kt",
+  "legacy_sha256": "b29956e303c282d00bc35a33d28afa5b186a26dfad58ca1b91593bfd5f45efa8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FrozenGroupComposerNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/FrozenGroupComposerNotice.kt",
+        "anchor": "fun FrozenGroupComposerNotice(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Frozen group composer notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/FrozenGroupComposerNotice.kt",
+        "anchor": "R.string.group_unrecoverable_notice",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
