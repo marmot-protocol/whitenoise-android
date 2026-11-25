@@ -2965,5 +2965,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
-
-private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"
