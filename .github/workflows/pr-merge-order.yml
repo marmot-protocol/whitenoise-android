@@ -1,0 +1,44 @@
+name: PR merge order
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open pull request number
+        required: true
+        type: number
+
+concurrency:
+  group: pr-merge-order-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report:
+    name: Suggest a clean merge order
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the trusted checker
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/report-pr-merge-order.js
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      # The checker fetches PR Git objects into a separate bare repository.
+      # This job executes only the checker from master.
+      - name: Simulate and report merge orders
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
+        with:
+          script: |
+            const checker = require('./.github/scripts/report-pr-merge-order.js')
+            await checker.run({ github, context, core })
