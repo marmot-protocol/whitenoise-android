@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -62,9 +63,9 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
 /**
- * Multi-select people picker shared by the New Group flow and the group
+ * Multi-select people picker shared by a conversation's Share user flow and the group
  * details Add Members flow. Selection lives in the caller's [selected] list so
- * flows can carry it across steps.
+ * flows can carry it across steps. While shown it holds the hardware keyboard shortcuts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +117,9 @@ internal fun ContactPickerScreen(
             if (reviewingSelection) reviewingSelection = false else onBack()
         }
     }
+    // The picker is drawn in the activity window over its caller, so it holds the hardware shortcuts as Back holds
+    // the screen beneath: Ctrl+F or Ctrl+N must not leave a conversation behind it and drop the selection (#4005).
+    HardwareShortcutBlocker()
 
     if (reviewingSelection && reviewGroup == null) {
         SelectedMembersReviewScreen(

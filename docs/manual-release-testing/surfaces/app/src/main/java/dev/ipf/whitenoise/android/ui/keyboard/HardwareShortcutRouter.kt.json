@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Keyboard Shortcuts Helper group: R.string.chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
+        "surface": "Keyboard Shortcuts Helper label: R.string.chat_list_search_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+        "anchor": "R.string.chat_list_search_open",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
+        "surface": "Keyboard Shortcuts Helper label: R.string.header_shortcut_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+        "anchor": "R.string.header_shortcut_search",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
+        "surface": "Keyboard Shortcuts Helper label: R.string.new_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+        "anchor": "R.string.new_message",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
+        "surface": "Hardware shortcut once-per-press dispatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutRouter.kt",
+        "anchor": "fun handle(event: KeyEvent)",
+        "test_ids": [
+          "AXY-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

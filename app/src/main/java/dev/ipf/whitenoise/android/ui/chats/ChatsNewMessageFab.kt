@@ -48,8 +48,11 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPenDialogMotion
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
+import dev.ipf.whitenoise.android.ui.keyboard.KeyboardShortcut
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingControlShown
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
@@ -72,7 +75,10 @@ internal data class NewMessageFlowLaunch(
     val pen: MeasuredPenDialogMotion? = null,
 )
 
-/** The FAB opens New Message or receiving-relay recovery using their existing owners. */
+/**
+ * The FAB opens New Message or receiving-relay recovery using their existing owners. Ctrl+N takes the same New
+ * Message path while the FAB offers it.
+ */
 @Suppress("FunctionNaming", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun ChatsNewMessageFab(
@@ -95,6 +101,7 @@ internal fun ChatsNewMessageFab(
         return active && sameOwner && available
     }
     var missing by remember(appState, account, runtime) { mutableStateOf(false) }
+    var relaysChecked by remember(appState, account, runtime) { mutableStateOf(false) }
     var relayOpening by remember(appState, account, runtime) { mutableStateOf<Any?>(null) }
     var refresh by remember(appState, account, runtime) { mutableIntStateOf(0) }
     LaunchedEffect(appState, account, runtime, refresh) {
@@ -107,7 +114,10 @@ internal fun ChatsNewMessageFab(
             } catch (_: Exception) {
                 null
             }
-        if (current()) missing = chatsFabNeedsRelays(result)
+        if (current()) {
+            missing = chatsFabNeedsRelays(result)
+            relaysChecked = true
+        }
     }
     var relayOrigin by remember(appState, account, runtime) { mutableStateOf<Rect?>(null) }
     var fabBounds by remember { mutableStateOf<Rect?>(null) }
@@ -116,6 +126,20 @@ internal fun ChatsNewMessageFab(
         with(LocalDensity.current) {
             ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
         }
+    // Ctrl+N takes the button's own path, only while the button is shown and its relay check found New Message
+    // usable, so a key cannot skip the Check relays state. A shown button is waiting during its check (#4005).
+    val shown = LocalFloatingControlShown.current && current()
+    KeyboardShortcut(
+        HardwareShortcutCommand.NewMessage,
+        available = shown && relaysChecked && !missing,
+        waiting = shown && !relaysChecked,
+    ) {
+        // Rechecked when the key arrives, as a tap is, since the owner can change before the next composition.
+        if (current() && relaysChecked && !missing) {
+            onNewMessageOrigin(null)
+            onNewMessage()
+        }
+    }
     ChatsNewMessageFabContent(missing, onBounds = { fabBounds = it }, hidePen = hidePen, onClick = {
         if (current()) {
             if (missing) {
