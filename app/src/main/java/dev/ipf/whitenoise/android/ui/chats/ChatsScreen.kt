@@ -6,18 +6,15 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -27,12 +24,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,11 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
@@ -128,7 +117,6 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
@@ -140,10 +128,8 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
-import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
-import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -233,6 +219,7 @@ internal fun ChatsScreen(
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -2707,9 +2694,18 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) {
-                                    newChatFlowLaunch = NewMessageFlowLaunch(it)
-                                }
+                                EmptyChats(
+                                    appState,
+                                    onCreate = openNewMessageFlow,
+                                    onFirstRunHelp =
+                                        onFirstRunHelp.takeIf {
+                                            controller.error == null &&
+                                                controller.archivedItems.isEmpty() &&
+                                                selectedFolderId == null &&
+                                                !searchOpen &&
+                                                !searchActive
+                                        },
+                                ) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2884,73 +2880,6 @@ internal fun ChatsScreen(
         )
     }
 }
-
-/**
- * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
- * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
- * it never overlaps either of them.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopControl(
-    visible: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier) {
-        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-        FloatingControlVisibility(
-            visible = visible,
-            motionEnabled = rememberSystemAnimationsEnabled(),
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-        ) {
-            ChatListJumpToTopButton(onClick = onClick)
-        }
-    }
-}
-
-/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-    Box(
-        modifier =
-            modifier
-                .size(42.dp)
-                .semantics { contentDescription = scrollToTopLabel }
-                .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_edge),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
-// 19 + 42 / 2 == 16 + 48 / 2.
-internal val JUMP_TO_TOP_END_INSET = 19.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back

@@ -200,9 +200,13 @@ internal fun SettingsList(
 /** Section label above a settings group at the 32 dp heading line, announced as a heading. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsSection(title: String) {
+internal fun SettingsSection(
+    title: String,
+    explanation: String? = null,
+) {
     SectionHeader(
         text = title,
+        modifier = Modifier.explainOnLongPress(explanation?.let { Explanation(title, it) }),
         contentPadding =
             PaddingValues(
                 start = WhiteNoiseSpacing.SettingsSectionInset,

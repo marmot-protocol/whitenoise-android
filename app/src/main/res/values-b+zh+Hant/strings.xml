@@ -1017,7 +1017,7 @@
     <string name="notification_background_on">背景連線已開啟。</string>
     <string name="notification_background_off">背景連線已關閉。</string>
     <string name="notification_categories_detail">Android 依類別設定聲音、震動和重要性。</string>
-    <string name="chat_with_support">與支援團隊聊天</string>
+    <string name="chat_with_support">聯絡 White Noise 團隊</string>
     <string name="theme">主題</string>
     <string name="theme_system">跟隨系統</string>
     <string name="theme_light">淺色</string>
@@ -2216,7 +2216,7 @@
     <string name="app_unlock_checking">正在檢查應用程式保護…</string>
     <string name="support_contact_title">White Noise 支援</string>
     <string name="support_contact_subtitle">問題、故障和建議</string>
-    <string name="support_contact_explainer">提問、回報問題或提出建議。</string>
+    <string name="support_contact_explainer">向 White Noise 的開發團隊提問、回報問題或提供意見。</string>
     <string name="support_relays_attention">個人資料中繼需要處理</string>
     <string name="support_open_relays">開啟中繼</string>
     <string name="support_relays_review">檢查此個人資料的接收中繼清單。</string>

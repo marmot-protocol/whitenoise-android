@@ -167,20 +167,6 @@
         ]
       },
       {
-        "surface": "string:diagnostics_controls_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
-        "anchor": "R.string.diagnostics_controls_detail",
-        "test_ids": [
-          "SEC-001",
-          "SEC-002",
-          "SEC-003",
-          "SEC-004",
-          "SEC-005",
-          "SEC-006",
-          "SEC-007"
-        ]
-      },
-      {
         "surface": "string:diagnostics_improvements",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
         "anchor": "R.string.diagnostics_improvements",
