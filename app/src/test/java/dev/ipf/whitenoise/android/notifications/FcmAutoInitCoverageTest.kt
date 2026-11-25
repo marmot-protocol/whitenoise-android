@@ -107,9 +107,10 @@ class FcmAutoInitCoverageTest {
 
         assertTrue("the fallback must run before the settle", fallback in 0 until settle)
         assertTrue(sync.substring(fallback, settle).contains("} finally {"))
-        val afterSettle = sync.substring(settle)
-        assertTrue(afterSettle.contains("runCatching { nativePushDemand(accountRefs) }"))
-        assertTrue(afterSettle.contains("if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)"))
+        assertTrue(sync.substring(settle).contains("disableFcmAutoInitWithoutNativeDemand(accountRefs)"))
+        val demandOff = appModuleSource(AUTO_INIT).functionBody("disableFcmAutoInitWithoutNativeDemand")
+        assertTrue(demandOff.contains("runCatchingCancellable { nativePushDemand(accountRefs) }"))
+        assertTrue(demandOff.contains("if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)"))
     }
 
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
@@ -126,11 +127,11 @@ class FcmAutoInitCoverageTest {
         assertTrue(
             selection
                 .functionBody("selectFcmDelivery")
-                .contains("settleFcmAutoInitAfterFailedSelection(owner.accountRefs)"),
+                .contains("settleFcmAutoInitAfterFailedSelection()"),
         )
         val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
         assertTrue(settle.contains("nativePushSyncMutex.withLock"))
-        assertTrue(settle.contains("applyFcmAutoInit(enabled = false)"))
+        assertTrue(settle.contains("disableFcmAutoInitWithoutNativeDemand(host.nativePushAccountRefs())"))
     }
 
     /** Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. */

@@ -32,8 +32,18 @@ internal suspend fun NotificationDeliveryController.pauseNotificationDeliveryRec
     return nativePushSyncMutex.withLock {
         drainPendingPushClears()
         drainPendingPushDisables()
+        disableFcmAutoInitWithoutLoadedNativeDemand()
         false
     }
+}
+
+/**
+ * Permission loss pauses registration but must not leave auto-init on once no account uses native push.
+ * An empty account list may only mean accounts have not loaded yet, so it leaves auto-init alone.
+ */
+private suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutLoadedNativeDemand() {
+    val accountRefs = host.nativePushAccountRefs()
+    if (accountRefs.isNotEmpty()) disableFcmAutoInitWithoutNativeDemand(accountRefs)
 }
 
 internal suspend fun NotificationDeliveryController.hasConfirmedNativePushRegistration(account: String): Boolean =
@@ -58,6 +68,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     refreshLocalNotificationPermission()
     if (!localNotificationPermissionGranted) {
         nativePushFallback.invalidateAll()
+        disableFcmAutoInitWithoutLoadedNativeDemand()
         return false
     }
     var accountRefs = host.nativePushAccountRefs()
@@ -80,10 +91,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
             // Once the fallback has moved every account off native push, Firebase must stop refreshing a
             // token. A cancelled fallback may already have committed a native disable, so this always runs.
             // A storage failure here must not replace the fallback's own result or cancellation.
-            withContext(NonCancellable) {
-                val demand = runCatching { nativePushDemand(accountRefs) }.getOrNull()
-                if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)
-            }
+            withContext(NonCancellable) { disableFcmAutoInitWithoutNativeDemand(accountRefs) }
         }
     }
     config ?: return false

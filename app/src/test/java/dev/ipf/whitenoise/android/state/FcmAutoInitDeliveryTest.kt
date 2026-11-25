@@ -384,6 +384,46 @@ class FcmAutoInitDeliveryTest {
         }
     }
 
+    /** With notification permission revoked, a sync still turns auto-init off once no account uses Push. */
+    @Test
+    fun permissionLossSyncTurnsAutoInitOffWithoutPushAccounts() =
+        assertPermissionLossSync(nativeEnabled = false) { writes ->
+            assertEquals(listOf(false), writes.distinct())
+        }
+
+    /** With notification permission revoked, a Push account keeps auto-init for when permission returns. */
+    @Test
+    fun permissionLossSyncKeepsAutoInitForPushAccount() =
+        assertPermissionLossSync(nativeEnabled = true) { writes ->
+            assertTrue("a Push account must keep auto-init: $writes", writes.isEmpty())
+        }
+
+    /** Revokes the notification permission, runs one sync, and checks its auto-init writes and token reads. */
+    private fun assertPermissionLossSync(
+        nativeEnabled: Boolean,
+        assertWrites: (List<Boolean>) -> Unit,
+    ) = runBlocking {
+        val platform = RecordingNativePushFallbackPlatform(context)
+        val tokenReads = CopyOnWriteArrayList<Unit>()
+        val fixture =
+            fixture(platform, nativeEnabled = nativeEnabled) {
+                tokenReads += Unit
+                TOKEN
+            }
+        try {
+            fixture.bootstrap()
+            platform.autoInitWrites.clear()
+            shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+
+            assertFalse(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+
+            assertWrites(platform.autoInitWrites.toList())
+            assertTrue(tokenReads.isEmpty())
+        } finally {
+            fixture.close()
+        }
+    }
+
     /** A settings read failure with no account known to need push neither reads a token nor flips auto-init. */
     @Test
     fun unreadableSettingsKeepAutoInitUntouched() =

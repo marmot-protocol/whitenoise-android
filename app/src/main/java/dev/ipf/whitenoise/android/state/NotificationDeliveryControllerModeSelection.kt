@@ -77,7 +77,7 @@ internal suspend fun NotificationDeliveryController.selectFcmDelivery(
         selected = selectFcmTransport(owner, explicit)
         return selected
     } finally {
-        if (!selected) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection(owner.accountRefs) }
+        if (!selected) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
     }
 }
 

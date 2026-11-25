@@ -37,13 +37,21 @@ internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Bo
 }
 
 /**
- * Turns Firebase auto-init off after a native-push selection that did not complete, unless an account
- * still uses native push. The sync lock orders this write after any registration or rollback.
+ * Turns Firebase auto-init off when the settings of [accountRefs] show that none uses native push. A
+ * settings or storage read failure changes nothing, so it can never turn auto-init off for a Push account.
  */
-internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterFailedSelection(accountRefs: List<String>) {
-    nativePushSyncMutex.withLock {
-        if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
-    }
+internal suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutNativeDemand(accountRefs: List<String>) {
+    val demand = runCatchingCancellable { nativePushDemand(accountRefs) }.getOrNull()
+    if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+}
+
+/**
+ * Turns Firebase auto-init off after a native-push selection that did not complete, unless an account
+ * still uses native push. It reads the live account list, since accounts can change during the selection,
+ * and the sync lock orders this write after any registration or rollback.
+ */
+internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterFailedSelection() {
+    nativePushSyncMutex.withLock { disableFcmAutoInitWithoutNativeDemand(host.nativePushAccountRefs()) }
 }
 
 /** Drops the cached FCM token and turns Firebase auto-init off when a wipe leaves no signed-in signer. */
