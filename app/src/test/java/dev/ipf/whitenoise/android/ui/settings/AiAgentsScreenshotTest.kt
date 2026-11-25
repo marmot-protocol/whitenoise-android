@@ -53,7 +53,7 @@ class AiAgentsScreenshotTest {
                 AiAgentsContent(
                     npub = TEST_NPUB,
                     onBack = {},
-                    onCopy = { _, _ -> },
+                    onCopy = { _, _ -> true },
                     onOpenDocs = { true },
                 )
             }

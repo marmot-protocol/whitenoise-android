@@ -82,7 +82,7 @@ internal fun AiAgentsScreen(
 internal fun AiAgentsContent(
     npub: String?,
     onBack: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
     onOpenDocs: () -> Boolean,
 ) {
     var selectedConnectorId by rememberSaveable(npub) { mutableStateOf<String?>(null) }
@@ -136,8 +136,7 @@ internal fun AiAgentsContent(
                             title = stringResource(R.string.copy_public_key),
                             onClick = {
                                 npub?.let {
-                                    onCopy(publicKeyLabel, it)
-                                    feedback = R.string.public_key_copied
+                                    if (onCopy(publicKeyLabel, it)) feedback = R.string.public_key_copied
                                     keyExpanded = true
                                 }
                             },
@@ -216,7 +215,7 @@ private fun AgentSetupSheet(
     connector: AgentConnector,
     npub: String,
     onDismiss: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
 ) {
     val name = stringResource(connector.nameRes)
     val title = stringResource(R.string.ai_agents_setup_title, name)
@@ -225,8 +224,7 @@ private fun AgentSetupSheet(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     val copyLabel = stringResource(R.string.ai_agents_copy_prompt)
     val copyPrompt = {
-        onCopy(title, prompt)
-        copied = true
+        if (onCopy(title, prompt)) copied = true
     }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
