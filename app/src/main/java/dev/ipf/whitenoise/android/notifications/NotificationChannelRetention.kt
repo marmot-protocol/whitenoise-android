@@ -124,5 +124,6 @@ private fun removeDepartedShortcuts(
     val ids = shortcuts.map { it.id }
     val pinned = shortcuts.filter { it.isPinned }.map { it.id }
     if (pinned.isNotEmpty()) ShortcutManagerCompat.disableShortcuts(appContext, pinned, "")
+    ShortcutManagerCompat.removeDynamicShortcuts(appContext, ids)
     ShortcutManagerCompat.removeLongLivedShortcuts(appContext, ids)
 }
