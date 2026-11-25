@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.common
 
 private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
 private val typeOperator = Regex("""\b(?:as\??|is)\s+[\w.]+$""")
+private val ifCondition = Regex("""^\s*if\s*\(""")
+private val elseBlock = Regex("""\s*else\s*\{""")
 private val conditionalModifier = Regex("""^\s*(?:if|when)\b""")
 private val sourcePresentCondition = Regex("""^\s*if\s*\(\s*(\w+)\s*!=\s*null\s*\)""")
 private val emptyModifierElse = Regex("""\belse\s+Modifier\s*$""")
@@ -121,7 +123,11 @@ internal fun String.modifierLinks(
                 if (name == "then" && this@modifierLinks[open] == '(') {
                     val optional = conditionalModifier.containsMatchIn(args)
                     val guard = if (optional) args.sourcePresentGuard().takeUnless { conditional } else guardedSource
-                    yieldAll(args.modifierLinks(offset + argumentOffset, conditional || optional, guard))
+                    val branches = args.bracedModifierBranches().ifEmpty { listOf(TouchArgument(0, args)) }
+                    for (branch in branches) {
+                        val branchOffset = offset + argumentOffset + branch.offset
+                        yieldAll(branch.text.modifierLinks(branchOffset, conditional || optional, guard))
+                    }
                 } else {
                     yield(ModifierLink(name, args, offset + argumentOffset, conditional, guardedSource))
                 }
@@ -132,6 +138,25 @@ internal fun String.modifierLinks(
             index++
         }
     }
+
+/** Unwraps the expression blocks in a modifier built by a braced if/else. */
+private fun String.bracedModifierBranches(): List<TouchArgument> {
+    val condition = ifCondition.find(this) ?: return emptyList()
+    val body = indexOfNonWhitespace(closingBracket(condition.range.last) + 1)
+    return if (getOrNull(body) == '{') {
+        val end = closingBracket(body)
+        val alternative = elseBlock.matchAt(this, end + 1)?.range?.last
+        listOfNotNull(modifierBranch(body), alternative?.let(::modifierBranch))
+    } else {
+        emptyList()
+    }
+}
+
+/** Reads one branch without its outer braces and retains the original expression offset. */
+private fun String.modifierBranch(open: Int): TouchArgument {
+    val start = open + 1
+    return TouchArgument(start, substring(start, closingBracket(open)))
+}
 
 /** Recognizes the simple nullable-source hand-off whose else branch appends no modifier. */
 private fun String.sourcePresentGuard(): String? =

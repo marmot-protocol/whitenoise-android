@@ -127,6 +127,48 @@ class ShapedTouchScannerRegressionTest {
         assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), shapedTouchFindings(source))
     }
 
+    /** The helper always suppresses the default ripple and needs applied feedback for the same source. */
+    @Test
+    fun shapedTouchTargetRequiresMatchingFeedback() {
+        val target = "Box(Modifier.shapedTouchTarget(press, onClick = go))"
+        val different = "Box(Modifier.shapedPressFeedback(other, CircleShape))"
+        val unused = "val feedback = Modifier.shapedPressFeedback(press, CircleShape)"
+        val matching = different.replace("other", "press")
+        for (content in listOf("", different, unused)) {
+            assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$target { $content }"))
+        }
+        assertEquals(emptyList<String>(), shapedTouchFindings("$target { $matching }"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("val unused = Modifier.shapedTouchTarget(press, go)"))
+    }
+
+    /** A target supplied through a conditional modifier chain still needs feedback when the target is present. */
+    @Test
+    fun aConditionalTouchTargetRequiresFeedback() {
+        val conditional =
+            "Box(Modifier.then(if (canCancel) { " +
+                "Modifier.shapedTouchTarget(press, go) } else { Modifier }))"
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(conditional))
+        assertEquals(emptyList<String>(), shapedTouchFindings("$conditional { $feedback }"))
+    }
+
+    /** A private layout can draw feedback for the same source passed to it with its touch modifier. */
+    @Test
+    fun aWrappedTouchTargetRequiresFeedback() {
+        val body =
+            """
+            TouchLayout(press = press, modifier = Modifier.shapedTouchTarget(press, go))
+            private fun TouchLayout(press: MutableInteractionSource, modifier: Modifier) {
+                Box(modifier) {
+                    Box(Modifier.shapedPressFeedback(press, CircleShape))
+                }
+            }
+            """.trimIndent()
+        assertEquals(emptyList<String>(), shapedTouchFindings(body))
+        val detached = body.replace(".shapedPressFeedback(press, CircleShape)", "")
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(detached))
+    }
+
     /** Builds a shaped control whose click needs replacement feedback in the supplied content. */
     private fun surfaceWith(content: String): String =
         "Surface(shape = CircleShape, modifier = Modifier.clickable(" +

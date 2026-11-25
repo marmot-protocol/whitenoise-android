@@ -39,17 +39,35 @@ internal class ShapedTouchIndications(
         }
     }
 
-    /** Collects indications only from a modifier supplied to a component. */
-    private fun appliedReplacements(owner: FeedbackOwner): List<FeedbackReference> {
+    /** Reports applied targets that suppress their normal indication without drawing matching feedback. */
+    fun unmatchedTouchTargets(): List<Int> {
+        if ("shapedTouchTarget" !in code) return emptyList()
+        return owners
+            .flatMap { owner ->
+                appliedModifierLinks(owner)
+                    .filter { it.name == "shapedTouchTarget" }
+                    .filterNot { link ->
+                        val source = link.feedbackReference()?.let { binding(it.expression, it.offset) }
+                        source != null && hasFeedback(owner, source)
+                    }.map(ModifierLink::argumentOffset)
+                    .toList()
+            }.distinct()
+    }
+
+    /** Reads the links that actually reach this component, including a local modifier initializer. */
+    private fun appliedModifierLinks(owner: FeedbackOwner): Sequence<ModifierLink> {
         val args = code.substring(owner.open + 1, owner.close)
-        val modifier = modifierArgument(args, positionalModifiers[owner.name]) ?: return emptyList()
+        val modifier = modifierArgument(args, positionalModifiers[owner.name]) ?: return emptySequence()
         val offset = owner.open + 1 + modifier.offset
         val alias = modifierRoot.find(modifier.text)?.value
         val initializer = alias?.let { code.substring(0, offset).localBinding(it) }
-        val links =
-            initializer?.text.orEmpty().modifierLinks(initializer?.offset ?: 0) + modifier.text.modifierLinks(offset)
+        return initializer?.text.orEmpty().modifierLinks(initializer?.offset ?: 0) + modifier.text.modifierLinks(offset)
+    }
+
+    /** Collects indications only from a modifier supplied to a component. */
+    private fun appliedReplacements(owner: FeedbackOwner): List<FeedbackReference> {
         var clipped = false
-        return links
+        return appliedModifierLinks(owner)
             .mapNotNull { link ->
                 clipped = clipped || link.clipsToShape()
                 when (link.name) {
@@ -83,8 +101,14 @@ internal class ShapedTouchIndications(
         return named["indication"]?.trim() == "null" &&
             source != null &&
             owner != null &&
-            (draws(owner, source) || forwards(owner, source))
+            hasFeedback(owner, source)
     }
+
+    /** A control can draw its own feedback or pass the source to its implementation by name. */
+    private fun hasFeedback(
+        owner: FeedbackOwner,
+        source: FeedbackBinding,
+    ): Boolean = draws(owner, source) || forwards(owner, source)
 
     /** Only feedback inside the receiving component's call or content can replace its click's indication. */
     private fun draws(

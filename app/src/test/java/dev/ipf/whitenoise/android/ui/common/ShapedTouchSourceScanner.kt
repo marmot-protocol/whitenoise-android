@@ -14,6 +14,7 @@ internal const val ROUND_COMPONENT = "click modifier passed to a round component
 internal const val STRETCHED_ICON_BUTTON = "IconButton sized to a box that may not be square"
 internal const val CLICK_OVER_SHAPED_FILL = "click modifier over a shaped background or border without a clip"
 internal const val BARE_GLYPH = "click modifier on a bare Icon without a shaped clip"
+internal const val MISSING_TOUCH_FEEDBACK = "shapedTouchTarget without matching applied press feedback"
 
 /** The package whose icon buttons sit in slots narrower than they are tall. */
 private const val COMPOSER_PACKAGE = "conversation/composer/"
@@ -65,7 +66,8 @@ internal fun shapedTouchFindings(
     return (
         code.clicksBeforeClip(feedback) + code.clicksInShapedSurfaces(feedback) +
             code.clickableBoxesAroundRoundChildren(feedback) + code.clicksOnRoundComponents(feedback) +
-            code.stretchedIconButtons(path) + code.clicksOverShapedFills(feedback) + code.clicksOnBareGlyphs(feedback)
+            code.stretchedIconButtons(path) + code.clicksOverShapedFills(feedback) + code.clicksOnBareGlyphs(feedback) +
+            feedback.unmatchedTouchTargets().map { MISSING_TOUCH_FEEDBACK to it }
     ).sortedBy { it.second }.map { (kind, offset) -> "$kind @${code.lineAt(offset)}" }
 }
 

@@ -5,10 +5,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
@@ -56,6 +56,7 @@ import java.time.format.TextStyle
 internal const val NOTIFICATION_PROFILE_EDIT_LIST_TAG = "notification-profile.edit"
 private const val MINUTES_PER_HOUR = 60
 private const val DISABLED_ALPHA = 0.38f
+private const val DAYS_PER_COMPACT_ROW = 4
 private val DayToggleSize = 40.dp
 private val DayToggleTarget = 48.dp
 
@@ -284,7 +285,10 @@ private fun ScheduleError(text: String) {
     )
 }
 
-/** Seven day toggles in the locale's week order, each a 48 dp target with the full day name for TalkBack. */
+/**
+ * Seven day toggles in the locale's week order, wrapping when the row is too narrow for independent 48 dp targets.
+ * Each announces its full day name to TalkBack.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun DayPicker(
@@ -302,16 +306,26 @@ private fun DayPicker(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Row(Modifier.fillMaxWidth().testTag("notification-profile.days")) {
-            notificationProfileWeek(locale).forEach { day ->
-                DayToggle(
-                    label = day.getDisplayName(TextStyle.NARROW, locale),
-                    description = day.getDisplayName(TextStyle.FULL, locale),
-                    selected = day in days,
-                    onToggle = { onToggle(day) },
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f).testTag("notification-profile.day.${day.name}"),
-                )
+        BoxWithConstraints(Modifier.fillMaxWidth().testTag("notification-profile.days")) {
+            val week = notificationProfileWeek(locale)
+            val availableTargets = (maxWidth / DayToggleTarget).toInt().coerceAtLeast(1)
+            val daysPerRow =
+                if (availableTargets >= week.size) week.size else minOf(availableTargets, DAYS_PER_COMPACT_ROW)
+            Column {
+                week.chunked(daysPerRow).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { day ->
+                            DayToggle(
+                                label = day.getDisplayName(TextStyle.NARROW, locale),
+                                description = day.getDisplayName(TextStyle.FULL, locale),
+                                selected = day in days,
+                                onToggle = { onToggle(day) },
+                                enabled = enabled,
+                                modifier = Modifier.weight(1f).testTag("notification-profile.day.${day.name}"),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -332,7 +346,7 @@ private fun DayToggle(
     val press = remember { MutableInteractionSource() }
     Box(
         modifier
-            .heightIn(min = DayToggleTarget)
+            .sizeIn(minWidth = DayToggleTarget, minHeight = DayToggleTarget)
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
             // The whole cell toggles, and the press highlight is drawn on the day's circle below.
             .toggleable(

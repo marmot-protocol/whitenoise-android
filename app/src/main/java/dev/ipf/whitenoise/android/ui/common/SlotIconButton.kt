@@ -49,7 +49,7 @@ internal fun SlotIconButton(
 ) {
     val press = remember { MutableInteractionSource() }
     SlotIconButtonLayout(
-        target =
+        modifier =
             modifier
                 .minimumInteractiveComponentSize()
                 .shapedTouchTarget(press, onClick = onClick, enabled = enabled),
@@ -76,7 +76,7 @@ internal fun SlotIconToggleButton(
     val press = remember { MutableInteractionSource() }
     val contentColor = if (checked) MaterialTheme.colorScheme.primary else LocalContentColor.current
     SlotIconButtonLayout(
-        target =
+        modifier =
             modifier
                 .minimumInteractiveComponentSize()
                 .sizeIn(minWidth = MinimumTouchTarget, minHeight = MinimumTouchTarget)
@@ -96,17 +96,17 @@ internal fun SlotIconToggleButton(
     )
 }
 
-/** The slot both buttons share: the touch on [target], a centred circle for the highlight and fill, the icon. */
+/** The slot both buttons share: the touch on [modifier], a centred circle for the highlight and fill, the icon. */
 @Composable
 private fun SlotIconButtonLayout(
-    target: Modifier,
+    modifier: Modifier,
     press: MutableInteractionSource,
     containerColor: Color,
     contentColor: Color,
     highlightMax: Dp,
     content: @Composable () -> Unit,
 ) {
-    Box(modifier = target, contentAlignment = Alignment.Center) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
