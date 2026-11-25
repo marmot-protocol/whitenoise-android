@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">歷史記錄備份</string>
     <string name="explanation_organize_hub_history_backups">保存一份由復原詞解鎖的加密聊天記錄副本，以便在重新安裝後還原。</string>
-    <string name="history_backups_explanation">White Noise 可以將聊天記錄的加密副本儲存在線上。十二個復原詞可以解鎖它，讓你在重新安裝後找回歷史記錄。你的私鑰永遠不會包含在備份中。</string>
     <string name="history_backups_status">備份</string>
     <string name="history_backups_status_loading">正在檢查…</string>
     <string name="history_backups_status_unavailable">暫不可用</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">無法檢查備份</string>
     <string name="history_backups_retry">重試</string>
     <string name="history_backups_unavailable">此版本的 White Noise 還不能建立或還原歷史記錄備份。此功能將在後續更新中推出。</string>
-    <string name="history_backups_turn_on">開啟備份</string>
-    <string name="history_backups_turn_on_detail">你會得到 12 個需要抄寫下來的復原詞。</string>
     <string name="history_backups_new_words">取得新的復原詞</string>
     <string name="history_backups_new_words_detail">新的備份使用新的復原詞。舊的備份仍需要舊的復原詞。</string>
     <string name="history_backups_turn_off">關閉備份</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">你的帳號將停止儲存新的備份。已儲存的備份會保留在線上，你的復原詞仍然可以還原它們。</string>
     <string name="history_backups_schedule">此裝置會在連接 Wi-Fi 並充電時大約每天儲存一次備份。</string>
     <string name="history_backups_words_title">你的復原詞</string>
-    <string name="history_backups_words_message">請按順序抄下這 12 個詞，或儲存到密碼管理器。它們只會在此時顯示。任何拿到它們的人都能讀取你備份的歷史記錄。</string>
     <string name="history_backups_words_written">我已儲存</string>
     <string name="history_backups_copy_words">複製詞語</string>
     <string name="history_backups_confirm_title">確認復原詞</string>
     <string name="history_backups_confirm_message">請輸入清單中的第 %1$d 個詞和第 %2$d 個詞。如果你沒有抄寫下來，請取消並重新開始以取得新的復原詞。</string>
     <string name="history_backups_word_label">第 %1$d 個詞</string>
-    <string name="history_backups_restore_section">還原</string>
-    <string name="history_backups_restore_detail">將備份中的訊息還原到你仍在的聊天中。還原永遠不會變更你的金鑰，也不會讓你重新加入已離開的聊天。</string>
     <string name="history_backups_restore_words">復原詞</string>
     <string name="history_backups_restore_words_help">輸入全部 12 個詞，以空格分隔。</string>
     <string name="history_backups_restore">還原歷史記錄</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">已有還原正在進行。</string>
     <string name="history_backups_problem_expired">這些詞已失效。請重新開始以取得新的復原詞。</string>
     <string name="history_backups_problem_failed">發生問題。請重試。</string>
-    <string name="history_backups_chat_hint">某個備份中有此聊天較早的訊息。若要匯入，請在「設定 → 個人檔案 → 歷史記錄備份」中再次輸入相同的復原詞。</string>
+    <string name="history_backups_chat_hint">某個備份中有此聊天較早的訊息。若要匯入，請在「設定 → 資料與儲存空間 → 歷史記錄備份」中再次輸入相同的復原詞。</string>
     <string name="history_backups_reveal_warning">請確認沒有人能看到你的螢幕。顯示復原詞並妥善保存。</string>
     <string name="history_backups_word_correct">單詞正確</string>
     <string name="history_backups_word_incorrect">單詞錯誤</string>

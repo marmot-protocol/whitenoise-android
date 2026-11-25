@@ -76,7 +76,7 @@ internal fun rememberHistoryBackupsController(appState: WhiteNoiseAppState): His
 }
 
 /**
- * Settings → Account → History backups (#3655). The whole screen blocks screenshots because it shows or takes
+ * Settings → Data & storage → History backups (#3655). The whole screen blocks screenshots because it shows or takes
  * recovery words.
  */
 @Suppress("FunctionNaming")

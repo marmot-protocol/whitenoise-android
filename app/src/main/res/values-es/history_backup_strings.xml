@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">Copias del historial</string>
     <string name="explanation_organize_hub_history_backups">Guarda una copia cifrada de tu historial de chats, que se desbloquea con palabras de recuperación, para restaurarlo en una instalación nueva.</string>
-    <string name="history_backups_explanation">White Noise puede guardar en línea una copia cifrada de tu historial de chats. Doce palabras de recuperación la desbloquean para que puedas recuperar el historial en una instalación nueva. Tu clave privada nunca forma parte de una copia.</string>
     <string name="history_backups_status">Copias</string>
     <string name="history_backups_status_loading">Comprobando…</string>
     <string name="history_backups_status_unavailable">Aún no disponible</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">No se pudieron comprobar las copias</string>
     <string name="history_backups_retry">Reintentar</string>
     <string name="history_backups_unavailable">Esta versión de White Noise aún no puede crear ni restaurar copias del historial. Llegarán en una actualización posterior.</string>
-    <string name="history_backups_turn_on">Activar copias</string>
-    <string name="history_backups_turn_on_detail">Recibirás 12 palabras de recuperación para anotar.</string>
     <string name="history_backups_new_words">Obtener nuevas palabras de recuperación</string>
     <string name="history_backups_new_words_detail">Las copias nuevas usan las palabras nuevas. Las copias anteriores siguen necesitando tus palabras antiguas.</string>
     <string name="history_backups_turn_off">Desactivar copias</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">Tu cuenta deja de guardar copias nuevas. Las copias ya guardadas permanecen en línea y tus palabras de recuperación aún pueden restaurarlas.</string>
     <string name="history_backups_schedule">Este dispositivo guarda una copia aproximadamente una vez al día mientras se carga con wifi.</string>
     <string name="history_backups_words_title">Tus palabras de recuperación</string>
-    <string name="history_backups_words_message">Anota estas 12 palabras en orden o guárdalas en un gestor de contraseñas. Solo se muestran ahora. Cualquiera que las tenga puede leer tu historial guardado.</string>
     <string name="history_backups_words_written">Ya las guardé</string>
     <string name="history_backups_copy_words">Copiar palabras</string>
     <string name="history_backups_confirm_title">Confirma tus palabras</string>
     <string name="history_backups_confirm_message">Escribe la palabra %1$d y la palabra %2$d de tu lista. Si no las anotaste, cancela y empieza de nuevo para obtener otras palabras.</string>
     <string name="history_backups_word_label">Palabra %1$d</string>
-    <string name="history_backups_restore_section">Restaurar</string>
-    <string name="history_backups_restore_detail">Recupera mensajes de una copia en los chats en los que sigues. Restaurar nunca cambia tus claves ni te vuelve a unir a chats que dejaste.</string>
     <string name="history_backups_restore_words">Palabras de recuperación</string>
     <string name="history_backups_restore_words_help">Escribe las 12 palabras separadas por espacios.</string>
     <string name="history_backups_restore">Restaurar historial</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">Ya hay una restauración en curso.</string>
     <string name="history_backups_problem_expired">Estas palabras ya no son válidas. Empieza de nuevo para obtener palabras nuevas.</string>
     <string name="history_backups_problem_failed">Algo salió mal. Inténtalo de nuevo.</string>
-    <string name="history_backups_chat_hint">Una copia tiene mensajes anteriores de este chat. Para recuperarlos, vuelve a escribir las mismas palabras de recuperación en Configuración → Perfil → Copias del historial.</string>
+    <string name="history_backups_chat_hint">Una copia tiene mensajes anteriores de este chat. Para recuperarlos, vuelve a escribir las mismas palabras de recuperación en Configuración → Datos y almacenamiento → Copias del historial.</string>
     <string name="history_backups_reveal_warning">Asegúrate de que nadie pueda ver tu pantalla. Muestra las palabras y guárdalas en un lugar seguro.</string>
     <string name="history_backups_word_correct">Palabra correcta</string>
     <string name="history_backups_word_incorrect">Palabra incorrecta</string>

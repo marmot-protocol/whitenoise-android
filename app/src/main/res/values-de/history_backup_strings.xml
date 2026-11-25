@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">Verlaufssicherungen</string>
     <string name="explanation_organize_hub_history_backups">Bewahre eine verschlüsselte Kopie deines Chatverlaufs auf, die mit Wiederherstellungswörtern entsperrt wird, damit du ihn bei einer Neuinstallation wiederherstellen kannst.</string>
-    <string name="history_backups_explanation">White Noise kann eine verschlüsselte Kopie deines Chatverlaufs online speichern. Zwölf Wiederherstellungswörter entsperren sie, damit du den Verlauf bei einer Neuinstallation zurückholen kannst. Dein privater Schlüssel ist nie Teil einer Sicherung.</string>
     <string name="history_backups_status">Sicherungen</string>
     <string name="history_backups_status_loading">Wird geprüft…</string>
     <string name="history_backups_status_unavailable">Noch nicht verfügbar</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">Sicherungen konnten nicht geprüft werden</string>
     <string name="history_backups_retry">Erneut versuchen</string>
     <string name="history_backups_unavailable">Diese Version von White Noise kann noch keine Verlaufssicherungen erstellen oder wiederherstellen. Sie kommen mit einem späteren Update.</string>
-    <string name="history_backups_turn_on">Sicherungen aktivieren</string>
-    <string name="history_backups_turn_on_detail">Du erhältst 12 Wiederherstellungswörter zum Aufschreiben.</string>
     <string name="history_backups_new_words">Neue Wiederherstellungswörter erhalten</string>
     <string name="history_backups_new_words_detail">Neue Sicherungen verwenden die neuen Wörter. Ältere Sicherungen brauchen weiterhin deine alten Wörter.</string>
     <string name="history_backups_turn_off">Sicherungen deaktivieren</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">Dein Konto speichert keine neuen Sicherungen mehr. Bereits gespeicherte Sicherungen bleiben online und lassen sich weiterhin mit deinen Wiederherstellungswörtern wiederherstellen.</string>
     <string name="history_backups_schedule">Dieses Gerät speichert etwa einmal täglich eine Sicherung, während es im WLAN geladen wird.</string>
     <string name="history_backups_words_title">Deine Wiederherstellungswörter</string>
-    <string name="history_backups_words_message">Schreib diese 12 Wörter der Reihe nach auf oder speichere sie in einem Passwortmanager. Sie werden nur jetzt angezeigt. Wer sie hat, kann deinen gesicherten Verlauf lesen.</string>
     <string name="history_backups_words_written">Ich habe sie gespeichert</string>
     <string name="history_backups_copy_words">Wörter kopieren</string>
     <string name="history_backups_confirm_title">Wörter bestätigen</string>
     <string name="history_backups_confirm_message">Gib Wort %1$d und Wort %2$d aus deiner Liste ein. Falls du sie nicht aufgeschrieben hast, brich ab und beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_word_label">Wort %1$d</string>
-    <string name="history_backups_restore_section">Wiederherstellen</string>
-    <string name="history_backups_restore_detail">Hol Nachrichten aus einer Sicherung in Chats zurück, in denen du noch bist. Die Wiederherstellung ändert nie deine Schlüssel und tritt verlassenen Chats nie wieder bei.</string>
     <string name="history_backups_restore_words">Wiederherstellungswörter</string>
     <string name="history_backups_restore_words_help">Gib alle 12 Wörter durch Leerzeichen getrennt ein.</string>
     <string name="history_backups_restore">Verlauf wiederherstellen</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">Es läuft bereits eine Wiederherstellung.</string>
     <string name="history_backups_problem_expired">Diese Wörter sind nicht mehr gültig. Beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_problem_failed">Etwas ist schiefgelaufen. Versuche es erneut.</string>
-    <string name="history_backups_chat_hint">Eine Sicherung enthält ältere Nachrichten für diesen Chat. Gib dieselben Wiederherstellungswörter erneut unter Einstellungen → Profil → Verlaufssicherungen ein, um sie zu übernehmen.</string>
+    <string name="history_backups_chat_hint">Eine Sicherung enthält ältere Nachrichten für diesen Chat. Gib dieselben Wiederherstellungswörter erneut unter Einstellungen → Daten &amp; Speicher → Verlaufssicherungen ein, um sie zu übernehmen.</string>
     <string name="history_backups_reveal_warning">Achte darauf, dass niemand deinen Bildschirm sehen kann. Zeige die Wörter an und bewahre sie sicher auf.</string>
     <string name="history_backups_word_correct">Richtiges Wort</string>
     <string name="history_backups_word_incorrect">Falsches Wort</string>

@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">Sauvegardes de l’historique</string>
     <string name="explanation_organize_hub_history_backups">Conservez une copie chiffrée de l’historique de vos discussions, déverrouillée par des mots de récupération, pour la restaurer sur une nouvelle installation.</string>
-    <string name="history_backups_explanation">White Noise peut enregistrer en ligne une copie chiffrée de l’historique de vos discussions. Douze mots de récupération la déverrouillent pour retrouver l’historique sur une nouvelle installation. Votre clé privée ne fait jamais partie d’une sauvegarde.</string>
     <string name="history_backups_status">Sauvegardes</string>
     <string name="history_backups_status_loading">Vérification…</string>
     <string name="history_backups_status_unavailable">Pas encore disponible</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">Impossible de vérifier les sauvegardes</string>
     <string name="history_backups_retry">Réessayer</string>
     <string name="history_backups_unavailable">Cette version de White Noise ne peut pas encore créer ni restaurer de sauvegardes de l’historique. Elles arriveront dans une prochaine mise à jour.</string>
-    <string name="history_backups_turn_on">Activer les sauvegardes</string>
-    <string name="history_backups_turn_on_detail">Vous recevrez 12 mots de récupération à noter.</string>
     <string name="history_backups_new_words">Obtenir de nouveaux mots de récupération</string>
     <string name="history_backups_new_words_detail">Les nouvelles sauvegardes utilisent les nouveaux mots. Les anciennes nécessitent toujours vos anciens mots.</string>
     <string name="history_backups_turn_off">Désactiver les sauvegardes</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">Votre compte n’enregistre plus de nouvelles sauvegardes. Celles déjà enregistrées restent en ligne et vos mots de récupération peuvent toujours les restaurer.</string>
     <string name="history_backups_schedule">Cet appareil enregistre une sauvegarde environ une fois par jour lorsqu’il est en charge et connecté au Wi-Fi.</string>
     <string name="history_backups_words_title">Vos mots de récupération</string>
-    <string name="history_backups_words_message">Notez ces 12 mots dans l’ordre ou enregistrez-les dans un gestionnaire de mots de passe. Ils ne s’affichent que maintenant. Quiconque les possède peut lire votre historique sauvegardé.</string>
     <string name="history_backups_words_written">Je les ai enregistrés</string>
     <string name="history_backups_copy_words">Copier les mots</string>
     <string name="history_backups_confirm_title">Confirmez vos mots</string>
     <string name="history_backups_confirm_message">Saisissez le mot %1$d et le mot %2$d de votre liste. Si vous ne les avez pas notés, annulez et recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_word_label">Mot %1$d</string>
-    <string name="history_backups_restore_section">Restauration</string>
-    <string name="history_backups_restore_detail">Récupérez les messages d’une sauvegarde dans les discussions dont vous faites encore partie. La restauration ne modifie jamais vos clés et ne rejoint jamais les discussions quittées.</string>
     <string name="history_backups_restore_words">Mots de récupération</string>
     <string name="history_backups_restore_words_help">Saisissez les 12 mots, séparés par des espaces.</string>
     <string name="history_backups_restore">Restaurer l’historique</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">Une restauration est déjà en cours.</string>
     <string name="history_backups_problem_expired">Ces mots ne sont plus valides. Recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_problem_failed">Une erreur s’est produite. Réessayez.</string>
-    <string name="history_backups_chat_hint">Une sauvegarde contient des messages plus anciens de cette discussion. Pour les récupérer, saisissez à nouveau les mêmes mots de récupération dans Paramètres → Profil → Sauvegardes de l’historique.</string>
+    <string name="history_backups_chat_hint">Une sauvegarde contient des messages plus anciens de cette discussion. Pour les récupérer, saisissez à nouveau les mêmes mots de récupération dans Paramètres → Données et stockage → Sauvegardes de l’historique.</string>
     <string name="history_backups_reveal_warning">Assure-toi que personne ne voit ton écran. Affiche les mots et conserve-les en lieu sûr.</string>
     <string name="history_backups_word_correct">Mot correct</string>
     <string name="history_backups_word_incorrect">Mot incorrect</string>

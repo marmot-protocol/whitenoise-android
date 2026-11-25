@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">Backup della cronologia</string>
     <string name="explanation_organize_hub_history_backups">Conserva una copia crittografata della cronologia delle chat, sbloccata dalle parole di recupero, per ripristinarla su una nuova installazione.</string>
-    <string name="history_backups_explanation">White Noise può salvare online una copia crittografata della cronologia delle chat. Dodici parole di recupero la sbloccano, così puoi riavere la cronologia su una nuova installazione. La tua chiave privata non fa mai parte di un backup.</string>
     <string name="history_backups_status">Backup</string>
     <string name="history_backups_status_loading">Verifica in corso…</string>
     <string name="history_backups_status_unavailable">Non ancora disponibile</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">Impossibile verificare i backup</string>
     <string name="history_backups_retry">Riprova</string>
     <string name="history_backups_unavailable">Questa versione di White Noise non può ancora creare o ripristinare backup della cronologia. Arriveranno in un aggiornamento successivo.</string>
-    <string name="history_backups_turn_on">Attiva backup</string>
-    <string name="history_backups_turn_on_detail">Riceverai 12 parole di recupero da annotare.</string>
     <string name="history_backups_new_words">Ottieni nuove parole di recupero</string>
     <string name="history_backups_new_words_detail">I nuovi backup usano le nuove parole. I backup precedenti richiedono ancora le vecchie parole.</string>
     <string name="history_backups_turn_off">Disattiva backup</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">Il tuo account smette di salvare nuovi backup. I backup già salvati restano online e le parole di recupero possono ancora ripristinarli.</string>
     <string name="history_backups_schedule">Questo dispositivo salva un backup circa una volta al giorno mentre è in carica e connesso al Wi-Fi.</string>
     <string name="history_backups_words_title">Le tue parole di recupero</string>
-    <string name="history_backups_words_message">Annota queste 12 parole in ordine o salvale in un gestore di password. Vengono mostrate solo ora. Chiunque le abbia può leggere la cronologia salvata.</string>
     <string name="history_backups_words_written">Le ho salvate</string>
     <string name="history_backups_copy_words">Copia parole</string>
     <string name="history_backups_confirm_title">Conferma le parole</string>
     <string name="history_backups_confirm_message">Digita la parola %1$d e la parola %2$d dal tuo elenco. Se non le hai annotate, annulla e ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_word_label">Parola %1$d</string>
-    <string name="history_backups_restore_section">Ripristino</string>
-    <string name="history_backups_restore_detail">Recupera i messaggi da un backup nelle chat di cui fai ancora parte. Il ripristino non cambia mai le tue chiavi e non ti fa rientrare nelle chat che hai lasciato.</string>
     <string name="history_backups_restore_words">Parole di recupero</string>
     <string name="history_backups_restore_words_help">Inserisci tutte le 12 parole, separate da spazi.</string>
     <string name="history_backups_restore">Ripristina cronologia</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">Un ripristino è già in corso.</string>
     <string name="history_backups_problem_expired">Queste parole non sono più valide. Ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_problem_failed">Qualcosa è andato storto. Riprova.</string>
-    <string name="history_backups_chat_hint">Un backup contiene messaggi meno recenti di questa chat. Per recuperarli, inserisci di nuovo le stesse parole di recupero in Impostazioni → Profilo → Backup della cronologia.</string>
+    <string name="history_backups_chat_hint">Un backup contiene messaggi meno recenti di questa chat. Per recuperarli, inserisci di nuovo le stesse parole di recupero in Impostazioni → Dati e archiviazione → Backup della cronologia.</string>
     <string name="history_backups_reveal_warning">Assicurati che nessuno possa vedere lo schermo. Mostra le parole e conservale in un luogo sicuro.</string>
     <string name="history_backups_word_correct">Parola corretta</string>
     <string name="history_backups_word_incorrect">Parola errata</string>

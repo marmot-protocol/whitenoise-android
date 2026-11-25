@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">Резервные копии истории</string>
     <string name="explanation_organize_hub_history_backups">Храните зашифрованную копию истории чатов, которую открывают слова восстановления, чтобы вернуть её после новой установки.</string>
-    <string name="history_backups_explanation">White Noise может сохранять зашифрованную копию истории чатов в сети. Её открывают двенадцать слов восстановления, чтобы вернуть историю после новой установки. Закрытый ключ никогда не входит в копию.</string>
     <string name="history_backups_status">Резервные копии</string>
     <string name="history_backups_status_loading">Проверка…</string>
     <string name="history_backups_status_unavailable">Пока недоступно</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">Не удалось проверить копии</string>
     <string name="history_backups_retry">Повторить</string>
     <string name="history_backups_unavailable">Эта версия White Noise пока не умеет создавать и восстанавливать резервные копии истории. Они появятся в одном из следующих обновлений.</string>
-    <string name="history_backups_turn_on">Включить копии</string>
-    <string name="history_backups_turn_on_detail">Вы получите 12 слов восстановления, которые нужно записать.</string>
     <string name="history_backups_new_words">Получить новые слова восстановления</string>
     <string name="history_backups_new_words_detail">Новые копии используют новые слова. Для старых копий по-прежнему нужны старые слова.</string>
     <string name="history_backups_turn_off">Выключить копии</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">Аккаунт перестанет сохранять новые копии. Уже сохранённые копии останутся в сети, и слова восстановления по-прежнему смогут их восстановить.</string>
     <string name="history_backups_schedule">Это устройство сохраняет копию примерно раз в день, когда заряжается и подключено к Wi-Fi.</string>
     <string name="history_backups_words_title">Ваши слова восстановления</string>
-    <string name="history_backups_words_message">Запишите эти 12 слов по порядку или сохраните их в менеджере паролей. Они показываются только сейчас. Любой, у кого они есть, сможет прочитать сохранённую историю.</string>
     <string name="history_backups_words_written">Слова сохранены</string>
     <string name="history_backups_copy_words">Скопировать слова</string>
     <string name="history_backups_confirm_title">Подтвердите слова</string>
     <string name="history_backups_confirm_message">Введите слово %1$d и слово %2$d из своего списка. Если вы их не записали, отмените и начните заново, чтобы получить новые слова.</string>
     <string name="history_backups_word_label">Слово %1$d</string>
-    <string name="history_backups_restore_section">Восстановление</string>
-    <string name="history_backups_restore_detail">Верните сообщения из копии в чаты, в которых вы ещё состоите. Восстановление не меняет ваши ключи и не возвращает вас в покинутые чаты.</string>
     <string name="history_backups_restore_words">Слова восстановления</string>
     <string name="history_backups_restore_words_help">Введите все 12 слов через пробел.</string>
     <string name="history_backups_restore">Восстановить историю</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">Восстановление уже идёт.</string>
     <string name="history_backups_problem_expired">Эти слова больше не действуют. Начните заново, чтобы получить новые.</string>
     <string name="history_backups_problem_failed">Что-то пошло не так. Попробуйте ещё раз.</string>
-    <string name="history_backups_chat_hint">В резервной копии есть более старые сообщения этого чата. Чтобы вернуть их, снова введите те же слова восстановления в разделе Настройки → Профиль → Резервные копии истории.</string>
+    <string name="history_backups_chat_hint">В резервной копии есть более старые сообщения этого чата. Чтобы вернуть их, снова введите те же слова восстановления в разделе Настройки → Данные и хранилище → Резервные копии истории.</string>
     <string name="history_backups_reveal_warning">Убедитесь, что никто не видит ваш экран. Покажите слова и сохраните их в надёжном месте.</string>
     <string name="history_backups_word_correct">Верное слово</string>
     <string name="history_backups_word_incorrect">Неверное слово</string>

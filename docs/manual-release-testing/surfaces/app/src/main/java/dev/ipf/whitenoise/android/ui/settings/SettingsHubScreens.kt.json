@@ -448,8 +448,7 @@
           "SET-071"
         ]
       }
-    ],
-    "string_resources": []
+    ]
   },
   "discovery_exceptions": []
 }

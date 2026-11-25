@@ -61,7 +61,7 @@ internal class RecoveryWordsSetup(
     val confirming: Boolean = false,
     private val expectedAnswers: List<String> = emptyList(),
 ) {
-    /** The words are shown once: confirmation keeps only the positions, so they cannot be displayed again. */
+    /** Confirmation retains only the requested positions and their two expected words for feedback. */
     fun confirming(): RecoveryWordsSetup =
         RecoveryWordsSetup(
             emptyList(),
@@ -74,7 +74,17 @@ internal class RecoveryWordsSetup(
     fun matchesAnswer(
         index: Int,
         answer: String,
-    ): Boolean? = expectedAnswers.getOrNull(index)?.let { it.equals(answer.trim(), ignoreCase = true) }
+    ): Boolean? {
+        val expected = expectedAnswers.getOrNull(index) ?: return null
+        val typed = answer.trim()
+        if (typed.any { it !in 'a'..'z' && it !in 'A'..'Z' }) return false
+        val normalized = typed.lowercase()
+        return when {
+            expected == normalized -> true
+            expected.startsWith(normalized) -> null
+            else -> false
+        }
+    }
 
     /** Formats setup state without exposing the words. */
     override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirming=$confirming)"

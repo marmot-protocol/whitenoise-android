@@ -57,6 +57,7 @@ internal fun RecoveryWordsSetupContent(
     actions: HistoryBackupsActions,
 ) {
     var revealed by remember(setup) { mutableStateOf(false) }
+    var revealedOnce by remember(setup) { mutableStateOf(false) }
     val first = remember(setup.confirmPositions) { TextFieldState() }
     val second = remember(setup.confirmPositions) { TextFieldState() }
     DisposableEffect(first, second) {
@@ -76,14 +77,21 @@ internal fun RecoveryWordsSetupContent(
         SettingsList(modifier = Modifier.testTag("history_backups.setup")) {
             if (!setup.confirming) {
                 item(key = "words.message") {
-                    RecoveryWordsControls(setup.words, revealed, onToggleReveal = { revealed = !revealed })
+                    RecoveryWordsControls(
+                        setup.words,
+                        revealed,
+                        onToggleReveal = {
+                            revealed = !revealed
+                            if (revealed) revealedOnce = true
+                        },
+                    )
                 }
                 item(key = "words.grid") { RecoveryWordsGrid(setup.words, revealed) }
                 item(key = "words.actions") {
                     SetupButtons(
                         primary = stringResource(R.string.history_backups_words_written),
                         onPrimary = actions.onWordsWritten,
-                        primaryEnabled = revealed,
+                        primaryEnabled = revealedOnce,
                         secondary = stringResource(R.string.cancel),
                         onSecondary = actions.onCancelSetup,
                         primaryTag = "history_backups.words_written",

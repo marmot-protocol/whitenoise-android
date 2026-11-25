@@ -2,7 +2,6 @@
 <resources>
     <string name="history_backups">历史记录备份</string>
     <string name="explanation_organize_hub_history_backups">保存一份由恢复词解锁的加密聊天记录副本，以便在重新安装后恢复。</string>
-    <string name="history_backups_explanation">White Noise 可以将聊天记录的加密副本保存在线上。十二个恢复词可以解锁它，让你在重新安装后找回历史记录。你的私钥永远不会包含在备份中。</string>
     <string name="history_backups_status">备份</string>
     <string name="history_backups_status_loading">正在检查…</string>
     <string name="history_backups_status_unavailable">暂不可用</string>
@@ -12,8 +11,6 @@
     <string name="history_backups_status_failed">无法检查备份</string>
     <string name="history_backups_retry">重试</string>
     <string name="history_backups_unavailable">此版本的 White Noise 还不能创建或恢复历史记录备份。该功能将在后续更新中推出。</string>
-    <string name="history_backups_turn_on">开启备份</string>
-    <string name="history_backups_turn_on_detail">你会得到 12 个需要抄写下来的恢复词。</string>
     <string name="history_backups_new_words">获取新的恢复词</string>
     <string name="history_backups_new_words_detail">新的备份使用新的恢复词。旧的备份仍需要旧的恢复词。</string>
     <string name="history_backups_turn_off">关闭备份</string>
@@ -21,14 +18,11 @@
     <string name="history_backups_turn_off_message">你的账户将停止保存新的备份。已保存的备份会保留在线上，你的恢复词仍然可以恢复它们。</string>
     <string name="history_backups_schedule">此设备会在连接 Wi-Fi 并充电时大约每天保存一次备份。</string>
     <string name="history_backups_words_title">你的恢复词</string>
-    <string name="history_backups_words_message">请按顺序抄下这 12 个词，或保存到密码管理器。它们只会在此时显示。任何拿到它们的人都能读取你备份的历史记录。</string>
     <string name="history_backups_words_written">我已保存</string>
     <string name="history_backups_copy_words">复制词语</string>
     <string name="history_backups_confirm_title">确认恢复词</string>
     <string name="history_backups_confirm_message">请输入列表中的第 %1$d 个词和第 %2$d 个词。如果你没有抄写下来，请取消并重新开始以获取新的恢复词。</string>
     <string name="history_backups_word_label">第 %1$d 个词</string>
-    <string name="history_backups_restore_section">恢复</string>
-    <string name="history_backups_restore_detail">将备份中的消息恢复到你仍在的聊天中。恢复永远不会更改你的密钥，也不会让你重新加入已离开的聊天。</string>
     <string name="history_backups_restore_words">恢复词</string>
     <string name="history_backups_restore_words_help">输入全部 12 个词，用空格分隔。</string>
     <string name="history_backups_restore">恢复历史记录</string>
@@ -47,7 +41,7 @@
     <string name="history_backups_problem_restore_busy">已有恢复正在进行。</string>
     <string name="history_backups_problem_expired">这些词已失效。请重新开始以获取新的恢复词。</string>
     <string name="history_backups_problem_failed">出了点问题。请重试。</string>
-    <string name="history_backups_chat_hint">某个备份中有此聊天更早的消息。要导入它们，请在“设置 → 个人资料 → 历史记录备份”中再次输入相同的恢复词。</string>
+    <string name="history_backups_chat_hint">某个备份中有此聊天更早的消息。要导入它们，请在“设置 → 数据与存储 → 历史记录备份”中再次输入相同的恢复词。</string>
     <string name="history_backups_reveal_warning">请确认没人能看到你的屏幕。显示恢复词并妥善保存。</string>
     <string name="history_backups_word_correct">单词正确</string>
     <string name="history_backups_word_incorrect">单词错误</string>

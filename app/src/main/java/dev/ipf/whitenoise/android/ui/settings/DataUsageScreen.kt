@@ -126,7 +126,7 @@ internal fun DataUsageScreen(
                             routeKey = SettingsDetail.HistoryBackups,
                             explanation = stringResource(R.string.explanation_organize_hub_history_backups),
                             onClick = onOpenHistoryBackups,
-                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_history) },
                         )
                     }
                     row("manage_storage") { context ->
