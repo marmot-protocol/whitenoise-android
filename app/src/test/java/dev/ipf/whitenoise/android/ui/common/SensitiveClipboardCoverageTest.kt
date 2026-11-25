@@ -48,7 +48,7 @@ class SensitiveClipboardCoverageTest {
         val screen = appModuleSource(ACCOUNT_KEYS)
         assertTrue("copySensitiveToClipboard(context, privateKeyLabel, " in screen)
         assertTrue("copySensitiveToClipboard(context, encryptedBackupLabel, " in screen)
-        assertTrue("copyToClipboard(context, publicKeyLabel, " in screen)
+        assertTrue("copier.copy(npub, publicKeyLabel)" in screen)
         assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PUBLIC_COPY).functionBody("copyToClipboard"))
     }
 
@@ -85,12 +85,12 @@ class SensitiveClipboardCoverageTest {
     private companion object {
         val FUNCTION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?(\w+)\s*\(""")
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
-        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/CopyToClipboard.kt"
+        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/ClipboardCopier.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
         val DIRECT_WRITERS =
             listOf(
                 "common/Clipboard.kt",
-                "common/CopyToClipboard.kt",
+                "common/ClipboardCopier.kt",
                 "conversation/messages/MessageBubble.kt",
                 "conversation/messages/MessageTextSelection.kt",
             )
