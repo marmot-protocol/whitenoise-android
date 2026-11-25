@@ -24,7 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -119,9 +118,9 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
-import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -1614,12 +1613,15 @@ internal fun GroupDetailsScreen(
                 scrollBehavior = detailsScrollBehavior,
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 topBar = {
-                    TopAppBar(
+                    WhiteNoiseTopBar(
+                        title = conversationTitle,
+                        onBack = onBack,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier =
                             Modifier.onGloballyPositioned {
                                 headerBottom = it.positionInWindow().y + it.size.height
                             },
-                        title = {
+                        titleContent = {
                             if (showHeaderIdentity) {
                                 Row(
                                     modifier = Modifier.testTag("chat_info.header_identity"),
@@ -1646,20 +1648,6 @@ internal fun GroupDetailsScreen(
                                         style = MaterialTheme.typography.titleLarge,
                                     )
                                 }
-                            }
-                        },
-                        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
-                        colors =
-                            androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    painterResource(R.drawable.ic_arrow_back),
-                                    contentDescription = stringResource(R.string.back),
-                                )
                             }
                         },
                     )
