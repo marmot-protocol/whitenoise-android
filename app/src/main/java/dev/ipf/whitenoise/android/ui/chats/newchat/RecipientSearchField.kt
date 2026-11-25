@@ -83,6 +83,7 @@ internal fun RecipientSearchField(
         enabled = enabled,
         outlined = true,
         keyboardOptions = RecipientSearchKeyboardOptions,
+        clearDescription = stringResource(R.string.clear),
         onClear = { state.replaceRecipientText("") },
         emptyTrailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {

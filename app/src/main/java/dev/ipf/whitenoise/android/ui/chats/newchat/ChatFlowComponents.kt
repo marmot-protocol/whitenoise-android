@@ -66,6 +66,7 @@ internal fun FlowSearchField(
         placeholder = placeholder,
         outlined = true,
         keyboardOptions = RecipientSearchKeyboardOptions,
+        clearDescription = stringResource(R.string.clear),
         emptyTrailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PublicIdentifierFieldTrailingAction(
