@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import android.os.Build
-import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
@@ -32,7 +30,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -271,20 +268,17 @@ private suspend fun PointerInputScope.copyOnShortTap(
 }
 
 /**
- * Copies [npub] to the clipboard. Android 13 and later confirm clipboard writes themselves; older supported releases
- * get the app's localized Copied toast, as other compact copy sites do.
+ * Copies [npub] to the clipboard and confirms it through [rememberCopyConfirmation].
  */
 @Composable
 private fun rememberPublicKeyCopy(npub: String): () -> Unit {
     val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
+    val confirmCopied = rememberCopyConfirmation()
     val current by rememberUpdatedState(npub)
-    return remember(clipboard, context) {
+    return remember(clipboard, confirmCopied) {
         {
             clipboard.setText(AnnotatedString(current))
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-            }
+            confirmCopied()
         }
     }
 }

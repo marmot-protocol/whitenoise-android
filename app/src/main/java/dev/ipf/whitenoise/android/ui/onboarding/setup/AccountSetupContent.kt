@@ -35,6 +35,7 @@ import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 /** Lifecycle-aware route; the process-owned controller survives Activity recreation and signer handoff. */
@@ -127,15 +128,17 @@ internal fun AccountSetupContent(
                 )
                 SetupEditorContent(editor, checkNotNull(fields), state.busy, randomName, step?.findings.orEmpty())
                 state.relayRemovalIssue?.let { issue ->
-                    Text(
-                        stringResource(
-                            if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
-                                R.string.setup_repair_edit_unavailable
-                            } else {
-                                R.string.setup_add_relay_before_saving
-                            },
-                        ),
-                        color = MaterialTheme.colorScheme.error,
+                    WhiteNoiseCallout(
+                        text =
+                            stringResource(
+                                if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
+                                    R.string.setup_repair_edit_unavailable
+                                } else {
+                                    R.string.setup_add_relay_before_saving
+                                },
+                            ),
+                        icon = R.drawable.ic_error,
+                        isError = true,
                     )
                 }
                 SetupEditorActions(
@@ -258,9 +261,10 @@ private fun SetupErrors(
 ) {
     val connectionLost = state.disconnected && state.snapshot?.ready != true
     if (state.error || connectionLost || state.staleDecision) {
-        Text(
-            stringResource(if (state.staleDecision) R.string.setup_stale else R.string.setup_retry_help),
-            color = MaterialTheme.colorScheme.error,
+        WhiteNoiseCallout(
+            text = stringResource(if (state.staleDecision) R.string.setup_stale else R.string.setup_retry_help),
+            icon = R.drawable.ic_error,
+            isError = true,
         )
         if (state.snapshot?.ready != true) {
             OutlinedButton(onClick = onReconnect, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {

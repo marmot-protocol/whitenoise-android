@@ -164,20 +164,19 @@
     <string name="leave_and_delete_message">退出此群組並從此裝置刪除聊天記錄？</string>
     <string name="toast_left_chat_delete_failed">已退出群組，但本機刪除失敗。</string>
     <string name="group_reset_action">重設並等待新邀請</string>
-    <string name="group_reset_dialog_title">要在此裝置上重設此群組嗎？</string>
-    <string name="group_reset_dialog_message">White Noise 只會在此裝置上清除該群組的歷史紀錄與加密狀態，不會傳送任何內容給群組。只有當管理員在此次重設後傳送新的邀請時，你才會重新加入。</string>
+    <string name="group_reset_dialog_title">要重設此群組嗎？</string>
+    <string name="group_reset_dialog_message">清除這個群組在此裝置上的歷史紀錄與加密狀態，不會傳送任何內容。要重新加入，你需要管理員在重設後建立的新邀請。</string>
     <string name="group_reset_confirm">重設</string>
     <string name="toast_group_reset_done">群組已重設。收到新邀請後會重新出現。</string>
     <string name="toast_group_reset_already_waiting">此群組已在等待新的邀請。</string>
     <string name="toast_couldnt_reset_group">無法重設群組，請再試一次。</string>
-    <string name="chat_abandon_dialog_title">要從此裝置刪除此對話嗎？</string>
-    <string name="chat_abandon_dialog_message">在此處刪除並停止接收新訊息。不會傳送任何內容。</string>
+    <string name="chat_abandon_dialog_title">要刪除此聊天室嗎？</string>
+    <string name="chat_abandon_dialog_message">從此裝置清除此聊天室並停止接收新訊息，不會傳送任何內容。</string>
     <string name="chat_abandon_confirm">放棄</string>
     <string name="abandon_identity_chat">對話：%1$s</string>
     <string name="abandon_identity_group">群組：%1$s</string>
-    <string name="abandon_identity_account">你的帳號：%1$s</string>
     <string name="chats_abandon_action">在此裝置上放棄所選對話</string>
-    <string name="chats_abandon_dialog_title">要在此裝置上放棄所選對話嗎？</string>
+    <string name="chats_abandon_dialog_title">要在此裝置上放棄聊天室嗎？</string>
     <string name="toast_chat_already_abandoned">此對話已從此裝置刪除。</string>
     <string name="leave_blocked_abandon_hint_dm">離開未完成。你可以改為從此裝置刪除此對話，不會傳送任何內容給對方。</string>
     <string name="leave_blocked_abandon_hint_group">離開未完成。你可以改為在此裝置上重設此群組，不會傳送任何內容給群組。</string>
@@ -1504,9 +1503,15 @@
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_90_days">3 個月</string>
     <string name="disappearing_custom">自訂時間</string>
-    <string name="disappearing_days_format">%1$d 天</string>
-    <string name="disappearing_hours_format">%1$d 小時</string>
-    <string name="disappearing_minutes_format">%1$d 分鐘</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="other">%d 天</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="other">%d 小時</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="other">%d 分鐘</item>
+    </plurals>
     <string name="disappearing_unit_minutes">分鐘</string>
     <string name="disappearing_unit_hours">小時</string>
     <string name="disappearing_unit_days">天</string>
@@ -1544,7 +1549,9 @@
     <string name="disappearing_5_minutes">5 分鐘</string>
     <string name="disappearing_30_seconds">30 秒</string>
     <string name="disappearing_explainer">未讀的已接收訊息會在你閱讀時開始計時。其他新訊息會在你設定的時長後對所有人永久刪除。</string>
-    <string name="disappearing_seconds_format">%1$d 秒</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="other">%d 秒</item>
+    </plurals>
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
     <string name="disappearing_custom_decrease">縮短</string>

@@ -42,11 +42,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 
 /** Existing synthetic public key used by the group header fixtures; no native formatter is needed. */
-internal fun WhiteNoiseAppState.withGroupReviewActorNpub(): WhiteNoiseAppState {
+internal fun WhiteNoiseAppState.withGroupReviewActorNpub(
+    actorHex: String = GROUP_REVIEW_ACTOR_HEX,
+    actorNpub: String = GROUP_REVIEW_ACTOR_NPUB,
+): WhiteNoiseAppState {
     val field = WhiteNoiseAppState::class.java.getDeclaredField("npubs")
     field.isAccessible = true
     val cache = field.get(this) as BoundedNpubCache
-    cache.put(GROUP_REVIEW_ACTOR_HEX, GROUP_REVIEW_ACTOR_NPUB)
+    cache.put(actorHex, actorNpub)
     // Match the shared picker fixture's a0 public key as well.
     cache.put("a0".repeat(32), "npub15zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zs2pg9q5zsqun85q9")
     return this

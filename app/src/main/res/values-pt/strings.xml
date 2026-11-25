@@ -172,20 +172,19 @@
     <string name="leave_and_delete_message">Sair do grupo e excluir seu histórico deste dispositivo?</string>
     <string name="toast_left_chat_delete_failed">Você saiu do grupo. A exclusão local falhou.</string>
     <string name="group_reset_action">Redefinir e aguardar um novo convite</string>
-    <string name="group_reset_dialog_title">Redefinir este grupo neste dispositivo?</string>
-    <string name="group_reset_dialog_message">O White Noise apaga o histórico e o estado de criptografia deste grupo apenas neste dispositivo. Nada é enviado ao grupo. Você só voltará a entrar quando um administrador enviar um novo convite criado após esta redefinição.</string>
+    <string name="group_reset_dialog_title">Redefinir este grupo?</string>
+    <string name="group_reset_dialog_message">Apaga o histórico e o estado de criptografia deste grupo neste dispositivo. Nada é enviado. Para voltar ao grupo, você precisa de um novo convite criado por um administrador após a redefinição.</string>
     <string name="group_reset_confirm">Redefinir</string>
     <string name="toast_group_reset_done">Grupo redefinido. Ele reaparecerá quando chegar um novo convite.</string>
     <string name="toast_group_reset_already_waiting">Este grupo já está aguardando um novo convite.</string>
     <string name="toast_couldnt_reset_group">Não foi possível redefinir o grupo. Tente novamente.</string>
-    <string name="chat_abandon_dialog_title">Excluir esta conversa deste dispositivo?</string>
-    <string name="chat_abandon_dialog_message">Apaga-a aqui e para as novas mensagens. Nada é enviado.</string>
+    <string name="chat_abandon_dialog_title">Excluir esta conversa?</string>
+    <string name="chat_abandon_dialog_message">Apaga a conversa deste dispositivo e interrompe o recebimento de novas mensagens. Nada é enviado.</string>
     <string name="chat_abandon_confirm">Abandonar</string>
     <string name="abandon_identity_chat">Conversa: %1$s</string>
     <string name="abandon_identity_group">Grupo: %1$s</string>
-    <string name="abandon_identity_account">Sua conta: %1$s</string>
     <string name="chats_abandon_action">Abandonar as conversas neste dispositivo</string>
-    <string name="chats_abandon_dialog_title">Abandonar as conversas selecionadas neste dispositivo?</string>
+    <string name="chats_abandon_dialog_title">Abandonar as conversas neste dispositivo?</string>
     <string name="toast_chat_already_abandoned">Esta conversa já foi excluída deste dispositivo.</string>
     <string name="leave_blocked_abandon_hint_dm">A saída não foi concluída. Em vez disso, você pode excluir esta conversa deste dispositivo. Nada é enviado à outra pessoa.</string>
     <string name="leave_blocked_abandon_hint_group">A saída não foi concluída. Em vez disso, você pode redefinir este grupo neste dispositivo. Nada é enviado ao grupo.</string>
@@ -1521,9 +1520,18 @@
     <string name="disappearing_1_day">1 dia</string>
     <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tempo personalizado</string>
-    <string name="disappearing_days_format">%1$d dias</string>
-    <string name="disappearing_hours_format">%1$d horas</string>
-    <string name="disappearing_minutes_format">%1$d minutos</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d dia</item>
+        <item quantity="other">%d dias</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d hora</item>
+        <item quantity="other">%d horas</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minuto</item>
+        <item quantity="other">%d minutos</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutos</string>
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Dias</string>
@@ -1564,7 +1572,10 @@
     <string name="disappearing_5_minutes">5 minutos</string>
     <string name="disappearing_30_seconds">30 segundos</string>
     <string name="disappearing_explainer">As mensagens recebidas não lidas iniciam o temporizador quando você as lê. As outras mensagens novas são excluídas permanentemente para todos após o período escolhido.</string>
-    <string name="disappearing_seconds_format">%1$d segundos</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d segundo</item>
+        <item quantity="other">%d segundos</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Definir</string>
     <string name="disappearing_custom_decrease">Encurtar</string>

@@ -217,7 +217,6 @@ internal fun WhiteNoiseApp(
     val diagnosticsPromptOpen = diagnosticsPromptOwner.prompt.visible || diagnosticsPromptOwner.busy
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
-    // One owner decides which top slot shows the app's temporary banners; under app lock none does.
     val topNoticeHost =
         remember(appState, snackbarHostState) {
             TopNoticeHost(
@@ -226,6 +225,7 @@ internal fun WhiteNoiseApp(
                 partial = appState::currentPartialNotice,
                 dismissNotice = appState::clearTransientNotice,
                 presentationAllowed = { !appState.appLock.screenVisible },
+                present = { titleRes, kind -> appState.presentTransient(titleRes, kind = kind) },
             )
         }
     val transientNotice = appState.transientNotice

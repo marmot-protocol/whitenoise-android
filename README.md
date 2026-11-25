@@ -11,6 +11,10 @@ MDK owns shared product logic and authoritative state. Follow [the agent guide](
 and [MDK's host boundary](https://github.com/marmot-protocol/mdk/blob/master/docs/marmot-architecture/overview/app-core-boundary.md#host-app-boundary)
 when choosing where to implement a change.
 
+For UI work, the [Android design guide](docs/android-ui-patterns.md) explains
+which choices come from Material, which belong to White Noise, and how to
+review them using examples from the app.
+
 ## Common Commands
 
 ```bash
