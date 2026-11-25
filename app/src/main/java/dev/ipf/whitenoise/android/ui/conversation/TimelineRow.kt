@@ -94,10 +94,6 @@ internal fun TimelineRow(
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
     val agentTurnSteps = LocalAgentTurnSteps.current
-    // A step folded under its agent turn keeps its slot but draws nothing. Day separators, history
-    // markers, sender runs and avatars are decided against the nearest rows that do draw.
-    val shownOlder = agentTurnSteps.shownOlder(item, older)
-    val shownNewer = agentTurnSteps.shownNewer(item, newer)
     ReactionMotionRow(
         reactionMotion,
         modifier.overlapFoldedAgentRows(
@@ -107,6 +103,9 @@ internal fun TimelineRow(
         reactionViewport,
     ) {
         if (agentTurnSteps.isFolded(item.record.messageIdHex)) return@ReactionMotionRow
+        // Only a row that draws needs to look past folded steps for its separators and sender run.
+        val shownOlder = agentTurnSteps.shownOlder(item, older)
+        val shownNewer = agentTurnSteps.shownNewer(item, newer)
         val dateFormat = DateTimeFormatState.dateFormat
         val daySeparatorLabel =
             remember(shownOlder?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
