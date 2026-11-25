@@ -47,10 +47,12 @@ name: preferences-bubble-colors-invalid-reset
 - assertVisible:
     id: bubble_colors.save
     enabled: false
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.reset
+    direction: DOWN
 - tapOn:
-    id: bubble_colors.menu
-- assertVisible: Reset to default
-- tapOn: Reset to default
+    id: bubble_colors.reset
 - assertVisible:
     id: bubble_colors.save
     enabled: false

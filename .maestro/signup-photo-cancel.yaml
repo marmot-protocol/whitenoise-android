@@ -13,9 +13,9 @@ name: signup-photo-cancel
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - tapOn:
     id: "onboarding.sign_up.photo"
 - assertVisible: "Choose photos"
@@ -27,5 +27,5 @@ name: signup-photo-cancel
     id: "onboarding.sign_up.action"
     enabled: true
 - tapOn: "Back"
-- assertVisible: "Sign In"
+- assertVisible: "Sign in"
 - takeScreenshot: signup-photo-cancel

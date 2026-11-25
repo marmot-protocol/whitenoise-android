@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.ui.settings.KEY_PACKAGES_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.KeyPackagesContent
 import dev.ipf.whitenoise.android.ui.settings.keyPackagesState
@@ -99,7 +100,32 @@ class KeyPackagesScreenScreenshotTest {
         )
     }
 
+    /** Relay history as one settings group: the current event first, then a superseded one, on its card. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h1600dp-mdpi")
+    fun keyPackagesRelayHistoryLight() {
+        capture(
+            listOf(keyPackage("34".repeat(32), "ab".repeat(32), true)),
+            "src/test/snapshots/key_packages_relay_history_light.png",
+            dark = false,
+            relayEvents = relayEvents(),
+        )
+    }
+
+    /** The same relay history in AMOLED, where the group draws its outline on black. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h1600dp-mdpi")
+    fun keyPackagesRelayHistoryAmoled() {
+        capture(
+            listOf(keyPackage("34".repeat(32), "ab".repeat(32), true)),
+            "src/test/snapshots/key_packages_relay_history_amoled.png",
+            amoled = true,
+            relayEvents = relayEvents(),
+        )
+    }
+
     /** Renders the fixture and records its screenshot baseline. */
+    @Suppress("LongParameterList")
     private fun capture(
         packages: List<AccountKeyPackageFfi>,
         path: String,
@@ -108,6 +134,7 @@ class KeyPackagesScreenScreenshotTest {
         rtl: Boolean = false,
         fontScale: Float = 1f,
         refreshFailed: Boolean = false,
+        relayEvents: List<AccountKeyPackageRelayEventFfi> = emptyList(),
     ) {
         val originalTimeZone = TimeZone.getDefault()
         try {
@@ -135,6 +162,7 @@ class KeyPackagesScreenScreenshotTest {
                                 onRepublish = {},
                                 onPublishNew = {},
                                 onDelete = {},
+                                relayEvents = relayEvents,
                             )
                         }
                     }
@@ -148,6 +176,29 @@ class KeyPackagesScreenScreenshotTest {
             TimeZone.setDefault(originalTimeZone)
         }
     }
+
+    /** One current event on two relays and an older superseded one, as MDK reports a rotated slot. */
+    private fun relayEvents() =
+        listOf(
+            relayEvent("ab".repeat(32), createdAt = 1_700_000_000uL, current = true),
+            relayEvent("cd".repeat(32), createdAt = 1_699_000_000uL, current = false),
+        )
+
+    /** A relay event for the fixture account with the given id, time and current flag. */
+    private fun relayEvent(
+        eventIdHex: String,
+        createdAt: ULong,
+        current: Boolean,
+    ) = AccountKeyPackageRelayEventFfi(
+        accountIdHex = "12".repeat(32),
+        keyPackageId = "stable-package-slot",
+        keyPackageRefHex = eventIdHex.reversed(),
+        eventIdHex = eventIdHex,
+        createdAt = createdAt,
+        keyPackageBytes = 128uL,
+        sourceRelays = listOf("wss://relay.example") + if (current) listOf("wss://relay.two.example") else emptyList(),
+        isCurrent = current,
+    )
 
     private fun keyPackage(
         keyPackageRefHex: String,

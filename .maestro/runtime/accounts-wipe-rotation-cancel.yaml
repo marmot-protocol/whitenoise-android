@@ -11,7 +11,10 @@ name: accounts-wipe-rotation-cancel
     id: "profile_keys.wipe_confirm"
     enabled: true
 - setOrientation: LANDSCAPE_LEFT
-- assertVisible: "Wipe this account[?]"
+- assertVisible:
+    id: "profile_keys.wipe_confirm"
+    enabled: true
+- assertVisible: "Cancel"
 - setOrientation: PORTRAIT
 - assertVisible:
     id: "profile_keys.wipe_confirm"

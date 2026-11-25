@@ -15,17 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -36,11 +34,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -52,13 +48,11 @@ import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.retireDeviceUnlinkedNotice
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -258,7 +252,10 @@ private fun ProfileKeyWipeConfirmationBody(
     }
 }
 
-/** Blocks Back and outside interaction while the non-cancellable account teardown finishes. */
+/**
+ * Blocks Back and outside interaction while the non-cancellable account teardown finishes, showing the themed
+ * contained loading indicator over the window dim.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("FunctionNaming")
 @Composable
@@ -276,8 +273,8 @@ internal fun SignOutProgressDialog() {
             Modifier.fillMaxSize().testTag("settings.sign_out_progress").exposePerformanceTestTags(),
             contentAlignment = Alignment.Center,
         ) {
-            // The full-window dim layer can cover either theme; white stays visible against that scrim.
-            LoadingIndicator(color = Color.White)
+            // The contained indicator brings its own themed container, so it reads over the dim layer in any theme.
+            ContainedLoadingIndicator()
         }
     }
 }
@@ -324,8 +321,8 @@ internal fun signOutActiveAccount(
 /**
  * Non-destructive sign-out sheet (#348, #349). Explains what stays on device
  * and what changes, offers the "Delete key packages from relays" toggle
- * (default ON — passed through to the engine `sign_out` FFI), then performs
- * the actual sign-out via [onConfirm].
+ * (default ON — passed through to the engine `sign_out` FFI) as the shared
+ * settings switch row, then performs the actual sign-out via [onConfirm].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -367,33 +364,16 @@ internal fun SignOutSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .testTag("profile_keys.signout_invitation_keys")
-                    .explainOnLongPress(
-                        Explanation(
-                            stringResource(R.string.sign_out_delete_key_packages_label),
-                            stringResource(R.string.explanation_account_keys_signout_invitation_keys),
-                        ),
-                    ).toggleable(
-                        value = deleteKeyPackages,
-                        role = Role.Switch,
-                        onValueChange = { deleteKeyPackages = it },
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(stringResource(R.string.sign_out_delete_key_packages_label))
-                    Text(
-                        stringResource(R.string.sign_out_delete_key_packages_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = deleteKeyPackages, onCheckedChange = null)
-            }
+            SettingsSwitch(
+                context = settingsRowContext(0, 1, MaterialTheme.colorScheme.surfaceContainerLowest),
+                title = stringResource(R.string.sign_out_delete_key_packages_label),
+                subtitle = stringResource(R.string.sign_out_delete_key_packages_help),
+                explanation = stringResource(R.string.explanation_account_keys_signout_invitation_keys),
+                checked = deleteKeyPackages,
+                onCheckedChange = { deleteKeyPackages = it },
+                modifier = Modifier.testTag("profile_keys.signout_invitation_keys"),
+                leading = null,
+            )
             WhiteNoiseButton(
                 onClick = { terminal.close(deleteKeyPackages, onConfirm) },
                 modifier = Modifier.fillMaxWidth(),

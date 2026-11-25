@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +53,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bootstrapRelayCount
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -227,7 +227,7 @@ private fun copyPerformanceLogs(clipboard: ClipboardManager) {
     if (lines.isNotEmpty()) clipboard.setText(AnnotatedString(lines.joinToString("\n")))
 }
 
-/** Presents real diagnostic events in the prototype's card; operational data stays in Health. */
+/** Presents real diagnostic events in the prototype's card, split by [AppDivider]; operational data stays in Health. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun DiagnosticsContent(
@@ -360,7 +360,7 @@ internal fun DiagnosticsContent(
                                     )
                                 }
                                 if (index < entries.lastIndex) {
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
+                                    AppDivider()
                                 }
                             }
                         }

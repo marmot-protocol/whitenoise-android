@@ -2,20 +2,15 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.text.format.DateFormat
 import android.text.format.Formatter
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,11 +21,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AuditLogFileFfi
@@ -39,7 +32,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.listAuditLogExportCandidates
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.stageSelectedAuditLogs
+import dev.ipf.whitenoise.android.ui.common.DialogToggleControl
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogToggleRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -100,7 +95,11 @@ internal fun SelectAuditLogExportDialog(
     )
 }
 
-/** Selects whole files by date and size without opening their contents in the UI. */
+/**
+ * Selects whole files by date and size without opening their contents in the UI. Loading and exporting use the
+ * Material expressive loading indicator that settings rows show while busy.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("FunctionNaming")
 @Composable
 internal fun AuditLogPickerDialog(
@@ -120,7 +119,7 @@ internal fun AuditLogPickerDialog(
         title = { Text(stringResource(R.string.choose_audit_files)) },
         text = {
             when {
-                result == null -> CircularProgressIndicator()
+                result == null -> LoadingIndicator()
                 result.isFailure -> Text(stringResource(R.string.toast_couldnt_export_audit_logs))
                 files.isEmpty() -> Text(stringResource(R.string.toast_no_audit_logs_to_export))
                 else ->
@@ -150,10 +149,7 @@ internal fun AuditLogPickerDialog(
                         selected.isNotEmpty() && !exporting && acceptsInput,
                 ) {
                     if (exporting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(AuditLogPickerProgressSize),
-                            strokeWidth = 2.dp,
-                        )
+                        LoadingIndicator(modifier = Modifier.size(AuditLogPickerProgressSize))
                         Spacer(Modifier.width(WhiteNoiseSpacing.Related))
                     }
                     Text(stringResource(R.string.export))
@@ -168,7 +164,10 @@ internal fun AuditLogPickerDialog(
     )
 }
 
-/** Presents one selectable file. The checkbox and label share a single accessibility action. */
+/**
+ * Presents one selectable file on the shared dialog check row: date and size over the file name, kept to one line
+ * with the middle elided. The check box is decorative, so the row is the single accessibility target.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun AuditLogPickerRow(
@@ -190,29 +189,17 @@ private fun AuditLogPickerRow(
             val size = Formatter.formatShortFileSize(context, file.sizeBytes.toLong()).replace(' ', '\u00a0')
             listOfNotNull(dateTime, size).joinToString(" · ")
         }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = AuditLogPickerRowMinHeight)
-                .toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onCheckedChange)
-                .padding(vertical = WhiteNoiseSpacing.Related),
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                file.fileName,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
-            )
-        }
-        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
-    }
+    WhiteNoiseDialogToggleRow(
+        title = details,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        control = DialogToggleControl.Checkbox,
+        subtitle = file.fileName,
+        subtitleMaxLines = 1,
+        subtitleOverflow = TextOverflow.MiddleEllipsis,
+        enabled = enabled,
+    )
 }
 
 private val AuditLogPickerMaxHeight = 320.dp
-private val AuditLogPickerRowMinHeight = 56.dp
 private val AuditLogPickerProgressSize = 16.dp

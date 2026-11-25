@@ -34,23 +34,27 @@ internal class VoiceNoteForegroundService(
     private var recorder: VoiceRecordingController? = null
     private var observer: Job? = null
 
+    /** Routes voice-note foreground commands while satisfying any unmet start deadline. */
     @Suppress("ReturnCount") // Stale actions and failed promotion end without observation.
     fun onCommand(
         intent: Intent,
         startId: Int,
         scope: CoroutineScope,
     ) {
-        val token = intent.getStringExtra(EXTRA_TOKEN) ?: return
-        val owner = (service.application as? WhiteNoiseApplication)?.initializedAppState()?.voiceNotes
-        val current = owner?.foregroundRecorder(token)
+        val token = intent.getStringExtra(EXTRA_TOKEN)
+        val owner = ownerResolver(service)
+        val current = token?.let { owner?.foregroundRecorder(it) }
         if (intent.action != ACTION_START) {
             if (current != null && current === recorder) {
                 if (intent.action == ACTION_STOP) current.stop() else current.cancel()
+            } else {
+                service.foreground.stopIfIdleWithoutPlaceholder(startId)
             }
             return
         }
-        if (current == null || !current.isRecording) {
-            service.foreground.releaseVoice(startId)
+        service.foreground.noteForegroundStartPending(startId)
+        if (token == null || current == null || !current.isRecording) {
+            service.foreground.releaseVoice(startId, satisfyStartDeadline = true)
             return
         }
 
@@ -61,8 +65,8 @@ internal class VoiceNoteForegroundService(
                 notification = card
             }.isSuccess
         if (!promoted) {
+            service.foreground.releaseVoice(startId, satisfyStartDeadline = true)
             current.interrupt()
-            service.foreground.releaseVoice(startId)
             return
         }
 
@@ -116,10 +120,15 @@ internal class VoiceNoteForegroundService(
 
     companion object {
         const val CHANNEL_ID = "voice_note_capture"
-        private const val ACTION_START = "dev.ipf.whitenoise.android.voice.START"
-        private const val ACTION_STOP = "dev.ipf.whitenoise.android.voice.STOP"
-        private const val ACTION_DISCARD = "dev.ipf.whitenoise.android.voice.DISCARD"
-        private const val EXTRA_TOKEN = "voice_note_session"
+        internal const val ACTION_START = "dev.ipf.whitenoise.android.voice.START"
+        internal const val ACTION_STOP = "dev.ipf.whitenoise.android.voice.STOP"
+        internal const val ACTION_DISCARD = "dev.ipf.whitenoise.android.voice.DISCARD"
+        internal const val EXTRA_TOKEN = "voice_note_session"
+
+        /** Test seam for resolving the process-owned voice-note session owner. */
+        internal var ownerResolver: (NotificationStreamForegroundService) -> VoiceNoteSessionOwner? = { host ->
+            (host.application as? WhiteNoiseApplication)?.initializedAppState()?.voiceNotes
+        }
 
         fun isCommand(intent: Intent?): Boolean = intent?.action in setOf(ACTION_START, ACTION_STOP, ACTION_DISCARD)
 
