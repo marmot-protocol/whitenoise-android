@@ -1,22 +1,31 @@
 package dev.ipf.whitenoise.android.state
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.openExternalStoreListing
 import dev.ipf.whitenoise.android.updates.AppUpdateConstants
 import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 
+/**
+ * Opens the White Noise Zapstore listing in its own task through the user's chosen link handler,
+ * without forcing the Zapstore package, returning false when no handler can open it.
+ */
+internal fun openAppUpdateZapstoreListing(
+    context: Context,
+    startActivity: (Intent) -> Unit = context::startActivity,
+): Boolean =
+    openExternalStoreListing(
+        context = context,
+        listingUrl = AppUpdateConstants.ZAPSTORE_LISTING_URL,
+        preferPackage = null,
+        startActivity = startActivity,
+    )
+
+/** Opens the White Noise Zapstore listing in its own task, showing an error toast if no handler exists. */
 fun WhiteNoiseAppState.openZapstoreListing(context: Context = appContext) {
-    val intent =
-        Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateConstants.ZAPSTORE_LISTING_URL)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    try {
-        context.startActivity(intent)
-    } catch (_: ActivityNotFoundException) {
+    if (!openAppUpdateZapstoreListing(context = context)) {
         present(R.string.toast_zapstore_unavailable)
     }
 }

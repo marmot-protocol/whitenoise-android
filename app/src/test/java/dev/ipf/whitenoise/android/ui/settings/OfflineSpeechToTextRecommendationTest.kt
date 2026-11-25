@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
+import dev.ipf.whitenoise.android.core.ZAPSTORE_PACKAGE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -39,17 +40,21 @@ class OfflineSpeechToTextRecommendationTest {
         assertTrue(offlineSpeechToTextInstalled(context))
     }
 
+    /** Opening the dictation provider listing targets Zapstore in a new task when available. */
     @Test
     fun listingOpensInZapstoreWhenItCanHandleTheLink() {
         val started = mutableListOf<Intent>()
 
         assertTrue(openOfflineSpeechToTextListing(context) { started += it })
         assertEquals(1, started.size)
-        assertEquals(Intent.ACTION_VIEW, started.single().action)
-        assertEquals(OSTT_ZAPSTORE_URL, started.single().dataString)
-        assertEquals(ZAPSTORE_PACKAGE, started.single().`package`)
+        val intent = started.single()
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(OSTT_ZAPSTORE_URL, intent.dataString)
+        assertEquals(ZAPSTORE_PACKAGE, intent.`package`)
+        assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 
+    /** Falling back to the web listing keeps both Zapstore and browser intents in their own tasks. */
     @Test
     fun listingFallsBackToTheSameWebPageWhenZapstoreCannotHandleIt() {
         val started = mutableListOf<Intent>()
@@ -62,8 +67,11 @@ class OfflineSpeechToTextRecommendationTest {
         )
         assertEquals(2, started.size)
         assertEquals(ZAPSTORE_PACKAGE, started[0].`package`)
+        assertTrue((started[0].flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+        assertEquals(Intent.ACTION_VIEW, started[1].action)
         assertNull(started[1].`package`)
         assertEquals(OSTT_ZAPSTORE_URL, started[1].dataString)
+        assertTrue((started[1].flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 
     @Test
