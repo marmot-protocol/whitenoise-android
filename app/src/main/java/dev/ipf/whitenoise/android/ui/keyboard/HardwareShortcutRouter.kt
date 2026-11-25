@@ -128,7 +128,7 @@ internal class HardwareShortcutRouter(
     private val uptimeMillis: () -> Long = SystemClock::uptimeMillis,
     private val afterFrame: (() -> Unit) -> Unit = { Handler(Looper.getMainLooper()).post(it) },
 ) {
-    private val handlers = mutableListOf<HardwareShortcutHandler>()
+    private val handlers = mutableStateListOf<HardwareShortcutHandler>()
     private val chatsReturns = mutableStateListOf<ChatsReturnRoute>()
     private var blockers by mutableIntStateOf(0)
     private var chatsBlockers by mutableIntStateOf(0)
@@ -244,15 +244,16 @@ internal class HardwareShortcutRouter(
     }
 
     /**
-     * What [handler] should do with a command carried from a compact conversation. It reads only snapshot state
-     * and owners' availability, so an owner can observe it and act through [settleCarried] when it changes.
+     * What [handler] should do with a command carried from a compact conversation. It reads only snapshot state,
+     * owners included, so an owner can observe it and act through [settleCarried] when it changes.
      */
     fun carriedFate(handler: HardwareShortcutHandler): CarriedFate {
         if (carried?.command != handler.command) return CarriedFate.None
-        val owners = (handlers + handler).filter { it.command == handler.command }
+        val owners = handlers.filter { it.command == handler.command }
         return when {
             blocked -> CarriedFate.Wait
-            canRun(handler) -> CarriedFate.Run
+            // Like a direct key press, only the newest owner that can run the command takes it.
+            owners.lastOrNull { canRun(it) } === handler -> CarriedFate.Run
             handler.command.runsFromChats && chatsCovered -> CarriedFate.Wait
             owners.any { it.waiting() || canRun(it) } -> CarriedFate.Wait
             else -> CarriedFate.Lapse
@@ -286,12 +287,14 @@ internal class HardwareShortcutRouter(
         }
 
     /**
-     * Drops [pending] if, once the current frame is applied, it is still carried and no owner of its command is
-     * registered. Deferred, so an owner composed in the same frame, as when a route change has no motion, counts.
+     * Drops [pending] if, once the current frame is applied, it is still carried and no owner of its command can
+     * run it or is still checking. Deferred, so an owner composed in the same frame, as when a route change has no
+     * motion, counts.
      */
     private val lapseWithoutOwnerAfterFrame: (CarriedCommand) -> Unit = { pending ->
         afterFrame {
-            if (carried === pending && handlers.none { it.command == pending.command }) carried = null
+            val owned = handlers.any { it.command == pending.command && (it.waiting() || canRun(it)) }
+            if (carried === pending && !owned) carried = null
         }
     }
 

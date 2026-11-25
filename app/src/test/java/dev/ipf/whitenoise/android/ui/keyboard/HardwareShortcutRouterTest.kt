@@ -304,6 +304,47 @@ class HardwareShortcutRouterTest {
         assertEquals(1, runs)
     }
 
+    /**
+     * With several owners, a carried command waits only while one of them can still take it, and it runs only
+     * through the newest owner that can, whichever owner settles first.
+     */
+    @Test
+    fun carriedCommandFollowsTheNewestOwnerAndLapsesWhenNoneRemainsHopeful() {
+        val runs = mutableListOf<String>()
+        val older = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) { runs += "older" }
+        val newer = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) { runs += "newer" }
+        val carryNewMessage = {
+            val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+            router.dispatch(HardwareShortcutCommand.NewMessage)
+            removeConversation()
+            runAfterFrame()
+        }
+        val removeOlder = router.register(older)
+        val removeNewer = router.register(newer)
+
+        carryNewMessage()
+        assertEquals(CarriedFate.Wait, router.carriedFate(older))
+        router.settleCarried(older)
+        router.settleCarried(newer)
+        assertEquals(listOf("newer"), runs)
+        removeOlder()
+        removeNewer()
+
+        var refusingAvailable = false
+        val checking = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { false }, { true }) {}
+        val refusing = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { refusingAvailable }) {}
+        router.register(refusing)
+        val removeChecking = router.register(checking)
+        carryNewMessage()
+        assertEquals(CarriedFate.Wait, router.carriedFate(refusing))
+        removeChecking()
+        assertEquals(CarriedFate.Lapse, router.carriedFate(refusing))
+        router.settleCarried(refusing)
+        refusingAvailable = true
+        assertEquals(CarriedFate.None, router.carriedFate(refusing))
+        assertEquals(listOf("newer"), runs)
+    }
+
     /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */
     @Test
     fun carriedWindowStartsWhenChatsIsUncovered() {
