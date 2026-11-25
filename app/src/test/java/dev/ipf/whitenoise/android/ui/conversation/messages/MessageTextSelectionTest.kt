@@ -157,7 +157,12 @@ class MessageTextSelectionTest {
             var copyCompletions = 0
             var confirmations = 0
             var failures = 0
-            val copier = ClipboardCopier(ApplicationProvider.getApplicationContext(), { confirmations++ }, { failures++ })
+            val copier =
+                ClipboardCopier(
+                    ApplicationProvider.getApplicationContext(),
+                    confirmCopied = { confirmations++ },
+                    reportNotCopied = { failures++ },
+                )
             val clipboard = ExitOnCopyClipboard(delegate, copier) { copyCompletions++ }
             val selectedText = ClipEntry(ClipData.newPlainText("message selection", "partial text"))
 

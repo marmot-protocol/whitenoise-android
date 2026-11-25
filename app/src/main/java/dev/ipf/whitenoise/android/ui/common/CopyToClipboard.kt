@@ -49,11 +49,11 @@ internal class ClipboardCopier(
             clipboard.setClipEntry(null)
             return false
         }
-        runCatching { clipboard.setClipEntry(clipEntry) }.getOrElse {
-            if (it is CancellationException) throw it
-            return reportResult(false)
-        }
-        return reportResult(true)
+        val result =
+            runCatching { clipboard.setClipEntry(clipEntry) }.onFailure {
+                if (it is CancellationException) throw it
+            }
+        return reportResult(result.isSuccess)
     }
 
     private fun reportResult(written: Boolean): Boolean {
