@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -30,14 +29,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -50,8 +46,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
-import kotlinx.coroutines.launch
 
 /** Renders bounded event cards and their lifecycle-bound fullscreen viewers. */
 @Composable
@@ -128,8 +124,7 @@ private fun ResolvedNostrEventCard(
 ) {
     var launchOrigin: Rect? = null
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
+    val clipboard = rememberClipboardCopier()
     val flow =
         remember(resolver, occurrence.reference.stableId) {
             resolver.state(occurrence.reference, occurrence.authoredReference)
@@ -144,11 +139,7 @@ private fun ResolvedNostrEventCard(
         contentColor = contentColor,
         onRetry = { resolver.retry(occurrence.reference, flow, occurrence.authoredReference) },
         onCopy = {
-            scope.launch {
-                clipboard.setClipEntry(
-                    ClipEntry(ClipData.newPlainText("Nostr event", "nostr:$authoredReference")),
-                )
-            }
+            clipboard.copy("nostr:$authoredReference", "Nostr event")
         },
         onReadNote = { card -> onReadEvent(card, authoredReference, launchOrigin) },
         onPlayVideo = { card -> onPlayVideo(card, launchOrigin) },

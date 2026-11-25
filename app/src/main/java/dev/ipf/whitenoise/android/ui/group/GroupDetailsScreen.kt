@@ -54,7 +54,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -67,7 +66,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountDevicesActivationFfi
@@ -127,6 +125,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
@@ -394,7 +393,7 @@ internal fun GroupDetailsScreen(
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
             }
-        val clipboard = LocalClipboardManager.current
+        val clipboard = rememberClipboardCopier()
         val readOnlyInvite = controller.group.pendingConfirmation
         val isDm = controller.isDm
         val groupTerminal = controller.group.disbanding || controller.group.disbanded
@@ -1573,7 +1572,7 @@ internal fun GroupDetailsScreen(
                                     if (inviteNpub.isBlank()) {
                                         {}
                                     } else {
-                                        { clipboard.setText(AnnotatedString(inviteNpub)) }
+                                        { clipboard.copy(inviteNpub) }
                                     },
                             )
                         }
@@ -1936,8 +1935,7 @@ internal fun GroupDetailsScreen(
                                     subtitle = stringResource(R.string.copy_chat_link_subtitle),
                                     explanation = stringResource(R.string.explanation_chat_info_copy_chat_link),
                                     onClick = {
-                                        clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
-                                        appState.present(R.string.copied)
+                                        clipboard.copy(ChatLink.uri(controller.group.groupIdHex))
                                     },
                                     leading = { SettingsLeadingIcon(R.drawable.ic_link) },
                                 )

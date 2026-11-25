@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -18,6 +16,7 @@ import dev.ipf.whitenoise.android.state.MessageReportRegistry
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
 import kotlinx.coroutines.test.runTest
@@ -25,6 +24,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -106,18 +106,12 @@ class MessageBubbleActionsConfirmedTargetTest {
                         displayedBody = "Original",
                         messageTextCopy = TEXT_COPY,
                         localReactionMotion = LocalReactionMotion(),
-                        clipboard = NoClipboard,
+                        clipboard = ClipboardCopier(RuntimeEnvironment.getApplication()) {},
                         onActionMenuOpenChange = {},
                         onForwardMenuHandoff = {},
                     ),
                 ),
         )
-    }
-
-    private object NoClipboard : ClipboardManager {
-        override fun getText(): AnnotatedString? = null
-
-        override fun setText(annotatedString: AnnotatedString) = Unit
     }
 
     private companion object {

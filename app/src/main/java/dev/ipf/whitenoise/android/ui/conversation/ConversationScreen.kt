@@ -60,7 +60,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -75,7 +74,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -171,6 +169,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
@@ -1502,7 +1501,7 @@ internal fun ConversationScreen(
             onRevealSent = { revealSentMessage() },
         )
     val collectionPanels = rememberAttachmentCollectionPanels(appState, controller, mediaSender)
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val groupTitleCopy = rememberGroupTitleCopy()
     val conversationSearchState = presentationState.searchState.value.copy(isOpen = navigationState.searchOpen)
     val searchControls =
@@ -3687,7 +3686,7 @@ internal fun ConversationScreen(
                         selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
                         onCopySelection = {
                             if (batchSelectionUi.copyText.isNotBlank()) {
-                                clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                                clipboard.copy(batchSelectionUi.copyText)
                                 selectedMessages.clear()
                             }
                         },
@@ -3766,7 +3765,7 @@ internal fun ConversationScreen(
                         },
                         onCopyBatchDeleteReport = {
                             batchDeleteRetryState?.let { retryState ->
-                                clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
+                                clipboard.copy(batchDeleteDiagnosticReport(retryState))
                             }
                         },
                         searchOpen = navigationState.searchOpen,
@@ -4712,7 +4711,7 @@ internal fun ConversationScreen(
                 recipients = messageDetailsRecipients(controller, appState, infoMine),
                 attachmentLabels = infoAttachmentLabels,
                 onDismissRequest = { batchInfoSelection = null },
-                onCopy = { value -> clipboard.setText(AnnotatedString(value)) },
+                onCopy = { value -> clipboard.copy(value) },
             )
         }
 

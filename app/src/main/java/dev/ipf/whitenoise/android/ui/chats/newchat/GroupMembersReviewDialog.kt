@@ -28,13 +28,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 
@@ -291,7 +290,7 @@ private fun GroupReviewActingAvatar(
         }
         return
     }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     AccountAvatarButton(
         title = name,
         seed = account.accountIdHex,
@@ -300,7 +299,7 @@ private fun GroupReviewActingAvatar(
         touchTargetSize = 48.dp,
         actionDescription = role,
         onClickLabel = stringResource(R.string.copy),
-        onClick = { clipboard.setText(AnnotatedString(npub)) },
+        onClick = { clipboard.copy(npub) },
         modifier = Modifier.offset(x = GroupReviewActorTargetInset).testTag("group.action.acting_account"),
     )
 }

@@ -24,12 +24,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,6 +81,7 @@ import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
@@ -207,7 +206,7 @@ internal fun ProfileSheet(
         ) -> Unit
     )? = null,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val context = LocalContext.current
     val currentDismiss by rememberUpdatedState(onDismiss)
     val accountAtOpen = remember(appState, npub) { appState.activeAccountRef }
@@ -721,13 +720,13 @@ internal fun ProfileSheet(
             onPromote = { if (owner.canAct()) page = ProfileSheetPage.MAKE_ADMIN },
             onCopy = {
                 if (owner.canAct()) {
-                    clipboard.setText(AnnotatedString(presentationNpub))
+                    clipboard.copy(presentationNpub)
                     copied = true
                 }
             },
             onAvatar = { if (owner.canAct()) fullPictureOpen = true },
             onBanner = { if (owner.canAct()) fullBannerOpen = true },
-            onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.setText(AnnotatedString(it)) } },
+            onCopyLightning = { if (owner.canAct()) lightningAddress?.let { clipboard.copy(it) } },
             sharedAvatars = {
                 PreparedGroupAvatarContent(
                     appState,
@@ -754,7 +753,7 @@ internal fun ProfileSheet(
                                     .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
                             }
                         },
-                        onCopy = { clipboard.setText(AnnotatedString(it)) },
+                        onCopy = { clipboard.copy(it) },
                     )
                 }
             },

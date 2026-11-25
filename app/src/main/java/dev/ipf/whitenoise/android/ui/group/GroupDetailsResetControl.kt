@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -25,7 +24,6 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
@@ -37,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
@@ -209,7 +208,7 @@ internal fun GroupAbandonmentReviewDialog(
     val failed = status == GroupAbandonmentStatus.Failed
     val report = error?.report.takeIf { failed }
     val actionPadding = if (report == null) ButtonDefaults.TextButtonContentPadding else RecoveryActionPadding
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val anyDm = targets.any { it.isDm }
     val titleRes =
         when {
@@ -243,7 +242,7 @@ internal fun GroupAbandonmentReviewDialog(
         dismissButton = {
             if (report != null) {
                 TextButton(
-                    onClick = { clipboard.setText(AnnotatedString(report)) },
+                    onClick = { clipboard.copy(report) },
                     modifier = Modifier.testTag("group.abandon.error.copy"),
                     contentPadding = actionPadding,
                 ) { Text(stringResource(R.string.copy)) }

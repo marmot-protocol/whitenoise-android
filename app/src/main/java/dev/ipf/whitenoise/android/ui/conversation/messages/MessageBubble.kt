@@ -50,7 +50,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -62,7 +61,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -122,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
@@ -465,7 +464,7 @@ internal fun MessageBubble(
             replySwipe.cancel()
         }
     }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val messageTextCopy = rememberMessageTextCopy()
@@ -2965,7 +2964,7 @@ internal fun MessageBubble(
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
                         onDismissRequest = { surfaces.infoSheetOpen = false },
                         onCopy = { value ->
-                            clipboard.setText(AnnotatedString(value))
+                            clipboard.copy(value)
                         },
                     )
                 }

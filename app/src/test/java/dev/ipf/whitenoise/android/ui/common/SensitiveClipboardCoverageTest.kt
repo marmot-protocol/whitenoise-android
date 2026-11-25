@@ -49,7 +49,7 @@ class SensitiveClipboardCoverageTest {
         assertTrue("copySensitiveToClipboard(context, privateKeyLabel, " in screen)
         assertTrue("copySensitiveToClipboard(context, encryptedBackupLabel, " in screen)
         assertTrue("copyToClipboard(context, publicKeyLabel, " in screen)
-        assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PROFILE_KEY_CLIPBOARD).functionBody("copyToClipboard"))
+        assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PUBLIC_COPY).functionBody("copyToClipboard"))
     }
 
     /** Pairs each block-bodied function name with its body; expression bodies cannot hold two statements. */
@@ -67,7 +67,7 @@ class SensitiveClipboardCoverageTest {
     private companion object {
         val FUNCTION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?(\w+)\s*\(""")
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
-        const val PROFILE_KEY_CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyClipboard.kt"
+        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/CopyToClipboard.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }
