@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.translation.ComposerTranslationState
@@ -43,6 +44,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -163,6 +165,7 @@ class ComposerTranslationSendTest {
 
         composeRule.runOnIdle {
             assertTrue(controller.requestStart(ACCOUNT, GROUP, editor.valueState.value))
+            platform.listener.onReady()
             editor.updateValue(TextFieldValue("Hello there", TextRange(DRAFT.length)))
         }
         composeRule.onNodeWithTag("composer.translation").assertDoesNotExist()
@@ -172,6 +175,8 @@ class ComposerTranslationSendTest {
             editor.updateValue(TextFieldValue(DRAFT, TextRange(DRAFT.length)))
             controller.paste()
             platform.listener.onResult("dictated")
+            assertEquals("Hello dictated", editor.valueState.value.text)
+            assertEquals(ConversationDictationState.Idle, controller.state)
         }
         awaitMain { translation.outgoingFor("Hello dictated") == "de:Hello dictated" }
         composeRule
@@ -194,9 +199,11 @@ class ComposerTranslationSendTest {
 
         composeRule.runOnIdle {
             assertTrue(controller.requestStart(ACCOUNT, GROUP, editor.valueState.value))
+            platform.listener.onReady()
             controller.paste()
             platform.listener.onResult("dictated")
             assertEquals("Hello dictated", editor.valueState.value.text)
+            assertEquals(ConversationDictationState.Idle, controller.state)
             translation.toggle()
         }
         awaitMain { translation.outgoingFor("Hello dictated") == "de:Hello dictated" }
@@ -237,9 +244,17 @@ class ComposerTranslationSendTest {
         composeRule.runOnIdle { assertTrue(sent.isEmpty()) }
         allowTranslation.complete(Unit)
         awaitMain { sent.size == 1 }
+        composeRule.runOnIdle {
+            assertEquals(ConversationDictationState.Idle, controller.state)
+            assertEquals("", editor.valueState.value.text)
+        }
 
+        val firstListener = platform.listener
         dictate.performClick()
-        composeRule.runOnIdle { platform.listener.onReady() }
+        composeRule.runOnIdle {
+            assertNotSame(firstListener, platform.listener)
+            platform.listener.onReady()
+        }
         send.assertIsEnabled().performClick()
         composeRule.runOnIdle { platform.listener.onResult("next") }
         awaitMain { sent.size == 2 }
@@ -250,15 +265,13 @@ class ComposerTranslationSendTest {
     }
 
     /**
-     * Waits for [condition] by running the main looper and composition frames itself; under Robolectric `waitUntil`
-     * drives neither, so work the test resumed outside composition (a released translation)
-     * would never reach the composer.
+     * Runs current main-looper work and lets the composer apply resulting state changes before checking [condition].
      */
     private fun awaitMain(condition: () -> Boolean) {
         repeat(MAX_FRAMES) {
             shadowOf(Looper.getMainLooper()).idle()
             composeRule.mainClock.advanceTimeByFrame()
-            if (condition()) return
+            if (composeRule.runOnIdle(condition)) return
         }
         throw AssertionError("Condition still not satisfied after $MAX_FRAMES frames")
     }
@@ -337,7 +350,9 @@ class ComposerTranslationSendTest {
     ) =
         ConversationDictationController(
             platform = platform,
-            readDraft = { _, _ -> ConversationDictationDraftSnapshot(editor.valueState.value, editor.contentGeneration) },
+            readDraft = { _, _ ->
+                ConversationDictationDraftSnapshot(editor.valueState.value, editor.contentGeneration)
+            },
             writeDraft = { _, _, revision, value ->
                 if (revision != editor.contentGeneration) {
                     null
@@ -364,7 +379,9 @@ class ComposerTranslationSendTest {
         override fun recognitionAvailable() = true
 
         /** Returns a session whose controls are no-ops. */
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+        override fun createSession(
+            listener: ConversationDictationRecognitionListener,
+        ): ConversationDictationRecognitionSession {
             this.listener = listener
             return object : ConversationDictationRecognitionSession {
                 /** Starts nothing. */

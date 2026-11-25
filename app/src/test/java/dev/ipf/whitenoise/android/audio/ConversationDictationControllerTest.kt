@@ -7435,7 +7435,8 @@ class ConversationDictationControllerTest {
                             false
                         },
                     )
-                val translation = ConversationDictationTranslation(currentEpoch = { 0L.takeIf { ownerCurrent } }) { reply.await() }
+                val translation =
+                    ConversationDictationTranslation(currentEpoch = { 0L.takeIf { ownerCurrent } }) { reply.await() }
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
                 f.controller.send()
                 f.platform.listener.onResult("dictated")

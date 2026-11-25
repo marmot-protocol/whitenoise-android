@@ -626,7 +626,10 @@ internal fun ComposerBar(
                     replyToMessageIdHex = replyingTo?.messageIdHex,
                     translation = {
                         composerTranslation?.dictationTranslation {
-                            appState?.isConversationDictationOriginVisible(accountForDictation, groupForDictation) != false
+                            appState?.isConversationDictationOriginVisible(
+                                accountForDictation,
+                                groupForDictation,
+                            ) != false
                         }
                     },
                 )
