@@ -147,6 +147,8 @@ internal fun GroupEmojiImagePickerSheet(
         sheetState = sheetState,
         interactionEnabled = !inputBlocked,
     ) {
+        // Non-grid rows take the sheet inset; the emoji grid is wider so 360 dp keeps six columns.
+        val insetModifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset)
         Column(
             modifier =
                 Modifier
@@ -159,16 +161,17 @@ internal fun GroupEmojiImagePickerSheet(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(horizontal = WhiteNoiseSheetInset, vertical = WhiteNoiseSpacing.Related),
+                        .padding(vertical = WhiteNoiseSpacing.Related),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
+                    modifier = insetModifier,
                     text = stringResource(R.string.group_image_emoji_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = insetModifier,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -250,6 +253,7 @@ internal fun GroupEmojiImagePickerSheet(
                     }
                 errorText?.let {
                     Text(
+                        modifier = insetModifier,
                         text = it,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
@@ -268,16 +272,16 @@ internal fun GroupEmojiImagePickerSheet(
                     purpose = EmojiPickerPurpose.GROUP_IMAGE,
                     recentEmojis = recentEmojis,
                     selectionEnabled = !inputBlocked,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    // 8 dp on top of the grid's own margin matches the 24 dp edge and keeps six columns.
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 8.dp),
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = insetModifier,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     TextButton(
                         onClick = { terminal.close(onDismiss) },
                         enabled = !inputBlocked,
-                        modifier = Modifier.weight(1f),
                     ) {
                         Text(stringResource(R.string.cancel))
                     }

@@ -267,6 +267,7 @@ private fun ForwardOperationStatusRow(
     }
 }
 
+/** Bottom sheet showing a forward's progress, with cancel, retry and dismiss actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")

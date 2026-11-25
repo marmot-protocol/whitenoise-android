@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
+/** Lets a share target pick which signed-in account sends when more than one is available. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ShareChatPickerAccountSheet(
@@ -75,6 +76,7 @@ internal fun ShareChatPickerAccountSheet(
     }
 }
 
+/** Sheet body: a title and one selectable row per account. */
 @Composable
 internal fun ShareChatPickerAccountSheetContent(
     appState: WhiteNoiseAppState,

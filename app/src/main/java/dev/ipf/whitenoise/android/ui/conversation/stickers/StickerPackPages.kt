@@ -335,7 +335,7 @@ internal fun StickerPackDetailPage(
     val scope = rememberCoroutineScope()
     // A tap waits for MDK's link, so further taps meanwhile must not open a second share sheet.
     var sharing by remember(pack.coordinate) { mutableStateOf(false) }
-    WhiteNoiseSheetHeader(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
+    WhiteNoiseSheetHeader(stickerPackTitle(pack), onBack = onBack, onClose = onClose, titleMaxLines = 2) {
         IconButton(
             enabled = !sharing,
             onClick = {

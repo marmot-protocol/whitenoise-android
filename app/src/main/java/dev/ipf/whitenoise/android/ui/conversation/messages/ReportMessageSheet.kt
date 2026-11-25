@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -192,7 +193,9 @@ internal fun ReportMessageForm(
     form: ReportFormState = ReportFormState(sending),
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val compact = maxHeight < 160.dp * LocalDensity.current.fontScale
+        val fontScale = LocalDensity.current.fontScale
+        val compact = maxHeight < 160.dp * fontScale
+        val compactSendHeight = minOf(56.dp, 40.dp * fontScale)
         Column(
             modifier =
                 Modifier
@@ -217,6 +220,8 @@ internal fun ReportMessageForm(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = WhiteNoiseSheetInset)
+                        // Keyboard-compact: 40 dp at 1x text, growing back to 56 dp as text scales.
+                        .then(if (compact) Modifier.height(compactSendHeight) else Modifier)
                         .testTag("message.report.send"),
             ) {
                 Text(stringResource(R.string.report_message_send))

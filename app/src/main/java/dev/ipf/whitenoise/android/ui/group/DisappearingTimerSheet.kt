@@ -232,6 +232,7 @@ internal fun DisappearingMessagesPickerSheet(
     }
 }
 
+/** First page of the disappearing-messages sheet: the preset durations and the custom entry. */
 @Composable
 @Suppress("LongParameterList")
 private fun DisappearingPresetsPage(

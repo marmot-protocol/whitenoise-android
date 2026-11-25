@@ -28,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -39,7 +40,8 @@ val WhiteNoiseSheetInset = WhiteNoiseSpacing.Section
 /**
  * Ordinary sheets only. Material owns the handle, shape, width, IME, motion and dismissal.
  * The container is `surfaceContainerLow`, which the AMOLED scheme already maps to black.
- * [dragHandle] is replaced only by the full-height camera sheet (none) and the keyboard-compact report sheet.
+ * [dragHandle] is replaced only by the full-height camera sheet and the wipe progress sheet (none) and the
+ * keyboard-compact report sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
@@ -76,7 +78,10 @@ fun WhiteNoiseModalBottomSheet(
     }
 }
 
-/** Begins immediately after Material's drag-handle slot. No repeated status-bar or top padding. */
+/**
+ * Begins immediately after Material's drag-handle slot. No repeated status-bar or top padding.
+ * [titleMaxLines] bounds long remote titles to an ellipsized run so they cannot push the content out of the sheet.
+ */
 @Suppress("FunctionNaming")
 @Composable
 fun WhiteNoiseSheetHeader(
@@ -84,6 +89,7 @@ fun WhiteNoiseSheetHeader(
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
     onBack: (() -> Unit)? = null,
+    titleMaxLines: Int = Int.MAX_VALUE,
     action: @Composable () -> Unit = {},
 ) {
     Row(
@@ -106,6 +112,8 @@ fun WhiteNoiseSheetHeader(
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
+            maxLines = titleMaxLines,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         action()
