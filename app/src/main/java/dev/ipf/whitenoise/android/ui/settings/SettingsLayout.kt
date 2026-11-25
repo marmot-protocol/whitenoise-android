@@ -43,7 +43,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +54,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -204,31 +204,32 @@ internal fun SettingsSection(
     title: String,
     explanation: String? = null,
 ) {
-    Text(
+    SectionHeader(
         text = title,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .semantics { heading() }
-                .explainOnLongPress(explanation?.let { Explanation(title, it) })
-                .padding(
-                    start = WhiteNoiseSpacing.SettingsSectionInset,
-                    end = WhiteNoiseSpacing.SettingsSectionInset,
-                    top = if (LocalSettingsList.current) WhiteNoiseSpacing.FormField else WhiteNoiseSpacing.Section,
-                    bottom = if (LocalSettingsList.current) 0.dp else WhiteNoiseSpacing.Related,
-                ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.explainOnLongPress(explanation?.let { Explanation(title, it) }),
+        contentPadding =
+            PaddingValues(
+                start = WhiteNoiseSpacing.SettingsSectionInset,
+                top = if (LocalSettingsList.current) WhiteNoiseSpacing.FormField else WhiteNoiseSpacing.Section,
+                end = WhiteNoiseSpacing.SettingsSectionInset,
+                bottom = if (LocalSettingsList.current) 0.dp else WhiteNoiseSpacing.Related,
+            ),
     )
 }
 
-/** Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. */
+/**
+ * Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. [modifier] wraps the
+ * text, so semantics meant for the copy itself must merge descendants to reach it.
+ */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsExplainer(text: String) {
+internal fun SettingsExplainer(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(
                     start = WhiteNoiseSpacing.SettingsSectionInset,

@@ -56,7 +56,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -84,31 +83,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.roundToInt
-
-/** One visible native capability; dispatch remains in the owning message. */
-internal data class FocusedMessageAction(
-    val label: String,
-    val supportingLabel: String?,
-    val enabled: Boolean,
-    val destructive: Boolean,
-    val icon: @Composable () -> Unit,
-    val onClick: () -> Unit,
-    val onClickAt: ((Rect?) -> Unit)? = null,
-    val explanation: Explanation? = null,
-    val dismissBeforeActivation: Boolean = true,
-)
 
 /**
  * Gives the overlay the whole popup window rather than a window cut to its own content.
@@ -206,7 +192,6 @@ private fun Modifier.focusedStackDrag(
 }
 
 private const val FOCUSED_BACKDROP_ALPHA = 0.88f
-private const val FOCUSED_PRESSED_STATE_ALPHA = 0.12f
 private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
@@ -256,9 +241,12 @@ internal fun FocusedMessageActions(
     // Saveable so a popup window re-shown after an app switch does not hide content it already
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
+    // Back from the full action set returns to the first level instead of closing the menu (#4077).
+    val showingAllActions = rememberSaveable { mutableStateOf(false) }
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
+        consumeBack = showingAllActions::collapseFullActionSet,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
         animateWindowContent = false,
         scrimModifier =
@@ -437,7 +425,7 @@ internal fun FocusedMessageActions(
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(terminalActions)
+                    FocusedActionMenu(terminalActions, showingAllActions.value) { showingAllActions.value = it }
                 }
             }
         }
@@ -641,7 +629,7 @@ private fun FocusedReactionTarget(
                     .clip(CircleShape)
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },
@@ -725,7 +713,7 @@ private fun FocusedMoreReactionsTarget(
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_MORE_DISC_ALPHA))
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },

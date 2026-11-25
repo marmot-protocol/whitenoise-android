@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -71,9 +72,9 @@ internal fun LazyListScope.globalSearchResultItems(
 ) {
     if (content.rows.isNotEmpty()) {
         item(key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY, contentType = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY) {
-            ChatListSearchSectionHeader(
-                title = stringResource(R.string.notification_channel_messages),
-                testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
+            SectionHeader(
+                text = stringResource(R.string.notification_channel_messages),
+                modifier = Modifier.testTag(CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG),
             )
         }
     }

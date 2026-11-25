@@ -9,13 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 
 /**
@@ -76,8 +74,8 @@ internal fun messageDeleteSupportingCopy(
  * keeps it open — when still shown — so the error toast never has to compete
  * with a silently vanished dialog.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming")
 internal fun MessageDeleteDialog(
     capability: MessageDeleteCapability,
     mine: Boolean,
@@ -88,11 +86,7 @@ internal fun MessageDeleteDialog(
     onDismissRequest: () -> Unit,
 ) {
     AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest) {
-        Surface(
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
-        ) {
+        WhiteNoiseDialogSurface {
             MessageDeleteDialogContent(
                 capability = capability,
                 mine = mine,
@@ -214,8 +208,8 @@ internal fun MessageDeleteDialogContent(
  * allowed, the rest hidden locally) and hiding all on this device; otherwise
  * only the local-hide action is offered.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming")
 internal fun BatchMessageDeleteDialog(
     selectedCount: Int,
     breakdown: BatchDeleteBreakdown,
@@ -225,11 +219,7 @@ internal fun BatchMessageDeleteDialog(
     onDismissRequest: () -> Unit,
 ) {
     AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
-        Surface(
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
-        ) {
+        WhiteNoiseDialogSurface {
             BatchMessageDeleteDialogContent(
                 selectedCount = selectedCount,
                 breakdown = breakdown,

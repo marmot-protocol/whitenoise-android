@@ -13,9 +13,9 @@ name: signup-suggest-name
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
@@ -41,5 +41,5 @@ name: signup-suggest-name
     id: "onboarding.sign_up.name"
 - assertTrue: ${maestro.copiedText.length > 0 && maestro.copiedText != output.firstName}
 - tapOn: "Back"
-- assertVisible: "Sign In"
+- assertVisible: "Sign in"
 - takeScreenshot: signup-suggest-name

@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun RecoveryWordsSetupContent(",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun RecoveryWordsGrid(",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun CopyRecoveryWordsIcon(",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun SetupButtons(",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun RecoveryWordsInput(",
         "test_ids": [
-          "SET-072",
+          "SET-074",
           "SET-073"
         ]
       },
@@ -49,7 +49,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "fun RecoveryWordsControls(",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       }
     ],
@@ -59,7 +59,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.cancel",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -67,7 +67,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -75,7 +75,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_confirm_message",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -83,7 +83,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_confirm_title",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -91,7 +91,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_word_label",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -99,7 +99,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_words_title",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -107,7 +107,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_words_written",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -115,7 +115,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_copy_words",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -123,7 +123,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.copied",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -131,7 +131,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_reveal_warning",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -139,7 +139,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_word_correct",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -147,7 +147,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.history_backups_word_incorrect",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -155,7 +155,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.done",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -163,7 +163,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.hide",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       },
       {
@@ -171,7 +171,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
         "anchor": "R.string.show",
         "test_ids": [
-          "SET-072"
+          "SET-074"
         ]
       }
     ]

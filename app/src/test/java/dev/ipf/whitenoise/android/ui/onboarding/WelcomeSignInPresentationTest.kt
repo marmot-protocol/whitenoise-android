@@ -15,8 +15,11 @@ import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -328,6 +331,31 @@ class WelcomeSignInPresentationTest {
 
     /** A public QR is rejected immediately and cannot replace an already entered private key. */
     @Test fun qrPublicKeyDoesNotReplaceSecret() = scannerResult("npub1" + "q".repeat(58), false, SECRET)
+
+    /** A rejected scan shows its error as the key field's supporting text and opens no dialog. */
+    @Test fun qrRejectionUsesFieldSupportingTextWithoutDialog() {
+        val key = TextFieldState(SECRET)
+        val error = mutableStateOf<Int?>(null)
+        var deliver: ((String) -> Unit)? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SignInKeyField(
+                    key,
+                    false,
+                    error.value,
+                    {},
+                    { error.value = it },
+                    {},
+                    scannerContent = { _, scan -> deliver = scan },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("onboarding.sign_in.scan").performClick()
+        composeRule.runOnIdle { checkNotNull(deliver)("npub1" + "q".repeat(58)) }
+        composeRule.onNodeWithText(context.getString(R.string.sign_in_error_public_key)).assertIsDisplayed()
+        composeRule.onAllNodes(isDialog()).assertCountEquals(0)
+        composeRule.runOnIdle { assertEquals(SECRET, key.text.toString()) }
+    }
 
     /** A late camera callback cannot edit credentials once import or an external signer owns the form. */
     @Test fun qrReturnDuringBusyOperationIsIgnored() = scannerResult("nsec1" + "p".repeat(58), true, SECRET)

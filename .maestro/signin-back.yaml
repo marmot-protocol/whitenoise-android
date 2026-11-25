@@ -13,25 +13,25 @@ name: signin-back
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - assertVisible: "Private key"
 - assertNotVisible: "Sign in with Amber"
 - tapOn: "Private key"
 - inputText: "cancel-me"
 - hideKeyboard
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - assertNotVisible: "Private key"
-- tapOn: "Sign In"
+- tapOn: "Sign in"
 - assertVisible: "Private key"
 - tapOn: "Private key"
 - inputText: "cancel-again"
 - hideKeyboard
 - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - assertNotVisible: "Private key"
 - takeScreenshot: signin-back

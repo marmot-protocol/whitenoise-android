@@ -45,7 +45,7 @@ import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.BrokenImage
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -164,7 +164,7 @@ private fun PendingVisualBubble(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {

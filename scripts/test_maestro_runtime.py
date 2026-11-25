@@ -876,7 +876,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             for command in list(yaml.safe_load_all(text))[1]:
                 selector = command.get('assertVisible') if isinstance(command, dict) else None
                 if isinstance(selector, dict) and selector.get('containsChild') == {
-                    'text': '^(Allow Camera|Open settings)$'
+                    'text': '^(Allow camera|Open settings)$'
                 }:
                     self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
                     self.assertIs(selector['enabled'], True)
@@ -891,8 +891,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertIn('NAV-009', runtime.CASES[path.stem]['manual_ids'])
         initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
         self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
-                                        'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
-        self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
+                                        'containsChild': {'text': '^(Allow camera|Open settings)$'}}}, initial)
+        self.assertIn({'assertVisible': {'text': '^Allow camera$'}}, initial)
         chrome = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt').read_text()
         self.assertIn('.exposePerformanceTestTags()', chrome)
         self.assertIn('.testTag("qr_scanner.recovery")', chrome)
@@ -900,7 +900,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                                'maestro-2.11.0-qr-recovery-button.json').read_text())
         self.assertIs(captured['node']['enabled'], True)
         self.assertIs(captured['node']['clickable'], True)
-        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow Camera')
+        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow camera')
 
     def test_lightning_clear_retaps_remaining_suffix_and_requires_empty_actual_field(self):
         """A word selection deleted the prefix and left /path in the observed failure."""

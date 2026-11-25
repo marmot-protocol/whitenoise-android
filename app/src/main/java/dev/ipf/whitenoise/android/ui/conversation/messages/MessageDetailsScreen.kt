@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,7 +38,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -183,6 +184,25 @@ internal fun MessageDetailsScreen(
                 }
             }
         }
+    }
+}
+
+/** A card with its section header above it, on the card's own content line. */
+@Composable
+private fun MessageCardGroup(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        SectionHeader(
+            text = title,
+            contentPadding =
+                PaddingValues(
+                    horizontal = WhiteNoiseSpacing.CompactScreenMargin,
+                    vertical = WhiteNoiseSpacing.Related,
+                ),
+        )
+        content()
     }
 }
 
@@ -334,41 +354,31 @@ private fun FactRow(
 /** Reactions with their counts. */
 @Composable
 private fun MessageReactionsSection(reactions: List<ReactionTally>) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        border = amoledOutlineBorder(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column {
-            Text(
-                text = stringResource(R.string.reactions),
-                modifier =
-                    Modifier.padding(
-                        start = WhiteNoiseSpacing.CompactScreenMargin,
-                        top = WhiteNoiseSpacing.CompactScreenMargin,
-                        end = WhiteNoiseSpacing.CompactScreenMargin,
-                        bottom = WhiteNoiseSpacing.Related,
-                    ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            reactions.forEachIndexed { index, tally ->
-                if (index > 0) {
-                    AppDivider(
-                        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+    MessageCardGroup(stringResource(R.string.reactions)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            border = amoledOutlineBorder(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            Column {
+                reactions.forEachIndexed { index, tally ->
+                    if (index > 0) {
+                        AppDivider(
+                            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        )
+                    }
+                    ListItem(
+                        modifier = Modifier.testTag("message.details.reaction.$index"),
+                        headlineContent = {
+                            Text(pluralStringResource(R.plurals.people_reacted, tally.count, tally.count))
+                        },
+                        leadingContent = {
+                            EmojiLabel(tally.emoji, style = LocalTextStyle.current.copy(fontSize = ReactionGlyphSize))
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                 }
-                ListItem(
-                    modifier = Modifier.testTag("message.details.reaction.$index"),
-                    headlineContent = {
-                        Text(pluralStringResource(R.plurals.people_reacted, tally.count, tally.count))
-                    },
-                    leadingContent = {
-                        EmojiLabel(tally.emoji, style = LocalTextStyle.current.copy(fontSize = ReactionGlyphSize))
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                )
             }
         }
     }
@@ -385,34 +395,24 @@ private fun MessageReportsSection(
     canDismiss: Boolean,
     onDismiss: (ContentReportFfi) -> Unit,
 ) {
-    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
-    val zone = ZoneId.systemDefault()
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("message.details.reports"),
-        border = amoledOutlineBorder(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column {
-            Text(
-                text = stringResource(R.string.message_reports_section),
-                modifier =
-                    Modifier.padding(
-                        start = WhiteNoiseSpacing.CompactScreenMargin,
-                        top = WhiteNoiseSpacing.CompactScreenMargin,
-                        end = WhiteNoiseSpacing.CompactScreenMargin,
-                        bottom = WhiteNoiseSpacing.Related,
-                    ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            reports.forEachIndexed { index, report ->
-                if (index > 0) {
-                    AppDivider(
-                        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                    )
+    MessageCardGroup(stringResource(R.string.message_reports_section)) {
+        val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+        val zone = ZoneId.systemDefault()
+        Surface(
+            modifier = Modifier.fillMaxWidth().testTag("message.details.reports"),
+            border = amoledOutlineBorder(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            Column {
+                reports.forEachIndexed { index, report ->
+                    if (index > 0) {
+                        AppDivider(
+                            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        )
+                    }
+                    MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)
                 }
-                MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)
             }
         }
     }
