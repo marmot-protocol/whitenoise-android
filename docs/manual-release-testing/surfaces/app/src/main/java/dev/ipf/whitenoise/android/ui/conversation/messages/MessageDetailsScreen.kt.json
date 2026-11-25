@@ -20,6 +20,14 @@
         ]
       },
       {
+        "surface": "MessageCardGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageCardGroup(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
         "surface": "MessageDeliverySection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDeliverySection(",
@@ -42,14 +50,6 @@
         "anchor": "fun MessageDetailsScreen(",
         "test_ids": [
           "MSG-001",
-          "MSG-021"
-        ]
-      },
-      {
-        "surface": "Poll label in message details",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
-        "anchor": "R.string.poll_preview",
-        "test_ids": [
           "MSG-021"
         ]
       },
@@ -83,6 +83,14 @@
         "anchor": "fun MessageReportsSection(",
         "test_ids": [
           "MSG-016"
+        ]
+      },
+      {
+        "surface": "Poll label in message details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": [
+          "MSG-021"
         ]
       }
     ],

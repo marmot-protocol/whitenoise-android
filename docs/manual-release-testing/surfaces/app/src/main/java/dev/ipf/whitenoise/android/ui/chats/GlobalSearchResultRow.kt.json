@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
         "anchor": "fun GlobalSearchResultRow(",
         "test_ids": [
+          "FIND-001",
           "FIND-003",
           "FIND-018"
         ]
