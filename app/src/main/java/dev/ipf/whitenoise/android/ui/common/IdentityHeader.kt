@@ -45,7 +45,7 @@ internal fun IdentityHeader(
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val width = maxWidth
-        val margin = WhiteNoiseSpacing.CompactScreenMargin - outerInset
+        val margin = (WhiteNoiseSpacing.CompactScreenMargin - outerInset).coerceAtLeast(0.dp)
         val avatarSize = identityAvatarSize(width + outerInset * 2)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = margin),
@@ -59,12 +59,13 @@ internal fun IdentityHeader(
     }
 }
 
-/** The title of a group or person in the identity header: one style and line limit on every screen. */
+/** The title in the identity header: one style, two lines by default. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun IdentityName(
     title: String,
     modifier: Modifier = Modifier,
+    maxLines: Int = WhiteNoiseIdentity.NAME_MAX_LINES,
 ) {
     EmojiLabel(
         title,
@@ -72,7 +73,7 @@ internal fun IdentityName(
         textAlign = TextAlign.Center,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.SemiBold,
-        maxLines = WhiteNoiseIdentity.NAME_MAX_LINES,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )
 }

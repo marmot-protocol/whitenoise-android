@@ -48,9 +48,11 @@ import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 
-/** Adaptive conversation identity with native edit, full-picture and public-key copy actions. */
+/**
+ * Adaptive conversation identity with native edit, full-picture and public-key copy actions. It keeps its optional
+ * viewer action at the presentation boundary.
+ */
 @Composable
-// Existing adaptive header keeps its optional viewer action at the presentation boundary.
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun GroupDetailsHeader(
     title: String,

@@ -442,6 +442,7 @@ internal fun GroupEditScreen(
         pendingPublicPhoto?.let { selected ->
             val generation = imagePickGeneration.capture()
 
+            /** True while the picked photo still belongs to the current owner, pick generation and editable state. */
             fun selectionIsCurrent(): Boolean =
                 imageOwnerIsCurrent() &&
                     imagePickGeneration.isCurrent(generation) &&

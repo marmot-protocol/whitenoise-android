@@ -69,7 +69,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
  * [fromGroup] marks a profile opened from inside a group: the relationship rows then carry the Profile Actions
  * heading that separates them from the group-scoped moderation block supplied through [adminActions].
  */
-
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun PersonProfileContent(
@@ -446,7 +445,7 @@ private fun PersonProfileNames(
                 },
         )
     } else {
-        IdentityName(person.title, Modifier.testTag("person_profile.name"))
+        IdentityName(person.title, Modifier.testTag("person_profile.name"), maxLines = Int.MAX_VALUE)
     }
     if (person.title != person.publishedName && !(person.publishedNameIsPublicKey && keyShown)) {
         EmojiLabel(
