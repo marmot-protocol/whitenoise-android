@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** A button on a state page: [iconRes] leads the label and [testTag] marks it for tests. */
@@ -70,7 +71,7 @@ internal fun StatePage(
         verticalArrangement = Arrangement.Center,
     ) {
         StateContent(
-            modifier = Modifier.widthIn(max = WhiteNoiseSpacing.StatePageMaxWidth).fillMaxWidth(),
+            modifier = Modifier.widthIn(max = WhiteNoiseSizes.StatePageMaxWidth).fillMaxWidth(),
             icon = icon,
             title = title,
             message = message,
@@ -110,7 +111,7 @@ internal fun StateContent(
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
         icon?.let {
-            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(WhiteNoiseSpacing.StateIcon))
+            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(WhiteNoiseSizes.StateIcon))
         }
         title?.let {
             Text(
