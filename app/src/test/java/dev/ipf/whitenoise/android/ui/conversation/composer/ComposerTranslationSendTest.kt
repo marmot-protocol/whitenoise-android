@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
@@ -48,6 +50,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Drives the real composer Send paths with translate mode on, so only a ready translation can leave. */
 @RunWith(RobolectricTestRunner::class)
@@ -148,6 +151,7 @@ class ComposerTranslationSendTest {
 
     /** The preview stays idle during capture and refreshes the full editable draft after Paste. */
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun dictationPasteKeepsTranslateModeAndRefreshesTheDraft() {
         var calls = 0
         val translation = translateMode(beforeResult = { calls += 1 })
@@ -170,6 +174,9 @@ class ComposerTranslationSendTest {
             platform.listener.onResult("dictated")
         }
         awaitMain { translation.outgoingFor("Hello dictated") == "de:Hello dictated" }
+        composeRule
+            .onNodeWithTag("composer.translation.afterDictation")
+            .captureRoboImage("src/test/snapshots/composer_translation_after_dictation_paste.png")
         composeRule.runOnIdle {
             editor.updateValue(TextFieldValue("Hello dictated later"))
         }
@@ -200,10 +207,13 @@ class ComposerTranslationSendTest {
     fun dictationSendWaitsForTranslationAndDoesNotRepeatIt() {
         val allowTranslation = CompletableDeferred<Unit>()
         var calls = 0
-        val translation = translateMode(beforeResult = {
-            calls += 1
-            if (calls > 1) allowTranslation.await()
-        })
+        val translation =
+            translateMode(
+                beforeResult = {
+                    calls += 1
+                    if (calls > 1) allowTranslation.await()
+                },
+            )
         val editor = ComposerTextState(TextFieldValue(DRAFT, TextRange(DRAFT.length)))
         val platform = TestDictationPlatform()
         val controller =
@@ -276,7 +286,7 @@ class ComposerTranslationSendTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
-                Surface(Modifier.width(360.dp)) {
+                Surface(Modifier.width(360.dp).testTag("composer.translation.afterDictation")) {
                     ComposerBar(
                         replyingTo = replyingTo,
                         messageTextCopy = MessageTextCopy.Default,
