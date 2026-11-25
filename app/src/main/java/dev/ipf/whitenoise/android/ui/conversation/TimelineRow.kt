@@ -94,7 +94,8 @@ internal fun TimelineRow(
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
     val agentTurnSteps = LocalAgentTurnSteps.current
-    // Sender runs, gaps and avatars skip agent steps folded under their turn.
+    // A step folded under its agent turn keeps its slot but draws nothing. Day separators, history
+    // markers, sender runs and avatars are decided against the nearest rows that do draw.
     val shownOlder = agentTurnSteps.shownOlder(item, older)
     val shownNewer = agentTurnSteps.shownNewer(item, newer)
     ReactionMotionRow(
@@ -105,16 +106,17 @@ internal fun TimelineRow(
         ),
         reactionViewport,
     ) {
+        if (agentTurnSteps.isFolded(item.record.messageIdHex)) return@ReactionMotionRow
         val dateFormat = DateTimeFormatState.dateFormat
         val daySeparatorLabel =
-            remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
-                if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
+            remember(shownOlder?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
+                if (shownOlder == null || differentDay(shownOlder.record.recordedAt, item.record.recordedAt)) {
                     messageDayLabel(item.record.recordedAt, transcriptLocale, dateFormat)
                 } else {
                     null
                 }
             }
-        val followsGroupEvent = older?.record?.let { MessageProjector.isGroupSystem(it) } == true
+        val followsGroupEvent = shownOlder?.record?.let { MessageProjector.isGroupSystem(it) } == true
         val showUnreadDivider =
             shouldShowConversationEntryUnreadDivider(
                 entryUnreadCount = entryUnreadCount,
@@ -123,7 +125,7 @@ internal fun TimelineRow(
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
         val historyImport = LocalChatHistoryImport.current()
-        val historyBoundary = importedHistoryBoundary(older?.projected, item.projected, historyImport)
+        val historyBoundary = importedHistoryBoundary(shownOlder?.projected, item.projected, historyImport)
         // Draw the import line ahead of the day separator to close the imported rows.
         ImportedHistoryMarkers(
             transfer = if (older == null && !controller.hasMoreBefore) chatHistoryTransfer(historyImport) else null,
@@ -137,7 +139,7 @@ internal fun TimelineRow(
                     controller.conversationGroupRecoveryRowVisible()
             DaySeparator(
                 label = daySeparatorLabel,
-                atTranscriptStart = older == null && !hasLeadingHeader,
+                atTranscriptStart = shownOlder == null && !hasLeadingHeader,
                 followsGroupEvent = followsGroupEvent,
             )
         }
@@ -149,10 +151,8 @@ internal fun TimelineRow(
             )
         }
         val hasLeadingSeparator = daySeparatorLabel != null || showUnreadDivider || historyBoundary != null
-        // A step folded under its agent turn keeps its slot but draws nothing, not even a sender gap.
-        val agentStepFolded = agentTurnSteps.isFolded(item.record.messageIdHex)
         val senderGap =
-            if (!hasLeadingSeparator && !agentStepFolded &&
+            if (!hasLeadingSeparator &&
                 conversationBubbleSenderChanges(
                     shownOlder,
                     item,
@@ -217,7 +217,6 @@ internal fun TimelineRow(
                     }
                 }
                 TimelineRowKind.AgentItem -> {
-                    if (agentStepFolded) return@Column
                     val agentItem =
                         remember(item.record, item.projected) { AgentItemReader.read(item.record, item.projected) }
                     if (agentItem != null) {

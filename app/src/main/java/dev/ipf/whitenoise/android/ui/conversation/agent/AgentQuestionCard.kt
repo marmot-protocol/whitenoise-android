@@ -51,8 +51,10 @@ internal fun AgentQuestionCard(
 ) {
     val question = item.body as? AgentItemBody.Question ?: return
     var selected by remember(item.rowId) { mutableStateOf(mapOf<String, Set<String>>()) }
-    val typing = remember(item.rowId) { question.questions.associate { it.id to TextFieldState() } }
-    val typed = typing.mapValues { (_, state) -> state.text.toString() }
+    // A later version may add questions; each keeps its own field for as long as the row lives.
+    val typing = remember(item.rowId) { HashMap<String, TextFieldState>() }
+    question.questions.forEach { typing.getOrPut(it.id, ::TextFieldState) }
+    val typed = question.questions.associate { it.id to typing.getValue(it.id).text.toString() }
     val answerable = !question.answerViaMessage && question.questions.none { it.secret } && actions.enabled
     AgentWaitingCard(modifier) {
         question.questions.forEach { asked ->

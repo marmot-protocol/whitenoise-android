@@ -63,7 +63,10 @@ internal fun agentActivitySubject(item: AgentItem): String {
         when (body) {
             is AgentItemBody.Tool -> body.command?.let(::agentDisplayCommand) ?: body.path ?: body.query
             is AgentItemBody.Task -> body.description
-            is AgentItemBody.Plan -> body.entries.firstOrNull { it.state == AgentPlanEntryState.Running }?.text
+            // The step in progress, else the plan's opening line without its Markdown marks.
+            is AgentItemBody.Plan ->
+                body.entries.firstOrNull { it.state == AgentPlanEntryState.Running }?.text
+                    ?: body.text?.let(::agentPlainPlanText)
             // An answered request's text only repeats its title ("Answered: Allow once").
             is AgentItemBody.Approval, is AgentItemBody.Question -> return ""
             else -> null
