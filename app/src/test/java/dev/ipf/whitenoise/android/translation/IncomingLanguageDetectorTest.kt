@@ -22,7 +22,10 @@ class IncomingLanguageDetectorTest {
         assertEquals("es", detector.detect("Hola, ¿quieres tomar un café mañana por la mañana?"))
         assertEquals(
             "fa",
-            detector.detect("من امروز به خانه رفتم و با دوستانم درباره کار و زندگی صحبت کردم. بعد از آن به فروشگاه رفتم و برای شام غذا خریدم."),
+            detector.detect(
+                "من امروز به خانه رفتم و با دوستانم درباره کار و زندگی صحبت کردم. " +
+                    "بعد از آن به فروشگاه رفتم و برای شام غذا خریدم.",
+            ),
         )
         assertEquals("ja", detector.detect("今晩は友達と一緒に映画を見に行きます。"))
     }

@@ -690,17 +690,13 @@ internal class ConversationDictationController internal constructor(
     ) {
         val pending = state as? ConversationDictationState.PermissionRequired ?: return
         if (!granted) {
-            state =
-                ConversationDictationState.Failed(
-                    sessionId = pending.sessionId,
-                    target = pending.target,
-                    reason =
-                        if (permanentlyDenied) {
-                            ConversationDictationFailure.PermissionPermanentlyDenied
-                        } else {
-                            ConversationDictationFailure.PermissionDenied
-                        },
-                )
+            val failure =
+                if (permanentlyDenied) {
+                    ConversationDictationFailure.PermissionPermanentlyDenied
+                } else {
+                    ConversationDictationFailure.PermissionDenied
+                }
+            fail(pending.sessionId, pending.target, failure)
             return
         }
         resumeAfterMicrophonePermission(pending)
@@ -913,7 +909,7 @@ internal class ConversationDictationController internal constructor(
                 draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
                 replyToMessageIdHex = failed.target.replyToMessageIdHex,
                 mode = failed.target.mode,
-                outgoingTranslation = retryTranslationChoice(failed.target),
+                outgoingTranslation = failed.target.retryTranslation(composerTranslationBinding),
             )
         conversationDictationDiagnostic("event=retry path=fresh_start accepted=$accepted")
     }

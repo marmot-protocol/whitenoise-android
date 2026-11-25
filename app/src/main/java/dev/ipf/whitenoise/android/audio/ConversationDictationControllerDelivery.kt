@@ -182,7 +182,7 @@ private suspend fun ConversationDictationController.sendWithOutgoingTranslation(
     target: ConversationDictationTarget,
 ): Boolean {
     val choice = target.outgoingTranslation ?: return sendTranscriptIfOriginUnchanged(request)
-    val binding = translationBindingFor(target)
+    val binding = composerTranslationBinding?.takeIf { it.matches(target) }
     val translation = binding?.resolve()?.takeIf { it.choice == choice }
     val epoch = translation?.currentEpoch()
     val outgoing = translation?.takeIf { epoch != null }?.translate(request.payload)

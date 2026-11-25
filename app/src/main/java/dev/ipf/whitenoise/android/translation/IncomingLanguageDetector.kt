@@ -84,7 +84,11 @@ internal class IncomingLanguageDetector(
 
         /** Share the immutable profiles across conversations, with application resources. */
         @Synchronized
-        fun shared(resources: Resources): IncomingLanguageDetector = sharedDetector ?: IncomingLanguageDetector(resources).also { sharedDetector = it }
+        fun shared(resources: Resources): IncomingLanguageDetector {
+            val existing = sharedDetector
+            if (existing != null) return existing
+            return IncomingLanguageDetector(resources).also { sharedDetector = it }
+        }
 
         private const val MAX_SAMPLE_LENGTH = 512
         private const val MIN_LETTERS = 14
@@ -92,7 +96,11 @@ internal class IncomingLanguageDetector(
         private const val PROFILE_LENGTH = 300
         private const val MIN_SIMILARITY = 0.24
         private const val GAP_FLOOR = 0.015
-        private val IncomingLinks = Regex("""(?i)\b(?:(?:https?://|www\.|nostr:)\S+|[\p{L}\p{N}.-]+\.[a-z]{2,24}(?:/\S*)?)""")
+        private val IncomingLinks =
+            Regex(
+                """(?i)\b(?:(?:https?://|www\.|nostr:)\S+""" +
+                    """|[\p{L}\p{N}.-]+\.[a-z]{2,24}(?:/\S*)?)""",
+            )
         private val NonLetters = Regex("[^\\p{L}\\p{M}]+")
         private val KanaScripts = setOf(UnicodeScript.HIRAGANA, UnicodeScript.KATAKANA)
         private val JapaneseScripts = KanaScripts + UnicodeScript.HAN

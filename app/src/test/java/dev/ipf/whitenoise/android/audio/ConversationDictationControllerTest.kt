@@ -7388,7 +7388,10 @@ class ConversationDictationControllerTest {
             val translatedSources = mutableListOf<String>()
             val sent = mutableListOf<String>()
             val translation =
-                ConversationDictationTranslation(ConversationDictationTranslationChoice("de"), currentEpoch = { 0L }) { source ->
+                ConversationDictationTranslation(
+                    choice = ConversationDictationTranslationChoice("de"),
+                    currentEpoch = { 0L },
+                ) { source ->
                     translatedSources += source
                     reply.await()
                 }
@@ -7469,7 +7472,12 @@ class ConversationDictationControllerTest {
                         request.beginDispatch().also { if (it) sent += request.payload }
                     },
                 )
-            val translation = ConversationDictationTranslation(ConversationDictationTranslationChoice("de"), currentEpoch = { 0L }) { reply.await() }
+            val translation =
+                ConversationDictationTranslation(
+                    choice = ConversationDictationTranslationChoice("de"),
+                    currentEpoch = { 0L },
+                    translate = { reply.await() },
+                )
             f.startTranslatedDictation(translation)
             f.controller.send()
             f.platform.listener.onResult("dictated")
@@ -7526,11 +7534,14 @@ class ConversationDictationControllerTest {
                     ConversationDictationFailure.PermissionDenied,
                     (f.controller.state as ConversationDictationState.Failed).reason,
                 )
+                assertFalse(f.controller.foregroundMicrophoneRequired)
 
                 language = retryLanguage
                 if (!composerMounted) f.controller.composerTranslationBinding = null
                 platform.hasPermission = true
                 f.controller.retry()
+                assertEquals(2, platform.captureSessionsStarted)
+                assertTrue(platform.session.started)
                 f.controller.send()
                 platform.listener.onResult("dictated")
                 advanceUntilIdle()
