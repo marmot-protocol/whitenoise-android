@@ -2357,6 +2357,7 @@
     <string name="setup_finding_retired_relay">This relay is retired.</string>
     <string name="setup_finding_unsafe_relay">This relay address is not safe to use.</string>
     <string name="setup_finding_unreachable">This relay could not be reached.</string>
+    <string name="setup_relay_timeout_title">A relay didn’t respond in time</string>
     <string name="setup_finding_timed_out">This check timed out.</string>
     <string name="setup_finding_authentication_required">This relay requires authentication.</string>
     <string name="setup_finding_payment_required">This relay requires payment.</string>
@@ -2495,6 +2496,12 @@
     <string name="new_message_no_results_detail">Check the spelling or try a different search.</string>
     <string name="new_message_chat_created">Chat created</string>
     <string name="new_message_open_chat">Open chat</string>
+    <string name="group_setup_customize">Customize group</string>
+    <string name="group_setup_hide_customization">Hide customization</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d member selected</item>
+        <item quantity="other">%d members selected</item>
+    </plurals>
     <string name="group_setup_title">Set Up Group</string>
     <string name="group_create_action">Create Group</string>
     <string name="group_add_photo">Add Photo</string>
@@ -2645,6 +2652,8 @@
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_incompatible_key_package">This person’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
     <string name="error_incompatible_key_package_for">%1$s’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
+    <string name="new_message_copy_inbox_instructions">Copy instructions</string>
+    <string name="new_message_inbox_instructions">I couldn’t start a chat with you on White Noise. Could you check your inbox relays in White Noise settings and let me know when I can try again?</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>

@@ -51,7 +51,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt" to 892,
         "dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt" to 2968,
         "dev/ipf/whitenoise/android/ui/chats/GlobalSearchState.kt" to 608,
-        "dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt" to 846,
+        "dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt" to 758,
         "dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt" to 776,
         "dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt" to 707,
         "dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt" to 1032,
