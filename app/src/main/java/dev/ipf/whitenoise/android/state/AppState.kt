@@ -3689,14 +3689,12 @@ class WhiteNoiseAppState private constructor(
             bootstrapCompleted = true
             scheduleDisplayThumbnailReconciliation()
         } catch (error: Throwable) {
-            if (error is CancellationException) {
-                // The process-owned listener keeps retrying independently, but
-                // a cancelled UI bootstrap must not strand the splash forever.
-                phase = AppPhase.Failed(bootstrapFailure(error))
-                throw error
-            }
-            appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            if (error !is CancellationException) appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            // A cancelled bootstrap must release the splash before cancellation reaches its caller.
             phase = AppPhase.Failed(bootstrapFailure(error))
+            if (error is CancellationException) throw error
+        } finally {
+            abandonStartupChatListPrefetch()
         }
     }
 

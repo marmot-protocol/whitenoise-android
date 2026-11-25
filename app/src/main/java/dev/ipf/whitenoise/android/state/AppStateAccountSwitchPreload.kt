@@ -58,7 +58,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
 ): AccountSwitchLocalSnapshot? =
     try {
         val prefetched =
-            if (plan.startupRestoration) takeStartupChatListPrefetch(accountRef)?.await() else null
+            if (plan.startupRestoration) awaitStartupChatListPrefetch(accountRef) else null
         val presentedRows =
             prefetched ?: marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                 presentedChatList(accountRef, includeArchived = true)

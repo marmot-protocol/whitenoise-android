@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -51,9 +52,20 @@ class StartupChatListPrefetchTest {
     fun prefetchForAnotherAccountIsDiscarded() =
         runBlocking {
             val reads = Collections.synchronizedList(mutableListOf<String>())
-            val fixture = fixture(rememberedAccount = "removed") { accountRef -> reads += accountRef }
+            val speculativeRead = CompletableDeferred<Unit>()
+            val fixture =
+                fixture(blockStart = true, rememberedAccount = "removed") { accountRef ->
+                    reads += accountRef
+                    if (accountRef == "removed") speculativeRead.complete(Unit)
+                }
             try {
-                fixture.bootstrap()
+                val bootstrap = async { fixture.bootstrap() }
+                try {
+                    withTimeout(5_000) { speculativeRead.await() }
+                } finally {
+                    fixture.allowRuntimeStart()
+                }
+                bootstrap.await()
                 assertEquals(AppPhase.Ready, fixture.appState.phase)
                 assertEquals("self", fixture.appState.activeAccountRef)
                 assertEquals(listOf("removed", "self"), reads.toList())

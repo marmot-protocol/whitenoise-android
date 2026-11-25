@@ -85,13 +85,12 @@ private fun WhiteNoiseAppState.launchStartupChatListPrefetch(runtime: MarmotInte
     return StartupChatListPrefetch(accountRef, runtime, rows)
 }
 
-/**
- * Takes the startup prefetch for [accountRef] when it was read from the current runtime, and discards a
- * prefetch for any other account or runtime. Returns null when no usable prefetch exists.
- */
-internal fun WhiteNoiseAppState.takeStartupChatListPrefetch(accountRef: String): StartupChatListPrefetch? {
+/** Consumes the matching prefetch once and cancels it if activation stops waiting. */
+internal suspend fun WhiteNoiseAppState.awaitStartupChatListPrefetch(accountRef: String): List<PresentedChatRowFfi>? {
     val prefetch = accountSwitchHandoff.startupPrefetch.take() ?: return null
-    val usable = prefetch.matches(accountRef, marmotOrNull())
-    if (!usable) prefetch.cancel()
-    return prefetch.takeIf { usable }
+    return try {
+        if (prefetch.matches(accountRef, marmotOrNull())) prefetch.await() else null
+    } finally {
+        prefetch.cancel()
+    }
 }
