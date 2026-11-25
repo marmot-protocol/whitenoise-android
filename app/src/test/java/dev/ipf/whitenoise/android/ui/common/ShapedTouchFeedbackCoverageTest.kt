@@ -86,7 +86,7 @@ class ShapedTouchFeedbackCoverageTest {
 
     /**
      * The patterns found in review: card modifiers, a clip after the click (in `then`, or after a click's
-     * trailing lambda), fills and bare glyphs.
+     * trailing lambda), fills, bare glyphs, and sized icon buttons whose modifier is named or positional.
      */
     @Test
     fun scannerFindsTheReviewedHoles() {
@@ -156,8 +156,12 @@ class ShapedTouchFeedbackCoverageTest {
         val wrappers = passThroughIconButtonWrappers(wrapper)
         assertEquals(mapOf("PasteButton" to setOf(1)), wrappers)
         assertEquals(listOf(STRETCHED_ICON_BUTTON), stretchedWrapperCalls(caller, wrappers).map(::kind))
+        val mixed = "PasteButton(onPaste = go, Modifier.width(40.dp).height(48.dp))"
+        assertEquals(listOf(STRETCHED_ICON_BUTTON), stretchedWrapperCalls(mixed, wrappers).map(::kind))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(square, wrappers))
         assertEquals(emptyList<String>(), stretchedWrapperCalls(wrapper, wrappers))
+        val positional = "fun A(onClick: () -> Unit, modifier: Modifier) { IconButton(onClick = onClick, modifier) {} }"
+        assertEquals(mapOf("A" to setOf(1)), passThroughIconButtonWrappers(positional))
     }
 
     /**
