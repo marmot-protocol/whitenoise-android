@@ -79,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -674,18 +675,6 @@ private fun ForwardTargetList(
                 if (browsingFiltered && !targetsComplete && filteredTargets.isNotEmpty()) {
                     item { DestinationFilterIncomplete(retryLoad) }
                 }
-                if (browsingFiltered && filteredTargets.isEmpty()) {
-                    item {
-                        if (!targetsComplete) {
-                            DestinationFilterIncomplete(retryLoad)
-                            return@item
-                        }
-                        Text(
-                            stringResource(R.string.forward_no_matches),
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                        )
-                    }
-                }
                 val pinnedBoundary =
                     if (searching) {
                         null
@@ -729,12 +718,12 @@ private fun ForwardEmptyTargets(
 ) {
     if (filtered && !complete) {
         DestinationFilterIncomplete(onRetry)
+    } else if (targetsEmpty) {
+        WhiteNoiseEmptyState(stringResource(R.string.forward_no_chats))
     } else {
-        Text(
-            stringResource(if (targetsEmpty) R.string.forward_no_chats else R.string.forward_no_matches),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+        WhiteNoiseEmptyState(
+            title = stringResource(R.string.no_matches),
+            detail = stringResource(R.string.forward_no_matches),
         )
     }
 }

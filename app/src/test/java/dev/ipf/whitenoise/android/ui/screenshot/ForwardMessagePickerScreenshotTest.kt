@@ -11,10 +11,12 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -51,6 +53,15 @@ class ForwardMessagePickerScreenshotTest {
             snapshotPath = "src/test/snapshots/forward_message_picker_dark.png",
             folderFixture = FolderFixture.NONE,
         )
+        composeRule.onNodeWithContentDescription("Search chats").performClick()
+        composeRule.onNodeWithTag("forward.searchField").performTextInput("missing destination")
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasText("No matches")).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNodeWithText("No matches").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/forward_message_picker_no_matches_dark.png")
     }
 
     /** A mixed-selection folder remains compact beside enlarged destination text. */

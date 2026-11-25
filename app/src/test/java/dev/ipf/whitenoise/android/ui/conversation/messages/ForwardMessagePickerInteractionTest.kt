@@ -167,6 +167,7 @@ class ForwardMessagePickerInteractionTest {
         org.junit.Assert.assertTrue("avatar keeps its 48dp target", (avatar.right - avatar.left).value >= 48f)
         composeRule.onNodeWithContentDescription("Search chats").performClick()
         composeRule.onNodeWithTag("forward.searchField").performTextInput("missing")
+        composeRule.onNodeWithText("No matches").assertIsDisplayed()
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
         composeRule.onNodeWithTag("forward.selectAll").assertIsNotEnabled()
         Espresso.pressBack()
