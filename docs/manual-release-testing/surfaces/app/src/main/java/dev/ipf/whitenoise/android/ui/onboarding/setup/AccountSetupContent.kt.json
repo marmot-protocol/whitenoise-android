@@ -514,6 +514,14 @@
           "ONB-019",
           "ONB-021"
         ]
+      },
+      {
+        "surface": "Retry-first relay timeout moves the full endpoint into Details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "if (focusedTimeout) SetupRelayTimeoutHosts",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   }

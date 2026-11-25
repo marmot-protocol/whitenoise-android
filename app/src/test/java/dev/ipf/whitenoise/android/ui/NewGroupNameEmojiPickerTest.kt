@@ -251,6 +251,7 @@ class NewGroupNameEmojiPickerTest {
         val draftName = "Team launch"
         composeRule.onNodeWithTag("group_setup.name").performTextReplacement(draftName)
 
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.photoAction").performClick()
         composeRule.onNodeWithText(string(R.string.group_photo_emoji)).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/new_group_emoji_image_entry_light.png")

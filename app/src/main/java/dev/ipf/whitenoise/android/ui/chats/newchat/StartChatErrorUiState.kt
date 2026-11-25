@@ -12,6 +12,7 @@ internal data class StartChatErrorUiState(
     val invitation: Boolean = false,
     val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
     val retryGroupIdHex: String? = null,
+    val missingInbox: Boolean = false,
 ) {
     val copyable: Boolean
         get() = !diagnosticReport.isNullOrBlank()

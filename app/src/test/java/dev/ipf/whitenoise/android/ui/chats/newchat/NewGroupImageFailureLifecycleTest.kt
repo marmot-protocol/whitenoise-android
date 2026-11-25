@@ -82,6 +82,7 @@ class NewGroupImageFailureLifecycleTest {
 
     /** Drives a real image choice through the screen with a deterministic preparation failure. */
     private fun failWebImage(state: WhiteNoiseAppState) {
+        composeRule.onNodeWithTag("group_setup.customize").performClick()
         composeRule.onNodeWithTag("group_setup.photoAction").performClick()
         composeRule.onNodeWithText(context.getString(R.string.group_photo_web)).performClick()
         composeRule.onNodeWithTag("image_search.url").performTextReplacement("https://example.com/image.svg")

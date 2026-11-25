@@ -126,9 +126,8 @@ internal val AccountSetupState.hasPinnedActions: Boolean
 private val AccountSetupState.offersDecisionActions: Boolean
     get() {
         val step = currentStep ?: return false
-        val blockedByFailure = error || staleDecision || optionalMetadataPending
         val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
-        return !blockedByFailure && (!disconnected || reconnectOffered)
+        return !blocksSetupActions && (!disconnected || reconnectOffered)
     }
 
 /** The decision pins its own buttons: offered actions the plan shows, or the direct removal of one exact relay. */

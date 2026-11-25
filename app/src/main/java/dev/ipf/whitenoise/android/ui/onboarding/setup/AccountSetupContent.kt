@@ -268,6 +268,7 @@ private fun SetupDecisionContent(state: AccountSetupState) {
     }
 }
 
+/** Keeps findings already summarized in the heading available under Details. */
 @Composable
 private fun SetupStepFindings(
     state: AccountSetupState,
@@ -277,6 +278,8 @@ private fun SetupStepFindings(
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
     val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
+    val focusedTimeout = state.focusesRelayTimeout()
+    if (focusedTimeout) SetupRelayTimeoutHosts(step.findings)
     step.findings
         .distinct()
         .filterNot { finding ->
@@ -285,7 +288,8 @@ private fun SetupStepFindings(
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || directRemovalFinding
+            val summarizedTimeout = focusedTimeout && finding.issue == OnboardingIssueFfi.TIMED_OUT
+            routineDeviceNotice || directRemovalFinding || summarizedTimeout
         }.forEach { finding ->
             SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
         }

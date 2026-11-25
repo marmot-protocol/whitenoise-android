@@ -47,9 +47,10 @@
     "settings-help-support": {
       "suite": "settings",
       "manual_ids": [
-        "SET-001"
+        "SET-001",
+        "SET-071"
       ],
-      "assertions": "Help & support hub opens its group; toolbar Back returns to Settings and Chats.",
+      "assertions": "Help hub opens the walkthrough, advances through its cards and reveals the sample message actions. Close returns to the hub, then toolbar Back returns to Settings and Chats.",
       "postcondition": "none"
     },
     "settings-notification-sounds": {

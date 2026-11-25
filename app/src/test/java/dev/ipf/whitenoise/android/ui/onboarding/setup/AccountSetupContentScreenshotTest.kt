@@ -564,7 +564,14 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.AMOLED,
         )
 
-    @Test fun focusedTimeoutAmoled() {
+    @Test fun focusedTimeoutAmoled() = focusedTimeout("focused_timeout_amoled")
+
+    @Test fun focusedTimeoutDetailsAmoled() = focusedTimeout("focused_timeout_details_amoled", expanded = true)
+
+    private fun focusedTimeout(
+        file: String,
+        expanded: Boolean = false,
+    ) {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,
@@ -575,8 +582,8 @@ class AccountSetupContentScreenshotTest {
             findings = listOf(setupFinding(OnboardingIssueFfi.TIMED_OUT, "wss://slow.example"))
         }
         capture(
-            "focused_timeout_amoled",
-            AccountSetupState(snapshot),
+            file,
+            AccountSetupState(snapshot, detailsExpanded = expanded),
             theme = SetupScreenshotTheme.AMOLED,
         )
     }
