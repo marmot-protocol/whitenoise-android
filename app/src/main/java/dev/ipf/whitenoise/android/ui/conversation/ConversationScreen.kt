@@ -607,7 +607,7 @@ internal fun ConversationScreen(
     var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
     var bottomInputRevision by bottomInsetState.bottomInputRevision
     var routePresentationFrozen by bottomInsetState.routePresentationFrozen
-    val translationSession =
+    val translator =
         dev.ipf.whitenoise.android.translation.rememberConversationTranslation(
             appState,
             conversationAccountRef,
@@ -3153,10 +3153,7 @@ internal fun ConversationScreen(
                 captureContent = false
             }
         }
-    CompositionLocalProvider(
-        LocalSettingsCardMorph provides routeMorph,
-        dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
-    ) {
+    CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     }
     val settingsMotion =
@@ -3653,7 +3650,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }, translator) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             settingsMotion.launchFromComposer(
@@ -4007,6 +4004,7 @@ internal fun ConversationScreen(
         ) { padding ->
             val reactionArtwork = remember(appState, controller) { conversationReactionArtwork(appState, controller) }
             CompositionLocalProvider(
+                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translator,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,
