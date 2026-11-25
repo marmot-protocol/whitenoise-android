@@ -48,6 +48,8 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPenDialogMotion
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
+import dev.ipf.whitenoise.android.ui.keyboard.rememberHardwareShortcut
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
@@ -72,7 +74,10 @@ internal data class NewMessageFlowLaunch(
     val pen: MeasuredPenDialogMotion? = null,
 )
 
-/** The FAB opens New Message or receiving-relay recovery using their existing owners. */
+/**
+ * The FAB opens New Message or receiving-relay recovery using their existing owners. Ctrl+N takes the same New
+ * Message path while the FAB offers it.
+ */
 @Suppress("FunctionNaming", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun ChatsNewMessageFab(
@@ -116,6 +121,11 @@ internal fun ChatsNewMessageFab(
         with(LocalDensity.current) {
             ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
         }
+    // Ctrl+N takes the button's own path, and only while the button offers New Message (#4005).
+    rememberHardwareShortcut(HardwareShortcutCommand.NewMessage, available = current() && !missing) {
+        onNewMessageOrigin(null)
+        onNewMessage()
+    }
     ChatsNewMessageFabContent(missing, onBounds = { fabBounds = it }, hidePen = hidePen, onClick = {
         if (current()) {
             if (missing) {

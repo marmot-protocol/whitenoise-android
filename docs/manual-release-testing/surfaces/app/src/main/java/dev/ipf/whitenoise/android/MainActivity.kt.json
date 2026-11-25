@@ -49,6 +49,14 @@
         "test_ids": [
           "DIC-015"
         ]
+      },
+      {
+        "surface": "Keyboard Shortcuts Helper publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "override fun onProvideKeyboardShortcuts(",
+        "test_ids": [
+          "AXY-021"
+        ]
       }
     ]
   },

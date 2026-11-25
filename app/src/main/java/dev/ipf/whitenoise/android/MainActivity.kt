@@ -5,6 +5,9 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.Menu
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -62,6 +65,8 @@ import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutRouter
+import dev.ipf.whitenoise.android.ui.keyboard.hardwareShortcutGroup
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeLifecycleClass
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeActivityLifecycleClass
@@ -106,6 +111,11 @@ class MainActivity : AppCompatActivity() {
     }
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
+
+    // App Lock owns input while it is shown or still deciding whether to show (#4005).
+    internal val hardwareShortcuts by lazy {
+        HardwareShortcutRouter(inputBlocked = { appState.appLock.screenVisible || appState.appLock.evaluationPending })
+    }
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
     private var warmResumeTraceToken = 0
     private var warmResumeEpoch by mutableIntStateOf(0)
@@ -497,6 +507,23 @@ class MainActivity : AppCompatActivity() {
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLock.screenVisible) releaseAppLockBackgroundSecureFlag()
         }
+    }
+
+    /** Runs the messaging shortcuts before the focused view, so a text field cannot swallow them (#4005). */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val shortcut = ::appState.isInitialized && hardwareShortcuts.handle(event)
+        return shortcut || super.dispatchKeyEvent(event)
+    }
+
+    /** Lists the messaging shortcuts available right now in Android's Keyboard Shortcuts Helper. */
+    override fun onProvideKeyboardShortcuts(
+        data: MutableList<KeyboardShortcutGroup>?,
+        menu: Menu?,
+        deviceId: Int,
+    ) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        if (!::appState.isInitialized) return
+        hardwareShortcutGroup(this, hardwareShortcuts.availableCommands())?.let { data?.add(it) }
     }
 
     override fun onPause() {

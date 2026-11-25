@@ -217,6 +217,8 @@ internal fun ConversationTopBar(
         } else {
             presentedGroup
         }
+    // From a compact conversation, Ctrl+F and Ctrl+N leave through Back before Chats runs them (#4005).
+    rememberChatsReturnShortcut(available = !freezeRoutePresentation, exit = onBack)
     val searchCollapse = rememberSearchCollapse(searchOpen && !selectionMode)
     Column(Modifier.searchCollapseHost(searchCollapse)) {
         if (selectionMode) {
