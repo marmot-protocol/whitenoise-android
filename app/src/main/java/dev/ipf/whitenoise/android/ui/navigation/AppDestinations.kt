@@ -49,6 +49,9 @@ internal enum class SettingsDetail {
     Chats,
     VoiceLanguage,
     HelpSupport,
+    LearnWhiteNoise,
     NotificationSounds,
     NotificationDelivery,
 }
+
+internal fun firstRunHelpDetail(team: Boolean) = if (team) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise

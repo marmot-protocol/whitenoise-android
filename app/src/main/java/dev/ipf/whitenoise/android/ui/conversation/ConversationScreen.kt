@@ -590,7 +590,7 @@ internal fun ConversationScreen(
             )
         }
 
-    val ttsFollowHandle = rememberConversationTtsFollowHandle(controller.group.groupIdHex)
+    val readAloudFollow = rememberConversationReadAloudFollow(appState, controller)
     val postInitialReanchorGate =
         remember(controller, listState) {
             ConversationPostInitialReanchorGate()
@@ -993,17 +993,12 @@ internal fun ConversationScreen(
     // A row keeps the drag callbacks it was composed with. Moves resolve through the current instance, so a move
     // that reaches a replaced drag state finds no anchor, as the screen's rememberUpdatedState updater did.
     val currentMessageDragSelection by rememberUpdatedState(messageDragSelection)
-    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+    LaunchedEffect(timelineViewport, readAloudFollow.handle) {
         snapshotFlow { timelineViewport.readingBoundsInWindow }.collect { bounds ->
             if (bounds != null) messageDragSelection.updateTranscriptBounds(bounds)
         }
     }
-    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
-    LaunchedEffect(timelineViewport, ttsFollowHandle) {
-        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
-            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
-        }
-    }
+    readAloudFollow.speechBoundsEffect(timelineViewport)
 
     val viewportCaptureRevision = scrollEvidenceSink?.viewportCaptureRevision?.value ?: 0L
 
@@ -1221,10 +1216,7 @@ internal fun ConversationScreen(
     fun onReaderScrollStarted() {
         navigationState.targetNavigation.cancel()
         navigationState.targetHighlight.clear()
-        ttsFollowHandle.suspendForDirectDrag(
-            state = appState.ttsController.state.value,
-            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-        )
+        readAloudFollow.suspendForDirectDrag()
         scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
         controller.onOlderPagingGestureStarted()
     }
@@ -1961,85 +1953,31 @@ internal fun ConversationScreen(
         )
     }
 
-    /** Keeps read-aloud following the spoken message while this conversation owns the session. */
-    @Composable
-    fun ttsFollowEffects() {
-        ConversationTtsFollowEffects(
-            appState = appState,
+    readAloudFollow.followEffects(
+        listState = listState,
+        timelineViewport = timelineViewport,
+        scrollCoordinator = scrollCoordinator,
+        initialTimelineAnchored = initialTimelineAnchored,
+        renderedTimeline = renderedTimeline,
+        timelineItemHeightsPx = navigationState.timelineItemHeightsPx,
+        currentTimelineListIndex = ::currentTimelineListIndex,
+        currentScrollAnchor = ::currentScrollAnchor,
+        ttsFocusSessionId = ttsFocusSessionId,
+        focusMessageRequestId = focusMessageRequestId,
+    )
+
+    val bodyExpansionPosition =
+        rememberConversationBodyExpansionPosition(
             controller = controller,
+            scope = scope,
+            navigationState = navigationState,
             listState = listState,
             timelineViewport = timelineViewport,
             scrollCoordinator = scrollCoordinator,
-            handle = ttsFollowHandle,
-            initialTimelineAnchored = initialTimelineAnchored,
-            renderedTimeline = renderedTimeline,
-            timelineItemHeightsPx = navigationState.timelineItemHeightsPx,
             currentTimelineListIndex = ::currentTimelineListIndex,
             currentScrollAnchor = ::currentScrollAnchor,
-            explicitRevealRequestId =
-                if (ttsFocusSessionId == null) {
-                    0L
-                } else {
-                    focusMessageRequestId
-                },
+            resolveScrollAnchorIndex = ::resolveScrollAnchorIndex,
         )
-    }
-    ttsFollowEffects()
-
-    /**
-     * Keeps the former preview near the viewport when its row grows in the reversed list.
-     * The height increase would otherwise leave the reader at the newest end of a tall message.
-     * Expanding is the reader's own choice of position, so a reply or search jump still loading is
-     * cancelled and cannot move the viewport away when it completes.
-     */
-    fun preserveReadingPositionOnExpansion(item: TimelineMessage) {
-        val beforeLayout = timelineViewport.readingLayoutInfo()
-        val preview = beforeLayout.visibleItemsInfo.firstOrNull { it.key == item.presentationId } ?: return
-        val maxLayoutFrames = 3
-        val continuationPx = beforeLayout.viewportSize.height / 5
-        navigationState.targetNavigation.cancel()
-        scrollCoordinator.cancelForegroundRestoreForUserIntent()
-        val wasFollowingTail = scrollCoordinator.isFollowingTail
-        scrollCoordinator.settleReadingAt(currentScrollAnchor())
-        val expansionRevision = scrollCoordinator.intentToken.revision
-
-        scope.launch {
-            if (scrollCoordinator.intentToken.revision != expansionRevision) return@launch
-            val completed =
-                scrollCoordinator.programmaticJump(
-                    targetMessageId = item.record.messageIdHex,
-                    reason = ConversationScrollReason.MessageExpansion,
-                ) {
-                    repeat(maxLayoutFrames) {
-                        withFrameNanos { }
-                        val expanded =
-                            timelineViewport
-                                .readingLayoutInfo()
-                                .visibleItemsInfo
-                                .firstOrNull { it.key == item.presentationId }
-                                ?: return@programmaticJump
-                        val growth = expanded.size - preview.size
-                        if (growth > 0) {
-                            // Reveal some new text while retaining the last lines of the preview.
-                            val reveal = growth.coerceAtMost(continuationPx)
-                            scrollToItem(expanded.index, growth - preview.offset - reveal)
-                            return@programmaticJump
-                        }
-                    }
-                }
-            if (completed) {
-                scrollCoordinator.settleLandingAt(
-                    currentScrollAnchor(),
-                    atNewestEdge =
-                        wasFollowingTail &&
-                            conversationLandingAtNewestEdge(
-                                atNaturalTail = timelineViewport.isAtNaturalTail,
-                                hasMoreAfter = controller.hasMoreAfterTimeline,
-                            ),
-                )
-            }
-        }
-    }
 
     val tailTimelineIndex =
         conversationTimelineTailListIndex(
@@ -4377,12 +4315,7 @@ internal fun ConversationScreen(
                                                     textSelectionMessageId == messageId,
                                                 onTextSelectionModeChange = { enabled ->
                                                     if (enabled) {
-                                                        ttsFollowHandle.suspendForDirectDrag(
-                                                            appState.ttsController.state.value,
-                                                            appState.ownsTtsAutoReadSession(
-                                                                controller.group.groupIdHex,
-                                                            ),
-                                                        )
+                                                        readAloudFollow.suspendForDirectDrag()
                                                         openActionMenuId = null
                                                         textSelectionMessageId = messageId
                                                         textSelectionBubbleBounds = null
@@ -4416,13 +4349,7 @@ internal fun ConversationScreen(
                                                 onDragSelectionStart = { pointerWindowY ->
                                                     openActionMenuId = null
                                                     clearTextSelection()
-                                                    ttsFollowHandle.suspendForDirectDrag(
-                                                        state = appState.ttsController.state.value,
-                                                        ownsSession =
-                                                            appState.ownsTtsAutoReadSession(
-                                                                controller.group.groupIdHex,
-                                                            ),
-                                                    )
+                                                    readAloudFollow.suspendForDirectDrag()
                                                     scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                                     controller.onOlderPagingGestureStarted()
                                                     messageDragSelection.startMessageDrag(
@@ -4513,66 +4440,15 @@ internal fun ConversationScreen(
                                                         null
                                                     },
                                                 onBeforeBodyExpand = {
-                                                    preserveReadingPositionOnExpansion(item)
+                                                    bodyExpansionPosition.preserveReadingPositionOnExpansion(item)
                                                 },
                                                 onBeforeBodyCollapse = {
-                                                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
-                                                    // Collapse cancels deferred movement while preserving
-                                                    // whether the viewport is following the tail.
-                                                    val keepFollowingTail =
-                                                        scrollCoordinator.isFollowingTail &&
-                                                            conversationLandingAtNewestEdge(
-                                                                atNaturalTail = timelineViewport.isAtNaturalTail,
-                                                                hasMoreAfter = controller.hasMoreAfterTimeline,
-                                                            )
-                                                    currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
-                                                        // Preserve a visible top edge; a deep offset into a tall body
-                                                        // must not survive after that content has been clipped away.
-                                                        val visible =
-                                                            timelineViewport
-                                                                .readingLayoutInfo()
-                                                                .visibleItemsInfo
-                                                                .firstOrNull {
-                                                                    it.index == index
-                                                                }
-                                                        val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
-                                                        val anchor =
-                                                            ConversationScrollAnchor(
-                                                                messageId = item.record.messageIdHex,
-                                                                itemId = item.presentationId,
-                                                                listIndex = index,
-                                                                pixelOffset = offset,
-                                                            )
-                                                        scrollCoordinator.settleLandingAt(
-                                                            anchor,
-                                                            atNewestEdge = keepFollowingTail,
-                                                        )
-                                                        if (!keepFollowingTail) {
-                                                            val bookmark = scrollCoordinator.bookmark(anchor)
-                                                            scope.launch {
-                                                                scrollCoordinator.restoreBookmark(
-                                                                    bookmark,
-                                                                    resolveAnchorIndex = ::resolveScrollAnchorIndex,
-                                                                )
-                                                            }
-                                                        }
-                                                    } ?: scrollCoordinator.settleLandingAt(
-                                                        currentScrollAnchor(),
-                                                        atNewestEdge = keepFollowingTail,
-                                                    )
+                                                    bodyExpansionPosition.preserveReadingPositionOnCollapse(item)
                                                 },
                                                 collapseLongMessages = collapseLongMessages,
                                                 ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                                                ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
-                                                onTtsSentenceSeek = { state ->
-                                                    ttsFollowHandle.onSentenceSeek(
-                                                        state = state,
-                                                        ownsSession =
-                                                            appState.ownsTtsAutoReadSession(
-                                                                controller.group.groupIdHex,
-                                                            ),
-                                                    )
-                                                },
+                                                ttsSentenceLayoutSink = readAloudFollow.sentenceLayouts,
+                                                onTtsSentenceSeek = { state -> readAloudFollow.onSentenceSeek(state) },
                                             )
                                         }
                                     }
@@ -4652,16 +4528,9 @@ internal fun ConversationScreen(
                                     ConversationNavigationStack(composerOverlap = overlayPadding) {
                                         // Selection hides these controls; paging progress never covers message rows.
                                         ConversationNavigationControl(
-                                            visible = !selectionMode && ttsFollowHandle.showResumeAction,
+                                            visible = !selectionMode && readAloudFollow.showResumeAction,
                                         ) {
-                                            TtsResumeFollowButton(
-                                                onClick = {
-                                                    ttsFollowHandle.revealCurrentPassage(
-                                                        appState.ttsController.state.value,
-                                                        appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                                    )
-                                                },
-                                            )
+                                            TtsResumeFollowButton(onClick = { readAloudFollow.revealCurrentPassage() })
                                         }
                                         // A search result whose window could not load offers its own Retry; the
                                         // conversation's load-error banner covers the case where loading failed.

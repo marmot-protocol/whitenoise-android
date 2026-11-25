@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
         "anchor": "fun ChatHistoryBackupHint(",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
         "anchor": "fun ChatHistoryBackupHintCard(",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       }
     ],
@@ -26,7 +26,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
         "anchor": "R.string.history_backups_chat_hint",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       }
     ]

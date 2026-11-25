@@ -230,20 +230,19 @@
     <string name="leave_and_delete_message">Leave this group and delete its history from this device?</string>
     <string name="toast_left_chat_delete_failed">Left group. Local deletion failed.</string>
     <string name="group_reset_action">Reset and wait for a new invite</string>
-    <string name="group_reset_dialog_title">Reset this group on this device?</string>
-    <string name="group_reset_dialog_message">White Noise erases this group’s history and encryption state on this device only. Nothing is sent to the group. You’ll rejoin only when an admin sends a new invite created after this reset.</string>
+    <string name="group_reset_dialog_title">Reset this group?</string>
+    <string name="group_reset_dialog_message">Clears this group’s history and encryption state on this device. Nothing is sent. To rejoin, you’ll need a new invite created by an admin after the reset.</string>
     <string name="group_reset_confirm">Reset</string>
     <string name="toast_group_reset_done">Group reset. It will reappear when a new invite arrives.</string>
     <string name="toast_group_reset_already_waiting">This group is already waiting for a new invite.</string>
     <string name="toast_couldnt_reset_group">Couldn’t reset the group. Try again.</string>
-    <string name="chat_abandon_dialog_title">Delete this chat from this device?</string>
-    <string name="chat_abandon_dialog_message">Erases it here and stops new messages. Nothing is sent.</string>
+    <string name="chat_abandon_dialog_title">Delete this chat?</string>
+    <string name="chat_abandon_dialog_message">Erases this chat from this device and stops new messages. Nothing is sent.</string>
     <string name="chat_abandon_confirm">Abandon</string>
     <string name="abandon_identity_chat">Direct chat: %1$s</string>
     <string name="abandon_identity_group">Group: %1$s</string>
-    <string name="abandon_identity_account">Your account: %1$s</string>
     <string name="chats_abandon_action">Abandon chats on this device</string>
-    <string name="chats_abandon_dialog_title">Abandon the selected chats on this device?</string>
+    <string name="chats_abandon_dialog_title">Abandon chats on this device?</string>
     <string name="toast_chat_already_abandoned">This chat is already deleted from this device.</string>
     <string name="leave_blocked_abandon_hint_dm">Leaving didn’t finish. You can delete this chat from this device instead. Nothing is sent to the other person.</string>
     <string name="leave_blocked_abandon_hint_group">Leaving didn’t finish. You can reset this group on this device instead. Nothing is sent to the group.</string>
@@ -1425,7 +1424,7 @@
     <string name="notification_categories_detail">Android sets sound, vibration and importance per category.</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>
-    <string name="chat_with_support">Chat with support</string>
+    <string name="chat_with_support">Talk to the White Noise team</string>
     <string name="theme">Theme</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
@@ -1812,9 +1811,18 @@
     <string name="disappearing_1_day">1 day</string>
     <string name="disappearing_90_days">3 months</string>
     <string name="disappearing_custom">Custom time</string>
-    <string name="disappearing_days_format">%1$d days</string>
-    <string name="disappearing_hours_format">%1$d hours</string>
-    <string name="disappearing_minutes_format">%1$d minutes</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutes</string>
     <string name="disappearing_unit_hours">Hours</string>
     <string name="disappearing_unit_days">Days</string>
@@ -1855,7 +1863,10 @@
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 seconds</string>
     <string name="disappearing_explainer">New messages are deleted for everyone after this time. Unread messages start counting once read.</string>
-    <string name="disappearing_seconds_format">%1$d seconds</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
     <string name="disappearing_custom_decrease">Shorter</string>
@@ -2346,6 +2357,7 @@
     <string name="setup_finding_retired_relay">This relay is retired.</string>
     <string name="setup_finding_unsafe_relay">This relay address is not safe to use.</string>
     <string name="setup_finding_unreachable">This relay could not be reached.</string>
+    <string name="setup_relay_timeout_title">A relay didn’t respond in time</string>
     <string name="setup_finding_timed_out">This check timed out.</string>
     <string name="setup_finding_authentication_required">This relay requires authentication.</string>
     <string name="setup_finding_payment_required">This relay requires payment.</string>
@@ -2423,7 +2435,7 @@
     <string name="app_unlock_checking">Checking app protection…</string>
     <string name="support_contact_title">White Noise Support</string>
     <string name="support_contact_subtitle">Questions, problems, and suggestions</string>
-    <string name="support_contact_explainer">Ask a question, report a problem or suggest something.</string>
+    <string name="support_contact_explainer">Ask a question, report a problem or share feedback with the people building White Noise.</string>
     <string name="support_relays_attention">Profile relays need attention</string>
     <string name="support_open_relays">Open Relays</string>
     <string name="support_relays_review">Review this profile’s receiving relay list.</string>
@@ -2484,6 +2496,12 @@
     <string name="new_message_no_results_detail">Check the spelling or try a different search.</string>
     <string name="new_message_chat_created">Chat created</string>
     <string name="new_message_open_chat">Open chat</string>
+    <string name="group_setup_customize">Customize group</string>
+    <string name="group_setup_hide_customization">Hide customization</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d member selected</item>
+        <item quantity="other">%d members selected</item>
+    </plurals>
     <string name="group_setup_title">Set Up Group</string>
     <string name="group_create_action">Create Group</string>
     <string name="group_add_photo">Add Photo</string>
@@ -2634,6 +2652,8 @@
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_incompatible_key_package">This person’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
     <string name="error_incompatible_key_package_for">%1$s’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
+    <string name="new_message_copy_inbox_instructions">Copy instructions</string>
+    <string name="new_message_inbox_instructions">I couldn’t start a chat with you on White Noise. Could you check your inbox relays in White Noise settings and let me know when I can try again?</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>

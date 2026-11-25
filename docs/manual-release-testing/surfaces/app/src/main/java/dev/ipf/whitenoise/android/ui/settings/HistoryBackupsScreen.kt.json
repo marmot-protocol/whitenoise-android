@@ -9,7 +9,7 @@
         "anchor": "fun HistoryBackupsScreen(",
         "test_ids": [
           "SET-072",
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -18,7 +18,7 @@
         "anchor": "fun HistoryBackupsContent(",
         "test_ids": [
           "SET-072",
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -34,7 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "fun HistoryRestoreGroup(",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       }
     ],
@@ -45,7 +45,7 @@
         "anchor": "R.string.history_backups_problem_failed",
         "test_ids": [
           "SET-072",
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -54,7 +54,7 @@
         "anchor": "R.string.history_backups_status_failed",
         "test_ids": [
           "SET-072",
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -70,7 +70,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_cancel_restore",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -110,7 +110,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_problem_restore_busy",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -118,7 +118,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_problem_restore_words",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -142,7 +142,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_restore",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -150,7 +150,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_restore_words",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -158,7 +158,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups_restore_words_help",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -270,7 +270,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_cancelled",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -278,7 +278,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_complete",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -286,7 +286,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_discovering",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -294,7 +294,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_partial",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -302,7 +302,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_restoring",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {
@@ -310,7 +310,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_unavailable",
         "test_ids": [
-          "SET-071"
+          "SET-073"
         ]
       },
       {

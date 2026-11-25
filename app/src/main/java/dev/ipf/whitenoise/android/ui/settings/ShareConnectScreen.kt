@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -39,7 +40,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -64,6 +67,7 @@ import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -321,10 +325,10 @@ internal fun ShareConnectContent(
                 scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
             )
         },
-        bottomBar = { ShareConnectBottomAction(onClick = onOpenScanner) },
+        bottomBar = { ShareConnectBottomAction(scanInvalid = scanInvalid, onClick = onOpenScanner) },
     ) { innerPadding ->
         AdaptiveContent(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
+            ShareProfileContent(profile, qrContent, copied, onCopy)
         }
     }
 }
@@ -442,7 +446,6 @@ private fun ShareProfileContent(
     profile: ShareConnectProfile,
     qrContent: String,
     copied: Boolean,
-    scanInvalid: Boolean,
     onCopy: () -> Unit,
 ) {
     BoxWithConstraints(
@@ -511,37 +514,40 @@ private fun ShareProfileContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            if (scanInvalid) {
-                Text(
-                    text = stringResource(R.string.error_not_white_noise_profile_qr),
-                    modifier =
-                        Modifier
-                            .padding(top = WhiteNoiseSpacing.Related)
-                            .widthIn(max = ShareConnectDefaults.ErrorMaxWidth),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-            }
         }
     }
 }
 
-/** Pinned full-width "Scan QR Code" task button above the navigation bar. */
+/** Keeps the scan result visible beside the next scan action when the scanner closes. */
 @Suppress("FunctionNaming")
 @Composable
-private fun ShareConnectBottomAction(onClick: () -> Unit) {
+private fun ShareConnectBottomAction(
+    scanInvalid: Boolean,
+    onClick: () -> Unit,
+) {
     val scanLabel = stringResource(R.string.scan_qr_code)
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         AdaptiveContent {
-            Box(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(WhiteNoiseSpacing.PinnedActionInset),
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
+                if (scanInvalid) {
+                    WhiteNoiseCallout(
+                        text = stringResource(R.string.error_not_white_noise_profile_qr),
+                        modifier =
+                            Modifier
+                                .widthIn(max = ShareConnectDefaults.ErrorMaxWidth)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        icon = R.drawable.ic_error,
+                        isError = true,
+                    )
+                }
                 SettingsSearchRowReveal("scan_qr_code", modifier = Modifier.fillMaxWidth()) {
                     WhiteNoiseButton(
                         onClick = onClick,

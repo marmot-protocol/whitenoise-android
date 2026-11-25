@@ -85,14 +85,6 @@
         ]
       },
       {
-        "surface": "Failed abandonment's in-dialog Copy action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.copy",
-        "test_ids": [
-          "GRP-033"
-        ]
-      },
-      {
         "surface": "GroupLeaveBlockedNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "fun GroupLeaveBlockedNotice(",
@@ -142,9 +134,9 @@
         ]
       },
       {
-        "surface": "abandon identity account",
+        "surface": "Shared actor and destination identity in abandonment",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.abandon_identity_account",
+        "anchor": "identity?.invoke()",
         "test_ids": [
           "GRP-033"
         ]
@@ -179,6 +171,14 @@
         "surface": "retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-033"
+        ]
+      },
+      {
+        "surface": "Copy removal error report",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.copy",
         "test_ids": [
           "GRP-033"
         ]

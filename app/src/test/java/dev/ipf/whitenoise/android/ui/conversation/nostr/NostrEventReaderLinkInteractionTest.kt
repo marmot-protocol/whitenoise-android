@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,9 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,6 +45,10 @@ import org.robolectric.annotation.Config
 class NostrEventReaderLinkInteractionTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val notices = mutableListOf<Pair<Int, TransientNoticeKind>>()
+    private val noticeHost =
+        TopNoticeHost(SnackbarHostState(), notice = { null }, present = { title, kind -> notices += title to kind })
 
     @Test
     fun screenLongPressCopiesExactlyOnceWithoutConfirmationOrMediaActivation() {
@@ -62,7 +70,7 @@ class NostrEventReaderLinkInteractionTest {
                 }
             }
         composeRule.setContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard) {
+            CompositionLocalProvider(LocalClipboard provides clipboard, LocalTopNoticeHost provides noticeHost) {
                 WhiteNoiseTheme {
                     NostrEventReaderScreen(
                         card = noteCard().copy(mediaUrl = destination),
@@ -87,6 +95,7 @@ class NostrEventReaderLinkInteractionTest {
         composeRule.runOnIdle {
             assertEquals(listOf(destination), writes)
             assertEquals(0, mediaActivations)
+            assertTrue(notices.isEmpty())
         }
         assertEquals(
             0,
@@ -280,20 +289,22 @@ class NostrEventReaderLinkInteractionTest {
         val typed = "www.example.com/path?q=value#section"
         composeRule.setContent {
             WhiteNoiseTheme {
-                NostrEventReaderBlock(
-                    block =
-                        MarkdownBlockFfi.Paragraph(
-                            listOf(
-                                MarkdownInlineFfi.Autolink(
-                                    typed,
-                                    dev.ipf.marmotkit.MarkdownAutolinkKindFfi.WWW,
-                                    MarkdownLinkDestinationKindFfi.WEB,
+                CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
+                    NostrEventReaderBlock(
+                        block =
+                            MarkdownBlockFfi.Paragraph(
+                                listOf(
+                                    MarkdownInlineFfi.Autolink(
+                                        typed,
+                                        dev.ipf.marmotkit.MarkdownAutolinkKindFfi.WWW,
+                                        MarkdownLinkDestinationKindFfi.WEB,
+                                    ),
                                 ),
                             ),
-                        ),
-                    mentionDisplayName = { null },
-                    onNostrProfileTap = {},
-                )
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                    )
+                }
             }
         }
         val actions = composeRule.onNodeWithText(typed).fetchSemanticsNode().config[SemanticsActions.CustomActions]
@@ -312,31 +323,19 @@ class NostrEventReaderLinkInteractionTest {
                     .toString(),
             )
         }
-        assertEquals(
-            string(R.string.copied),
-            org.robolectric.shadows.ShadowToast
-                .getTextOfLatestToast(),
-        )
+        composeRule.runOnIdle { assertEquals(listOf(R.string.copied to TransientNoticeKind.Confirmation), notices) }
     }
 
     @Test
     fun clipboardFailureGivesFeedbackRatherThanEscapingTheReader() {
         triggerReaderCopyFailure(IllegalStateException("clipboard unavailable"))
-        assertEquals(
-            string(R.string.not_copied),
-            org.robolectric.shadows.ShadowToast
-                .getTextOfLatestToast(),
-        )
+        composeRule.runOnIdle { assertEquals(listOf(R.string.not_copied to TransientNoticeKind.Information), notices) }
     }
 
     @Test
     fun clipboardCancellationDoesNotShowFailureFeedback() {
         triggerReaderCopyFailure(kotlinx.coroutines.CancellationException("reader left"))
-        assertEquals(
-            0,
-            org.robolectric.shadows.ShadowToast
-                .shownToastCount(),
-        )
+        composeRule.runOnIdle { assertTrue(notices.isEmpty()) }
     }
 
     private fun triggerReaderCopyFailure(failure: Exception) {
@@ -357,7 +356,7 @@ class NostrEventReaderLinkInteractionTest {
             }
         val url = "https://example.com/clipboard"
         composeRule.setContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard) {
+            CompositionLocalProvider(LocalClipboard provides clipboard, LocalTopNoticeHost provides noticeHost) {
                 WhiteNoiseTheme {
                     NostrEventReaderBlock(
                         block =

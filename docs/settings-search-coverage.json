@@ -17,16 +17,20 @@
           "represented_by": "Account.share_connect"
         },
         {
-          "declaration": "\"sign_out\"",
-          "represented_by": "Home.sign_out"
-        },
-        {
           "declaration": "\"switch_profile\"",
           "represented_by": "Home.switch_profile"
         },
         {
           "declaration": "entry.name",
           "represented_by": "home.Appearance"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt": {
+      "controls": [
+        {
+          "declaration": "\"sign_out\"",
+          "represented_by": "Home.sign_out"
         }
       ]
     },
@@ -768,6 +772,10 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt": {
       "controls": [
         {
+          "declaration": "\"learn_white_noise\"",
+          "represented_by": "home.LearnWhiteNoise"
+        },
+        {
           "declaration": "\"profile\"",
           "represented_by": "home.Profile"
         },
@@ -998,6 +1006,9 @@
     },
     "HelpSupport": {
       "catalog_id": "home.HelpSupport"
+    },
+    "LearnWhiteNoise": {
+      "catalog_id": "home.LearnWhiteNoise"
     },
     "NotificationSounds": {
       "catalog_id": "home.NotificationSounds"

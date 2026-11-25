@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Scopri White Noise</string>
+    <string name="learn_find_title">Trova una persona</string>
+    <string name="learn_find_body">Apri una nuova chat e incolla il link del profilo oppure scansiona il codice QR. Se il nome non restituisce risultati, chiedi il link del profilo.</string>
+    <string name="learn_share_title">Condividi il tuo profilo</string>
+    <string name="learn_share_body">Apri Condividi e connettiti per mostrare il tuo codice QR o condividere il link del profilo. Tieni per te la chiave privata di accesso.</string>
+    <string name="learn_actions_title">Rispondi o reagisci</string>
+    <string name="learn_actions_body">Scorri un messaggio verso il centro della chat per rispondere. Tienilo premuto per altre azioni, incluse le reazioni.</string>
+    <string name="learn_example_question">Ci vediamo domani?</string>
+    <string name="learn_example_message">A domani!</string>
+    <string name="learn_show_actions">Mostra le azioni del messaggio</string>
+    <string name="learn_open_share">Apri Condividi e connettiti</string>
+    <string name="learn_group_title">Crea un gruppo privato</string>
+    <string name="learn_group_body">Riunisci le persone giuste in una conversazione. Crea un gruppo da Nuova chat e scegli chi invitare. I tuoi messaggi sono crittografati end-to-end.</string>
+    <string name="learn_demo_label">Chat di prova · Non viene inviato nulla</string>
+    <string name="learn_demo_sender">Contatto dimostrativo</string>
+    <string name="learn_marmot_title">Chatta tra app diverse</string>
+    <string name="learn_marmot_body">I tuoi amici possono partecipare da un’altra app compatibile. White Noise usa Marmot, un protocollo aperto che permette a team diversi di creare app che funzionano insieme.</string>
+    <string name="learn_marmot_link">Scopri le app Marmot</string>
+    <string name="learn_marmot_link_failed">Impossibile aprire il catalogo delle app. Visita marmot.build/apps.html nel browser.</string>
+</resources>
