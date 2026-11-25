@@ -77,9 +77,9 @@ internal class RecoveryWordsSetup(
     ): Boolean? {
         val expected = expectedAnswers.getOrNull(index) ?: return null
         val typed = answer.trim()
-        if (typed.any { it !in 'a'..'z' && it !in 'A'..'Z' }) return false
         val normalized = typed.lowercase()
         return when {
+            typed.any { it !in 'a'..'z' && it !in 'A'..'Z' } -> false
             expected == normalized -> true
             expected.startsWith(normalized) -> null
             else -> false
