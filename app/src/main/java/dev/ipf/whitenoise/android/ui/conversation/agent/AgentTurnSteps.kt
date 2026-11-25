@@ -13,6 +13,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
+import dev.ipf.marmotkit.AgentItemFfi
 import dev.ipf.marmotkit.AgentItemStateFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -78,8 +79,7 @@ internal class AgentTurnSteps(
      * the other half of the run on its newer side, or all of that run when no shown row follows it.
      */
     fun foldedSpacing(rowId: String): FoldedSpacing {
-        val index = positions[rowId] ?: return FoldedSpacing.None
-        if (isFolded(rowId)) return FoldedSpacing.None
+        val index = positions[rowId]?.takeUnless { isFolded(rowId) } ?: return FoldedSpacing.None
         val olderRun = foldedRun(index, step = -1)
         val newerRun = foldedRun(index, step = 1)
         val newerRunEndsTranscript = index + newerRun + 1 >= rows.size
@@ -104,9 +104,12 @@ internal class AgentTurnSteps(
         neighbour: TimelineMessage?,
         step: Int,
     ): TimelineMessage? {
-        if (neighbour == null || !isFolded(neighbour.record.messageIdHex)) return neighbour
-        val index = positions[item.record.messageIdHex] ?: return neighbour
-        return rows.getOrNull(index + step * (foldedRun(index, step) + 1))
+        val index = positions[item.record.messageIdHex]
+        return if (neighbour == null || index == null || !isFolded(neighbour.record.messageIdHex)) {
+            neighbour
+        } else {
+            rows.getOrNull(index + step * (foldedRun(index, step) + 1))
+        }
     }
 
     /** Same folding over the same rows: readers skip recomposition when a timeline update changes neither. */
@@ -192,36 +195,35 @@ internal fun Modifier.overlapFoldedAgentRows(
  * parses fields JSON for notices alone, so it is cheap on every timeline update.
  */
 internal fun agentTurnStepRows(timeline: List<TimelineMessage>): Map<String, String> {
-    val turnRows = HashMap<Pair<String, String>, String>()
-    for (row in timeline) {
-        val item = row.projected?.agentItem ?: continue
-        val turn = item.turn ?: continue
-        if (item.itemType == TURN_TYPE) turnRows[row.record.sender.lowercase() to turn] = row.record.messageIdHex
-    }
-    if (turnRows.isEmpty()) return emptyMap()
-    val steps = HashMap<String, String>()
-    for (row in timeline) {
-        val item = row.projected?.agentItem ?: continue
-        val turn = item.turn ?: continue
-        if (item.state == AgentItemStateFfi.FAILED || !foldsUnderTurn(item.itemType, item.fieldsJson)) continue
-        turnRows[row.record.sender.lowercase() to turn]?.let { steps[row.record.messageIdHex] = it }
-    }
-    return steps
+    val items = timeline.mapNotNull { row -> row.projected?.agentItem?.takeIf { it.turn != null }?.let { row to it } }
+    val turnRows =
+        items
+            .filter { (_, item) -> item.itemType == TURN_TYPE }
+            .associate { (row, item) -> turnKey(row, item) to row.record.messageIdHex }
+    return items
+        .filter { (_, item) -> item.foldsUnderTurn() }
+        .mapNotNull { (row, item) ->
+            turnRows[turnKey(row, item)]?.let { turnRow -> row.record.messageIdHex to turnRow }
+        }
+        .toMap()
 }
+
+private fun turnKey(
+    row: TimelineMessage,
+    item: AgentItemFfi,
+): Pair<String, String?> = row.record.sender.lowercase() to item.turn
 
 /**
  * Routine steps fold. Turns, sessions, approvals, questions, errors, refusals, warnings and failed
  * steps stay in view.
  */
-private fun foldsUnderTurn(
-    itemType: String,
-    fieldsJson: String,
-): Boolean =
-    when (itemType) {
-        "tool", "reasoning", "plan", "task", "message" -> true
-        "notice" -> noticeKind(fieldsJson) !in VISIBLE_NOTICE_KINDS
-        else -> false
-    }
+private fun AgentItemFfi.foldsUnderTurn(): Boolean =
+    state != AgentItemStateFfi.FAILED &&
+        when (itemType) {
+            "tool", "reasoning", "plan", "task", "message" -> true
+            "notice" -> noticeKind(fieldsJson) !in VISIBLE_NOTICE_KINDS
+            else -> false
+        }
 
 private fun noticeKind(fieldsJson: String): String? =
     runCatching { JSONObject(fieldsJson).optJSONObject("body")?.optString("kind") }.getOrNull()

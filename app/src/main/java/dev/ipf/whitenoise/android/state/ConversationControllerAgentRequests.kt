@@ -10,9 +10,9 @@ import dev.ipf.whitenoise.android.core.agent.AgentRequestEncoder
  * Sends an answer or a control to the agent [agentPubkeyHex] in this chat.
  *
  * [targetRowId] is the row of the item the request answers or stops. The agent settles the request
- * with a new version of that item, or with a `refused` notice that says why it did not act. Returns null when nothing was sent, after showing the failure.
- * A chat that cannot send, and every native or lock failure, is reported to the person;
- * cancellation is rethrown.
+ * with a new version of that item, or with a `refused` notice that says why it did not act.
+ * Returns null when nothing was sent, after showing the failure. A chat that cannot send, and every
+ * native or lock failure, is reported to the person; cancellation is rethrown.
  */
 @Suppress("TooGenericExceptionCaught")
 internal suspend fun ConversationController.sendAgentRequest(

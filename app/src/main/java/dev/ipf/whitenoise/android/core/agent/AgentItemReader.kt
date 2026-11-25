@@ -24,8 +24,9 @@ internal object AgentItemReader {
         record: AppMessageRecordFfi,
         projected: TimelineMessageRecordFfi?,
     ): AgentItem? {
-        val item = projected?.agentItem?.takeUnless { projected.deleted } ?: return null
-        val fields = runCatching { JSONObject(item.fieldsJson) }.getOrNull() ?: return null
+        val item = projected?.agentItem?.takeUnless { projected.deleted }
+        val fields = item?.let { runCatching { JSONObject(it.fieldsJson) }.getOrNull() }
+        if (item == null || fields == null) return null
         return AgentItem(
             rowId = record.messageIdHex,
             agentPubkeyHex = record.sender,

@@ -54,12 +54,7 @@ internal fun AgentTurnLine(
     val stepCount = steps.stepCount(item.rowId)
     val open = steps.isOpen(item.rowId)
     val failed = item.state == AgentItemState.Failed
-    val status =
-        listOfNotNull(
-            turnStatusText(item.state, (item.body as? AgentItemBody.Turn)?.durationMs),
-            item.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.takeIf { failed },
-            stepCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.agent_turn_steps, it, it) },
-        ).joinToString(" · ")
+    val status = turnLineStatus(item, stepCount)
     val toggleLabel = stringResource(if (open) R.string.agent_turn_hide_steps else R.string.agent_turn_show_steps)
     Row(
         modifier =
@@ -131,6 +126,22 @@ private fun AgentStopButton(actions: AgentItemActions) {
         )
     }
 }
+
+/** "Worked for 9s · 3 steps", or the failure's first line after "Didn't finish". */
+@Composable
+private fun turnLineStatus(
+    item: AgentItem,
+    stepCount: Int,
+): String =
+    listOfNotNull(
+        turnStatusText(item.state, (item.body as? AgentItemBody.Turn)?.durationMs),
+        item.text
+            .lineSequence()
+            .firstOrNull { it.isNotBlank() }
+            ?.trim()
+            ?.takeIf { item.state == AgentItemState.Failed },
+        stepCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.agent_turn_steps, it, it) },
+    ).joinToString(" · ")
 
 @Composable
 private fun turnStatusText(
