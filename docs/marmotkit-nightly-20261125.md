@@ -69,8 +69,18 @@ Not adopted in this change: `sendCustomEventWithClientToken`, the
 
 ## Upgrade
 
-Account databases gain migrations through 0221, including 0219 (agent item
-order; existing kind-1202 rows are deleted) and 0221 (expired agent item targets). The upgrade is one
-way: a 0.19.0 build cannot reopen a migrated account, so a preview built from
+The account database moves from schema 0218 to 0225.
+
+| Migration | Change |
+| --- | --- |
+| 0219 | Indexes agent item order and removes existing kind-1202 rows. |
+| 0220 | Repairs fallback chat activity timestamps. |
+| 0221 | Tracks expired agent item targets. |
+| 0222 | Records the roster targeted by the last small-state broadcast. |
+| 0223 | Preserves invitation status for locally deleted chats. |
+| 0224 | Preserves epoch-gap evidence across recovery and restart. |
+| 0225 | Records outbound Welcome deliveries. |
+
+The upgrade is one way. A 0.19.0 build cannot reopen a migrated account, so a preview built from
 this pin must not be installed over data another 0.19.0 preview still needs.
 See [INT-010](manual-release-testing/cases/INT-010.md).

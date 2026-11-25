@@ -274,7 +274,7 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
         hasMoreBefore = hasMoreBefore,
         loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
-        rawWindowMessageIds = timeline.map { it.id },
+        rawWindowMessageIds = timeline.map { it.record.messageIdHex },
     )
 
 private val InitialTimelineBackfillNoProgressError =
@@ -2167,7 +2167,7 @@ internal fun ConversationScreen(
     @Composable
     @Suppress("CyclomaticComplexMethod")
     fun initialBackfillEffect() {
-        // Edit events are derived state, so a raw subscription page can be non-empty
+        // Edit and background agent events can fill a raw subscription page
         // while offering no row for the initial anchor. Page backward before the
         // transcript is revealed; the pure coordinator stops on renderable content,
         // exhaustion, failure, no progress, cancellation, or controller replacement.

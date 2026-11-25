@@ -73,11 +73,11 @@ ignores history comparison. The October 22 nightly includes MDK #2513's fixes fo
 [#2381](https://github.com/marmot-protocol/mdk/issues/2381). All seven cases must
 execute: no ignored recovery case can satisfy adoption.
 
-The populated campaign builds the last master revision before the adoption
-(`6a59fe30`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
+The populated campaign builds the master revision that adopted 0.19.0
+(`016c4916c`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
 disposable signer and isolated `.mdkqualification` package, once with audit sharing
 enabled and once declined. It fails closed unless that revision pins the reviewed
-0.18.0 source `34646a57`. Qualification
+0.19.0 source `3fce9546`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
