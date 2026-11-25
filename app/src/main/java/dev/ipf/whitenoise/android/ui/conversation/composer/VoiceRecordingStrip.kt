@@ -87,7 +87,7 @@ internal fun RecordingStripLeading(
                         ((1f - enter) * micSide + leaving * controller.hold.cancelDirection) * VoiceStripSlide.toPx()
                 }.clip(RoundedCornerShape(Radii.xl))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = Dimens.spaceMd, vertical = WhiteNoiseSpacing.Related),
+                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm),
     ) {
         Row(
             modifier =
@@ -314,7 +314,7 @@ private fun RecordingStripLockedControls(
 
 @Composable
 internal fun rememberInfiniteRecordingPulse(): State<Float> {
-    // With animations off the dot rests at its 10 dp base size instead of the 1.6x peak Compose would park it on.
+    // With animations off the dot stays at VoiceStatusDotSize, the unscaled size.
     if (!rememberSystemAnimationsEnabled()) return remember { mutableFloatStateOf(1f) }
     val transition = rememberInfiniteTransition(label = "rec-pulse")
     return transition.animateFloat(
