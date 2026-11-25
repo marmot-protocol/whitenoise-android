@@ -12,6 +12,7 @@ internal data class ConversationDictationTarget(
     val finishAfterSilenceMillis: Long? = null,
     val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val pauseOtherAudio: Boolean = true,
+    val outgoingTranslation: ConversationDictationTranslation? = null,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -21,6 +22,12 @@ internal data class ConversationDictationTarget(
         this.accountRef.equals(accountRef, ignoreCase = true) &&
             this.groupIdHex.equals(groupIdHex, ignoreCase = true)
 }
+
+/** The originating composer's translation intent stays bound to this recording. */
+internal class ConversationDictationTranslation(
+    val currentEpoch: () -> Long?,
+    val translate: suspend (String) -> String?,
+)
 
 internal enum class ConversationDictationMode {
     InApp,

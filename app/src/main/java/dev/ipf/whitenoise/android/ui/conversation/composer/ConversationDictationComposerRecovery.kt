@@ -17,25 +17,34 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationTranslation
 import dev.ipf.whitenoise.android.audio.queueDictation
 
 /** Dictate starts a fresh attempt after safe local settlement, with no recovery decision pop-ups. */
 @Composable
+@Suppress("LongParameterList")
 internal fun rememberComposerDictationAction(
     controller: ConversationDictationController,
     accountRef: String,
     groupIdHex: String,
     draft: TextFieldValue,
     replyToMessageIdHex: String?,
+    translation: () -> ConversationDictationTranslation? = { null },
 ): () -> Unit {
     val binding = remember(controller, accountRef, groupIdHex) { ConversationDictationPanelBinding() }
     DisposableEffect(binding) { onDispose { binding.dispose() } }
     return {
         if (binding.active && controller.queuesFromComposer(accountRef, groupIdHex)) {
             // Another chat's dictation is still being transcribed; this recording waits its turn.
-            controller.queueDictation(accountRef, groupIdHex, replyToMessageIdHex)
+            controller.queueDictation(accountRef, groupIdHex, replyToMessageIdHex, translation())
         } else if (binding.active) {
-            controller.requestFreshComposerStart(accountRef, groupIdHex, draft, replyToMessageIdHex)
+            controller.requestFreshComposerStart(
+                accountRef,
+                groupIdHex,
+                draft,
+                replyToMessageIdHex,
+                translation(),
+            )
         }
     }
 }

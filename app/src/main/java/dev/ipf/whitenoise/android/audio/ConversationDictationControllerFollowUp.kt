@@ -61,7 +61,12 @@ internal fun ConversationDictationController.continueDictation(): Boolean {
     val target = continueTarget ?: return rejectFollowUp()
     val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
     val replyOwner = followUp.queue.lastOrNull { it.key == key }?.target ?: target
-    return queueDictation(target.accountRef, target.groupIdHex, replyOwner.replyToMessageIdHex)
+    return queueDictation(
+        target.accountRef,
+        target.groupIdHex,
+        replyOwner.replyToMessageIdHex,
+        replyOwner.outgoingTranslation,
+    )
 }
 
 /**
@@ -73,11 +78,17 @@ internal fun ConversationDictationController.queueDictation(
     accountRef: String,
     groupIdHex: String,
     replyToMessageIdHex: String?,
+    outgoingTranslation: ConversationDictationTranslation? = null,
 ): Boolean {
     val previous = followUp.pending?.target ?: state.target
     if (previous == null || !canQueueDictation(accountRef, groupIdHex)) return rejectFollowUp()
     val target =
-        previous.copy(accountRef = accountRef, groupIdHex = groupIdHex, replyToMessageIdHex = replyToMessageIdHex)
+        previous.copy(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            replyToMessageIdHex = replyToMessageIdHex,
+            outgoingTranslation = outgoingTranslation,
+        )
     if (followUp.queue.isEmpty()) {
         followUp.resetChain()
         followUp.drainingKey = state.target?.let { ConversationDictationKey.from(it.accountRef, it.groupIdHex) }

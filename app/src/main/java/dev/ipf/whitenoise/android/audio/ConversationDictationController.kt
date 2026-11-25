@@ -433,11 +433,12 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String?,
+        outgoingTranslation: ConversationDictationTranslation? = null,
     ): ConversationDictationComposerAccess {
         expireRetainedRecoveryIfDue()
         val access = composerAccess(accountRef, groupIdHex)
         if (access.phase != ConversationDictationComposerPhase.Ready) return access
-        val started = requestStart(accountRef, groupIdHex, draft, replyToMessageIdHex)
+        val started = requestStart(accountRef, groupIdHex, draft, replyToMessageIdHex, outgoingTranslation)
         val rejected = composerAccess(accountRef, groupIdHex)
         return when {
             started -> access
@@ -456,6 +457,7 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String?,
+        outgoingTranslation: ConversationDictationTranslation? = null,
     ): ConversationDictationComposerAccess {
         if (!runCatching { targetAvailable(accountRef, groupIdHex) }.getOrDefault(false)) {
             return composerAccess(accountRef, groupIdHex).copy(
@@ -479,7 +481,7 @@ internal class ConversationDictationController internal constructor(
                     if (runCatching { parked.audio.discard() }.isSuccess) parkedRecoveries.remove(key)
                 }
             }
-            requestComposerStart(accountRef, groupIdHex, value, replyToMessageIdHex)
+            requestComposerStart(accountRef, groupIdHex, value, replyToMessageIdHex, outgoingTranslation)
         } ?: composerAccess(accountRef, groupIdHex)
     }
 
@@ -580,6 +582,7 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String? = null,
+        outgoingTranslation: ConversationDictationTranslation? = null,
     ): Boolean =
         requestStart(
             accountRef = accountRef,
@@ -587,6 +590,7 @@ internal class ConversationDictationController internal constructor(
             draft = draft,
             replyToMessageIdHex = replyToMessageIdHex,
             mode = ConversationDictationMode.InApp,
+            outgoingTranslation = outgoingTranslation,
         )
 
     /** Starts the compatibility flow that delegates microphone ownership to a provider Activity. */
@@ -605,12 +609,14 @@ internal class ConversationDictationController internal constructor(
         )
 
     /** Captures one immutable target and replaces any safely replaceable prior session. */
+    @Suppress("LongParameterList")
     private fun requestStart(
         accountRef: String,
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String?,
         mode: ConversationDictationMode,
+        outgoingTranslation: ConversationDictationTranslation? = null,
     ): Boolean {
         expireRetainedRecoveryIfDue()
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
@@ -647,6 +653,7 @@ internal class ConversationDictationController internal constructor(
                 finishAfterSilenceMillis = finishAfterSilenceMillis()?.takeIf { it > 0L },
                 silenceDeliveryMode = silenceDeliveryMode(),
                 pauseOtherAudio = pauseOtherAudio(),
+                outgoingTranslation = outgoingTranslation,
             )
         if (!targetAvailable(target)) {
             conversationDictationDiagnostic("event=request_start accepted=false reason=reply_unavailable")

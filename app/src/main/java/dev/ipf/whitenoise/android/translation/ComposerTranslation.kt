@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationTranslation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -134,7 +135,7 @@ internal class ComposerTranslationState(
         consenting = false
     }
 
-    /** Leaves translate mode, for example when editing or dictation takes over the composer. */
+    /** Leaves translate mode, for example when editing takes over the composer. */
     fun close() {
         consenting = false
         if (!active) return
@@ -152,7 +153,7 @@ internal class ComposerTranslationState(
 
     /** Drops pending work and any shown translation; the composer then requests its current text again. */
     fun invalidate() {
-        cancel()
+        cancelPreview()
         result = null
         epoch += 1
     }
@@ -160,7 +161,7 @@ internal class ComposerTranslationState(
     /** Requests [text] once typing settles, unless the shown translation already matches it. */
     fun update(text: String) {
         // Any newer text replaces the previous request, including typing back to the text already translated.
-        cancel()
+        cancelPreview()
         val chosen = target
         if (!active || chosen == null || text.isBlank()) {
             result = null
@@ -185,6 +186,18 @@ internal class ComposerTranslationState(
                 ?.text
         }
 
+    /** Captures the current choice for one dictation before its final text is available. */
+    fun dictationTranslation(originCurrent: () -> Boolean): ConversationDictationTranslation? {
+        if (!active) return null
+        val chosen = target
+        return ConversationDictationTranslation(
+            currentEpoch = {
+                epoch.takeIf { active && target == chosen && noticeAccepted() && ownerCurrent() && originCurrent() }
+            },
+            translate = { text -> chosen?.let { translateWithPrivacyGate(engine(), text, "", it) } },
+        )
+    }
+
     /** Turns translate mode on and asks the composer for its current text. */
     private fun open() {
         active = true
@@ -192,7 +205,7 @@ internal class ComposerTranslationState(
     }
 
     /** Stops the current request and forgets its failure; a shown result stays until the caller drops it. */
-    private fun cancel() {
+    fun cancelPreview() {
         generation += 1
         job?.cancel()
         job = null
@@ -283,9 +296,12 @@ internal fun ComposerTranslationNotice(state: ComposerTranslationState) {
 internal fun ComposerTranslationSync(
     state: ComposerTranslationState,
     text: String,
+    dictating: Boolean,
 ) {
     val latest by rememberUpdatedState(text)
-    LaunchedEffect(state, text, state.active, state.target, state.epoch) { state.update(latest) }
+    LaunchedEffect(state, text, state.active, state.target, state.epoch, dictating) {
+        if (dictating) state.cancelPreview() else state.update(latest)
+    }
 }
 
 /**

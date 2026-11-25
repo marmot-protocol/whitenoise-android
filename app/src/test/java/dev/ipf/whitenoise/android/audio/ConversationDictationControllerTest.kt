@@ -7379,6 +7379,105 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** The exact final draft goes through translation before one origin-fenced send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishWaitsForOneTranslationOfTheCombinedDraft() =
+        runTest {
+            val reply = CompletableDeferred<String>()
+            val translatedSources = mutableListOf<String>()
+            val sent = mutableListOf<String>()
+            val translation =
+                ConversationDictationTranslation(currentEpoch = { 0L }) { source ->
+                    translatedSources += source
+                    reply.await()
+                }
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertEquals("Draft", request.expectedDraftText)
+                        request.beginDispatch().also { if (it) sent += request.payload }
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+            f.controller.send()
+            f.platform.listener.onResult("dictated")
+            runCurrent()
+            assertEquals(listOf("Draft dictated"), translatedSources)
+            assertTrue(sent.isEmpty())
+            assertEquals("Draft", f.drafts.getValue(key()).text)
+
+            reply.complete("Entwurf diktiert")
+            advanceUntilIdle()
+            assertEquals(listOf("Entwurf diktiert"), sent)
+            assertEquals("", f.drafts.getValue(key()).text)
+        }
+
+    /** Failed or superseded translation keeps the source instead of bypassing translation. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishRetainsTheSourceAfterTranslationFailureOrOwnerChange() =
+        runTest {
+            for (ownerChanges in listOf(false, true)) {
+                var ownerCurrent = true
+                var dispatchCalls = 0
+                val reply = CompletableDeferred<String?>()
+                val f =
+                    fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            dispatchCalls += 1
+                            false
+                        },
+                    )
+                val translation = ConversationDictationTranslation(currentEpoch = { 0L.takeIf { ownerCurrent } }) { reply.await() }
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+                f.controller.send()
+                f.platform.listener.onResult("dictated")
+                runCurrent()
+                ownerCurrent = !ownerChanges
+                reply.complete(if (ownerChanges) "Entwurf diktiert" else null)
+                advanceUntilIdle()
+
+                assertEquals(0, dispatchCalls)
+                assertEquals("Draft dictated", f.drafts.getValue(key()).text)
+            }
+        }
+
+    /** An edit made while translation waits still supersedes the send's draft snapshot. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishRetainsAnEditMadeWhileTranslating() =
+        runTest {
+            val reply = CompletableDeferred<String>()
+            val sent = mutableListOf<String>()
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        request.beginDispatch().also { if (it) sent += request.payload }
+                    },
+                )
+            val translation = ConversationDictationTranslation(currentEpoch = { 0L }) { reply.await() }
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+            f.controller.send()
+            f.platform.listener.onResult("dictated")
+            runCurrent()
+            f.edit(key(), TextFieldValue("Draft later"))
+            reply.complete("Entwurf diktiert")
+            advanceUntilIdle()
+
+            assertTrue(sent.isEmpty())
+            assertEquals("Draft dictated later", f.drafts.getValue(key()).text)
+        }
+
     /** Text pasted, typed, or removed while speaking is sent once together with the transcript. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
