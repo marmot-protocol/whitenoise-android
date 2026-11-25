@@ -110,7 +110,11 @@ class FcmAutoInitCoverageTest {
         assertTrue(sync.substring(settle).contains("disableFcmAutoInitWithoutNativeDemand(accountRefs)"))
         val demandOff = appModuleSource(AUTO_INIT).functionBody("disableFcmAutoInitWithoutNativeDemand")
         assertTrue(demandOff.contains("runCatchingCancellable { nativePushDemand(accountRefs) }"))
-        assertTrue(demandOff.contains("if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)"))
+        val demandWrite = "if (demand == NativePushDemand.None) disableFcmAutoInitIfUnchanged(accountRefs)"
+        assertTrue(demandOff.contains(demandWrite))
+        val unchanged = appModuleSource(AUTO_INIT).functionBody("disableFcmAutoInitIfUnchanged")
+        val liveRecheck = "if (host.nativePushAccountRefs() == readAccountRefs) applyFcmAutoInit(enabled = false)"
+        assertTrue("the off write must recheck the live account list", unchanged.contains(liveRecheck))
     }
 
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
@@ -160,7 +164,8 @@ class FcmAutoInitCoverageTest {
         val selection = appModuleSource(SELECTION)
 
         val autoInit = appModuleSource(AUTO_INIT)
-        assertTrue(autoInit.functionBody("completeSyncWithoutNativePush").contains("applyFcmAutoInit(enabled = false)"))
+        val completeSync = autoInit.functionBody("completeSyncWithoutNativePush")
+        assertTrue(completeSync.contains("disableFcmAutoInitIfUnchanged(accountRefs)"))
         assertTrue(
             selection
                 .functionBody("disableNativePushForPersistentDelivery")

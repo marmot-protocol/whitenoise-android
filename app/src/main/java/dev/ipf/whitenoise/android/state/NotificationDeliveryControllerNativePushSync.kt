@@ -71,7 +71,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
         if (marmotRuntime == null) return false
         host.refreshAccounts()
         accountRefs = host.nativePushAccountRefs()
-        if (accountRefs.isEmpty()) return completeSyncWithoutNativePush(operationIsCurrent)
+        if (accountRefs.isEmpty()) return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)
     }
     val config = pushServerConfigProvider()
     val capability = nativePushCapability(config)
@@ -104,7 +104,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
 ): Boolean {
     when (nativePushDemand(accountRefs)) {
         NativePushDemand.Unknown -> return false
-        NativePushDemand.None -> return completeSyncWithoutNativePush(operationIsCurrent)
+        NativePushDemand.None -> return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)
         NativePushDemand.Required -> Unit
     }
     val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false

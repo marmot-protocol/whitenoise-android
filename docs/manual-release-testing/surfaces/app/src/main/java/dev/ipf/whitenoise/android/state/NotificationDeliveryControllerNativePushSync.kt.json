@@ -14,7 +14,7 @@
       {
         "surface": "Native push sync reads an FCM token only when an account uses Push",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerNativePushSync.kt",
-        "anchor": "NativePushDemand.None -> return completeSyncWithoutNativePush(operationIsCurrent)",
+        "anchor": "NativePushDemand.None -> return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)",
         "test_ids": [
           "NTF-060"
         ]

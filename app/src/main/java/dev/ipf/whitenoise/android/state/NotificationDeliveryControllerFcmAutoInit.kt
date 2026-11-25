@@ -20,12 +20,15 @@ internal suspend fun NotificationDeliveryController.nativePushDemand(accountRefs
 }
 
 /**
- * Acknowledges a sync in which no account needs native delivery, and turns Firebase auto-init off so
- * the SDK stops refreshing a token nobody registers. A Push selection in flight writes it on again under
+ * Acknowledges a sync in which none of [accountRefs] needs native delivery, and turns Firebase auto-init off
+ * so the SDK stops refreshing a token nobody registers. A Push selection in flight writes it on again under
  * the sync lock once its accounts are registered.
  */
-internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePush(isCurrent: () -> Boolean): Boolean {
-    applyFcmAutoInit(enabled = false)
+internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePush(
+    accountRefs: List<String>,
+    isCurrent: () -> Boolean,
+): Boolean {
+    disableFcmAutoInitIfUnchanged(accountRefs)
     return withContext(pushWakeStorageDispatcher) {
         pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = isCurrent)
     }
@@ -42,7 +45,16 @@ internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Bo
  */
 internal suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutNativeDemand(accountRefs: List<String>) {
     val demand = runCatchingCancellable { nativePushDemand(accountRefs) }.getOrNull()
-    if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+    if (demand == NativePushDemand.None) disableFcmAutoInitIfUnchanged(accountRefs)
+}
+
+/**
+ * Turns auto-init off only while the account list still equals [readAccountRefs]. Accounts are republished
+ * without the sync lock, so a list that changed during the settings reads may hold a Push account they
+ * never saw. That account's own sync decides auto-init instead.
+ */
+private suspend fun NotificationDeliveryController.disableFcmAutoInitIfUnchanged(readAccountRefs: List<String>) {
+    if (host.nativePushAccountRefs() == readAccountRefs) applyFcmAutoInit(enabled = false)
 }
 
 /**
