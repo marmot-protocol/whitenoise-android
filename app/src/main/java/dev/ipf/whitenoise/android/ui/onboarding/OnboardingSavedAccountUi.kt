@@ -33,10 +33,10 @@ import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet as ModalBottomSheet
 
 data class OnboardingSavedAccountUi(
     val label: String,
@@ -155,7 +155,7 @@ internal fun RetainedProfilesSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
+    WhiteNoiseModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
         WhiteNoiseSheetHeader(
             stringResource(R.string.onboarding_choose_profile),
             onClose = { terminal.close(onDismiss) },

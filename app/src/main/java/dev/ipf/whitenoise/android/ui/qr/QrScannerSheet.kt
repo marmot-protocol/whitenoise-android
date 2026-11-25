@@ -22,8 +22,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -50,6 +48,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import java.util.concurrent.Executor
@@ -121,15 +120,11 @@ internal fun QrScannerSheet(
             LocalWindowInfo.current.containerSize.height
                 .toDp() * 0.94f
         }
-    ModalBottomSheet(
+    // The one full-height camera sheet: black, edge to edge, and no handle over the preview.
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = close,
         sheetState = sheet,
-        sheetGesturesEnabled = active,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = active,
-                shouldDismissOnClickOutside = active,
-            ),
+        interactionEnabled = active,
         containerColor = Color.Black,
         contentColor = Color.White,
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
