@@ -270,8 +270,9 @@ runs the complete dev-debug unit suite with `-Proborazzi.test.verify=true`:
 ordinary pull requests run Zapstore only, and the merge queue, master pushes and
 full-matrix runs also run Play. In the merge-queue precheck mode, pull requests
 verify Zapstore goldens by running only the tests listed in the committed-baseline
-owner registry, `config/screenshot-baseline-owners.txt`. The registry is also a
-static coverage contract and provides focused local regeneration filters.
+owner registry, `config/screenshot-baseline-owners.txt`, and fail if those tests
+leave any committed golden uncompared. The registry is also a static coverage
+contract and provides focused local regeneration filters.
 Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
 owns committed baselines lists its golden-producing methods there.
 `scripts/check_screenshot_baseline_owners.py` fails the tooling job when a capturing

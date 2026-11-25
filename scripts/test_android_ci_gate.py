@@ -332,7 +332,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/kover_class_outputs.py pack', self.tests_job)
         header = self.coverage.split('    steps:', 1)[0]
         self.assertIn('    needs: [changes, tests]\n', header)
-        self.assertIn("needs.changes.outputs.precheck != 'true'", header)
+        self.assertNotIn('precheck', header)
         coverage = self.named_step(self.coverage, 'Coverage gate and report (Kover)')
         for task in (':app:koverVerifyDevZapstoreDebug', ':app:koverXmlReportDevZapstoreDebug',
                      ':app:koverHtmlReportDevZapstoreDebug', '-x :app:testDevZapstoreDebugUnitTest',
@@ -1079,7 +1079,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('draft', self.named_step(self.coverage, 'Require every committed screenshot golden to be compared'))
         for name in ('Download shard coverage data', 'Coverage gate and report (Kover)',
                      'Runtime listener and viewport restoration coverage floors'):
-            self.assertIn("${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}",
+            self.assertIn("${{ needs.changes.outputs.precheck != 'true' && "
+                          "(!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}",
                           self.named_step(self.coverage, name))
         self.assertNotIn('draft', self.named_step(self.tests_job, 'Unit tests'))
         self.assertIn('PR_DRAFT: ${{ github.event.pull_request.draft == true }}', self.gate)
@@ -1150,7 +1151,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def precheck_outcomes(self, draft='false'):
         outcomes = self.successful_outcomes(draft=draft)
         outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
-        for job in ('coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
+        for job in ('static-analysis', 'secondary-variant', 'compose-compiler'):
             outcomes[job]['result'] = 'skipped'
         return outcomes
 
@@ -1308,9 +1309,9 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
         for job in (self.static_analysis, self.secondary, self.compose_compiler):
             self.assertIn("needs.changes.outputs.precheck != 'true'", job.split('    steps:', 1)[0])
-        # Prechecks run the Zapstore screenshot shards; coverage stays at integration.
+        # Prechecks run the Zapstore screenshot shards and the golden check; Kover stays at integration.
         self.assertNotIn('precheck', self.tests_job.split('    steps:', 1)[0])
-        self.assertIn("needs.changes.outputs.precheck != 'true'", self.coverage.split('    steps:', 1)[0])
+        self.assertNotIn('precheck', self.coverage.split('    steps:', 1)[0])
         self.assertIn("cancel-in-progress: ${{ github.event_name != 'merge_group' }}", self.workflow)
         for name in ('Upload reports', 'Upload Gradle timing reports',
                      'Verify selected dependency security floors'):
@@ -1360,6 +1361,16 @@ class AndroidCiGateTest(unittest.TestCase):
         upload = self.named_step(self.tests_job, 'Upload reports')
         self.assertIn('if: always()', upload)
         self.assertIn('app/build/outputs/roborazzi/', upload)
+        # A registry gap fails the precheck: coverage compares the shards' union, without Kover.
+        steps = re.findall(r'^      - name: (.+)$', self.coverage, re.MULTILINE)
+        ungated = {'Checkout', 'Download shard golden comparison evidence',
+                   'Require every committed screenshot golden to be compared',
+                   'Upload coverage report', 'Upload Gradle timing reports'}
+        self.assertLess(ungated, set(steps))
+        for name in set(steps) - ungated:
+            self.assertIn("if: ${{ needs.changes.outputs.precheck != 'true' && ", self.named_step(self.coverage, name), name)
+        for name in ungated - {'Upload coverage report', 'Upload Gradle timing reports'}:
+            self.assertNotIn('precheck', self.named_step(self.coverage, name), name)
 
     def test_instrumented_compile_tasks_have_one_owner_per_mode(self):
         """Execute real task selectors with a recording wrapper, never Android tooling."""

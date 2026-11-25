@@ -5,8 +5,9 @@
 # `diagnostic:` when it owns no committed golden. The tooling validator checks
 # ownership, and both full-unit CI suites verify and prove every golden compared.
 # Full CI runs the complete suites; PR prechecks run only these filters to verify
-# the Zapstore goldens. Mixed-purpose classes list only their golden-producing
-# methods, which also supports focused local regeneration.
+# the Zapstore goldens and fail if any committed golden goes uncompared, so a
+# missing method fails the PR. Mixed-purpose classes list only their
+# golden-producing methods, which also supports focused local regeneration.
 
 *ScreenshotTest
 
