@@ -57,7 +57,8 @@ private fun retainLocked(
         }
     // Remove shortcuts only after their channels are gone, and keep retrying if inventory or removal fails.
     val shortcutsRemoved =
-        orphansDeleted && departedShortcuts != null &&
+        orphansDeleted &&
+            departedShortcuts != null &&
             runCatching { removeDepartedShortcuts(appContext, departedShortcuts) }.isSuccess
     val complete = ownersPruned && shortcutsRemoved
     return if (complete && sweepPending && sweepUnowned) {

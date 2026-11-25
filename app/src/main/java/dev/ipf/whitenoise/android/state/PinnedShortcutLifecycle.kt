@@ -108,7 +108,8 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
 /**
  * Captures the departing account's known group ids before native sign-out or wipe revokes them,
  * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
- * another account remains signed in.
+ * another account remains signed in. Pending local-delete journal groups are included, since journal
+ * replay no longer runs for an account once it has signed out.
  */
 internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: String): Set<String> =
     buildSet {
@@ -121,6 +122,9 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: 
         runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
             .getOrDefault(emptySet())
             .forEach(::add)
+        runCatchingCancellable {
+            withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
+        }.getOrDefault(emptySet()).forEach(::add)
     }
 
 /**

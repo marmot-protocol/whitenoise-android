@@ -9,6 +9,8 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.buildShareShortcutIntent
+import dev.ipf.whitenoise.android.state.LocalGroupDeleteCleanupJournal
+import dev.ipf.whitenoise.android.state.PendingLocalGroupDeleteCleanup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -20,6 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -255,6 +258,42 @@ class NotificationChannelCleanupRegressionTest {
         assertNull(manager.getNotificationChannel(channel))
         assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == convId })
         assertNoChannelContainsText("Relabel Chat")
+    }
+
+    /**
+     * A conversation delete that fails before redaction leaves its group only in the local-delete journal.
+     * Signing that account out while another stays signed in deletes the named channel from the journal's group ids.
+     */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun journaledDeleteFailureFollowedBySignOutDeletesTheNamedChannel() {
+        val journalDir = File(context.cacheDir, "journal-sign-out").apply { deleteRecursively() }
+        val journal = LocalGroupDeleteCleanupJournal(journalDir)
+        val departedId = checkNotNull(conversationShortcutId("account-a", "group-journal"))
+        val departed = convChannel(NotificationChannelSpec.GROUP_MESSAGES, departedId, "Journal Secret")
+        val retainedId = checkNotNull(conversationShortcutId("account-b", "group-journal"))
+        val retained =
+            convChannel(NotificationChannelSpec.GROUP_MESSAGES, retainedId, "Retained B", accountRef = "account-b")
+
+        try {
+            FailingDeleteNotificationManager.failingCreateChannelIds = setOf(departed)
+            assertFalse(deleteConversationNotificationChannels(context, "account-a", "group-journal"))
+        } finally {
+            FailingDeleteNotificationManager.reset()
+        }
+        journal.stage(PendingLocalGroupDeleteCleanup("account-a", "group-journal", emptyList(), emptySet()))
+        journal.stage(PendingLocalGroupDeleteCleanup("account-b", "group-other", emptyList(), emptySet()))
+
+        clearRevokedConversationShortcutsForAccount(
+            context = context,
+            accountRef = "account-a",
+            includeUnscopedLegacy = false,
+            knownGroupIds = journal.groupIdsForAccount("account-a"),
+        )
+
+        assertNull(manager.getNotificationChannel(departed))
+        assertNoChannelContainsText("Journal Secret")
+        assertNotNull(manager.getNotificationChannel(retained))
     }
 
     /** Returns the hashed conversation-channel owner store cleanup reads and writes. */

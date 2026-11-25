@@ -158,6 +158,19 @@ class ConversationShortcutLifecycleCoverageTest {
         assertTrue("$channelCall must run before $shortcutCall", channelAt < shortcutAt)
     }
 
+    /** Sign-out capture includes pending local-delete journal groups, whose replay stops once the account leaves. */
+    @Test
+    fun signOutCaptureIncludesPendingLocalDeleteJournalGroups() {
+        val capture =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt")
+                .functionBody("captureAccountKnownGroupIds")
+
+        assertTrue(
+            "captureAccountKnownGroupIds must read the departing account's pending local-delete journal groups",
+            "localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef)" in capture,
+        )
+    }
+
     /** Local conversation deletion must delete the conversation's `:conv:` notification channels */
     @Test
     fun localConversationRemovalDeletesOwnedConversationNotificationChannels() {
