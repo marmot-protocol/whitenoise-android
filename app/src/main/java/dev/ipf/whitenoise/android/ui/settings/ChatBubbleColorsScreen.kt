@@ -196,8 +196,6 @@ private fun ChatBubbleColorEditor(
                     }
                 }
             }
-            // Reset sits under the editors it clears, as on Action color, and appears only once there is something to
-            // reset.
             if (canReset) {
                 item(key = "reset") {
                     BubbleColorsResetButton(perChat) {

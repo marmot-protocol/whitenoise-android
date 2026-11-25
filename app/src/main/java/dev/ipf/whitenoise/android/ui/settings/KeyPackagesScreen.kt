@@ -292,7 +292,6 @@ internal fun KeyPackagesContent(
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
         topBarActions = {
             SettingsSearchRowReveal("refresh", modifier = Modifier) {
-                // The same refresh glyph as Emoji sets, so sibling screens reload from one place and one look.
                 IconButton(
                     onClick = onRefresh,
                     enabled = state.actionsEnabled,

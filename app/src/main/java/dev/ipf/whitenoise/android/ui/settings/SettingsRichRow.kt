@@ -11,9 +11,9 @@ import androidx.compose.ui.graphics.Color
 /**
  * The settings row for content the fixed-text rows cannot carry: a profile or contact identity, a monospace
  * reference, or a coloured status. It is a Material list item on a transparent fill, so the enclosing
- * [SettingsGroupPanel] owns the shape, fill and AMOLED outline, and it keeps the link, switch and value rows' insets
- * and type: a `bodyLarge` headline, or `titleMedium` for a [hero] identity row, over supporting text in the
- * variant colour. The slots take the same names as [ListItem]'s, and the caller owns any click or semantics.
+ * [SettingsGroupPanel] owns the shape, fill and AMOLED outline. The headline is `bodyLarge`, or `titleMedium` for a
+ * [hero] identity row, over supporting text in the variant colour. The slots take the same names as [ListItem]'s,
+ * and the caller owns any click or semantics.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable

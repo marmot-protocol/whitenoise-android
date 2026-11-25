@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -124,7 +125,7 @@ internal fun TranslationGlobalSettingsContent(preferences: TranslationPreference
                 )
             }
         }
-        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)) {
             if (choice.target == null) TranslationTargetRecovery()
             OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })
         }
@@ -181,26 +182,28 @@ internal fun TranslationChatSettingsDialog(
 }
 
 /**
- * Inherit, On and Off for one chat as the shared dialog radio rows; changing the mode never touches the chat's
- * target language.
+ * Inherit, On and Off for one chat as one group of the shared dialog radio rows, stacked flush as in a choice
+ * dialog; changing the mode never touches the chat's target language.
  */
 @Composable
 private fun TranslationOverrideOptions(
     selected: TranslationOverride,
     onSelected: (TranslationOverride) -> Unit,
 ) {
-    TranslationOverride.entries.forEach { option ->
-        val label =
-            when (option) {
-                TranslationOverride.INHERIT -> R.string.translation_inherit
-                TranslationOverride.ON -> R.string.translation_on
-                TranslationOverride.OFF -> R.string.translation_off
-            }
-        WhiteNoiseDialogChoiceRow(
-            title = stringResource(label),
-            selected = selected == option,
-            onClick = { onSelected(option) },
-        )
+    Column(Modifier.fillMaxWidth().selectableGroup()) {
+        TranslationOverride.entries.forEach { option ->
+            val label =
+                when (option) {
+                    TranslationOverride.INHERIT -> R.string.translation_inherit
+                    TranslationOverride.ON -> R.string.translation_on
+                    TranslationOverride.OFF -> R.string.translation_off
+                }
+            WhiteNoiseDialogChoiceRow(
+                title = stringResource(label),
+                selected = selected == option,
+                onClick = { onSelected(option) },
+            )
+        }
     }
 }
 

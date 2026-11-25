@@ -21,7 +21,8 @@ internal fun relayHistoryRows(events: List<AccountKeyPackageRelayEventFfi>): Lis
 
 /**
  * Relay history section of the Key packages screen (MDK 0.10.0 `accountKeyPackageRelayEvents`): one settings group
- * with a row per event. Row keys carry the position as well as the event id, so a repeated id cannot collide.
+ * with a row per event. MDK does not promise one event per id, and the group rejects a repeated key, so each key
+ * carries the row's position as well as the event id.
  */
 @Suppress("FunctionNaming")
 @Composable

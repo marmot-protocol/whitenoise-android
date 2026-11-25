@@ -223,7 +223,8 @@ internal fun DiagnosticsImprovementsScreen(
             item(key = "search.DiagnosticsImprovements.5") {
                 SettingsExplainer(
                     stringResource(R.string.delete_audit_logs_subtitle),
-                    modifier = Modifier.semantics { hideFromAccessibility() },
+                    // Merging keeps the hidden node and its text one node, so TalkBack skips the copy itself.
+                    modifier = Modifier.semantics(mergeDescendants = true) { hideFromAccessibility() },
                 )
             }
         }

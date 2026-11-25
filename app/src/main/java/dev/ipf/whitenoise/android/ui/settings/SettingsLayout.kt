@@ -219,8 +219,8 @@ internal fun SettingsSection(title: String) {
 }
 
 /**
- * Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. [modifier] adds
- * semantics such as hiding copy a neighbouring row already announces.
+ * Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. [modifier] wraps the
+ * text, so semantics meant for the copy itself must merge descendants to reach it.
  */
 @Suppress("FunctionNaming")
 @Composable
