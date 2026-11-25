@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -36,8 +36,8 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
- * The least height the scrolling column keeps beside pinned actions: one text field with its label and supporting
- * text. Below it, the actions scroll with the fields so the keyboard never leaves the field being edited no room.
+ * The least height the scrolling column keeps beside pinned actions, about one single-line field with its label at
+ * default text size. Below it, the actions scroll with the fields rather than squeezing the field being edited.
  */
 internal val MinPinnedContentHeight = 120.dp
 
@@ -61,38 +61,44 @@ internal fun OnboardingPinnedActionPage(
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = { WhiteNoiseTopBar(title, onBack = onBack) },
     ) { padding ->
-        BoxWithConstraints(
+        // Heights are measured into state and only the pinned/inline decision is read in composition, so an
+        // animating keyboard re-lays out the page without recomposing it until the placement flips.
+        var availableHeightPx by remember { mutableIntStateOf(0) }
+        var actionsHeightPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val pinned by remember(density) {
+            derivedStateOf {
+                // Before the first layout nothing is measured yet, so the actions start pinned.
+                availableHeightPx == 0 ||
+                    with(density) { pinsActions(availableHeightPx.toDp(), actionsHeightPx.toDp()) }
+            }
+        }
+        val pinnedActions = actions?.takeIf { pinned }
+        val inlineActions = actions?.takeIf { !pinned }
+        val measuredActions = Modifier.onSizeChanged { actionsHeightPx = it.height }
+        Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .navigationBarsPadding()
-                .imePadding(),
-            contentAlignment = Alignment.TopCenter,
+                .imePadding()
+                .onSizeChanged { availableHeightPx = it.height },
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // The actions' own height, measured wherever they last rendered; zero until their first layout.
-            var actionsHeightPx by remember { mutableIntStateOf(0) }
-            val actionsHeight = with(LocalDensity.current) { actionsHeightPx.toDp() }
-            val pinned = actions != null && pinsActions(maxHeight, actionsHeight)
-            val measuredActions = Modifier.onSizeChanged { actionsHeightPx = it.height }
-            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .widthIn(max = OnboardingMaxContentWidth)
-                        .fillMaxWidth()
-                        .whiteNoiseVerticalScroll(rememberScrollState())
-                        .padding(
-                            horizontal = WhiteNoiseSpacing.CompactScreenMargin,
-                            vertical = WhiteNoiseSpacing.Section,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-                ) {
-                    content()
-                    if (actions != null && !pinned) OnboardingActionColumn(actions, measuredActions)
-                }
-                if (pinned && actions != null) OnboardingPinnedActions(actions, measuredActions)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .widthIn(max = OnboardingMaxContentWidth)
+                    .fillMaxWidth()
+                    .whiteNoiseVerticalScroll(rememberScrollState())
+                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Section),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            ) {
+                content()
+                if (inlineActions != null) OnboardingActionColumn(inlineActions, measuredActions)
             }
+            if (pinnedActions != null) OnboardingPinnedActions(pinnedActions, measuredActions)
         }
     }
 }

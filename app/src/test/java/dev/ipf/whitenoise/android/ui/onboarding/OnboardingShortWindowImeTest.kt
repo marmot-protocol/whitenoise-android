@@ -90,7 +90,7 @@ class OnboardingShortWindowImeTest {
     @Test fun closingTheKeyboardPinsTheActionsAgain() {
         showSetupEditor(fontScale = 1f)
         dispatchImeBottom(IME_HEIGHT_PX)
-        assertFalse(isPinned("setup-editor-save"))
+        composeRule.onNode(hasTestTag("setup-editor-save") and hasAnyAncestor(hasScrollAction())).assertExists()
         dispatchImeBottom(0)
         assertTrue(isPinned("setup-editor-save"))
         assertTrue(isPinned("setup-editor-cancel"))

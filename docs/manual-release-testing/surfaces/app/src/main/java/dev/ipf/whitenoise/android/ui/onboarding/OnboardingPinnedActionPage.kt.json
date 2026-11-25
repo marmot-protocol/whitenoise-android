@@ -8,7 +8,6 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
         "anchor": "fun OnboardingPinnedActionPage(",
         "test_ids": [
-          "ONB-001",
           "ONB-004",
           "ONB-013"
         ]
@@ -27,7 +26,6 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
         "anchor": "fun OnboardingActionColumn(",
         "test_ids": [
-          "ONB-001",
           "ONB-004",
           "ONB-013"
         ]
