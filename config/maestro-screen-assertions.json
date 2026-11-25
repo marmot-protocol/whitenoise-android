@@ -1280,6 +1280,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+      "symbol": "ActivitySheet",
+      "bindings": [],
+      "remaining": "CON-057 covers opening Agent activity from the conversation header and Chat details, then closing it and returning to the same chat."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+      "symbol": "AgentActivitySheet",
+      "bindings": [],
+      "remaining": "CON-057 covers expanding tool and edit details and paging through history. CON-059 covers sending Stop and seeing the turn settle."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
       "symbol": "EmojiPickerContent",
       "bindings": [
