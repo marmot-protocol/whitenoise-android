@@ -7,7 +7,7 @@ import java.io.File
 class ChatsScreenScrollControlAccessibilityCoverageTest {
     @Test
     fun scrollToTopControlIsExposedAsButton() {
-        val source = chatsScreenSource().readText()
+        val source = jumpToTopSource().readText()
         val scrollControl =
             source.requiredSection(
                 start = "val scrollToTopLabel = stringResource(R.string.scroll_to_top)",
@@ -20,12 +20,12 @@ class ChatsScreenScrollControlAccessibilityCoverageTest {
         )
     }
 
-    private fun chatsScreenSource(): File =
+    private fun jumpToTopSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListJumpToTop.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListJumpToTop.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing ChatsScreen.kt source file")
+            ?: error("Missing ChatListJumpToTop.kt source file")
 
     private fun String.requiredSection(
         start: String,

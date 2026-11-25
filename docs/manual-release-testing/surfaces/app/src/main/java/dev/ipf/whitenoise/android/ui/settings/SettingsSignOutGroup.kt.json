@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SignOutGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt",
+        "anchor": "fun SignOutGroup(",
+        "test_ids": [
+          "SET-001",
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "Settings home hold-to-explain: sign out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt",
+        "anchor": "R.string.explanation_account_keys_sign_out",
+        "test_ids": [
+          "SET-053"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:sign_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSignOutGroup.kt",
+        "anchor": "R.string.sign_out",
+        "test_ids": [
+          "SET-001",
+          "ONB-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

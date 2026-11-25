@@ -35,7 +35,7 @@
         "anchor": "fun AuditLogPickerRow(",
         "test_ids": [
           "SEC-009",
-          "SET-071"
+          "SET-072"
         ]
       }
     ],

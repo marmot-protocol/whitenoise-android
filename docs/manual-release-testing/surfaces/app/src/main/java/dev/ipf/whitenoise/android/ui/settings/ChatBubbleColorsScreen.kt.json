@@ -45,7 +45,7 @@
         "anchor": "fun BubbleColorsResetButton(",
         "test_ids": [
           "SET-005",
-          "SET-071"
+          "SET-072"
         ]
       }
     ],
@@ -154,7 +154,7 @@
         "anchor": "R.string.explanation_appearance_bubble_colors_reset",
         "test_ids": [
           "SET-054",
-          "SET-071"
+          "SET-072"
         ]
       },
       {

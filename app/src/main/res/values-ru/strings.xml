@@ -1072,7 +1072,7 @@
     <string name="notification_background_on">Фоновое соединение включено.</string>
     <string name="notification_background_off">Фоновое соединение отключено.</string>
     <string name="notification_categories_detail">Android задаёт звук, вибрацию и важность для каждой категории.</string>
-    <string name="chat_with_support">Чат с поддержкой</string>
+    <string name="chat_with_support">Написать команде White Noise</string>
     <string name="theme">Тема</string>
     <string name="theme_system">Системная</string>
     <string name="theme_light">Светлая</string>
@@ -2336,7 +2336,7 @@
     <string name="app_unlock_checking">Проверка защиты приложения…</string>
     <string name="support_contact_title">Поддержка White Noise</string>
     <string name="support_contact_subtitle">Вопросы, проблемы и предложения</string>
-    <string name="support_contact_explainer">Задайте вопрос, сообщите о проблеме или предложите идею.</string>
+    <string name="support_contact_explainer">Задайте вопрос, сообщите о проблеме или поделитесь отзывом с разработчиками White Noise.</string>
     <string name="support_relays_attention">Ретрансляторы профиля требуют внимания</string>
     <string name="support_open_relays">Открыть ретрансляторы</string>
     <string name="support_relays_review">Проверьте список ретрансляторов для получения сообщений этого профиля.</string>

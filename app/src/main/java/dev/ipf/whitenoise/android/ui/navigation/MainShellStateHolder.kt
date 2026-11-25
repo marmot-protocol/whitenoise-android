@@ -572,3 +572,6 @@ internal fun PrepareMainShellFirstFrame(
         )
     }
 }
+
+internal const val ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED = "attachment-open-uninitialized"
+internal const val ATTACHMENT_OPEN_DESTINATION_NONE = "attachment-open-none"

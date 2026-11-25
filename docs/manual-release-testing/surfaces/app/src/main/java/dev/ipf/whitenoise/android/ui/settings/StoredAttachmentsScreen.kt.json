@@ -97,14 +97,6 @@
         ]
       },
       {
-        "surface": "string:storage_removal_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
-        "anchor": "R.string.storage_removal_help",
-        "test_ids": [
-          "SET-049"
-        ]
-      },
-      {
         "surface": "string:storage_remove",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
         "anchor": "R.string.storage_remove",
@@ -175,6 +167,14 @@
         "surface": "R.string.explanation_privacy_storage_remove_all_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
         "anchor": "R.string.explanation_privacy_storage_remove_all_chat",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.storage_removal_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_removal_help",
         "test_ids": [
           "SET-055"
         ]

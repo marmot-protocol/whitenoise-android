@@ -32,7 +32,7 @@
           "SET-010",
           "SET-011",
           "MED-005",
-          "SET-071"
+          "SET-072"
         ]
       },
       {
@@ -149,16 +149,6 @@
         "surface": "string:download_quality",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
         "anchor": "R.string.download_quality",
-        "test_ids": [
-          "SET-010",
-          "SET-011",
-          "MED-005"
-        ]
-      },
-      {
-        "surface": "string:download_quality_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
-        "anchor": "R.string.download_quality_help",
         "test_ids": [
           "SET-010",
           "SET-011",
@@ -406,14 +396,11 @@
     ],
     "source_coverage": [
       {
-        "surface": "Scroll boundaries: DataUsageScreen",
+        "surface": "R.string.download_quality_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
-        "anchor": ".fadingVerticalScroll(",
+        "anchor": "R.string.download_quality_help",
         "test_ids": [
-          "SCR-001",
-          "SCR-002",
-          "SCR-003",
-          "SCR-004"
+          "SET-055"
         ]
       },
       {
@@ -470,6 +457,17 @@
         "anchor": "R.string.explanation_privacy_data_reset",
         "test_ids": [
           "SET-055"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: DataUsageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ],

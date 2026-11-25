@@ -114,7 +114,7 @@
         "anchor": "SettingsExplainer(stringResource(R.string.profile_public_key_help))",
         "test_ids": [
           "SET-001",
-          "SET-071"
+          "SET-072"
         ]
       }
     ],

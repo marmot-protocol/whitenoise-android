@@ -49,7 +49,7 @@
         "anchor": "fun KeyPackageRelayEventRow(",
         "test_ids": [
           "ACC-016",
-          "SET-071"
+          "SET-072"
         ]
       },
       {
@@ -58,7 +58,7 @@
         "anchor": "fun KeyPackageRelayHistory(",
         "test_ids": [
           "ACC-016",
-          "SET-071"
+          "SET-072"
         ]
       }
     ]
