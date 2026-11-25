@@ -24,6 +24,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.GENERATION_RESTART_DELAY_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
@@ -52,6 +53,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.Duration
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 /** Drives the real composer Send paths with translate mode on, so only a ready translation can leave. */
@@ -251,6 +253,7 @@ class ComposerTranslationSendTest {
 
         val firstListener = platform.listener
         dictate.performClick()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(GENERATION_RESTART_DELAY_MILLIS))
         composeRule.runOnIdle {
             assertNotSame(firstListener, platform.listener)
             platform.listener.onReady()
