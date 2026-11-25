@@ -39,9 +39,10 @@ class ShapedTouchFeedbackCoverageTest {
                 .filter { it.isFile && it.extension == "kt" }
                 .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
         val wrappers = stretchedWrapperFindings(sources)
+        val shapes = topLevelShapeConstants(sources.values)
         val found =
             sources.flatMap { (path, source) ->
-                (shapedTouchFindings(source, path) + wrappers.getValue(path)).map { finding ->
+                (shapedTouchFindings(source, path, shapes) + wrappers.getValue(path)).map { finding ->
                     val kind = kind(finding)
                     val line = finding.substringAfterLast(" @").toInt()
                     val site = if (kind == ROUND_CHILD) roundChildClickSite(source, line) else null
@@ -55,6 +56,43 @@ class ShapedTouchFeedbackCoverageTest {
             allowed,
             found.sorted(),
         )
+    }
+
+    /**
+     * The shared press-feedback API is used only where this gate scans, and declared only in ShapedTouch.kt. A
+     * caller in another production source set or package, or a same-named function elsewhere, would escape or
+     * impersonate every rule above.
+     */
+    @Test
+    fun theSharedFeedbackApiStaysInsideTheScannedTree() {
+        val sourceSets = appModuleFile(SOURCE_ROOT)
+        val ui = appModuleFile(UI_ROOT)
+        val production =
+            sourceSets
+                .walkTopDown()
+                .onEnter { it == sourceSets || it.parentFile != sourceSets || it.name !in testSourceSets }
+                .filter { it.isFile && it.extension == "kt" }
+                .associateWith { blankCommentsAndStrings(it.readText()) }
+        val outside =
+            production
+                .filter { (file, code) -> !file.startsWith(ui) && sharedFeedbackApi.containsMatchIn(code) }
+                .keys
+                .map { it.relativeTo(sourceSets).invariantSeparatorsPath }
+        assertEquals("Move these callers under main ui/ so the touch gate checks them", emptyList<String>(), outside)
+        val declarations =
+            production
+                .filter { (_, code) -> sharedFeedbackDeclaration.containsMatchIn(code) }
+                .keys
+                .map { it.relativeTo(sourceSets).invariantSeparatorsPath }
+        assertEquals(listOf(SHARED_FEEDBACK_SOURCE), declarations)
+        // The gate trusts these layout components and standard modifiers, so production must not redefine them.
+        val trusted =
+            Regex(
+                """\bfun\s+(?:${drawingComponents.joinToString("|")})\s*\(|""" +
+                    """\bfun\s+Modifier\.(?:${(standardModifiers - sharedFeedbackNames).joinToString("|")})\s*\(""",
+            )
+        val redefined = production.filter { (_, code) -> trusted.containsMatchIn(code) }.keys
+        assertEquals(emptyList<String>(), redefined.map { it.relativeTo(sourceSets).invariantSeparatorsPath })
     }
 
     /** The scanner finds each pattern the gate exists for, so a parsing regression cannot pass silently. */
@@ -461,6 +499,13 @@ class ShapedTouchFeedbackCoverageTest {
 
     private companion object {
         const val UI_ROOT = "src/main/java/dev/ipf/whitenoise/android/ui"
+        const val SOURCE_ROOT = "src"
+        const val SHARED_FEEDBACK_SOURCE = "main/java/dev/ipf/whitenoise/android/ui/common/ShapedTouch.kt"
+        val testSourceSets = setOf("androidTest", "test", "testSupport", "testZapstore")
+        val sharedFeedbackNames = setOf("pressFeedbackInsideClip", "shapedPressFeedback", "shapedTouchTarget")
+        val sharedFeedbackApi = Regex("""\b(?:shapedTouchTarget|shapedPressFeedback|pressFeedbackInsideClip)\b""")
+        val sharedFeedbackDeclaration =
+            Regex("""\bfun\s+(?:[\w.<>]+\.)?(?:shapedTouchTarget|shapedPressFeedback|pressFeedbackInsideClip)\s*\(""")
 
         /**
          * The rectangular video tile and profile banner each contain a round status or camera glyph.

@@ -3,7 +3,66 @@ package dev.ipf.whitenoise.android.ui.common
 private val componentCall = Regex("""\b([A-Z]\w*)\s*\(""")
 private val componentDeclaration = Regex("""\b(fun|class|interface)\s*$""")
 private const val COMPONENT_DECLARATION_LOOKBEHIND = 32
-private val modifierRoot = Regex("""^[A-Za-z_]\w*(?!\w)(?!\s*\()""")
+private val touchTargetCall = Regex("""\bshapedTouchTarget\s*\(""")
+private val extensionDeclaration = Regex("""\bfun\s+(?:[\w.<>]+\.)?$""")
+private const val EXTENSION_DECLARATION_LOOKBEHIND = 48
+internal val drawingComponents =
+    setOf("Box", "BoxWithConstraints", "Column", "Icon", "Image", "Row", "Spacer", "Surface", "Text")
+private val targetReference = Regex("""::\s*shapedTouchTarget\b""")
+
+// Standard modifiers that keep what comes before them; a stored or helper modifier is not among them.
+internal val standardModifiers =
+    setOf(
+        "align",
+        "alpha",
+        "aspectRatio",
+        "background",
+        "border",
+        "clearAndSetSemantics",
+        "clickable",
+        "clip",
+        "combinedClickable",
+        "defaultMinSize",
+        "drawBehind",
+        "drawWithContent",
+        "fillMaxHeight",
+        "fillMaxSize",
+        "fillMaxWidth",
+        "focusable",
+        "graphicsLayer",
+        "height",
+        "heightIn",
+        "indication",
+        "matchParentSize",
+        "minimumInteractiveComponentSize",
+        "offset",
+        "onGloballyPositioned",
+        "onSizeChanged",
+        "padding",
+        "pointerInput",
+        "pressFeedbackInsideClip",
+        "requiredHeight",
+        "requiredSize",
+        "requiredWidth",
+        "selectable",
+        "semantics",
+        "shadow",
+        "shapedPressFeedback",
+        "shapedTouchTarget",
+        "size",
+        "sizeIn",
+        "testTag",
+        "toggleable",
+        "weight",
+        "width",
+        "widthIn",
+        "wrapContentHeight",
+        "wrapContentSize",
+        "wrapContentWidth",
+        "zIndex",
+    )
+private val renamedTargetImport = Regex("""\bimport\s+[\w.]*\bshapedTouchTarget\s+as\b""")
+private val uncertainFactory = Regex("""\bnull\b|\b(?:if|when)\b|\?:|\?\.""")
 private val positionalModifiers =
     mapOf(
         "Box" to 0,
@@ -28,7 +87,12 @@ private val qualifiedReceiver = Regex("""(?:[A-Za-z_]\w*\.)+$""")
 private val returnStatement = Regex("""\breturn(?:@(\w+))?\b""")
 private val branchCondition = Regex("""\bif\s*\(""")
 private val controlCondition = Regex("""\b(?:if|for|while)\s*\(""")
-private val elseBranch = Regex("""\belse$""")
+
+// Modifiers that draw or describe without changing size, so a ripple after them still fills the clip.
+private val drawOnlyModifiers =
+    setOf("alpha", "background", "border", "clearAndSetSemantics", "drawBehind", "semantics", "testTag")
+private val freshModifierChain = Regex("""^\s*Modifier\s*\.""")
+private val elseBranch = Regex("""(?:\belse|\?:|&&|\|\||\?\.)$""")
 private val sourceReference = Regex("""[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*""")
 
 /**
@@ -38,11 +102,14 @@ private val sourceReference = Regex("""[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*""")
  */
 internal class ShapedTouchIndications(
     private val code: String,
+    private val sharedShapes: Map<String, String> = emptyMap(),
 ) {
     private val owners = code.feedbackOwners()
+    private val shapes = ShapedTouchShapes(code, sharedShapes, ::parameterNamed)
     private val functions = code.feedbackFunctions()
     private val replacements by lazy {
-        owners.mapNotNull { owner ->
+        // Only a known layout component draws its modifier; any other uppercase call could be a stored value.
+        owners.filter { it.name in drawingComponents }.mapNotNull { owner ->
             appliedReplacements(owner).takeIf { it.isNotEmpty() }?.let { owner to it }
         }
     }
@@ -65,49 +132,147 @@ internal class ShapedTouchIndications(
             }.toList()
     }
 
-    /** Reports applied targets that suppress their normal indication without drawing matching feedback. */
+    /**
+     * Reports every touch target that suppresses its normal indication without matching feedback. Every
+     * `shapedTouchTarget(…)` call in the file counts, so one that no component's modifier can be shown to
+     * receive, such as in an extension function, a parameter default, a reassigned `var` or an unused value,
+     * is reported rather than skipped.
+     */
     fun unmatchedTouchTargets(): List<Int> {
         if ("shapedTouchTarget" !in code) return emptyList()
-        return owners
-            .flatMap { owner ->
-                appliedModifierLinks(owner)
-                    .filter { it.name == "shapedTouchTarget" }
-                    .filterNot { link ->
-                        val source = link.feedbackReference()?.let { binding(it.expression, it.offset) }
-                        source != null && hasFeedback(owner, source)
-                    }.map(ModifierLink::argumentOffset)
+        val applied =
+            owners.flatMap { owner ->
+                // A target nested in another call's arguments or a lambda may be discarded, so it reaches nothing.
+                (appliedModifierLinks(owner) + otherArgumentLinks(owner))
+                    .filter { it.name == "shapedTouchTarget" && !it.nested }
+                    .map { owner to it }
                     .toList()
-            }.distinct()
+            }
+        val unmatched =
+            applied
+                .filterNot { (owner, link) ->
+                    val source = link.feedbackReference()?.let { binding(it.expression, it.offset) }
+                    source != null && hasFeedback(owner, source)
+                }.map { (_, link) -> link.argumentOffset }
+        val reached = applied.map { (_, link) -> link.argumentOffset }.toSet()
+        val unreached =
+            touchTargetCall
+                .findAll(code)
+                .filterNot(::declaresTarget)
+                .map { it.range.last + 1 }
+                .filterNot { it in reached }
+        val renamed = (renamedTargetImport.findAll(code) + targetReference.findAll(code)).map { it.range.first }
+        return (unmatched + unreached + renamed).distinct()
     }
 
-    /** Reads the links that actually reach this component, including a local modifier initializer. */
+    /**
+     * Links reached through the component's other arguments, such as a modifier passed by position to a component
+     * this scanner does not know. They never prove feedback, but a target among them must still find it.
+     */
+    private fun otherArgumentLinks(owner: FeedbackOwner): Sequence<ModifierLink> {
+        val args = code.substring(owner.open + 1, owner.close)
+        val modifier = modifierArgument(args, positionalModifiers[owner.name])
+        return topLevelArgumentValues(args)
+            .asSequence()
+            .filterNot { it.offset == modifier?.offset || it.text.startsWith("{") }
+            .flatMap { argument ->
+                val start = owner.open + 1 + argument.offset
+                argument.text.modifierLinks(start, LinkScope(conditional = true))
+            }
+    }
+
+    /** Whether this match is the `fun Modifier.shapedTouchTarget(` declaration itself rather than a call. */
+    private fun declaresTarget(call: MatchResult): Boolean {
+        val window = maxOf(0, call.range.first - EXTENSION_DECLARATION_LOOKBEHIND)
+        return extensionDeclaration.containsMatchIn(code.substring(window, call.range.first))
+    }
+
+    /** Reads every link in the modifier written inline for this component; a named modifier value is not expanded. */
     private fun appliedModifierLinks(owner: FeedbackOwner): Sequence<ModifierLink> {
         val args = code.substring(owner.open + 1, owner.close)
         val modifier = modifierArgument(args, positionalModifiers[owner.name]) ?: return emptySequence()
-        val offset = owner.open + 1 + modifier.offset
-        val alias = modifierRoot.find(modifier.text)?.value
-        val initializer = alias?.let { code.substring(0, offset).localBinding(it) }
-        return initializer?.text.orEmpty().modifierLinks(initializer?.offset ?: 0) + modifier.text.modifierLinks(offset)
+        return modifier.text.modifierLinks(owner.open + 1 + modifier.offset)
     }
 
-    /** Collects indications only from a modifier supplied to a component. */
+    /**
+     * Collects replacement feedback only from a modifier written for a component. A ripple that does not clip
+     * itself (`indication`, `pressFeedbackInsideClip`) counts only after a shaped clip that always applies, or that
+     * sits in the same plain guarded arm, with only draw-only links between them, so nothing can shrink the ripple;
+     * or as the first link of a chain rooted at `Modifier` on a direct child of a rounded Surface.
+     */
     private fun appliedReplacements(owner: FeedbackOwner): List<FeedbackReference> {
-        var clipped = false
-        return appliedModifierLinks(owner)
-            .mapNotNull { link ->
-                clipped = clipped || link.clipsToShape()
-                when (link.name) {
-                    "indication" -> link.feedbackReference().takeIf { clipped && link.hasIndication() }
-                    "pressFeedbackInsideClip", "shapedPressFeedback" -> link.feedbackReference()
-                    else -> null
-                }
-            }.toList()
+        val chain = appliedModifierLinks(owner).filterNot { it.nested }.toList()
+        // Only a ripple that starts a fresh chain has the Surface child's full, clipped size.
+        val fillsSurface by lazy { sitsInShapedSurface(owner) && appliedModifierText(owner).startsWithModifier() }
+        return chain.mapIndexedNotNull { index, link ->
+            val clipped = link.clipBefore(chain, index)
+            val surface = index == 0 && fillsSurface
+            // A stored or helper modifier after the feedback could discard it, so only known modifiers may follow.
+            val kept = chain.drop(index + 1).all { it.name in standardModifiers }
+            if (!kept) return@mapIndexedNotNull null
+            when (link.name) {
+                "indication" -> link.feedbackReference().takeIf { (clipped || surface) && link.hasIndication() }
+                "pressFeedbackInsideClip" -> link.feedbackReference().takeIf { clipped || surface }
+                "shapedPressFeedback" -> link.feedbackReference().takeIf { link.hasShapedArgument() }
+                else -> null
+            }
+        }
     }
 
-    /** A raw indication must actually draw, even if its modifier is clipped. */
+    /** Whether [clip] is a rounded clip that is certain wherever this link applies. */
+    private fun ModifierLink.followsClip(clip: ModifierLink): Boolean =
+        clip.name == "clip" &&
+            shapes.isKnownRounded(clip.args, clip.argumentOffset) &&
+            (!clip.conditional || (clip.scope.guard != null && clip.scope.guard == scope.guard))
+
+    /** The shaped clip this ripple fills: the nearest earlier one with only draw-only links between them. */
+    private fun ModifierLink.clipBefore(
+        chain: List<ModifierLink>,
+        index: Int,
+    ): Boolean {
+        val earlier = chain.subList(0, index).asReversed()
+        val clip =
+            earlier.indexOfFirst { it.name != "clip" && it.name !in drawOnlyModifiers }.let { stop ->
+                earlier.take(if (stop < 0) earlier.size else stop).firstOrNull { it.name == "clip" }
+            }
+        return clip != null && followsClip(clip)
+    }
+
+    /** The modifier argument text written for this component, or empty when it has none. */
+    private fun appliedModifierText(owner: FeedbackOwner): String =
+        modifierArgument(code.substring(owner.open + 1, owner.close), positionalModifiers[owner.name])?.text.orEmpty()
+
+    /** Whether a modifier expression starts a fresh chain on `Modifier` rather than extending a parameter. */
+    private fun String.startsWithModifier(): Boolean = freshModifierChain.containsMatchIn(this)
+
+    /** `shapedPressFeedback` clips to its own shape argument, which must be established as rounded. */
+    private fun ModifierLink.hasShapedArgument(): Boolean {
+        val shape = topLevelNamedArguments(args)["shape"] ?: topLevelArguments(args).getOrNull(1)
+        return shape != null && shapes.isKnownRounded(shape, argumentOffset)
+    }
+
+    /**
+     * Whether the component is a direct child of a Surface whose shape is established as rounded. Material's
+     * Surface passes its minimum size to its content, so that child fills the clipped shape; a card's content
+     * wraps, so cards do not count.
+     */
+    private fun sitsInShapedSurface(owner: FeedbackOwner): Boolean {
+        val parent = code.openScopesAt(0, owner.start).lastOrNull()?.let(composedContentScopes::get)
+        val surface = owners.firstOrNull { it.start == parent?.start && it.name == "Surface" } ?: return false
+        val shape = topLevelNamedArguments(code.substring(surface.open + 1, surface.close))["shape"]?.trim()
+        return shape != null && shapes.isKnownRounded(shape, surface.open)
+    }
+
+    /** Whether a function enclosing [useOffset] declares a parameter named [name]. */
+    private fun parameterNamed(
+        name: String,
+        useOffset: Int,
+    ): Boolean = functions.any { useOffset in it.body until it.end && parameterBinding(it, name) != null }
+
+    /** A raw indication must always draw, even if its modifier is clipped: no null or conditional factory. */
     private fun ModifierLink.hasIndication(): Boolean {
         val factory = topLevelNamedArguments(args)["indication"] ?: topLevelArguments(args).getOrNull(1)
-        return factory != null && factory.trim() != "null"
+        return factory != null && !uncertainFactory.containsMatchIn(factory)
     }
 
     /** Reads the source observed by a replacement at the modifier's declaration location. */
@@ -206,14 +371,18 @@ internal class ShapedTouchIndications(
         val parents = scopes.mapNotNull(composedContentScopes::get)
         val calls = parents.map(ContentCall::start) + offset
         val branching = calls.any { it >= start && code.followsUnbracedBranch(start, it) }
-        return parents.size == scopes.size && !branching && !canReturnBeforeFeedback(start, offset, parents, activeArms)
+        return parents.size == scopes.size && !branching && !canReturnBeforeFeedback(start, offset, activeArms)
     }
 
-    /** An early return can skip feedback even when both calls are in the same composed block. */
+    /**
+     * An early return can skip feedback even when both calls are in the same composed block. A plain `return`
+     * leaves the whole function. A labeled one leaves the lambda or function its label names, so it skips the
+     * feedback whenever that scope still encloses it: `return@Pill` or `return@forEach` around the feedback counts,
+     * inside any `if` or `run` braces, while `return@clickable` in a click handler that closed before it does not.
+     */
     private fun canReturnBeforeFeedback(
         from: Int,
         feedbackStart: Int,
-        enclosingContent: List<ContentCall>,
         activeArms: List<IntRange>,
     ): Boolean {
         val inactiveArms =
@@ -230,11 +399,22 @@ internal class ShapedTouchIndications(
                 if (label == null) {
                     functions.none { it.body > from && offset in it.body until it.end }
                 } else {
-                    val scopes = code.openScopesAt(from, offset)
-                    val destination = scopes.mapNotNull(composedContentScopes::get).lastOrNull { it.name == label }
-                    destination != null && destination in enclosingContent
+                    labeledScopeEncloses(label, offset, feedbackStart)
                 }
             }
+    }
+
+    /**
+     * Whether the innermost scope open at [returnOffset] that [label] names, a lambda passed to that call or the
+     * body of that function, still encloses [feedbackStart]. An unresolved label counts, so the rule fails closed.
+     */
+    private fun labeledScopeEncloses(
+        label: String,
+        returnOffset: Int,
+        feedbackStart: Int,
+    ): Boolean {
+        val named = code.openScopesAt(0, returnOffset).lastOrNull { code.scopeName(it) == label }
+        return named == null || code.closingBracket(named) >= feedbackStart
     }
 
     /** Knows the trailing and named content blocks that these layout functions compose immediately. */
@@ -296,7 +476,7 @@ internal class ShapedTouchIndications(
 }
 
 /** Collects the enclosing syntax scopes between the start of a composition and a candidate call. */
-private fun String.openScopesAt(
+internal fun String.openScopesAt(
     from: Int,
     offset: Int,
 ): List<Int> {

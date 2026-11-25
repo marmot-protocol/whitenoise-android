@@ -60,9 +60,10 @@ private const val DECLARATION_LOOKBEHIND = 12
 internal fun shapedTouchFindings(
     source: String,
     path: String = "",
+    sharedShapes: Map<String, String> = emptyMap(),
 ): List<String> {
     val code = blankCommentsAndStrings(source)
-    val feedback = ShapedTouchIndications(code)
+    val feedback = ShapedTouchIndications(code, sharedShapes)
     return (
         code.clicksBeforeClip(feedback) + code.clicksInShapedSurfaces(feedback) +
             code.clickableBoxesAroundRoundChildren(feedback) + code.clicksOnRoundComponents(feedback) +
@@ -289,12 +290,17 @@ private fun String.endsStatementAt(
     depth: Int,
 ): Boolean = depth <= 0 && (this[index] == ';' || (this[index] == '\n' && !continuesOnNextLine(index + 1)))
 
-/** Whether the line starting at [from] continues a call chain with a leading `.`. */
+/**
+ * Whether the next non-blank line from [from] continues the expression: a call chain, `?.`, `?:`, `&&`, `||` or
+ * `else`. Comments are already blanked, so a comment line between the parts reads as blank and is skipped.
+ */
 private fun String.continuesOnNextLine(from: Int): Boolean {
     var index = from
-    while (index < length && (this[index] == ' ' || this[index] == '\t')) index++
-    return index < length && this[index] == '.'
+    while (index < length && this[index].isWhitespace()) index++
+    return continuationLead.matchAt(this, index) != null
 }
+
+private val continuationLead = Regex("""\.|\?[.:]|&&|\|\||else\b""")
 
 /** A function's parameter list split at top-level commas, counting `<…>` type arguments as brackets. */
 private fun parameterList(parameters: String): List<String> {
@@ -477,7 +483,7 @@ private fun String.roundChildTag(click: Int): String? =
             modifier.text.takeIf { click in offset until offset + it.length }
         }.lastOrNull()
         ?.modifierLinks()
-        ?.singleOrNull { it.name == "testTag" }
+        ?.singleOrNull { it.name == "testTag" && !it.conditional }
         ?.args
         ?.normalizedArguments()
 

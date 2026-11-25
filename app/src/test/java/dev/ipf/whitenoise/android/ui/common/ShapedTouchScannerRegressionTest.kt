@@ -21,15 +21,19 @@ class ShapedTouchScannerRegressionTest {
         assertNotEquals(roundChildClickSite(source, 2), roundChildClickSite(replacement, 2))
     }
 
-    /** A stock indication needs a shaped clip earlier on the modifier that actually draws it. */
+    /**
+     * A stock indication needs a shaped clip earlier on the modifier that actually draws it, unless it sits
+     * directly in the shaped Surface, whose own clip then shapes it.
+     */
     @Test
-    fun rawIndicationRequiresItsOwnEarlierClip() {
-        val raw = "Box(Modifier.indication(press, ripple()))"
+    fun rawIndicationRequiresAShapedClip() {
+        val raw = "Row { Box(Modifier.indication(press, ripple())) }"
         val clipped = "Box(Modifier.then(Modifier.clip(CircleShape)).indication(press, ripple()))"
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(raw)))
+        assertEquals(emptyList<String>(), shapedTouchFindings(surfaceWith("Box(Modifier.indication(press, ripple()))")))
         assertEquals(emptyList<String>(), shapedTouchFindings(surfaceWith(clipped)))
         val optionalClip = "Modifier.then(if (show) Modifier.clip(CircleShape) else Modifier)"
-        val optional = "Box($optionalClip.indication(press, ripple()))"
+        val optional = "Row { Box($optionalClip.indication(press, ripple())) }"
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(optional)))
         val disabled = clipped.replace("ripple()", "null")
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(disabled)))
@@ -40,7 +44,8 @@ class ShapedTouchScannerRegressionTest {
     fun aReplacementModifierMustReachAComponent() {
         val local = "val feedback = Modifier.shapedPressFeedback(press, CircleShape)"
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith("$local; Box(Modifier)")))
-        assertEquals(emptyList<String>(), shapedTouchFindings(surfaceWith("$local; Box(feedback)")))
+        // A named modifier value is never expanded, so applying it does not prove feedback either.
+        assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith("$local; Box(feedback)")))
         val unused = "val value = Pair(Modifier.shapedPressFeedback(press, CircleShape), 1); Box(Modifier)"
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(unused)))
         val text = """Text("label", Modifier.shapedPressFeedback(press, CircleShape))"""
@@ -61,15 +66,15 @@ class ShapedTouchScannerRegressionTest {
     /** Both entry points can use branched layouts when each branch draws feedback for the same source. */
     @Test
     fun feedbackMustBeDrawnInBothBranches() {
-        val modifier = "val pulse = Modifier.shapedPressFeedback(press, CircleShape)"
-        val rendered = "$modifier; if (available) { Image(bitmap, null, pulse) } else { Box(pulse) }"
+        val pulse = "Modifier.shapedPressFeedback(press, CircleShape)"
+        val rendered = "if (available) { Image(bitmap, null, $pulse) } else { Box($pulse) }"
         val target = "Box(Modifier.shapedTouchTarget(press, go))"
         assertEquals(emptyList<String>(), shapedTouchFindings(surfaceWith(rendered)))
         assertEquals(emptyList<String>(), shapedTouchFindings("$target { $rendered }"))
-        val missing = rendered.replace("Box(pulse)", "Box(Modifier)")
+        val missing = rendered.replace("Box($pulse)", "Box(Modifier)")
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(missing)))
         assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$target { $missing }"))
-        val uncalled = rendered.replace("Box(pulse)", "val render = @Composable { Box(pulse) }")
+        val uncalled = rendered.replace("Box($pulse)", "val render = @Composable { Box($pulse) }")
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(uncalled)))
     }
 
@@ -162,7 +167,9 @@ class ShapedTouchScannerRegressionTest {
             assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$target { $content }"))
         }
         assertEquals(emptyList<String>(), shapedTouchFindings("$target { $matching }"))
-        assertEquals(emptyList<String>(), shapedTouchFindings("val unused = Modifier.shapedTouchTarget(press, go)"))
+        // No component can be shown to receive an unused target, so it is reported rather than trusted.
+        val unusedTarget = "val unused = Modifier.shapedTouchTarget(press, go)"
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(unusedTarget))
     }
 
     /** A target supplied through a conditional modifier chain still needs feedback when the target is present. */
