@@ -70,6 +70,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
                 accountRef,
                 presentedRows,
                 awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                decode = prefetched == null,
                 onPrepared =
                     if (plan.startupRestoration) {
                         { renderable, decoded ->

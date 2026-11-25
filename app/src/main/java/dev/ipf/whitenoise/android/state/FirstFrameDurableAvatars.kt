@@ -70,6 +70,7 @@ internal class FirstFrameDurableAvatar(
  * cache. No acquisition is started and nothing is written to an Android store. The wait is bounded by
  * [FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS]; avatars not decoded by then keep the ordinary lazy path.
  *
+ * Startup can set [decode] false when its speculative read already spent the decode budget.
  * Unless [awaitColdWorkers], only avatars already decoded or whose domain has a worker ready are awaited. A quick
  * account switch sets it false: the switch resets the decoder workers, so each group picture needs a new isolated
  * worker, which can take longer than the whole budget to start (#3496). Waiting for one would delay the switch
@@ -79,16 +80,19 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
     awaitColdWorkers: Boolean = true,
+    decode: Boolean = true,
     onPrepared: ((renderableAssets: Int, decodedAssets: Int) -> Unit)? = null,
 ): List<FirstFrameDurableAvatar> {
     val selections =
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
         }
-    decodeDurableAvatarsWithinBudget(
-        if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
-        accountRef,
-    )
+    if (decode) {
+        decodeDurableAvatarsWithinBudget(
+            if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
+            accountRef,
+        )
+    }
     val decoded =
         selections.map { it.first }.mapNotNull { asset ->
             val key = asset.cacheKey(accountRef) ?: return@mapNotNull null

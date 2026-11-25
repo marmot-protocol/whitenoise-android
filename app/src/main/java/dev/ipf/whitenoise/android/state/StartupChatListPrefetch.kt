@@ -67,10 +67,10 @@ private fun WhiteNoiseAppState.launchStartupChatListPrefetch(runtime: MarmotInte
             try {
                 val rows =
                     marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+                        check(this === runtime) { "Startup runtime changed before chat-list prefetch" }
                         presentedChatList(accountRef, includeArchived = true)
                     }.rows
-                // Decode the first-frame avatars into the pixel cache now, so activation's own bounded
-                // prewarm finds them decoded instead of starting cold decoder workers.
+                // Spend the avatar budget here. Activation collects the ready pixels once it adopts these rows.
                 prewarmFirstFrameDurableAvatars(accountRef, rows)
                 rows
             } catch (cancel: CancellationException) {

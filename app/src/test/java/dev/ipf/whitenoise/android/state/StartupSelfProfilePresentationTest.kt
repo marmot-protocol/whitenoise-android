@@ -49,6 +49,7 @@ class StartupSelfProfilePresentationTest {
             }
         }
 
+    /** Activation reads local rows even while its separate profile read is blocked. */
     @Test
     fun startupReadsChatRowsWhileWaitingForSelfProfile() =
         runBlocking {
@@ -56,7 +57,7 @@ class StartupSelfProfilePresentationTest {
             val releaseProfile = CountDownLatch(1)
             val rowsRead = CountDownLatch(1)
             val fixture =
-                fixture(onRowsRead = { rowsRead.countDown() }) { id ->
+                fixture(rememberedAccount = null, onRowsRead = rowsRead::countDown) { id ->
                     profileStarted.countDown()
                     check(releaseProfile.await(10, TimeUnit.SECONDS))
                     profile(id)
@@ -86,7 +87,7 @@ class StartupSelfProfilePresentationTest {
         runBlocking {
             val rowReadFailed = CountDownLatch(1)
             val fixture =
-                fixture(failRows = true, onRowsRead = rowReadFailed::countDown) { id ->
+                fixture(failRows = true, rememberedAccount = null, onRowsRead = rowReadFailed::countDown) { id ->
                     check(rowReadFailed.await(10, TimeUnit.SECONDS))
                     profile(id)
                 }
@@ -312,11 +313,13 @@ class StartupSelfProfilePresentationTest {
     private fun fixture(
         failRows: Boolean = false,
         accountSnapshot: List<AccountSummaryFfi> = listOf(account("self", SELF), account("other", OTHER)),
+        rememberedAccount: String? = accountSnapshot.firstOrNull()?.label.orEmpty(),
         onRowsRead: () -> Unit = {},
         read: (String) -> UserProfileMetadataFfi?,
     ) = NotificationBootstrapTestFixture(
         context = context,
         accounts = accountSnapshot,
+        initialActiveAccountRef = rememberedAccount,
         emitStartupNotification = false,
         localDisplayName = null,
         onUserProfile = read,
