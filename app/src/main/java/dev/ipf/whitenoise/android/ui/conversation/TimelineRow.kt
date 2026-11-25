@@ -29,8 +29,6 @@ import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemRowContext
 import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemTimelineRow
-import dev.ipf.whitenoise.android.ui.conversation.agent.LocalAgentTurnSteps
-import dev.ipf.whitenoise.android.ui.conversation.agent.overlapFoldedAgentRows
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
@@ -93,29 +91,17 @@ internal fun TimelineRow(
     senderGapMeasurements: ConversationSenderGapMeasurements? = null,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
-    val agentTurnSteps = LocalAgentTurnSteps.current
-    ReactionMotionRow(
-        reactionMotion,
-        modifier.overlapFoldedAgentRows(
-            agentTurnSteps.foldedSpacing(item.record.messageIdHex),
-            CONVERSATION_TIMELINE_ROW_SPACING,
-        ),
-        reactionViewport,
-    ) {
-        if (agentTurnSteps.isFolded(item.record.messageIdHex)) return@ReactionMotionRow
-        // Only a row that draws needs to look past folded steps for its separators and sender run.
-        val shownOlder = agentTurnSteps.shownOlder(item, older)
-        val shownNewer = agentTurnSteps.shownNewer(item, newer)
+    ReactionMotionRow(reactionMotion, modifier, reactionViewport) {
         val dateFormat = DateTimeFormatState.dateFormat
         val daySeparatorLabel =
-            remember(shownOlder?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
-                if (shownOlder == null || differentDay(shownOlder.record.recordedAt, item.record.recordedAt)) {
+            remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
+                if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
                     messageDayLabel(item.record.recordedAt, transcriptLocale, dateFormat)
                 } else {
                     null
                 }
             }
-        val followsGroupEvent = shownOlder?.record?.let { MessageProjector.isGroupSystem(it) } == true
+        val followsGroupEvent = older?.record?.let { MessageProjector.isGroupSystem(it) } == true
         val showUnreadDivider =
             shouldShowConversationEntryUnreadDivider(
                 entryUnreadCount = entryUnreadCount,
@@ -124,7 +110,7 @@ internal fun TimelineRow(
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
         val historyImport = LocalChatHistoryImport.current()
-        val historyBoundary = importedHistoryBoundary(shownOlder?.projected, item.projected, historyImport)
+        val historyBoundary = importedHistoryBoundary(older?.projected, item.projected, historyImport)
         // Draw the import line ahead of the day separator to close the imported rows.
         ImportedHistoryMarkers(
             transfer = if (older == null && !controller.hasMoreBefore) chatHistoryTransfer(historyImport) else null,
@@ -138,7 +124,7 @@ internal fun TimelineRow(
                     controller.conversationGroupRecoveryRowVisible()
             DaySeparator(
                 label = daySeparatorLabel,
-                atTranscriptStart = shownOlder == null && !hasLeadingHeader,
+                atTranscriptStart = older == null && !hasLeadingHeader,
                 followsGroupEvent = followsGroupEvent,
             )
         }
@@ -153,7 +139,7 @@ internal fun TimelineRow(
         val senderGap =
             if (!hasLeadingSeparator &&
                 conversationBubbleSenderChanges(
-                    shownOlder,
+                    older,
                     item,
                     appState.streamingDebugEnabled,
                     controller.deletedMessageIds,
@@ -226,7 +212,7 @@ internal fun TimelineRow(
                             context =
                                 AgentItemRowContext(
                                     showSenderName =
-                                        shownOlder?.let { candidate ->
+                                        older?.let { candidate ->
                                             conversationBubbleRowsShareSenderRun(
                                                 first = candidate,
                                                 second = item,
@@ -238,6 +224,15 @@ internal fun TimelineRow(
                                         composerGate != ComposerGate.COMPOSER ||
                                             selectionMode ||
                                             controller.group.pendingConfirmation,
+                                    showSenderAvatar =
+                                        newer?.let { candidate ->
+                                            conversationBubbleRowsShareSenderRun(
+                                                first = item,
+                                                second = candidate,
+                                                streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                deletedMessageIds = controller.deletedMessageIds,
+                                            )
+                                        } != true,
                                 ),
                         )
                         return@Column
@@ -253,7 +248,7 @@ internal fun TimelineRow(
                 TimelineRowKind.Bubble -> Unit
             }
             val sameSenderAsOlderBubble =
-                shownOlder?.let { candidate ->
+                older?.let { candidate ->
                     conversationBubbleRowsShareSenderRun(
                         first = candidate,
                         second = item,
@@ -262,7 +257,7 @@ internal fun TimelineRow(
                     )
                 } == true
             val sameSenderAsNewerBubble =
-                shownNewer?.let { candidate ->
+                newer?.let { candidate ->
                     conversationBubbleRowsShareSenderRun(
                         first = item,
                         second = candidate,

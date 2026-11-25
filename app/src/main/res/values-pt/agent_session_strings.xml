@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_request_failed">Não foi possível enviar ao agente</string>
+    <string name="agent_activity">Atividade do agente</string>
+    <string name="agent_activity_loading">Carregando atividade do agente…</string>
+    <string name="agent_activity_empty">Nenhuma atividade do agente nesta parte da conversa</string>
+    <string name="agent_activity_older">Mais antiga</string>
+    <string name="agent_activity_newer">Mais recente</string>
+    <string name="agent_activity_retry">Recarregar atividade</string>
+    <string name="agent_activity_page_failed">Não foi possível carregar mais atividades do agente</string>
     <string name="agent_turn_working">Trabalhando</string>
     <string name="agent_turn_worked_for">Trabalhou %1$s</string>
     <string name="agent_turn_finished">Concluído</string>
@@ -43,11 +50,4 @@
         <item quantity="other">%1$d arquivos a mais omitidos</item>
     </plurals>
     <string name="agent_text_show_all">Mostrar tudo</string>
-    <string name="agent_turn_show_steps">Mostrar etapas</string>
-    <string name="agent_turn_hide_steps">Ocultar etapas</string>
-    <plurals name="agent_turn_steps">
-        <item quantity="one">%1$d etapa</item>
-        <item quantity="many">%1$d etapas</item>
-        <item quantity="other">%1$d etapas</item>
-    </plurals>
 </resources>

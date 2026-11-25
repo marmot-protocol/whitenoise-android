@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAgentRequests.kt",
         "anchor": "R.string.agent_request_failed",
         "test_ids": [
-          "CON-054"
+          "CON-059"
         ]
       }
     ]

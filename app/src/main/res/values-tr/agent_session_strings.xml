@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_request_failed">Ajana gönderilemedi</string>
+    <string name="agent_activity">Ajan etkinliği</string>
+    <string name="agent_activity_loading">Ajan etkinliği yükleniyor…</string>
+    <string name="agent_activity_empty">Sohbetin bu bölümünde ajan etkinliği yok</string>
+    <string name="agent_activity_older">Daha eski</string>
+    <string name="agent_activity_newer">Daha yeni</string>
+    <string name="agent_activity_retry">Etkinliği yeniden yükle</string>
+    <string name="agent_activity_page_failed">Daha fazla ajan etkinliği yüklenemedi</string>
     <string name="agent_turn_working">Çalışıyor</string>
     <string name="agent_turn_worked_for">%1$s çalıştı</string>
     <string name="agent_turn_finished">Bitti</string>
@@ -42,10 +49,4 @@
         <item quantity="other">%1$d dosya daha atlandı</item>
     </plurals>
     <string name="agent_text_show_all">Tümünü göster</string>
-    <string name="agent_turn_show_steps">Adımları göster</string>
-    <string name="agent_turn_hide_steps">Adımları gizle</string>
-    <plurals name="agent_turn_steps">
-        <item quantity="one">%1$d adım</item>
-        <item quantity="other">%1$d adım</item>
-    </plurals>
 </resources>

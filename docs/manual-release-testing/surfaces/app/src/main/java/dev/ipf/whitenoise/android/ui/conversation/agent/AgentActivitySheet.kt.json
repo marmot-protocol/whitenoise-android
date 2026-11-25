@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ActivityButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "fun ActivityButton(",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "ActivitySheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "fun ActivitySheet(",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "AgentActivityButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "fun AgentActivityButton(",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "AgentActivityList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "fun AgentActivityList(",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "AgentActivitySheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "fun AgentActivitySheet(",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "R.string.agent_activity",
+        "test_ids": [
+          "CON-057",
+          "CON-059"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:agent_activity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "title = stringResource(R.string.agent_activity)",
+        "test_ids": [
+          "CON-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

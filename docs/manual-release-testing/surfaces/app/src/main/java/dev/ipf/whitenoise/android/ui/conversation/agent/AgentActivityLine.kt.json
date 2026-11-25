@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "fun AgentActivityLabel(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "fun AgentActivityLine(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "fun AgentActivityTrailing(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "R.string.agent_item_running",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "R.string.agent_tool_exit_code",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "R.string.group_system_hide_details",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
         "anchor": "R.string.group_system_show_details",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       }
     ]

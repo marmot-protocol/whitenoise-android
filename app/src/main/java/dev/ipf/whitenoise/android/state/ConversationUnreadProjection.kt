@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.util.Log
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.core.isThreadMessage
 
 /**
@@ -139,7 +140,7 @@ internal fun logUnreadCountDivergence(
 internal fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
 
 /** Only incoming chat rows contribute to unread counts; derived edits and system events do not. */
-private fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind)
+private fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind) && kind != AgentItemReader.ITEM_KIND
 
 /** A timeline row counts as unread only when it is incoming chat from someone else, never the account's own message. */
 internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice && record.isUnreadEligible()

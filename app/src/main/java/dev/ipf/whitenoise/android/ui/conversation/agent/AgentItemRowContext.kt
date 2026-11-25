@@ -6,4 +6,6 @@ internal data class AgentItemRowContext(
     val showSenderName: Boolean,
     /** True while the conversation cannot send, so cards show their state without actions. */
     val readOnly: Boolean,
+    /** The last row of a sender run carries its avatar in the chat. */
+    val showSenderAvatar: Boolean = false,
 )

@@ -60,7 +60,7 @@ private fun AgentToolDetails(
 ) {
     // An edit names its files above each diff, so its path is not repeated here.
     val path = tool.path?.takeIf { tool.changes.isEmpty() }
-    val subject = tool.command?.let { "$ " + agentDisplayCommand(it) } ?: path ?: tool.query
+    val subject = tool.command?.let { "$ $it" } ?: path ?: tool.query
     subject?.let { AgentCodeBlock(it) }
     toolMeta(tool)?.let { AgentMeta(it) }
     val subjectInBody = tool.command != null || tool.path != null || tool.query != null

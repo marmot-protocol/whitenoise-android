@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItem
@@ -56,6 +58,13 @@ internal class AgentRequestSender(
     }
 }
 
+/** Shared by the inline requests and the activity sheet for one conversation. */
+internal val LocalAgentRequestProgress =
+    compositionLocalOf<MutableMap<String, AgentRequestStatus>> { mutableStateMapOf() }
+
+@Composable
+internal fun rememberAgentRequestProgress(conversationKey: Any): MutableMap<String, AgentRequestStatus> = remember(conversationKey) { mutableStateMapOf() }
+
 /**
  * Sends the row's requests to the agent that wrote [item]. Keyed by the item's version, so the
  * agent's next version, which settles the request, starts from no progress.
@@ -66,7 +75,7 @@ internal fun rememberAgentRequestSender(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
 ): AgentRequestSender {
-    val progress = LocalAgentTurnSteps.current.requests
+    val progress = LocalAgentRequestProgress.current
     return remember(progress, controller, item.rowId, item.version, item.agentPubkeyHex) {
         AgentRequestSender(progress, "${item.rowId}:${item.version}") { request, onCompleted ->
             appState.launchMutation {

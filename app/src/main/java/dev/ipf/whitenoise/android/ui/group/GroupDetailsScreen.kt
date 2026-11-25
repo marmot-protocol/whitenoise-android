@@ -132,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
+import dev.ipf.whitenoise.android.ui.conversation.agent.agentActivityDetailsRow
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
@@ -260,6 +261,7 @@ internal fun GroupDetailsScreen(
     onAutoOpenMembersConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
+    onOpenActivity: (() -> Unit)? = null,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     onStartGroupWithPeerMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
@@ -1994,6 +1996,7 @@ internal fun GroupDetailsScreen(
                                 leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                             )
                         }
+                        if (onOpenActivity != null) agentActivityDetailsRow(onOpenActivity)
                         row("bubble_colors") { rowContext ->
                             SettingsLink(
                                 context = rowContext,

@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -25,6 +26,11 @@ internal object AgentRecordingFixtures {
     val VIEWER_ID = "11".repeat(32)
     val AGENT_ID = "22".repeat(32)
     val GROUP_ID = "44".repeat(32)
+
+    fun activityRows(
+        rows: List<TimelineMessage>,
+        deletedIds: Set<String> = emptySet(),
+    ): List<TimelineMessage> = activityHistoryRows(TimelinePageFfi(rows.mapNotNull { it.projected }, false, false), deletedIds)
 
     /**
      * Loads [name] from `src/test/resources/agent-recordings`. [events] keeps only the first events,

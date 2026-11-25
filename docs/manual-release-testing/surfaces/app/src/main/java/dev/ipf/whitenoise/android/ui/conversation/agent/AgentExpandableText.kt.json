@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentExpandableText.kt",
         "anchor": "fun AgentExpandableText(",
         "test_ids": [
-          "CON-052",
-          "CON-053"
+          "CON-057",
+          "CON-058"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentExpandableText.kt",
         "anchor": "R.string.agent_text_show_all",
         "test_ids": [
-          "CON-052",
-          "CON-053"
+          "CON-057",
+          "CON-058"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentExpandableText.kt",
         "anchor": "R.string.show_less",
         "test_ids": [
-          "CON-052",
-          "CON-053"
+          "CON-057",
+          "CON-058"
         ]
       }
     ]

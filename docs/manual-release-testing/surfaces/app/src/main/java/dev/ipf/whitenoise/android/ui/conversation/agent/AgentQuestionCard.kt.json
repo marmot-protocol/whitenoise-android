@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "fun AgentAskedQuestion(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "fun AgentQuestionCard(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "fun AgentQuestionNote(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "fun AgentQuestionOptionRow(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_multiple_choice",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_reply_in_chat",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_secret",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_send",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_single_choice",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentQuestionCard.kt",
         "anchor": "R.string.agent_question_text_hint",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       }
     ]

@@ -3,12 +3,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -17,13 +19,14 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.Avatar
 
 /**
  * One agent item in the transcript, at the latest version MDK holds.
  *
  * Items sit in the agent's column beside its message bubbles: indented past the avatar gutter in
  * group chats, flush in direct chats. The agent's words stay ordinary bubbles; this row draws what
- * the agent did and what it asks. The caller skips rows folded under a closed turn.
+ * the agent did and what it asks. The timeline calls this only for items that need attention.
  */
 @Composable
 internal fun AgentItemTimelineRow(
@@ -47,22 +50,34 @@ internal fun AgentItemTimelineRow(
             status = requests.status,
             onSend = requests::send,
         )
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = if (groupChrome) AgentAvatarGutter else 0.dp, end = AgentTrailingGutter),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        if (groupChrome && context.showSenderName) {
-            EmojiLabel(
-                text = agentName,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-            )
+    Box(Modifier.fillMaxWidth()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = if (groupChrome) AgentAvatarGutter else 0.dp, end = AgentTrailingGutter),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            if (groupChrome && context.showSenderName) {
+                EmojiLabel(
+                    text = agentName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+                )
+            }
+            AgentItemContent(agentItem, actions, Modifier.widthIn(max = AgentContentMaxWidth))
         }
-        AgentItemContent(agentItem, actions, Modifier.widthIn(max = AgentContentMaxWidth))
+        if (groupChrome && context.showSenderAvatar) {
+            Box(Modifier.align(Alignment.BottomStart)) {
+                Avatar(
+                    title = agentName,
+                    seed = agentItem.agentPubkeyHex,
+                    size = 30.dp,
+                    pictureUrl = appState.contactAvatarSource(agentItem.agentPubkeyHex),
+                )
+            }
+        }
     }
 }
 

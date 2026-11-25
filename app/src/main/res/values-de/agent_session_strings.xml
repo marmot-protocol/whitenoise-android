@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_request_failed">Senden an den Agenten fehlgeschlagen</string>
+    <string name="agent_activity">Agentenaktivität</string>
+    <string name="agent_activity_loading">Agentenaktivität wird geladen…</string>
+    <string name="agent_activity_empty">Keine Agentenaktivität in diesem Chatabschnitt</string>
+    <string name="agent_activity_older">Älter</string>
+    <string name="agent_activity_newer">Neuer</string>
+    <string name="agent_activity_retry">Aktivität erneut laden</string>
+    <string name="agent_activity_page_failed">Weitere Agentenaktivität konnte nicht geladen werden</string>
     <string name="agent_turn_working">Arbeitet</string>
     <string name="agent_turn_worked_for">Gearbeitet: %1$s</string>
     <string name="agent_turn_finished">Fertig</string>
@@ -42,10 +49,4 @@
         <item quantity="other">%1$d weitere Dateien ausgelassen</item>
     </plurals>
     <string name="agent_text_show_all">Alles anzeigen</string>
-    <string name="agent_turn_show_steps">Schritte anzeigen</string>
-    <string name="agent_turn_hide_steps">Schritte ausblenden</string>
-    <plurals name="agent_turn_steps">
-        <item quantity="one">%1$d Schritt</item>
-        <item quantity="other">%1$d Schritte</item>
-    </plurals>
 </resources>

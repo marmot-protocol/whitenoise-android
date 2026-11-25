@@ -2,6 +2,14 @@
 <resources>
     <!-- Shown when an answer or a Stop request could not be sent to an AI agent in a chat. -->
     <string name="agent_request_failed">Couldn\'t send to the agent</string>
+    <!-- Opens the conversation’s detailed agent activity. -->
+    <string name="agent_activity">Agent activity</string>
+    <string name="agent_activity_loading">Loading agent activity…</string>
+    <string name="agent_activity_empty">No agent activity in this part of the chat</string>
+    <string name="agent_activity_older">Older</string>
+    <string name="agent_activity_newer">Newer</string>
+    <string name="agent_activity_retry">Retry loading activity</string>
+    <string name="agent_activity_page_failed">Couldn\'t load more agent activity</string>
     <!-- Status line while an AI agent works on a request in a chat. -->
     <string name="agent_turn_working">Working</string>
     <!-- Status line after an AI agent finished a request. %1$s is a duration such as "1m 12s". -->
@@ -82,12 +90,6 @@
     <!-- Opens the rest of a long command, output or diff from an AI agent. -->
     <string name="agent_text_show_all">Show all</string>
     <!-- Opens the steps an AI agent took during one request, folded under its status line. -->
-    <string name="agent_turn_show_steps">Show steps</string>
     <!-- Folds the steps an AI agent took during one request back under its status line. -->
-    <string name="agent_turn_hide_steps">Hide steps</string>
     <!-- How many steps (commands, edits, reads) an AI agent took during one request. -->
-    <plurals name="agent_turn_steps">
-        <item quantity="one">%1$d step</item>
-        <item quantity="other">%1$d steps</item>
-    </plurals>
 </resources>

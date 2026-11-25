@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_request_failed">Не удалось отправить агенту</string>
+    <string name="agent_activity">Действия агента</string>
+    <string name="agent_activity_loading">Загрузка действий агента…</string>
+    <string name="agent_activity_empty">В этой части чата нет действий агента</string>
+    <string name="agent_activity_older">Раньше</string>
+    <string name="agent_activity_newer">Позже</string>
+    <string name="agent_activity_retry">Загрузить действия ещё раз</string>
+    <string name="agent_activity_page_failed">Не удалось загрузить другие действия агента</string>
     <string name="agent_turn_working">Работает</string>
     <string name="agent_turn_worked_for">Работал %1$s</string>
     <string name="agent_turn_finished">Готово</string>
@@ -44,12 +51,4 @@
         <item quantity="other">Пропущено ещё %1$d файла</item>
     </plurals>
     <string name="agent_text_show_all">Показать всё</string>
-    <string name="agent_turn_show_steps">Показать шаги</string>
-    <string name="agent_turn_hide_steps">Скрыть шаги</string>
-    <plurals name="agent_turn_steps">
-        <item quantity="one">%1$d шаг</item>
-        <item quantity="few">%1$d шага</item>
-        <item quantity="many">%1$d шагов</item>
-        <item quantity="other">%1$d шага</item>
-    </plurals>
 </resources>

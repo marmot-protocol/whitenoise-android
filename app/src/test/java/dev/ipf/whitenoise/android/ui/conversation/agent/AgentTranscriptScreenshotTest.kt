@@ -7,22 +7,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.conversation.AgentTranscriptRows
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Before
@@ -37,7 +46,7 @@ import java.util.TimeZone
 /**
  * Real recorded agent sessions drawn by the production transcript row, beside the agent's own
  * message bubbles. Each scene loads a marmot-agents recording as the rows MDK projects and renders
- * every row through `TimelineRow`, with the conversation's turn folding.
+ * the chat and the activity details through their production composables.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -65,19 +74,45 @@ class AgentTranscriptScreenshotTest {
         render(scene, amoled = true)
         composeRule.onNodeWithText("/usr/bin/zsh -lc 'python3 greet.py'").assertExists()
         composeRule.onNodeWithText("Allow once").assertIsEnabled()
-        composeRule.onNodeWithText("Stop").assertIsEnabled()
+        composeRule.onNodeWithText("Working").assertDoesNotExist()
+        composeRule.onNodeWithText("Stop").assertDoesNotExist()
         capture("agent_transcript_approval_amoled")
+        composeRule.onNodeWithContentDescription("Agent activity").performClick()
+        composeRule.onNodeWithText("Stop").assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText("Allow once").assertIsEnabled()
+        composeRule.onNodeWithText("Stop").assertDoesNotExist()
     }
 
     @Test
-    fun finishedTurnCollapsesToQuietStepsAmoled() {
+    fun finishedTurnShowsOnlyConversationAmoled() {
         val scene = scene("codex_approval_allowed", agentName = "Codex", prompt = RUN_PROMPT)
         render(scene, amoled = true)
-        composeRule.onNodeWithText("Answered: Allow once").assertExists()
+        composeRule.onNodeWithText("It printed:", substring = true).assertExists()
+        composeRule.onNodeWithText("Worked for", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Answered: Allow once").assertDoesNotExist()
         composeRule.onNodeWithText("Ran a command").assertDoesNotExist()
-        composeRule.onNodeWithText("1 step", substring = true).performClick()
-        composeRule.onNodeWithText("Ran a command").performClick()
         capture("agent_transcript_finished_amoled")
+    }
+
+    @Test
+    fun activityOpensFromAChatWithoutLoadedAgentItems() {
+        val scene = scene("codex_approval_allowed", agentName = "Codex", events = 0, prompt = RUN_PROMPT)
+        render(scene, amoled = true)
+        composeRule.onNodeWithText(RUN_PROMPT).assertExists()
+        composeRule.onNodeWithText("Agent activity").performClick()
+        composeRule.onNodeWithContentDescription("Close").assertExists()
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText(RUN_PROMPT).assertExists()
+    }
+
+    @Test
+    fun completedWorkOpensToTheCommandOutputAmoled() {
+        val scene = scene("codex_approval_allowed", agentName = "Codex", prompt = RUN_PROMPT)
+        render(scene, amoled = true, activity = true)
+        composeRule.onNodeWithText("Ran a command").performClick()
+        composeRule.onNodeWithText("Hello, world", substring = true).assertExists()
+        capture("agent_transcript_activity_amoled")
     }
 
     @Test
@@ -93,8 +128,7 @@ class AgentTranscriptScreenshotTest {
     @Test
     fun fileEditOpensToItsDiffDark() {
         val scene = scene("claude_file_edit", agentName = "Claude", prompt = "Make greet() end with a bang")
-        render(scene, amoled = false, dark = true)
-        composeRule.onNodeWithText("3 steps", substring = true).performClick()
+        render(scene, amoled = false, dark = true, activity = true)
         composeRule.onNodeWithText("Edited a file").performClick()
         capture("agent_transcript_file_edit_dark")
     }
@@ -103,15 +137,14 @@ class AgentTranscriptScreenshotTest {
     fun failedCommandInGroupRtlLargeFont() {
         val scene =
             scene("claude_failing_command", agentName = "Claude", prompt = "Run the tests", group = true)
-        render(scene, amoled = true, rtl = true, fontScale = LARGE_FONT)
+        render(scene, amoled = true, rtlLarge = true)
         capture("agent_transcript_failed_group_rtl_large")
     }
 
     @Test
     fun planAndAnsweredQuestionLight() {
         val scene = scene("codex_plan_mode", agentName = "Codex", prompt = "Plan a farewell(name) function")
-        render(scene, amoled = false)
-        composeRule.onNodeWithText("3 steps", substring = true).performClick()
+        render(scene, amoled = false, activity = true)
         composeRule.onNodeWithText("Plan").performClick()
         capture("agent_transcript_plan_light")
     }
@@ -139,15 +172,16 @@ class AgentTranscriptScreenshotTest {
         scene: Scene,
         amoled: Boolean,
         dark: Boolean = amoled,
-        rtl: Boolean = false,
-        fontScale: Float = 1f,
+        rtlLarge: Boolean = false,
+        activity: Boolean = false,
     ) {
         composeRule.setContent {
-            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            val direction = if (rtlLarge) LayoutDirection.Rtl else LayoutDirection.Ltr
+            val fontScale = if (rtlLarge) LARGE_FONT else 1f
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        Transcript(scene)
+                        Transcript(scene, activity)
                     }
                 }
             }
@@ -156,9 +190,31 @@ class AgentTranscriptScreenshotTest {
     }
 
     @Composable
-    private fun Transcript(scene: Scene) {
-        Column(Modifier.width(360.dp).padding(vertical = 8.dp).testTag(TAG)) {
-            AgentTranscriptRows(scene.rows, scene.appState, scene.controller)
+    private fun Transcript(
+        scene: Scene,
+        activity: Boolean,
+    ) {
+        val rows = remember(scene) { AgentRecordingFixtures.activityRows(scene.rows) }
+        var activityOpen by remember { mutableStateOf(false) }
+        CompositionLocalProvider(LocalAgentRequestProgress provides rememberAgentRequestProgress(scene.controller)) {
+            Column(Modifier.width(360.dp).padding(vertical = 8.dp).testTag(TAG)) {
+                if (activity) {
+                    WhiteNoiseSheetHeader(stringResource(R.string.agent_activity), onClose = {})
+                    AgentActivityList(rows, scene.appState, scene.controller, readOnly = false)
+                } else {
+                    if (rows.isEmpty()) {
+                        SettingsGroup { agentActivityDetailsRow { activityOpen = true } }
+                    } else {
+                        AgentActivityButton { activityOpen = true }
+                    }
+                    AgentTranscriptRows(scene.rows, scene.appState, scene.controller)
+                }
+            }
+            if (activityOpen) {
+                AgentActivitySheet(onClose = { activityOpen = false }) {
+                    AgentActivityList(rows, scene.appState, scene.controller, readOnly = false)
+                }
+            }
         }
     }
 

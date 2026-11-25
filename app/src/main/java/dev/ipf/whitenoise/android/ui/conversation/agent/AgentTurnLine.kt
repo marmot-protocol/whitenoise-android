@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -19,10 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -36,13 +32,10 @@ import dev.ipf.whitenoise.android.core.agent.AgentItemState
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 
 /**
  * The line at the start of a turn. While the agent works it says so and offers Stop; afterwards it
- * says how long the work took, that it failed, or that it was stopped. When steps fold under the
- * turn, the line says how many and opens or closes them in place.
+ * says how long the work took, that it failed, or that it was stopped.
  */
 @Composable
 internal fun AgentTurnLine(
@@ -50,25 +43,9 @@ internal fun AgentTurnLine(
     actions: AgentItemActions,
     modifier: Modifier = Modifier,
 ) {
-    val steps = LocalAgentTurnSteps.current
-    val stepCount = steps.stepCount(item.rowId)
-    val open = steps.isOpen(item.rowId)
     val failed = item.state == AgentItemState.Failed
-    val status = turnLineStatus(item, stepCount)
-    val toggleLabel = stringResource(if (open) R.string.agent_turn_hide_steps else R.string.agent_turn_show_steps)
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = if (stepCount > 0) TappableLineMinHeight else LineMinHeight)
-                .clip(MaterialTheme.shapes.small)
-                .then(
-                    if (stepCount > 0) {
-                        Modifier.clickable(onClickLabel = toggleLabel, role = Role.Button) { steps.toggle(item.rowId) }
-                    } else {
-                        Modifier
-                    },
-                ).padding(start = 4.dp),
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = LineMinHeight).padding(start = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -87,24 +64,14 @@ internal fun AgentTurnLine(
                     modifier = Modifier.size(16.dp),
                 )
         }
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = status,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            if (stepCount > 0) {
-                Icon(
-                    imageVector = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp).size(18.dp),
-                )
-            }
-        }
+        Text(
+            text = turnLineStatus(item),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         if (item.state.isOpen && actions.enabled) AgentStopButton(actions)
     }
 }
@@ -127,12 +94,9 @@ private fun AgentStopButton(actions: AgentItemActions) {
     }
 }
 
-/** "Worked for 9s · 3 steps", or the failure's first line after "Didn't finish". */
+/** "Worked for 9s", or the failure's first line after "Didn't finish". */
 @Composable
-private fun turnLineStatus(
-    item: AgentItem,
-    stepCount: Int,
-): String =
+private fun turnLineStatus(item: AgentItem): String =
     listOfNotNull(
         turnStatusText(item.state, (item.body as? AgentItemBody.Turn)?.durationMs),
         item.text
@@ -140,7 +104,6 @@ private fun turnLineStatus(
             .firstOrNull { it.isNotBlank() }
             ?.trim()
             ?.takeIf { item.state == AgentItemState.Failed },
-        stepCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.agent_turn_steps, it, it) },
     ).joinToString(" · ")
 
 @Composable
@@ -193,4 +156,3 @@ internal fun agentDurationText(durationMs: Long): String {
 }
 
 private val LineMinHeight = 32.dp
-private val TappableLineMinHeight = 48.dp

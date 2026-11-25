@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "fun AgentApprovalCard(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "fun AgentApprovalChoices(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "fun AgentChoiceButton(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -32,8 +32,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "fun AgentRequestStatusLabel(",
         "test_ids": [
-          "CON-053",
-          "CON-054"
+          "CON-058",
+          "CON-059"
         ]
       },
       {
@@ -41,7 +41,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "fun AgentWaitingCard(",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -49,7 +49,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "R.string.agent_request_sent",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -57,7 +57,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "R.string.delivery_not_confirmed",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       },
       {
@@ -65,7 +65,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
         "anchor": "R.string.sending",
         "test_ids": [
-          "CON-053"
+          "CON-058"
         ]
       }
     ]

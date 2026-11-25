@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -33,7 +32,7 @@ internal fun conversationFirstFrameSeedPresentation(
     hasFocusedDestination: Boolean,
     notificationOpenRequestId: Long,
 ): ConversationFirstFrameSeedPresentation {
-    val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+    val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
     val anchorTailImmediately =
         shouldAnchorConversationTailOnFirstFrame(
             entryUnreadCount = entryUnreadCount,

@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentActivityDetails(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentCodeBlock(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentFileDiff(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentMeta(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentProse(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentToolDetails(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentToolOutput(",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "R.string.agent_tool_cwd",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "R.string.agent_tool_exit_code",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "R.string.agent_tool_input",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -88,7 +88,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "R.string.agent_tool_output",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       },
       {
@@ -96,7 +96,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "R.string.agent_tool_output_cut",
         "test_ids": [
-          "CON-052"
+          "CON-057"
         ]
       }
     ]

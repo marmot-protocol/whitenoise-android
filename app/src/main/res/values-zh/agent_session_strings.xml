@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_request_failed">无法发送给代理</string>
+    <string name="agent_activity">代理活动</string>
+    <string name="agent_activity_loading">正在加载代理活动…</string>
+    <string name="agent_activity_empty">这段聊天中没有代理活动</string>
+    <string name="agent_activity_older">更早</string>
+    <string name="agent_activity_newer">更新</string>
+    <string name="agent_activity_retry">重新加载活动</string>
+    <string name="agent_activity_page_failed">无法加载更多代理活动</string>
     <string name="agent_turn_working">工作中</string>
     <string name="agent_turn_worked_for">已工作 %1$s</string>
     <string name="agent_turn_finished">已完成</string>
@@ -41,9 +48,4 @@
         <item quantity="other">另有 %1$d 个文件未显示</item>
     </plurals>
     <string name="agent_text_show_all">显示全部</string>
-    <string name="agent_turn_show_steps">显示步骤</string>
-    <string name="agent_turn_hide_steps">隐藏步骤</string>
-    <plurals name="agent_turn_steps">
-        <item quantity="other">%1$d 个步骤</item>
-    </plurals>
 </resources>

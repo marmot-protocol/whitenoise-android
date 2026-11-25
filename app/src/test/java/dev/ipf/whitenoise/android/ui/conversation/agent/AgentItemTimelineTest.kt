@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
-import androidx.compose.runtime.mutableStateListOf
+import dev.ipf.marmotkit.AgentItemStateFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
@@ -10,14 +10,14 @@ import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentRequestEncoder
 import dev.ipf.whitenoise.android.core.agent.AgentToolKind
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineRowVisible
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Reads real recorded sessions the way the transcript does: MDK's rows, folded under their turns. */
+/** Reads real recorded sessions the way the transcript does: MDK's rows, with background work in activity. */
 class AgentItemTimelineTest {
     @Test
     fun finishedCodexTurnReadsEveryItemAtItsLatestVersion() {
@@ -87,80 +87,48 @@ class AgentItemTimelineTest {
     }
 
     @Test
-    fun routineStepsFoldUnderTheirTurnAndAttentionStaysInView() {
+    fun completedWorkAndSettledQuestionsStayInActivity() {
         val rows = AgentRecordingFixtures.load("codex_plan_mode", prompt = "Plan it")
-        val turnRow = rows.single { read(it)?.body is AgentItemBody.Turn }.record.messageIdHex
-        val folded = agentTurnStepRows(rows)
-
-        val foldedTypes = rows.filter { it.record.messageIdHex in folded }.map { read(it)!!.body.typeName() }
-        assertEquals(listOf("tool", "tool", "plan"), foldedTypes)
-        assertTrue(folded.values.all { it == turnRow })
-        val unreadBoundary = folded.keys.first()
-        assertEquals(folded - unreadBoundary, agentTurnStepRows(rows, unreadBoundary))
-        // The answered question, the session and the agent's words stay in the transcript.
-        assertTrue(rows.filter { read(it)?.body is AgentItemBody.Question }.none { it.record.messageIdHex in folded })
-        assertTrue(rows.filter { it.projected?.agentItem == null }.none { it.record.messageIdHex in folded })
+        assertEquals(
+            rows.filter { it.projected?.agentItem == null },
+            rows.filter(::conversationTimelineRowVisible),
+        )
+        assertEquals(
+            listOf("session", "turn", "tool", "tool", "question", "plan"),
+            AgentRecordingFixtures.activityRows(rows).map { read(it)!!.body.typeName() },
+        )
     }
 
     @Test
-    fun failedStepsAndStepsWithoutALoadedTurnStayInView() {
-        val failing = AgentRecordingFixtures.load("claude_failing_command")
-        assertTrue(agentTurnStepRows(failing).isEmpty())
+    fun waitingApprovalAndFailedTurnStayInChatWithoutToolRows() {
+        val waiting = AgentRecordingFixtures.load("codex_approval_allowed", events = 6)
+        val failed = AgentRecordingFixtures.load("claude_failing_command")
 
-        val withoutTurn =
-            AgentRecordingFixtures.load("claude_file_edit").filterNot { read(it)?.body is AgentItemBody.Turn }
-        assertTrue(agentTurnStepRows(withoutTurn).isEmpty())
+        val turn = failed.single { read(it)?.body is AgentItemBody.Turn }
+        val projected = requireNotNull(turn.projected)
+        val terminalFailure =
+            turn.copy(
+                projected = projected.copy(agentItem = projected.agentItem?.copy(state = AgentItemStateFfi.FAILED)),
+            )
+
+        assertEquals(
+            listOf("approval"),
+            waiting.filter(::conversationTimelineRowVisible).mapNotNull(::read).map { it.body.typeName() },
+        )
+        assertTrue(failed.filter(::conversationTimelineRowVisible).all { read(it) == null })
+        assertTrue(conversationTimelineRowVisible(terminalFailure))
+        assertTrue(AgentRecordingFixtures.activityRows(failed).mapNotNull(::read).any { it.body is AgentItemBody.Tool })
     }
 
     @Test
-    fun anotherSendersStepsNeverFoldUnderAnAgentsTurn() {
-        val rows = AgentRecordingFixtures.load("claude_file_edit")
-        val impostor =
-            rows.map { row ->
-                val tool = read(row)?.body is AgentItemBody.Tool
-                if (tool) row.copy(record = row.record.copy(sender = "33".repeat(32))) else row
-            }
-        assertTrue(agentTurnStepRows(impostor).isEmpty())
-    }
-
-    @Test
-    fun aClosedTurnHidesItsStepsAndItsNeighboursAbsorbTheirSpacing() {
-        // Rows: the session, the turn, three tool steps and the agent's reply.
-        val rows = AgentRecordingFixtures.load("claude_file_edit")
-        val ids = rows.map { it.record.messageIdHex }
-        val turnRow = rows.single { read(it)?.body is AgentItemBody.Turn }
-        val reply = rows.last { it.projected?.agentItem == null }
-        val steps = AgentTurnSteps(agentTurnStepRows(rows), mutableStateListOf(), rows)
-        val turnId = turnRow.record.messageIdHex
-
-        assertEquals(3, steps.stepCount(turnId))
-        assertEquals(3, ids.count(steps::isFolded))
-        // Three folded rows leave three spacings: the turn draws over two, the reply over one.
-        assertEquals(FoldedSpacing(olderRows = 0, newerRows = 2), steps.foldedSpacing(turnId))
-        assertEquals(FoldedSpacing(olderRows = 1, newerRows = 0), steps.foldedSpacing(reply.record.messageIdHex))
-        // The reply's sender run continues from the turn, past the folded steps.
-        val olderOfReply = rows[ids.indexOf(reply.record.messageIdHex) - 1]
-        assertEquals(turnRow, steps.shownOlder(reply, olderOfReply))
-        assertEquals(reply, steps.shownNewer(turnRow, rows[ids.indexOf(turnId) + 1]))
-
-        steps.toggle(turnId)
-        assertTrue(steps.isOpen(turnId))
-        assertEquals(FoldedSpacing.None, steps.foldedSpacing(turnId))
-        assertTrue(ids.none(steps::isFolded))
-
-        steps.toggle(turnId)
-        assertFalse(steps.isOpen(turnId))
-    }
-
-    @Test
-    fun foldedStepsAtTheNewestEndAreAbsorbedByTheTurnAlone() {
-        // Mid-turn: session, turn and a running read, nothing after it yet.
-        val rows = AgentRecordingFixtures.load("claude_file_edit", events = 3)
-        val turnId = rows.single { read(it)?.body is AgentItemBody.Turn }.record.messageIdHex
-        val steps = AgentTurnSteps(agentTurnStepRows(rows), mutableStateListOf(), rows)
-
-        assertEquals(1, steps.stepCount(turnId))
-        assertEquals(FoldedSpacing(olderRows = 0, newerRows = 1), steps.foldedSpacing(turnId))
+    fun activityKeepsStepsWithoutTheTurnAndSkipsDeletedItems() {
+        val rows = AgentRecordingFixtures.load("claude_file_edit").filter { read(it)?.body is AgentItemBody.Tool }
+        val deleted = rows.first().record.messageIdHex
+        assertTrue(rows.none(::conversationTimelineRowVisible))
+        assertEquals(
+            rows.drop(1).map { it.record.messageIdHex },
+            AgentRecordingFixtures.activityRows(rows, setOf(deleted)).map { it.record.messageIdHex },
+        )
     }
 
     @Test
