@@ -1,26 +1,16 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isJoiningChats
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.StateAction
+import dev.ipf.whitenoise.android.ui.common.StatePage
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
 
@@ -45,9 +35,7 @@ internal fun ChatListNoResults(
             unreadFolderSelected -> stringResource(R.string.chat_rows_no_unread_detail)
             else -> stringResource(R.string.chat_rows_empty_folder_detail)
         }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        WhiteNoiseEmptyState(title, detail)
-    }
+    StatePage(title = title, message = detail)
 }
 
 /** The empty chat list for the profile in view, which says so when its chats are still arriving after linking. */
@@ -93,37 +81,30 @@ internal fun EmptyChats(
             onCreateOrigin(it)
             onCreate()
         }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
-            progress?.let { Text(linkChatProgressText(it)) }
-            Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
-                Text(stringResource(R.string.new_chat))
-            }
+    StatePage(
+        title = stringResource(title),
+        message = stringResource(detail),
+        extra = { progress?.let { Text(linkChatProgressText(it)) } },
+        primary = StateAction(stringResource(R.string.new_chat), create, modifier = origin),
+        footer = {
             if (!arriving && onFirstRunHelp != null) {
-                TextButton(onClick = { onFirstRunHelp(false) }, modifier = Modifier.padding(horizontal = 24.dp)) {
+                TextButton(onClick = { onFirstRunHelp(false) }) {
                     Text(stringResource(R.string.learn_white_noise))
                 }
-                TextButton(onClick = { onFirstRunHelp(true) }, modifier = Modifier.padding(horizontal = 24.dp)) {
+                TextButton(onClick = { onFirstRunHelp(true) }) {
                     Text(stringResource(R.string.chat_with_support))
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 /** Archived scope uses its own native empty condition; it does not claim that every conversation is absent. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun EmptyArchivedChats() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        WhiteNoiseEmptyState(
-            title = stringResource(R.string.chat_rows_no_archived_title),
-            detail = stringResource(R.string.chat_rows_no_archived_detail),
-        )
-    }
+    StatePage(
+        title = stringResource(R.string.chat_rows_no_archived_title),
+        message = stringResource(R.string.chat_rows_no_archived_detail),
+    )
 }
