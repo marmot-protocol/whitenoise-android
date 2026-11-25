@@ -90,24 +90,6 @@
         ]
       },
       {
-        "surface": "Stored group-avatar surface: R.string.share_no_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "R.string.share_no_chats",
-        "test_ids": [
-          "CHL-017",
-          "PRO-008"
-        ]
-      },
-      {
-        "surface": "Stored group-avatar surface: R.string.share_no_matches",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "R.string.share_no_matches",
-        "test_ids": [
-          "CHL-017",
-          "PRO-008"
-        ]
-      },
-      {
         "surface": "Scroll boundaries: ShareChatPickerFullScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
         "anchor": "WhiteNoiseLazyColumn(",
@@ -139,17 +121,7 @@
         ]
       }
     ],
-    "settings_controls": [
-      {
-        "surface": "string:no_matches",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "R.string.no_matches",
-        "test_ids": [
-          "SYS-001",
-          "PRO-008"
-        ]
-      }
-    ]
+    "settings_controls": []
   },
   "discovery_exceptions": []
 }

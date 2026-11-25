@@ -59,7 +59,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 internal fun PersonRow(
     title: String,
     subtitle: String?,

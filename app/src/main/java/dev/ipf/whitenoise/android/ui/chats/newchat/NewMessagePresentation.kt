@@ -253,7 +253,12 @@ internal fun NewMessagePersonRow(
         publicKeyInTitle = key.inTitle,
         trailing =
             if (creating) {
-                { CircularProgressIndicator(Modifier.size(WhiteNoiseSizes.ProgressInline), strokeWidth = WhiteNoiseSizes.ProgressInlineStroke) }
+                {
+                    CircularProgressIndicator(
+                        Modifier.size(WhiteNoiseSizes.ProgressInline),
+                        strokeWidth = WhiteNoiseSizes.ProgressInlineStroke,
+                    )
+                }
             } else {
                 null
             },

@@ -392,7 +392,7 @@ internal fun ContactPickerScreen(
                     }
                 } else {
                     item { SectionHeader(stringResource(R.string.contacts)) }
-                    itemsIndexed(matches, key = { _, it -> it.accountIdHex }) { index, candidate ->
+                    itemsIndexed(matches, key = { _, person -> person.accountIdHex }) { index, candidate ->
                         val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
                         val subtitleIsKey =
                             !addressQuery && !candidate.isFollowing && candidate.searchProfile == null

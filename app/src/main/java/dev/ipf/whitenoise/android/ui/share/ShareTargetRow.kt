@@ -5,12 +5,15 @@ package dev.ipf.whitenoise.android.ui.share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
@@ -68,4 +71,14 @@ internal fun ShareTargetRow(
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },
     )
+}
+
+/** Nothing to share to yet, or nothing matching the search. */
+@Composable
+internal fun ShareEmptyState(noChats: Boolean) {
+    if (noChats) {
+        WhiteNoiseEmptyState(stringResource(R.string.share_no_chats))
+    } else {
+        WhiteNoiseEmptyState(stringResource(R.string.no_matches), stringResource(R.string.share_no_matches))
+    }
 }

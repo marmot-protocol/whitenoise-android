@@ -60,7 +60,6 @@ import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -395,19 +394,12 @@ private fun ShareChatPickerTargetList(
                             DestinationFilterIncomplete(pickerState::retryLoad)
                             return@item
                         }
-                        if (pickerState.targets.isEmpty()) {
-                            WhiteNoiseEmptyState(stringResource(R.string.share_no_chats))
-                        } else {
-                            WhiteNoiseEmptyState(
-                                stringResource(R.string.no_matches),
-                                stringResource(R.string.share_no_matches),
-                            )
-                        }
+                        ShareEmptyState(noChats = pickerState.targets.isEmpty())
                     }
                 }
             } else {
                 item { SectionHeader(stringResource(R.string.recent_chats)) }
-                itemsIndexed(filteredTargets, key = { _, it -> it.item.group.groupIdHex }) { index, target ->
+                itemsIndexed(filteredTargets, key = { _, target -> target.item.group.groupIdHex }) { index, target ->
                     ShareTargetRow(
                         index = index,
                         count = filteredTargets.size,
