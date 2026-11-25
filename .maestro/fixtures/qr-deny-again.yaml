@@ -7,7 +7,7 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible:
     text: ^Scan QR Code$
 - assertVisible:
-    text: ^Camera Access Needed$
+    text: ^Camera access needed$
 - assertVisible:
     id: qr_scanner.recovery
     enabled: true

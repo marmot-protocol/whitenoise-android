@@ -34,6 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
         "anchor": "R.string.translation_install_release",
         "test_ids": [
+          "DIC-021",
           "SET-037"
         ]
       },

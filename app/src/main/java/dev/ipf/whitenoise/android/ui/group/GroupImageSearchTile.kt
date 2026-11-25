@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.media.ImageSearchResult
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 @Composable
@@ -63,7 +64,7 @@ internal fun GroupImageSearchTile(
                     selected = isSelected
                     contentDescription = resultDescription
                 }.clickable(onClick = onTap),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radii.sm),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
     ) {

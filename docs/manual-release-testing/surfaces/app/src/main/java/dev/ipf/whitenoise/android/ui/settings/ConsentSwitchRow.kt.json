@@ -11,13 +11,14 @@
           "SEC-007",
           "SEC-011",
           "SEC-012",
-          "SEC-013"
+          "SEC-013",
+          "SET-072"
         ]
       },
       {
         "surface": "Consent switch row hold-to-explain",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
-        "anchor": ".explainOnLongPress(",
+        "anchor": "explanation = explanation,",
         "test_ids": [
           "SET-053"
         ]

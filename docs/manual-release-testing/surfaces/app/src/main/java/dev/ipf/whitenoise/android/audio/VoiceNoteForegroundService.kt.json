@@ -26,6 +26,14 @@
         "test_ids": [
           "MED-061"
         ]
+      },
+      {
+        "surface": "Voice note foreground start satisfies FGS deadline when take ends early",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/VoiceNoteForegroundService.kt",
+        "anchor": "fun onCommand(",
+        "test_ids": [
+          "DIC-022"
+        ]
       }
     ]
   },

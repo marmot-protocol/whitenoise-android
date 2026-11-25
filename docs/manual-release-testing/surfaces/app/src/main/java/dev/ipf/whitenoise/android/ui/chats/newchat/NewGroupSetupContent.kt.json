@@ -64,6 +64,30 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "surface": "GroupSetupNameField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "fun GroupSetupNameField(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "GroupSetupDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "fun GroupSetupDisclosure(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "GroupSetupPhotoStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "fun GroupSetupPhotoStatus(",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "settings_controls": [
@@ -194,15 +218,6 @@
         ]
       },
       {
-        "surface": "setting:members",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
-        "anchor": "R.string.members",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:new_message_chat_created",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.string.new_message_chat_created",
@@ -264,6 +279,46 @@
         "surface": "Description field grows with text",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": ".testTag(\"group_setup.description\")",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "Group setup member count and visible roster",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "R.plurals.group_setup_selected_members",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "Show optional group details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "R.string.group_setup_customize",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "Hide optional group details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "R.string.group_setup_hide_customization",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "R.string.onboarding_details_expanded",
         "test_ids": [
           "NCH-002"
         ]

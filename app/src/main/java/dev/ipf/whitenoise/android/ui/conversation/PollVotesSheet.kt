@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -57,7 +58,6 @@ import kotlinx.coroutines.withContext
 internal const val POLL_VOTES_SHEET_TAG = "poll-votes-sheet"
 internal const val POLL_VOTES_LOAD_MORE_TAG = "poll-votes-load-more"
 internal const val POLL_VOTES_RETRY_TAG = "poll-votes-retry"
-private val VoterAvatarSize = 40.dp
 
 /**
  * Per-voter results for one poll in a bottom sheet. The pager is recreated whenever the account, chat, poll
@@ -268,7 +268,7 @@ private fun PollVoterItem(
             Avatar(
                 title = name,
                 seed = id,
-                size = VoterAvatarSize,
+                size = WhiteNoiseSizes.AvatarCompact,
                 // A blocked voter keeps a monogram, so their picture is never fetched for this list.
                 pictureUrl = if (blocked) null else avatarUrl(id),
                 pictureDomain = AvatarImageLoader.publicProfiles(),

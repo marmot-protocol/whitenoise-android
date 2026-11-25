@@ -32,9 +32,17 @@
         ]
       },
       {
-        "surface": "Compact bubble and activity boundaries",
+        "surface": "Sender changes and compact activity boundaries",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
-        "anchor": "// Sender runs own attribution only;",
+        "anchor": "conversationBubbleSenderChanges(",
+        "test_ids": [
+          "MSG-043"
+        ]
+      },
+      {
+        "surface": "Imported-history boundary owns the interval between bubbles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+        "anchor": "val historyBoundary = importedHistoryBoundary(",
         "test_ids": [
           "MSG-043"
         ]

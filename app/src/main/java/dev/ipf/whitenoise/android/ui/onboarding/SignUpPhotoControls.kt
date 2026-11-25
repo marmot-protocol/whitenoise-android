@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -41,6 +40,7 @@ import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
@@ -249,7 +249,13 @@ internal fun SignUpPhotoControls(
                 Text(stringResource(R.string.signup_preparing_photo))
             }
         }
-        if (error) Text(stringResource(R.string.toast_couldnt_prepare_image), color = MaterialTheme.colorScheme.error)
+        if (error) {
+            WhiteNoiseCallout(
+                text = stringResource(R.string.toast_couldnt_prepare_image),
+                icon = R.drawable.ic_error,
+                isError = true,
+            )
+        }
     }
     val session = webSession
     if (session != null && enabled) {

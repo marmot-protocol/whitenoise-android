@@ -6,22 +6,22 @@ name: qr-permission-denied-rotation
 - assertVisible:
     text: ^Scan QR Code$
 - assertVisible:
-    text: ^Camera Access Needed$
+    text: ^Camera access needed$
 - assertVisible:
     id: qr_scanner.recovery
     enabled: true
     containsChild:
-      text: ^(Allow Camera|Open settings)$
+      text: ^(Allow camera|Open settings)$
 - setOrientation: PORTRAIT
 - assertVisible:
     text: ^Scan QR Code$
 - assertVisible:
-    text: ^Camera Access Needed$
+    text: ^Camera access needed$
 - assertVisible:
     id: qr_scanner.recovery
     enabled: true
     containsChild:
-      text: ^(Allow Camera|Open settings)$
+      text: ^(Allow camera|Open settings)$
 - tapOn:
     text: ^Close$
 - runFlow: ../fixtures/qr-return.yaml

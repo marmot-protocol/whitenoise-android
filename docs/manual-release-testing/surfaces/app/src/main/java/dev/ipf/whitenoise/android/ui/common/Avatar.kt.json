@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
         "anchor": "fun Avatar(",
         "test_ids": [
+          "AXY-001",
           "PRO-008"
         ]
       },

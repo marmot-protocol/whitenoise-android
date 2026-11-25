@@ -5,6 +5,8 @@ import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +52,7 @@ import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
+import dev.ipf.whitenoise.android.ui.common.copyToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -328,8 +331,7 @@ internal fun AccountKeysScreen(
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
-                copyToClipboard(context, publicKeyLabel, npub)
-                ui.copiedKey = CopiedProfileKey.Public
+                if (copyToClipboard(context, publicKeyLabel, npub)) ui.copiedKey = CopiedProfileKey.Public
             },
             onToggleReveal = {
                 if (ui.revealRequested) {
@@ -525,7 +527,7 @@ private fun ProfileKeysList(
             }
         }
         item(key = "search.AccountKeys.5") {
-            ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
+            SettingsExplainer(stringResource(R.string.profile_public_key_help))
         }
         if (remoteSigner != null) {
             remoteSignerAccountItems(remoteSigner)
@@ -559,8 +561,10 @@ private fun ProfileKeysList(
                 }
             }
             item(key = "search.AccountKeys.9") {
-                ProfileKeySupportingText(stringResource(R.string.profile_private_key_help))
-                ProfileKeySupportingText(stringResource(R.string.profile_private_key_use_help))
+                Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+                    SettingsExplainer(stringResource(R.string.profile_private_key_help))
+                    SettingsExplainer(stringResource(R.string.profile_private_key_use_help))
+                }
             }
             item(key = "search.AccountKeys.10") { SettingsSection(stringResource(R.string.export)) }
             item(key = "search.AccountKeys.11") {
@@ -716,25 +720,6 @@ private fun ProfileKeyValueRow(
             trailingAction()
         }
     }
-}
-
-/** Helper copy under a key group at the 32 dp content line. */
-@Suppress("FunctionNaming")
-@Composable
-private fun ProfileKeySupportingText(text: String) {
-    Text(
-        text = text,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = WhiteNoiseSpacing.SettingsSectionInset,
-                    end = WhiteNoiseSpacing.SettingsSectionInset,
-                    top = WhiteNoiseSpacing.Related,
-                ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodySmall,
-    )
 }
 
 /** The copy action's glyph: a check while the last copy is still fresh. */

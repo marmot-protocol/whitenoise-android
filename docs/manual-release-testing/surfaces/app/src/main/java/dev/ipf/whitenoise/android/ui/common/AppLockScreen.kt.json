@@ -1,0 +1,62 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+  "legacy_sha256": "4a0ddc446604ac3a5bd9592a4aa443529c2509eed79ccec70ee8102148a832db",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppLockScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+        "anchor": "fun AppLockScreen(",
+        "test_ids": [
+          "AXY-001",
+          "SEC-002",
+          "SEC-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:app_locked_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+        "anchor": "R.string.app_locked_body",
+        "test_ids": [
+          "AXY-001",
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "string:app_locked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+        "anchor": "R.string.app_locked_title",
+        "test_ids": [
+          "AXY-001",
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "string:app_unlock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+        "anchor": "R.string.app_unlock",
+        "test_ids": [
+          "AXY-001",
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "string:app_unlock_checking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+        "anchor": "R.string.app_unlock_checking",
+        "test_ids": [
+          "AXY-001",
+          "SEC-002",
+          "SEC-004"
+        ]
+      }
+    ],
+    "source_coverage": []
+  },
+  "discovery_exceptions": []
+}

@@ -3,7 +3,7 @@ name: presentation-modal-group-control-delete-hidden
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertNotVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - assertNotVisible:
     text: Delete group\?
 - assertNotVisible:

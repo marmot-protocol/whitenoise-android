@@ -19,7 +19,11 @@ name: settings-translation
     direction: DOWN
 - tapOn: "Translate"
 - assertVisible: "Automatically translate messages"
-- tapOn: "Target language: English"
+- assertVisible:
+    id: "translation.target"
+- assertVisible: "English"
+- tapOn:
+    id: "translation.target"
 - assertVisible: "Search languages"
 - tapOn: "Search languages"
 - inputText: "ger"

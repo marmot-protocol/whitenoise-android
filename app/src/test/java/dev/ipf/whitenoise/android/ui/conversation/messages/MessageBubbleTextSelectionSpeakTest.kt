@@ -126,7 +126,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(actionMenuOpen)
 
         composeRule
-            .onNodeWithText(app.getString(R.string.read_aloud))
+            .messageAction(app.getString(R.string.read_aloud))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -180,7 +180,7 @@ class MessageBubbleTextSelectionSpeakTest {
         }
         composeRule.waitForIdle()
         assertTrue(menuOpen)
-        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        composeRule.messageAction(app.getString(R.string.read_aloud)).performScrollTo().performClick()
         waitForTts(engine, appState)
         assertTrue(
             engine.spoken
@@ -218,7 +218,7 @@ class MessageBubbleTextSelectionSpeakTest {
         engine.complete(0)
         assertEquals(generation, appState.ttsController.playbackCallbackGeneration())
         val submissions = engine.spoken.size
-        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        composeRule.messageAction(app.getString(R.string.read_aloud)).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             shadowOf(android.os.Looper.getMainLooper()).idle()
             engine.spoken.size > submissions
@@ -245,7 +245,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
         assertTrue(menuOpen)
         composeRule.runOnIdle { offset = 32.dp }
-        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        composeRule.messageAction(app.getString(R.string.read_aloud)).performScrollTo().performClick()
         waitForTts(engine, appState)
         assertTrue(
             engine.spoken
@@ -488,7 +488,7 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
         longPressOnMessageText("First sentence")
         composeRule
-            .onNodeWithText(app.getString(R.string.read_aloud))
+            .messageAction(app.getString(R.string.read_aloud))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -828,7 +828,7 @@ class MessageBubbleTextSelectionSpeakTest {
             }
             composeRule.waitForIdle()
             assertTrue(actionMenuOpen)
-            composeRule.onNodeWithText(app.getString(R.string.select_text)).performScrollTo().performClick()
+            composeRule.messageAction(app.getString(R.string.select_text)).performScrollTo().performClick()
             composeRule.waitForIdle()
             assertTrue(textSelectionMode)
             val selectedRange = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
@@ -1005,7 +1005,7 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(actionMenuOpen)
 
         composeRule
-            .onNodeWithText(app.getString(R.string.select_text))
+            .messageAction(app.getString(R.string.select_text))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -1066,7 +1066,7 @@ class MessageBubbleTextSelectionSpeakTest {
         longPressOnMessageText("Accessibility sentence")
         composeRule.waitForIdle()
         composeRule
-            .onNodeWithText(app.getString(R.string.select_text))
+            .messageAction(app.getString(R.string.select_text))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
@@ -1129,7 +1129,7 @@ class MessageBubbleTextSelectionSpeakTest {
         longPressOnMessageText("Selected sentence")
         composeRule.waitForIdle()
         composeRule
-            .onNodeWithText(app.getString(R.string.select_text))
+            .messageAction(app.getString(R.string.select_text))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()

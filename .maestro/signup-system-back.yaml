@@ -14,9 +14,9 @@ name: signup-system-back
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
@@ -37,8 +37,8 @@ name: signup-system-back
 - back
 - assertVisible: "Synthetic offline test only"
 - back
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
@@ -52,6 +52,6 @@ name: signup-system-back
 - assertVisible: "About"
 - assertNotVisible: "Synthetic offline test only"
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signup-system-back

@@ -4,16 +4,12 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.test.hasScrollToNodeAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
@@ -21,7 +17,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControl
 import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControlState
-import dev.ipf.whitenoise.android.ui.settings.NotificationSoundsScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -71,18 +66,6 @@ class NotificationsScreenScreenshotTest {
         )
     }
 
-    /** The tone explanation on Sounds & vibration remains readable in a large-font RTL scrolled viewport. */
-    @Test
-    fun notificationToneScopeRtlLargeFont() {
-        capture(
-            "notification_tone_scope_rtl_large_font",
-            darkTheme = false,
-            fontScale = 2f,
-            layoutDirection = LayoutDirection.Rtl,
-            scrollToToneScope = true,
-        )
-    }
-
     /** Opted-out previews remain a clear independent choice without an account. */
     @Test
     fun notificationsPreviewsHidden() {
@@ -129,7 +112,6 @@ class NotificationsScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
-        scrollToToneScope: Boolean = false,
     ) {
         check(runBlocking { NotificationPreviewPreferences.setMode(app, previews, scrub = { true }) })
         val appState =
@@ -147,18 +129,9 @@ class NotificationsScreenScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                    if (scrollToToneScope) {
-                        NotificationSoundsScreen(appState = appState, onBack = {})
-                    } else {
-                        NotificationsScreen(appState = appState, onBack = {})
-                    }
+                    NotificationsScreen(appState = appState, onBack = {})
                 }
             }
-        }
-        if (scrollToToneScope) {
-            composeRule
-                .onNode(hasScrollToNodeAction())
-                .performScrollToNode(hasText(app.getString(R.string.notification_tone_scope)))
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

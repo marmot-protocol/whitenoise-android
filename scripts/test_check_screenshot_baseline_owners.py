@@ -50,6 +50,7 @@ class ScreenshotOwnerFixture:
         snapshots = self.root / owners.SNAPSHOTS
         snapshots.mkdir(parents=True)
         for golden in goldens:
+            (snapshots / golden).parent.mkdir(parents=True, exist_ok=True)
             (snapshots / golden).write_bytes(b'png')
         (self.root / owners.REGISTRY).parent.mkdir(parents=True)
         (self.root / owners.REGISTRY).write_text(registry)
@@ -172,6 +173,19 @@ class ScreenshotBaselineOwnersTest(unittest.TestCase):
         status, _, err = fixture.run('--results', str(results))
         self.assertEqual(status, 1)
         self.assertIn('light.png was not compared', err)
+
+    def test_uncompared_nested_golden_fails_when_flat_goldens_are_covered(self):
+        """A golden in a subdirectory is matched by its relative path, never by its file name."""
+        fixture = self.fixture(goldens=('chat_row_light.png', 'light.png', 'composer/light.png'))
+        results = fixture.root / 'summary.json'
+        results.write_text(json.dumps(fixture.summary('chat_row_light.png', 'light.png')))
+        status, _, err = fixture.run('--results', str(results))
+        self.assertEqual(status, 1)
+        self.assertIn('composer/light.png was not compared', err)
+        self.assertNotIn('owner: light.png was not compared', err)
+        results.write_text(json.dumps(fixture.summary('chat_row_light.png', 'light.png', 'composer/light.png')))
+        status, _, err = fixture.run('--results', str(results))
+        self.assertEqual(status, 0, err)
 
     def test_recorded_or_foreign_results_do_not_count_as_comparisons(self):
         """Fresh recordings and images outside the golden directory prove nothing."""

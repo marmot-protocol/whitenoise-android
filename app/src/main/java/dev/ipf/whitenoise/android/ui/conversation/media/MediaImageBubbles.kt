@@ -75,8 +75,8 @@ import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.removesDisplayThumbnail
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -214,7 +214,7 @@ internal fun MediaImageBubble(
         isGifAttachmentMediaType(reference.mediaType) || load.presentation is DecodedAttachmentPresentation.Animated
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         // Single source of truth for image-bubble shape: portraits become
         // uniform-width cards (capped height), landscapes fill the bubble
         // width. Used by both the confirmed bubble and the optimistic
@@ -554,7 +554,7 @@ internal fun MediaVisualGridBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)

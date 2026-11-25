@@ -17,6 +17,12 @@ object WhiteNoiseSizes {
     val ProgressPage: Dp = 48.dp
     val ProgressPageStroke: Dp = 4.dp
 
+    /** Icon at the top of a full-screen state page. */
+    val StateIcon: Dp = 48.dp
+
+    /** Widest a state page grows, so copy and buttons keep a readable measure on tablets. */
+    val StatePageMaxWidth: Dp = 520.dp
+
     /** Avatar in search results and compact lists. */
     val AvatarCompact: Dp = 40.dp
 
@@ -25,4 +31,7 @@ object WhiteNoiseSizes {
 
     /** Avatar in the chat list. */
     val AvatarChatList: Dp = 52.dp
+
+    /** Avatar in dense rows, chips and overlapping stacks. */
+    val AvatarSmall: Dp = 32.dp
 }

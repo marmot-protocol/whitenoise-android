@@ -22,13 +22,15 @@ class PerformanceLogReleaseSafetyTest {
         assertEquals(listOf("diagnostics/PerformanceDiagnostics.kt"), owners)
     }
 
+    /** Release journey logs, including every split part of the disk cache, never carry known dynamic payloads. */
     @Test
     fun coveredJourneyLogsDoNotExposeKnownDynamicPayloadShapesInRelease() {
         // This pins payload shapes removed by this migration. The exhaustive
         // WNPerf ownership boundary is enforced separately above.
         val controllers = chatsControllerSource() + "\n" + conversationControllerSource()
         val appState = source("state/AppState.kt")
-        val diskCache = source("media/DiskByteCache.kt")
+        val diskCache =
+            listOf("DiskByteCache.kt", "DiskByteCacheSupport.kt").joinToString("\n") { source("media/$it") }
         val updateWorker = source("updates/AppUpdateWorker.kt")
         val foregroundService = source("notifications/NotificationStreamForegroundService.kt")
         val attachmentWorker = source("state/AttachmentDownloadWorker.kt")

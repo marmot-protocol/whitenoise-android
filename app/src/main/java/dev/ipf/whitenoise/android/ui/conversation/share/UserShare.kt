@@ -1,22 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,7 +20,11 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
-import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedCard
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedIconDisc
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedLeadingSize
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedPadding
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 
 /**
  * A shared Nostr user — the actionable, identity-native counterpart to a phone
@@ -88,33 +86,27 @@ internal fun UserMessageBubble(
             ?.trim()
             ?.takeIf { it.isNotEmpty() && it != shortened && it != user.npub }
     val title = resolvedName ?: shortened
-    Surface(
-        modifier =
-            modifier
-                .width(260.dp)
-                .clip(RoundedCornerShape(Radii.lg))
-                .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(Radii.lg),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ConversationEmbedCard(
+        modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
+        onClick = onOpen,
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(ConversationEmbedPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (resolvedName != null || pictureUrl != null) {
-                PersonAvatar(title, user.npub, 44.dp, pictureUrl, followedAccount = followedAccount)
+                PersonAvatar(
+                    title,
+                    user.npub,
+                    ConversationEmbedLeadingSize,
+                    pictureUrl,
+                    followedAccount = followedAccount,
+                )
             } else {
                 // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
                 // would read as a name the sender never supplied.
-                FollowedPersonAvatarFrame(followedAccount, 44.dp) {
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                        Icon(
-                            painterResource(R.drawable.ic_person),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(10.dp).size(24.dp),
-                        )
-                    }
+                FollowedPersonAvatarFrame(followedAccount, ConversationEmbedLeadingSize) {
+                    ConversationEmbedIconDisc(painterResource(R.drawable.ic_person))
                 }
             }
             Spacer(Modifier.width(12.dp))

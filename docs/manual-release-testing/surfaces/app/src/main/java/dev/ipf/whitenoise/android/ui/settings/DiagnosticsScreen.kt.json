@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
         "anchor": "fun DiagnosticsContent(",
         "test_ids": [
-          "SET-021"
+          "SET-021",
+          "SET-072"
         ]
       },
       {

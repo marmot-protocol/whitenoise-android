@@ -172,20 +172,19 @@
     <string name="leave_and_delete_message">Sair do grupo e excluir seu histórico deste dispositivo?</string>
     <string name="toast_left_chat_delete_failed">Você saiu do grupo. A exclusão local falhou.</string>
     <string name="group_reset_action">Redefinir e aguardar um novo convite</string>
-    <string name="group_reset_dialog_title">Redefinir este grupo neste dispositivo?</string>
-    <string name="group_reset_dialog_message">O White Noise apaga o histórico e o estado de criptografia deste grupo apenas neste dispositivo. Nada é enviado ao grupo. Você só voltará a entrar quando um administrador enviar um novo convite criado após esta redefinição.</string>
+    <string name="group_reset_dialog_title">Redefinir este grupo?</string>
+    <string name="group_reset_dialog_message">Apaga o histórico e o estado de criptografia deste grupo neste dispositivo. Nada é enviado. Para voltar ao grupo, você precisa de um novo convite criado por um administrador após a redefinição.</string>
     <string name="group_reset_confirm">Redefinir</string>
     <string name="toast_group_reset_done">Grupo redefinido. Ele reaparecerá quando chegar um novo convite.</string>
     <string name="toast_group_reset_already_waiting">Este grupo já está aguardando um novo convite.</string>
     <string name="toast_couldnt_reset_group">Não foi possível redefinir o grupo. Tente novamente.</string>
-    <string name="chat_abandon_dialog_title">Excluir esta conversa deste dispositivo?</string>
-    <string name="chat_abandon_dialog_message">Apaga-a aqui e para as novas mensagens. Nada é enviado.</string>
+    <string name="chat_abandon_dialog_title">Excluir esta conversa?</string>
+    <string name="chat_abandon_dialog_message">Apaga a conversa deste dispositivo e interrompe o recebimento de novas mensagens. Nada é enviado.</string>
     <string name="chat_abandon_confirm">Abandonar</string>
     <string name="abandon_identity_chat">Conversa: %1$s</string>
     <string name="abandon_identity_group">Grupo: %1$s</string>
-    <string name="abandon_identity_account">Sua conta: %1$s</string>
     <string name="chats_abandon_action">Abandonar as conversas neste dispositivo</string>
-    <string name="chats_abandon_dialog_title">Abandonar as conversas selecionadas neste dispositivo?</string>
+    <string name="chats_abandon_dialog_title">Abandonar as conversas neste dispositivo?</string>
     <string name="toast_chat_already_abandoned">Esta conversa já foi excluída deste dispositivo.</string>
     <string name="leave_blocked_abandon_hint_dm">A saída não foi concluída. Em vez disso, você pode excluir esta conversa deste dispositivo. Nada é enviado à outra pessoa.</string>
     <string name="leave_blocked_abandon_hint_group">A saída não foi concluída. Em vez disso, você pode redefinir este grupo neste dispositivo. Nada é enviado ao grupo.</string>
@@ -1035,7 +1034,7 @@
     <string name="notification_background_on">A conexão em segundo plano está ativada.</string>
     <string name="notification_background_off">A conexão em segundo plano está desativada.</string>
     <string name="notification_categories_detail">O Android define som, vibração e importância por categoria.</string>
-    <string name="chat_with_support">Conversar com o suporte</string>
+    <string name="chat_with_support">Fale com a equipe do White Noise</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
@@ -2157,6 +2156,7 @@
     <string name="setup_finding_retired_relay">Este relay foi desativado.</string>
     <string name="setup_finding_unsafe_relay">Este endereço de relay não é seguro para uso.</string>
     <string name="setup_finding_unreachable">Não foi possível acessar este relay.</string>
+    <string name="setup_relay_timeout_title">Um relay não respondeu a tempo</string>
     <string name="setup_finding_timed_out">Esta verificação excedeu o tempo limite.</string>
     <string name="setup_finding_authentication_required">Este relay exige autenticação.</string>
     <string name="setup_finding_payment_required">Este relay exige pagamento.</string>
@@ -2260,7 +2260,7 @@
     <string name="app_unlock_checking">Verificando a proteção do aplicativo…</string>
     <string name="support_contact_title">Suporte do White Noise</string>
     <string name="support_contact_subtitle">Perguntas, problemas e sugestões</string>
-    <string name="support_contact_explainer">Faça uma pergunta, informe um problema ou sugira algo.</string>
+    <string name="support_contact_explainer">Faça uma pergunta, relate um problema ou envie sugestões para quem desenvolve o White Noise.</string>
     <string name="support_relays_attention">Os relés do perfil precisam de atenção</string>
     <string name="support_open_relays">Abrir relés</string>
     <string name="support_relays_review">Confira a lista de relés de recepção deste perfil.</string>
@@ -2321,6 +2321,12 @@
     <string name="new_message_no_results_detail">Confira a ortografia ou tente outra busca.</string>
     <string name="new_message_chat_created">Conversa criada</string>
     <string name="new_message_open_chat">Abrir conversa</string>
+    <string name="group_setup_customize">Personalizar grupo</string>
+    <string name="group_setup_hide_customization">Ocultar personalização</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d membro selecionado</item>
+        <item quantity="other">%d membros selecionados</item>
+    </plurals>
     <string name="group_setup_title">Configurar grupo</string>
     <string name="group_create_action">Criar grupo</string>
     <string name="group_add_photo">Adicionar foto</string>
@@ -2461,6 +2467,8 @@
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
     <string name="error_incompatible_key_package">A chave de conversa desta pessoa não é compatível. Peça que ela atualize e abra o White Noise e tente novamente.</string>
     <string name="error_incompatible_key_package_for">A chave de conversa de %1$s não é compatível. Peça que essa pessoa atualize e abra o White Noise e tente novamente.</string>
+    <string name="new_message_copy_inbox_instructions">Copiar instruções</string>
+    <string name="new_message_inbox_instructions">Não consegui iniciar uma conversa com você no White Noise. Pode verificar seus relays de entrada nas configurações do White Noise e me avisar quando eu puder tentar de novo?</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>

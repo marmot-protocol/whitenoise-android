@@ -34,6 +34,7 @@ class TranslationEngineLaunchTest {
             val started = shadowOf(context as Application).nextStartedActivity
             assertEquals(Intent.ACTION_MAIN, started.action)
             assertEquals(OFFLINE_TRANSLATOR_PACKAGE, started.component?.packageName)
+            assertTrue((started.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
             assertNull(started.data)
             assertNull(started.extras)
         }
@@ -51,6 +52,7 @@ class TranslationEngineLaunchTest {
         val started = shadowOf(context as Application).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, started.action)
         assertEquals(GITHUB_RELEASE, started.dataString)
+        assertTrue((started.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
         assertNull(started.`package`)
         assertNull(started.extras)
         assertNull(shadowOf(context as Application).nextStartedActivity)
@@ -69,6 +71,7 @@ class TranslationEngineLaunchTest {
         assertEquals(Intent.ACTION_VIEW, intent.action)
         assertEquals("dev.zapstore.app", intent.`package`)
         assertEquals(ZAPSTORE_LISTING, intent.dataString)
+        assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
         assertNull(intent.extras)
     }
 
@@ -97,6 +100,7 @@ class TranslationEngineLaunchTest {
         assertTrue(openOfflineTranslator(context, OfflineTranslatorRoute.ZAPSTORE, withoutStore))
         assertEquals(listOf("dev.zapstore.app", null), attempts.map { it.`package` })
         assertEquals(listOf(ZAPSTORE_LISTING, ZAPSTORE_LISTING), attempts.map { it.dataString })
+        assertTrue(attempts.all { (it.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0 })
 
         attempts.clear()
         val nothing = { intent: Intent ->
@@ -105,6 +109,7 @@ class TranslationEngineLaunchTest {
         }
         assertFalse(openOfflineTranslator(context, OfflineTranslatorRoute.ZAPSTORE, nothing))
         assertEquals(listOf(ZAPSTORE_LISTING, ZAPSTORE_LISTING, GITHUB_RELEASE), attempts.map { it.dataString })
+        assertTrue(attempts.all { (it.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0 })
         assertFalse(openOfflineTranslator(context, OfflineTranslatorRoute.GITHUB_RELEASE, nothing))
     }
 
@@ -120,6 +125,7 @@ class TranslationEngineLaunchTest {
         }
         assertEquals(4, attempts.size)
         for (intent in attempts) {
+            assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
             assertNull(intent.extras)
             assertNull(intent.clipData)
             assertNull(intent.type)
