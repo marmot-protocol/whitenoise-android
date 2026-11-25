@@ -68,6 +68,17 @@ class ConversationVibrationPreferences(
         }
     }
 
+    /** Returns every group id with a stored local vibration selection for [accountRef]. */
+    fun groupIdsForAccount(accountRef: String): Set<String> {
+        val account = accountRef.trim().takeIf(String::isNotEmpty) ?: return emptySet()
+        val prefix = "$account|"
+        return readSelections(preferences)
+            .keys
+            .mapNotNull { key ->
+                key.takeIf { it.startsWith(prefix) }?.removePrefix(prefix)?.takeIf(String::isNotEmpty)
+            }.toSet()
+    }
+
     internal companion object {
         private const val PREFERENCES_NAME = "whitenoise.conversation_vibration"
         private const val KEY_SELECTIONS = "selections"

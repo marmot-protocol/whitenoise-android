@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
+import dev.ipf.whitenoise.android.notifications.clearRevokedConversationShortcutsForAccount
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -91,5 +92,35 @@ class ProfileNotificationOverrideControllerTest {
                     it.id.startsWith(ProfileNotificationChannels.PREFIX)
                 },
             )
+        }
+
+    /** Account channel cleanup winning `mutationLock` prevents an in-flight customization from recreating a channel. */
+    @Test fun cleanupWinningMutationLockRejectsInFlightProfileCustomization() =
+        runTest {
+            NotificationChannels.ensureChannels(context)
+            val preferences = ProfileNotificationOverridePreferences(context)
+            val controller =
+                ProfileNotificationOverrideController(
+                    context,
+                    preferences,
+                    "personal",
+                    author,
+                    this,
+                    { true },
+                    StandardTestDispatcher(testScheduler),
+                )
+            controller.customize("Alice")
+            clearRevokedConversationShortcutsForAccount(context, "personal", includeUnscopedLegacy = false)
+            advanceUntilIdle()
+            assertEquals(ProfileNotificationMode.DEFAULT, preferences.get("personal", author).mode)
+            assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            assertEquals(
+                0,
+                context.getSystemService(android.app.NotificationManager::class.java).notificationChannels.count {
+                    it.id.startsWith(ProfileNotificationChannels.PREFIX)
+                },
+            )
+            assertFalse(controller.state.value.busy)
+            assertFalse(controller.state.value.failed)
         }
 }

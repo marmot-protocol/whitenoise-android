@@ -1,8 +1,15 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.NotificationManager
 import androidx.compose.material3.SnackbarResult
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
+import dev.ipf.whitenoise.android.notifications.FailingDeleteNotificationManager
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.NotificationChannels
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import kotlinx.coroutines.CancellationException
@@ -18,6 +25,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -419,6 +427,96 @@ class LocalGroupDeleteControllerTest {
                 assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
                 flushChatRows()
                 assertTrue(fixture.controller.items.none { it.id == GROUP })
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Failing before channel redaction leaves durable local-delete cleanup pending until retry deletes the channel. */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun channelRedactionFailureKeepsLocalDeleteCleanupPendingUntilRetrySucceeds() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Deleted Group",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+                var deferred = 0
+                assertTrue(
+                    fixture.controller.deleteGroupLocalFromChatList(
+                        GROUP,
+                        observer = LocalChatDeleteObserver(onCleanupDeferred = { deferred++ }),
+                    ),
+                )
+                assertEquals(1, deferred)
+                assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNotNull(manager.getNotificationChannel(channelId))
+                FailingDeleteNotificationManager.reset()
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                FailingDeleteNotificationManager.reset()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A queued vibration-pattern write cannot recreate a `:conv:` channel after local conversation deletion wins. */
+    @Test
+    fun staleVibrationPatternWriteAfterLocalDeleteDoesNotRecreateConversationChannel() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                val beforeJobs =
+                    fixture.state.mutationsScope.coroutineContext[Job]
+                        ?.children
+                        ?.toSet()
+                        .orEmpty()
+                fixture.state.conversationVibrationChannelMutex.lock()
+                val vibrationJobs: List<Job>
+                try {
+                    fixture.state.setConversationVibrationPattern(
+                        GROUP,
+                        isDm = false,
+                        conversationTitle = "Deleted Chat",
+                        pattern = ConversationVibrationPattern.DOUBLE,
+                    )
+                    vibrationJobs =
+                        fixture.state.mutationsScope.coroutineContext[Job]
+                            ?.children
+                            ?.filterNot { it in beforeJobs }
+                            ?.toList()
+                            .orEmpty()
+                    assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+                } finally {
+                    fixture.state.conversationVibrationChannelMutex.unlock()
+                }
+                assertTrue(vibrationJobs.isNotEmpty())
+                vibrationJobs.forEach { it.join() }
+                assertEquals(
+                    ConversationVibrationPattern.SYSTEM_DEFAULT,
+                    fixture.state.conversationVibrationPreferences.pattern(ACCOUNT, GROUP),
+                )
+                assertTrue(manager.notificationChannels.none { it.id.contains(":conv:") })
             } finally {
                 Dispatchers.resetMain()
             }

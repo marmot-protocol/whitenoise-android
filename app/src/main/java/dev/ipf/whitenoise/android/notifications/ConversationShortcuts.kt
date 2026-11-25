@@ -79,7 +79,10 @@ internal fun hideConversationShortcutsFromDirectShare(context: Context) {
 /**
  * Select shortcuts that are provably owned by [accountRef]. Legacy shortcuts
  * lack an owner stamp, so [includeUnscopedLegacy] is safe only when no other
- * signed-in account remains and therefore cannot own one of those entries.
+ * signing account remains and therefore cannot own one of those entries.
+ * Read-only accounts are excluded: without a signer they cannot decrypt
+ * messages, so they post no notifications and own no conversation shortcuts
+ * or channels.
  */
 internal fun conversationShortcutIdsForAccount(
     shortcuts: List<ShortcutInfoCompat>,
@@ -110,29 +113,56 @@ internal fun accountConversationShortcutCleanupPlan(
     )
 }
 
-/** Removes platform entries after the caller has durably revoked and fenced account credentials. */
+/**
+ * Removes platform shortcuts and owned notification channels after the caller has durably revoked
+ * and fenced account credentials.
+ */
 internal fun clearRevokedConversationShortcutsForAccount(
     context: Context,
     accountRef: String,
     includeUnscopedLegacy: Boolean,
+    additionalShortcutIds: Collection<String> = emptySet(),
+    knownGroupIds: Collection<String> = emptySet(),
 ) {
     synchronized(UserEventNotificationGroup.mutationLock) {
+        val shortcuts =
+            runCatching {
+                ShortcutManagerCompat.getShortcuts(
+                    context,
+                    ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                        ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                        ShortcutManagerCompat.FLAG_MATCH_PINNED,
+                )
+            }.getOrElse {
+                runCatching { ShortcutManagerCompat.getDynamicShortcuts(context) }.getOrDefault(emptyList())
+            }
         val plan =
             accountConversationShortcutCleanupPlan(
-                shortcuts =
-                    runCatching {
-                        ShortcutManagerCompat.getShortcuts(
-                            context,
-                            ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
-                                ShortcutManagerCompat.FLAG_MATCH_CACHED or
-                                ShortcutManagerCompat.FLAG_MATCH_PINNED,
-                        )
-                    }.getOrElse {
-                        ShortcutManagerCompat.getDynamicShortcuts(context)
-                    },
+                shortcuts = shortcuts,
                 accountRef = accountRef,
                 includeUnscopedLegacy = includeUnscopedLegacy,
             )
+        // Redact and delete channels before removing shortcuts: Android can soft-delete a linked
+        // channel on shortcut removal, keeping its private name and hiding it from enumeration.
+        val channelsCleared =
+            runCatching {
+                deleteAccountNotificationChannels(
+                    context = context,
+                    accountRef = accountRef,
+                    shortcuts = shortcuts,
+                    accountShortcutIds = plan.longLivedIds + additionalShortcutIds,
+                    includeUnscopedLegacy = includeUnscopedLegacy,
+                    knownGroupIds = knownGroupIds,
+                )
+            }.getOrDefault(false)
+        if (!channelsCleared) {
+            // Keep the shortcuts but drop their private labels; account-refresh retention deletes the
+            // departed account's channels and then these shortcuts.
+            val affected = (plan.disabledIds + plan.dynamicIds + plan.longLivedIds).toSet()
+            val relabeled = shortcuts.filter { it.id in affected }.map { genericNotificationShortcut(context, it) }
+            if (relabeled.isNotEmpty()) runCatching { ShortcutManagerCompat.updateShortcuts(context, relabeled) }
+            return@synchronized
+        }
         if (plan.disabledIds.isNotEmpty()) {
             runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
         }

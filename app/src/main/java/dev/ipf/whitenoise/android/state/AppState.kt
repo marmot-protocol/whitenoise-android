@@ -4897,13 +4897,18 @@ class WhiteNoiseAppState private constructor(
     private suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
+        knownGroupIds: Collection<String> = emptySet(),
     ) {
         withContext(Dispatchers.IO) {
             val cleared = runCatching { profileNotificationOverrides.clearAccount(accountRef) }.getOrDefault(false)
             if (!cleared) {
                 appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
             }
-            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(
+                accountRef,
+                includeUnscopedLegacy,
+                knownGroupIds,
+            )
         }
     }
 
@@ -5028,23 +5033,18 @@ class WhiteNoiseAppState private constructor(
         val deleteKeyPackages: Boolean,
     )
 
+    /** Captures the account's group ids, then revokes pinned targets and finishes the owned sign-out once. */
     private suspend fun revokeAndFinishSignOutLocked(
         request: SignOutRequest,
         completed: (OwnedSignOutCompletion) -> Unit,
     ): OwnedSignOutCompletion {
         val draftsSaved = draftWriter.flushAccount(request.requested)
+        val knownGroupIds = captureAccountKnownGroupIds(request.requested)
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(request.requested) {
                 admitted = true
-                finishRevokedAccountSignOut(
-                    request.requested,
-                    request.runtime,
-                    request.runtimeEpoch,
-                    request.selectionEpoch,
-                    request.deleteKeyPackages,
-                    draftsSaved,
-                ).also(completed)
+                finishRevokedAccountSignOut(request, draftsSaved, knownGroupIds).also(completed)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5065,13 +5065,11 @@ class WhiteNoiseAppState private constructor(
     /** Lifetime is already owned; acquire both push locks cancellably before admitting any cleanup intent. */
     @Suppress("LongMethod", "ReturnCount")
     private suspend fun finishRevokedAccountSignOut(
-        account: String,
-        runtime: AppMarmotRuntime?,
-        runtimeEpoch: Int,
-        selectionEpoch: Long,
-        deleteKeyPackages: Boolean,
+        request: SignOutRequest,
         draftsSaved: Boolean,
+        knownGroupIds: Set<String>,
     ): OwnedSignOutCompletion {
+        val (account, runtime, selectionEpoch) = Triple(request.requested, request.runtime, request.selectionEpoch)
         notificationDelivery.notificationDeliveryModeMutex.lock()
         var pushOwned = false
         var deliveryOwned = true
@@ -5080,10 +5078,8 @@ class WhiteNoiseAppState private constructor(
             pushOwned = true
             currentCoroutineContext().ensureActive()
             val ownerCurrent =
-                activeAccountRef == account && marmotRuntime === runtime && runtimeGeneration == runtimeEpoch
-            if (!ownerCurrent ||
-                !accountSwitchHandoff.isCurrent(selectionEpoch)
-            ) {
+                activeAccountRef == account && marmotRuntime === runtime && runtimeGeneration == request.runtimeEpoch
+            if (!ownerCurrent || !accountSwitchHandoff.isCurrent(selectionEpoch)) {
                 return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
             }
             // After this point the explicit logout owns its cleanup intent, including failed disk acknowledgement.
@@ -5093,7 +5089,7 @@ class WhiteNoiseAppState private constructor(
             return withContext(NonCancellable) {
                 val attempt =
                     try {
-                        admittedNativeSignOutLocked(account, runtime, deleteKeyPackages)
+                        admittedNativeSignOutLocked(account, runtime, request.deleteKeyPackages)
                     } finally {
                         notificationDelivery.nativePushSyncMutex.unlock()
                         pushOwned = false
@@ -5101,7 +5097,7 @@ class WhiteNoiseAppState private constructor(
                         deliveryOwned = false
                     }
                 // Shared and account-keyed cleanup finishes while lifetime is still owned, before any successor.
-                finishOwnedSignOutLocked(account, runtime, attempt, selectionGeneration, draftsSaved)
+                finishOwnedSignOutLocked(account, runtime, attempt, selectionGeneration, draftsSaved, knownGroupIds)
             }
         } finally {
             if (pushOwned) notificationDelivery.nativePushSyncMutex.unlock()
@@ -5154,13 +5150,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** A partial or lost native reply requires durable status before the host can retire its session. */
-    @Suppress("LongMethod", "ReturnCount")
+    @Suppress("LongMethod", "LongParameterList", "ReturnCount")
     private suspend fun finishOwnedSignOutLocked(
         account: String,
         runtime: AppMarmotRuntime?,
         attempt: NativeSignOutAttempt,
         selectionGeneration: Long,
         draftsSaved: Boolean,
+        knownGroupIds: Set<String>,
     ): OwnedSignOutCompletion {
         val result =
             attempt.result ?: return OwnedSignOutCompletion(
@@ -5196,6 +5193,7 @@ class WhiteNoiseAppState private constructor(
         clearRevokedConversationShortcutsForAccount(
             accountRef = account,
             includeUnscopedLegacy = accounts.none { it.label != account && it.isSignedInSigningAccount() },
+            knownGroupIds = knownGroupIds,
         )
         clearContactPrivateDetailsForAccount(account)
         val refreshed = accountsAfterSignOut(account, knownSignedOut)
@@ -5274,6 +5272,7 @@ class WhiteNoiseAppState private constructor(
         val inView = activeAccountRef
         val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
+        val knownGroupIds = captureAccountKnownGroupIds(wipedRef)
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         receivedVoiceTranscripts.forgetAccount(wipedRef)
         releaseCaptureOwners(wipedRef)
@@ -5334,6 +5333,7 @@ class WhiteNoiseAppState private constructor(
             clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = retireSession && accounts.none { it.isSignedInSigningAccount() },
+                knownGroupIds = knownGroupIds,
             )
             if (retireSession) {
                 AvatarImageLoader.clear()
