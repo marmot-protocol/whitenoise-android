@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
@@ -46,11 +47,12 @@ class GroupMemberKeyCopyTest {
     fun transferAdminKeyCopiesWithoutPickingTheMember() {
         val picked = showTransferAdminSheet(peerName = PEER_NAME)
 
-        composeRule.onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true).performClick()
+        val key = composeRule.onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true)
+        val shortKey = key.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString("")
+        key.performClick()
         assertEquals(PEER_NPUB, clipText())
-        composeRule
-            .onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true)
-            .assertTextEquals(PEER_NPUB.chunked(5).joinToString(" "))
+        // A sheet row has no room for the grouped key, so copying leaves the short form in place.
+        key.assertTextEquals(shortKey)
         assertEquals(emptyList<String>(), picked)
         composeRule.onNode(hasText(PEER_NAME), useUnmergedTree = true).performClick()
         composeRule.waitForIdle()

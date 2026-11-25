@@ -68,3 +68,8 @@ internal fun firstMessageOrder(messageIds: Iterable<String>): Map<String, Int> =
     buildMap {
         messageIds.forEachIndexed { index, messageId -> putIfAbsent(messageId, index) }
     }
+
+/** Whether [message] carries a pinned local disappearing-message expiry deadline. */
+internal fun hasLocalExpiryDeadline(message: TimelineMessage): Boolean =
+    message.record.retentionExpiresAt?.let { it > 0uL } == true ||
+        message.retentionAtSendSeconds?.let { it > 0uL } == true

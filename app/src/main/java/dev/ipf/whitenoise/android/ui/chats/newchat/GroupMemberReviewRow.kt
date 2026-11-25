@@ -48,7 +48,7 @@ internal fun GroupMemberReviewRow(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val stacked = groupReviewStacked(maxWidth)
         val identity: @Composable (Modifier) -> Unit = { modifier ->
-            val content: @Composable RowScope.(Boolean) -> Unit = { expanded ->
+            val content: @Composable RowScope.() -> Unit = {
                 Avatar(
                     person.publicName ?: person.identifier,
                     member.accountIdHex,
@@ -58,7 +58,7 @@ internal fun GroupMemberReviewRow(
                     followedAccount = member.accountIdHex,
                 )
                 Column(Modifier.weight(1f)) {
-                    GroupReviewPersonText(person, memberRole, copyable = false, expanded = expanded)
+                    GroupReviewPersonText(person, memberRole, copyable = false)
                 }
             }
             val tagged = modifier.testTag("group.members.review.member")
@@ -66,7 +66,7 @@ internal fun GroupMemberReviewRow(
             if (person.identifier.isNotBlank()) {
                 GroupReviewCopyRow(person.identifier, spoken, tagged, gap, content)
             } else {
-                Row(tagged.heightIn(min = 48.dp), gap, Alignment.CenterVertically) { content(false) }
+                Row(tagged.heightIn(min = 48.dp), gap, Alignment.CenterVertically, content)
             }
         }
         val change = onInitialAdminChange

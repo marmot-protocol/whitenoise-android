@@ -480,6 +480,9 @@ internal fun ConversationController.insertTimelineItemId(itemId: String) {
     timelineOrder.add(itemId)
 }
 
+/** The projected rows `timelineOrder` holds, for membership only — callers order rows for display. */
+internal fun ConversationController.loadedProjectedRows() = timelineOrder.mapNotNull { timelineItemsById[it] }
+
 internal inline fun ConversationController.coalesceTimelinePublishes(block: () -> Unit) {
     assertMainThread { "coalesceTimelinePublishes" }
     publishSuppressionDepth += 1
@@ -546,29 +549,18 @@ internal fun ConversationController.publishTimelineFromIndexesInternal() {
         publishPending = true
         return
     }
-    val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
     // Read-anchored local expiry (#797) uses only the policy pinned to each
     // row. The mutable group policy cannot reinterpret projected history.
     // When no row owns a deadline, keep the no-filter-allocation fast path.
-    val candidates = optimisticMessages.values + projected
-    val hasExpiryCandidate =
-        candidates.any { message ->
-            message.record.retentionExpiresAt?.let { it > 0uL } == true ||
-                message.retentionAtSendSeconds?.let { it > 0uL } == true
-        }
+    val candidates = optimisticMessages.values + loadedProjectedRows()
+    val hasExpiryCandidate = candidates.any(::hasLocalExpiryDeadline)
     val live =
         if (!hasExpiryCandidate) {
             candidates
         } else {
             val nowMillis = clockMillis()
             val nowSeconds = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong()
-            val messageOrder =
-                firstMessageOrder(
-                    buildList {
-                        optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-                        projected.forEach { add(it.record.messageIdHex) }
-                    },
-                )
+            val messageOrder = firstMessageOrder(loadedTimelineMessagesInDisplayOrder().map { it.record.messageIdHex })
             candidates.filter { message ->
                 val record = message.record
                 if (record.direction == "sent" && message.projected == null) {

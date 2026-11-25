@@ -83,7 +83,7 @@ internal suspend fun ConversationController.refreshCurrentTimeline(
 
 /** Returns loaded ordinary-message ids eligible for the foreground expiry sweep. */
 internal fun ConversationController.testSweepExpiryIds(): List<String> =
-    sweepExpiryMessages()
+    loadedTimelineMessagesInDisplayOrder()
         .filter { shouldApplyLocalDisappearingExpiry(it.record) }
         .map { it.record.messageIdHex }
 

@@ -14,11 +14,8 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -36,11 +33,8 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
 
 private const val NPUB_PREFIX = "npub1"
 private const val NPUB_LENGTH = 63
@@ -159,13 +153,15 @@ internal fun Modifier.animatePublicKeyExpansion(expanded: Boolean): Modifier {
 }
 
 /**
- * A compact public-key [label] that copies the complete canonical [npub] and expands it in place. The tap belongs to
- * the label, so a surrounding row keeps navigation, selection or account switching, and a long press is
- * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
- * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
- * [enabled], it is plain text. With [keyboardFocusable] — for a row with no action of its own, or a disabled one —
- * the label becomes its own focus stop with the theme's focus highlight, Enter, D-pad centre or Space copies the key,
- * and its widened touch margin still copies, since no row action owns that margin.
+ * A compact public-key [label] that copies the complete canonical [npub]. The label never grows into the full key:
+ * it sits in list rows, chips, menus and dialogs that have no room for a grouped key, so a caller with full content
+ * width reveals the whole key in its own layout through [onExpand]. The tap belongs to the label, so a surrounding
+ * row keeps navigation, selection or account switching, and a long press is left to the row. The label adds no
+ * semantics boundary: its short text stays in the row's spoken label, and the row gains a Copy public key action
+ * whose label carries the full key. Without a canonical [npub], or while not [enabled], it is plain text. With
+ * [keyboardFocusable] — for a row with no action of its own, or a disabled one — the label becomes its own focus stop
+ * with the theme's focus highlight, Enter, D-pad centre or Space copies the key, and its widened touch margin still
+ * copies, since no row action owns that margin.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -181,19 +177,17 @@ internal fun PublicKeyCopyText(
     onExpand: (() -> Unit)? = null,
 ) {
     val copy = rememberPublicKeyCopy(npub)
-    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
-    val copyAndExpand = {
+    val copyAndExpand: () -> Unit = {
         copy()
-        if (onExpand == null) expanded = true else onExpand()
+        onExpand?.invoke()
     }
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
     val focusInteractions = remember { MutableInteractionSource() }
-    val animatedModifier = modifier.animatePublicKeyExpansion(expanded)
     Text(
-        if (expanded) publicKeyDisplayGroups(npub).joinToString(" ") else label,
+        label,
         modifier =
             if (enabled && isCanonicalNpub(npub)) {
-                animatedModifier
+                modifier
                     .pointerInput(npub, keyboardFocusable) {
                         copyOnShortTap(copyAndExpand, keepTouchMargin = keyboardFocusable)
                     }.then(
@@ -214,12 +208,11 @@ internal fun PublicKeyCopyText(
                             )
                     }
             } else {
-                animatedModifier
+                modifier
             },
-        style = if (expanded) style.copy(fontFamily = FontFamily.Monospace) else style,
+        style = style,
         color = color,
-        textAlign = if (expanded) TextAlign.Center else style.textAlign,
-        maxLines = if (expanded) Int.MAX_VALUE else maxLines,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )
 }
