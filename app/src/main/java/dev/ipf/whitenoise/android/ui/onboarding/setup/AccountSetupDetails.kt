@@ -22,6 +22,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -51,7 +52,7 @@ internal fun SetupDecisionHeading(state: AccountSetupState) {
             state.focusesRelayTimeout() -> R.string.setup_relay_timeout_title
             else -> setupDefaultHeadingTitle(step, proposal)
         }
-    Text(stringResource(title), style = MaterialTheme.typography.titleLarge)
+    Text(stringResource(title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
 }
 
 private fun setupPendingHeadingTitle(
@@ -202,7 +203,11 @@ internal fun SetupStepIcon(step: OnboardingStepFfi) {
  * note stays with the step, so Details does not repeat it.
  */
 @Composable
-internal fun SetupDetails(state: AccountSetupState) {
+internal fun SetupDetails(
+    state: AccountSetupState,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
         state.snapshot?.let { snapshot ->
             snapshot.proposal?.takeIf { it.step == state.currentStep?.step }?.relayRepair?.let { repair ->
@@ -213,7 +218,7 @@ internal fun SetupDetails(state: AccountSetupState) {
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(state.currentStep?.step, finding))
             }
-            SetupChecklist(snapshot)
+            SetupChecklist(state, onAction, onEdit)
         }
     }
 }

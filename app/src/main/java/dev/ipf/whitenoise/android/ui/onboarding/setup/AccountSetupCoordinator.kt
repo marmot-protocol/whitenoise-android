@@ -20,6 +20,8 @@ import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -266,6 +268,9 @@ internal class AccountSetupCoordinator(
                         isCurrent = isMountCurrent,
                         onReady = { finish(token, owner, client, account, isMountCurrent) },
                         onCancelled = { app.launchMutation { if (generation == token) later() } },
+                        // Only new recoveries count; the current generation is the network this screen opened on.
+                        connectivityRestored =
+                            app.validatedConnectivityRecoveryGeneration.drop(1).filter { app.appInForeground },
                     )
                 if (app.phase == AppPhase.Bootstrapping) onPhaseChange(AppPhase.Onboarding)
             }

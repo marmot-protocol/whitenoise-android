@@ -14,7 +14,8 @@ internal fun AccountSetupState.directRemovalEndpoint(): String? {
     val step = currentStep ?: return null
     return if (step.step in relaySetupSteps &&
         snapshot?.proposal == null &&
-        OnboardingActionFfi.EDIT_RELAYS in step.actions
+        OnboardingActionFfi.EDIT_RELAYS in step.actions &&
+        OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS !in step.actions
     ) {
         step.findings
             .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY && OnboardingActionFfi.EDIT_RELAYS in it.actions }

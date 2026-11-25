@@ -10,6 +10,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -17,6 +20,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
@@ -41,6 +46,14 @@ internal fun AccountSetupScreen(
     onLater: () -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    var stopped by remember(controller) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopped = true }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        if (stopped) {
+            stopped = false
+            controller.retryFailedCheck()
+        }
+    }
     AccountSetupContent(
         state,
         controller::submit,
@@ -159,6 +172,7 @@ internal fun AccountSetupContent(
             SetupSurface.Decision -> {
                 if (step != null) {
                     SetupDecisionHeading(state)
+                    SetupStepExplanation(state)
                     SetupDecisionContent(state)
                     SetupDirectRelayRemoval(state)
                     if (snapshot?.proposal?.relayRepair != null &&
@@ -187,7 +201,7 @@ internal fun AccountSetupContent(
                 Text(stringResource(if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details))
             }
             if (state.detailsExpanded) {
-                SetupDetails(state)
+                SetupDetails(state, onAction, onEdit)
                 SetupAlternativeActions(state, onAction, onEdit)
             }
         }

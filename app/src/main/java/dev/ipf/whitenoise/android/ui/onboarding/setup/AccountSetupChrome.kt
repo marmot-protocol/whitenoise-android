@@ -22,62 +22,54 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.OnboardingSnapshotFfi
+import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.statusColors
 
-/** Native checkpoint history; only the current checkpoint is inspectable, never inferred completion. */
+/** Native checkpoint history with optional cleanup alongside warnings on a passed relay step. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SetupChecklist(
-    snapshot: OnboardingSnapshotFfi,
-    actionableStep: OnboardingStepFfi? = null,
-    onStep: (OnboardingStepFfi) -> Unit = {},
+    state: AccountSetupState,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
 ) {
+    val snapshot = state.snapshot ?: return
+    val offerCleanup =
+        state.editor == null &&
+            !state.showsSetupFailure &&
+            !state.busy &&
+            !snapshot.cancellationPending &&
+            snapshot.proposal == null
     Column {
         snapshot.steps.forEach { step ->
             val status = stringResource(setupStatusTitle(step.status))
-            val modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .semantics(mergeDescendants = true) {
-                        stateDescription = status
-                        liveRegion = LiveRegionMode.Polite
-                    }.testTag("setup-step-${step.step.name}")
-            val leading: @Composable () -> Unit = { SetupStatusIcon(step.status) }
-            val supporting: @Composable () -> Unit = { Text(status, Modifier.clearAndSetSemantics {}) }
-            val headline: @Composable () -> Unit = { Text(stringResource(setupStepTitle(step.step))) }
-            val colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
-            if (step.step == actionableStep) {
-                ListItem(
-                    onClick = { onStep(step.step) },
-                    modifier = modifier.semantics { role = Role.Button },
-                    shapes = WhiteNoiseListItemDefaults.shapes(),
-                    leadingContent = leading,
-                    supportingContent = supporting,
-                    trailingContent = { Icon(painterResource(R.drawable.ic_chevron_right), null) },
-                    colors = colors,
-                    content = headline,
-                )
-            } else {
-                ListItem(
-                    modifier = modifier,
-                    leadingContent = leading,
-                    supportingContent = supporting,
-                    colors = colors,
-                    content = headline,
-                )
+            ListItem(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) {
+                            stateDescription = status
+                            liveRegion = LiveRegionMode.Polite
+                        }.testTag("setup-step-${step.step.name}"),
+                leadingContent = { SetupStatusIcon(step.status) },
+                supportingContent = { Text(status, Modifier.clearAndSetSemantics {}) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                content = { Text(stringResource(setupStepTitle(step.step))) },
+            )
+            val cleanup = OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS
+            val canRemove =
+                offerCleanup && step.status == OnboardingStatusFfi.PASSED && cleanup in step.actions
+            SetupPassedWarnings(step.passedWarnings(), canRemove) {
+                SetupOfferedAction(state, cleanup, false, onAction, onEdit, step = step.step)
             }
         }
     }

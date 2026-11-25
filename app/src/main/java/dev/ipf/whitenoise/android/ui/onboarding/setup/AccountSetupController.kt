@@ -8,14 +8,17 @@ import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 /** Screen-only drafts survive rotation and signer handoff within this process; MDK owns all durable progress. */
@@ -66,7 +69,10 @@ internal data class AccountSetupState(
                 current.steps.firstOrNull {
                     current.cancellationPending && OnboardingActionFfi.CANCEL_ONBOARDING in it.actions
                 }
-            return cancellation ?: current.steps.firstOrNull {
+            // A cleanup proposal can belong to a step which is already marked Passed.
+            val relayProposal = current.proposal?.takeIf { it.relayRepair != null && it.step in relaySetupSteps }
+            val proposedStep = current.steps.firstOrNull { it.step == relayProposal?.step }
+            return cancellation ?: proposedStep ?: current.steps.firstOrNull {
                 it.status != OnboardingStatusFfi.PASSED && it.status != OnboardingStatusFfi.SKIPPED
             }
         }
@@ -81,6 +87,8 @@ internal class AccountSetupController(
     /** Activates this account and reports whether it did; a declined activation stays retryable (#3697). */
     private val onReady: suspend () -> Boolean,
     private val onCancelled: () -> Unit,
+    /** Emits each time usable internet returns. */
+    connectivityRestored: Flow<Long> = emptyFlow(),
 ) {
     private val lifetime = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = CoroutineScope(parentScope.coroutineContext + lifetime)
@@ -96,6 +104,7 @@ internal class AccountSetupController(
                 if (isCurrent()) automation.advance(current, ::openChats)
             }
         }
+        scope.launch { connectivityRestored.collect { retryFailedCheck() } }
     }
 
     /** Keeps diagnostics and secondary controls out of the default decision screen. */
@@ -135,6 +144,25 @@ internal class AccountSetupController(
                 readinessDelivered = onReady()
             }
         }
+
+    /** Makes one automatic attempt for this wake, leaving Try again available on a transient failure. */
+    fun retryFailedCheck() {
+        val request = mutableState.value.retryableCheckRequest() ?: return
+        operate {
+            try {
+                client.retryFailedCheck(request)?.let(::accept)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                runCatchingCancellable { client.snapshot() }.getOrNull()?.let(::accept)
+                val status = mutableState.value.currentStep?.status
+                // Native may have reset the step before the connection failed. Resume can advance it again.
+                if (status == OnboardingStatusFfi.PENDING || status == OnboardingStatusFfi.CHECKING) {
+                    throw failure
+                }
+            }
+        }
+    }
 
     /** Rejects repeated taps and stale rendered actions before issuing any protocol mutation. */
     fun submit(request: SetupRequest) {
