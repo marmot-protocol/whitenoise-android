@@ -541,6 +541,7 @@ private fun TextAttachmentReaderContent(
     }
 }
 
+/** Inline progress while the attachment text is read and decoded. */
 @Composable
 private fun TextAttachmentLoading() {
     StateContent(progress = true, progressLabel = stringResource(R.string.text_attachment_loading))

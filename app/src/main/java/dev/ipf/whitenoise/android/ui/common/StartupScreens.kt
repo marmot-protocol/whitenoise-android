@@ -28,10 +28,9 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 /** Literal prototype loading chrome; indeterminate feedback never estimates native bootstrap progress. */
 @Composable
 internal fun StartupProgressContent() {
-    StatePage(
+    StateProgressPage(
         modifier = Modifier.testTag(STARTUP_LOADING_TEST_TAG),
         icon = R.drawable.ic_white_noise_mark,
-        progress = true,
         progressLabel = stringResource(R.string.startup_loading_message),
     )
 }

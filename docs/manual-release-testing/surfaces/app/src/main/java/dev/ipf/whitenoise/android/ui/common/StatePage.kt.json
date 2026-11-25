@@ -14,6 +14,16 @@
         ]
       },
       {
+        "surface": "StateProgressPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
+        "anchor": "fun StateProgressPage(",
+        "test_ids": [
+          "INT-003",
+          "INT-004",
+          "INT-012"
+        ]
+      },
+      {
         "surface": "StateContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
         "anchor": "fun StateContent(",

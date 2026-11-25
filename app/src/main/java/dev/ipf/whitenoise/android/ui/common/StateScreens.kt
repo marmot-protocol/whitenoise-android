@@ -58,9 +58,8 @@ internal fun loadFailurePlacement(
  */
 @Composable
 fun LoadingScreen(message: String? = null) {
-    StatePage(
+    StateProgressPage(
         modifier = Modifier.testTag(FULL_SCREEN_LOADING_TEST_TAG),
-        progress = true,
         progressLabel = message,
         progressLabelModifier = Modifier.testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG),
     )

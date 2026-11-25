@@ -19,7 +19,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /**
  * Opaque, secure app-owned cover. Only the caller's native authentication result may remove it;
@@ -27,7 +26,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
  * [evaluating] represents the actual persisted lock decision, before the platform prompt can open.
  */
 @Composable
-@Suppress("FunctionNaming", "LongMethod") // The complete opaque cover shares one authentication state.
+@Suppress("FunctionNaming") // The complete opaque cover shares one authentication state.
 internal fun AppLockScreen(
     error: AppText?,
     onRetry: () -> Unit,

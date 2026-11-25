@@ -206,6 +206,7 @@ private fun RemoteSignerSecondary(
     }
 }
 
+/** Inline progress for a signer step: [title] with optional [detail], announced as it changes. */
 @Suppress("FunctionNaming")
 @Composable
 private fun RemoteSignerProgress(

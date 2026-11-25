@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
@@ -88,6 +89,33 @@ internal fun StatePage(
     }
 }
 
+/**
+ * Full-screen progress (app and startup loaders): the same centred parts as [StatePage] without its scroll
+ * container, so it costs nothing on cold start and stays safe inside a lazy list item measured with unbounded
+ * height. Progress pages hold only an [icon], the indicator and a short [progressLabel], so they never need to
+ * scroll.
+ */
+@Composable
+internal fun StateProgressPage(
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    progressLabel: String? = null,
+    progressLabelModifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize().padding(WhiteNoiseSpacing.CompactScreenMargin),
+        contentAlignment = Alignment.Center,
+    ) {
+        StateContent(
+            modifier = Modifier.widthIn(max = WhiteNoiseSizes.StatePageMaxWidth).fillMaxWidth(),
+            icon = icon,
+            progress = true,
+            progressLabel = progressLabel,
+            progressLabelModifier = progressLabelModifier,
+        )
+    }
+}
+
 /** The state page's parts without the full-screen frame, for a card or a step inside a larger screen. */
 @Composable
 internal fun StateContent(
@@ -155,11 +183,13 @@ internal fun StateContent(
     }
 }
 
+/** Full-width action button, tagged with the action's [StateAction.testTag] when it has one. */
 private fun StateAction.modifier(): Modifier {
     val width = Modifier.fillMaxWidth()
     return if (testTag != null) width.testTag(testTag) else width
 }
 
+/** The action's optional leading icon followed by its label. */
 @Composable
 private fun ActionLabel(action: StateAction) {
     action.iconRes?.let {
