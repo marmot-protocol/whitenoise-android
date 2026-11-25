@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt",
+  "legacy_sha256": "7fc74f386c76cbb1b81f2267a2b35ad1e432244e031e520f406935d772bdddd7",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TtsCustomRateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt",
+        "anchor": "fun TtsCustomRateDialog(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TtsCustomRateEditor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt",
+        "anchor": "fun TtsCustomRateEditor(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

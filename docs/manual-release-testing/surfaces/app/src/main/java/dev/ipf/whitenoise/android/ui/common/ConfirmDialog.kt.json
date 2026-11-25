@@ -1,0 +1,69 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+  "legacy_sha256": "1bb3a28286d2c021794b95112782a5164b6015a0679c4a463c84ba7d1359a76b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+        "anchor": "fun ConfirmDialog(",
+        "test_ids": [
+          "ACC-016",
+          "ACC-017",
+          "ACC-018",
+          "AXY-001",
+          "FLD-001",
+          "FLD-002",
+          "NTF-049",
+          "SET-009",
+          "SET-064",
+          "SET-065",
+          "SET-066",
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: ConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ConfirmText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+        "anchor": "fun ConfirmText(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ACC-016",
+          "ACC-017",
+          "ACC-018",
+          "AXY-001",
+          "FLD-001",
+          "FLD-002",
+          "NTF-049",
+          "SET-009",
+          "SET-064",
+          "SET-065",
+          "SET-066",
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
