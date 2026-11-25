@@ -31,7 +31,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.discoverDictationProviders
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
@@ -106,18 +106,20 @@ internal fun DictationProviderSheet(
                 )
             }
             item {
-                WhiteNoiseDialogChoiceRow(
+                WhiteNoiseChoiceRow(
                     title = stringResource(R.string.dictation_provider_automatic),
                     subtitle = stringResource(R.string.dictation_provider_precedence),
                     selected = selected == null,
                     onClick = { terminal.close(null, onSelect) },
                     modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.dictation_provider_automatic),
-                                stringResource(R.string.explanation_appearance_dictation_provider_automatic),
+                        Modifier
+                            .padding(horizontal = WhiteNoiseSpacing.Related)
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.dictation_provider_automatic),
+                                    stringResource(R.string.explanation_appearance_dictation_provider_automatic),
+                                ),
                             ),
-                        ),
                 )
             }
             if (providers == null) {
@@ -151,19 +153,21 @@ internal fun DictationProviderSheet(
                                 } else {
                                     choice.engineName
                                 }
-                            WhiteNoiseDialogChoiceRow(
+                            WhiteNoiseChoiceRow(
                                 title = engine,
                                 subtitle = capability,
                                 accessibilityLabel = "${provider.appName}, $engine, $capability",
                                 selected = selected?.sameInstallation(choice) == true,
                                 onClick = { terminal.close(choice, onSelect) },
                                 modifier =
-                                    Modifier.explainOnLongPress(
-                                        Explanation(
-                                            engine,
-                                            stringResource(R.string.explanation_appearance_dictation_provider_engine),
+                                    Modifier
+                                        .padding(horizontal = WhiteNoiseSpacing.Related)
+                                        .explainOnLongPress(
+                                            Explanation(
+                                                engine,
+                                                stringResource(R.string.explanation_appearance_dictation_provider_engine),
+                                            ),
                                         ),
-                                    ),
                             )
                         }
                     }
