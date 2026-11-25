@@ -142,7 +142,7 @@ class AiAgentsScreenScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
-                    AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+                    AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> true }, onOpenDocs = { true })
                 }
             }
         }

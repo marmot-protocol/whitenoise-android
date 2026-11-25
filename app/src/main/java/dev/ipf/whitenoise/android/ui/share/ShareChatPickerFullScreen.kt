@@ -18,11 +18,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -42,10 +41,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
-import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -61,8 +56,12 @@ import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -151,7 +150,7 @@ private fun ShareChatPickerScaffold(
         },
         overlayBackRegistrar = overlayBackRegistrar,
     ) {
-        Scaffold(
+        WhiteNoiseScaffold(
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -162,12 +161,17 @@ private fun ShareChatPickerScaffold(
                         paneTitle = shareToTitle
                     },
             containerColor = amoledSheetContainerColor(),
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            // This picker places the banner slot itself, above its own snackbars.
+            topNoticeSlot = false,
             topBar = {
                 // App banners and the picker's own snackbars sit below its bar, never over the footer (#3312).
                 Column {
-                    TopAppBar(
-                        title = { Text(shareToTitle) },
-                        navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
+                    WhiteNoiseTopBar(
+                        title = shareToTitle,
+                        onBack = actions.dismiss,
+                        containerColor = amoledSheetContainerColor(),
+                        navigation = WhiteNoiseTopBarNavigation.Close,
                         actions = {
                             val selected = pickerState.selectedAccountRef
                             if (onOpenEmojiSet != null && selected != null) {
@@ -372,7 +376,7 @@ private fun ShareChatPickerTargetList(
         accountRef = pickerState.selectedAccountRef,
     ) {
         WhiteNoiseLazyColumn(
-            modifier = modifier.fillMaxWidth().testTag("share.destinations"),
+            modifier = modifier.fillMaxWidth().testTag("share.destinations").trackWhiteNoiseHeader(listState),
             state = listState,
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {
@@ -571,77 +575,6 @@ private fun ShareChatPickerAccountRow(
         compact = compact,
     )
 }
-
-private data class ShareChatPickerTargetPresentation(
-    val item: ChatListItem,
-    val title: String,
-    val foldedHumanSearchValues: List<String>,
-    val foldedIdentitySearchValues: List<String>,
-)
-
-private fun shareTargetPresentation(
-    item: ChatListItem,
-    accountAliases: Map<String, ShareAccountAliases>,
-    groupTitleCopy: GroupTitleCopy,
-): ShareChatPickerTargetPresentation {
-    val projectedTitle =
-        item.sanitizedNamedTitle ?: GroupProjector.displayTitle(
-            group = item.group,
-            otherMemberAccount = item.presentationOtherMemberAccount,
-            memberCount = item.presentationMemberCount,
-            memberTitle = { accountIdHex ->
-                accountAliases[accountIdHex]?.displayName ?: groupTitleCopy.unknownTitle
-            },
-            copy = groupTitleCopy,
-            conversationKind = item.projection?.conversationKind,
-            soleSelfMember = item.presentationActiveAccountIsSoleMember,
-            selfAccountIdHex = item.ownerAccountIdHex,
-        )
-    val title =
-        when {
-            item.sanitizedNamedTitle != null || projectedTitle != groupTitleCopy.unknownTitle -> projectedTitle
-            accountAliases.isNotEmpty() -> accountAliases.values.first().displayName
-            else -> "${groupTitleCopy.unknownTitle} · ${IdentityFormatter.short(item.group.groupIdHex)}"
-        }
-    val searchableTitle =
-        title.takeIf {
-            item.sanitizedNamedTitle != null ||
-                title == groupTitleCopy.groupOfPeople(item.presentationMemberCount) ||
-                accountAliases.values.any { aliases -> title in aliases.human }
-        }
-    val humanSearchValues =
-        (listOfNotNull(searchableTitle) + accountAliases.values.flatMap { it.human })
-            .mapNotNull(ProfileSanitizer::displayName)
-            .distinct()
-    return ShareChatPickerTargetPresentation(
-        item = item,
-        title = title,
-        foldedHumanSearchValues = humanSearchValues.map(::localeInvariantFold),
-        foldedIdentitySearchValues =
-            (listOf(item.group.groupIdHex) + accountAliases.values.flatMap { it.identity })
-                .map(::localeInvariantFold)
-                .distinct(),
-    )
-}
-
-private fun shareTargetAccountIds(
-    item: ChatListItem,
-    selectedAccountIdHex: String?,
-): List<String> =
-    buildList {
-        item.presentationOtherMemberAccount?.let(::add)
-        val directTarget =
-            item.presentationOtherMemberAccount != null ||
-                item.projection?.conversationKind == ChatConversationKindFfi.DIRECT
-        if (directTarget) {
-            item.memberSnapshot
-                ?.members
-                .orEmpty()
-                .forEach { add(it.memberIdHex) }
-            item.group.welcomerAccountIdHex?.let(::add)
-            item.latest?.sender?.let(::add)
-        }
-    }.filter { it.isNotBlank() && !it.equals(selectedAccountIdHex, ignoreCase = true) }.distinct()
 
 @Composable
 @Suppress("LongMethod") // Centralizes request-keyed Compose state and controller ownership.
