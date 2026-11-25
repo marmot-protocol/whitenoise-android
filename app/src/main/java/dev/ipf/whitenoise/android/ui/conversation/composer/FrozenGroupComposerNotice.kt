@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 
+/** Composer replacement while the group is frozen for repair, in the error tone. */
 @Composable
 internal fun FrozenGroupComposerNotice(modifier: Modifier = Modifier) {
     ComposerNotice(

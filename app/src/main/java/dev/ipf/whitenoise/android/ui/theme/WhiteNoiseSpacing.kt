@@ -23,7 +23,10 @@ object WhiteNoiseSpacing {
     val ConversationCluster: Dp = Dimens.spaceMd
     val PinnedActionInset: Dp = Dimens.spaceLg
 
-    /** Horizontal inset of banners and inline notices (callouts, composer and conversation notices). */
+    /**
+     * Horizontal inset of banners and inline notices (callouts and conversation notices). Composer replacement
+     * notices are full-width panels and keep the composer's [CompactScreenMargin].
+     */
     val NoticeHorizontalInset: Dp = Dimens.spaceMd
 
     /** Vertical inset of banners and inline notices. */

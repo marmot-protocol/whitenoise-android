@@ -33,6 +33,10 @@ class ComposerNoticesScreenshotTest {
     @Test
     fun composerNoticesAmoled() = capture("composer_notices_amoled", darkTheme = true, amoled = true)
 
+    /** Plain dark theme, so the error tone is pinned on the dark surface as well as AMOLED. */
+    @Test
+    fun composerNoticesDark() = capture("composer_notices_dark", darkTheme = true)
+
     /** Light theme. */
     @Test
     fun composerNoticesLight() = capture("composer_notices_light", darkTheme = false)
