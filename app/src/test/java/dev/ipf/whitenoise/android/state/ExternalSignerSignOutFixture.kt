@@ -75,6 +75,9 @@ internal abstract class ExternalSignerSignOutFixture {
     protected var beforeListAccounts: () -> Unit = {}
     protected var beforeSignOutReply: () -> Unit = {}
 
+    /** Runs after the native wipe has committed, before its reply returns to the caller. */
+    protected var beforeWipeReply: () -> Unit = {}
+
     // Both setup reads are synchronous bindings, so a scenario holds them on their IO thread instead of suspending.
     protected var setupRecoveryReply: (() -> Boolean)? = null
     protected var setupSnapshotReply: (() -> dev.ipf.marmotkit.OnboardingSnapshotFfi?)? = null
@@ -149,15 +152,19 @@ internal abstract class ExternalSignerSignOutFixture {
                 }
                 "signOutAndWipe" -> {
                     wipeCalls.incrementAndGet()
-                    wipeOutcome.also { engineWiped = it.localCleanup.completed }
+                    wipeOutcome.also {
+                        engineWiped = it.localCleanup.completed
+                        beforeWipeReply()
+                    }
                 }
                 "listAccounts" -> {
                     beforeListAccounts()
                     listAccountsCalls.incrementAndGet()
                     // The account list is a synchronous binding: a failure is thrown, not resumed.
                     listAccountsFailure?.let { throw it }
+                    // A wipe removes only this fixture's account, so other signers stay listed.
                     if (engineWiped) {
-                        emptyList()
+                        additionalAccounts
                     } else {
                         listOf(externalSignerAccount(signedOut = engineSignedOut)) + additionalAccounts
                     }

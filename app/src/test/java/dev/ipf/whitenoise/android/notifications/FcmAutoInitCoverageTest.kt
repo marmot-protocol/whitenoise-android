@@ -180,9 +180,13 @@ class FcmAutoInitCoverageTest {
         )
         val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
         assertTrue(settle.contains("nativePushSyncMutex.withLock"))
-        assertTrue(settle.contains("disableFcmAutoInitWithoutLoadedNativeDemand()"))
+        assertTrue(
+            "an incomplete change that leaves Push demand, or cannot read it, leaves a registration sync pending",
+            settle.contains("disableFcmAutoInitWithoutLoadedNativeDemand() != NativePushDemand.None") &&
+                settle.contains("recordPendingRegistrationSync()"),
+        )
         val loaded = autoInit.functionBody("disableFcmAutoInitWithoutLoadedNativeDemand")
-        assertTrue(loaded.contains("if (accountRefs.isNotEmpty()) disableFcmAutoInitWithoutNativeDemand(accountRefs)"))
+        assertTrue(loaded.contains("if (accountRefs.isEmpty()) null else disableFcmAutoInitWithoutNativeDemand("))
     }
 
     /** A Local selection that fails or is cancelled after a native disable committed settles auto-init. */
@@ -195,7 +199,10 @@ class FcmAutoInitCoverageTest {
         assertTrue(local.contains("selected.getOrThrow()"))
     }
 
-    /** Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. */
+    /**
+     * Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. A wipe
+     * settles auto-init from the native account list on every outcome but a reported unfinished cleanup.
+     */
     @Test
     fun lastAccountRemovalDisablesAutoInit() {
         val appState = appModuleSource("$STATE/AppState.kt")
@@ -210,6 +217,9 @@ class FcmAutoInitCoverageTest {
         val signOut = autoInit.functionBody("settleFcmAfterSignOut")
         assertTrue(signOut.contains("remaining.any { it.isSignedInSigningAccount() }"))
         assertTrue(signOut.contains("applyFcmAutoInit(enabled = false)"))
+        assertTrue(appState.contains(".wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }"))
+        val wipe = appModuleSource(PUSH_CLEARS).functionBody("wipeSettlingFcmAutoInit")
+        assertTrue(wipe.contains("withContext(NonCancellable) { disableFcmAutoInitWithoutNativeAccountDemand() }"))
     }
 
     /** Leaving native push for every account, by selection or by sync, turns auto-init off. */
@@ -263,5 +273,6 @@ class FcmAutoInitCoverageTest {
         const val SYNC = "$STATE/NotificationDeliveryControllerNativePushSync.kt"
         const val SELECTION = "$STATE/NotificationDeliveryControllerModeSelection.kt"
         const val AUTO_INIT = "$STATE/NotificationDeliveryControllerFcmAutoInit.kt"
+        const val PUSH_CLEARS = "$STATE/NotificationDeliveryControllerPushClears.kt"
     }
 }

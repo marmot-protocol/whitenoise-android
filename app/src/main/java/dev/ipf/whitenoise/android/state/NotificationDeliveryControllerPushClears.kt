@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,53 @@ internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterSignOu
 }
 
 /**
+ * Runs an account [wipe] while the caller holds the native sync lock, then settles Firebase auto-init from the
+ * native account list unless the wipe reports that its cleanup did not finish, which keeps the account. A wipe
+ * can commit just before a cancellation surfaces, so the settle reads what committed rather than trusting the
+ * result, and it also covers a wipe that leaves only accounts off native push.
+ */
+@Suppress("MaxLineLength")
+internal suspend fun NotificationDeliveryController.wipeSettlingFcmAutoInit(wipe: suspend () -> WipeOutcomeFfi): Result<WipeOutcomeFfi> {
+    val result = runCatching { wipe() }
+    if (result.getOrNull()?.localCleanup?.completed != false) {
+        withContext(NonCancellable) { disableFcmAutoInitWithoutNativeAccountDemand() }
+    }
+    return result
+}
+
+/**
+ * Turns auto-init off when the native account list holds no signed-in signer on native push. Unlike the
+ * loaded list, the native list is authoritative, so an empty one means no signer is left. When the list or a
+ * signer's settings cannot be read, it records the durable pending registration sync instead, so the next
+ * sync settles auto-init.
+ */
+private suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutNativeAccountDemand() {
+    val listed = runCatchingCancellable { host.marmotIo { listAccounts() } }.getOrNull()
+    val signerRefs = listed?.filter { it.isSignedInSigningAccount() }?.map { it.label }
+    val demand =
+        when {
+            signerRefs == null -> null
+            signerRefs.isEmpty() -> NativePushDemand.None
+            else -> runCatchingCancellable { nativePushDemand(signerRefs) }.getOrNull()
+        }
+    when (demand) {
+        NativePushDemand.None -> applyFcmAutoInit(enabled = false)
+        NativePushDemand.Required -> Unit
+        NativePushDemand.Unknown, null -> recordPendingRegistrationSync()
+    }
+}
+
+/**
+ * Records the durable pending registration sync, which the next sync, at the latest on the next app start,
+ * acknowledges once it has settled registration and auto-init. A storage failure is ignored.
+ */
+internal suspend fun NotificationDeliveryController.recordPendingRegistrationSync() {
+    withContext(NonCancellable + pushWakeStorageDispatcher) {
+        runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }
+    }
+}
+
+/**
  * Turns native push on or off for one account, confirming an enablement only once its registration is in
  * place and rolling it back otherwise. Once a disable or a rollback has been attempted, Firebase auto-init is
  * settled from the accounts' live demand on every exit, cancellation included, so the account's change never
@@ -83,11 +131,7 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
         // A cancelled enable may have left native push on without a registration, before its rollback or
         // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on
         // first. After a rollback that did commit, that sync clears it when no account needs Push.
-        if (enabled) {
-            withContext(NonCancellable + pushWakeStorageDispatcher) {
-                runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }
-            }
-        }
+        if (enabled) recordPendingRegistrationSync()
         throw cancelled
     } finally {
         if (nativeDisableAttempted.get()) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }

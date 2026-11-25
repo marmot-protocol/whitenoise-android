@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicReference
  * a Local selection cancelled after the last account's native disable committed, a per-account native-push
  * enablement that fails and is rolled back, a per-account disable cancelled after its native commit, and a
  * reconciliation that leaves no account on Push. A cancelled per-account enable, including one cancelled
- * during its rollback, leaves a registration sync pending instead.
+ * during its rollback, and a cancelled Push selection whose rollback fails, leave a registration sync pending.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -316,6 +316,63 @@ class FcmAutoInitIncompleteChangeTest {
                 assertFalse("no account uses Push, so auto-init must not turn on: $writes", true in writes)
                 assertEquals("the reconciliation must turn it off", false, writes.lastOrNull())
             } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * A Push selection cancelled once the registration commits, whose rollback then fails to turn native push
+     * back off, leaves the account on Push with a durable registration sync pending. That sync turns auto-init on.
+     */
+    @Test
+    fun cancelledPushSelectionWithFailedRollbackRecordsPendingSync() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val selection = AtomicReference<Job?>()
+            val cancelOnRegistration = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = false),
+                    nativePushFallbackPlatform = platform,
+                    onSetNativePushEnabled = { ref, enabled ->
+                        check(enabled || !cancelOnRegistration.get()) { "rollback write failed" }
+                        settings(ref, nativeEnabled = enabled)
+                    },
+                    // The registration commits, then the selection is cancelled before its auto-init write.
+                    onUpsertPushRegistration = { if (cancelOnRegistration.get()) selection.get()?.cancel() },
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { "test-token" },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.clearPendingNativePushRegistrationSync()
+                platform.autoInitWrites.clear()
+                val delivery = fixture.appState.notificationDelivery
+                val intent = delivery.notificationDeliveryModeIntent.capture()
+                val owner = checkNotNull(delivery.captureNotificationDeliveryModeOwner(intent))
+                cancelOnRegistration.set(true)
+
+                val job = launch { delivery.selectFcmDelivery(owner) }
+                selection.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the selection must have been cancelled", job.isCancelled)
+                assertTrue(ACCOUNT_A in fixture.upsertedPushRegistrations)
+                assertTrue("a failed rollback leaves Push", fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertFalse("a cancelled selection never turns auto-init on", true in platform.autoInitWrites)
+                assertTrue("the next sync must settle the account", store.nativePushRegistrationSyncPending())
+                cancelOnRegistration.set(false)
+
+                assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+
+                assertEquals(true, platform.autoInitWrites.lastOrNull())
+                assertFalse("the sync must acknowledge the marker", store.nativePushRegistrationSyncPending())
+            } finally {
+                cancelOnRegistration.set(false)
                 fixture.close()
             }
         }

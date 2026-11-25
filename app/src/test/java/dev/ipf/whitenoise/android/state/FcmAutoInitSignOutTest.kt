@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -157,6 +159,74 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
             assertEquals(otherAccountRef, state.activeAccountRef)
             val writes = platform.autoInitWrites.toList()
             assertFalse("a remaining Push account must keep auto-init: $writes", false in writes)
+        }
+
+    /** A wipe cancelled right after its native commit still turns auto-init off once no signer is left. */
+    @Test
+    fun wipeCancelledAfterItsNativeCommitTurnsAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state = appState(nativePushFallbackPlatform = platform)
+            lateinit var wipe: Job
+            beforeWipeReply = { wipe.cancel() }
+
+            wipe = launch { state.signOutAndWipeActiveAccount() }
+            wipe.join()
+
+            assertTrue("the native wipe must commit before the cancellation", engineWiped)
+            assertTrue("the wipe must end cancelled", wipe.isCancelled)
+            assertEquals(false, platform.autoInitWrites.lastOrNull())
+        }
+
+    /** Wiping the only Push account turns auto-init off even while a signer on local delivery remains. */
+    @Test
+    fun wipingTheOnlyPushAccountBesideALocalSignerTurnsAutoInitOff() =
+        runBlocking {
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)))
+            additionalNativePush[otherAccountRef] = false
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state = appState(profileReader = { null }, nativePushFallbackPlatform = platform)
+
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+
+            assertTrue("a signer must survive the wipe", state.accounts.any { it.label == otherAccountRef })
+            assertEquals(false, platform.autoInitWrites.lastOrNull())
+        }
+
+    /** Wiping one Push account while another signer still uses Push never turns auto-init off. */
+    @Test
+    fun wipeWithAnotherPushAccountKeepsAutoInit() =
+        runBlocking {
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)))
+            additionalNativePush[otherAccountRef] = true
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state = appState(profileReader = { null }, nativePushFallbackPlatform = platform)
+
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+
+            val writes = platform.autoInitWrites.toList()
+            assertFalse("a remaining Push account must keep auto-init: $writes", false in writes)
+        }
+
+    /** A wipe whose account list cannot be read afterwards leaves a durable registration sync to settle auto-init. */
+    @Test
+    fun wipeWithUnreadableAccountsAfterwardsRecordsPendingSync() =
+        runBlocking {
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)))
+            val store = PushTokenStore.create(context)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state =
+                appState(pushTokenStore = store, profileReader = { null }, nativePushFallbackPlatform = platform)
+            store.clearPendingNativePushRegistrationSync()
+            beforeWipeReply = { listAccountsFailure = java.io.IOException("account list unavailable") }
+
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+
+            assertTrue("the next sync must settle auto-init", store.nativePushRegistrationSyncPending())
+            assertTrue("an unread demand never turns auto-init on", true !in platform.autoInitWrites)
         }
 
     /** A remaining signed-in signer keeps auto-init and the token for the next sync to decide. */
