@@ -5145,7 +5145,7 @@ class WhiteNoiseAppState private constructor(
         }
         notificationDelivery.localNotificationSettings = settings
         // The native SQLite transaction committed false plus durable registration removals before returning.
-        withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
+        notificationDelivery.settleFcmAutoInitAfterSignOutNativeDisable(account)
         val result =
             runCatching {
                 withContext(marmotIoDispatcher) { runtime.marmot.signOut(account, deleteKeyPackages) }

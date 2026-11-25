@@ -11,7 +11,9 @@ import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -29,11 +31,13 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Delivery changes that do not complete still settle Firebase auto-init from the accounts' live demand (#4081):
- * a Local selection cancelled after the last account's native disable committed, and a per-account native-push
- * enablement that fails and is rolled back.
+ * a Local selection cancelled after the last account's native disable committed, a per-account native-push
+ * enablement that fails and is rolled back, and a per-account disable cancelled after its native commit.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -90,7 +94,7 @@ class FcmAutoInitIncompleteChangeTest {
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) { while (cleanupStarted.count > 0L) yield() }
                 }
-                // The native disable has committed; the cutover's own off write has not run yet.
+                // The native disable has committed, and the cutover's own off write has not run yet.
                 platform.autoInitWrites.clear()
 
                 result.cancel()
@@ -132,6 +136,46 @@ class FcmAutoInitIncompleteChangeTest {
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertEquals(false, platform.autoInitWrites.lastOrNull())
             } finally {
+                fixture.close()
+            }
+        }
+
+    /** A per-account Push disable cancelled right after its native `false` commits still turns auto-init off. */
+    @Test
+    fun cancelledPerAccountDisableAfterNativeCommitTurnsAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val toggle = AtomicReference<Job?>()
+            val cancelOnDisable = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = true),
+                    nativePushFallbackPlatform = platform,
+                    onSetNativePushEnabled = { ref, enabled ->
+                        // The native disable commits, then the toggle is cancelled before it can settle inline.
+                        if (!enabled && cancelOnDisable.get()) toggle.get()?.cancel()
+                        settings(ref, nativeEnabled = enabled)
+                    },
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { "test-token" },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+                cancelOnDisable.set(true)
+
+                val job = launch { fixture.appState.setNativePushEnabled(false) }
+                toggle.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the toggle must have been cancelled", job.isCancelled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertEquals(false, platform.autoInitWrites.lastOrNull())
+            } finally {
+                cancelOnDisable.set(false)
                 fixture.close()
             }
         }

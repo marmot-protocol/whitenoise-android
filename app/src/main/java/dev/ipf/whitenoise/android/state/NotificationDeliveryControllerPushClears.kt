@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Retry every `clearPushRegistration` that previously failed (sign-out
@@ -51,16 +53,42 @@ internal suspend fun NotificationDeliveryController.drainPendingPushDisables() {
 }
 
 /**
- * Turns native push on or off for one account, confirming an enablement only once its registration is in
- * place and rolling it back otherwise. A rollback or a disable then settles Firebase auto-init from the
- * accounts' live demand, so the account's change never leaves auto-init on for nobody.
+ * Runs while sign-out holds the native sync lock, once [account]'s native-push disable has committed: drops
+ * its pending-disable marker and settles auto-init from the loaded accounts' demand. A sign-out that then
+ * fails keeps the account signed in but off Push, so auto-init must not wait for the sign-out to finish.
  */
-internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
+internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterSignOutNativeDisable(account: String) {
+    withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
+    disableFcmAutoInitWithoutLoadedNativeDemand()
+}
+
+/**
+ * Turns native push on or off for one account, confirming an enablement only once its registration is in
+ * place and rolling it back otherwise. Once a disable or a rollback has been attempted, Firebase auto-init is
+ * settled from the accounts' live demand on every exit, cancellation included, so the account's change never
+ * leaves auto-init on for nobody.
+ */
+internal suspend fun NotificationDeliveryController.setNativePushEnabledSettlingAutoInit(
     account: String,
     enabled: Boolean,
 ): Boolean {
     if (enabled && !nativePushCapability().isAvailable) return false
-    return runCatching {
+    // A native disable can commit before a cancellation surfaces, so the settle runs in finally.
+    val nativeDisableAttempted = AtomicBoolean(!enabled)
+    try {
+        return setNativePushEnabledLocked(account, enabled, nativeDisableAttempted)
+    } finally {
+        if (nativeDisableAttempted.get()) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
+    }
+}
+
+/** Writes [account]'s native-push flag and confirms or rolls back an enablement, marking any disable attempt. */
+private suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
+    account: String,
+    enabled: Boolean,
+    nativeDisableAttempted: AtomicBoolean,
+): Boolean =
+    runCatching {
         val settings =
             nativePushSyncMutex.withLock {
                 if (
@@ -86,16 +114,15 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
                     activeAccountRegistered = hasConfirmedNativePushRegistration(account),
                 )
             if (!confirmed) {
+                // The sync turned auto-init on before its token read, so the rollback settles it on exit.
+                nativeDisableAttempted.set(true)
                 val rollbackSettings = host.marmotIo { setNativePushEnabled(account, false) }
                 localNotificationSettings = rollbackSettings
                 clearPushRegistrationForAccount(account)
-                // The sync turned auto-init on before its token read, so a failed enablement settles it.
-                settleFcmAutoInitAfterFailedSelection()
             }
             confirmed
         } else {
             clearPushRegistrationForAccount(account)
-            settleFcmAutoInitAfterFailedSelection()
             true
         }
     }.getOrElse {
@@ -103,7 +130,6 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
         host.presentFailure(R.string.toast_couldnt_update_notifications, "NOTIFICATION_SETTINGS_UPDATE", it)
         false
     }
-}
 
 /**
  * Runtime-side clear of an account's push registration plus the cached

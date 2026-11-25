@@ -131,8 +131,8 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
 
 /**
  * Whether any captured account still needs an FCM token, as far as its settings could be read. Firebase
- * auto-init follows this demand (#4081): the manifest keeps it off, the token fetch turns it on, and a
- * sync or Local selection that leaves no account on native push turns it off.
+ * auto-init follows this demand (#4081): the manifest keeps it off, a sync for accounts already on Push
+ * turns it on before its token read, and a change that leaves no account on native push turns it off.
  */
 internal enum class NativePushDemand {
     Required,

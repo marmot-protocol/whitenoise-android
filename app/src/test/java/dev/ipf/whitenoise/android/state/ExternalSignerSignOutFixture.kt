@@ -124,6 +124,8 @@ internal abstract class ExternalSignerSignOutFixture {
                         NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
                     }
                 }
+                // The native flag this fake keeps, for reads such as Firebase auto-init demand.
+                "notificationSettings" -> NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
                 "signOut" -> {
                     signOutCalls.incrementAndGet()
                     nativeCallOrder += "signOut"

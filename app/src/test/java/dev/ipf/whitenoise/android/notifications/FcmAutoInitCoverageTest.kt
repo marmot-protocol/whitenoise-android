@@ -18,8 +18,9 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Firebase must not request an FCM token before an account selects native push (#4081). The manifest
- * keeps Firebase Messaging auto-init off, only the delivery controller turns it on, and it does so
- * right before every token read. Leaving native push for every account turns it off again.
+ * keeps Firebase Messaging auto-init off and only the delivery controller turns it on: a sync for accounts
+ * already on Push does so right before its token read, and a new Push selection reads its token with it off
+ * and turns it on once registration commits. Leaving native push for every account turns it off again.
  * `FcmAutoInitDeliveryTest` drives the same rules through the controller.
  */
 @RunWith(RobolectricTestRunner::class)

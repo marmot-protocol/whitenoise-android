@@ -428,7 +428,7 @@ internal class NotificationDeliveryController(
                 ) {
                     return@withLock false
                 }
-                setNativePushEnabledLocked(requested, enabled)
+                setNativePushEnabledSettlingAutoInit(requested, enabled)
             }
         }
     }

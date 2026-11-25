@@ -119,6 +119,29 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
             assertNull(store.lastToken())
         }
 
+    /**
+     * A sign-out that commits the native-push disable but then fails keeps the account signed in and off Push,
+     * so auto-init must already be off when it returns incomplete.
+     */
+    @Test
+    fun incompleteSignOutAfterNativeDisableTurnsAutoInitOff() =
+        runBlocking {
+            signOutOutcome =
+                signOutOutcome.copy(
+                    localCleanup = dev.ipf.marmotkit.LocalCleanupReportFfi(false, "report cleanup"),
+                )
+            listAccountsFailure = java.io.IOException("readback unavailable")
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state = appState(nativePushFallbackPlatform = platform)
+
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+
+            assertEquals(accountRef, state.activeAccountRef)
+            assertFalse(nativePushEnabled)
+            assertEquals(false, platform.autoInitWrites.lastOrNull())
+            assertTrue(true !in platform.autoInitWrites)
+        }
+
     /** A remaining signed-in signer keeps auto-init and the token for the next sync to decide. */
     @Test
     fun remainingSignedInSignerLeavesAutoInit() =
