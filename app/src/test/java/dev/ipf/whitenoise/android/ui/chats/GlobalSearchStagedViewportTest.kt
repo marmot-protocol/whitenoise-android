@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 class GlobalSearchStagedViewportTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Deep restored search viewport holds its anchor until the initial message-results batch finishes loading. */
     @Test
     fun remountedSameDatasetRetainsDeepMessageAnchorUntilBodyRowsReturn() {
         var loading by mutableStateOf(true)
@@ -37,8 +38,7 @@ class GlobalSearchStagedViewportTest {
                 rememberSearchBodyAnchorRestoration(
                     datasetKey = dataset,
                     sameDataset = savedOwner.appliedDatasetKey == dataset,
-                    firstVisibleIndex = listState.firstVisibleItemIndex,
-                    firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                    listState = listState,
                     loading = loading,
                 )
             ChatListSearchTopResetEffect(listState, dataset, searchActive = true, viewportState = savedOwner)
@@ -64,20 +64,21 @@ class GlobalSearchStagedViewportTest {
         assertEquals(9, listState.firstVisibleItemScrollOffset)
     }
 
+    /** Anchor restoration waits only for the first observed load and retires before retries or dataset switches. */
     @Test
     fun restoredAnchorWaitsForItsFirstLoadButDoesNotHideNamesOnRetry() {
         val restoredDataset = ChatListDatasetKey(false, null, "name")
         var dataset by mutableStateOf(restoredDataset)
         var loading by mutableStateOf(false)
         var mounted by mutableStateOf(true)
+        val listState = LazyListState(firstVisibleItemIndex = 40, firstVisibleItemScrollOffset = 9)
         composeRule.setContent {
             if (mounted) {
                 val preserve =
                     rememberSearchBodyAnchorRestoration(
                         datasetKey = dataset,
                         sameDataset = dataset == restoredDataset,
-                        firstVisibleIndex = 40,
-                        firstVisibleOffset = 9,
+                        listState = listState,
                         loading = loading,
                     )
                 Text(if (preserve) "Restoration pending" else "Restoration finished")

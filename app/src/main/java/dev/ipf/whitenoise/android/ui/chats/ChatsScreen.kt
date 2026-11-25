@@ -1300,8 +1300,7 @@ internal fun ChatsScreen(
         rememberSearchBodyAnchorRestoration(
             datasetKey = chatListDatasetKey,
             sameDataset = searchViewport?.resetState(showArchived)?.appliedDatasetKey == chatListDatasetKey,
-            firstVisibleIndex = chatListState.firstVisibleItemIndex,
-            firstVisibleOffset = chatListState.firstVisibleItemScrollOffset,
+            listState = chatListState,
             loading = messageResultsPending,
         )
     ChatListSearchTopResetEffect(
