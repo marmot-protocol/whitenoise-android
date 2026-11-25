@@ -176,7 +176,7 @@ internal fun Modifier.mediaViewerThumbnail(
         remember(messageIdHex, attachmentIndex) {
             ConversationMediaViewerAttachmentId(messageIdHex, attachmentIndex)
         }
-    val radius = with(LocalDensity.current) { ConversationMessageMetrics.RichComponentCornerRadius.toPx() }
+    val radius = with(LocalDensity.current) { ConversationMessageMetrics.MediaTileCornerRadius.toPx() }
     val canvas = LocalMediaThumbnailCanvas.current
     val readingViewport = LocalMediaReadingViewport.current
     val currentReadingViewport by androidx.compose.runtime.rememberUpdatedState(readingViewport)

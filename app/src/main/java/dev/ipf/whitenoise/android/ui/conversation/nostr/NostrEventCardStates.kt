@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedActionIconSize
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedPadding
 
 @Composable
 internal fun EventCardActions(
@@ -49,7 +51,7 @@ internal fun EventCardActions(
             Icon(
                 painterResource(R.drawable.ic_content_copy),
                 contentDescription = copyDescription,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(ConversationEmbedActionIconSize),
                 tint = contentColor.copy(alpha = 0.8f),
             )
         }
@@ -57,7 +59,7 @@ internal fun EventCardActions(
             Icon(
                 openIcon,
                 contentDescription = openDescription,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(ConversationEmbedActionIconSize),
                 tint = contentColor,
             )
         }
@@ -92,7 +94,7 @@ internal fun EventCardStatus(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    Column(modifier = Modifier.padding(start = 10.dp, top = 4.dp, end = 4.dp, bottom = 6.dp)) {
+    Column(modifier = Modifier.padding(start = ConversationEmbedPadding, top = 4.dp, end = 4.dp, bottom = 6.dp)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -128,7 +130,7 @@ internal fun EventCardFailure(
     onOpen: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.padding(start = 8.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = ConversationEmbedPadding, top = 4.dp, end = 4.dp, bottom = 4.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -155,7 +157,7 @@ internal fun EventCardFailure(
                 Icon(
                     painterResource(R.drawable.ic_refresh),
                     contentDescription = stringResource(R.string.retry),
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(ConversationEmbedActionIconSize),
                     tint = contentColor,
                 )
             }
