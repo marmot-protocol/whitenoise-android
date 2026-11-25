@@ -3,11 +3,8 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,23 +33,26 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
+import dev.ipf.whitenoise.android.ui.common.IdentityHeader
+import dev.ipf.whitenoise.android.ui.common.IdentityName
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
-import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 
-/** Adaptive conversation identity with native edit, full-picture and public-key copy actions. */
+/**
+ * Adaptive conversation identity with native edit, full-picture and public-key copy actions. It keeps its optional
+ * viewer action at the presentation boundary.
+ */
 @Composable
-// Existing adaptive header keeps its optional viewer action at the presentation boundary.
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun GroupDetailsHeader(
     title: String,
@@ -92,13 +92,9 @@ internal fun GroupDetailsHeader(
             copied = false
         }
     }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val avatarSize = (maxWidth * 0.32f).coerceIn(104.dp, 152.dp)
-        Column(
-            Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp).padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    IdentityHeader(
+        modifier = Modifier.padding(top = WhiteNoiseSpacing.Section, bottom = WhiteNoiseSpacing.Related),
+        avatar = { avatarSize ->
             // The clip shapes the picture viewer's ripple; the followed badge sits outside it.
             FollowedPersonAvatarFrame(followedAccount, avatarSize) {
                 Box(
@@ -123,108 +119,91 @@ internal fun GroupDetailsHeader(
                     )
                 }
             }
-            if (onEdit == null) {
+        },
+    ) {
+        if (onEdit == null) {
+            IdentityName(
+                title,
+                Modifier.testTag("chat_info.name").onGloballyPositioned {
+                    onNameBottom(it.positionInWindow().y + it.size.height)
+                },
+            )
+        } else {
+            Row(
+                modifier =
+                    Modifier
+                        .widthIn(max = 440.dp)
+                        .heightIn(min = 48.dp)
+                        .testTag("chat_info.name")
+                        .then(editOrigin)
+                        .onGloballyPositioned { onNameBottom(it.positionInWindow().y + it.size.height) }
+                        .clickable(
+                            enabled = editEnabled,
+                            onClickLabel = stringResource(R.string.edit_group_name_and_description),
+                            role = Role.Button,
+                            onClick = editClick,
+                        ),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IdentityName(title, Modifier.weight(1f, fill = false))
+                Icon(
+                    painterResource(R.drawable.ic_edit),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        if (description.isNotBlank()) {
+            val copyValue = descriptionCopyValue
+            if (copyValue == null) {
                 EmojiLabel(
-                    title,
-                    modifier =
-                        Modifier.padding(top = 4.dp).testTag("chat_info.name").onGloballyPositioned {
-                            onNameBottom(it.positionInWindow().y + it.size.height)
-                        },
+                    description,
+                    modifier = Modifier.widthIn(max = 440.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             } else {
-                Row(
-                    modifier =
-                        Modifier
-                            .widthIn(max = 440.dp)
-                            .padding(top = 4.dp)
-                            .heightIn(min = 48.dp)
-                            .testTag("chat_info.name")
-                            .then(editOrigin)
-                            .onGloballyPositioned { onNameBottom(it.positionInWindow().y + it.size.height) }
-                            .clickable(
-                                enabled = editEnabled,
-                                onClickLabel = stringResource(R.string.edit_group_name_and_description),
-                                role = Role.Button,
-                                onClick = editClick,
-                            ),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    EmojiLabel(
-                        title,
-                        modifier = Modifier.weight(1f, fill = false),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        painterResource(R.drawable.ic_edit),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                CopyablePublicKey(
+                    npub = copyValue,
+                    copied = copied,
+                    onCopy = {
+                        clipboard.setText(AnnotatedString(copyValue))
+                        copied = true
+                    },
+                    targetTestTag = "chat_info.copy_public_key",
+                    textTestTag = "chat_info.full_public_key",
+                    explanationRes = R.string.explanation_chat_info_copy_peer_public_key,
+                )
             }
-            if (description.isNotBlank()) {
-                val copyValue = descriptionCopyValue
-                if (copyValue == null) {
-                    EmojiLabel(
-                        description,
-                        modifier = Modifier.widthIn(max = 440.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    IdentifierCopyCapsule(
-                        value = copyValue,
-                        copied = copied,
-                        onCopy = {
-                            clipboard.setText(AnnotatedString(copyValue))
-                            copied = true
-                        },
-                        copyContentDescription = stringResource(R.string.copy_public_key),
-                        copiedContentDescription = stringResource(R.string.copied),
-                        notCopiedStateDescription = stringResource(R.string.not_copied),
-                        copiedStateDescription = stringResource(R.string.copied),
-                        targetTestTag = "chat_info.copy_public_key",
-                        visualTestTag = "chat_info.copy_public_key.visual",
-                        explanationRes = R.string.explanation_chat_info_copy_peer_public_key,
-                    )
-                }
-            } else if (onAddDescription != null) {
-                TextButton(onClick = descriptionClick, modifier = descriptionOrigin) {
-                    Text(
-                        stringResource(R.string.add_group_description),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (subtitle.isNotBlank()) {
+        } else if (onAddDescription != null) {
+            TextButton(onClick = descriptionClick, modifier = descriptionOrigin) {
                 Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    stringResource(R.string.add_group_description),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (archived) {
-                    AssistChip(
-                        onClick = {},
-                        enabled = false,
-                        label = { Text(stringResource(R.string.archive_chat)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_archive), contentDescription = null) },
-                    )
-                }
+        }
+        if (subtitle.isNotBlank()) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            if (archived) {
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = { Text(stringResource(R.string.archive_chat)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_archive), contentDescription = null) },
+                )
             }
         }
     }
