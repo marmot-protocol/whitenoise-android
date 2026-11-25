@@ -18,10 +18,13 @@ class MessageActionKindsTest {
                 canForward = false,
                 canSave = false,
                 canShowLess = eligible,
+                canTranscribe = eligible,
             )
         assertTrue(MessageActionKind.ShowLess !in actions(false))
         assertTrue(MessageActionKind.ShowLess in actions(true))
         assertTrue(MessageActionKind.CopyText in actions(true))
         assertTrue(MessageActionKind.Reply in actions(true))
+        assertTrue(MessageActionKind.Transcribe !in actions(false))
+        assertTrue(MessageActionKind.Transcribe in actions(true))
     }
 }

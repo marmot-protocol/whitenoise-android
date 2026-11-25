@@ -163,6 +163,15 @@
         ]
       },
       {
+        "surface": "rememberMessageSideDiscPressAlpha",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun rememberMessageSideDiscPressAlpha(",
+        "test_ids": [
+          "MED-038",
+          "SET-033"
+        ]
+      },
+      {
         "surface": "MessageSideDiscIcon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "fun MessageSideDiscIcon(",
@@ -178,6 +187,17 @@
         "test_ids": [
           "SET-033",
           "MED-038"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Circular press feedback on transcript and translation controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "drawCircle(contentColor.copy(alpha = alpha))",
+        "test_ids": [
+          "MED-038",
+          "SET-033"
         ]
       }
     ]
