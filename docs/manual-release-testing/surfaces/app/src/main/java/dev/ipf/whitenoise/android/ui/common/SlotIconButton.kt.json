@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SlotIconButton.kt",
         "anchor": "fun SlotIconButton(",
         "test_ids": [
-          "AXY-018"
+          "AXY-022"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SlotIconButton.kt",
         "anchor": "fun SlotIconToggleButton(",
         "test_ids": [
-          "AXY-018"
+          "AXY-022"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/SlotIconButton.kt",
         "anchor": "fun SlotIconButtonLayout(",
         "test_ids": [
-          "AXY-018"
+          "AXY-022"
         ]
       }
     ]

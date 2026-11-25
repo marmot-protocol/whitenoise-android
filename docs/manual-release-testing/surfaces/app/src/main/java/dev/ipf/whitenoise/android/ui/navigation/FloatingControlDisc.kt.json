@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingControlDisc.kt",
         "anchor": "fun FloatingControlDisc(",
         "test_ids": [
-          "AXY-018",
+          "AXY-022",
           "CON-001",
           "CHL-022",
           "TTS-004"

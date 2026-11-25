@@ -77,7 +77,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "fun Modifier.mirrorInRtl(",
         "test_ids": [
-          "AXY-018",
+          "AXY-022",
           "TTS-001"
         ]
       }

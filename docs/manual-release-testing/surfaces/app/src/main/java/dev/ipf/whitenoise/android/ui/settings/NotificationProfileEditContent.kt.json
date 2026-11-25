@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
         "anchor": "fun DayPicker(",
         "test_ids": [
-          "AXY-018",
+          "AXY-022",
           "NTF-049"
         ]
       },
@@ -17,7 +17,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
         "anchor": "fun DayToggle(",
         "test_ids": [
-          "AXY-018",
+          "AXY-022",
           "NTF-049"
         ]
       },
