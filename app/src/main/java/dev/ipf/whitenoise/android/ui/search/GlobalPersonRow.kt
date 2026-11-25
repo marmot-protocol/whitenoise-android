@@ -35,7 +35,13 @@ internal fun GlobalPersonRow(
         shapes = WhiteNoiseListItemDefaults.shapes(),
         modifier = Modifier.testTag("global.person." + npub),
         leadingContent = {
-            PersonAvatar(displayName ?: IdentityFormatter.short(npub), npub, WhiteNoiseSizes.AvatarCompact, pictureUrl, followedAccount)
+            PersonAvatar(
+                displayName ?: IdentityFormatter.short(npub),
+                npub,
+                WhiteNoiseSizes.AvatarCompact,
+                pictureUrl,
+                followedAccount,
+            )
         },
     ) {
         Column {

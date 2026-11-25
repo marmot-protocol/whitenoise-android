@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
         "anchor": "fun RowScope.MessageSenderAvatarSlot(",
         "test_ids": [
-          "CON-002"
+          "CON-002",
+          "MSG-005"
         ]
       },
       {
