@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -280,18 +283,18 @@ internal fun KeyPackagesContent(
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
         topBarActions = {
             SettingsSearchRowReveal("refresh", modifier = Modifier) {
-                TextButton(
+                IconButton(
                     onClick = onRefresh,
                     enabled = state.actionsEnabled,
                     modifier =
-                        Modifier.explainOnLongPress(
+                        Modifier.testTag("key_packages.refresh").explainOnLongPress(
                             Explanation(
                                 stringResource(R.string.refresh),
                                 stringResource(R.string.explanation_relays_key_packages_refresh),
                             ),
                         ),
                 ) {
-                    Text(stringResource(R.string.refresh))
+                    Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
                 }
             }
         },

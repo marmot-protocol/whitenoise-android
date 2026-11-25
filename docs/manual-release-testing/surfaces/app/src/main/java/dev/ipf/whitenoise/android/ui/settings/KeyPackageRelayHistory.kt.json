@@ -1,0 +1,67 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+  "legacy_sha256": "a4de33315b98959a695627496a967d963f46788d05c1a186ce3635a9268a9457",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "key package relay event unpublished",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.developer_not_published",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package current",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_current",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package relay event summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_relay_event_summary",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package relay history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_relay_history",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "key package superseded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "R.string.key_package_superseded",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "KeyPackageRelayEventRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "fun KeyPackageRelayEventRow(",
+        "test_ids": [
+          "ACC-016",
+          "SET-072"
+        ]
+      },
+      {
+        "surface": "KeyPackageRelayHistory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRelayHistory.kt",
+        "anchor": "fun KeyPackageRelayHistory(",
+        "test_ids": [
+          "ACC-016",
+          "SET-072"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
