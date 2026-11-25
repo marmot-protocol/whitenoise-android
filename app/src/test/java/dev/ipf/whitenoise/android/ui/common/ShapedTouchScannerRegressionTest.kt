@@ -49,6 +49,30 @@ class ShapedTouchScannerRegressionTest {
         assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(optional)))
     }
 
+    /** A shaped Surface must actually compose its replacement for the null-indication click. */
+    @Test
+    fun aSurfaceRejectsFeedbackInOptionalOrUncalledContent() {
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        for (content in listOf("if (visible) { $feedback }", "val render = @Composable { $feedback }")) {
+            assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(content)))
+        }
+    }
+
+    /** Both entry points can use branched layouts when each branch draws feedback for the same source. */
+    @Test
+    fun feedbackMustBeDrawnInBothBranches() {
+        val modifier = "val pulse = Modifier.shapedPressFeedback(press, CircleShape)"
+        val rendered = "$modifier; if (available) { Image(bitmap, null, pulse) } else { Box(pulse) }"
+        val target = "Box(Modifier.shapedTouchTarget(press, go))"
+        assertEquals(emptyList<String>(), shapedTouchFindings(surfaceWith(rendered)))
+        assertEquals(emptyList<String>(), shapedTouchFindings("$target { $rendered }"))
+        val missing = rendered.replace("Box(pulse)", "Box(Modifier)")
+        assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(missing)))
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$target { $missing }"))
+        val uncalled = rendered.replace("Box(pulse)", "val render = @Composable { Box(pulse) }")
+        assertEquals(listOf("$SHAPED_SURFACE @1"), shapedTouchFindings(surfaceWith(uncalled)))
+    }
+
     /** A named content lambda cannot be the Surface modifier; the positional modifier is checked in place. */
     @Test
     fun shapedSurfaceScansOnlyItsModifier() {

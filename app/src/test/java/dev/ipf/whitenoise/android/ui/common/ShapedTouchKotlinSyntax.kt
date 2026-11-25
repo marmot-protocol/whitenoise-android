@@ -152,20 +152,18 @@ internal fun String.modifierLinks(
 /** Unwraps the expression blocks in a modifier built by a braced if/else. */
 private fun String.bracedModifierBranches(): List<TouchArgument> {
     val condition = ifCondition.find(this) ?: return emptyList()
-    val body = indexOfNonWhitespace(closingBracket(condition.range.last) + 1)
-    return if (getOrNull(body) == '{') {
-        val end = closingBracket(body)
-        val alternative = elseBlock.matchAt(this, end + 1)?.range?.last
-        listOfNotNull(modifierBranch(body), alternative?.let(::modifierBranch))
-    } else {
-        emptyList()
+    return bracedIfArms(condition.range.last).map { arm ->
+        TouchArgument(arm.first + 1, substring(arm.first + 1, arm.last))
     }
 }
 
-/** Reads one branch without its outer braces and retains the original expression offset. */
-private fun String.modifierBranch(open: Int): TouchArgument {
-    val start = open + 1
-    return TouchArgument(start, substring(start, closingBracket(open)))
+/** Reads the braced arms after a condition, keeping each arm's opening and closing braces. */
+internal fun String.bracedIfArms(conditionOpen: Int): List<IntRange> {
+    val body = indexOfNonWhitespace(closingBracket(conditionOpen) + 1)
+    if (getOrNull(body) != '{') return emptyList()
+    val end = closingBracket(body)
+    val alternative = elseBlock.matchAt(this, end + 1)?.range?.last
+    return listOfNotNull(body..end, alternative?.let { it..closingBracket(it) })
 }
 
 /** Recognizes the simple nullable-source hand-off whose else branch appends no modifier. */

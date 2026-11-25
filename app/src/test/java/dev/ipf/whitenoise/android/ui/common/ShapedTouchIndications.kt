@@ -26,6 +26,7 @@ private val composedContentOwners =
 private val bareContentCall = Regex("""\b(${composedContentOwners.joinToString("|")})\s*\{""")
 private val qualifiedReceiver = Regex("""(?:[A-Za-z_]\w*\.)+$""")
 private val returnStatement = Regex("""\breturn(?:@(\w+))?\b""")
+private val branchCondition = Regex("""\bif\s*\(""")
 private val controlCondition = Regex("""\b(?:if|for|while)\s*\(""")
 private val elseBranch = Regex("""\belse$""")
 private val sourceReference = Regex("""[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*""")
@@ -55,6 +56,15 @@ internal class ShapedTouchIndications(
         (arguments.asSequence() + bare).toMap()
     }
 
+    private val exhaustiveBranches by lazy {
+        branchCondition
+            .findAll(code)
+            .mapNotNull { condition ->
+                val arms = code.bracedIfArms(condition.range.last)
+                if (arms.size == 2) ExhaustiveBranch(condition.range.first, arms) else null
+            }.toList()
+    }
+
     /** Reports applied targets that suppress their normal indication without drawing matching feedback. */
     fun unmatchedTouchTargets(): List<Int> {
         if ("shapedTouchTarget" !in code) return emptyList()
@@ -64,7 +74,7 @@ internal class ShapedTouchIndications(
                     .filter { it.name == "shapedTouchTarget" }
                     .filterNot { link ->
                         val source = link.feedbackReference()?.let { binding(it.expression, it.offset) }
-                        source != null && hasFeedback(owner, source, requireGuaranteedComposition = true)
+                        source != null && hasFeedback(owner, source)
                     }.map(ModifierLink::argumentOffset)
                     .toList()
             }.distinct()
@@ -124,31 +134,12 @@ internal class ShapedTouchIndications(
     private fun hasFeedback(
         owner: FeedbackOwner,
         source: FeedbackBinding,
-        requireGuaranteedComposition: Boolean = false,
-    ): Boolean {
-        val drawn = draws(owner, source, requireGuaranteedComposition)
-        return drawn || forwards(owner, source, requireGuaranteedComposition)
-    }
-
-    /** Only feedback inside the receiving component's call or content can replace its click's indication. */
-    private fun draws(
-        owner: FeedbackOwner,
-        source: FeedbackBinding,
-        requireGuaranteedComposition: Boolean,
-    ): Boolean =
-        replacements.any { (component, references) ->
-            component.start in owner.start until owner.end &&
-                (!requireGuaranteedComposition || isComposedFrom(owner.open, component)) &&
-                references.any { reference ->
-                    !reference.conditional && binding(reference.expression, reference.offset) == source
-                }
-        }
+    ): Boolean = hasDrawnFeedback(owner.start until owner.end, owner.open, source) || forwards(owner, source)
 
     /** Follows a named source parameter into the called component, never an unrelated function's parameter. */
     private fun forwards(
         owner: FeedbackOwner,
         source: FeedbackBinding,
-        requireGuaranteedComposition: Boolean,
     ): Boolean {
         val passed = topLevelNamedArguments(code.substring(owner.open + 1, owner.close))
         val function = componentImplementation(owner) ?: return false
@@ -156,28 +147,66 @@ internal class ShapedTouchIndications(
             val declared = parameterBinding(function, parameter)
             binding(argument.trim(), owner.open) == source &&
                 declared != null &&
-                replacements.any { (component, references) ->
-                    component.start in function.body until function.end &&
-                        (!requireGuaranteedComposition || isComposedFrom(function.body, component)) &&
-                        references.any { reference ->
-                            (!reference.conditional || reference.guardedSource == parameter) &&
-                                binding(reference.expression, reference.offset) == FeedbackBinding(parameter, declared)
-                        }
-                }
+                hasDrawnFeedback(
+                    function.body until function.end,
+                    function.body,
+                    FeedbackBinding(parameter, declared),
+                    guardedParameter = parameter,
+                )
         }
     }
 
-    /** The complete path to a feedback node must run through immediately composed layout content. */
+    /** Finds feedback that observes the exact binding, then proves the matching nodes are actually composed. */
+    private fun hasDrawnFeedback(
+        scope: IntRange,
+        compositionStart: Int,
+        source: FeedbackBinding,
+        guardedParameter: String? = null,
+    ): Boolean {
+        val matching =
+            replacements.mapNotNull { (component, references) ->
+                component.start.takeIf { offset ->
+                    offset in scope &&
+                        references.any { reference ->
+                            val presentGuard = guardedParameter != null && reference.guardedSource == guardedParameter
+                            (!reference.conditional || presentGuard) &&
+                                binding(reference.expression, reference.offset) == source
+                        }
+                }
+            }
+        return hasFeedbackOnAllPaths(compositionStart, matching)
+    }
+
+    /** Accepts an exhaustive branch only when each of its arms independently draws matching feedback. */
+    private fun hasFeedbackOnAllPaths(
+        start: Int,
+        matching: List<Int>,
+        activeArms: List<IntRange> = emptyList(),
+    ): Boolean {
+        if (matching.isEmpty()) return false
+        return matching.any { isComposedFrom(start, it, activeArms) } ||
+            exhaustiveBranches.any { branch ->
+                val byArm = branch.arms.map { arm -> matching.filter { it in arm } }
+                byArm.all { it.isNotEmpty() } &&
+                    isComposedFrom(start, branch.start, activeArms) &&
+                    branch.arms.zip(byArm).all { (arm, candidates) ->
+                        hasFeedbackOnAllPaths(start, candidates, activeArms.plusElement(arm))
+                    }
+            }
+    }
+
+    /** The path must run through immediately composed layout content and arms already proved exhaustive. */
     private fun isComposedFrom(
         start: Int,
-        component: FeedbackOwner,
+        offset: Int,
+        activeArms: List<IntRange>,
     ): Boolean {
-        if (component.start < start) return true // Feedback on the receiving component itself.
-        val scopes = code.openScopesAt(start, component.start)
+        if (offset < start) return true // Feedback on the receiving component itself.
+        val scopes = code.openScopesAt(start, offset).filterNot { open -> activeArms.any { it.first == open } }
         val parents = scopes.mapNotNull(composedContentScopes::get)
-        val calls = parents.map(ContentCall::start) + component.start
+        val calls = parents.map(ContentCall::start) + offset
         val branching = calls.any { it >= start && code.followsUnbracedBranch(start, it) }
-        return parents.size == scopes.size && !branching && !canReturnBeforeFeedback(start, component.start, parents)
+        return parents.size == scopes.size && !branching && !canReturnBeforeFeedback(start, offset, parents, activeArms)
     }
 
     /** An early return can skip feedback even when both calls are in the same composed block. */
@@ -185,10 +214,16 @@ internal class ShapedTouchIndications(
         from: Int,
         feedbackStart: Int,
         enclosingContent: List<ContentCall>,
-    ): Boolean =
-        returnStatement
+        activeArms: List<IntRange>,
+    ): Boolean {
+        val inactiveArms =
+            exhaustiveBranches
+                .filter { branch -> branch.arms.any { it in activeArms } }
+                .flatMap { branch -> branch.arms.filterNot { it in activeArms } }
+        return returnStatement
             .findAll(code, from)
             .takeWhile { it.range.first < feedbackStart }
+            .filterNot { statement -> inactiveArms.any { statement.range.first in it } }
             .any { statement ->
                 val offset = statement.range.first
                 val label = statement.groups[1]?.value
@@ -200,6 +235,7 @@ internal class ShapedTouchIndications(
                     destination != null && destination in enclosingContent
                 }
             }
+    }
 
     /** Knows the trailing and named content blocks that these layout functions compose immediately. */
     private fun FeedbackOwner.contentScopeOpenings(): List<Pair<Int, ContentCall>> {
@@ -288,6 +324,12 @@ private fun String.followsUnbracedBranch(
             }
     return elseBranch.containsMatchIn(before) || closesCondition
 }
+
+/** An if/else whose two explicit arms can be proved separately. */
+private data class ExhaustiveBranch(
+    val start: Int,
+    val arms: List<IntRange>,
+)
 
 /** Identifies the layout call that owns a known composed content block. */
 private data class ContentCall(
