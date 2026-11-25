@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.translation
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,7 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.settings.ZAPSTORE_PACKAGE
+import dev.ipf.whitenoise.android.core.openExternalStoreListing
 
 /**
  * The publisher's Zapstore app identity: kind 32267 app `dev.davidv.translator`, signed by the publisher key
@@ -83,27 +82,36 @@ internal fun offlineTranslatorInstalled(context: Context): Boolean =
 
 /**
  * Opens the installed engine for model management, even a version White Noise cannot translate with.
- * Otherwise it opens [route]: the Zapstore app, then the same listing in a browser, then the GitHub release.
- * Every intent names only a package or a public page, never message text or translation arguments. Returns
- * false when no app could open any of them.
+ * Otherwise it opens [route] in a new task: the Zapstore app, then the same listing in a browser, then the
+ * GitHub release. Every intent names only a package or a public page, never message text or translation
+ * arguments. Returns false when no app could open any of them.
  */
 internal fun openOfflineTranslator(
     context: Context,
     route: OfflineTranslatorRoute = offlineTranslatorRoute(),
-    startActivity: (Intent) -> Unit = { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+    startActivity: (Intent) -> Unit = context::startActivity,
 ): Boolean {
-    val launch = runCatching { context.packageManager.getLaunchIntentForPackage(OFFLINE_TRANSLATOR_PACKAGE) }
-    val zapstore = Uri.parse(OFFLINE_TRANSLATOR_ZAPSTORE_URL)
-    val candidates =
-        listOfNotNull(
-            launch.getOrNull(),
-            Intent(Intent.ACTION_VIEW, zapstore).setPackage(ZAPSTORE_PACKAGE).takeIf {
-                route == OfflineTranslatorRoute.ZAPSTORE
-            },
-            Intent(Intent.ACTION_VIEW, zapstore).takeIf { route == OfflineTranslatorRoute.ZAPSTORE },
-            Intent(Intent.ACTION_VIEW, Uri.parse(offlineTranslatorReleaseUrl)),
-        )
-    return candidates.any { intent -> runCatching { startActivity(intent) }.isSuccess }
+    val launch =
+        runCatching { context.packageManager.getLaunchIntentForPackage(OFFLINE_TRANSLATOR_PACKAGE) }
+            .getOrNull()
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (launch != null && runCatching { startActivity(launch) }.isSuccess) return true
+    return when (route) {
+        OfflineTranslatorRoute.ZAPSTORE ->
+            openExternalStoreListing(
+                context = context,
+                listingUrl = OFFLINE_TRANSLATOR_ZAPSTORE_URL,
+                fallbackUrls = listOf(offlineTranslatorReleaseUrl),
+                startActivity = startActivity,
+            )
+        OfflineTranslatorRoute.GITHUB_RELEASE ->
+            openExternalStoreListing(
+                context = context,
+                listingUrl = offlineTranslatorReleaseUrl,
+                preferPackage = null,
+                startActivity = startActivity,
+            )
+    }
 }
 
 /**

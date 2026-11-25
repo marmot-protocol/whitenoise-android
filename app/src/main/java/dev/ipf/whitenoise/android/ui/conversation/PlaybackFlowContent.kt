@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 
-/** In-place Chats destinations retain their transport above content without adding another dialog or root inset. */
+/**
+ * In-place Chats destinations retain their transport above content without adding another dialog or root inset.
+ * They own input in place of Chats, so its keyboard shortcuts wait until they close.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun PlaybackFlowContent(
@@ -25,6 +29,7 @@ internal fun PlaybackFlowContent(
             host != null &&
             host.appState.observePlaybackTransportVisible() &&
             !host.appState.appLock.screenVisible
+    HardwareShortcutBlocker(chatsOnly = true)
     Column(Modifier.fillMaxSize()) {
         if (host != null && visible) {
             Box(Modifier.statusBarsPadding()) {

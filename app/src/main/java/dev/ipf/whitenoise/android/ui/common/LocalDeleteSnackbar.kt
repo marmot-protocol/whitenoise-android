@@ -20,11 +20,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -72,7 +70,7 @@ private fun LocalDeleteDetails(
     visuals: ToastSnackbarVisuals,
     onDismiss: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     WhiteNoiseAlertDialog(
         modifier = Modifier.testTag("local-delete-details"),
         onDismissRequest = onDismiss,
@@ -88,7 +86,7 @@ private fun LocalDeleteDetails(
         dismissButton =
             visuals.copyText?.takeIf { visuals.copyable && it.isNotBlank() }?.let { report ->
                 {
-                    TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) {
+                    TextButton(onClick = { clipboard.copy(report) }) {
                         Text(stringResource(R.string.copy))
                     }
                 }

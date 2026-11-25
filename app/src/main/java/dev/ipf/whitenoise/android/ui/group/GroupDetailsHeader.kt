@@ -27,12 +27,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -42,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.IdentityHeader
 import dev.ipf.whitenoise.android.ui.common.IdentityName
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
@@ -80,7 +79,7 @@ internal fun GroupDetailsHeader(
     val (descriptionOrigin, descriptionClick) =
         dev.ipf.whitenoise.android.ui.settings
             .rememberSettingsRouteClick { onAddDescription?.invoke() }
-    val clipboard = LocalClipboardManager.current
+    val copier = rememberClipboardCopier()
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null }, pictureDomain)
     val avatarImageAvailable = picture != null || remoteImageAvailable
@@ -170,8 +169,7 @@ internal fun GroupDetailsHeader(
                     npub = copyValue,
                     copied = copied,
                     onCopy = {
-                        clipboard.setText(AnnotatedString(copyValue))
-                        copied = true
+                        if (copier.copy(copyValue)) copied = true
                     },
                     targetTestTag = "chat_info.copy_public_key",
                     textTestTag = "chat_info.full_public_key",

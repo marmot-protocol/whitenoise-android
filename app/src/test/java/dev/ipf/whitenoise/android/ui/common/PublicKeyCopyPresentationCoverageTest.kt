@@ -113,7 +113,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val key = keyText(ROW).getUnclippedBoundsInRoot()
         assertTrue("the key target leaves its row", key.left >= row.left && key.right <= row.right)
         assertTrue("the key target spans the whole row", key.right - key.left < row.right - row.left)
-        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", "npub1 qqqqq")
+        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", SHORT_KEY)
     }
 
     /**

@@ -12,22 +12,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -39,8 +31,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
-import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 
 /** Public identity without repeating technical labels or exposing operational references. */
 @Composable
@@ -106,7 +97,6 @@ internal fun GroupReviewPersonText(
     person: GroupReviewPerson,
     role: String,
     copyable: Boolean = true,
-    expanded: Boolean = false,
 ) {
     person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
     groupReviewNicknameLabel(person)?.let { Text(it) }
@@ -114,7 +104,7 @@ internal fun GroupReviewPersonText(
         if (copyable) {
             GroupReviewNpub(person.identifier, role)
         } else {
-            GroupReviewKeyText(person.identifier, expanded)
+            GroupReviewKeyText(person.identifier)
         }
     } else if (person.publicName == null) {
         Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
@@ -176,7 +166,7 @@ private fun GroupReviewNpub(
     compact: Boolean = false,
     showRole: Boolean = false,
 ) {
-    GroupReviewCopyRow(npub, "$role, $npub") { expanded ->
+    GroupReviewCopyRow(npub, "$role, $npub") {
         if (showRole) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -184,10 +174,10 @@ private fun GroupReviewNpub(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                GroupReviewKeyText(npub, expanded, compact, textDirection = TextDirection.Ltr)
+                GroupReviewKeyText(npub, compact, textDirection = TextDirection.Ltr)
             }
         } else {
-            GroupReviewKeyText(npub, expanded, compact)
+            GroupReviewKeyText(npub, compact)
         }
     }
 }
@@ -196,21 +186,12 @@ private fun GroupReviewNpub(
 @Suppress("FunctionNaming")
 private fun GroupReviewKeyText(
     npub: String,
-    expanded: Boolean,
     compact: Boolean = false,
     textDirection: TextDirection = MaterialTheme.typography.bodySmall.textDirection,
 ) {
     Text(
-        text =
-            if (expanded) {
-                publicKeyDisplayGroups(npub).joinToString(" ")
-            } else {
-                IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
-            },
-        modifier = Modifier.animatePublicKeyExpansion(expanded),
+        text = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8),
         style = MaterialTheme.typography.bodySmall.copy(textDirection = textDirection),
-        fontFamily = if (expanded) FontFamily.Monospace else null,
-        textAlign = if (expanded) TextAlign.Center else null,
     )
 }
 
@@ -225,21 +206,19 @@ internal fun GroupReviewCopyRow(
     description: String,
     modifier: Modifier = Modifier,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    content: @Composable RowScope.(Boolean) -> Unit,
+    content: @Composable RowScope.() -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val copyLabel = stringResource(R.string.copy)
-    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
     Row(
         modifier
             .heightIn(min = 48.dp)
-            .clickable(onClickLabel = copyLabel, role = Role.Button) {
-                clipboard.setText(AnnotatedString(npub))
-                expanded = true
-            }.semantics(mergeDescendants = true) { contentDescription = description },
+            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.copy(npub) }
+            .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = horizontalArrangement,
-    ) { content(expanded) }
+        content = content,
+    )
 }
 
 /** Separate destinations retain exact hidden keys without displaying group IDs. */

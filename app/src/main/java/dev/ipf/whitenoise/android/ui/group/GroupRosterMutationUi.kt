@@ -9,24 +9,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
-import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
-import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
-import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 
@@ -71,30 +62,13 @@ internal fun PendingGroupInviteRow(
     avatarSeed: String,
     avatarUrl: String?,
     onClick: () -> Unit,
-    npub: String = "",
 ) {
-    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
     ContactRow(
         title = title,
-        subtitle = subtitle.takeUnless { expanded },
+        subtitle = subtitle,
         avatarSeed = avatarSeed,
         avatarUrl = avatarUrl,
-        onClick = {
-            onClick()
-            expanded = isCanonicalNpub(npub)
-        },
-        secondaryContent = {
-            if (expanded) {
-                Text(
-                    stringResource(R.string.invite_pending, publicKeyDisplayGroups(npub).joinToString(" ")),
-                    modifier = Modifier.animatePublicKeyExpansion(expanded),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        },
+        onClick = onClick,
         trailing = {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         },

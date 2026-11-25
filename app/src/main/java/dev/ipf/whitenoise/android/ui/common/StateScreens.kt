@@ -9,43 +9,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal enum class LoadFailurePlacement {
     None,
@@ -71,31 +56,11 @@ internal fun loadFailurePlacement(
  */
 @Composable
 fun LoadingScreen(message: String? = null) {
-    Box(
-        Modifier.fillMaxSize().testTag(FULL_SCREEN_LOADING_TEST_TAG),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        ) {
-            CircularProgressIndicator()
-            if (message != null) {
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    // The copy arrives after the indicator has been on screen a while, so announce it.
-                    modifier =
-                        Modifier
-                            .testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
-        }
-    }
+    StateProgressPage(
+        modifier = Modifier.testTag(FULL_SCREEN_LOADING_TEST_TAG),
+        progressLabel = message,
+        progressLabelModifier = Modifier.testTag(FULL_SCREEN_LOADING_MESSAGE_TEST_TAG),
+    )
 }
 
 /** Presents the prototype startup indicator while native bootstrap owns all progress and readiness. */
@@ -163,53 +128,27 @@ internal fun InlineConfirmationNotice(
 
 /**
  * Presents a retryable failure with copyable diagnostics.
- *
- * [copyActionColor] lets a caller provide a foreground with sufficient contrast for its local
- * recovery surface while the default preserves the existing Material text-button treatment.
  */
 @Composable
 internal fun ErrorContent(
     title: String,
     error: ErrorPresentation,
     onRetry: () -> Unit,
-    copyActionColor: Color? = null,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val copier = rememberClipboardCopier()
     val context = LocalContext.current
-    val message = error.message.resolve(context)
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(painterResource(R.drawable.ic_info), contentDescription = null, modifier = Modifier.size(40.dp))
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            SelectionContainer {
-                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (error.retryable) {
-                Button(onClick = onRetry) {
-                    Icon(
-                        painterResource(R.drawable.ic_refresh),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.retry))
-                }
-            }
-            TextButton(
-                onClick = { clipboard.setText(AnnotatedString(error.report)) },
-                colors =
-                    ButtonDefaults.textButtonColors(
-                        contentColor = copyActionColor ?: MaterialTheme.colorScheme.primary,
-                    ),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_content_copy),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.copy))
-            }
-        }
-    }
+    StatePage(
+        icon = R.drawable.ic_info,
+        title = title,
+        message = error.message.resolve(context),
+        selectableMessage = true,
+        primary =
+            if (error.retryable) StateAction(stringResource(R.string.retry), onRetry, R.drawable.ic_refresh) else null,
+        secondary =
+            StateAction(
+                stringResource(R.string.copy),
+                { copier.copy(error.report) },
+                R.drawable.ic_content_copy,
+            ),
+    )
 }

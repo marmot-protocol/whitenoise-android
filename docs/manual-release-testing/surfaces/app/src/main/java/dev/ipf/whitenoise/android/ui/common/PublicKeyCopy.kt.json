@@ -9,7 +9,8 @@
         "anchor": "internal fun PublicKeyCopyText(",
         "test_ids": [
           "ACC-002",
-          "GRP-005"
+          "GRP-005",
+          "NCH-010"
         ]
       },
       {

@@ -79,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScope
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationOwnsShortcuts
 import dev.ipf.whitenoise.android.ui.conversation.canonicalMessageId
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
@@ -2006,6 +2007,7 @@ internal fun MainShell(
                                 content.accountRef,
                                 chat.group.groupIdHex,
                                 LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,
+                                LocalConversationOwnsShortcuts provides (selectedChat?.id == chat.id),
                             ) {
                                 ConversationScreen(
                                     appState = appState,

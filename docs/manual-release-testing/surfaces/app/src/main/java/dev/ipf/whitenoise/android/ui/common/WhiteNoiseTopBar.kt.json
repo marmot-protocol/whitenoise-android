@@ -1,0 +1,77 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+  "legacy_sha256": "78074a9402e7d6c2c6bd11767d1dd8ad8697d7591912865d85c6ec48d12ea026",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "fun WhiteNoiseTopBar(",
+        "test_ids": [
+          "SET-001",
+          "SET-022",
+          "NCH-002",
+          "GRP-005",
+          "MSG-007",
+          "MSG-013",
+          "SYS-004",
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Top bar leading control: Back arrow or X",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "enum class WhiteNoiseTopBarNavigation",
+        "test_ids": [
+          "SET-001",
+          "SYS-004",
+          "MSG-010"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SET-001",
+          "SET-022",
+          "NCH-002",
+          "GRP-005",
+          "MSG-007",
+          "MSG-013"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SYS-004",
+          "MSG-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Top bar Back disabled while a page commits",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "enabled = navigationEnabled",
+        "test_ids": [
+          "GRP-005",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "Top bar account accessory beside the leading control",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTopBar.kt",
+        "anchor": "navigationAccessory?.invoke()",
+        "test_ids": [
+          "MSG-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

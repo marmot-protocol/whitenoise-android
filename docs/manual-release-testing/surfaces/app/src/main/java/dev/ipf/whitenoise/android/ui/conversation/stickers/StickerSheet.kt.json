@@ -12,15 +12,6 @@
         ]
       },
       {
-        "surface": "StickerSheetTopBar",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
-        "anchor": "fun StickerSheetTopBar(",
-        "test_ids": [
-          "MSG-045",
-          "MSG-046"
-        ]
-      },
-      {
         "surface": "StickerSectionTitle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
         "anchor": "fun StickerSectionTitle(",
@@ -42,24 +33,6 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
         "anchor": "fun StickerProgress(",
         "test_ids": [
-          "MSG-046"
-        ]
-      },
-      {
-        "surface": "Sticker copy back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "MSG-045",
-          "MSG-046"
-        ]
-      },
-      {
-        "surface": "Sticker copy close",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
-        "anchor": "R.string.close",
-        "test_ids": [
-          "MSG-045",
           "MSG-046"
         ]
       },

@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.SurfaceMorphResume
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.surfaceMorphInk
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlin.math.roundToInt
 
@@ -199,6 +200,8 @@ private fun <T> SettingsTopLevelRouteLayers(
         layers.forEach { layer ->
             key(layer) {
                 val live = layer == target
+                // Keys reach shortcuts before this layer's input gate, so an inert underlay withdraws its own.
+                if (!live) HardwareShortcutBlocker(chatsOnly = true)
                 val focused = remember { mutableStateOf(false) }
                 if (!live && focused.value) SideEffect { focusManager.clearFocus(force = true) }
                 val layerModifier = if (live) hostModifier else Modifier.fillMaxSize().settingsTransitionInputGate(true)

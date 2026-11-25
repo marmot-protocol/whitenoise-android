@@ -5,16 +5,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 
 /** Keeps the native profile/group result visible above the secure full-screen window, including safe-report Copy. */
 @Suppress("FunctionNaming")
@@ -25,7 +24,7 @@ internal fun PersonProfileFeedbackDialog(
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val report = feedback.diagnosticReport?.takeIf { feedback.copyable }
     WhiteNoiseAlertDialog(
         properties = DialogProperties(securePolicy = securePolicy),
@@ -41,7 +40,7 @@ internal fun PersonProfileFeedbackDialog(
             report?.let { safeReport ->
                 {
                     TextButton(
-                        onClick = { clipboard.setText(AnnotatedString(safeReport)) },
+                        onClick = { clipboard.copy(safeReport) },
                         modifier = Modifier.testTag("person-profile-feedback-copy"),
                     ) { Text(stringResource(R.string.copy)) }
                 }

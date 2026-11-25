@@ -11,16 +11,15 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -32,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -43,13 +41,16 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -62,9 +63,9 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
 /**
- * Multi-select people picker shared by the New Group flow and the group
+ * Multi-select people picker shared by a conversation's Share user flow and the group
  * details Add Members flow. Selection lives in the caller's [selected] list so
- * flows can carry it across steps.
+ * flows can carry it across steps. While shown it holds the hardware keyboard shortcuts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +94,8 @@ internal fun ContactPickerScreen(
     reviewDescription: String? = null,
     // Callers whose selection survives recreation pass saveable review state so an open review survives with it.
     reviewOpen: MutableState<Boolean>? = null,
+    // A picker that overlays a chat and returns to it, like Share user, leads with Close; pushed steps keep Back.
+    navigation: WhiteNoiseTopBarNavigation = WhiteNoiseTopBarNavigation.Back,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
@@ -114,6 +117,9 @@ internal fun ContactPickerScreen(
             if (reviewingSelection) reviewingSelection = false else onBack()
         }
     }
+    // The picker is drawn in the activity window over its caller, so it holds the hardware shortcuts as Back holds
+    // the screen beneath: Ctrl+F or Ctrl+N must not leave a conversation behind it and drop the selection (#4005).
+    HardwareShortcutBlocker()
 
     if (reviewingSelection && reviewGroup == null) {
         SelectedMembersReviewScreen(
@@ -198,39 +204,32 @@ internal fun ContactPickerScreen(
                 shape = androidx.compose.ui.graphics.RectangleShape,
                 strokeColor = androidx.compose.ui.graphics.Color.Unspecified,
             ).first
-    Scaffold(
+    WhiteNoiseScaffold(
         modifier = Modifier.imePadding().exposePerformanceTestTags(),
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
-            // App banners sit below this screen's bar rather than over it (#3312).
-            Column {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(title)
-                            if (selected.isNotEmpty()) {
-                                Text(
-                                    pluralStringResource(
-                                        R.plurals.selected_members_count,
-                                        selected.size,
-                                        selected.size,
-                                    ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack, enabled = !busy) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.back),
+            WhiteNoiseTopBar(
+                title = title,
+                onBack = onBack,
+                navigation = navigation,
+                navigationEnabled = !busy,
+                titleContent = {
+                    Column {
+                        Text(title)
+                        if (selected.isNotEmpty()) {
+                            Text(
+                                pluralStringResource(
+                                    R.plurals.selected_members_count,
+                                    selected.size,
+                                    selected.size,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                    },
-                )
-                TopNoticeSlot()
-            }
+                    }
+                },
+            )
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -275,7 +274,6 @@ internal fun ContactPickerScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .nativePageBody(padding)
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .then(pickerBody),
@@ -296,8 +294,11 @@ internal fun ContactPickerScreen(
                     enabled = !busy,
                 )
             }
+            // The bar's tint follows the list position, so a search that shrinks the list to the top clears it.
+            val listState = rememberLazyListState()
             WhiteNoiseLazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().trackWhiteNoiseHeader(listState),
+                state = listState,
                 contentPadding = PaddingValues(bottom = 96.dp),
             ) {
                 if (recipientAddressLookupFailed(query, resolution.state)) {

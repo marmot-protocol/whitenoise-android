@@ -15,15 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,7 +41,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,13 +60,14 @@ import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -130,7 +126,7 @@ internal fun ShareConnectScreen(
         )
     val link = remember(npub) { ProfileLink.parse(npub) }
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val shareProfileTitle = stringResource(R.string.share_profile)
     var copied by rememberSaveable(accountIdHex) { mutableStateOf(false) }
     var scannerSession by remember(accountIdHex, runtime) { mutableStateOf<Long?>(null) }
@@ -224,8 +220,7 @@ internal fun ShareConnectScreen(
         },
         onCopy = copy@{
             if (!ownsScreen()) return@copy
-            clipboard.setText(AnnotatedString(npub))
-            copied = true
+            if (clipboard.copy(npub)) copied = true
         },
         onOpenScanner = {
             if (ownsScreen() && scannerSession == null) {
@@ -273,8 +268,7 @@ internal data class ShareConnectProfile(
     val nostrAddress: String,
 )
 
-/** Share & Connect as the prototype lays it out: centered top bar with share, identity column, pinned scan button. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Share & Connect: the shared top bar with a share action, identity column and pinned scan button. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Single visual surface with one anchored share menu.
 @Composable
 internal fun ShareConnectContent(
@@ -297,16 +291,10 @@ internal fun ShareConnectContent(
         contentWindowInsets = WindowInsets.safeDrawing,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.share_and_connect)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
+            WhiteNoiseTopBar(
+                title = stringResource(R.string.share_and_connect),
+                onBack = onBack,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 actions = {
                     ShareConnectShareAction(
                         pictureShareInProgress = pictureShareInProgress,
@@ -317,12 +305,6 @@ internal fun ShareConnectContent(
                         onSaveToGallery = onSaveToGallery,
                     )
                 },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
             )
         },
         bottomBar = { ShareConnectBottomAction(scanInvalid = scanInvalid, onClick = onOpenScanner) },

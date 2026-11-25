@@ -263,20 +263,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
-      "calls": {
-        "fadingVerticalScroll": 1
-      },
-      "family": "common",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -291,7 +277,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -715,7 +701,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",
@@ -785,7 +771,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",

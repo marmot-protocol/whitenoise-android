@@ -69,17 +69,6 @@
         ]
       },
       {
-        "surface": "Scroll boundaries: StartupScreens",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
-        "anchor": ".whiteNoiseVerticalScroll(",
-        "test_ids": [
-          "SCR-001",
-          "SCR-002",
-          "SCR-003",
-          "SCR-004"
-        ]
-      },
-      {
         "surface": "R.string.white_noise_couldnt_start",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
         "anchor": "R.string.white_noise_couldnt_start",

@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -33,7 +31,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
@@ -43,9 +40,9 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
-import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -63,12 +60,13 @@ internal fun AiAgentsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val clipboard = rememberClipboardCopier()
     val active = appState.activeAccount
     val npub = active?.let { appState.npub(it.accountIdHex) }?.takeIf { it.startsWith(NPUB_PREFIX) }
     AiAgentsContent(
         npub = npub,
         onBack = onBack,
-        onCopy = { label, value -> copyAgentValue(context, label, value) },
+        onCopy = { label, value -> clipboard.copy(value, label) },
         onOpenDocs = { openAgentConnectorDocs(context) },
     )
 }
@@ -82,12 +80,11 @@ internal fun AiAgentsScreen(
 internal fun AiAgentsContent(
     npub: String?,
     onBack: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
     onOpenDocs: () -> Boolean,
 ) {
     var selectedConnectorId by rememberSaveable(npub) { mutableStateOf<String?>(null) }
     var feedback by rememberSaveable(npub) { mutableStateOf<Int?>(null) }
-    var keyExpanded by rememberSaveable(npub) { mutableStateOf(false) }
     val publicKeyLabel = stringResource(R.string.public_key)
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
@@ -136,28 +133,11 @@ internal fun AiAgentsContent(
                             title = stringResource(R.string.copy_public_key),
                             onClick = {
                                 npub?.let {
-                                    onCopy(publicKeyLabel, it)
-                                    feedback = R.string.public_key_copied
-                                    keyExpanded = true
+                                    if (onCopy(publicKeyLabel, it)) feedback = R.string.public_key_copied
                                 }
                             },
                             modifier = Modifier.testTag("ai_agents.copy_public_key"),
-                            supportingContent =
-                                npub?.let { key ->
-                                    {
-                                        if (keyExpanded) {
-                                            Text(
-                                                publicKeyDisplayGroups(key).joinToString(" "),
-                                                modifier = Modifier.animatePublicKeyExpansion(keyExpanded),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                fontFamily = FontFamily.Monospace,
-                                                textAlign = TextAlign.Center,
-                                            )
-                                        } else {
-                                            SettingsRowSupportingText(abbreviatedNpub(key), editable = true)
-                                        }
-                                    }
-                                },
+                            subtitle = npub?.let(::abbreviatedNpub),
                             enabled = npub != null,
                             explanation = stringResource(R.string.explanation_organize_ai_copy_public_key),
                             leading = {
@@ -216,7 +196,7 @@ private fun AgentSetupSheet(
     connector: AgentConnector,
     npub: String,
     onDismiss: () -> Unit,
-    onCopy: (String, String) -> Unit,
+    onCopy: (String, String) -> Boolean,
 ) {
     val name = stringResource(connector.nameRes)
     val title = stringResource(R.string.ai_agents_setup_title, name)
@@ -225,8 +205,7 @@ private fun AgentSetupSheet(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     val copyLabel = stringResource(R.string.ai_agents_copy_prompt)
     val copyPrompt = {
-        onCopy(title, prompt)
-        copied = true
+        if (onCopy(title, prompt)) copied = true
     }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
@@ -322,16 +301,6 @@ private fun documentationOutcome(opened: Boolean): Int {
 private fun abbreviatedNpub(npub: String): String {
     if (npub.length <= NPUB_PREFIX_CHARS + NPUB_SUFFIX_CHARS) return npub
     return "${npub.take(NPUB_PREFIX_CHARS)}…${npub.takeLast(NPUB_SUFFIX_CHARS)}"
-}
-
-/** Public values only: the npub and the setup prompt that embeds it, never a private key. */
-private fun copyAgentValue(
-    context: Context,
-    label: String,
-    value: String,
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 /** Reports whether a browser accepted the documentation hand-off, so the screen can state the outcome. */
