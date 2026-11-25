@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.keyboard
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
@@ -107,6 +109,7 @@ private class CarriedCommand(
 internal class HardwareShortcutRouter(
     private val inputBlocked: () -> Boolean = { false },
     private val uptimeMillis: () -> Long = SystemClock::uptimeMillis,
+    private val afterFrame: (() -> Unit) -> Unit = { Handler(Looper.getMainLooper()).post(it) },
 ) {
     private val handlers = mutableListOf<HardwareShortcutHandler>()
     private val chatsReturns = mutableStateListOf<ChatsReturnRoute>()
@@ -130,13 +133,23 @@ internal class HardwareShortcutRouter(
 
     /**
      * Adds [route] as the newest way back to Chats and returns the call that removes it. Once the last route goes,
-     * a carried command's window restarts, so it measures how long Chats has been uncovered.
+     * Chats is uncovered and a carried command's window restarts, so an owner still checking, such as New Message's
+     * relay check, can take it. If Chats has no owner for it once the current frame is applied (its control is
+     * hidden), the command lapses, so a control that appears later never runs it.
      */
     fun registerChatsReturn(route: ChatsReturnRoute): () -> Unit {
         chatsReturns += route
         return {
             chatsReturns.remove(route)
-            if (chatsReturns.isEmpty()) carried = carried?.let { CarriedCommand(it.command, uptimeMillis()) }
+            val waiting = carried?.takeIf { chatsReturns.isEmpty() }
+            val uncovered = waiting?.let { CarriedCommand(it.command, uptimeMillis()) }
+            if (uncovered != null) {
+                carried = uncovered
+                // Deferred, so an owner composed in the same frame, as when the route change has no motion, counts.
+                afterFrame {
+                    if (carried === uncovered && handlers.none { it.command == uncovered.command }) carried = null
+                }
+            }
         }
     }
 

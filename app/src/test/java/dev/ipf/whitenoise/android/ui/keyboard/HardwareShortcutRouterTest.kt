@@ -18,7 +18,9 @@ import org.robolectric.annotation.Config
 class HardwareShortcutRouterTest {
     private var now = 1_000L
     private var appLocked = false
-    private val router = HardwareShortcutRouter(inputBlocked = { appLocked }, uptimeMillis = { now })
+    private val afterFrame = mutableListOf<() -> Unit>()
+    private val router =
+        HardwareShortcutRouter(inputBlocked = { appLocked }, uptimeMillis = { now }, afterFrame = { afterFrame += it })
 
     /** Only Ctrl with the exact Shift state names a command, so Alt, Meta and bare letters never match. */
     @Test
@@ -211,11 +213,40 @@ class HardwareShortcutRouterTest {
         assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage))
     }
 
+    /**
+     * When Chats is uncovered, an owner composed in the same frame still takes the carried command, but without
+     * one by the end of that frame (its control is hidden) the command lapses and a later owner never runs it.
+     */
+    @Test
+    fun carriedCommandNeedsAnOwnerByTheEndOfTheUncoveringFrame() {
+        var runs = 0
+        val button = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) { runs++ }
+
+        var removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+        router.dispatch(HardwareShortcutCommand.NewMessage)
+        removeConversation()
+        val removeButton = router.register(button)
+        runAfterFrame()
+        router.claimCarried(button)
+        assertEquals(1, runs)
+
+        removeButton()
+        removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+        router.dispatch(HardwareShortcutCommand.NewMessage)
+        removeConversation()
+        runAfterFrame()
+        router.register(button)
+        assertFalse(router.canTakeCarried(button))
+        router.claimCarried(button)
+        assertEquals(1, runs)
+    }
+
     /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */
     @Test
     fun carriedWindowStartsWhenChatsIsUncovered() {
         var runs = 0
         val chatsSearch = HardwareShortcutHandler(HardwareShortcutCommand.GlobalSearch, { true }) { runs++ }
+        router.register(chatsSearch)
         val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
 
         router.dispatch(HardwareShortcutCommand.GlobalSearch)
@@ -233,6 +264,7 @@ class HardwareShortcutRouterTest {
         var available = false
         var runs = 0
         val chatsNewMessage = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }) { runs++ }
+        router.register(chatsNewMessage)
         val carryNewMessage = {
             val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
             router.dispatch(HardwareShortcutCommand.NewMessage)
@@ -295,6 +327,13 @@ class HardwareShortcutRouterTest {
             shortcuts,
         )
         assertNull(hardwareShortcutGroup(context, emptyList()))
+    }
+
+    /** Runs the work the router deferred until after the current frame. */
+    private fun runAfterFrame() {
+        val pending = afterFrame.toList()
+        afterFrame.clear()
+        pending.forEach { it() }
     }
 
     /** Registers an always-available owner for every command and returns how often each one ran. */
