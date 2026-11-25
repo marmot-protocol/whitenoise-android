@@ -21,7 +21,7 @@ class AccountSetupStepGuidanceTest {
             state.decisionButtons(),
         )
         assertEquals(
-            SetupStepGuidance(R.string.setup_problem_check_incomplete, R.string.setup_next_retry_then_review),
+            AccountSetupStepGuidance(R.string.setup_problem_check_incomplete, R.string.setup_next_retry_then_review),
             state.stepGuidance(),
         )
     }
@@ -31,7 +31,7 @@ class AccountSetupStepGuidanceTest {
         val state = AccountSetupState(snapshot = refusedSaveSnapshot())
         assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
         assertEquals(
-            SetupStepGuidance(R.string.setup_problem_save_refused, R.string.setup_next_retry),
+            AccountSetupStepGuidance(R.string.setup_problem_save_refused, R.string.setup_next_retry),
             state.stepGuidance(),
         )
     }
@@ -47,7 +47,7 @@ class AccountSetupStepGuidanceTest {
         val state = AccountSetupState(snapshot = refusedPublicationSnapshot())
         assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
         assertEquals(
-            SetupStepGuidance(R.string.setup_problem_publication_failed, R.string.setup_next_retry),
+            AccountSetupStepGuidance(R.string.setup_problem_publication_failed, R.string.setup_next_retry),
             state.stepGuidance(),
         )
     }
@@ -57,7 +57,7 @@ class AccountSetupStepGuidanceTest {
         val state = AccountSetupState(snapshot = keyPackageFailureSnapshot())
         assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
         assertEquals(
-            SetupStepGuidance(R.string.setup_problem_keys_failed, R.string.setup_next_retry),
+            AccountSetupStepGuidance(R.string.setup_problem_keys_failed, R.string.setup_next_retry),
             state.stepGuidance(),
         )
     }
@@ -82,7 +82,7 @@ class AccountSetupStepGuidanceTest {
             state.decisionButtons(),
         )
         assertEquals(
-            SetupStepGuidance(R.string.setup_problem_missing, R.string.setup_next_review),
+            AccountSetupStepGuidance(R.string.setup_problem_missing, R.string.setup_next_review),
             state.stepGuidance(),
         )
     }
@@ -215,9 +215,16 @@ class AccountSetupStepGuidanceTest {
     /** Only failure evidence for this saved approval can replace an exception from that command. */
     @Test fun refusedApprovalUsesTheMatchingNativeCheckpoint() {
         val failure = refusedSaveSnapshot().copy(revision = 4uL, recoveryEpoch = "epoch")
-        val request = SetupRequest(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.APPROVE_REPAIR, recoveryEpoch = "epoch")
+        val request =
+            SetupRequest(
+                3uL,
+                OnboardingStepFfi.INBOX_RELAYS,
+                OnboardingActionFfi.APPROVE_REPAIR,
+                recoveryEpoch = "epoch",
+            )
         assertTrue(failure.reportsFailedApproval(SETUP_TEST_ACCOUNT, request))
         assertTrue(!failure.reportsFailedApproval(SETUP_TEST_ACCOUNT, request.copy(recoveryEpoch = "other")))
-        assertTrue(!failure.copy(proposal = refusedPublicationSnapshot().proposal).reportsFailedApproval(SETUP_TEST_ACCOUNT, request))
+        val pending = failure.copy(proposal = refusedPublicationSnapshot().proposal)
+        assertTrue(!pending.reportsFailedApproval(SETUP_TEST_ACCOUNT, request))
     }
 }

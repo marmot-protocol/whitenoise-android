@@ -89,6 +89,7 @@ internal class AccountSetupController(
     private val onCancelled: () -> Unit,
     /** Emits each time usable internet returns. */
     connectivityRestored: Flow<Long> = emptyFlow(),
+    private val automaticRetryAllowed: () -> Boolean = { true },
 ) {
     private val lifetime = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = CoroutineScope(parentScope.coroutineContext + lifetime)
@@ -97,6 +98,7 @@ internal class AccountSetupController(
     private var reader: Job? = null
     private val automation = AccountSetupAutomation()
     private var readinessDelivered = false
+    val foregroundRetry = SetupForegroundRetry(::retryFailedCheck)
 
     init {
         scope.launch {
@@ -117,10 +119,29 @@ internal class AccountSetupController(
         lifetime.cancelAndJoin()
     }
 
-    /** Reloads a terminated stream, preserving any unapproved proposal exactly as MDK saved it. */
+    /** Reloads the stream after draining its old reader and preserves native proposals. */
     fun reconnect() =
         operate {
-            attach()
+            reader?.cancelAndJoin()
+            val subscription = client.subscribe()
+            reader =
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        accept(subscription.snapshot())
+                        mutableState.value = mutableState.value.copy(disconnected = false)
+                        while (isCurrent()) {
+                            val next = subscription.next() ?: break
+                            accept(next)
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (_: Exception) {
+                        if (isCurrent()) mutableState.value = mutableState.value.copy(error = true)
+                    } finally {
+                        subscription.close()
+                        if (isCurrent()) mutableState.value = mutableState.value.copy(disconnected = true)
+                    }
+                }
             accept(client.run())
         }
 
@@ -147,20 +168,16 @@ internal class AccountSetupController(
 
     /** Makes one automatic attempt for this wake, leaving Try again available on a transient failure. */
     fun retryFailedCheck() {
+        if (!automaticRetryAllowed()) return
         val request = mutableState.value.retryableCheckRequest() ?: return
         operate {
-            try {
-                client.retryFailedCheck(request)?.let(::accept)
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (failure: Exception) {
-                runCatchingCancellable { client.snapshot() }.getOrNull()?.let(::accept)
-                val status = mutableState.value.currentStep?.status
-                // Native may have reset the step before the connection failed. Resume can advance it again.
-                if (status == OnboardingStatusFfi.PENDING || status == OnboardingStatusFfi.CHECKING) {
-                    throw failure
-                }
-            }
+            val result = runCatchingCancellable { client.retryFailedCheck(request, automaticRetryAllowed) }
+            val latest = result.getOrElse { runCatchingCancellable { client.snapshot() }.getOrNull() }
+            latest?.let(::accept)
+            val status = mutableState.value.currentStep?.status
+            // Native may have reset the step before the connection failed. Resume can advance it again.
+            val interruptedCheck = status == OnboardingStatusFfi.PENDING || status == OnboardingStatusFfi.CHECKING
+            if (result.isFailure && interruptedCheck) result.getOrThrow()
         }
     }
 
@@ -270,30 +287,6 @@ internal class AccountSetupController(
                 if (isCurrent()) mutableState.value = mutableState.value.copy(busy = false)
             }
         }
-    }
-
-    /** Replaces a reader only after its native next call has finished cancellation. */
-    private suspend fun attach() {
-        reader?.cancelAndJoin()
-        val subscription = client.subscribe()
-        reader =
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                try {
-                    accept(subscription.snapshot())
-                    mutableState.value = mutableState.value.copy(disconnected = false)
-                    while (isCurrent()) {
-                        val next = subscription.next() ?: break
-                        accept(next)
-                    }
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (_: Exception) {
-                    if (isCurrent()) mutableState.value = mutableState.value.copy(error = true)
-                } finally {
-                    subscription.close()
-                    if (isCurrent()) mutableState.value = mutableState.value.copy(disconnected = true)
-                }
-            }
     }
 
     /** Ignores callbacks from another account or an earlier persisted revision. */

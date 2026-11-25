@@ -130,7 +130,10 @@ private class PresentationSetupClient(
         return current
     }
 
-    override suspend fun retryFailedCheck(request: SetupRequest) = current
+    override suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ) = current
 
     override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi {
         check(step == this.step && current.revision == 3uL)

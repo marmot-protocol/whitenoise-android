@@ -29,7 +29,8 @@ class AccountSetupAutomaticRetryCoverageTest {
             restored.tryEmit(1L)
             runCurrent()
             restored.tryEmit(2L)
-            controller.retryFailedCheck()
+            controller.foregroundRetry.onBackgrounded()
+            controller.foregroundRetry.onForegrounded()
             runCurrent()
             release.complete(Unit)
             runCurrent()
@@ -124,7 +125,8 @@ class AccountSetupAutomaticRetryCoverageTest {
             controller.submit(approve)
             runCurrent()
             restored.tryEmit(1L)
-            controller.retryFailedCheck()
+            controller.foregroundRetry.onBackgrounded()
+            controller.foregroundRetry.onForegrounded()
             runCurrent()
             assertEquals(listOf(approve), client.requests)
             release.complete(Unit)
@@ -163,9 +165,63 @@ class AccountSetupAutomaticRetryCoverageTest {
             controller.close()
         }
 
+    /** Connectivity recovery cannot start a native check while Android withholds the setup route. */
+    @Test
+    fun networkRecoveryWaitsForAnEligibleWake() =
+        runTest {
+            val client = FakeSetupClient(inboxDiscoveryIncompleteSnapshot())
+            val restored = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+            var allowed = false
+            val controller = connectivityController(client, restored, automaticRetryAllowed = { allowed })
+            controller.reconnect()
+            runCurrent()
+
+            restored.tryEmit(1L)
+            runCurrent()
+            assertTrue(client.requests.isEmpty())
+
+            allowed = true
+            client.beforeSnapshot = { allowed = false }
+            restored.tryEmit(2L)
+            runCurrent()
+            assertTrue(client.requests.isEmpty())
+
+            allowed = true
+            client.beforeSnapshot = {}
+            restored.tryEmit(3L)
+            runCurrent()
+            assertEquals(OnboardingActionFfi.RETRY, client.requests.single().action)
+            controller.close()
+        }
+
+    /** A retained setup retries one observed background return, independent of the Activity that delivers it. */
+    @Test
+    fun retainedSetupRetriesOnceOnWarmForeground() =
+        runTest {
+            val client = FakeSetupClient(inboxDiscoveryIncompleteSnapshot())
+            val controller = connectivityController(client, MutableSharedFlow())
+            controller.reconnect()
+            runCurrent()
+
+            controller.foregroundRetry.onForegrounded()
+            runCurrent()
+            assertTrue(client.requests.isEmpty())
+
+            controller.foregroundRetry.onBackgrounded()
+            controller.foregroundRetry.onForegrounded()
+            runCurrent()
+            controller.foregroundRetry.onForegrounded()
+            runCurrent()
+
+            assertEquals(1, client.requests.size)
+            assertEquals(OnboardingActionFfi.RETRY, client.requests.single().action)
+            controller.close()
+        }
+
     private fun TestScope.connectivityController(
         client: FakeSetupClient,
         restored: MutableSharedFlow<Long>,
+        automaticRetryAllowed: () -> Boolean = { true },
     ) = AccountSetupController(
         SETUP_TEST_ACCOUNT,
         client,
@@ -174,5 +230,6 @@ class AccountSetupAutomaticRetryCoverageTest {
         { true },
         {},
         connectivityRestored = restored,
+        automaticRetryAllowed = automaticRetryAllowed,
     )
 }

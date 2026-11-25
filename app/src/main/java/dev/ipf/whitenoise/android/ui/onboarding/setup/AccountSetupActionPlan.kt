@@ -71,7 +71,9 @@ private val unpinnedSecondary = setOf(OnboardingActionFfi.CANCEL_ONBOARDING, Onb
 private fun duplicates(
     primary: OnboardingActionFfi?,
     candidate: OnboardingActionFfi,
-): Boolean = primary == OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS && candidate == OnboardingActionFfi.USE_RECOMMENDED_RELAYS
+): Boolean =
+    primary == OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS &&
+        candidate == OnboardingActionFfi.USE_RECOMMENDED_RELAYS
 
 private fun AccountSetupState.directRemoveAvailable(offered: List<OnboardingActionFfi>): Boolean =
     OnboardingActionFfi.EDIT_RELAYS in offered && directRemovalEndpoint() != null

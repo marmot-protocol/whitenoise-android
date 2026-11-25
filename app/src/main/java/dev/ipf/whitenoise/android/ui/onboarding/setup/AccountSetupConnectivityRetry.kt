@@ -9,14 +9,19 @@ import dev.ipf.marmotkit.OnboardingStatusFfi
  * so neither can be retried automatically.
  */
 internal fun AccountSetupState.retryableCheckRequest(): SetupRequest? {
-    val snapshot = snapshot ?: return null
-    val step = currentStep ?: return null
+    val checkpoint = snapshot?.takeUnless { it.ready || it.cancellationPending || it.proposal != null }
+    val step =
+        currentStep?.takeIf {
+            it.status == OnboardingStatusFfi.RETRYABLE_FAILURE && OnboardingActionFfi.RETRY in it.actions
+        }
     val idle = !busy && !showsSetupFailure && editor == null
-    val failedCheck =
-        step.status == OnboardingStatusFfi.RETRYABLE_FAILURE && OnboardingActionFfi.RETRY in step.actions
-    val nothingPending = !snapshot.ready && !snapshot.cancellationPending && snapshot.proposal == null
-    return if (idle && failedCheck && nothingPending) {
-        SetupRequest(snapshot.revision, step.step, OnboardingActionFfi.RETRY, recoveryEpoch = snapshot.recoveryEpoch)
+    return if (idle && step != null && checkpoint != null) {
+        SetupRequest(
+            checkpoint.revision,
+            step.step,
+            OnboardingActionFfi.RETRY,
+            recoveryEpoch = checkpoint.recoveryEpoch,
+        )
     } else {
         null
     }

@@ -28,7 +28,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /** What went wrong on the current step, in plain words, and the pinned action that can move it forward. */
-internal data class SetupStepGuidance(
+internal data class AccountSetupStepGuidance(
     val problem: Int?,
     val next: Int?,
 )
@@ -47,21 +47,20 @@ internal fun setupStepPurpose(step: OnboardingStepFfi): Int? =
  * Reads the native findings of a blocked relay or key step. A proposal under review, a signer prompt, a pending
  * cancellation and a stopped screen already say what to do, so they get no guidance here.
  */
-internal fun AccountSetupState.stepGuidance(): SetupStepGuidance? {
-    val snapshot = snapshot ?: return null
+internal fun AccountSetupState.stepGuidance(): AccountSetupStepGuidance? {
     val step = currentStep ?: return null
-    val proposal = snapshot.proposal?.takeIf { it.step == step.step }
+    val proposal = snapshot?.proposal?.takeIf { it.step == step.step }
     val explainedElsewhere =
         step.step !in guidedSteps ||
-            snapshot.cancellationPending ||
+            snapshot?.cancellationPending == true ||
             blocksSetupActions ||
             disconnected ||
             step.status == OnboardingStatusFfi.WAITING_FOR_SIGNER ||
             proposal?.relayRepair?.mode == OnboardingRelayRepairModeFfi.MANUAL_REVIEW ||
             (proposal != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions)
-    if (explainedElsewhere) return null
-    val guidance = SetupStepGuidance(stepProblem(step, proposal), stepNextAction(step))
-    return guidance.takeIf { it.problem != null || it.next != null }
+    val guidance =
+        if (explainedElsewhere) null else AccountSetupStepGuidance(stepProblem(step, proposal), stepNextAction(step))
+    return guidance?.takeIf { it.problem != null || it.next != null }
 }
 
 /** The problem sentence for the step's native status and findings; null when the heading already says it. */

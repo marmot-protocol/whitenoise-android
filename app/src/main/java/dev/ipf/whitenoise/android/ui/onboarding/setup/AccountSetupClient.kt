@@ -42,7 +42,10 @@ internal interface AccountSetupClient {
     suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi?
 
     /** Rechecks the exact failed checkpoint and serializes the automatic retry with other native setup commands. */
-    suspend fun retryFailedCheck(request: SetupRequest): OnboardingSnapshotFfi?
+    suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ): OnboardingSnapshotFfi?
 
     /** Creates an unapproved relay preview without advancing optional setup decisions. */
     suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi
@@ -148,15 +151,16 @@ internal class MarmotAccountSetupClient(
         }
     }
 
-    override suspend fun retryFailedCheck(request: SetupRequest): OnboardingSnapshotFfi? =
+    override suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ): OnboardingSnapshotFfi? =
         withLifetime {
-            withContext(Dispatchers.IO) {
-                val latest = marmot.onboardingSnapshot(account)
-                if (latest?.allowsAutomaticRetry(account, request) == true) {
-                    defaults.advance(marmot.retryOnboardingStep(account, request.step))
-                } else {
-                    latest
-                }
+            val latest = snapshot()
+            if (stillAllowed() && latest?.allowsAutomaticRetry(account, request) == true) {
+                withContext(Dispatchers.IO) { defaults.advance(marmot.retryOnboardingStep(account, request.step)) }
+            } else {
+                latest
             }
         }
 

@@ -523,6 +523,11 @@ class MainActivity : AppCompatActivity() {
         if (::appState.isInitialized) {
             foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
+            if (!isChangingConfigurations) {
+                appState.accountSetup.controller
+                    ?.foregroundRetry
+                    ?.onBackgrounded()
+            }
             appState.setAppInForeground(false)
         }
         WarmResumeTrace.foregroundStopped(warmResumeTraceToken, warmResumeEpoch)

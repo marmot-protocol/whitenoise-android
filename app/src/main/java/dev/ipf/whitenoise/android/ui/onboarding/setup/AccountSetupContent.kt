@@ -9,10 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -21,8 +20,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
@@ -33,25 +33,28 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppLockController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.flow.first
 
 /** Lifecycle-aware route; the process-owned controller survives Activity recreation and signer handoff. */
 @Composable
 internal fun AccountSetupScreen(
     controller: AccountSetupController,
     randomName: (String?) -> String,
+    appLock: AppLockController? = null,
     onLater: () -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    var stopped by remember(controller) { mutableStateOf(false) }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopped = true }
-    LifecycleEventEffect(Lifecycle.Event.ON_START) {
-        if (stopped) {
-            stopped = false
-            controller.retryFailedCheck()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(controller, lifecycleOwner, appLock) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            // The lock decision can still be pending when the Activity resumes.
+            snapshotFlow { appLock?.screenVisible != true && appLock?.evaluationPending != true }.first { it }
+            controller.foregroundRetry.onForegrounded()
         }
     }
     AccountSetupContent(

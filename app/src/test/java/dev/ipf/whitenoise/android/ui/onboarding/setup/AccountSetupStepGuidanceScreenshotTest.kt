@@ -31,7 +31,11 @@ class AccountSetupStepGuidanceScreenshotTest {
             amoled = true,
         )
 
-    @Test fun inboxDiscoveryIncompleteLight() = capture("inbox_discovery_incomplete", AccountSetupState(snapshot = inboxDiscoveryIncompleteSnapshot()))
+    @Test fun inboxDiscoveryIncompleteLight() =
+        capture(
+            "inbox_discovery_incomplete",
+            AccountSetupState(snapshot = inboxDiscoveryIncompleteSnapshot()),
+        )
 
     /** The explanation and both pinned actions stay readable mirrored at double text size. */
     @Test
@@ -46,7 +50,12 @@ class AccountSetupStepGuidanceScreenshotTest {
         )
 
     /** Save was refused at the final check: nothing published, Try again is the only pinned action. */
-    @Test fun refusedSaveAmoled() = capture("refused_save_amoled", AccountSetupState(snapshot = refusedSaveSnapshot()), amoled = true)
+    @Test fun refusedSaveAmoled() =
+        capture(
+            "refused_save_amoled",
+            AccountSetupState(snapshot = refusedSaveSnapshot()),
+            amoled = true,
+        )
 
     /** An approved change no relay accepted stays pending with Try again. */
     @Test fun refusedPublicationAmoled() =
@@ -57,7 +66,12 @@ class AccountSetupStepGuidanceScreenshotTest {
         )
 
     /** Messaging keys that could not be published explain the step and offer Try again. */
-    @Test fun keyPackageFailureAmoled() = capture("key_package_failure_amoled", AccountSetupState(snapshot = keyPackageFailureSnapshot()), amoled = true)
+    @Test fun keyPackageFailureAmoled() =
+        capture(
+            "key_package_failure_amoled",
+            AccountSetupState(snapshot = keyPackageFailureSnapshot()),
+            amoled = true,
+        )
 
     /** Details lists the unreachable relay under the passed Read and write relays step. */
     @Test fun passedWithWarningsDetailsAmoled() =
