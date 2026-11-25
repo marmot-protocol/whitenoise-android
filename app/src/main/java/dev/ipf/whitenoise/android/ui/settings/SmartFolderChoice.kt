@@ -93,15 +93,16 @@ internal fun <T> FolderChoice(
     }
 }
 
+/** A folder button label with a trailing glyph: a [DisclosureChevron] when [expanded] is set, else [icon]. */
 @Composable
 internal fun FolderButtonLabel(
     label: String,
     icon: Int,
-    expanded: Boolean = false,
+    expanded: Boolean? = null,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
-        if (icon == R.drawable.ic_expand_more) {
+        if (expanded != null) {
             DisclosureChevron(expanded)
         } else {
             Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))

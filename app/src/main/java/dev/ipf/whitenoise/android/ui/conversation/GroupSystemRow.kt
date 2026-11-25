@@ -176,6 +176,7 @@ private fun rememberGroupSystemWave(
     }
 }
 
+/** Debug-only disclosure of the raw commit record, expanded per row on tap. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupSystemDebugDetails(record: AppMessageRecordFfi) {

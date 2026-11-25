@@ -26,9 +26,11 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
  * The one compact selectable filter or option. A pill with a tonal fill, no border outside AMOLED, and the
- * secondary container plus a check when selected, so selection reads from shape and colour at any font scale.
+ * secondary container plus a check when selected. In light and AMOLED themes the fill barely differs from the
+ * unselected one, so the check is the only reliable cue at any font scale.
  *
- * A [leadingIcon] replaces the check; [showCheck] = false drops it for chips that are removable ([trailingIcon]).
+ * The check replaces a [leadingIcon] while selected; [showCheck] = false keeps the icon and drops the check, for
+ * chips that are removable ([trailingIcon]).
  * [onLongClick] moves the gesture and semantics to one overlay that owns the whole chip, because the Material
  * chip has no long press; [modifier] then lands on that overlay, not on the chip's layout. [role] overrides the
  * chip's checkbox role, for example with a radio button in a single-choice group.
@@ -52,7 +54,7 @@ internal fun WhiteNoiseFilterChip(
     role: Role? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
-    val lead = leadingIcon ?: if (selected && showCheck) ({ WhiteNoiseFilterChipCheck() }) else null
+    val lead = if (selected && showCheck) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
     val overlay = onLongClick != null
     val describe =
         if (contentDescription == null && role == null) {
@@ -105,6 +107,7 @@ internal fun WhiteNoiseFilterChip(
     }
 }
 
+/** Tonal container colours shared by every filter chip; selected chips use the secondary container. */
 @Composable
 private fun whiteNoiseFilterChipColors(): SelectableChipColors =
     FilterChipDefaults.filterChipColors(
@@ -116,6 +119,7 @@ private fun whiteNoiseFilterChipColors(): SelectableChipColors =
         selectedTrailingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
     )
 
+/** The check that marks a selected chip, sized to the Material chip icon slot. */
 @Composable
 @Suppress("FunctionNaming")
 private fun WhiteNoiseFilterChipCheck() {

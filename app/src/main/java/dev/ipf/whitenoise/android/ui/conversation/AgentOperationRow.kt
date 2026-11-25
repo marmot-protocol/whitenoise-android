@@ -313,6 +313,7 @@ internal fun AgentOperationChip(
     }
 }
 
+/** The operation title row: status glyph, title and the expand control for a long-running agent step. */
 @Composable
 private fun AgentOperationHeader(
     operation: AgentOperationPresentation,
