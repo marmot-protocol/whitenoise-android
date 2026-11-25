@@ -31,13 +31,13 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * A Local selection turns Firebase auto-init off once every account has left native push (#4081). When it is
- * cancelled after the last account's native disable commits, but before that off write, auto-init is still
- * settled from the accounts' live demand.
+ * Delivery changes that do not complete still settle Firebase auto-init from the accounts' live demand (#4081):
+ * a Local selection cancelled after the last account's native disable committed, and a per-account native-push
+ * enablement that fails and is rolled back.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class FcmAutoInitLocalCutoverTest {
+class FcmAutoInitIncompleteChangeTest {
     @get:Rule
     val pushTokenKey = PushTokenKeyRule()
 
@@ -104,6 +104,34 @@ class FcmAutoInitLocalCutoverTest {
                 assertFalse(true in platform.autoInitWrites)
             } finally {
                 releaseCleanup.countDown()
+                fixture.close()
+            }
+        }
+
+    /** A per-account Push enablement whose token read fails is rolled back and leaves auto-init off. */
+    @Test
+    fun failedPerAccountEnablementLeavesAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = false),
+                    nativePushFallbackPlatform = platform,
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { null },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+
+                assertFalse(fixture.runWithMainLooperPumping { fixture.appState.setNativePushEnabled(true) })
+
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertEquals(false, platform.autoInitWrites.lastOrNull())
+            } finally {
                 fixture.close()
             }
         }

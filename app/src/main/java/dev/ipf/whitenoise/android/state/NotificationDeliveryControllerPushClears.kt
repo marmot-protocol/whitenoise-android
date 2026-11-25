@@ -50,6 +50,11 @@ internal suspend fun NotificationDeliveryController.drainPendingPushDisables() {
     }
 }
 
+/**
+ * Turns native push on or off for one account, confirming an enablement only once its registration is in
+ * place and rolling it back otherwise. A rollback or a disable then settles Firebase auto-init from the
+ * accounts' live demand, so the account's change never leaves auto-init on for nobody.
+ */
 internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
     account: String,
     enabled: Boolean,
@@ -84,10 +89,13 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
                 val rollbackSettings = host.marmotIo { setNativePushEnabled(account, false) }
                 localNotificationSettings = rollbackSettings
                 clearPushRegistrationForAccount(account)
+                // The sync turned auto-init on before its token read, so a failed enablement settles it.
+                settleFcmAutoInitAfterFailedSelection()
             }
             confirmed
         } else {
             clearPushRegistrationForAccount(account)
+            settleFcmAutoInitAfterFailedSelection()
             true
         }
     }.getOrElse {
