@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -22,6 +24,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -80,12 +85,18 @@ class SettingsHomeBehaviorTest {
     @Test
     @Config(sdk = [32])
     fun versionFooterShowsCopiedFeedbackBeforeAndroid13() {
-        versionFooterCopiesInstalledBuildIdentity()
-        assertEquals(
-            context.getString(R.string.copied),
-            org.robolectric.shadows.ShadowToast
-                .getTextOfLatestToast(),
-        )
+        val notices = mutableListOf<Pair<Int, TransientNoticeKind>>()
+        val host =
+            TopNoticeHost(SnackbarHostState(), notice = { null }, present = { title, kind -> notices += title to kind })
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalTopNoticeHost provides host) {
+                    SettingsVersionFooter("2026.9.11")
+                }
+            }
+        }
+        composeRule.onNodeWithTag("settings.version_footer").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(R.string.copied to TransientNoticeKind.Confirmation), notices) }
     }
 
     @Test fun searchToolbarActionIsAccessibleAndOpensOnlySearch() {

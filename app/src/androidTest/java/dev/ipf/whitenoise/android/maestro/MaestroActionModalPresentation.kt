@@ -101,10 +101,17 @@ private fun GroupControlPresentation(fixture: MaestroPresentationFixture) {
             )
             if (reviewing) {
                 GroupAbandonmentDialog(
-                    target = FIXTURE_ABANDONMENT_TARGET,
+                    target =
+                        GroupAbandonmentTarget(
+                            accountRef = checkNotNull(fixture.appState.activeAccountRef),
+                            groupIdHex = "0".repeat(64),
+                            conversationTitle = "Fixture group",
+                            isDm = false,
+                        ),
                     status = GroupAbandonmentStatus.Review,
                     onConfirm = { fixture.finish("reset-confirm") },
                     onDismiss = { reviewing = false },
+                    appState = fixture.appState,
                 )
             }
         } else {
@@ -161,13 +168,3 @@ private fun MediaViewerMenuPresentation(fixture: MaestroPresentationFixture) {
         body = { Image(fixture.image, contentDescription = "Fixture viewer image") },
     )
 }
-
-/** A fixed group identity for the shared abandonment review, so the reset check never names a real account. */
-private val FIXTURE_ABANDONMENT_TARGET =
-    GroupAbandonmentTarget(
-        accountRef = "fixture-account",
-        accountName = "Fixture account",
-        groupIdHex = "0".repeat(64),
-        conversationTitle = "Fixture group",
-        isDm = false,
-    )

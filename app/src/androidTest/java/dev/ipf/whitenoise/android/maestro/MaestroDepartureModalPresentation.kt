@@ -38,10 +38,11 @@ internal fun MaestroDepartureModalPresentation(fixture: MaestroPresentationFixtu
 private fun DepartureAbandonReviewPresentation(fixture: MaestroPresentationFixture) {
     var reviewing by remember(fixture) { mutableStateOf(true) }
     val targets =
-        remember {
+        remember(fixture) {
+            val account = checkNotNull(fixture.appState.activeAccountRef)
             listOf(
-                fixtureAbandonmentTarget("1", "Fixture group", isDm = false),
-                fixtureAbandonmentTarget("2", "Fixture direct chat", isDm = true),
+                GroupAbandonmentTarget(account, "1".repeat(64), "Fixture group", isDm = false),
+                GroupAbandonmentTarget(account, "2".repeat(64), "Fixture direct chat", isDm = true),
             )
         }
     if (reviewing) {
@@ -54,18 +55,12 @@ private fun DepartureAbandonReviewPresentation(fixture: MaestroPresentationFixtu
                 fixture.record("departure-abandon-dismiss")
                 reviewing = false
             },
+            appState = fixture.appState,
         )
     } else {
         Button(onClick = { reviewing = true }) { Text("Reopen abandonment review") }
     }
 }
-
-/** One reviewed chat of the fixture account, so the review never names a real account or conversation. */
-private fun fixtureAbandonmentTarget(
-    idDigit: String,
-    title: String,
-    isDm: Boolean,
-) = GroupAbandonmentTarget("fixture-account", "Fixture account", idDigit.repeat(64), title, isDm)
 
 /** Real successor picker and confirmation complete a bounded answer, without transferring or leaving. */
 @Composable

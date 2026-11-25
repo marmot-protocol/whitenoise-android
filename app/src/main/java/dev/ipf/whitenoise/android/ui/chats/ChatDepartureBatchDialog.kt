@@ -40,7 +40,6 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
-import dev.ipf.whitenoise.android.ui.group.groupAbandonmentActionLabel
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import kotlinx.coroutines.CompletableDeferred
 
@@ -72,8 +71,7 @@ internal class PendingChatDeparture(
         controller.accountRef
             ?.takeIf { abandon }
             ?.let { account ->
-                val accountName = abandonmentAccountName(appState, account)
-                targets.map { GroupAbandonmentTarget(account, accountName, it.groupId, it.title, it.isDm) }
+                targets.map { GroupAbandonmentTarget(account, it.groupId, it.title, it.isDm) }
             }.orEmpty()
 }
 
@@ -157,6 +155,7 @@ internal fun ChatDepartureBatchDialog(
             actionLabel = actionLabel,
             onConfirm = { start(request.targets) },
             onDismiss = actions.onDismiss,
+            appState = appState,
             confirmEnabled = isCurrent(),
             identity = {
                 GroupActingAccountIdentity(appState, request.actingAccountRef)
@@ -214,6 +213,7 @@ internal fun ChatDepartureReview(
     actionLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    appState: WhiteNoiseAppState,
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
     forgetsDm: Boolean = false,
@@ -228,7 +228,7 @@ internal fun ChatDepartureReview(
                 targets = abandonmentTargets,
                 onConfirm = onConfirm,
                 onDismiss = onDismiss,
-                identity = identity,
+                appState = appState,
                 confirmEnabled = confirmEnabled,
             )
         }
@@ -433,14 +433,7 @@ private fun ChatDepartureReviewTargets(
                 avatar.image,
                 groupAnimation = avatar.groupAnimation,
             ),
-            actionLabel =
-                stringResource(
-                    when {
-                        request.abandon -> groupAbandonmentActionLabel(target.isDm)
-                        target.isDm -> R.string.delete_from_device
-                        else -> R.string.leave_and_delete
-                    },
-                ),
+            actionLabel = stringResource(if (target.isDm) R.string.delete_from_device else R.string.leave_and_delete),
         )
     }
 }
