@@ -501,7 +501,10 @@ class ComposerDragAndReadingTest {
         assertEquals(0, sends)
     }
 
-    /** Wrapped reading controls reserve a complete editor line while all accessory actions remain clickable. */
+    /**
+     * Wrapped reading controls reserve a complete editor line while all accessory actions remain clickable.
+     * At 300 dp the three 48 dp leading slots leave room for the three controls but not for navigation too.
+     */
     @Test
     fun navigationWrapsWithoutHidingActiveControlsOrTheEditor() {
         var extra = 0.dp
@@ -510,7 +513,7 @@ class ComposerDragAndReadingTest {
         composeRule.setContent {
             var extraHeight by remember { mutableStateOf(0.dp) }
             WhiteNoiseTheme {
-                Surface(Modifier.width(240.dp).height(240.dp)) {
+                Surface(Modifier.width(300.dp).height(240.dp)) {
                     Box(contentAlignment = Alignment.BottomCenter) {
                         ComposerPill(
                             actionColors = accountActionColors(appState = null),
@@ -524,7 +527,7 @@ class ComposerDragAndReadingTest {
                             onPickFromGallery = {},
                             onPickDocument = {},
                             expansionMode = ComposerExpansionMode.Manual,
-                            compactMeasurementWidth = 240.dp,
+                            compactMeasurementWidth = 300.dp,
                             dictationControls = {
                                 repeat(3) { index ->
                                     IconButton(
@@ -556,7 +559,7 @@ class ComposerDragAndReadingTest {
             1f,
         )
         repeat(3) { index ->
-            composeRule.onNodeWithTag("synthetic-control-$index").assertIsDisplayed().performClick()
+            composeRule.onNodeWithTag("synthetic-control-$index").assertShownWhole(48.dp).performClick()
         }
         composeRule.waitForIdle()
         assertEquals("all active controls remain actionable", 3, pressed)
