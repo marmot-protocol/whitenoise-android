@@ -6,9 +6,10 @@
       {
         "surface": "Dictation notification completion cleanup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "private fun removeForegroundNotification()",
+        "anchor": "private fun removeForegroundNotification(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-022"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "fun onStartCommand(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-022"
         ]
       },
       {
