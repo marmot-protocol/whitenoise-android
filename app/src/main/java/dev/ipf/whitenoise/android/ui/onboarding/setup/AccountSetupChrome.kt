@@ -18,8 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -37,6 +35,7 @@ import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.statusColors
 
 /** Native checkpoint history; only the current checkpoint is inspectable, never inferred completion. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,9 +86,8 @@ internal fun SetupChecklist(
 /** Visible labels accompany the prototype status artwork; icons never duplicate the spoken status. */
 @Composable
 internal fun SetupStatusIcon(status: OnboardingStatusFfi) {
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val success = if (dark) Color(0xFF81C995) else Color(0xFF146C2E)
-    val warning = if (dark) Color(0xFFFFB86B) else Color(0xFF934B00)
+    val success = MaterialTheme.statusColors.success
+    val warning = MaterialTheme.statusColors.warning
     Box(Modifier.size(24.dp).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
         when (status) {
             OnboardingStatusFfi.CHECKING -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)

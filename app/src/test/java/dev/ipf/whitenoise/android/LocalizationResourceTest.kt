@@ -1320,7 +1320,7 @@ class LocalizationResourceTest {
                         // "Version" is spelled identically in French.
                         "about_version",
                         "disappearing_unit_minutes",
-                        "disappearing_minutes_format",
+                        "disappearing_minutes_count",
                         "disappearing_5_minutes",
                         // "Contacts" is spelled identically in French.
                         "contacts",

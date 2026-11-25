@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageDebugCategory
 import dev.ipf.whitenoise.android.core.MessageDebugStyle
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * Category -> accent color for the streaming-debug row. Kept out of the
@@ -69,11 +70,11 @@ internal fun MessageDebugRow(
                     .fillMaxWidth()
                     .background(
                         color = accent.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(Radii.sm),
                     ).border(
                         width = 1.dp,
                         color = accent.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(Radii.sm),
                     ).padding(horizontal = 10.dp, vertical = 6.dp),
         ) {
             val idSuffix =

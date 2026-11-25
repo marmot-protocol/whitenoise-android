@@ -77,6 +77,32 @@ class GodComposableDecompositionCoverageTest {
         )
     }
 
+    /**
+     * A queued Select text keeps the holder it was built with. When a pending send confirms, the record id replaces
+     * the text layouts and so the holder; the old holder must keep its own inputs, never the confirmed message's.
+     */
+    @Test
+    fun messageBubbleTextSelectionKeepsInputsPerHolder() {
+        val bubbleBody =
+            source("conversation/messages/MessageBubble.kt").readText().functionBody("MessageBubble")
+        val remembered =
+            source("conversation/messages/MessageBubbleTextSelection.kt")
+                .readText()
+                .functionBody("rememberMessageBubbleTextSelection")
+
+        assertTrue(
+            "MessageBubble must use the text selection holder",
+            "rememberMessageBubbleTextSelection(" in bubbleBody,
+        )
+        assertTrue(
+            "inputs must be remembered on the holder's key, never shared across holders",
+            remembered.contains("remember(textLayouts) { mutableStateOf(inputs) }") &&
+                remembered.contains("latest.value = inputs") &&
+                remembered.contains("remember(textLayouts) {\n        MessageBubbleTextSelection(") &&
+                !remembered.contains("rememberUpdatedState"),
+        )
+    }
+
     @Test
     fun messageBubbleUiBlocksLiveInNamedRestartScopes() {
         val bubbleSource = source("conversation/messages/MessageBubble.kt").motionOwnerSource()

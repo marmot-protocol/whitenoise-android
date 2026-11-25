@@ -44,9 +44,10 @@ internal fun ConversationController.presentRosterChanged(
 internal suspend fun ConversationController.resolveCanonicalInviteRefs(
     memberRefs: List<String>,
     diagnostic: DmCreationAttempt? = null,
+    resolve: suspend (String) -> String? = appState::resolveAccountIdHex,
 ): List<String>? =
     try {
-        canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
+        canonicalGroupInviteRefs(memberRefs, resolve)
     } catch (throwable: Throwable) {
         diagnostic?.failed(DmCreationPhase.RECIPIENTS, throwable)
         throwable.rethrowIfCancellation()

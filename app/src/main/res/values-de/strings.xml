@@ -1528,9 +1528,18 @@
     <string name="disappearing_1_day">1 Tag</string>
     <string name="disappearing_90_days">3 Monate</string>
     <string name="disappearing_custom">Benutzerdefinierte Zeit</string>
-    <string name="disappearing_days_format">%1$d Tage</string>
-    <string name="disappearing_hours_format">%1$d Stunden</string>
-    <string name="disappearing_minutes_format">%1$d Minuten</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tage</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d Stunde</item>
+        <item quantity="other">%d Stunden</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d Minute</item>
+        <item quantity="other">%d Minuten</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minuten</string>
     <string name="disappearing_unit_hours">Stunden</string>
     <string name="disappearing_unit_days">Tage</string>
@@ -1571,7 +1580,10 @@
     <string name="disappearing_5_minutes">5 Minuten</string>
     <string name="disappearing_30_seconds">30 Sekunden</string>
     <string name="disappearing_explainer">Ungelesene empfangene Nachrichten starten ihren Timer, wenn du sie liest. Andere neue Nachrichten werden nach der gewählten Dauer für alle endgültig gelöscht.</string>
-    <string name="disappearing_seconds_format">%1$d Sekunden</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d Sekunde</item>
+        <item quantity="other">%d Sekunden</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Sekunden</string>
     <string name="disappearing_set">Festlegen</string>
     <string name="disappearing_custom_decrease">Kürzer</string>

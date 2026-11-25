@@ -66,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /** Flat inset the prototype gives a system-event row on both sides. */
@@ -186,7 +187,7 @@ private fun GroupSystemDebugDetails(record: AppMessageRecordFfi) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .clickable { detailsExpanded = !detailsExpanded }
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
