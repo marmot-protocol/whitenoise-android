@@ -2156,6 +2156,7 @@
     <string name="setup_finding_retired_relay">Este relé ha sido retirado.</string>
     <string name="setup_finding_unsafe_relay">Esta dirección de relé no es segura.</string>
     <string name="setup_finding_unreachable">No se pudo acceder a este relé.</string>
+    <string name="setup_relay_timeout_title">Un relay no respondió a tiempo</string>
     <string name="setup_finding_timed_out">Se agotó el tiempo de esta comprobación.</string>
     <string name="setup_finding_authentication_required">Este relé requiere autenticación.</string>
     <string name="setup_finding_payment_required">Este relé requiere un pago.</string>
@@ -2320,6 +2321,12 @@
     <string name="new_message_no_results_detail">Comprueba la ortografía o prueba otra búsqueda.</string>
     <string name="new_message_chat_created">Chat creado</string>
     <string name="new_message_open_chat">Abrir chat</string>
+    <string name="group_setup_customize">Personalizar el grupo</string>
+    <string name="group_setup_hide_customization">Ocultar personalización</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d miembro seleccionado</item>
+        <item quantity="other">%d miembros seleccionados</item>
+    </plurals>
     <string name="group_setup_title">Configurar grupo</string>
     <string name="group_create_action">Crear grupo</string>
     <string name="group_add_photo">Añadir foto</string>
@@ -2460,6 +2467,8 @@
     <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
     <string name="error_incompatible_key_package">La clave de chat de esta persona no es compatible. Pídele que actualice y abra White Noise, y vuelve a intentarlo.</string>
     <string name="error_incompatible_key_package_for">La clave de chat de %1$s no es compatible. Pídele que actualice y abra White Noise, y vuelve a intentarlo.</string>
+    <string name="new_message_copy_inbox_instructions">Copiar instrucciones</string>
+    <string name="new_message_inbox_instructions">No pude iniciar un chat contigo en White Noise. ¿Puedes revisar tus relays de entrada en los ajustes de White Noise y avisarme cuando pueda volver a intentarlo?</string>
     <string name="error_missing_member_inbox">No hay un relay de entrada utilizable para esta persona. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox_for">No hay un relay de entrada utilizable para %1$s. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Pídele que añada un relay de entrada que acepte mensajes más grandes.</string>
