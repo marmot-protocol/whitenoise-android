@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -81,10 +82,10 @@ class ChatListSearchSectionHeaderTest {
                         color = MaterialTheme.colorScheme.surface,
                     ) {
                         Column {
-                            ChatListSearchSectionHeader("Groups", CHAT_LIST_SEARCH_GROUPS_HEADER_TAG)
+                            SectionHeader("Groups", Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG))
                             SearchPreviewRow("Marmot release")
                             SearchPreviewRow("Marmot friends")
-                            ChatListSearchSectionHeader("Messages", CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG)
+                            SectionHeader("Messages", Modifier.testTag(CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG))
                             SearchPreviewRow("…planning the marmot release")
                         }
                     }

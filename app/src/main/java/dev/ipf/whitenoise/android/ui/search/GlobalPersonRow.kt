@@ -9,12 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 /**
  * Shows the available profile metadata and opens the profile on tap. The shortened key copies the complete
@@ -35,7 +35,13 @@ internal fun GlobalPersonRow(
         shapes = WhiteNoiseListItemDefaults.shapes(),
         modifier = Modifier.testTag("global.person." + npub),
         leadingContent = {
-            PersonAvatar(displayName ?: IdentityFormatter.short(npub), npub, 40.dp, pictureUrl, followedAccount)
+            PersonAvatar(
+                displayName ?: IdentityFormatter.short(npub),
+                npub,
+                WhiteNoiseSizes.AvatarCompact,
+                pictureUrl,
+                followedAccount,
+            )
         },
     ) {
         Column {

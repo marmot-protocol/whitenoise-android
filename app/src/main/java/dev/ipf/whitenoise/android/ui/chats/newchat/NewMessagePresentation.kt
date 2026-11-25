@@ -135,7 +135,9 @@ internal fun NewMessageContent(
                     enabled = !busy,
                 )
             }
-            item { NewMessageActionGroup(actions, connectQrEnabled, busy, inviteShareInProgress) }
+            if (query.isBlank()) {
+                item { NewMessageActionGroup(actions, connectQrEnabled, busy, inviteShareInProgress) }
+            }
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
                 NewMessageSearchFeedback(

@@ -3,12 +3,23 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -18,9 +29,11 @@ import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nativePushCapabilityForContext
+import dev.ipf.whitenoise.android.ui.chats.EmptyChats
 import dev.ipf.whitenoise.android.ui.settings.AccountScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.settings.HelpSupportScreen
+import dev.ipf.whitenoise.android.ui.settings.LearnWhiteNoiseScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationDeliveryScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationSoundsScreen
 import dev.ipf.whitenoise.android.ui.settings.VoiceLanguageScreen
@@ -88,6 +101,80 @@ class SettingsHubScreenshotTest {
     @Test
     fun helpSupportRtlLargeFont() = capture("settings_help_support_rtl_large_font", false, rtl = true) { HelpSupportScreen(it, {}, {}) }
 
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun emptyChatsFirstRunHelp() =
+        capture("empty_chats_first_run_help_amoled", true, amoled = true) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun emptyChatsFirstRunHelpLight() =
+        capture("empty_chats_first_run_help_light", false) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun emptyChatsFirstRunHelpRtlLargeFont() =
+        capture("empty_chats_first_run_help_rtl_large_font", false, rtl = true) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun firstRunWalkthrough() =
+        capture(
+            "learn_white_noise_amoled",
+            true,
+            amoled = true,
+            afterCapture = {
+                advanceWalkthrough("Find someone", "learn_white_noise_connect_amoled")
+                advanceWalkthrough("Make a private group", "learn_white_noise_groups_amoled")
+                advanceWalkthrough("Reply or react", "learn_white_noise_actions_amoled")
+                composeRule.onNodeWithText("See you tomorrow?").assertExists()
+                composeRule.onNodeWithText("10:24", useUnmergedTree = true).assertExists()
+                composeRule.onNodeWithText("10:25", useUnmergedTree = true).assertExists()
+                val example = composeRule.onNodeWithText("See you tomorrow!")
+                example.performScrollTo().performTouchInput { longClick() }
+                composeRule.onNodeWithText("Reply").assertExists()
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_actions_amoled.png")
+                composeRule.onNodeWithText("Reply").performClick()
+                composeRule.onNodeWithText("Demo contact").assertExists()
+                composeRule.onNodeWithContentDescription("Cancel reply").performClick()
+                composeRule.onNodeWithText("Demo contact").assertDoesNotExist()
+                example.performTouchInput { swipeRight() }
+                composeRule.onNodeWithText("Demo contact").assertExists()
+                advanceWalkthrough("Chat across apps", "learn_white_noise_marmot_amoled")
+            },
+        ) {
+            LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})
+        }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun firstRunWalkthroughRtlLargeFont() =
+        capture("learn_white_noise_rtl_large_font", false, rtl = true) {
+            LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})
+        }
+
+    private fun advanceWalkthrough(
+        label: String,
+        snapshot: String,
+    ) {
+        composeRule.onNodeWithText("Next").performClick()
+        composeRule.mainClock.advanceTimeBy(600)
+        composeRule.onNodeWithText(label).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot.png")
+    }
+
     @Test fun soundsLight() = capture("notification_sounds_light", false) { NotificationSoundsScreen(it, {}) }
 
     @Test fun soundsDark() = capture("notification_sounds_dark", true) { NotificationSoundsScreen(it, {}) }
@@ -129,6 +216,7 @@ class SettingsHubScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         pushAvailable: Boolean = false,
+        afterCapture: () -> Unit = {},
         content: @Composable (WhiteNoiseAppState) -> Unit,
     ) {
         val appState =
@@ -152,5 +240,6 @@ class SettingsHubScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        afterCapture()
     }
 }

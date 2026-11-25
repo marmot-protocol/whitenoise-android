@@ -71,14 +71,31 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** Prototype centered avatar and two-field setup. */
+    /** The group name and selected identities lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
     @Test fun setupDark() = setup("group_setup_dark.png", dark = true)
 
     /** AMOLED setup and primary action. */
-    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true, description = "")
+    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
+
+    /** Optional photo, description and timer use the same form and retain the current draft. */
+    @Test fun setupCustomizedAmoled() =
+        setup(
+            "group_setup_customized_amoled.png",
+            dark = true,
+            amoled = true,
+            description = "A place to coordinate our next trip.",
+        )
+
+    /** An authored description reopens customization at large RTL text sizes. */
+    @Test fun setupCustomizedLargeRtl() =
+        setup(
+            "group_setup_customized_large_rtl.png",
+            largeRtl = true,
+            description = "A place to coordinate our next trip.",
+        )
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -188,7 +205,7 @@ class NewGroupScreenshotTest {
         canonical: Boolean = false,
         recovery: Boolean = false,
         unknown: Boolean = false,
-        description: String = "A place to coordinate our next trip.",
+        description: String = "",
     ) {
         val draft =
             NewGroupDraft(
