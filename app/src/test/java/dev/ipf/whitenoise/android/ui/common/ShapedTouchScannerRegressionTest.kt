@@ -169,6 +169,43 @@ class ShapedTouchScannerRegressionTest {
         assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(detached))
     }
 
+    /** Feedback must be composed whenever the target exists, including through its content layout. */
+    @Test
+    fun conditionalChildrenAndUncalledLambdasDoNotDrawFeedback() {
+        val target = "Box(Modifier.shapedTouchTarget(press, go))"
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        val optionalContent =
+            listOf(
+                "if (visible) { $feedback }",
+                "if (visible) $feedback",
+                "if (visible) Box() { $feedback }",
+                "if (visible) androidx.compose.foundation.layout.$feedback",
+                "if (!visible) return@Box\n$feedback",
+                "val render: @Composable () -> Unit = { $feedback }",
+                "AnimatedVisibility(visible) { $feedback }",
+            )
+        for (content in optionalContent) {
+            assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$target { $content }"))
+        }
+        assertEquals(emptyList<String>(), shapedTouchFindings("if (visible) { $target { Row() { $feedback } } }"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("$target { if (visible) Box(); Surface { $feedback } }"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("$target { Box { return@Box }; $feedback }"))
+        val named = "Box(Modifier.shapedTouchTarget(press, go), content = { $feedback })"
+        assertEquals(emptyList<String>(), shapedTouchFindings(named))
+    }
+
+    /** Forwarded feedback is also required to be drawn by its implementation. */
+    @Test
+    fun anUncalledForwardedLayoutDoesNotDrawFeedback() {
+        val target = "TouchLayout(press = press, modifier = Modifier.shapedTouchTarget(press, go))"
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        val header = "fun TouchLayout(press: MutableInteractionSource, modifier: Modifier)"
+        val expected = listOf("$MISSING_TOUCH_FEEDBACK @1")
+        for (content in listOf("if (visible) { $feedback }", "val render = @Composable { $feedback }")) {
+            assertEquals(expected, shapedTouchFindings("$target\n$header { Box(modifier) { $content } }"))
+        }
+    }
+
     /** Builds a shaped control whose click needs replacement feedback in the supplied content. */
     private fun surfaceWith(content: String): String =
         "Surface(shape = CircleShape, modifier = Modifier.clickable(" +

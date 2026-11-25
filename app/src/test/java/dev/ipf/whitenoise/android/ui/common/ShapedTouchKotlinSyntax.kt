@@ -36,6 +36,16 @@ internal fun modifierArgument(
     return namedModifier ?: positional?.takeUnless { namedArgument.containsMatchIn(it.text) }?.valueAfter(0)
 }
 
+/** Returns the source location of a named argument's value. */
+internal fun namedArgumentValue(
+    args: String,
+    parameter: String,
+): TouchArgument? =
+    topLevelArgumentSpans(args).firstNotNullOfOrNull { part ->
+        val name = namedArgument.find(part.text)
+        name?.takeIf { it.groupValues[1] == parameter }?.let { part.valueAfter(it.range.last + 1) }
+    }
+
 /** The top-level arguments of a call's argument text, in order. */
 internal fun topLevelArguments(args: String): List<String> = topLevelArgumentSpans(args).map(TouchArgument::text)
 

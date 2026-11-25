@@ -21,6 +21,13 @@ private val positionalModifiers =
         "Surface" to 0,
         "Text" to 1,
     )
+private val composedContentOwners =
+    setOf("Box", "BoxWithConstraints", "Row", "Column", "Surface", "CompositionLocalProvider")
+private val bareContentCall = Regex("""\b(${composedContentOwners.joinToString("|")})\s*\{""")
+private val qualifiedReceiver = Regex("""(?:[A-Za-z_]\w*\.)+$""")
+private val returnStatement = Regex("""\breturn(?:@(\w+))?\b""")
+private val controlCondition = Regex("""\b(?:if|for|while)\s*\(""")
+private val elseBranch = Regex("""\belse$""")
 private val sourceReference = Regex("""[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*""")
 
 /**
@@ -39,6 +46,15 @@ internal class ShapedTouchIndications(
         }
     }
 
+    private val composedContentScopes by lazy {
+        val arguments = owners.filter { it.name in composedContentOwners }.flatMap { it.contentScopeOpenings() }
+        val bare =
+            bareContentCall.findAll(code).filterNot { code.isDeclaration(it.range.first) }.map { match ->
+                match.range.last to ContentCall(match.groupValues[1], match.range.first)
+            }
+        (arguments.asSequence() + bare).toMap()
+    }
+
     /** Reports applied targets that suppress their normal indication without drawing matching feedback. */
     fun unmatchedTouchTargets(): List<Int> {
         if ("shapedTouchTarget" !in code) return emptyList()
@@ -48,7 +64,7 @@ internal class ShapedTouchIndications(
                     .filter { it.name == "shapedTouchTarget" }
                     .filterNot { link ->
                         val source = link.feedbackReference()?.let { binding(it.expression, it.offset) }
-                        source != null && hasFeedback(owner, source)
+                        source != null && hasFeedback(owner, source, requireGuaranteedComposition = true)
                     }.map(ModifierLink::argumentOffset)
                     .toList()
             }.distinct()
@@ -108,15 +124,21 @@ internal class ShapedTouchIndications(
     private fun hasFeedback(
         owner: FeedbackOwner,
         source: FeedbackBinding,
-    ): Boolean = draws(owner, source) || forwards(owner, source)
+        requireGuaranteedComposition: Boolean = false,
+    ): Boolean {
+        val drawn = draws(owner, source, requireGuaranteedComposition)
+        return drawn || forwards(owner, source, requireGuaranteedComposition)
+    }
 
     /** Only feedback inside the receiving component's call or content can replace its click's indication. */
     private fun draws(
         owner: FeedbackOwner,
         source: FeedbackBinding,
+        requireGuaranteedComposition: Boolean,
     ): Boolean =
         replacements.any { (component, references) ->
             component.start in owner.start until owner.end &&
+                (!requireGuaranteedComposition || isComposedFrom(owner.open, component)) &&
                 references.any { reference ->
                     !reference.conditional && binding(reference.expression, reference.offset) == source
                 }
@@ -126,6 +148,7 @@ internal class ShapedTouchIndications(
     private fun forwards(
         owner: FeedbackOwner,
         source: FeedbackBinding,
+        requireGuaranteedComposition: Boolean,
     ): Boolean {
         val passed = topLevelNamedArguments(code.substring(owner.open + 1, owner.close))
         val function = componentImplementation(owner) ?: return false
@@ -135,11 +158,61 @@ internal class ShapedTouchIndications(
                 declared != null &&
                 replacements.any { (component, references) ->
                     component.start in function.body until function.end &&
+                        (!requireGuaranteedComposition || isComposedFrom(function.body, component)) &&
                         references.any { reference ->
                             (!reference.conditional || reference.guardedSource == parameter) &&
                                 binding(reference.expression, reference.offset) == FeedbackBinding(parameter, declared)
                         }
                 }
+        }
+    }
+
+    /** The complete path to a feedback node must run through immediately composed layout content. */
+    private fun isComposedFrom(
+        start: Int,
+        component: FeedbackOwner,
+    ): Boolean {
+        if (component.start < start) return true // Feedback on the receiving component itself.
+        val scopes = code.openScopesAt(start, component.start)
+        val parents = scopes.mapNotNull(composedContentScopes::get)
+        val calls = parents.map(ContentCall::start) + component.start
+        val branching = calls.any { it >= start && code.followsUnbracedBranch(start, it) }
+        return parents.size == scopes.size && !branching && !canReturnBeforeFeedback(start, component.start, parents)
+    }
+
+    /** An early return can skip feedback even when both calls are in the same composed block. */
+    private fun canReturnBeforeFeedback(
+        from: Int,
+        feedbackStart: Int,
+        enclosingContent: List<ContentCall>,
+    ): Boolean =
+        returnStatement
+            .findAll(code, from)
+            .takeWhile { it.range.first < feedbackStart }
+            .any { statement ->
+                val offset = statement.range.first
+                val label = statement.groups[1]?.value
+                if (label == null) {
+                    functions.none { it.body > from && offset in it.body until it.end }
+                } else {
+                    val scopes = code.openScopesAt(from, offset)
+                    val destination = scopes.mapNotNull(composedContentScopes::get).lastOrNull { it.name == label }
+                    destination != null && destination in enclosingContent
+                }
+            }
+
+    /** Knows the trailing and named content blocks that these layout functions compose immediately. */
+    private fun FeedbackOwner.contentScopeOpenings(): List<Pair<Int, ContentCall>> {
+        val trailing = code.skipFeedbackWhitespace(close + 1)
+        val args = code.substring(open + 1, close)
+        val named = namedArgumentValue(args, "content")
+        val call = ContentCall(name, start)
+        return buildList {
+            if (trailing < end) add(trailing to call)
+            if (named != null && named.text.startsWith("{")) {
+                add(open to call)
+                add(open + 1 + named.offset to call)
+            }
         }
     }
 
@@ -186,6 +259,42 @@ internal class ShapedTouchIndications(
             ?.plus(function.open + 1)
 }
 
+/** Collects the enclosing syntax scopes between the start of a composition and a candidate call. */
+private fun String.openScopesAt(
+    from: Int,
+    offset: Int,
+): List<Int> {
+    val openings = mutableListOf<Int>()
+    for (index in from until offset) {
+        when (this[index]) {
+            '(', '{', '[' -> openings.add(index)
+            ')', '}', ']' -> if (openings.isNotEmpty()) openings.removeAt(openings.lastIndex)
+        }
+    }
+    return openings
+}
+
+/** A single-expression control-flow branch can skip a component without enclosing it in braces. */
+private fun String.followsUnbracedBranch(
+    from: Int,
+    call: Int,
+): Boolean {
+    val before = substring(from, call).replace(qualifiedReceiver, "").trimEnd()
+    val end = before.lastIndex
+    val closesCondition =
+        before.endsWith(')') &&
+            controlCondition.findAll(before).any {
+                before.closingBracket(it.range.last) == end
+            }
+    return elseBranch.containsMatchIn(before) || closesCondition
+}
+
+/** Identifies the layout call that owns a known composed content block. */
+private data class ContentCall(
+    val name: String,
+    val start: Int,
+)
+
 /** One component call, including its trailing content lambda when present. */
 private data class FeedbackOwner(
     val name: String,
@@ -218,14 +327,18 @@ private data class FeedbackBinding(
     val declaration: Int,
 )
 
+/** Excludes class and function declarations when identifying calls. */
+private fun String.isDeclaration(start: Int): Boolean {
+    val before = substring(maxOf(0, start - COMPONENT_DECLARATION_LOOKBEHIND), start)
+    return componentDeclaration.containsMatchIn(before)
+}
+
 /** Finds component calls while excluding declarations, so a whole function never acts as one control. */
 private fun String.feedbackOwners(): List<FeedbackOwner> =
     componentCall
         .findAll(this)
-        .filterNot { match ->
-            val before = substring(0, match.range.first).takeLast(COMPONENT_DECLARATION_LOOKBEHIND)
-            componentDeclaration.containsMatchIn(before)
-        }.map { match ->
+        .filterNot { isDeclaration(it.range.first) }
+        .map { match ->
             val open = match.range.last
             val close = closingBracket(open)
             val next = skipFeedbackWhitespace(close + 1)
