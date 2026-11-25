@@ -3176,7 +3176,7 @@ internal fun ConversationScreen(
         showDetails = true
     }
     val openConversationSearch =
-        navigationState.searchShortcut(!freezeRoutePresentation && !transcriptRoutedAway) {
+        navigationState.searchShortcut(!freezeRoutePresentation && !transcriptRoutedAway && !selectionMode) {
             showDetails = false
             presentationState.searchState.value =
                 conversationSearchPreset(

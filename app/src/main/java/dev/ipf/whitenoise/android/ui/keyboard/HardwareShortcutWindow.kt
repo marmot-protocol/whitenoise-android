@@ -20,7 +20,7 @@ internal fun installHardwareShortcuts(
 
 /**
  * Forwards every [Window.Callback] call to [original], first offering keys to [router]. Kotlin delegation skips
- * Java default methods, so each one is forwarded explicitly; `HardwareShortcutWindowCallbackTest` fails when a
+ * Java default methods, so each one is forwarded explicitly, and `HardwareShortcutWindowCallbackTest` fails when a
  * platform update adds another.
  */
 internal class HardwareShortcutWindowCallback(

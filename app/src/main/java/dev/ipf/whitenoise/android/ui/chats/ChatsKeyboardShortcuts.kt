@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
-import dev.ipf.whitenoise.android.ui.keyboard.rememberHardwareShortcut
+import dev.ipf.whitenoise.android.ui.keyboard.KeyboardShortcut
 
 /**
  * Remembers the Chats search field's focus requester and lets Ctrl+F open that search through the toolbar
@@ -18,7 +18,7 @@ internal fun rememberGlobalSearchShortcut(
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit,
 ): FocusRequester {
     val focusRequester = remember { FocusRequester() }
-    rememberHardwareShortcut(HardwareShortcutCommand.GlobalSearch, available = !selectionMode) {
+    KeyboardShortcut(HardwareShortcutCommand.GlobalSearch, available = !selectionMode) {
         if (searchOpen) {
             focusRequester.requestFocus()
         } else {

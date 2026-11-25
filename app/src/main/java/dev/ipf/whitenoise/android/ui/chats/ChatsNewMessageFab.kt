@@ -49,7 +49,7 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
-import dev.ipf.whitenoise.android.ui.keyboard.rememberHardwareShortcut
+import dev.ipf.whitenoise.android.ui.keyboard.KeyboardShortcut
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingControlShown
@@ -101,6 +101,7 @@ internal fun ChatsNewMessageFab(
         return active && sameOwner && available
     }
     var missing by remember(appState, account, runtime) { mutableStateOf(false) }
+    var relaysChecked by remember(appState, account, runtime) { mutableStateOf(false) }
     var relayOpening by remember(appState, account, runtime) { mutableStateOf<Any?>(null) }
     var refresh by remember(appState, account, runtime) { mutableIntStateOf(0) }
     LaunchedEffect(appState, account, runtime, refresh) {
@@ -113,7 +114,10 @@ internal fun ChatsNewMessageFab(
             } catch (_: Exception) {
                 null
             }
-        if (current()) missing = chatsFabNeedsRelays(result)
+        if (current()) {
+            missing = chatsFabNeedsRelays(result)
+            relaysChecked = true
+        }
     }
     var relayOrigin by remember(appState, account, runtime) { mutableStateOf<Rect?>(null) }
     var fabBounds by remember { mutableStateOf<Rect?>(null) }
@@ -122,9 +126,10 @@ internal fun ChatsNewMessageFab(
         with(LocalDensity.current) {
             ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
         }
-    // Ctrl+N takes the button's own path, and only while the button is shown and offers New Message (#4005).
-    val shown = LocalFloatingControlShown.current
-    rememberHardwareShortcut(HardwareShortcutCommand.NewMessage, available = shown && current() && !missing) {
+    // Ctrl+N takes the button's own path, only while the button is shown and its relay check found New Message
+    // usable, so a key cannot skip the Check relays state (#4005).
+    val offersNewMessage = LocalFloatingControlShown.current && relaysChecked && !missing
+    KeyboardShortcut(HardwareShortcutCommand.NewMessage, available = offersNewMessage && current()) {
         onNewMessageOrigin(null)
         onNewMessage()
     }

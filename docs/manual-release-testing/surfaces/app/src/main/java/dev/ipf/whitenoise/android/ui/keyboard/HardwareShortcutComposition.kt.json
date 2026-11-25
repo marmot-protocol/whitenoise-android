@@ -10,6 +10,14 @@
         "test_ids": [
           "AXY-021"
         ]
+      },
+      {
+        "surface": "KeyboardShortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/keyboard/HardwareShortcutComposition.kt",
+        "anchor": "fun KeyboardShortcut(",
+        "test_ids": [
+          "AXY-021"
+        ]
       }
     ],
     "source_coverage": [

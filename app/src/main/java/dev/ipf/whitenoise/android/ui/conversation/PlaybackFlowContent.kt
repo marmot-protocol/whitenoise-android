@@ -14,7 +14,7 @@ import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 
 /**
  * In-place Chats destinations retain their transport above content without adding another dialog or root inset.
- * They own input in place of Chats, so the messaging keyboard shortcuts wait until they close.
+ * They own input in place of Chats, so its keyboard shortcuts wait until they close.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -29,7 +29,7 @@ internal fun PlaybackFlowContent(
             host != null &&
             host.appState.observePlaybackTransportVisible() &&
             !host.appState.appLock.screenVisible
-    HardwareShortcutBlocker()
+    HardwareShortcutBlocker(chatsOnly = true)
     Column(Modifier.fillMaxSize()) {
         if (host != null && visible) {
             Box(Modifier.statusBarsPadding()) {

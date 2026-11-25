@@ -89,7 +89,7 @@ class HardwareShortcutRouterTest {
         assertEquals(1, runs)
     }
 
-    /** App Lock and in-window blockers make every command unavailable; a released blocker cannot release twice. */
+    /** App Lock and in-window blockers make every command unavailable, and a released blocker cannot release twice. */
     @Test
     fun appLockAndBlockersMakeEveryCommandUnavailable() {
         val runs = registerAll()
@@ -131,7 +131,7 @@ class HardwareShortcutRouterTest {
         assertEquals(listOf("newer", "older", "older"), order)
     }
 
-    /** Side by side, in-chat search belongs to the conversation pane; a compact conversation always owns it. */
+    /** Side by side, in-chat search belongs to the conversation pane, while a compact conversation always owns it. */
     @Test
     fun inChatSearchFollowsThePaneThatOwnsTheKeys() {
         val runs = registerAll()
@@ -173,7 +173,6 @@ class HardwareShortcutRouterTest {
 
         assertEquals(1, searches)
         assertEquals(1, exits)
-        assertFalse(HardwareShortcutCommand.ConversationSearch.runsFromChats)
     }
 
     /** While a compact conversation is composed, a retained Chats screen behind it never takes Chats commands. */
@@ -193,6 +192,39 @@ class HardwareShortcutRouterTest {
         assertEquals(1, exits)
         assertEquals(0, runs.getValue(HardwareShortcutCommand.GlobalSearch))
         assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage))
+    }
+
+    /** An in-place Chats flow holds only Chats commands, so in-chat search beside it still works. */
+    @Test
+    fun chatsOnlyBlockerLeavesInChatSearch() {
+        val runs = registerAll()
+        router.attachPanes(split = { true }, conversationOwnsKeys = { true })
+        val release = router.block(chatsOnly = true)
+
+        assertFalse(router.dispatch(HardwareShortcutCommand.GlobalSearch))
+        assertFalse(router.dispatch(HardwareShortcutCommand.NewMessage))
+        assertTrue(router.dispatch(HardwareShortcutCommand.ConversationSearch))
+        release()
+        assertTrue(router.dispatch(HardwareShortcutCommand.NewMessage))
+
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.GlobalSearch))
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage))
+    }
+
+    /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */
+    @Test
+    fun carriedWindowStartsWhenChatsIsUncovered() {
+        var runs = 0
+        val chatsSearch = HardwareShortcutHandler(HardwareShortcutCommand.GlobalSearch, { true }) { runs++ }
+        val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+
+        router.dispatch(HardwareShortcutCommand.GlobalSearch)
+        now += CHATS_RETURN_COMMAND_WINDOW_MS * 2
+        removeConversation()
+        now += CHATS_RETURN_COMMAND_WINDOW_MS
+        router.claimCarried(chatsSearch)
+
+        assertEquals(1, runs)
     }
 
     /** A carried command waits while Chats is unavailable, runs once it is, and lapses once its window has passed. */

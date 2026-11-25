@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.keyboard
 
 import android.view.KeyEvent
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -34,14 +32,13 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
-import dev.ipf.whitenoise.android.ui.conversation.rememberChatsReturnShortcut
+import dev.ipf.whitenoise.android.ui.conversation.ChatsReturnShortcut
+import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import dev.ipf.whitenoise.android.ui.navigation.TwoPaneChatFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -68,8 +65,8 @@ class HardwareShortcutCompositionTest {
 
     /**
      * Typing, Enter and Shift+Enter reach a focused composer-style field, while Ctrl+F and Ctrl+N run once and never
-     * reach it. Editing shortcuts such as Ctrl+A are left out here because Robolectric's key map types their letter;
-     * the router test shows they pass through untouched.
+     * reach it. Editing shortcuts such as Ctrl+A are left out here because Robolectric's key map types their letter,
+     * and the router test shows they pass through untouched.
      */
     @Test
     fun composerKeysReachTheFocusedFieldWhileShortcutsRunOnce() {
@@ -106,29 +103,32 @@ class HardwareShortcutCompositionTest {
         assertEquals(1, sends)
     }
 
-    /** A dialog is its own window, so its keys never reach the screen behind it. */
+    /**
+     * A keyboard-preserving sheet leaves keys with the activity window, so the window's own dispatch must find the
+     * shortcuts held while it is open and released once it closes.
+     */
     @Test
-    fun dialogWindowsKeepShortcutsFromTheScreenBehind() {
-        var dialogRoot: View? = null
+    fun keyboardPreservingSheetHoldsShortcutsSentThroughTheWindow() {
+        var sheetOpen by mutableStateOf(true)
         setRoutedContent {
             OwnAllCommands()
-            Dialog(onDismissRequest = {}) {
-                val view = LocalView.current
-                Box(Modifier.testTag(DIALOG)) { dialogRoot = view.rootView }
+            if (sheetOpen) {
+                KeyboardPreservingBottomSheet(paneTitle = "Sheet", onDismissRequest = { sheetOpen = false }) {
+                    Box(Modifier.testTag(SHEET).height(120.dp).fillMaxWidth())
+                }
             }
         }
-        composeRule.waitForIdle()
-        val root = requireNotNull(dialogRoot)
-        assertNotSame(composeRule.activity.window.decorView, root)
+        composeRule.onNodeWithTag(SHEET).assertExists()
 
-        composeRule.runOnUiThread {
-            root.dispatchKeyEvent(keyDown(KeyEvent.KEYCODE_N, CTRL))
-            root.dispatchKeyEvent(keyDown(KeyEvent.KEYCODE_F, CTRL))
-        }
+        assertFalse(press(KeyEvent.KEYCODE_N, CTRL))
+        assertFalse(press(KeyEvent.KEYCODE_F, CTRL or SHIFT))
+        assertEquals(emptyList<HardwareShortcutCommand>(), router.availableCommands())
+        sheetOpen = false
         composeRule.waitForIdle()
+        assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
 
-        assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
-        assertEquals(0, runs.getValue(HardwareShortcutCommand.GlobalSearch).intValue)
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.ConversationSearch).intValue)
     }
 
     /** An in-window surface that owns input holds every shortcut until it leaves the composition. */
@@ -151,8 +151,8 @@ class HardwareShortcutCompositionTest {
     }
 
     /**
-     * Side by side, Ctrl+Shift+F needs the conversation pane to hold focus or, without focus, to be pressed last;
-     * before either pane is focused or pressed, neither owns it.
+     * Side by side, Ctrl+Shift+F needs the conversation pane to hold focus or, without focus, to be pressed last.
+     * Before either pane is focused or pressed, neither owns it.
      */
     @Test
     fun splitPaneFocusDecidesInChatSearch() {
@@ -196,7 +196,7 @@ class HardwareShortcutCompositionTest {
         setRoutedContent {
             TwoPaneChatFrame(twoPane = false, listPane = {}) {
                 if (inConversation) {
-                    rememberChatsReturnShortcut(available = true) {
+                    ChatsReturnShortcut(available = true) {
                         exits++
                         inConversation = false
                     }
@@ -231,7 +231,7 @@ class HardwareShortcutCompositionTest {
     @Composable
     private fun Own(command: HardwareShortcutCommand) {
         val count = runs.getValue(command)
-        rememberHardwareShortcut(command, available = true) { count.intValue += 1 }
+        KeyboardShortcut(command, available = true) { count.intValue += 1 }
     }
 
     /** A full pane tagged [paneTag] with a focusable field tagged [fieldTag], owning [command]. */
@@ -270,7 +270,7 @@ class HardwareShortcutCompositionTest {
 
     private companion object {
         const val COMPOSER = "composer"
-        const val DIALOG = "dialog"
+        const val SHEET = "sheet"
         const val LIST_PANE = "list_pane"
         const val LIST_FIELD = "list_field"
         const val CONVERSATION_FIELD = "conversation_field"

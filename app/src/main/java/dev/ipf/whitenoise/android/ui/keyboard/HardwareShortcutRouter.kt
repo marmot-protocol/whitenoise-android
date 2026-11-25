@@ -39,8 +39,11 @@ internal enum class HardwareShortcutCommand(
 private const val OTHER_COMMAND_MODIFIERS =
     KeyEvent.META_ALT_ON or KeyEvent.META_META_ON or KeyEvent.META_SYM_ON or KeyEvent.META_FUNCTION_ON
 
-/** How long a command carried from a compact conversation waits for Chats to compose and take it. */
-internal const val CHATS_RETURN_COMMAND_WINDOW_MS = 3_000L
+/**
+ * How long a command carried from a compact conversation may wait once Chats is uncovered, for example for the
+ * New Message button's relay check. A command Chats cannot take by then lapses instead of firing later.
+ */
+internal const val CHATS_RETURN_COMMAND_WINDOW_MS = 1_000L
 
 /**
  * Maps a key and its modifier state to a command. Only Ctrl with the exact Shift state qualifies, so Alt, Meta
@@ -108,6 +111,7 @@ internal class HardwareShortcutRouter(
     private val handlers = mutableListOf<HardwareShortcutHandler>()
     private val chatsReturns = mutableStateListOf<ChatsReturnRoute>()
     private var blockers by mutableIntStateOf(0)
+    private var chatsBlockers by mutableIntStateOf(0)
     private var carried by mutableStateOf<CarriedCommand?>(null)
     private var heldCommand: HardwareShortcutCommand? = null
     private var splitPanes: () -> Boolean = { false }
@@ -115,8 +119,8 @@ internal class HardwareShortcutRouter(
     private val blocked: Boolean get() = blockers > 0 || inputBlocked()
 
     // A compact conversation (its return route registered, usable or not) covers Chats, even while a retained
-    // Chats screen is still composed for a route transition.
-    private val chatsCovered: Boolean get() = !splitPanes() && chatsReturns.isNotEmpty()
+    // Chats screen is still composed for a route transition. An in-place Chats flow covers it too.
+    private val chatsCovered: Boolean get() = chatsBlockers > 0 || (!splitPanes() && chatsReturns.isNotEmpty())
 
     /** Adds [handler] as the newest owner of its command and returns the call that removes it. */
     fun register(handler: HardwareShortcutHandler): () -> Unit {
@@ -124,27 +128,36 @@ internal class HardwareShortcutRouter(
         return { handlers.remove(handler) }
     }
 
-    /** Adds [route] as the newest way back to Chats and returns the call that removes it. */
+    /**
+     * Adds [route] as the newest way back to Chats and returns the call that removes it. Once the last route goes,
+     * a carried command's window restarts, so it measures how long Chats has been uncovered.
+     */
     fun registerChatsReturn(route: ChatsReturnRoute): () -> Unit {
         chatsReturns += route
-        return { chatsReturns.remove(route) }
+        return {
+            chatsReturns.remove(route)
+            if (chatsReturns.isEmpty()) carried = carried?.let { CarriedCommand(it.command, uptimeMillis()) }
+        }
     }
 
-    /** Makes every command unavailable until the returned call runs; running it again has no effect. */
-    fun block(): () -> Unit {
-        blockers += 1
+    /**
+     * Makes every command, or with [chatsOnly] just the Chats commands, unavailable until the returned call runs.
+     * Running the returned call again has no effect.
+     */
+    fun block(chatsOnly: Boolean = false): () -> Unit {
+        if (chatsOnly) chatsBlockers += 1 else blockers += 1
         var released = false
         return {
             if (!released) {
                 released = true
-                blockers -= 1
+                if (chatsOnly) chatsBlockers -= 1 else blockers -= 1
             }
         }
     }
 
     /**
      * Lets the two-pane frame report whether panes sit side by side and whether the conversation pane owns the
-     * keys there. Returns the call that detaches this report; a stale detach leaves a newer frame's report alone.
+     * keys there. Returns the call that detaches this report, and a stale detach leaves a newer frame's report alone.
      */
     fun attachPanes(
         split: () -> Boolean,
@@ -223,6 +236,10 @@ internal class HardwareShortcutRouter(
             }
         }
 
+    /**
+     * Whether [handler] may run now: available, and on the side that owns its command. In-chat search needs the
+     * conversation pane when panes sit side by side, and Chats commands need Chats uncovered.
+     */
     private fun canRun(handler: HardwareShortcutHandler): Boolean {
         val paneAllows =
             when {
@@ -234,6 +251,11 @@ internal class HardwareShortcutRouter(
         return paneAllows && handler.available()
     }
 
+    /** The compact conversation route that can carry [command] to Chats, or null when none can. */
     private fun chatsReturnFor(command: HardwareShortcutCommand): ChatsReturnRoute? =
-        if (command.runsFromChats && !splitPanes()) chatsReturns.lastOrNull { it.available() } else null
+        if (command.runsFromChats && !splitPanes() && chatsBlockers == 0) {
+            chatsReturns.lastOrNull { it.available() }
+        } else {
+            null
+        }
 }

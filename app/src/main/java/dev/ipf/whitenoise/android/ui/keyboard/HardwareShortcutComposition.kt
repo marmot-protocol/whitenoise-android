@@ -30,16 +30,16 @@ internal fun currentHardwareShortcutRouter(): HardwareShortcutRouter? =
     LocalHardwareShortcutRouter.current ?: (LocalActivity.current as? MainActivity)?.hardwareShortcuts
 
 /**
- * Registers [onInvoke] as this composition's owner of [command], offered while [available], and returns
- * [onInvoke] unchanged so a screen can wrap the lambda its on-screen control already calls. A command carried
- * from a compact conversation runs here once this owner becomes available.
+ * Registers [onInvoke] as this composition's owner of [command], offered while [available]. A screen passes the
+ * lambda its on-screen control already calls. A command carried from a compact conversation runs here once this
+ * owner can take it.
  */
 @Composable
-internal fun rememberHardwareShortcut(
+internal fun KeyboardShortcut(
     command: HardwareShortcutCommand,
     available: Boolean,
     onInvoke: () -> Unit,
-): () -> Unit {
+) {
     val router = currentHardwareShortcutRouter()
     val currentAvailable by rememberUpdatedState(available)
     val currentInvoke by rememberUpdatedState(onInvoke)
@@ -55,15 +55,17 @@ internal fun rememberHardwareShortcut(
             if (canTake) owner.claimCarried(handler)
         }
     }
-    return onInvoke
 }
 
-/** Makes every hardware shortcut unavailable while an in-window surface that owns input is composed. */
+/**
+ * Makes hardware shortcuts unavailable while an in-window surface that owns input is composed: every command, or
+ * with [chatsOnly] just the Chats commands, for a surface that replaces Chats beside an open conversation.
+ */
 @Composable
-internal fun HardwareShortcutBlocker() {
+internal fun HardwareShortcutBlocker(chatsOnly: Boolean = false) {
     val router = currentHardwareShortcutRouter()
-    DisposableEffect(router) {
-        val release = router?.block()
+    DisposableEffect(router, chatsOnly) {
+        val release = router?.block(chatsOnly)
         onDispose { release?.invoke() }
     }
 }
@@ -77,7 +79,7 @@ internal class ChatPaneKeyOwner {
     var listFocused by mutableStateOf(false)
     var conversationFocused by mutableStateOf(false)
 
-    /** The pane pressed last, true for the list; null until a pane is pressed. */
+    /** The pane pressed last, true for the list, or null until a pane is pressed. */
     var listPressedLast by mutableStateOf<Boolean?>(null)
 
     /** True when the conversation pane owns keyboard commands. */
