@@ -131,7 +131,9 @@ class FcmAutoInitCoverageTest {
         )
         val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
         assertTrue(settle.contains("nativePushSyncMutex.withLock"))
-        assertTrue(settle.contains("disableFcmAutoInitWithoutNativeDemand(host.nativePushAccountRefs())"))
+        assertTrue(settle.contains("disableFcmAutoInitWithoutLoadedNativeDemand()"))
+        val loaded = autoInit.functionBody("disableFcmAutoInitWithoutLoadedNativeDemand")
+        assertTrue(loaded.contains("if (accountRefs.isNotEmpty()) disableFcmAutoInitWithoutNativeDemand(accountRefs)"))
     }
 
     /** Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. */

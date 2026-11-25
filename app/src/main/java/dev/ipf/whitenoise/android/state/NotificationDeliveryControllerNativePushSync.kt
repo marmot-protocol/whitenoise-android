@@ -37,15 +37,6 @@ internal suspend fun NotificationDeliveryController.pauseNotificationDeliveryRec
     }
 }
 
-/**
- * Permission loss pauses registration but must not leave auto-init on once no account uses native push.
- * An empty account list may only mean accounts have not loaded yet, so it leaves auto-init alone.
- */
-private suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutLoadedNativeDemand() {
-    val accountRefs = host.nativePushAccountRefs()
-    if (accountRefs.isNotEmpty()) disableFcmAutoInitWithoutNativeDemand(accountRefs)
-}
-
 internal suspend fun NotificationDeliveryController.hasConfirmedNativePushRegistration(account: String): Boolean =
     nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
