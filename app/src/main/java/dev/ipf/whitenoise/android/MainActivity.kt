@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
 
-    // Hardware keyboard shortcuts (#4005); App Lock owns input while it is shown or still deciding.
+    // Hardware keyboard shortcuts (#4005), held while App Lock is shown or still deciding.
     internal val hardwareShortcuts = appLockShortcutRouter { appState.appLock }
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
     private var warmResumeTraceToken = 0
