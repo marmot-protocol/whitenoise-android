@@ -16,14 +16,12 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -51,10 +49,14 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.retireDeviceUnlinkedNotice
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Sign out and wipe: teardown spinner, explanatory sheet and the typed confirmation, unchanged from before. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -332,17 +334,16 @@ internal fun SignOutSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var deleteKeyPackages by remember { mutableStateOf(true) }
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         modifier = Modifier.exposePerformanceTestTags(),
-        containerColor = amoledSheetContainerColor(),
         onDismissRequest = { terminal.close(onDismiss) },
         sheetState = sheetState,
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.sign_out_sheet_title))
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
-            Text(stringResource(R.string.sign_out_sheet_title), style = MaterialTheme.typography.titleLarge)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.sign_out_sheet_stays_heading),
@@ -373,7 +374,10 @@ internal fun SignOutSheet(
                 modifier = Modifier.testTag("profile_keys.signout_invitation_keys"),
                 leading = null,
             )
-            Button(onClick = { terminal.close(deleteKeyPackages, onConfirm) }, modifier = Modifier.fillMaxWidth()) {
+            WhiteNoiseButton(
+                onClick = { terminal.close(deleteKeyPackages, onConfirm) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Icon(painterResource(R.drawable.ic_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -397,45 +401,42 @@ private fun SignOutAndWipeSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { terminal.close(onDismiss) },
         sheetState = sheetState,
     ) {
-        Column(
-            Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                stringResource(R.string.sign_out_and_wipe_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Text(stringResource(R.string.sign_out_and_wipe_sheet_intro))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.sign_out_and_wipe_sheet_destroyed_heading),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_db))
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_keychain))
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_relays))
-            }
-            Text(
-                stringResource(R.string.sign_out_and_wipe_sheet_fresh_start),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(
-                onClick = { terminal.close(onConfirm) },
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
+        Column(Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
+            WhiteNoiseSheetHeader(stringResource(R.string.sign_out_and_wipe_sheet_title))
+            Column(
+                Modifier.padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
             ) {
-                Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.sign_out_and_wipe))
+                Text(stringResource(R.string.sign_out_and_wipe_sheet_intro))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.sign_out_and_wipe_sheet_destroyed_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_db))
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_keychain))
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_relays))
+                }
+                Text(
+                    stringResource(R.string.sign_out_and_wipe_sheet_fresh_start),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { terminal.close(onConfirm) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.sign_out_and_wipe))
+                }
             }
         }
     }
