@@ -16,8 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -33,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -766,7 +763,10 @@ private fun SettingsProfileHeader(
     }
 }
 
-/** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
+/**
+ * The active profile as one tappable hero [SettingsRichRow]: avatar, name, short key that copies the full key, QR
+ * glyph and chevron.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -787,7 +787,8 @@ private fun SettingsProfileRow(
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ListItem(
+            SettingsRichRow(
+                hero = true,
                 headlineContent = {
                     EmojiLabel(
                         text = account.title,
@@ -833,7 +834,6 @@ private fun SettingsProfileRow(
                     }
                 },
                 trailingContent = { SettingsProfileTrailing() },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier =
                     Modifier
                         .fillMaxWidth()

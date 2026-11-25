@@ -2,24 +2,16 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import androidx.compose.ui.graphics.Color
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 
-/** Makes the complete choice tappable, retaining selected colors while persistence blocks further input. */
+/**
+ * A consent choice on the diagnostics card, drawn as the shared [SettingsSwitch] so its height, insets and type
+ * match every other settings switch. The card behind it owns the fill and outline, so the row is transparent and
+ * unbordered. The whole row toggles; while [saving] the row is busy, which blocks input and shows the progress
+ * indicator in the switch's place, exactly as other settings switches report a pending save.
+ */
 @Composable
 internal fun ConsentSwitchRow(
     title: String,
@@ -30,29 +22,25 @@ internal fun ConsentSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     explanation: String? = null,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .explainOnLongPress(explanation?.let { Explanation(title, it) })
-                .toggleable(
-                    value = checked,
-                    enabled = enabled && !saving,
-                    role = Role.Switch,
-                    onValueChange = onCheckedChange,
-                ).padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // The row owns input and accessibility; saving must not dim the newly selected thumb/track.
-        Switch(checked = checked, enabled = enabled, onCheckedChange = null)
-    }
+    SettingsSwitch(
+        context = consentRowContext(),
+        title = title,
+        subtitle = subtitle,
+        checked = checked,
+        enabled = enabled,
+        busy = saving,
+        onCheckedChange = onCheckedChange,
+        explanation = explanation,
+        leading = null,
+    )
 }
+
+/** One unbordered, transparent row: the enclosing card already draws the shape, fill and AMOLED outline. */
+@Composable
+private fun consentRowContext(): SettingsRowContext =
+    SettingsRowContext(
+        shapes = WhiteNoiseListItemDefaults.segmentedShapes(0, 1),
+        containerColor = Color.Transparent,
+        borderColor = Color.Unspecified,
+        suppressChrome = { true },
+    )

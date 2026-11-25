@@ -31,7 +31,6 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.updateGlobalBubbleColor
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -53,8 +52,8 @@ class ProfileStartGroupNavigationTest {
     private val app: Application = ApplicationProvider.getApplicationContext()
 
     /** Optional real production owners with controlled local backend data; no relay/signing work. */
+    /** Optional frame export that follows the real support, profile and group ownership handoff in one session. */
     @Test
-    // Optional frame export follows the real support/profile/group ownership handoff in one session.
     @Suppress("LongMethod")
     fun captureSupportProfileAndStartGroupOwners() {
         org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
@@ -132,38 +131,7 @@ class ProfileStartGroupNavigationTest {
         }
     }
 
-    @Test
-    fun captureProductionBubbleColorsDropdown() {
-        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
-        val state = profileFixture(SHELL_SURFACE).appState
-        // Seed all existing theme variants, since the editor resolves app preference separately.
-        dev.ipf.whitenoise.android.state.BubbleTheme.entries.forEach { theme ->
-            state.updateGlobalBubbleColor(theme, dev.ipf.whitenoise.android.state.BubbleSide.Mine, 0xff225588L)
-        }
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
-                ) {
-                    dev.ipf.whitenoise.android.ui.settings
-                        .ChatBubbleColorsScreen(state, onBack = {})
-                }
-            }
-        }
-        try {
-            captureRemainingOwnerFrames("anchored-dropdown/forward") {
-                composeRule.onNodeWithTag("bubble_colors.menu").performClick()
-            }
-            composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).assertIsDisplayed()
-            captureRemainingOwnerFrames("anchored-dropdown/reverse") {
-                composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).performClick()
-            }
-            composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).assertDoesNotExist()
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
-    }
-
+    /** Exports the source frame, then 32 frames after [action], under `build/animation-frames/<name>`. */
     private fun captureRemainingOwnerFrames(
         name: String,
         action: () -> Unit,

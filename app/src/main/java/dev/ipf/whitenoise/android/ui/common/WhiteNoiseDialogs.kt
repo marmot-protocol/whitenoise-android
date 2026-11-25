@@ -16,6 +16,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
@@ -177,6 +179,82 @@ internal fun WhiteNoiseDialogChoiceRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                }
+            }
+        }
+    }
+}
+
+/** The decorative control a [WhiteNoiseDialogToggleRow] draws; the row itself carries the matching role. */
+internal enum class DialogToggleControl(
+    val role: Role,
+) {
+    Switch(Role.Switch),
+    Checkbox(Role.Checkbox),
+}
+
+/**
+ * The on/off counterpart of [WhiteNoiseDialogChoiceRow]: the same dialog-owned insets, minimum height, type and
+ * selected fill, a trailing switch or check box that stays decorative, and one toggle target for the whole row.
+ * [subtitleMaxLines] and [subtitleOverflow] let a row keep a long file name on one line; holding a row with
+ * [explanation] explains [title].
+ */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun WhiteNoiseDialogToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    control: DialogToggleControl = DialogToggleControl.Switch,
+    subtitle: String? = null,
+    subtitleMaxLines: Int = Int.MAX_VALUE,
+    subtitleOverflow: TextOverflow = TextOverflow.Clip,
+    enabled: Boolean = true,
+    explanation: String? = null,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        Row(
+            modifier =
+                Modifier
+                    .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
+                    .then(modifier)
+                    .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
+                    .whiteNoiseDialogSelection(checked && enabled)
+                    .explainOnLongPress(explanation?.let { Explanation(title, it) })
+                    .toggleable(checked, enabled = enabled, role = control.role, onValueChange = onCheckedChange)
+                    .padding(horizontal = ChoiceDialogDefaults.RowOverhang),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ChoiceDialogDefaults.RowOverhang),
+        ) {
+            Column(Modifier.weight(1f).padding(vertical = ChoiceDialogDefaults.RowTextPadding)) {
+                Text(
+                    text = title,
+                    color =
+                        if (enabled) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = subtitleMaxLines,
+                        overflow = subtitleOverflow,
+                    )
+                }
+            }
+            val silent = Modifier.clearAndSetSemantics {}
+            when (control) {
+                DialogToggleControl.Switch -> {
+                    Switch(checked, onCheckedChange = null, enabled = enabled, modifier = silent)
+                }
+                DialogToggleControl.Checkbox -> {
+                    Checkbox(checked, onCheckedChange = null, enabled = enabled, modifier = silent)
                 }
             }
         }

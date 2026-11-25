@@ -58,6 +58,5 @@
     <string name="explanation_appearance_action_color_save">为此设备上的当前个人资料和当前主题保存此操作颜色。当颜色有效且与已保存的颜色不同时可用。</string>
     <string name="explanation_appearance_action_color_reset">移除当前主题下你自定义的操作颜色并恢复为默认值。它适用于此设备上的当前个人资料。</string>
     <string name="explanation_appearance_bubble_colors_save">保存所选的气泡颜色。它们适用于此设备上的当前个人资料；如果你是从某个聊天打开此屏幕的，则仅适用于该聊天。</string>
-    <string name="explanation_appearance_bubble_colors_menu">打开一个菜单，其中的重置操作会清除你在此处自定义的气泡颜色并恢复为默认颜色。</string>
     <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text 在此设备上进行转写。使用消息旁的按钮可隐藏转写文本。</string>
 </resources>

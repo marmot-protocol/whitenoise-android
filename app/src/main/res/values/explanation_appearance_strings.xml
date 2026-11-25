@@ -59,5 +59,5 @@
     <string name="explanation_appearance_action_color_save">Saves this action color for the active profile and the current theme on this device. It is available once the color is valid and different from the saved one.</string>
     <string name="explanation_appearance_action_color_reset">Removes your custom action color for the current theme and goes back to the default. It applies to the active profile on this device.</string>
     <string name="explanation_appearance_bubble_colors_save">Saves the chosen bubble colors. They apply to the active profile on this device, or only to this chat when you opened this screen from a chat.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Opens a menu with a reset action that clears your custom bubble colors here and goes back to the defaults.</string>
+    <string name="explanation_appearance_bubble_colors_reset">Clears your custom bubble colors here and goes back to the defaults, or to your global colors in a chat. Nothing changes until you save.</string>
 </resources>

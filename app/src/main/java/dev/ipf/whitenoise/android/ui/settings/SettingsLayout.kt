@@ -220,13 +220,19 @@ internal fun SettingsSection(title: String) {
     )
 }
 
-/** Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. */
+/**
+ * Helper copy beneath a group at the same 32 dp content line, in the quiet supporting style. [modifier] adds
+ * semantics such as hiding copy a neighbouring row already announces.
+ */
 @Suppress("FunctionNaming")
 @Composable
-internal fun SettingsExplainer(text: String) {
+internal fun SettingsExplainer(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(
                     start = WhiteNoiseSpacing.SettingsSectionInset,

@@ -12,12 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -222,14 +220,9 @@ internal fun DiagnosticsImprovementsScreen(
                 }
             }
             item(key = "search.DiagnosticsImprovements.5") {
-                Text(
+                SettingsExplainer(
                     stringResource(R.string.delete_audit_logs_subtitle),
-                    modifier =
-                        Modifier
-                            .padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)
-                            .semantics { hideFromAccessibility() },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { hideFromAccessibility() },
                 )
             }
         }
@@ -270,32 +263,31 @@ internal fun DiagnosticsImprovementsScreen(
     }
 }
 
-/** The collection scope, exporter readiness and any read or save failure, in the explainer column. */
+/**
+ * The collection scope, exporter readiness and any read or save failure as settings explainers; only the failure
+ * and its Retry keep their own error colour and button at the same content line.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun DiagnosticsDisclosure(appState: WhiteNoiseAppState) {
     val state = appState.diagnostics
-    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        ) {
-            UsageDiagnosticsDisclosure()
-            if (state.requiresChoice && state.snapshot?.settings?.previouslyEnabled == true) {
-                Text(stringResource(R.string.usage_diagnostics_renew), style = MaterialTheme.typography.bodySmall)
-            }
-            Text(
-                stringResource(
-                    R.string.usage_diagnostics_status,
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.productAnalytics)),
-                    stringResource(diagnosticsStatusLabel(state.snapshot?.status?.telemetry)),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (state.snapshot == null && !state.failed) {
-                Text(stringResource(R.string.usage_diagnostics_loading), style = MaterialTheme.typography.bodySmall)
-            }
-            if (state.failed) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+        UsageDiagnosticsDisclosure()
+        if (state.requiresChoice && state.snapshot?.settings?.previouslyEnabled == true) {
+            SettingsExplainer(stringResource(R.string.usage_diagnostics_renew))
+        }
+        SettingsExplainer(
+            stringResource(
+                R.string.usage_diagnostics_status,
+                stringResource(diagnosticsStatusLabel(state.snapshot?.status?.productAnalytics)),
+                stringResource(diagnosticsStatusLabel(state.snapshot?.status?.telemetry)),
+            ),
+        )
+        if (state.snapshot == null && !state.failed) {
+            SettingsExplainer(stringResource(R.string.usage_diagnostics_loading))
+        }
+        if (state.failed) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)) {
                 Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
                 TextButton(
                     enabled = !state.busy,

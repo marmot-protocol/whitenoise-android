@@ -39,10 +39,13 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
-/** Full settings disclosure; onboarding offers the same information in each choice's Details section. */
+/**
+ * Full settings disclosure as settings explainers; onboarding offers the same information in each choice's
+ * Details section.
+ */
 @Composable
 internal fun UsageDiagnosticsDisclosure() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         listOf(
             R.string.usage_diagnostics_disclosure,
             R.string.diagnostics_group_disclosure,
@@ -50,7 +53,7 @@ internal fun UsageDiagnosticsDisclosure() {
             R.string.diagnostics_retention,
             R.string.diagnostics_disable_disclosure,
         ).forEach { text ->
-            Text(stringResource(text), style = MaterialTheme.typography.bodySmall)
+            SettingsExplainer(stringResource(text))
         }
     }
 }

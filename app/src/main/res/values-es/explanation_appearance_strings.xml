@@ -58,6 +58,5 @@
     <string name="explanation_appearance_action_color_save">Guarda este color de acción para el perfil activo y el tema actual en este dispositivo. Está disponible cuando el color es válido y distinto del guardado.</string>
     <string name="explanation_appearance_action_color_reset">Quita tu color de acción personalizado del tema actual y vuelve al predeterminado. Se aplica al perfil activo en este dispositivo.</string>
     <string name="explanation_appearance_bubble_colors_save">Guarda los colores de burbuja elegidos. Se aplican al perfil activo en este dispositivo, o solo a este chat si abriste la pantalla desde un chat.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Abre un menú con una acción de restablecer que borra tus colores de burbuja personalizados aquí y vuelve a los colores predeterminados.</string>
     <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text transcribe en este dispositivo. Usa el botón junto al mensaje para ocultar su transcripción.</string>
 </resources>

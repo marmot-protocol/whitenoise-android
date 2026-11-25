@@ -58,6 +58,5 @@
     <string name="explanation_appearance_action_color_save">Enregistre cette couleur d\'action pour le profil actif et le thème actuel sur cet appareil. Disponible quand la couleur est valide et différente de celle enregistrée.</string>
     <string name="explanation_appearance_action_color_reset">Supprime votre couleur d\'action personnalisée pour le thème actuel et revient à celle par défaut. Elle s\'applique au profil actif sur cet appareil.</string>
     <string name="explanation_appearance_bubble_colors_save">Enregistre les couleurs de bulle choisies. Elles s\'appliquent au profil actif sur cet appareil, ou seulement à cette discussion si vous avez ouvert l\'écran depuis une discussion.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Ouvre un menu avec une action de réinitialisation qui supprime ici vos couleurs de bulle personnalisées et revient aux couleurs par défaut.</string>
     <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text transcrit sur cet appareil. Le bouton à côté du message permet de masquer la transcription.</string>
 </resources>
