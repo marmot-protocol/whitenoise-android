@@ -136,15 +136,17 @@ private suspend fun NotificationDeliveryController.selectFcmTransport(
 }
 
 /**
- * Reads the selection's token under the native sync lock while [owner] still owns delivery. A wipe ends
- * ownership before it takes this lock to turn auto-init off, so a selection resumed after a wipe or an
- * account change neither turns auto-init back on nor keeps a token.
+ * Reads the selection's token while [owner] still owns delivery. The ownership checks, the auto-init write
+ * and the token store run under the native sync lock, and the Firebase read does not. A wipe ends ownership
+ * before it takes this lock to turn auto-init off, so a selection resumed after a wipe or an account change
+ * neither turns auto-init back on nor keeps a token, and a stalled read never holds up the wipe.
  */
 @Suppress("MaxLineLength")
 private suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner: NotificationDeliveryModeOwner): String? =
-    nativePushSyncMutex.withLock {
-        fetchFcmTokenOrNull(tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) })
-    }
+    fetchFcmTokenOrNull(
+        tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) },
+        ownerFence = nativePushSyncMutex,
+    )
 
 /** Drops [owner]'s queued native-push disable, reporting whether it was cleared while the owner stays current. */
 @Suppress("MaxLineLength")

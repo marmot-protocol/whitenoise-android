@@ -139,11 +139,15 @@ class FcmAutoInitCoverageTest {
         val fetch = appModuleSource(SYNC).functionBody("fetchFcmTokenOrNull")
 
         assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
-        assertTrue(fenced.contains("nativePushSyncMutex.withLock"))
+        assertTrue(fenced.contains("ownerFence = nativePushSyncMutex"))
         assertTrue(fenced.contains("tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) }"))
-        val ownerCheck = fetch.indexOf("if (!tokenOwnerIsCurrent()) return null")
-        val autoInitWrite = fetch.indexOf("applyFcmAutoInit")
-        assertTrue("the owner check must precede the auto-init write", ownerCheck in 0 until autoInitWrite)
+        val admit = "tokenOwnerIsCurrent().also { current -> if (current) applyFcmAutoInit(enabled = true) }"
+        val admitAt = fetch.indexOf(admit)
+        val read = fetch.indexOf("reader()")
+        val fenceAt = fetch.indexOf("fence.withLock")
+        assertTrue("the owner check and auto-init write must run under the fence", fenceAt in 0 until admitAt)
+        assertTrue("the SDK read must run outside the fence", admitAt < read)
+        assertTrue("the token store must run under the fence", fetch.indexOf("fence.withLock", read) > read)
     }
 
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */

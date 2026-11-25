@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -235,17 +236,25 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
 /**
  * Turns Firebase auto-init on, then fetches and retains a non-blank FCM token when push is available.
  * A caller whose owner is no longer current gets null before auto-init is touched, and its token is not kept.
+ * A caller that does not already hold the native sync lock passes it as [ownerFence]. The owner check with
+ * the auto-init write, and the recheck with the token store, then run under it, while the SDK read does not.
  */
 @Suppress("ReturnCount")
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     expectedCallbackToken: String? = null,
     tokenOwnerIsCurrent: () -> Boolean = { true },
+    ownerFence: Mutex? = null,
 ): String? {
     val rotation = pushTokenRotationSequence.get()
     if (!nativePushCapability().isAvailable) return null
-    if (!tokenOwnerIsCurrent()) return null
-    // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
-    applyFcmAutoInit(enabled = true)
+    // A caller that already holds the native sync lock passes no fence, and a private mutex never contends.
+    val fence = ownerFence ?: Mutex()
+    val ownerAdmitted =
+        fence.withLock {
+            // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
+            tokenOwnerIsCurrent().also { current -> if (current) applyFcmAutoInit(enabled = true) }
+        }
+    if (!ownerAdmitted) return null
     val token =
         runCatchingCancellable {
             val reader: suspend () -> String? = fcmTokenReaderOverride ?: this::readFcmTokenFromSdk
@@ -257,13 +266,15 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
         null
     } else {
         val retained =
-            withContext(pushWakeStorageDispatcher) {
-                pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
-                    // The SDK delivers a new token to onNewToken before getToken() resolves. A rotation
-                    // caused by this same token does not make the read stale.
-                    val rotationCurrent =
-                        pushTokenRotationSequence.get() == rotation || lastRotatedFcmToken.get() == token
-                    rotationCurrent && tokenOwnerIsCurrent()
+            fence.withLock {
+                withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
+                        // The SDK delivers a new token to onNewToken before getToken() resolves. A rotation
+                        // caused by this same token does not make the read stale.
+                        val rotationCurrent =
+                            pushTokenRotationSequence.get() == rotation || lastRotatedFcmToken.get() == token
+                        rotationCurrent && tokenOwnerIsCurrent()
+                    }
                 }
             }
         token.takeIf { retained }

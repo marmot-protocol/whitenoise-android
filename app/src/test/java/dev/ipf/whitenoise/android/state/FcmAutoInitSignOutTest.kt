@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -67,12 +69,53 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
             assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
             assertEquals(false, platform.autoInitWrites.lastOrNull())
             platform.autoInitWrites.clear()
+            tokenReads.set(0)
+            // Positive control: push storage is ready, so only the ownership fence can stop the token read.
+            assertTrue(store.registrationAllowed())
 
             assertFalse(delivery.selectFcmDelivery(selectionOwner))
 
             val writes = platform.autoInitWrites.toList()
             assertTrue("a wiped owner must not turn auto-init on: $writes", true !in writes)
             assertEquals(0, tokenReads.get())
+            assertNull(store.lastToken())
+        }
+
+    /**
+     * A last-signer wipe that lands while the selection waits on Firebase completes without waiting for it,
+     * ends with auto-init off, and the selection keeps none of the token it then reads.
+     */
+    @Test
+    fun wipeDuringSelectionTokenReadLeavesAutoInitOffWithoutToken() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val store = PushTokenStore.create(context)
+            lateinit var state: WhiteNoiseAppState
+            val wiped = AtomicBoolean(false)
+            state =
+                appState(
+                    pushTokenStore = store,
+                    nativePushFallbackPlatform = platform,
+                    pushServerConfigProvider = { PushServerConfig("0".repeat(64), null) },
+                    fcmTokenReader = {
+                        // The wipe must not need the lock the selection holds around its owner checks.
+                        val completion = withTimeout(WIPE_TIMEOUT_MILLIS) { state.signOutAndWipeActiveAccount() }
+                        wiped.set(checkNotNull(completion).native.localCleanup.completed)
+                        "token-read-across-wipe"
+                    },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            val delivery = state.notificationDelivery
+            val selectionOwner =
+                checkNotNull(
+                    delivery.captureNotificationDeliveryModeOwner(delivery.notificationDeliveryModeIntent.capture()),
+                )
+            assertTrue(store.registrationAllowed())
+
+            assertFalse(delivery.selectFcmDelivery(selectionOwner))
+
+            assertTrue("the wipe must complete during the token read", wiped.get())
+            assertEquals(false, platform.autoInitWrites.lastOrNull())
             assertNull(store.lastToken())
         }
 
@@ -92,4 +135,8 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
 
             assertTrue(platform.autoInitWrites.isEmpty())
         }
+
+    private companion object {
+        const val WIPE_TIMEOUT_MILLIS = 10_000L
+    }
 }
