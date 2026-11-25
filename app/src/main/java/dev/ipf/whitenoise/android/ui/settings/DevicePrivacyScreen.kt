@@ -188,9 +188,6 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
-            item(key = "search.DevicePrivacy.9") {
-                SettingsExplainer(stringResource(R.string.diagnostics_controls_detail))
-            }
         }
     }
     if (autoLockPicker) {
