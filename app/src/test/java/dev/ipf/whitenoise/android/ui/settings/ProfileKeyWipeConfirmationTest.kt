@@ -47,7 +47,9 @@ class ProfileKeyWipeConfirmationTest {
 
     /**
      * On a 320 dp window at 200% RTL the shared dialog width leaves too little room for both actions on one row, so
-     * they stack. The title then scrolls away with the body, and scrolling to the keyword field shows all of it.
+     * they stack. Scrolling to the keyword field shows all of it and takes the title out of view: the title check is
+     * what pins the title to the scrolling body, since without a keyboard the field would fit beside a fixed title.
+     * Robolectric has no keyboard, so ProfileKeyWipeConfirmationAndroidTest checks the same field above the real IME.
      */
     @Test
     @Config(qualifiers = "en-w320dp-h640dp-mdpi")
@@ -55,9 +57,11 @@ class ProfileKeyWipeConfirmationTest {
         showWipeConfirmation(largeRtl = true)
         val confirm = composeRule.onNodeWithTag("profile_keys.wipe_confirm")
         val cancel = composeRule.onNodeWithText(context.getString(R.string.cancel))
+        val confirmBounds = confirm.fetchSemanticsNode().boundsInRoot
+        val cancelBounds = cancel.fetchSemanticsNode().boundsInRoot
         assertTrue(
-            "Actions should stack on a 320 dp window at 200% text",
-            confirm.fetchSemanticsNode().boundsInRoot.top != cancel.fetchSemanticsNode().boundsInRoot.top,
+            "Actions should stack on a 320 dp window at 200% text: $confirmBounds, $cancelBounds",
+            confirmBounds.bottom <= cancelBounds.top || cancelBounds.bottom <= confirmBounds.top,
         )
         val field = composeRule.onNodeWithText(context.getString(R.string.sign_out_and_wipe_confirm_field_label))
         // Scroll actions run on clock frames, so the clock advances only for the scroll itself.
