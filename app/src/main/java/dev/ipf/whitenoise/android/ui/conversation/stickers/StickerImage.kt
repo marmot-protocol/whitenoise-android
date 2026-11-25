@@ -41,9 +41,10 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.StickerAssetCache
 import dev.ipf.whitenoise.android.state.StickerKey
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-internal val StickerTileShape = RoundedCornerShape(16.dp)
+internal val StickerTileShape = RoundedCornerShape(Radii.lg)
 
 private enum class StickerPhase { Idle, Loading, WaitingForTap, Failed }
 

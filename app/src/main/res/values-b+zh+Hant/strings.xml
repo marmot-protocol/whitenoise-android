@@ -164,20 +164,19 @@
     <string name="leave_and_delete_message">退出此群組並從此裝置刪除聊天記錄？</string>
     <string name="toast_left_chat_delete_failed">已退出群組，但本機刪除失敗。</string>
     <string name="group_reset_action">重設並等待新邀請</string>
-    <string name="group_reset_dialog_title">要在此裝置上重設此群組嗎？</string>
-    <string name="group_reset_dialog_message">White Noise 只會在此裝置上清除該群組的歷史紀錄與加密狀態，不會傳送任何內容給群組。只有當管理員在此次重設後傳送新的邀請時，你才會重新加入。</string>
+    <string name="group_reset_dialog_title">要重設此群組嗎？</string>
+    <string name="group_reset_dialog_message">清除這個群組在此裝置上的歷史紀錄與加密狀態，不會傳送任何內容。要重新加入，你需要管理員在重設後建立的新邀請。</string>
     <string name="group_reset_confirm">重設</string>
     <string name="toast_group_reset_done">群組已重設。收到新邀請後會重新出現。</string>
     <string name="toast_group_reset_already_waiting">此群組已在等待新的邀請。</string>
     <string name="toast_couldnt_reset_group">無法重設群組，請再試一次。</string>
-    <string name="chat_abandon_dialog_title">要從此裝置刪除此對話嗎？</string>
-    <string name="chat_abandon_dialog_message">在此處刪除並停止接收新訊息。不會傳送任何內容。</string>
+    <string name="chat_abandon_dialog_title">要刪除此聊天室嗎？</string>
+    <string name="chat_abandon_dialog_message">從此裝置清除此聊天室並停止接收新訊息，不會傳送任何內容。</string>
     <string name="chat_abandon_confirm">放棄</string>
     <string name="abandon_identity_chat">對話：%1$s</string>
     <string name="abandon_identity_group">群組：%1$s</string>
-    <string name="abandon_identity_account">你的帳號：%1$s</string>
     <string name="chats_abandon_action">在此裝置上放棄所選對話</string>
-    <string name="chats_abandon_dialog_title">要在此裝置上放棄所選對話嗎？</string>
+    <string name="chats_abandon_dialog_title">要在此裝置上放棄聊天室嗎？</string>
     <string name="toast_chat_already_abandoned">此對話已從此裝置刪除。</string>
     <string name="leave_blocked_abandon_hint_dm">離開未完成。你可以改為從此裝置刪除此對話，不會傳送任何內容給對方。</string>
     <string name="leave_blocked_abandon_hint_group">離開未完成。你可以改為在此裝置上重設此群組，不會傳送任何內容給群組。</string>
@@ -1018,7 +1017,7 @@
     <string name="notification_background_on">背景連線已開啟。</string>
     <string name="notification_background_off">背景連線已關閉。</string>
     <string name="notification_categories_detail">Android 依類別設定聲音、震動和重要性。</string>
-    <string name="chat_with_support">與支援團隊聊天</string>
+    <string name="chat_with_support">聯絡 White Noise 團隊</string>
     <string name="theme">主題</string>
     <string name="theme_system">跟隨系統</string>
     <string name="theme_light">淺色</string>
@@ -1504,9 +1503,15 @@
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_90_days">3 個月</string>
     <string name="disappearing_custom">自訂時間</string>
-    <string name="disappearing_days_format">%1$d 天</string>
-    <string name="disappearing_hours_format">%1$d 小時</string>
-    <string name="disappearing_minutes_format">%1$d 分鐘</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="other">%d 天</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="other">%d 小時</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="other">%d 分鐘</item>
+    </plurals>
     <string name="disappearing_unit_minutes">分鐘</string>
     <string name="disappearing_unit_hours">小時</string>
     <string name="disappearing_unit_days">天</string>
@@ -1544,7 +1549,9 @@
     <string name="disappearing_5_minutes">5 分鐘</string>
     <string name="disappearing_30_seconds">30 秒</string>
     <string name="disappearing_explainer">未讀的已接收訊息會在你閱讀時開始計時。其他新訊息會在你設定的時長後對所有人永久刪除。</string>
-    <string name="disappearing_seconds_format">%1$d 秒</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="other">%d 秒</item>
+    </plurals>
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
     <string name="disappearing_custom_decrease">縮短</string>
@@ -2106,6 +2113,7 @@
     <string name="setup_finding_retired_relay">此中繼站已停用。</string>
     <string name="setup_finding_unsafe_relay">此中繼站位址無法安全使用。</string>
     <string name="setup_finding_unreachable">無法連線至此中繼站。</string>
+    <string name="setup_relay_timeout_title">有一個中繼未及時回應</string>
     <string name="setup_finding_timed_out">此次檢查已逾時。</string>
     <string name="setup_finding_authentication_required">此中繼站要求驗證身分。</string>
     <string name="setup_finding_payment_required">此中繼站要求付費。</string>
@@ -2209,7 +2217,7 @@
     <string name="app_unlock_checking">正在檢查應用程式保護…</string>
     <string name="support_contact_title">White Noise 支援</string>
     <string name="support_contact_subtitle">問題、故障和建議</string>
-    <string name="support_contact_explainer">提問、回報問題或提出建議。</string>
+    <string name="support_contact_explainer">向 White Noise 的開發團隊提問、回報問題或提供意見。</string>
     <string name="support_relays_attention">個人資料中繼需要處理</string>
     <string name="support_open_relays">開啟中繼</string>
     <string name="support_relays_review">檢查此個人資料的接收中繼清單。</string>
@@ -2270,6 +2278,11 @@
     <string name="new_message_no_results_detail">檢查拼寫或嘗試不同的搜尋.</string>
     <string name="new_message_chat_created">聊天已建立</string>
     <string name="new_message_open_chat">開啟聊天</string>
+    <string name="group_setup_customize">自訂群組</string>
+    <string name="group_setup_hide_customization">隱藏自訂選項</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="other">已選取 %d 位成員</item>
+    </plurals>
     <string name="group_setup_title">設定組</string>
     <string name="group_create_action">建立組</string>
     <string name="group_add_photo">新增圖片</string>
@@ -2407,6 +2420,8 @@
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_incompatible_key_package">對方的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
     <string name="error_incompatible_key_package_for">%1$s 的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
+    <string name="new_message_copy_inbox_instructions">複製操作說明</string>
+    <string name="new_message_inbox_instructions">我無法在 White Noise 上與你開始聊天。可以在 White Noise 設定中檢查你的收件匣中繼，然後告訴我何時可以再試嗎？</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>

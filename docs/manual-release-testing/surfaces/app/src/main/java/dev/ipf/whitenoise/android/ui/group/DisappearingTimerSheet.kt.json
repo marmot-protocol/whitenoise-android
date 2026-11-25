@@ -48,17 +48,6 @@
         ]
       },
       {
-        "surface": "DisappearingSheetTitle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
-        "anchor": "fun DisappearingSheetTitle(",
-        "test_ids": [
-          "GRP-001",
-          "GRP-043",
-          "SET-028",
-          "SET-058"
-        ]
-      },
-      {
         "surface": "ChipRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
         "anchor": "fun ChipRow(",
@@ -174,17 +163,6 @@
         "surface": "string:cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
         "anchor": "R.string.cancel",
-        "test_ids": [
-          "GRP-001",
-          "GRP-043",
-          "SET-028",
-          "SET-058"
-        ]
-      },
-      {
-        "surface": "string:back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
-        "anchor": "R.string.back",
         "test_ids": [
           "GRP-001",
           "GRP-043",

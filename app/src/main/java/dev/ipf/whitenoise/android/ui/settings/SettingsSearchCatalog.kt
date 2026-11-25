@@ -727,4 +727,4 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             R.string.notifications,
             SettingsDetail.NotificationDelivery,
         ),
-    ) + linkedDevicesSearchEntry()
+    ) + linkedDevicesSearchEntry() + userHelpSearchEntries()

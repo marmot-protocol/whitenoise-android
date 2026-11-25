@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/DisbandedGroupComposerNotice.kt",
+  "legacy_sha256": "c5816b8081d1accb6b97e979445e6e21409f68ee20d1f7b4250315d272c00813",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DisbandedGroupComposerNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/DisbandedGroupComposerNotice.kt",
+        "anchor": "fun DisbandedGroupComposerNotice(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Disbanded group composer notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/DisbandedGroupComposerNotice.kt",
+        "anchor": "R.string.conversation_disbanded_notice",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Disbanding group composer notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/DisbandedGroupComposerNotice.kt",
+        "anchor": "R.string.conversation_disbanding_notice",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

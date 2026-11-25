@@ -34,9 +34,10 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.dismissGroupCommitRefusal
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Wires the conversation-owned recovery actions consistently in empty and populated timelines. */
@@ -256,7 +257,7 @@ private fun RecoveryNoticeSurface(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
-        modifier = modifier.fillMaxWidth().padding(vertical = 24.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = WhiteNoiseSpacing.Section),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -268,9 +269,9 @@ private fun RecoveryNoticeSurface(
             border = amoledOutlineBorder(),
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(WhiteNoiseSpacing.CompactScreenMargin),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 content = content,
             )
         }
@@ -295,7 +296,7 @@ private fun GroupRejoinInvitationDialog(
     val currentOnConfirm = rememberUpdatedState(onConfirm)
     val currentOnDecline = rememberUpdatedState(onDecline)
     key(invitation, busy) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { if (!busy) onDismiss() },
             dismissEnabled = { !busy },
             title = { Text(stringResource(R.string.group_rejoin_title)) },

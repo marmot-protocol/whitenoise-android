@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">了解 White Noise</string>
+    <string name="learn_find_title">查找联系人</string>
+    <string name="learn_find_body">打开新聊天，粘贴对方的个人资料链接或扫描二维码。如果按姓名找不到，请向对方索要链接。</string>
+    <string name="learn_share_title">分享你的个人资料</string>
+    <string name="learn_share_body">打开“分享与连接”以展示二维码或分享个人资料链接。请妥善保管你的私钥。</string>
+    <string name="learn_actions_title">回复或添加表情回应</string>
+    <string name="learn_actions_body">将消息向聊天中间滑动即可回复。长按消息可查看回应等更多操作。</string>
+    <string name="learn_example_question">明天见吗？</string>
+    <string name="learn_example_message">明天见！</string>
+    <string name="learn_show_actions">显示消息操作</string>
+    <string name="learn_open_share">打开分享与连接</string>
+    <string name="learn_group_title">创建私密群组</string>
+    <string name="learn_group_body">把想联系的人聚在同一个对话里。从新建聊天创建群组，然后选择要邀请的人。你的消息采用端到端加密。</string>
+    <string name="learn_demo_label">练习聊天 · 不会发送任何消息</string>
+    <string name="learn_demo_sender">演示联系人</string>
+    <string name="learn_marmot_title">跨应用聊天</string>
+    <string name="learn_marmot_body">好友可以通过其他兼容应用加入对话。White Noise 使用开放的 Marmot 协议，让不同团队开发的应用能够互通。</string>
+    <string name="learn_marmot_link">探索 Marmot 应用</string>
+    <string name="learn_marmot_link_failed">无法打开应用目录。请在浏览器中访问 marmot.build/apps.html。</string>
+</resources>

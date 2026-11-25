@@ -652,7 +652,6 @@
     <ID>MaxLineLength:DiagnosticFormatter.kt:DiagnosticFormatter$private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&amp;]+)")</ID>
     <ID>MaxLineLength:DiagnosticFormatterTest.kt:DiagnosticFormatterTest$assertTrue(described.startsWith("[alice] error: failed [redacted] token=[redacted] https://[redacted]@example.test"))</ID>
     <ID>MaxLineLength:DiagnosticsScreen.kt:appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }</ID>
-    <ID>MaxLineLength:DiskByteCache.kt:DiskByteCache$private fun Throwable.isAuthenticationFailure: Boolean</ID>
     <ID>MaxLineLength:DiskByteCache.kt:DiskByteCache$val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)</ID>
     <ID>MaxLineLength:DiskByteCacheTest.kt:DiskByteCacheTest$assertEquals("AES-GCM envelope stores a 6-byte header, metadata auth, and payload IV/tag", payload.size + 62, stored.size)</ID>
     <ID>MaxLineLength:DiskByteCacheTest.kt:DiskByteCacheTest$assertTrue("a `.enc` must remain on disk after replace", dir.listFiles()?.any { it.name.endsWith(".enc") } ?: false)</ID>

@@ -47,9 +47,9 @@
         ]
       },
       {
-        "surface": "R.string.back",
+        "surface": "Shared top bar: Review selection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
-        "anchor": "R.string.back",
+        "anchor": "WhiteNoiseTopBar(",
         "test_ids": [
           "NCH-002"
         ]

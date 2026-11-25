@@ -296,6 +296,34 @@ projection, acceptance and publication metrics provide the deeper breakdown.
 Do not add their percentiles to these overlapping host measurements. Existing
 Perfetto slices and the local WNPerf toggle remain independent of export consent.
 
+## Group create and commit latency
+
+Use two release-like builds with the same MarmotKit pin on the same dedicated
+fixture. Interleave baseline and candidate runs, and repeat each action at least
+30 times per build and condition. Use separate groups or restore the same roster
+shape between runs. Start the next trial after delivery settles. Separate
+founding with no recipients from founding with recipients, invites with ordinary
+members from invites with initial admins, and warm directory state from cold
+directory state. Keep online and delayed-relay runs in separate buckets.
+
+Time from the final confirmation input to the first usable conversation frame
+for creation, the committed roster for invite and removal, and the new title
+after save for rename. Use a fixture that keeps the roster visible for the
+membership interaction, or capture the first committed confirmation and verify
+the roster separately. A pending row can be timed separately using
+`group_membership_pending`. Count partial invites, failures, and retries
+separately. Report median and p90 for successful actions with the sample and
+failure counts. Compare paired traces before attributing a speedup.
+
+With the app category enabled in Perfetto, the asynchronous
+`WhiteNoise.marmot.*` slices bracket the bridge calls for `createGroup`,
+`createdGroupDetails`, `inviteMembers`, `removeMembers`, and
+`updateGroupProfile`. Compare them to the full interaction. Create/open
+diagnostics also report the create and projection phases separately. In
+delayed-relay trials, track recipient join or the remote roster/title separately
+from the sender UI. Verify one commit per action, canonical state after process
+restart, and the existing refusal flow when delivery is stalled.
+
 ## Prepare a physical-device fixture
 
 Use a dedicated API 34+ device with animations disabled and a stable power and

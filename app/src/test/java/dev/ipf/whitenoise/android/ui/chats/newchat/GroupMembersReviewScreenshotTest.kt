@@ -418,7 +418,9 @@ class GroupMembersReviewScreenshotTest {
             val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
             assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
             memberCopy.performClick()
-            rule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
+            rule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertDoesNotExist()
+            // The dialog has no room for the whole key, so copying leaves the row at its height.
+            assertEquals(memberBounds.height, memberCopy.fetchSemanticsNode().boundsInRoot.height, 0.5f)
             assertEquals(
                 npub,
                 clipboard.primaryClip!!

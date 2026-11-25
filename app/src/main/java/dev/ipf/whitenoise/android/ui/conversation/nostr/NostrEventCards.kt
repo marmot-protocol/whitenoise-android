@@ -2,10 +2,8 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,12 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -30,14 +26,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -50,8 +43,13 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
-import kotlinx.coroutines.launch
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedActionIconSize
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedCard
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedPadding
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedSurface
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /** Renders bounded event cards and their lifecycle-bound fullscreen viewers. */
 @Composable
@@ -128,8 +126,7 @@ private fun ResolvedNostrEventCard(
 ) {
     var launchOrigin: Rect? = null
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
+    val clipboard = rememberClipboardCopier()
     val flow =
         remember(resolver, occurrence.reference.stableId) {
             resolver.state(occurrence.reference, occurrence.authoredReference)
@@ -144,11 +141,7 @@ private fun ResolvedNostrEventCard(
         contentColor = contentColor,
         onRetry = { resolver.retry(occurrence.reference, flow, occurrence.authoredReference) },
         onCopy = {
-            scope.launch {
-                clipboard.setClipEntry(
-                    ClipEntry(ClipData.newPlainText("Nostr event", "nostr:$authoredReference")),
-                )
-            }
+            clipboard.copy("nostr:$authoredReference", "Nostr event")
         },
         onReadNote = { card -> onReadEvent(card, authoredReference, launchOrigin) },
         onPlayVideo = { card -> onPlayVideo(card, launchOrigin) },
@@ -184,11 +177,9 @@ internal fun NostrEventCard(
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
     val copyDescription = stringResource(R.string.nostr_event_copy)
-    Surface(
-        color = Color.Transparent,
+    ConversationEmbedCard(
+        surface = ConversationEmbedSurface.OnBubble,
         contentColor = contentColor,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.22f)),
         modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_CARD_BOUNDS_TAG),
     ) {
         NostrEventCardLayout(
@@ -306,7 +297,9 @@ private fun LoadedEventCard(
     onPlayVideo: () -> Unit,
     onLaunchOrigin: (Rect?) -> Unit,
 ) {
-    Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 9.dp)) {
+    Column(
+        Modifier.padding(start = ConversationEmbedPadding, end = ConversationEmbedPadding, bottom = Dimens.spaceSm),
+    ) {
         LoadedEventHeader(
             card = card,
             authorDisplayName = authorDisplayName,
@@ -405,7 +398,7 @@ private fun LoadedEventHeader(
             Icon(
                 painter = painterResource(R.drawable.ic_content_copy),
                 contentDescription = copyDescription,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(ConversationEmbedActionIconSize),
                 tint = contentColor.copy(alpha = 0.8f),
             )
         }
@@ -413,7 +406,7 @@ private fun LoadedEventHeader(
             Icon(
                 painter = painterResource(R.drawable.ic_open_in_new),
                 contentDescription = openDescription,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ConversationEmbedActionIconSize),
                 tint = contentColor,
             )
         }

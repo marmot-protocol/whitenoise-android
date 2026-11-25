@@ -11,18 +11,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -31,6 +26,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedCard
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedIconDisc
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedPadding
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 
 /**
  * Contact-card bubble drawn from the share caption (name + phone), so no vCard
@@ -48,24 +47,10 @@ internal fun ContactMessageBubble(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier =
-            modifier
-                .width(260.dp)
-                .clip(RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(Modifier.padding(12.dp)) {
+    ConversationEmbedCard(modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth)) {
+        Column(Modifier.padding(ConversationEmbedPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                    Icon(
-                        painterResource(R.drawable.ic_person),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
+                ConversationEmbedIconDisc(painterResource(R.drawable.ic_person))
                 Spacer(Modifier.width(12.dp))
                 Column {
                     EmojiLabel(

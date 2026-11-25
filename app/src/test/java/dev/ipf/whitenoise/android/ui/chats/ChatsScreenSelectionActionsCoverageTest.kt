@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -88,7 +89,7 @@ class ChatsScreenSelectionActionsCoverageTest {
 
     /** Bulk actions must enter one fixed-scope command, never loop the selection-clearing row callbacks. */
     @Test fun selectionCapturesExplicitTargetsAndDirections() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val controls =
             source
                 .requiredSection("ChatListSelectionControls(", "\n        floatingActionButton =")
@@ -116,7 +117,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "ordering uses complete native universe",
-            "onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
+            "onMovePinned = { delta -> chatListActions.movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
                 "controller.movePinnedSelection(ids, delta, owner)" in source,
         )
         assertFalse(
@@ -184,7 +185,7 @@ class ChatsScreenSelectionActionsCoverageTest {
 
     /** Row/menu callbacks retain the existing captured presentation and session ownership boundaries. */
     @Test fun singleContextActionsKeepOwnershipAndAuthoritativeResolution() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val helper = source.requiredSection("fun markChatRead(", "\n    fun toggleChatMute(")
         assertTrue(
             "single callbacks still resolve native rows",
@@ -222,7 +223,7 @@ class ChatsScreenSelectionActionsCoverageTest {
     /** Long press sheet reuses pin and manual order mutations. */
     @Test
     fun longPressSheetReusesPinAndManualOrderMutations() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
 
         val actionSheet =
             source.requiredSection(
@@ -232,13 +233,13 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "the long-press sheet must expose the same unarchived pin toggle",
             "showPinToggle = !item.group.archived" in actionSheet &&
-                "onPinToggle = { toggleChatPin(item) }" in actionSheet,
+                "onPinToggle = { chatListActions.toggleChatPin(item) }" in actionSheet,
         )
         assertTrue(
             "the long-press sheet must reuse the same pinned-order mutation path",
             "showMovePinnedUp" in actionSheet &&
                 "showMovePinnedDown" in actionSheet &&
-                "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
+                "onMovePinned = { delta -> chatListActions.movePinnedChat(item, delta) }" in actionSheet,
         )
         val singleMove = source.requiredSection(start = "fun movePinnedChat(", end = "\n    }\n")
         assertTrue(
@@ -250,7 +251,7 @@ class ChatsScreenSelectionActionsCoverageTest {
     /** Selection bar wires add to folder picker and create handoff. */
     @Test
     fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val selectionBar =
             source.requiredSection(
                 start = "ChatListSelectionControls(",
@@ -353,6 +354,66 @@ class ChatsScreenSelectionActionsCoverageTest {
                 "val canEdit = controller.canEditGroupSettings" in source &&
                 Regex("""isSelfAdmin &&\s*!group\.disbanding &&\s*!group\.disbanded""").containsMatchIn(editor) &&
                 "!mutationsBlocked && controller.membersLoaded && !groupTerminal" in source,
+        )
+    }
+
+    /**
+     * Chat drag selection resets on the account and runtime keys its state always used, and every caller passes the
+     * values of the composition that built it: a row its own callback's inputs, the edge-scroll loop its launch inputs.
+     */
+    @Test
+    fun chatDragSelectionKeepsResetKeysAndComposedInputs() {
+        val screen = chatsScreenSource().readText()
+        val drag = sourceFile("ui/chats/ChatListDragSelection.kt").readText()
+        val holderKeys =
+            "rememberChatListDragSelection(\n" +
+                "            accountRef = appState.activeAccountRef,\n" +
+                "            runtimeGeneration = appState.runtimeGeneration,"
+        val completeSelectionKeys =
+            "val completeSelectionState =\n" +
+                "        remember(appState.activeAccountRef, appState.runtimeGeneration) {"
+        assertTrue(
+            "the holder and the complete selection it clears share the account and runtime keys",
+            "remember(accountRef, runtimeGeneration, completeSelection) {" in drag &&
+                holderKeys in screen &&
+                "completeSelection = completeSelectionState," in screen &&
+                completeSelectionKeys in screen,
+        )
+        assertFalse(
+            "no caller may read another composition's inputs",
+            "rememberUpdatedState" in drag || "latest" in drag,
+        )
+        assertTrue(
+            "row callbacks keep their identity while the drag inputs are unchanged",
+            "remember(chatListState, visibleChatIds, orderedVisibleChatIds) {" in screen,
+        )
+        assertTrue(
+            "a row resolves its range with the inputs of its own composition",
+            "chatDragSelection.moveChatDragPointer(pointerWindowY)\n" in screen &&
+                "chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)" in screen,
+        )
+        val effects =
+            drag.requiredSection("@NonRestartableComposable\n    fun chatDragSelectionEffects(", "\n    }\n}\n")
+        val datasetReset = effects.indexOf("LaunchedEffect(datasetKey) {")
+        val anchorRemoved = effects.indexOf("LaunchedEffect(inputs.visibleChatIds) {")
+        val edgeScroll = effects.indexOf("LaunchedEffect(dragAnchorChatId, inputs.chatListState) {")
+        assertTrue(
+            "drag effects keep their keys and launch order",
+            datasetReset >= 0 && datasetReset < anchorRemoved && anchorRemoved < edgeScroll,
+        )
+        assertTrue(
+            "the edge-scroll loop resolves with the inputs it launched with",
+            "updateChatDragSelection(pointerWindowY, inputs)" in effects.substring(edgeScroll),
+        )
+        val accountReset =
+            screen.indexOf(
+                "LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {\n" +
+                    "        chatDragSelection.finishChatDrag(clearSelection = true)\n" +
+                    "        actionSheetChatId = null",
+            )
+        assertTrue(
+            "the account reset still runs before the other drag effects",
+            accountReset >= 0 && accountReset < screen.indexOf("chatDragSelection.chatDragSelectionEffects("),
         )
     }
 

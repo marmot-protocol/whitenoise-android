@@ -44,6 +44,7 @@
     <string name="explanation_poll_multiple_choice">Участники могут проголосовать за несколько вариантов.</string>
 
     <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_transcribe">Преобразует эту запись в текст на этом устройстве.</string>
     <string name="explanation_message_action_reply">Цитирует это сообщение в поле ввода, чтобы ваш ответ был связан с ним.</string>
     <string name="explanation_message_action_edit">Открывает ваше сообщение в поле ввода, чтобы вы могли его изменить.</string>
     <string name="explanation_message_action_select">Включает режим выбора, чтобы отметить сразу несколько сообщений.</string>

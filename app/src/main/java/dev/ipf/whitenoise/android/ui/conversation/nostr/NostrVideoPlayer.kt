@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +29,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,6 +46,8 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
+import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
 import dev.ipf.whitenoise.android.ui.conversation.media.localVideoPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -171,6 +169,7 @@ private fun rememberNostrVideoPlayer(
     return player
 }
 
+/** The video edge to edge on black, with the shared viewer chrome's Close over it and a retryable failure card. */
 @Composable
 private fun NostrVideoPlayerSurface(
     player: Player?,
@@ -200,21 +199,16 @@ private fun NostrVideoPlayerSurface(
             CircularProgressIndicator(color = Color.White, modifier = Modifier.testTag(NOSTR_VIDEO_DOWNLOADING_TAG))
         }
         if (playbackFailed) NostrVideoPlaybackFailure(onRetry)
-        IconButton(
-            onClick = onDismiss,
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .nativePageHeader()
-                    .statusBarsPadding()
-                    .padding(8.dp),
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_arrow_back),
-                contentDescription = stringResource(R.string.close),
-                tint = Color.White,
-            )
-        }
+        AttachmentViewerChrome(
+            title = stringResource(R.string.media_type_video),
+            onClose = onDismiss,
+            modifier = Modifier.align(Alignment.TopStart).nativePageHeader(),
+            containerColor = AttachmentViewerChromeDefaults.overlayColor(),
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            windowInsets = AttachmentViewerChromeDefaults.topInsets(),
+            // Taps beside Close still reach the player and toggle its transport controls.
+            passTouchesThrough = true,
+        )
     }
 }
 

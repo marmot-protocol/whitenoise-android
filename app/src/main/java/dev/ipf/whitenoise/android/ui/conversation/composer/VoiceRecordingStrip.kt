@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /** How far the strip slides as it arrives from the microphone or leaves toward the cancel side. */
 private const val HALF_TURN_DEGREES = 180f
@@ -81,7 +82,7 @@ internal fun RecordingStripLeading(
                     alpha = enter * (1f - leaving)
                     translationX =
                         ((1f - enter) * micSide + leaving * controller.hold.cancelDirection) * VoiceStripSlide.toPx()
-                }.clip(RoundedCornerShape(24.dp))
+                }.clip(RoundedCornerShape(Radii.xl))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {

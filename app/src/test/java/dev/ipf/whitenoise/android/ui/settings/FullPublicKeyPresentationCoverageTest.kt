@@ -46,7 +46,10 @@ class FullPublicKeyPresentationCoverageTest {
         assertTrue("the public key row lost its full display", "fullPublicKey = true" in publicRow)
     }
 
-    /** Only display components group a key; copy, share and QR paths keep the contiguous value. */
+    /**
+     * Only full-width identity components group a key; copy, share and QR paths keep the contiguous value. List rows,
+     * chips, menus and dialogs have no room for a grouped key, so a copy there leaves the short form in place.
+     */
     @Test
     fun groupingStaysDisplayOnly() {
         val grouping =
@@ -57,12 +60,7 @@ class FullPublicKeyPresentationCoverageTest {
 
         assertEquals(
             setOf(
-                "AiAgentsScreen.kt",
                 "FullPublicKey.kt",
-                "GroupActionReviewIdentity.kt",
-                "GroupRosterMutationUi.kt",
-                "IdentityCodeComponents.kt",
-                "PublicKeyCopy.kt",
                 "SettingsProfileKey.kt",
             ),
             grouping,

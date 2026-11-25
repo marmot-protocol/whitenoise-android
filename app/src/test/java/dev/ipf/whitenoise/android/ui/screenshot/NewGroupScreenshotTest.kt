@@ -71,14 +71,31 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** Prototype centered avatar and two-field setup. */
+    /** The group name and selected identities lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
     @Test fun setupDark() = setup("group_setup_dark.png", dark = true)
 
     /** AMOLED setup and primary action. */
-    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true, description = "")
+    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
+
+    /** Optional photo, description and timer use the same form and retain the current draft. */
+    @Test fun setupCustomizedAmoled() =
+        setup(
+            "group_setup_customized_amoled.png",
+            dark = true,
+            amoled = true,
+            description = "A place to coordinate our next trip.",
+        )
+
+    /** An authored description reopens customization at large RTL text sizes. */
+    @Test fun setupCustomizedLargeRtl() =
+        setup(
+            "group_setup_customized_large_rtl.png",
+            largeRtl = true,
+            description = "A place to coordinate our next trip.",
+        )
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -120,8 +137,8 @@ class NewGroupScreenshotTest {
     @Test fun setupUnattributedRecovery() = setup("group_setup_unattributed_recovery.png", unknown = true)
 
     @Test
-    fun peopleKeyExpandsInPlace() {
-        picker("new_group_people_expanded_key.png", expandKey = true)
+    fun peopleKeyCopiesWithoutGrowingTheRow() {
+        picker("new_group_people_copied_key.png", copyKey = true)
     }
 
     /** The real picker composable renders controlled display states, never a fake search provider. */
@@ -134,7 +151,7 @@ class NewGroupScreenshotTest {
         partial: Boolean = false,
         largeRtl: Boolean = false,
         addressFailed: Boolean = false,
-        expandKey: Boolean = false,
+        copyKey: Boolean = false,
     ) {
         val npub = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
         val shortKey = "npub142424…4qamrcaj"
@@ -148,7 +165,7 @@ class NewGroupScreenshotTest {
                         when {
                             empty -> emptyList()
                             addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
-                            expandKey ->
+                            copyKey ->
                                 people().mapIndexed { index, person ->
                                     if (index == 0) {
                                         person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
@@ -170,9 +187,10 @@ class NewGroupScreenshotTest {
                 }
             }
         }
-        if (expandKey) {
+        if (copyKey) {
             composeRule.onNodeWithText(shortKey, useUnmergedTree = true).performTouchInput { click(center) }
-            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithText(shortKey, useUnmergedTree = true).assertExists()
         }
         composeRule.onNodeWithTag("new_group.screen").captureRoboImage("src/test/snapshots/$file")
     }
@@ -188,7 +206,7 @@ class NewGroupScreenshotTest {
         canonical: Boolean = false,
         recovery: Boolean = false,
         unknown: Boolean = false,
-        description: String = "A place to coordinate our next trip.",
+        description: String = "",
     ) {
         val draft =
             NewGroupDraft(

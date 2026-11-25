@@ -106,15 +106,12 @@ private fun ConversationController.shouldConsumeManualUnreadReminder(accountRef:
     !manualUnreadReminderConsumed &&
         appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
 
+/** Anchors local disappearing expiry for [messageId] and every older loaded row in display order. */
 private fun ConversationController.anchorReadExpiryUpTo(
     messageId: String,
     anchoredAtSeconds: ULong,
 ) {
-    val ordered =
-        buildList {
-            optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-            timelineOrder.mapNotNull { timelineItemsById[it]?.record?.messageIdHex }.forEach(::add)
-        }
+    val ordered = loadedTimelineMessagesInDisplayOrder().map { it.record.messageIdHex }
     val upToIdx = ordered.indexOf(messageId)
     if (upToIdx < 0) {
         readAnchoredAtSeconds.putIfAbsent(messageId, anchoredAtSeconds)

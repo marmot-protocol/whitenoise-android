@@ -172,20 +172,19 @@
     <string name="leave_and_delete_message">¿Salir del grupo y eliminar su historial de este dispositivo?</string>
     <string name="toast_left_chat_delete_failed">Has salido del grupo. No se pudo eliminar el historial local.</string>
     <string name="group_reset_action">Restablecer y esperar una nueva invitación</string>
-    <string name="group_reset_dialog_title">¿Restablecer este grupo en este dispositivo?</string>
-    <string name="group_reset_dialog_message">White Noise borra el historial y el estado de cifrado de este grupo solo en este dispositivo. No se envía nada al grupo. Volverás a unirte cuando un administrador envíe una nueva invitación creada después de este restablecimiento.</string>
+    <string name="group_reset_dialog_title">¿Restablecer este grupo?</string>
+    <string name="group_reset_dialog_message">Borra el historial y el estado de cifrado de este grupo en este dispositivo. No se envía nada. Para volver a unirte, necesitas una invitación nueva creada por un administrador después del restablecimiento.</string>
     <string name="group_reset_confirm">Restablecer</string>
     <string name="toast_group_reset_done">Grupo restablecido. Reaparecerá cuando llegue una nueva invitación.</string>
     <string name="toast_group_reset_already_waiting">Este grupo ya está esperando una nueva invitación.</string>
     <string name="toast_couldnt_reset_group">No se pudo restablecer el grupo. Inténtalo de nuevo.</string>
-    <string name="chat_abandon_dialog_title">¿Eliminar este chat de este dispositivo?</string>
-    <string name="chat_abandon_dialog_message">Lo borra aquí y detiene los mensajes nuevos. No se envía nada.</string>
+    <string name="chat_abandon_dialog_title">¿Eliminar este chat?</string>
+    <string name="chat_abandon_dialog_message">Borra el chat de este dispositivo y deja de recibir mensajes nuevos. No se envía nada.</string>
     <string name="chat_abandon_confirm">Abandonar</string>
     <string name="abandon_identity_chat">Chat: %1$s</string>
     <string name="abandon_identity_group">Grupo: %1$s</string>
-    <string name="abandon_identity_account">Tu cuenta: %1$s</string>
     <string name="chats_abandon_action">Abandonar los chats en este dispositivo</string>
-    <string name="chats_abandon_dialog_title">¿Abandonar los chats seleccionados en este dispositivo?</string>
+    <string name="chats_abandon_dialog_title">¿Abandonar chats en este dispositivo?</string>
     <string name="toast_chat_already_abandoned">Este chat ya se eliminó de este dispositivo.</string>
     <string name="leave_blocked_abandon_hint_dm">No se completó la salida. En su lugar, puedes eliminar este chat de este dispositivo. No se envía nada a la otra persona.</string>
     <string name="leave_blocked_abandon_hint_group">No se completó la salida. En su lugar, puedes restablecer este grupo en este dispositivo. No se envía nada al grupo.</string>
@@ -1035,7 +1034,7 @@
     <string name="notification_background_on">La conexión en segundo plano está activada.</string>
     <string name="notification_background_off">La conexión en segundo plano está desactivada.</string>
     <string name="notification_categories_detail">Android fija sonido, vibración e importancia por categoría.</string>
-    <string name="chat_with_support">Chatear con soporte</string>
+    <string name="chat_with_support">Habla con el equipo de White Noise</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
@@ -1521,9 +1520,18 @@
     <string name="disappearing_1_day">1 día</string>
     <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tiempo personalizado</string>
-    <string name="disappearing_days_format">%1$d días</string>
-    <string name="disappearing_hours_format">%1$d horas</string>
-    <string name="disappearing_minutes_format">%1$d minutos</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d día</item>
+        <item quantity="other">%d días</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d hora</item>
+        <item quantity="other">%d horas</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minuto</item>
+        <item quantity="other">%d minutos</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutos</string>
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Días</string>
@@ -1564,7 +1572,10 @@
     <string name="disappearing_5_minutes">5 minutos</string>
     <string name="disappearing_30_seconds">30 segundos</string>
     <string name="disappearing_explainer">Los mensajes recibidos sin leer inician su temporizador cuando los lees. Los demás mensajes nuevos se eliminan para todos de forma permanente tras el periodo que elijas.</string>
-    <string name="disappearing_seconds_format">%1$d segundos</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d segundo</item>
+        <item quantity="other">%d segundos</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
     <string name="disappearing_custom_decrease">Acortar</string>
@@ -2145,6 +2156,7 @@
     <string name="setup_finding_retired_relay">Este relé ha sido retirado.</string>
     <string name="setup_finding_unsafe_relay">Esta dirección de relé no es segura.</string>
     <string name="setup_finding_unreachable">No se pudo acceder a este relé.</string>
+    <string name="setup_relay_timeout_title">Un relay no respondió a tiempo</string>
     <string name="setup_finding_timed_out">Se agotó el tiempo de esta comprobación.</string>
     <string name="setup_finding_authentication_required">Este relé requiere autenticación.</string>
     <string name="setup_finding_payment_required">Este relé requiere un pago.</string>
@@ -2248,7 +2260,7 @@
     <string name="app_unlock_checking">Comprobando la protección de la aplicación…</string>
     <string name="support_contact_title">Soporte de White Noise</string>
     <string name="support_contact_subtitle">Preguntas, problemas y sugerencias</string>
-    <string name="support_contact_explainer">Haz una pregunta, informa de un problema o sugiere una mejora.</string>
+    <string name="support_contact_explainer">Pregunta, informa de un problema o comparte tus comentarios con quienes crean White Noise.</string>
     <string name="support_relays_attention">Los relés del perfil requieren atención</string>
     <string name="support_open_relays">Abrir relés</string>
     <string name="support_relays_review">Revisa la lista de relés de recepción de este perfil.</string>
@@ -2309,6 +2321,12 @@
     <string name="new_message_no_results_detail">Comprueba la ortografía o prueba otra búsqueda.</string>
     <string name="new_message_chat_created">Chat creado</string>
     <string name="new_message_open_chat">Abrir chat</string>
+    <string name="group_setup_customize">Personalizar el grupo</string>
+    <string name="group_setup_hide_customization">Ocultar personalización</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d miembro seleccionado</item>
+        <item quantity="other">%d miembros seleccionados</item>
+    </plurals>
     <string name="group_setup_title">Configurar grupo</string>
     <string name="group_create_action">Crear grupo</string>
     <string name="group_add_photo">Añadir foto</string>
@@ -2449,6 +2467,8 @@
     <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
     <string name="error_incompatible_key_package">La clave de chat de esta persona no es compatible. Pídele que actualice y abra White Noise, y vuelve a intentarlo.</string>
     <string name="error_incompatible_key_package_for">La clave de chat de %1$s no es compatible. Pídele que actualice y abra White Noise, y vuelve a intentarlo.</string>
+    <string name="new_message_copy_inbox_instructions">Copiar instrucciones</string>
+    <string name="new_message_inbox_instructions">No pude iniciar un chat contigo en White Noise. ¿Puedes revisar tus relays de entrada en los ajustes de White Noise y avisarme cuando pueda volver a intentarlo?</string>
     <string name="error_missing_member_inbox">No hay un relay de entrada utilizable para esta persona. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox_for">No hay un relay de entrada utilizable para %1$s. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Pídele que añada un relay de entrada que acepte mensajes más grandes.</string>

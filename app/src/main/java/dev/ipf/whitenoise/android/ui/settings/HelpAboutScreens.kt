@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
@@ -22,11 +21,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberTransientNoticeOf
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 /** Help: the bug report, reviewed before it leaves the app, and the build's own facts. */
@@ -192,6 +193,8 @@ internal fun AboutScreen(
         return
     }
     val context = LocalContext.current
+    val alreadyEnabled =
+        rememberTransientNoticeOf(R.string.developer_tools_already_enabled, TransientNoticeKind.Information)
     AboutContent(
         versionName = versionName,
         buildNumber = buildNumber,
@@ -203,7 +206,7 @@ internal fun AboutScreen(
             appState.presentTransient(R.string.developer_tools_unlocked)
         },
         onDeveloperAlreadyEnabled = {
-            Toast.makeText(context, R.string.developer_tools_already_enabled, Toast.LENGTH_SHORT).show()
+            alreadyEnabled()
         },
         onOpenDeveloper = onOpenDeveloper,
         onOpenLicenses = {

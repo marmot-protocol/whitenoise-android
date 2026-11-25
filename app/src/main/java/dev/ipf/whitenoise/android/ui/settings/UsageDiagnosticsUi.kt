@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -34,15 +35,21 @@ import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
 import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
-/** Full settings disclosure; onboarding offers the same information in each choice's Details section. */
+/**
+ * Full settings disclosure as settings explainers; onboarding offers the same information in each choice's
+ * Details section.
+ */
 @Composable
 internal fun UsageDiagnosticsDisclosure() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         listOf(
             R.string.usage_diagnostics_disclosure,
             R.string.diagnostics_group_disclosure,
@@ -50,7 +57,7 @@ internal fun UsageDiagnosticsDisclosure() {
             R.string.diagnostics_retention,
             R.string.diagnostics_disable_disclosure,
         ).forEach { text ->
-            Text(stringResource(text), style = MaterialTheme.typography.bodySmall)
+            SettingsExplainer(stringResource(text))
         }
     }
 }
@@ -97,11 +104,10 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
         Text(stringResource(R.string.usage_diagnostics_loading), style = MaterialTheme.typography.bodySmall)
     }
     if (state.failed) {
-        Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-        TextButton(
-            enabled = !state.busy,
-            onClick = { appState.launchMutation { appState.retryUsageDiagnostics() } },
-        ) { Text(stringResource(R.string.retry)) }
+        UsageDiagnosticsFailure(
+            busy = state.busy,
+            retry = { appState.launchMutation { appState.retryUsageDiagnostics() } },
+        )
     }
 }
 
@@ -160,9 +166,8 @@ internal fun UsageDiagnosticsPrompt(
             onDone = onDone,
             onDismissFailedClose = onDismissFailedClose,
         )
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = finish,
-        containerColor = amoledSheetContainerColor(),
         sheetState = sheetState,
     ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section)) {
@@ -191,9 +196,8 @@ private fun DiagnosticsCloseFailure(
     retry: () -> Unit,
 ) {
     if (failed) {
-        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
-            Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-            TextButton(enabled = !busy, onClick = retry) { Text(stringResource(R.string.retry)) }
+        Box(Modifier.padding(horizontal = WhiteNoiseSheetInset)) {
+            UsageDiagnosticsFailure(busy = busy, retry = retry)
         }
     }
 }
@@ -302,12 +306,33 @@ private fun IndependentAuditLogChoice(
         },
     )
     if (failed) {
-        Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
+        WhiteNoiseCallout(
+            text = stringResource(R.string.usage_diagnostics_error),
+            icon = R.drawable.ic_error,
+            isError = true,
+        )
+    }
+}
+
+/** The failed usage-diagnostics read or save, with the Retry that re-runs it. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun UsageDiagnosticsFailure(
+    busy: Boolean,
+    retry: () -> Unit,
+) {
+    WhiteNoiseCallout(
+        text = stringResource(R.string.usage_diagnostics_error),
+        icon = R.drawable.ic_error,
+        isError = true,
+    ) {
+        TextButton(enabled = !busy, onClick = retry, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.retry))
+        }
     }
 }
 
 /** Prominent disclosure shown before enabling audit uploads from Diagnostics & Improvements settings. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AuditUploadConsentDialog(
     onDismiss: () -> Unit,
@@ -315,7 +340,9 @@ internal fun AuditUploadConsentDialog(
     ownerKey: Any? = Unit,
 ) {
     AnimatedBasicAlertDialog(onDismissRequest = onDismiss, ownerKey = ownerKey) {
-        AuditUploadConsentContent(dismiss, { close(onConfirm) })
+        WhiteNoiseDialogSurface {
+            AuditUploadConsentContent(dismiss, { close(onConfirm) })
+        }
     }
 }
 
@@ -325,31 +352,25 @@ internal fun AuditUploadConsentContent(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.testTag("audit.consent.surface"),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    Column(
+        Modifier.widthIn(max = 360.dp).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(
-            Modifier.widthIn(max = 360.dp).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
-            Text(
-                stringResource(R.string.audit_upload_disclosure),
-                modifier =
-                    Modifier
-                        .weight(1f, fill = false)
-                        .testTag("audit.consent.disclosure")
-                        .fadingVerticalScroll(rememberScrollState()),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
-                Text(stringResource(R.string.audit_upload_confirm))
-            }
-            TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+        Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.audit_upload_disclosure),
+            modifier =
+                Modifier
+                    .weight(1f, fill = false)
+                    .testTag("audit.consent.disclosure")
+                    .fadingVerticalScroll(rememberScrollState()),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {
+            Text(stringResource(R.string.audit_upload_confirm))
+        }
+        TextButton(modifier = Modifier.fillMaxWidth(), onClick = onDismiss) {
+            Text(stringResource(R.string.cancel))
         }
     }
 }

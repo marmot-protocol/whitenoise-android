@@ -60,7 +60,8 @@
           "SEC-007",
           "SEC-011",
           "SEC-012",
-          "SEC-013"
+          "SEC-013",
+          "SET-072"
         ]
       },
       {
@@ -116,6 +117,17 @@
         "anchor": "R.string.explanation_diagnostics_logs",
         "test_ids": [
           "SET-053"
+        ]
+      },
+      {
+        "surface": "UsageDiagnosticsFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun UsageDiagnosticsFailure(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
         ]
       }
     ],

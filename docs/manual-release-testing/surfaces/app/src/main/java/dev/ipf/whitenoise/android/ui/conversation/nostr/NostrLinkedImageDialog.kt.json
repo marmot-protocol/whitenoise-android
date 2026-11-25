@@ -12,9 +12,17 @@
         ]
       },
       {
-        "surface": "Linked image Back",
+        "surface": "Shared viewer chrome: linked image",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
-        "anchor": "R.string.back",
+        "anchor": "AttachmentViewerChrome(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "Linked image title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
+        "anchor": "R.string.attachment_type_image",
         "test_ids": [
           "RDR-004"
         ]

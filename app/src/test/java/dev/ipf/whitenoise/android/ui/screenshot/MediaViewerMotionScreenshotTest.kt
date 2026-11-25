@@ -57,8 +57,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailRegistry
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerPlatformMotionAllowed
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerThumbnail
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -137,7 +137,7 @@ class MediaViewerMotionScreenshotTest {
                                         Modifier
                                             .offset(24.dp, 8.dp)
                                             .size(144.dp, 104.dp)
-                                            .clip(ConversationRichContentShape)
+                                            .clip(ConversationMediaTileShape)
                                             .testTag("motion-thumbnail")
                                             .clickable { open = true }
                                             .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
@@ -595,13 +595,13 @@ class MediaViewerMotionScreenshotTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                    radius = with(LocalDensity.current) { ConversationMessageMetrics.RichComponentCornerRadius.toPx() }
+                    radius = with(LocalDensity.current) { ConversationMessageMetrics.MediaTileCornerRadius.toPx() }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         Text("Three-tile album · native Compose", Modifier.offset(12.dp, 32.dp))
                         MediaViewerThumbnailHost(registry) {
                             // This is the production outer clip and actual masonry layout, including its
                             // explicit canvas host. Nested right-column tiles must not round interior corners.
-                            Box(Modifier.offset(12.dp, 120.dp).width(320.dp).clip(ConversationRichContentShape)) {
+                            Box(Modifier.offset(12.dp, 120.dp).width(320.dp).clip(ConversationMediaTileShape)) {
                                 MasonryImageLayout(visibleCount = 3) { index, tileModifier ->
                                     Canvas(tileModifier.mediaViewerThumbnail(messageId, index, 0uL, gridTile = true)) {
                                         val colors = listOf(Color(0xff195563), Color(0xff5bb89d), Color(0xffffc45d))

@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -49,6 +48,7 @@ import dev.ipf.whitenoise.android.core.globalAttachmentGridIsVisual
 import dev.ipf.whitenoise.android.core.globalAttachmentPresentation
 import dev.ipf.whitenoise.android.core.sectionGlobalAttachments
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -316,16 +316,10 @@ private fun LibrarySectionHeader(
             GlobalAttachmentSectionKey.ThisMonth -> stringResource(R.string.library_section_this_month)
             is GlobalAttachmentSectionKey.Month -> key.month.format(monthFormat)
         }
-    Text(
+    SectionHeader(
         text = label,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(vertical = WhiteNoiseSpacing.Related)
-                .semantics { heading() },
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+        contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.Related),
     )
 }
 

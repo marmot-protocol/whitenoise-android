@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.test.espresso.Espresso
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.GROUP_A
@@ -113,6 +114,31 @@ class ForwardMessagePickerInteractionTest {
             row.performClick()
             if (tap % 2 == 0) row.assertIsSelected() else row.assertIsNotSelected()
         }
+    }
+
+    /** The bar's Close leaves the picker even while search is open; only system Back closes the search first. */
+    @Test
+    fun barCloseDismissesThePickerEvenWithSearchOpen() {
+        val state = appStateWithDirectChats("20".repeat(32) to "40".repeat(32))
+        var dismissed = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ForwardMessagePickerContent(
+                    appState = state,
+                    messageCount = 1,
+                    attachmentCount = 0,
+                    originGroupIdHex = "ff".repeat(32),
+                    sourceAccountRef = ACCOUNT_REF,
+                    onDismiss = { dismissed++ },
+                    onForward = { _, _ -> true },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Search chats").performClick()
+        composeRule.onNodeWithTag("forward.searchField").assertExists()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.waitForIdle()
+        org.junit.Assert.assertEquals(1, dismissed)
     }
 
     @Test

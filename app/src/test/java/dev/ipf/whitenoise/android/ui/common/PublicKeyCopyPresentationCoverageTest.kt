@@ -113,7 +113,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val key = keyText(ROW).getUnclippedBoundsInRoot()
         assertTrue("the key target leaves its row", key.left >= row.left && key.right <= row.right)
         assertTrue("the key target spans the whole row", key.right - key.left < row.right - row.left)
-        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", "npub1 qqqqq")
+        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", SHORT_KEY)
     }
 
     /**
@@ -653,6 +653,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val CALL_SITES =
             listOf(
                 "ui/profile/PersonProfileContent.kt" to """CopyablePublicKey\(\s*npub = person\.publicKey,""",
+                "ui/group/GroupDetailsHeader.kt" to """CopyablePublicKey\(\s*npub = copyValue,""",
                 "ui/search/GlobalPersonRow.kt" to """PublicKeyCopyText\(\s*IdentityFormatter\.short\(npub""",
                 "ui/account/ProfileSwitcherSheet.kt" to
                     """PublicKeyCopyText\(\s*shortNpub\(account\.accountIdHex\),\s*npub\(account\.accountIdHex\)""",

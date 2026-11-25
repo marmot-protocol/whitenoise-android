@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.amber.Nip55
 import dev.ipf.whitenoise.android.maestro.MaestroFixtureApplication
 import dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
+import dev.ipf.whitenoise.android.ui.onboarding.scrollToIfScrollable
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -143,7 +144,7 @@ class LateSignerRuntimeDeviceTest {
     private fun reachRelayApproval(session: Session) {
         waitIdle(session)
         compose.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
-        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-CONTINUE_WITHOUT").scrollToIfScrollable().performClick()
         waitIdle(session)
         assertEquals(
             OnboardingStepFfi.RELAYS,
@@ -154,9 +155,9 @@ class LateSignerRuntimeDeviceTest {
                 ?.step,
         )
         compose.onNodeWithTag("setup-step-RELAYS").performScrollTo().performClick()
-        compose.onNodeWithText("Fix relay setup").performScrollTo().performClick()
+        compose.onNodeWithText("Fix relay setup").scrollToIfScrollable().performClick()
         waitIdle(session)
-        compose.onNodeWithText("Save changes").performScrollTo().performClick()
+        compose.onNodeWithText("Save changes").scrollToIfScrollable().performClick()
     }
 
     /** Confirms the real NIP-55 request in official Amber using only the preconfigured public scalar-one key. */

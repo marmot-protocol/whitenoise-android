@@ -15,19 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -38,11 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -52,13 +48,15 @@ import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.retireDeviceUnlinkedNotice
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Sign out and wipe: teardown spinner, explanatory sheet and the typed confirmation, unchanged from before. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -161,7 +159,10 @@ private fun launchAccountWipe(
     }
 }
 
-/** Stateless typed confirmation; the account screen retains input and the destructive mutation scope. */
+/**
+ * Stateless typed confirmation; the account screen retains input and the destructive mutation scope.
+ * Its title scrolls with the body (see [ProfileKeyWipeConfirmationBody]) so only the actions stay fixed.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ProfileKeyWipeConfirmationDialog(
@@ -176,32 +177,7 @@ internal fun ProfileKeyWipeConfirmationDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(decorFitsSystemWindows = false),
         modifier = Modifier.systemBarsPadding().imePadding(),
-        title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
-                Text(
-                    stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = onInputChange,
-                    label = { Text(stringResource(R.string.sign_out_and_wipe_confirm_field_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Characters,
-                            autoCorrectEnabled = false,
-                        ),
-                )
-            }
-        },
+        text = { ProfileKeyWipeConfirmationBody(confirmKeyword, input, onInputChange) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -230,7 +206,56 @@ internal fun ProfileKeyWipeConfirmationDialog(
     )
 }
 
-/** Blocks Back and outside interaction while the non-cancellable account teardown finishes. */
+/**
+ * The wipe confirmation's scrolling body: title, explanation, keyword instruction and the [confirmKeyword] field.
+ *
+ * The title scrolls here instead of sitting in the dialog's fixed title slot. At 200% text on a narrow phone the
+ * icon-bearing actions stack onto two rows, and with the keyboard open a fixed title would leave this body shorter
+ * than the keyword field, so the field could never be fully on screen. The title keeps the title slot's style,
+ * colour and 16 dp gap, so the dialog looks the same whenever nothing needs to scroll.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileKeyWipeConfirmationBody(
+    confirmKeyword: String,
+    input: String,
+    onInputChange: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            stringResource(R.string.sign_out_and_wipe_confirm_title),
+            modifier = Modifier.semantics { heading() },
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
+        Text(
+            stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = input,
+            onValueChange = onInputChange,
+            label = { Text(stringResource(R.string.sign_out_and_wipe_confirm_field_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    autoCorrectEnabled = false,
+                ),
+        )
+    }
+}
+
+/**
+ * Blocks Back and outside interaction while the non-cancellable account teardown finishes, showing the themed
+ * contained loading indicator over the window dim.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("FunctionNaming")
 @Composable
@@ -248,8 +273,8 @@ internal fun SignOutProgressDialog() {
             Modifier.fillMaxSize().testTag("settings.sign_out_progress").exposePerformanceTestTags(),
             contentAlignment = Alignment.Center,
         ) {
-            // The full-window dim layer can cover either theme; white stays visible against that scrim.
-            LoadingIndicator(color = Color.White)
+            // The contained indicator brings its own themed container, so it reads over the dim layer in any theme.
+            ContainedLoadingIndicator()
         }
     }
 }
@@ -296,8 +321,8 @@ internal fun signOutActiveAccount(
 /**
  * Non-destructive sign-out sheet (#348, #349). Explains what stays on device
  * and what changes, offers the "Delete key packages from relays" toggle
- * (default ON — passed through to the engine `sign_out` FFI), then performs
- * the actual sign-out via [onConfirm].
+ * (default ON — passed through to the engine `sign_out` FFI) as the shared
+ * settings switch row, then performs the actual sign-out via [onConfirm].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -309,17 +334,16 @@ internal fun SignOutSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var deleteKeyPackages by remember { mutableStateOf(true) }
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         modifier = Modifier.exposePerformanceTestTags(),
-        containerColor = amoledSheetContainerColor(),
         onDismissRequest = { terminal.close(onDismiss) },
         sheetState = sheetState,
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.sign_out_sheet_title))
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
-            Text(stringResource(R.string.sign_out_sheet_title), style = MaterialTheme.typography.titleLarge)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.sign_out_sheet_stays_heading),
@@ -340,34 +364,20 @@ internal fun SignOutSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .testTag("profile_keys.signout_invitation_keys")
-                    .explainOnLongPress(
-                        Explanation(
-                            stringResource(R.string.sign_out_delete_key_packages_label),
-                            stringResource(R.string.explanation_account_keys_signout_invitation_keys),
-                        ),
-                    ).toggleable(
-                        value = deleteKeyPackages,
-                        role = Role.Switch,
-                        onValueChange = { deleteKeyPackages = it },
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            SettingsSwitch(
+                context = settingsRowContext(0, 1, MaterialTheme.colorScheme.surfaceContainerLowest),
+                title = stringResource(R.string.sign_out_delete_key_packages_label),
+                subtitle = stringResource(R.string.sign_out_delete_key_packages_help),
+                explanation = stringResource(R.string.explanation_account_keys_signout_invitation_keys),
+                checked = deleteKeyPackages,
+                onCheckedChange = { deleteKeyPackages = it },
+                modifier = Modifier.testTag("profile_keys.signout_invitation_keys"),
+                leading = null,
+            )
+            WhiteNoiseButton(
+                onClick = { terminal.close(deleteKeyPackages, onConfirm) },
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(stringResource(R.string.sign_out_delete_key_packages_label))
-                    Text(
-                        stringResource(R.string.sign_out_delete_key_packages_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = deleteKeyPackages, onCheckedChange = null)
-            }
-            Button(onClick = { terminal.close(deleteKeyPackages, onConfirm) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(painterResource(R.drawable.ic_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -391,45 +401,42 @@ private fun SignOutAndWipeSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { terminal.close(onDismiss) },
         sheetState = sheetState,
     ) {
-        Column(
-            Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                stringResource(R.string.sign_out_and_wipe_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Text(stringResource(R.string.sign_out_and_wipe_sheet_intro))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.sign_out_and_wipe_sheet_destroyed_heading),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_db))
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_keychain))
-                WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_relays))
-            }
-            Text(
-                stringResource(R.string.sign_out_and_wipe_sheet_fresh_start),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(
-                onClick = { terminal.close(onConfirm) },
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
+        Column(Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
+            WhiteNoiseSheetHeader(stringResource(R.string.sign_out_and_wipe_sheet_title))
+            Column(
+                Modifier.padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
             ) {
-                Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.sign_out_and_wipe))
+                Text(stringResource(R.string.sign_out_and_wipe_sheet_intro))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.sign_out_and_wipe_sheet_destroyed_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_db))
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_keychain))
+                    WipeBullet(stringResource(R.string.sign_out_and_wipe_sheet_destroyed_relays))
+                }
+                Text(
+                    stringResource(R.string.sign_out_and_wipe_sheet_fresh_start),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { terminal.close(onConfirm) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.sign_out_and_wipe))
+                }
             }
         }
     }

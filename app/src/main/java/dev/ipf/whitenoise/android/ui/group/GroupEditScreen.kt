@@ -35,7 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +61,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
+import dev.ipf.whitenoise.android.ui.common.IdentityHeader
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -442,6 +442,7 @@ internal fun GroupEditScreen(
         pendingPublicPhoto?.let { selected ->
             val generation = imagePickGeneration.capture()
 
+            /** True while the picked photo still belongs to the current owner, pick generation and editable state. */
             fun selectionIsCurrent(): Boolean =
                 imageOwnerIsCurrent() &&
                     imagePickGeneration.isCurrent(generation) &&
@@ -564,40 +565,41 @@ internal fun GroupEditScreen(
                         .padding(vertical = WhiteNoiseSpacing.Section),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                IdentityHeader(
+                    top = {
+                        Text(stringResource(R.string.group_photo_title), style = MaterialTheme.typography.titleMedium)
+                        groupPhotoVisibilityDetail(controller.group)?.let { detail ->
+                            Text(
+                                stringResource(detail),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.testTag("group_edit.photoVisibility"),
+                            )
+                        }
+                    },
+                    avatar = { avatarSize ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(
+                                        enabled = groupAvatarImageAvailable,
+                                        onClickLabel = stringResource(R.string.profile_view_picture),
+                                        role = Role.Button,
+                                    ) { avatarViewerOpen = true },
+                        ) {
+                            Avatar(
+                                title = controller.title(groupTitleCopy),
+                                seed = controller.group.groupIdHex,
+                                size = avatarSize,
+                                pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
+                                picture = encryptedGroupAvatar,
+                                groupAnimation = groupAvatar.groupAnimation,
+                                pictureDomain = groupAvatar.pictureDomain,
+                            )
+                        }
+                    },
                 ) {
-                    Text(stringResource(R.string.group_photo_title), style = MaterialTheme.typography.titleMedium)
-                    groupPhotoVisibilityDetail(controller.group)?.let { detail ->
-                        Text(
-                            stringResource(detail),
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.testTag("group_edit.photoVisibility"),
-                        )
-                    }
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(CircleShape)
-                                .clickable(
-                                    enabled = groupAvatarImageAvailable,
-                                    onClickLabel = stringResource(R.string.profile_view_picture),
-                                    role = Role.Button,
-                                ) { avatarViewerOpen = true },
-                    ) {
-                        Avatar(
-                            title = controller.title(groupTitleCopy),
-                            seed = controller.group.groupIdHex,
-                            size = GroupEditAvatarSize,
-                            pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
-                            picture = encryptedGroupAvatar,
-                            groupAnimation = groupAvatar.groupAnimation,
-                            pictureDomain = groupAvatar.pictureDomain,
-                        )
-                    }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
                     Box {
                         WhiteNoiseFilledTonalButton(
@@ -742,8 +744,6 @@ internal fun GroupEditScreen(
         }
     }
 }
-
-private val GroupEditAvatarSize = 120.dp
 
 /** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable
