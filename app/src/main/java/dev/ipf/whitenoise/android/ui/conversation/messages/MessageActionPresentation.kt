@@ -20,6 +20,7 @@ internal fun messageActionExplanationRes(kind: MessageActionKind?): Int =
         MessageActionKind.SelectText -> R.string.explanation_message_action_select_text
         MessageActionKind.CopyText -> R.string.explanation_message_action_copy
         MessageActionKind.Translate -> R.string.explanation_message_action_translate
+        MessageActionKind.Transcribe -> R.string.explanation_message_action_transcribe
         MessageActionKind.Speak -> R.string.explanation_message_action_read_aloud
         MessageActionKind.SpeakCodeLiterally -> R.string.explanation_message_action_read_code_literally
         MessageActionKind.Forward -> R.string.explanation_message_action_forward

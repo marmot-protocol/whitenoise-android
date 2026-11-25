@@ -4288,8 +4288,8 @@ internal fun ConversationScreen(
                                                         ).then(membershipFrameModifier),
                                                 item = item,
                                                 reactionViewport = reactionViewport,
-                                                // Newest-first rows: the chronologically
-                                                // older neighbour is the next row emitted.
+                                                senderGapMeasurements = timelineViewport.senderGapMeasurements,
+                                                // The next row in the newest-first list is the older neighbor.
                                                 older = renderedTimelineNewestFirst.getOrNull(index + 1),
                                                 newer = renderedTimelineNewestFirst.getOrNull(index - 1),
                                                 transcriptLocale = transcriptLocale,

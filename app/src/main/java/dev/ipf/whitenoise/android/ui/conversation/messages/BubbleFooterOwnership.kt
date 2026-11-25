@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import dev.ipf.whitenoise.android.core.IndexedAttachment
+
 internal fun ttsBodyIsCollapsed(
     collapseEnabled: Boolean,
     measuredBodyHeightPx: Int?,
@@ -17,6 +19,12 @@ internal fun fileCardOwnsFooter(
     visualOwnsFooter: Boolean,
     hasCaption: Boolean = false,
 ): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter && !hasCaption
+
+/** Gives the final received recording the available footer when all attachments are accepted. */
+internal fun BubbleMedia.transcriptFooterVoice(
+    showReceivedVoice: Boolean,
+    footerAvailable: Boolean,
+): IndexedAttachment? = audio.lastOrNull()?.takeIf { showReceivedVoice && footerAvailable && rejected.isEmpty() }
 
 /**
  * Selects an uncaptioned visual-only group for overlay metadata.

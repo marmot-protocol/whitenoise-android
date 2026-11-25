@@ -4,12 +4,14 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,6 +42,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -51,7 +55,9 @@ import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.translation.MessageSideDisc
 import dev.ipf.whitenoise.android.translation.MessageSideDiscProgress
+import dev.ipf.whitenoise.android.ui.conversation.messages.BubbleFooterLayout
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
+import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleFooterLastLineWidth
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -109,6 +115,22 @@ internal class AudioTranscriptionToggleState(
         value: Boolean,
     ) = scope(provided).setShown(messageIdHex, value)
 
+    /** Returns the cached transcript for this recording while the message's transcript is shown. */
+    fun completedText(
+        provided: VoiceTranscriptionScope?,
+        index: Int,
+        epoch: ULong,
+    ): String? {
+        val key = voicePlaybackKey(messageIdHex, index, epoch)
+        return scope(provided).result(key)?.text.takeIf { requested(provided) }
+    }
+
+    /** Offers the menu action once a recording is ready, using the same request as the side disc. */
+    fun menuAction(provided: VoiceTranscriptionScope?): (() -> Unit)? {
+        if (!enabled) return null
+        return { setRequested(provided, true) }
+    }
+
     fun register(
         key: Any,
         ready: Boolean,
@@ -121,6 +143,16 @@ internal class AudioTranscriptionToggleState(
     fun unregister(key: Any) {
         slots.remove(key)
     }
+}
+
+/** A received voice message has one transcription control shared by its recordings. */
+@Composable
+internal fun rememberReceivedAudioTranscription(
+    messageIdHex: String,
+    mine: Boolean,
+): AudioTranscriptionToggleState? {
+    if (mine) return null
+    return remember(messageIdHex) { AudioTranscriptionToggleState(messageIdHex) }
 }
 
 /**
@@ -136,6 +168,7 @@ internal fun ReceivedAudioTranscription(
     file: File?,
     attachmentKey: String,
     toggle: AudioTranscriptionToggleState,
+    completedInFooter: Boolean = false,
 ) {
     val context = LocalContext.current
     val provided = LocalVoiceTranscription.current
@@ -178,7 +211,7 @@ internal fun ReceivedAudioTranscription(
     }
 
     AudioTranscriptBody(
-        state = ui,
+        state = ui.takeUnless { completedInFooter && it?.phase == AudioTranscriptPhase.COMPLETE },
         listingError = if (listingFailed) stringResource(R.string.dictation_ostt_recommendation_open_failed) else null,
         onRetry = {
             listingFailed = false
@@ -298,6 +331,42 @@ internal fun AudioTranscriptBody(
                     }.testTag(AUDIO_TRANSCRIPT_TEST_TAG),
         ) {
             AudioTranscriptResult(shown, listingError, onRetry, onGetProvider)
+        }
+    }
+}
+
+/** Keeps the timestamp and transcript in one animated content area. */
+internal fun Modifier.animateTranscriptFooter(enabled: Boolean): Modifier {
+    if (!enabled) return this
+    return animateContentSize(alignment = Alignment.TopStart)
+}
+
+/** Uses the same last-line footer placement as a regular message caption. */
+@Composable
+internal fun AudioTranscriptWithFooter(
+    text: String,
+    footer: @Composable () -> Unit,
+) {
+    val generated = stringResource(R.string.audio_transcription_generated)
+    val direction = LocalLayoutDirection.current
+    var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+
+    BubbleFooterLayout(
+        footer = footer,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    stateDescription = generated
+                }.testTag(AUDIO_TRANSCRIPT_TEST_TAG),
+        lastLineWidth = { layout?.bubbleFooterLastLineWidth(direction) },
+        lastLineBaseline = {
+            layout?.takeIf { it.lineCount > 0 }?.let { it.getLineBaseline(it.lineCount - 1).toInt() }
+        },
+    ) {
+        SelectionContainer {
+            Text(text, style = MaterialTheme.typography.bodyLarge, onTextLayout = { layout = it })
         }
     }
 }

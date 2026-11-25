@@ -24,6 +24,18 @@ internal fun conversationBubbleRowsShareSenderRun(
             sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
         )
 
+/** Whether adjacent message bubbles have different authors, independently of the sender attribution time window. */
+internal fun conversationBubbleSenderChanges(
+    older: TimelineMessage?,
+    newer: TimelineMessage,
+    streamingDebugEnabled: Boolean,
+    deletedMessageIds: Set<String>,
+): Boolean =
+    older != null &&
+        !older.record.sender.equals(newer.record.sender, ignoreCase = true) &&
+        timelineItemRendersAsConversationBubble(older, streamingDebugEnabled, deletedMessageIds) &&
+        timelineItemRendersAsConversationBubble(newer, streamingDebugEnabled, deletedMessageIds)
+
 /** Classifies rows that participate in adjacent sender grouping as message bubbles. */
 private fun timelineItemRendersAsConversationBubble(
     item: TimelineMessage,

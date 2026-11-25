@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -13,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
 import dev.ipf.whitenoise.android.ui.settings.AuditUploadConsentContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -65,7 +68,9 @@ class AuditUploadConsentScreenshotTest {
                 LocalLayoutDirection provides direction,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                    AuditUploadConsentContent(onDismiss = { cancellations++ }, onConfirm = { confirmations++ })
+                    WhiteNoiseDialogSurface(Modifier.testTag("audit.consent.surface")) {
+                        AuditUploadConsentContent(onDismiss = { cancellations++ }, onConfirm = { confirmations++ })
+                    }
                 }
             }
         }
