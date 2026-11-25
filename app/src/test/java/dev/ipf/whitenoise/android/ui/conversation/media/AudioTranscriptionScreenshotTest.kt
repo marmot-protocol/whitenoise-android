@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -19,11 +21,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isOff
@@ -32,6 +39,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -76,6 +84,96 @@ class AudioTranscriptionScreenshotTest {
     fun idleLight() = capture("idle-light", null)
 
     @Test
+    fun shortTranscriptSharesItsLastLineWithTheTimestamp() {
+        composeRule.setContent {
+            AudioTranscriptWithFooter("Hello") {
+                Text("12:34", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        val transcript = composeRule.onNodeWithText("Hello").getUnclippedBoundsInRoot()
+        val timestamp = composeRule.onNodeWithText("12:34").getUnclippedBoundsInRoot()
+        assertTrue(transcript.right < timestamp.left)
+        assertTrue(timestamp.top < transcript.bottom && timestamp.bottom > transcript.top)
+    }
+
+    /** An edge tap in the wide gutter toggles the action, while its press state stays inside the disc. */
+    @Test
+    fun pressedDiscKeepsCircularFeedback() = capturePressed("pressed-dark", Appearance.DARK)
+
+    /** The off-state feedback is also visible and circular in the light theme. */
+    @Test
+    fun pressedDiscLight() = capturePressed("pressed-light", Appearance.LIGHT)
+
+    /** The active disc keeps its circular feedback with large text and RTL in AMOLED. */
+    @Test
+    fun pressedOnAmoledRtlLarge() = capturePressed("pressed-amoled-rtl-large-on", Appearance.AMOLED_RTL, completed())
+
+    /** Samples the quick tap, release fade and held shape without changing the fixture's toggle state. */
+    private fun capturePressed(
+        name: String,
+        appearance: Appearance,
+        state: AudioTranscriptUi? = null,
+    ) {
+        val requests = mutableListOf<Boolean>()
+        val toggleTo = state == null
+        composeRule.setContent { PressedVoicePreview(appearance, state) { requests += it } }
+        val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
+        val idle = disc.captureToImage().toPixelMap()
+        val middleX = idle.width / 2
+        val middleY = idle.height / 2
+        composeRule.mainClock.autoAdvance = false
+        disc.performTouchInput { click(Offset(2f, center.y)) }
+        composeRule.mainClock.advanceTimeByFrame()
+        val released = disc.captureToImage().toPixelMap()
+        assertTrue(
+            "a quick edge tap still gives feedback",
+            idle[middleX + 9, middleY] != released[middleX + 9, middleY],
+        )
+        composeRule.mainClock.advanceTimeBy(300)
+        assertEquals(listOf(toggleTo), requests)
+        val faded = disc.captureToImage().toPixelMap()
+        assertEquals("feedback fades to idle", idle[middleX + 9, middleY], faded[middleX + 9, middleY])
+
+        disc.performTouchInput { down(Offset(2f, center.y)) }
+        composeRule.mainClock.advanceTimeBy(300)
+        val pressed = disc.captureToImage().toPixelMap()
+        assertTrue("the disc responds to the edge press", idle[middleX + 9, middleY] != pressed[middleX + 9, middleY])
+        assertEquals("the gutter has no state layer", idle[2, middleY], pressed[2, middleY])
+        assertEquals("clipped disc corner", idle[middleX + 10, middleY + 10], pressed[middleX + 10, middleY + 10])
+        assertEquals(listOf(toggleTo), requests)
+        composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-$name.png")
+        disc.performTouchInput { up() }
+        composeRule.mainClock.advanceTimeBy(300)
+        assertEquals(listOf(toggleTo, toggleTo), requests)
+    }
+
+    /** Uses a scrolling parent so the control receives the same delayed press interactions as a chat row. */
+    @Composable
+    private fun PressedVoicePreview(
+        appearance: Appearance,
+        state: AudioTranscriptUi?,
+        onToggle: (Boolean) -> Unit,
+    ) {
+        val amoledRtl = appearance == Appearance.AMOLED_RTL
+        val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+        WhiteNoiseTheme(
+            darkTheme = appearance != Appearance.LIGHT,
+            amoled = amoledRtl,
+            fontScale = if (amoledRtl) 2f else 1f,
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                LazyColumn {
+                    item {
+                        Surface(Modifier.width(360.dp).testTag(FRAME)) {
+                            IncomingVoiceMessage(state, onToggle = onToggle)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun processingDark() = capture("working-dark", AudioTranscriptUi(AudioTranscriptPhase.WORKING), Appearance.DARK)
 
     @Test
@@ -89,11 +187,32 @@ class AudioTranscriptionScreenshotTest {
 
     /** The production frame: the player on top, the transcript, then the time, all in one bubble. */
     @Test
-    fun completedInBubbleLight() = capture("bubble-light", completed(), inlineMedia = true)
+    fun completedInBubbleLight() = capture("bubble-light", completed(), placement = TranscriptPlacement.SEPARATE_FOOTER)
 
     @Test
     fun completedInBubbleAmoledRtlLarge() {
-        capture("bubble-amoled-rtl-large", completed(), Appearance.AMOLED_RTL, inlineMedia = true)
+        capture("bubble-amoled-rtl-large", completed(), Appearance.AMOLED_RTL, TranscriptPlacement.SEPARATE_FOOTER)
+    }
+
+    @Test
+    fun completedWithFooterLight() = captureFooter("footer-light", Appearance.LIGHT)
+
+    @Test
+    fun completedWithFooterDark() = captureFooter("footer-dark", Appearance.DARK)
+
+    @Test
+    fun completedWithFooterAmoledRtlLarge() = captureFooter("footer-amoled-rtl-large", Appearance.AMOLED_RTL)
+
+    private fun captureFooter(
+        name: String,
+        appearance: Appearance,
+    ) {
+        val transcript =
+            AudioTranscriptUi(
+                AudioTranscriptPhase.COMPLETE,
+                "The train leaves at ten. I will meet you by the station roundabout.",
+            )
+        capture(name, transcript, appearance, TranscriptPlacement.SHARED_FOOTER)
     }
 
     /** Automatic mode shows a transcript that is already known at once, with the disc on and no tap. */
@@ -216,10 +335,24 @@ class AudioTranscriptionScreenshotTest {
     /** Records three actual inline transcript toggles without adding fixture-only motion. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
-    fun captureTranscriptFrames() {
+    fun captureTranscriptFrames() = captureTranscriptToggles("transcript", TranscriptPlacement.SEPARATE_FOOTER)
+
+    /** Records the timestamp and transcript animating together in the shared footer. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun captureSharedFooterFrames() =
+        captureTranscriptToggles(
+            "transcript-shared-footer",
+            TranscriptPlacement.SHARED_FOOTER,
+        )
+
+    private fun captureTranscriptToggles(
+        directory: String,
+        placement: TranscriptPlacement,
+    ) {
         org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
-        val output = File("build/animation-frames/transcript")
-        check(!output.exists()) { "Archive the previous transcript output first" }
+        val output = File("build/animation-frames", directory)
+        check(!output.exists()) { "Archive the previous transcript output at ${output.path} first" }
         check(output.mkdirs())
         val shown = mutableStateOf(false)
         composeRule.setContent {
@@ -227,7 +360,7 @@ class AudioTranscriptionScreenshotTest {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     IncomingVoiceMessage(
                         state = if (shown.value) completed() else null,
-                        inlineMedia = true,
+                        placement = placement,
                         onToggle = { shown.value = it },
                     )
                 }
@@ -273,7 +406,7 @@ class AudioTranscriptionScreenshotTest {
         name: String,
         state: AudioTranscriptUi?,
         appearance: Appearance = Appearance.LIGHT,
-        inlineMedia: Boolean = false,
+        placement: TranscriptPlacement = TranscriptPlacement.BODY,
     ) {
         val amoledRtl = appearance == Appearance.AMOLED_RTL
         val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -285,7 +418,7 @@ class AudioTranscriptionScreenshotTest {
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     Surface(modifier = Modifier.width(360.dp).testTag(FRAME)) {
-                        IncomingVoiceMessage(state, inlineMedia = inlineMedia)
+                        IncomingVoiceMessage(state, placement = placement)
                     }
                 }
             }
@@ -293,6 +426,10 @@ class AudioTranscriptionScreenshotTest {
         val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsDisplayed()
         if (state == null) disc.assertIsOff() else disc.assertIsOn()
         composeRule.onNode(isDialog()).assertDoesNotExist()
+        if (placement == TranscriptPlacement.SHARED_FOOTER) {
+            composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertIsDisplayed()
+            composeRule.onNodeWithText(VOICE_TIMESTAMP).assertIsDisplayed()
+        }
         composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-$name.png")
     }
 
@@ -300,7 +437,7 @@ class AudioTranscriptionScreenshotTest {
     @Composable
     private fun IncomingVoiceMessage(
         state: AudioTranscriptUi?,
-        inlineMedia: Boolean = false,
+        placement: TranscriptPlacement = TranscriptPlacement.BODY,
         onToggle: (Boolean) -> Unit = {},
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -314,7 +451,10 @@ class AudioTranscriptionScreenshotTest {
                 onClick = {},
             )
             Column(modifier = Modifier.weight(1f, fill = false).alignBy(MessageBubbleBottomAlignmentLine)) {
-                if (inlineMedia) {
+                if (placement != TranscriptPlacement.BODY) {
+                    val sharedFooter = placement == TranscriptPlacement.SHARED_FOOTER
+                    val footerTranscript =
+                        state?.takeIf { sharedFooter && it.phase == AudioTranscriptPhase.COMPLETE }?.text
                     MediaCaptionFrame(
                         presentation = messageBubblePresentation(deleted = false, mine = false),
                         highlighted = false,
@@ -322,17 +462,14 @@ class AudioTranscriptionScreenshotTest {
                         mentionedSelf = false,
                         mentionedYouLabel = "Mentioned you",
                         alignEnd = false,
-                        media = { VoiceAndTranscript(state) },
+                        contentModifier = Modifier.animateTranscriptFooter(sharedFooter),
+                        media = { VoiceAndTranscript(state.takeIf { footerTranscript == null }) },
                         caption = {
-                            MessageInlineFooter(
-                                timeText = "10:24",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                showStatus = false,
-                                status = MessageStatus.Received,
-                                editedLabel = null,
-                                onEditedClick = null,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            if (footerTranscript != null) {
+                                AudioTranscriptWithFooter(footerTranscript) { VoiceTimestamp() }
+                            } else {
+                                VoiceTimestamp(Modifier.fillMaxWidth())
+                            }
                         },
                     )
                 } else {
@@ -363,6 +500,19 @@ class AudioTranscriptionScreenshotTest {
     }
 
     @Composable
+    private fun VoiceTimestamp(modifier: Modifier = Modifier) {
+        MessageInlineFooter(
+            timeText = VOICE_TIMESTAMP,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            showStatus = false,
+            status = MessageStatus.Received,
+            editedLabel = null,
+            onEditedClick = null,
+            modifier = modifier,
+        )
+    }
+
+    @Composable
     private fun VoiceAndTranscript(state: AudioTranscriptUi?) {
         VoiceAttachmentContent(
             loading = false,
@@ -390,10 +540,13 @@ class AudioTranscriptionScreenshotTest {
 
     private enum class Appearance { LIGHT, DARK, AMOLED_RTL }
 
+    private enum class TranscriptPlacement { BODY, SEPARATE_FOOTER, SHARED_FOOTER }
+
     private companion object {
         const val FRAME = "audio.transcription.frame"
         const val MESSAGE = "m1"
         const val ATTACHMENT = "m1:0:1"
+        const val VOICE_TIMESTAMP = "10:24"
         const val TIMEOUT_MS = 10_000L
     }
 }

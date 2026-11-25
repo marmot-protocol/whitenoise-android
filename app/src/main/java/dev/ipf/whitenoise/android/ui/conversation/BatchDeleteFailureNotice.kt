@@ -1,14 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,8 +16,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val BATCH_DELETE_FAILURE_NOTICE_TAG = "batch-delete-failure-notice"
 
@@ -35,61 +34,42 @@ internal fun BatchDeleteFailureNotice(
     onCopyReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    val actionContentColor = MaterialTheme.colorScheme.onErrorContainer
+    val disabledActionContentColor = actionContentColor.copy(alpha = 0.38f)
+    val actionColors =
+        ButtonDefaults.textButtonColors(
+            contentColor = actionContentColor,
+            disabledContentColor = disabledActionContentColor,
+        )
+    WhiteNoiseCallout(
         modifier =
             modifier
-                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag(BATCH_DELETE_FAILURE_NOTICE_TAG),
+        title = stringResource(R.string.batch_delete_failure_progress, state.succeeded, state.attempted),
+        text = batchDeleteFailureScopeText(state),
+        icon = R.drawable.ic_error,
+        isError = true,
     ) {
-        val actionContentColor = MaterialTheme.colorScheme.onErrorContainer
-        val disabledActionContentColor = actionContentColor.copy(alpha = 0.38f)
-        val actionColors =
-            ButtonDefaults.textButtonColors(
-                contentColor = actionContentColor,
-                disabledContentColor = disabledActionContentColor,
-            )
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
         ) {
-            Text(
-                text =
-                    stringResource(
-                        R.string.batch_delete_failure_progress,
-                        state.succeeded,
-                        state.attempted,
-                    ),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = batchDeleteFailureScopeText(state),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onCopyReport, colors = actionColors) {
-                    Text(
-                        text = stringResource(R.string.copy),
-                        color = actionContentColor,
-                    )
-                }
-                TextButton(onClick = onDismiss, enabled = !retryInFlight, colors = actionColors) {
-                    Text(
-                        text = stringResource(R.string.dismiss),
-                        color = if (retryInFlight) disabledActionContentColor else actionContentColor,
-                    )
-                }
-                TextButton(onClick = onRetry, enabled = !retryInFlight, colors = actionColors) {
-                    Text(
-                        text = stringResource(R.string.retry),
-                        color = if (retryInFlight) disabledActionContentColor else actionContentColor,
-                    )
-                }
+            TextButton(onClick = onCopyReport, colors = actionColors) {
+                Text(text = stringResource(R.string.copy), color = actionContentColor)
+            }
+            TextButton(onClick = onDismiss, enabled = !retryInFlight, colors = actionColors) {
+                Text(
+                    text = stringResource(R.string.dismiss),
+                    color = if (retryInFlight) disabledActionContentColor else actionContentColor,
+                )
+            }
+            TextButton(onClick = onRetry, enabled = !retryInFlight, colors = actionColors) {
+                Text(
+                    text = stringResource(R.string.retry),
+                    color = if (retryInFlight) disabledActionContentColor else actionContentColor,
+                )
             }
         }
     }

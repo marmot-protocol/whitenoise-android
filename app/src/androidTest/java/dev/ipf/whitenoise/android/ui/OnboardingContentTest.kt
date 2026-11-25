@@ -64,16 +64,16 @@ class OnboardingContentTest {
             .assertIsDisplayed()
             // The mark is described by the flavour's app name ("White Noise Dev" on dev builds).
             .assertContentDescriptionEquals(context.getString(R.string.app_name))
-        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
-        composeRule.onNodeWithText("Sign In").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign up").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign in").assertIsDisplayed()
         composeRule.onNodeWithTag(SIGN_IN_KEY_TAG).assertDoesNotExist()
 
-        composeRule.onNodeWithText("Sign Up").performClick()
+        composeRule.onNodeWithText("Sign up").performClick()
         composeRule.runOnIdle { assertEquals(1, createClicks) }
 
-        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule.onNodeWithText("Sign in").performClick()
         composeRule.onNodeWithTag(SIGN_IN_KEY_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText("Sign Up").assertDoesNotExist()
+        composeRule.onNodeWithText("Sign up").assertDoesNotExist()
 
         composeRule.onNodeWithTag(SIGN_IN_KEY_TAG).performTextInput(nsec)
         composeRule.onNodeWithTag(SIGN_IN_ACTION_TAG).performClick()
@@ -154,12 +154,12 @@ class OnboardingContentTest {
         }
 
         composeRule.onNodeWithText("Continue as Amber User").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Sign In").assertIsDisplayed()
-        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign in").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign up").assertIsDisplayed()
         composeRule.onNodeWithTag(SIGN_IN_AMBER_TAG).assertDoesNotExist()
         composeRule.runOnIdle { assertEquals("amber-account", resumedLabel) }
 
-        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule.onNodeWithText("Sign in").performClick()
         composeRule.onNodeWithTag(SIGN_IN_AMBER_TAG).assertIsDisplayed()
     }
 }

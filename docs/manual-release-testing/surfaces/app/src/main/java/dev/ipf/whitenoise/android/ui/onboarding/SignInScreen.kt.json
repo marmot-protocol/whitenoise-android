@@ -178,14 +178,11 @@
     ],
     "source_coverage": [
       {
-        "surface": "Scroll boundaries: SignInScreen",
+        "surface": "Sign-in uses the shared onboarding layout",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
-        "anchor": ".whiteNoiseVerticalScroll(",
+        "anchor": "OnboardingPinnedActionPage(",
         "test_ids": [
-          "SCR-001",
-          "SCR-002",
-          "SCR-003",
-          "SCR-004"
+          "ONB-004"
         ]
       }
     ]

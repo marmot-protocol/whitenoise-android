@@ -13,9 +13,9 @@ name: signin-public
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - assertVisible: "Private key"
 - tapOn: "Private key"
 - inputText: "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzqujme"
@@ -24,7 +24,7 @@ name: signin-public
     id: "onboarding.sign_in.action"
 - assertVisible: "That's a public key. Enter your secret key (nsec) to sign in."
 - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - assertNotVisible: "Private key"
 - takeScreenshot: signin-public

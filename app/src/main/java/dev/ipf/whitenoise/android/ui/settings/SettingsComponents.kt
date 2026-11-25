@@ -284,7 +284,7 @@ internal fun SettingsLink(
                     settingsRow = Unit
                 },
         enabled = editable,
-        leadingContent = settingsLeadingSlot(leading, editable),
+        leadingContent = settingsLeadingSlot(leading, editable, destructive),
         supportingContent = summary?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = {
             SettingsRowTrailing(busy) {
@@ -303,7 +303,7 @@ internal fun SettingsLink(
 /**
  * Row that performs an action in place instead of opening a destination, so it carries no chevron.
  *
- * [destructive] actions use the error role for the title; callers tint any leading icon to match.
+ * [destructive] actions use the error role for the title and for a [SettingsLeadingIcon] in the leading slot.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -336,7 +336,7 @@ internal fun SettingsAction(
                     settingsRow = Unit
                 },
         enabled = enabled,
-        leadingContent = settingsLeadingSlot(leading, enabled),
+        leadingContent = settingsLeadingSlot(leading, enabled, destructive),
         supportingContent = supportingContent ?: subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, enabled, destructive) },

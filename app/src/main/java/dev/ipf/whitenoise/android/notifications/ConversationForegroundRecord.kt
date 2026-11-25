@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import dev.ipf.whitenoise.android.audio.VoiceNoteForegroundService
 import dev.ipf.whitenoise.android.audio.conversationDictationDiagnostic
@@ -23,12 +25,27 @@ internal class ConversationForegroundRecord(
         get() = dictation.foregroundServiceType or voice.serviceType
     private val hasCaptureLease: Boolean
         get() = dictation.hasForegroundLease || voice.notification != null
+    private val hasActiveLease: Boolean
+        get() = connectionServiceType != 0 || hasCaptureLease
 
     var connectionServiceType = 0
         private set
     private var foregroundPromoted = false
     private var publishedServiceType = 0
     private var publishedNotificationId = 0
+    private var showingDeadlinePlaceholder = false
+    private var pendingStartDeadlineId: Int? = null
+    private var stoppedStartId: Int? = null
+
+    /** Records an unmet startForegroundService command so re-entrant releases satisfy the deadline first. */
+    fun noteForegroundStartPending(startId: Int) {
+        if (!foregroundPromoted) {
+            pendingStartDeadlineId = startId
+        }
+        if (stoppedStartId == startId) {
+            stoppedStartId = null
+        }
+    }
 
     fun foregroundNotification(): Notification {
         val capture = voice.notification ?: dictation.notificationOrNull()
@@ -56,6 +73,7 @@ internal class ConversationForegroundRecord(
         connectionServiceType = type
     }
 
+    /** Publishes or updates the active foreground notification and clears any pending start deadline. */
     @Suppress("TooGenericExceptionCaught") // Android foreground rejection subclasses RuntimeException.
     private fun publishForeground(
         notification: Notification,
@@ -74,6 +92,7 @@ internal class ConversationForegroundRecord(
             // Keep the authorized record intact while capture continues. Removed ordinary type
             // bits are narrowed after capture closes; never reassert microphone from a wake.
             notifyPresentation(notification)
+            showingDeadlinePlaceholder = false
             return
         }
         try {
@@ -81,6 +100,9 @@ internal class ConversationForegroundRecord(
             publishedServiceType = type
             publishedNotificationId = notificationId
             foregroundPromoted = true
+            showingDeadlinePlaceholder = false
+            pendingStartDeadlineId = null
+            stoppedStartId = null
         } catch (error: RuntimeException) {
             val addsType = type and publishedServiceType.inv() != 0
             val narrowingExistingRecord = foregroundPromoted && !acquireMicrophone && !addsType
@@ -89,6 +111,7 @@ internal class ConversationForegroundRecord(
             // Detaching would lose foreground protection and a background restart can fail.
             // Keep the existing record, replace its controls, and retry narrowing on foreground.
             notifyPresentation(notification)
+            showingDeadlinePlaceholder = false
         }
     }
 
@@ -143,12 +166,16 @@ internal class ConversationForegroundRecord(
         )
     }
 
-    fun releaseVoice(startId: Int = serviceStartId()) {
+    /** Releases the voice-note lease, restoring connection or stopping cleanly. */
+    fun releaseVoice(
+        startId: Int = serviceStartId(),
+        satisfyStartDeadline: Boolean = false,
+    ) {
         if (!isCurrent() || voice.notification != null || dictation.hasForegroundLease) return
         if (connectionServiceType != 0) {
-            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
+            restoreConnectionIfNeeded()
         } else {
-            removeForegroundAndStop(startId)
+            removeForegroundAndStop(startId, satisfyStartDeadline)
         }
     }
 
@@ -177,7 +204,10 @@ internal class ConversationForegroundRecord(
 
     /** A rejected ordinary card must never leave completed microphone controls behind. */
     @Suppress("TooGenericExceptionCaught") // API 31+ foreground-start rejection extends RuntimeException.
-    fun releaseDictation(startId: Int = serviceStartId()) {
+    fun releaseDictation(
+        startId: Int = serviceStartId(),
+        satisfyStartDeadline: Boolean = false,
+    ) {
         val current = isCurrent()
         conversationDictationDiagnostic(
             "event=foreground_service_stop source=teardown active=$current " +
@@ -185,10 +215,27 @@ internal class ConversationForegroundRecord(
         )
         if (hasCaptureLease || !current) return
         if (connectionServiceType != 0) {
-            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
+            restoreConnectionIfNeeded()
         } else {
-            removeForegroundAndStop(startId)
+            removeForegroundAndStop(startId, satisfyStartDeadline)
         }
+    }
+
+    /** Restores the connection card only when capture changed the published foreground record. */
+    private fun restoreConnectionIfNeeded() {
+        val sameConnectionCard =
+            publishedServiceType == connectionServiceType &&
+                publishedNotificationId == BackgroundConnectionNotification.NOTIFICATION_ID
+        val alreadyShowingConnection = foregroundPromoted && !showingDeadlinePlaceholder && sameConnectionCard
+        if (!alreadyShowingConnection) {
+            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
+        }
+    }
+
+    /** Stops an idle service for a stale non-foreground action without publishing a placeholder. */
+    fun stopIfIdleWithoutPlaceholder(startId: Int) {
+        if (!isCurrent() || hasActiveLease) return
+        removeForegroundAndStop(startId, satisfyStartDeadline = false)
     }
 
     /** Releasing connection never interrupts a separately authorized microphone lease. */
@@ -212,17 +259,87 @@ internal class ConversationForegroundRecord(
         }
     }
 
-    private fun removeForegroundAndStop(startId: Int) {
-        if (foregroundPromoted) {
-            NotificationStreamForegroundService.foregroundRemover(service)
-            foregroundPromoted = false
-            publishedServiceType = 0
-            publishedNotificationId = 0
+    /** Stops the service for [startId], downgrading to an action-free placeholder if a newer start is queued. */
+    private fun removeForegroundAndStop(
+        startId: Int,
+        satisfyStartDeadline: Boolean = false,
+    ) {
+        val hasUnmetDeadline = satisfyStartDeadline || pendingStartDeadlineId != null
+        if (stoppedStartId == startId && pendingStartDeadlineId == null) return
+        if (hasUnmetDeadline && !foregroundPromoted) {
+            satisfyStartDeadlineBeforeStop()
         }
+        stoppedStartId = startId
         val stopped = service.stopSelfResult(startId)
+        if (stopped) {
+            if (foregroundPromoted) {
+                NotificationStreamForegroundService.foregroundRemover(service)
+                foregroundPromoted = false
+                publishedServiceType = 0
+                publishedNotificationId = 0
+                showingDeadlinePlaceholder = false
+            }
+        } else if (foregroundPromoted && !showingDeadlinePlaceholder) {
+            publishSpecialUsePlaceholder(clearControlsOnRejection = true)
+        }
         conversationDictationDiagnostic(
             "event=foreground_notification_closed accepted=$stopped foreground=$foregroundPromoted",
         )
+    }
+
+    /** Publishes a minimal special-use notification so a stale foreground start can stop without crashing. */
+    private fun satisfyStartDeadlineBeforeStop() {
+        pendingStartDeadlineId = null
+        publishSpecialUsePlaceholder(clearControlsOnRejection = false)
+    }
+
+    /** Publishes the action-free special-use placeholder, clearing dead controls if narrowing is rejected. */
+    @Suppress("TooGenericExceptionCaught") // API 31+ foreground-start rejection extends RuntimeException.
+    private fun publishSpecialUsePlaceholder(clearControlsOnRejection: Boolean) {
+        val placeholder = deadlinePlaceholderNotification()
+        try {
+            NotificationStreamForegroundService.foregroundPublisher(
+                service,
+                placeholder,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+            publishedServiceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            publishedNotificationId = NotificationStreamForegroundService.foregroundNotificationId(placeholder)
+            foregroundPromoted = true
+            showingDeadlinePlaceholder = true
+        } catch (_: SecurityException) {
+            // Android rejected even specialUse; clear dead controls if already foreground, else stop immediately.
+            if (clearControlsOnRejection && foregroundPromoted) notifyPresentation(placeholder)
+        } catch (error: RuntimeException) {
+            if (!error.isForegroundServiceStartRejection()) throw error
+            if (clearControlsOnRejection && foregroundPromoted) notifyPresentation(placeholder)
+        }
+    }
+
+    /** Builds an action-free placeholder on the low-importance service channel for immediate teardown. */
+    private fun deadlinePlaceholderNotification(): Notification {
+        val manager = service.getSystemService(NotificationManager::class.java)
+        if (manager != null && manager.getNotificationChannel(BackgroundConnectionNotification.CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    BackgroundConnectionNotification.CHANNEL_ID,
+                    service.getString(R.string.notification_channel_background_connection),
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = service.getString(R.string.notification_channel_background_connection_description)
+                    setShowBadge(false)
+                },
+            )
+        }
+        return Notification
+            .Builder(service, BackgroundConnectionNotification.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+            .setContentTitle(service.getString(R.string.app_name))
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .build()
     }
 
     fun onDestroy() {

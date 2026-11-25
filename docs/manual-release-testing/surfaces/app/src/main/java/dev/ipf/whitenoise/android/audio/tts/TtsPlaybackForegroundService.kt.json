@@ -37,6 +37,14 @@
         "test_ids": [
           "TTS-001"
         ]
+      },
+      {
+        "surface": "TTS foreground service stops via startId-scoped stopSelfResult",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+        "anchor": "stopSelfResult(startId)",
+        "test_ids": [
+          "TTS-001"
+        ]
       }
     ]
   },

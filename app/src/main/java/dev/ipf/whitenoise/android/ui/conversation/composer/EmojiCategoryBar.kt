@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiPickerTab
@@ -52,12 +54,12 @@ private val EmojiCategoryToggleSize = 48.dp
 private val EmojiCategorySelectionSize = 36.dp
 private val EmojiCategoryIconSize = 22.dp
 
-/** Gap between the bar's outer buttons and the panel's rounded bottom corners. */
+/** Default gap between the bar's outer buttons and a panel's rounded bottom corners. */
 private val EmojiCategoryBarEdgeInset = 12.dp
 
 /**
  * Bottom bar of the emoji picker: optional search and configure actions, one toggle per visible
- * category with a 36dp selection disc, and an optional backspace action for the composer pane.
+ * category in equal-width slots with a 36dp selection disc, and an optional backspace action for the composer pane.
  */
 @Composable
 internal fun EmojiCategoryBar(
@@ -68,6 +70,9 @@ internal fun EmojiCategoryBar(
     onConfigure: (() -> Unit)?,
     onBackspace: (() -> Unit)?,
     onCategory: (EmojiPickerTab) -> Unit,
+    onBrowseSets: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
+    edgeInset: Dp = EmojiCategoryBarEdgeInset,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -81,30 +86,40 @@ internal fun EmojiCategoryBar(
                     .testTag(EMOJI_PICKER_CATEGORIES_TEST_TAG),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val leadingActions = onSearch != null || onConfigure != null
-            if (leadingActions) EmojiCategoryBarLeadingActions(onSearch, onConfigure)
-            LazyRow(
-                state = state,
-                modifier = Modifier.weight(1f),
-                contentPadding =
-                    PaddingValues(
-                        start = if (leadingActions) 0.dp else WhiteNoiseSpacing.Related,
-                        end = WhiteNoiseSpacing.Related,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(categories, key = { it.id }) { category ->
-                    EmojiCategoryToggle(
-                        category = category,
-                        selected = selected == category,
-                        onClick = { onCategory(category) },
+            val leadingActions = listOf(onSearch, onConfigure, onBrowseSets, onOpenSettings).any { it != null }
+            if (leadingActions) {
+                EmojiCategoryBarLeadingActions(edgeInset, onSearch, onConfigure, onBrowseSets, onOpenSettings)
+            }
+            BoxWithConstraints(Modifier.weight(1f)) {
+                // Equal-width slots spread the toggles; they scroll only when they cannot all fit.
+                val startPadding = if (leadingActions) 0.dp else WhiteNoiseSpacing.Related
+                val endPadding = if (onBackspace == null) WhiteNoiseSpacing.Related else 0.dp
+                val slot =
+                    maxOf(
+                        EmojiCategoryToggleSize,
+                        (maxWidth - startPadding - endPadding) / categories.size.coerceAtLeast(1),
                     )
+                LazyRow(
+                    state = state,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(start = startPadding, end = endPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items(categories, key = { it.id }) { category ->
+                        Box(Modifier.width(slot), contentAlignment = Alignment.Center) {
+                            EmojiCategoryToggle(
+                                category = category,
+                                selected = selected == category,
+                                onClick = { onCategory(category) },
+                            )
+                        }
+                    }
                 }
             }
             if (onBackspace != null) {
                 IconButton(
                     onClick = onBackspace,
-                    modifier = Modifier.padding(end = EmojiCategoryBarEdgeInset),
+                    modifier = Modifier.padding(end = edgeInset),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Backspace,
@@ -119,10 +134,13 @@ internal fun EmojiCategoryBar(
 /** Search and configure actions at the start of the category bar. */
 @Composable
 private fun EmojiCategoryBarLeadingActions(
+    edgeInset: Dp,
     onSearch: (() -> Unit)?,
     onConfigure: (() -> Unit)?,
+    onBrowseSets: (() -> Unit)?,
+    onOpenSettings: (() -> Unit)?,
 ) {
-    Spacer(Modifier.width(EmojiCategoryBarEdgeInset))
+    Spacer(Modifier.width(edgeInset))
     if (onSearch != null) {
         IconButton(
             onClick = onSearch,
@@ -139,6 +157,25 @@ private fun EmojiCategoryBarLeadingActions(
             Icon(
                 painterResource(R.drawable.ic_search),
                 contentDescription = stringResource(R.string.emoji_search_hint),
+            )
+        }
+    }
+    if (onBrowseSets != null) {
+        IconButton(
+            onClick = onBrowseSets,
+            modifier = Modifier.testTag(EMOJI_PICKER_BROWSE_SETS_TEST_TAG),
+        ) {
+            Icon(painterResource(R.drawable.ic_add), contentDescription = stringResource(R.string.emoji_sets_title))
+        }
+    }
+    if (onOpenSettings != null) {
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.testTag(EMOJI_PICKER_SETTINGS_TEST_TAG),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_emoji_settings),
+                contentDescription = stringResource(R.string.custom_emoji),
             )
         }
     }

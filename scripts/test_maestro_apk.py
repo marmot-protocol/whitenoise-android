@@ -524,7 +524,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         flow = (ROOT / '.maestro/onboarding.yaml').read_text()
         self.assertIn('clearState: false', flow)
         self.assertIn('all: deny', flow)
-        self.assertEqual(flow.count('- assertVisible: "Sign Up"'), 2)
+        self.assertEqual(flow.count('- assertVisible: "Sign up"'), 2)
         self.assertIn('- assertVisible: "Private key"', flow)
         self.assertIn('- assertNotVisible: "Private key"', flow)
         self.assertNotIn('inputText', flow)
