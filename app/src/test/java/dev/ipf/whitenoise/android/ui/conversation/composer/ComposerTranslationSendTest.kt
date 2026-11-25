@@ -214,11 +214,15 @@ class ComposerTranslationSendTest {
         try {
             render(translateMode(), textState = ComposerTextState(TextFieldValue()), voice = voice)
             val microphone =
-                composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_record))
-                    .fetchSemanticsNode().boundsInRoot
+                composeRule
+                    .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             val emoji =
-                composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
-                    .fetchSemanticsNode().boundsInRoot
+                composeRule
+                    .onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             val translation = composeRule.onNodeWithTag("composer.translation").fetchSemanticsNode().boundsInRoot
             assertEquals(emoji.center.y, microphone.center.y, 1f)
             assertTrue(microphone.top >= translation.bottom)
