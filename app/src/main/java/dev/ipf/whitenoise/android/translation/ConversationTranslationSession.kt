@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -15,6 +14,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.TimeUnit
 
 internal data class TranslationSource(
     val messageId: String,
@@ -177,15 +177,18 @@ internal fun ConversationTranslationSession.suggestedTarget(
     val recent = (nowSeconds - minOf(nowSeconds, SUGGESTION_MAX_AGE_SECONDS))..nowSeconds
     val translatedIncoming = renditions.entries.filter { it.key.incomingRecordedAt != null }
     val replyLanguage =
-        translatedIncoming.mapNotNull { (source, rendition) ->
-            rendition.sourceLanguage.takeIf { source.messageId == replyId }
-        }.distinct().singleOrNull()
+        translatedIncoming
+            .mapNotNull { (source, rendition) -> rendition.sourceLanguage.takeIf { source.messageId == replyId } }
+            .distinct()
+            .singleOrNull()
     val language =
-        replyLanguage ?: translatedIncoming.mapNotNull { (source, rendition) ->
-            rendition.sourceLanguage.takeIf {
-                source.incomingRecordedAt != null && source.incomingRecordedAt in recent
-            }
-        }.distinct().singleOrNull()
+        replyLanguage ?: translatedIncoming
+            .mapNotNull { (source, rendition) ->
+                rendition.sourceLanguage.takeIf {
+                    source.incomingRecordedAt != null && source.incomingRecordedAt in recent
+                }
+            }.distinct()
+            .singleOrNull()
     return language?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
 }
 

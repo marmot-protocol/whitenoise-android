@@ -38,19 +38,23 @@ internal class IncomingLanguageDetector(
     ): String? {
         val cleaned = " ${NonLetters.replace(text, " ").trim()} "
         val sample =
-            cleaned.windowed(size = 3)
+            cleaned
+                .windowed(size = 3)
                 .groupingBy { it }
                 .eachCount()
-                .entries.sortedByDescending { it.value }
+                .entries
+                .sortedByDescending { it.value }
                 .take(PROFILE_LENGTH)
         val scores =
-            profiles[script].orEmpty().map { profile ->
-                val distance =
-                    sample.withIndex().sumOf { (rank, trigram) ->
-                        profile.ranks[trigram.key]?.let { abs(it - rank) } ?: PROFILE_LENGTH
-                    }
-                profile.code to (1.0 - distance.toDouble() / (sample.size * PROFILE_LENGTH))
-            }.sortedByDescending { it.second }
+            profiles[script]
+                .orEmpty()
+                .map { profile ->
+                    val distance =
+                        sample.withIndex().sumOf { (rank, trigram) ->
+                            profile.ranks[trigram.key]?.let { abs(it - rank) } ?: PROFILE_LENGTH
+                        }
+                    profile.code to (1.0 - distance.toDouble() / (sample.size * PROFILE_LENGTH))
+                }.sortedByDescending { it.second }
         if (scores.size < 2) return null
         val (code, best) = scores[0]
         val runnerUp = scores[1].second
