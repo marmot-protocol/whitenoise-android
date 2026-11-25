@@ -512,8 +512,7 @@ internal fun ComposerPill(
         try {
             clipboardManager.withPrimaryClipForPaste { clip ->
                 // Text only; image receive-content and attachment import keep their own routes.
-                val pastedText =
-                    if (clip.description.hasMimeType("text/*")) clip.plainText(context) else null
+                val pastedText = if (clip.description.hasMimeType("text/*")) clip.plainText(context) else null
                 if (!pastedText.isNullOrEmpty()) {
                     val value = latestReadAcceptedValue()
                     val start = value.selection.min.coerceIn(0, value.text.length)
@@ -534,8 +533,7 @@ internal fun ComposerPill(
         }
     }
     val pasteFromClipboard: () -> Unit = { tryPasteFromClipboard() }
-    val caretFollowSuspended =
-        readingScrollAnchor?.matches(textFieldValue) == true
+    val caretFollowSuspended = readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
         // A mismatched anchor is retired for good, not merely dormant: an edit
         // that later restores the identical (text, selection) pair — type a
@@ -610,6 +608,9 @@ internal fun ComposerPill(
                     .toDp()
             } * 6,
         )
+    // While recording hides input, end shortcuts are neither drawn nor announced, like the leading actions.
+    val hiddenWithInput =
+        if (recordingContent != null && !inputContentVisible) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier
     // Recording replaces the hidden toolbar, but retains its idle row floor. The strip separately
     // reserves the full live Stop/Cancel width. Group allocation and hidden row counts use the same
     // idle width so neither the fit threshold nor wrapping can add height for invisible shortcuts.
@@ -654,8 +655,7 @@ internal fun ComposerPill(
     val groupRoom =
         (navigationSurfaceWidth - toolbarGeometryPrimaryWidth - minimumDictationWidth - ComposerToolbarGutter)
             .coerceAtLeast(ComposerShortcutPitch)
-    val defaultFocusOnLeadingToolbar =
-        leadingToolbar?.shortcuts?.any { it.takesDefaultFocus } == true
+    val defaultFocusOnLeadingToolbar = leadingToolbar?.shortcuts?.any { it.takesDefaultFocus } == true
     val leadingCount = leadingToolbar?.shortcuts?.size ?: 0
     val trailingCount = trailingToolbar?.shortcuts?.size ?: 0
     // The end group hugs Send with exactly its own columns; the start group takes the spare width.
@@ -692,8 +692,7 @@ internal fun ComposerPill(
         } else {
             ComposerToolbarSlotWidth * (if (hasAttachmentAction) 3 else 2) + sendingIdentityWidth + 8.dp
         }
-    val compactEditorStartInset =
-        leadingControlsWidth
+    val compactEditorStartInset = leadingControlsWidth
     val navigationRoom =
         navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - toolbarGeometryPrimaryWidth -
             minimumDictationWidth - sendAccessoryWidth
@@ -1892,6 +1891,7 @@ internal fun ComposerPill(
                                     checkNotNull(trailingToolbar),
                                     rightConfiguredWidth,
                                     toolbarHeight,
+                                    modifier = hiddenWithInput,
                                     singleRowOverflow = multilineControlsSuppressed,
                                     endAligned = true,
                                     defaultFocus = defaultActionFocus.takeUnless { defaultFocusOnLeadingToolbar },

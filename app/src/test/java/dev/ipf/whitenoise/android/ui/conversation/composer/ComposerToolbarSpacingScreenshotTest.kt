@@ -125,6 +125,16 @@ class ComposerToolbarSpacingScreenshotTest {
             ),
         )
 
+    /**
+     * At 240dp with a 2x font, 48dp shortcut slots reach under Stop and Cancel; recording hides them from sight and
+     * from accessibility, so no shortcut shows through beside Cancel.
+     */
+    @Test fun lockedVoice240RtlLargeHidesShortcuts() {
+        render(ToolbarCase("locked240_rtl_large", 240, rtl = true, fontScale = 2f, locked = true))
+        composeRule.onNodeWithContentDescription("Open emoji picker").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Cancel voice message").assertIsDisplayed()
+    }
+
     /** Locking retains an inline composer and the configured physical voice edge in either direction. */
     @Test fun lockedSingleLtrLeft() = recordingTransition("single_ltr_left", false, ComposerShortcutSide.Left)
 
