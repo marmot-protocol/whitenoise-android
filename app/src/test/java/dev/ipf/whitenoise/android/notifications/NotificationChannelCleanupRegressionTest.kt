@@ -296,6 +296,36 @@ class NotificationChannelCleanupRegressionTest {
         assertNotNull(manager.getNotificationChannel(retained))
     }
 
+    /**
+     * Sign-out saves its capture before native revocation. If the process dies after native sign-out commits
+     * but before Android cleanup, startup retention with another signer present deletes the departed account's
+     * upgrade-era channels, which have no shortcut, earlier record or vibration preference. While the account
+     * is still retained, as after a sign-out that never committed, its channels stay.
+     */
+    @Test
+    fun restartBetweenNativeSignOutAndChannelCleanupDeletesTheCapturedChannels() {
+        val departedId = checkNotNull(conversationShortcutId("account-a", "group-restart"))
+        val departedReactionId = checkNotNull(reactionConversationShortcutId("account-a", "group-restart"))
+        val departed = convChannel(NotificationChannelSpec.GROUP_MESSAGES, departedId, "Restart Secret", doublePattern)
+        val departedReaction = convChannel(NotificationChannelSpec.REACTIONS, departedReactionId, "Restart Reaction")
+        val retainedId = checkNotNull(conversationShortcutId("account-b", "group-restart"))
+        val retained =
+            convChannel(NotificationChannelSpec.GROUP_MESSAGES, retainedId, "Retained B", accountRef = "account-b")
+
+        assertTrue(recordDepartingConversationChannelOwners(context, "account-a", setOf("group-restart")))
+        assertTrue(retainConversationChannelOwners(context, listOf("account-a", "account-b")))
+        assertNotNull(manager.getNotificationChannel(departed))
+
+        // The process died before Android cleanup: startup sees account-a gone and account-b still signed in.
+        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+
+        assertNull(manager.getNotificationChannel(departed))
+        assertNull(manager.getNotificationChannel(departedReaction))
+        assertNoChannelContainsText("Restart Secret", "Restart Reaction")
+        assertNotNull(manager.getNotificationChannel(retained))
+        assertFalse(ownerPrefs().contains(sha256Hex("account-a")))
+    }
+
     /** Returns the hashed conversation-channel owner store cleanup reads and writes. */
     private fun ownerPrefs(): SharedPreferences {
         val name = "whitenoise.conversation_channel_owners"

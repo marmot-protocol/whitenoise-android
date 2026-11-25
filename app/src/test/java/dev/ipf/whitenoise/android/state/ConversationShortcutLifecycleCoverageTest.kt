@@ -163,12 +163,42 @@ class ConversationShortcutLifecycleCoverageTest {
     fun signOutCaptureIncludesPendingLocalDeleteJournalGroups() {
         val capture =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt")
-                .functionBody("captureAccountKnownGroupIds")
+                .functionBody("readAccountKnownGroupIds")
 
         assertTrue(
             "captureAccountKnownGroupIds must read the departing account's pending local-delete journal groups",
             "localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef)" in capture,
         )
+    }
+
+    /**
+     * The capture is saved to the owner store before native sign-out or wipe commits, so a process death
+     * before Android cleanup still leaves account-refresh retention a record of the departed channels.
+     */
+    @Test
+    fun signOutCaptureIsSavedBeforeNativeRevocation() {
+        val capture =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt")
+                .functionBody("captureAccountKnownGroupIds")
+        val appState = appStateSource().readText()
+
+        assertTrue(
+            "captureAccountKnownGroupIds must save the departing account's channel owners",
+            "recordDepartingConversationChannelOwners(appContext, accountRef, groupIds)" in capture,
+        )
+        assertCapturedBefore(appState.functionBody("revokeAndFinishSignOutLocked"), "withRevokedPinnedTarget(")
+        assertCapturedBefore(appState.functionBody("finishRevokedAccountWipe"), "signOutAndWipe(wipedRef)")
+    }
+
+    /** Asserts [body] captures the departing account's groups before [nativeCall]. */
+    private fun assertCapturedBefore(
+        body: String,
+        nativeCall: String,
+    ) {
+        val captureAt = body.indexOf("captureAccountKnownGroupIds(")
+        val nativeAt = body.indexOf(nativeCall)
+        assertTrue("expected the capture and $nativeCall", captureAt >= 0 && nativeAt >= 0)
+        assertTrue("the capture must be saved before $nativeCall", captureAt < nativeAt)
     }
 
     /** Local conversation deletion must delete the conversation's `:conv:` notification channels */

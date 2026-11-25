@@ -9,6 +9,22 @@ import androidx.core.content.pm.ShortcutManagerCompat
 private const val SHA256_HEX_LENGTH = 64
 
 /**
+ * Records the departing [accountRef]'s conversation channels for [groupIds] before native sign-out or
+ * wipe commits. If the process dies before Android cleanup runs, [retainConversationChannelOwners] still
+ * finds the departed account's record and deletes its upgrade-era channels, which have no shortcut or
+ * earlier record. A sign-out that never commits leaves accurate links for an account that still owns them.
+ * Returns false when the record could not be saved.
+ */
+internal fun recordDepartingConversationChannelOwners(
+    context: Context,
+    accountRef: String,
+    groupIds: Collection<String>,
+): Boolean {
+    val shortcutIds = groupChannelShortcutIds(accountRef, groupIds).mapTo(HashSet(), ::canonicalConversationShortcutId)
+    return recordConversationChannelOwners(context, accountRef, shortcutIds)
+}
+
+/**
  * Retains conversation-channel owner records only for [retainedAccountRefs], retrying channel cleanup for
  * departed accounts before removing their owner records. It also deletes contact channels whose account hash
  * belongs to no retained account, and the channels and then shortcuts of departed accounts that sign-out left

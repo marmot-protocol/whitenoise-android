@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -115,9 +116,19 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
  * Captures the departing account's known group ids before native sign-out or wipe revokes them,
  * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
  * another account remains signed in. Pending local-delete journal groups are included, since journal
- * replay no longer runs for an account once it has signed out.
+ * replay no longer runs for an account once it has signed out. The capture is saved to the channel owner
+ * store before returning, so a process death before Android cleanup cannot lose it.
  */
-internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: String): Set<String> =
+internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: String): Set<String> {
+    val groupIds = readAccountKnownGroupIds(accountRef)
+    val recorded =
+        withContext(Dispatchers.IO) { recordDepartingConversationChannelOwners(appContext, accountRef, groupIds) }
+    if (!recorded) appStateDebug { "sign-out channel capture could not be saved for a restart" }
+    return groupIds
+}
+
+/** Reads every group id the account's channels may be named after, logging reads that fail. */
+private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): Set<String> =
     buildSet {
         // A failed read here cannot be retried after revocation; log it so a lingering channel is traceable.
         runCatchingCancellable {

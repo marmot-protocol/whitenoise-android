@@ -61,18 +61,25 @@ internal fun recordConversationChannelOwner(
     accountRef: String?,
     conversationShortcutId: String,
 ) {
-    val ownerKey = channelOwnerAccountHash(accountRef)
-    if (ownerKey == null || !isConversationShortcutId(conversationShortcutId)) return
-    synchronized(UserEventNotificationGroup.mutationLock) {
+    recordConversationChannelOwners(context, accountRef, listOf(conversationShortcutId))
+}
+
+/** Adds [conversationShortcutIds] to [accountRef]'s owner record, returning false when it could not be saved. */
+internal fun recordConversationChannelOwners(
+    context: Context,
+    accountRef: String?,
+    conversationShortcutIds: Collection<String>,
+): Boolean {
+    val ownerKey = channelOwnerAccountHash(accountRef) ?: return false
+    val shortcutIds = conversationShortcutIds.filter(::isConversationShortcutId)
+    return synchronized(UserEventNotificationGroup.mutationLock) {
         runCatching {
             val appContext = context.applicationContext
             val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
             val owned = prefs.getStringSet(ownerKey, emptySet()).orEmpty()
-            // Every routed post lands here, so skip the synchronous commit once the link is stored.
-            if (conversationShortcutId !in owned) {
-                prefs.edit().putStringSet(ownerKey, owned + conversationShortcutId).commit()
-            }
-        }
+            // Every routed post lands here, so skip the synchronous commit once the links are stored.
+            owned.containsAll(shortcutIds) || prefs.edit().putStringSet(ownerKey, owned + shortcutIds).commit()
+        }.getOrDefault(false)
     }
 }
 
