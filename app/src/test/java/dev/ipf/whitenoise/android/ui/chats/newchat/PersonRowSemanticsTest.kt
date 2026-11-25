@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class ContactRowSemanticsTest {
+class PersonRowSemanticsTest {
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -38,7 +38,7 @@ class ContactRowSemanticsTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    ContactRow(
+                    PersonRow(
                         title = "Alice",
                         subtitle = followedLabel,
                         avatarSeed = "alice",
@@ -77,7 +77,7 @@ class ContactRowSemanticsTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    ContactRow(
+                    PersonRow(
                         title = "Grace",
                         subtitle = searchResultLabel,
                         avatarSeed = "grace",

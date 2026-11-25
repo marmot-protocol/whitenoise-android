@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,33 +7,23 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
@@ -44,15 +32,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.collectionItemInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
  * Searchable list of people or chats in a sheet. With [onSelect] and [multiple] each row toggles a checkbox; with
@@ -137,12 +121,13 @@ fun WhiteNoiseEntityPickerSheet(
                     ),
             ) {
                 if (visible.isEmpty()) {
-                    item { Text(stringResource(R.string.no_results), Modifier.padding(WhiteNoiseSpacing.Related)) }
+                    item { WhiteNoiseEmptyState(stringResource(R.string.no_matches)) }
                 }
                 itemsIndexed(visible, key = { _, item -> item.id }) { index, item ->
                     PickerRow(
                         item = item,
                         index = index,
+                        count = visible.size,
                         checked = item.id in selectedIds,
                         multiple = multiple,
                         onSelect =
@@ -173,6 +158,7 @@ fun WhiteNoiseEntityPickerSheet(
 private fun PickerRow(
     item: WhiteNoisePickerItem,
     index: Int,
+    count: Int,
     checked: Boolean,
     multiple: Boolean,
     onSelect: ((String) -> Unit)?,
@@ -190,7 +176,9 @@ private fun PickerRow(
                 )
             else -> Modifier.toggleable(value = false, enabled = item.enabled, role = Role.Button) { onSelect(item.id) }
         }
-    ContactRow(
+    PersonRow(
+        index = index,
+        count = count,
         title = item.title,
         subtitle = null,
         avatarSeed = item.avatarSeed,
@@ -213,99 +201,6 @@ private fun PickerRow(
     )
 }
 
-/**
- * Shared compact search. Empty trailing actions, IME options and accessibility labels remain caller-owned;
- * existing entity pickers retain their defaults, while Chats supplies native voice entry and its clear label.
- * The leading search glyph can be swapped, for example for a back action that leaves the search.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
-@Composable
-fun WhiteNoiseCompactSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    emptyTrailingIcon: (@Composable () -> Unit)? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-    clearDescription: String = stringResource(R.string.clear_search),
-    outlined: Boolean = false,
-    keyboardActions: KeyboardActions = KeyboardActions.Default,
-    onClear: (() -> Unit)? = null,
-    leadingIcon: @Composable () -> Unit = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val outline =
-        if (outlined) {
-            amoledOutlineBorder()
-        } else {
-            null
-        }
-    val fieldColors =
-        TextFieldDefaults.colors(
-            focusedContainerColor = containerColor,
-            unfocusedContainerColor = containerColor,
-            disabledContainerColor = containerColor,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-        )
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.heightIn(min = SearchFieldMinHeight),
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        singleLine = true,
-        interactionSource = interactionSource,
-        decorationBox = { innerTextField ->
-            TextFieldDefaults.DecorationBox(
-                value = value,
-                innerTextField = innerTextField,
-                enabled = true,
-                singleLine = true,
-                visualTransformation = VisualTransformation.None,
-                interactionSource = interactionSource,
-                placeholder = { Text(text = placeholder, maxLines = 1) },
-                leadingIcon = leadingIcon,
-                trailingIcon =
-                    if (value.isNotEmpty()) {
-                        {
-                            IconButton(onClick = { onClear?.invoke() ?: onValueChange("") }) {
-                                Icon(painterResource(R.drawable.ic_close), clearDescription)
-                            }
-                        }
-                    } else {
-                        emptyTrailingIcon
-                    },
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = fieldColors,
-                contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(top = 0.dp, bottom = 0.dp),
-                container = {
-                    TextFieldDefaults.Container(
-                        modifier =
-                            if (outline != null) {
-                                Modifier.border(outline, MaterialTheme.shapes.extraLarge)
-                            } else {
-                                Modifier
-                            },
-                        enabled = true,
-                        isError = false,
-                        interactionSource = interactionSource,
-                        colors = fieldColors,
-                        shape = MaterialTheme.shapes.extraLarge,
-                        focusedIndicatorLineThickness = 0.dp,
-                        unfocusedIndicatorLineThickness = 0.dp,
-                    )
-                },
-            )
-        },
-    )
-}
-
 /** One selectable entity: a stable id, its display title and an avatar identity. */
 data class WhiteNoisePickerItem(
     val id: String,
@@ -316,4 +211,3 @@ data class WhiteNoisePickerItem(
 )
 
 private const val SHEET_HEIGHT_SHARE = 0.88f
-private val SearchFieldMinHeight = 48.dp

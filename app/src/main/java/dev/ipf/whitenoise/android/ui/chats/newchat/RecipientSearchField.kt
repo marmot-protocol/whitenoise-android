@@ -8,16 +8,10 @@ import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -25,22 +19,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientPasteDecision
 import dev.ipf.whitenoise.android.core.RecipientPastePolicy
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
-import dev.ipf.whitenoise.android.ui.theme.Radii
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
  * Recipient-only search field that validates explicit clipboard input before it can reach search.
@@ -57,7 +47,6 @@ internal fun RecipientSearchField(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onScanQr: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(Radii.xxl),
     enabled: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -88,45 +77,37 @@ internal fun RecipientSearchField(
             }
         }
 
-    TextField(
+    WhiteNoiseCompactSearchField(
         state = state,
+        placeholder = placeholder,
         enabled = enabled,
-        placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-        trailingIcon = {
+        outlined = true,
+        keyboardOptions = RecipientSearchKeyboardOptions,
+        onClear = { state.replaceRecipientText("") },
+        emptyTrailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                when {
-                    state.text.isNotEmpty() -> {
-                        IconButton(onClick = { state.replaceRecipientText("") }, enabled = enabled) {
-                            Icon(
-                                painterResource(R.drawable.ic_close),
-                                contentDescription = stringResource(R.string.clear),
-                            )
-                        }
-                    }
-                    canOfferPaste -> {
-                        SystemPasteIconButton(
-                            enabled = enabled,
-                            onPaste = {
-                                clipboardManager.withPrimaryClipForPaste { clip ->
-                                    dispatchRecipientPaste(
-                                        state = state,
-                                        items = clip.directRecipientPasteItems(),
-                                        platformHandlesPassThrough = false,
-                                        isValidNpub = isValidNpub,
-                                        onRejected = onPasteRejected,
-                                    )
-                                }
-                            },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_content_paste),
-                                contentDescription = stringResource(R.string.paste),
-                            )
-                        }
+                if (canOfferPaste) {
+                    SystemPasteIconButton(
+                        enabled = enabled,
+                        onPaste = {
+                            clipboardManager.withPrimaryClipForPaste { clip ->
+                                dispatchRecipientPaste(
+                                    state = state,
+                                    items = clip.directRecipientPasteItems(),
+                                    platformHandlesPassThrough = false,
+                                    isValidNpub = isValidNpub,
+                                    onRejected = onPasteRejected,
+                                )
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_content_paste),
+                            contentDescription = stringResource(R.string.paste),
+                        )
                     }
                 }
-                if (state.text.isEmpty() && onScanQr != null) {
+                if (onScanQr != null) {
                     IconButton(onClick = onScanQr, enabled = enabled) {
                         Icon(
                             painterResource(R.drawable.ic_qr_code_scanner),
@@ -136,30 +117,21 @@ internal fun RecipientSearchField(
                 }
             }
         },
-        lineLimits = TextFieldLineLimits.SingleLine,
-        shape = shape,
-        colors =
-            TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
-        keyboardOptions =
-            KeyboardOptions(
-                capitalization = KeyboardCapitalization.None,
-                autoCorrectEnabled = false,
-                imeAction = ImeAction.Search,
-            ),
         modifier =
             modifier
                 .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
                 .contentReceiver(receiver)
-                .fillMaxWidth()
-                .amoledSurfaceBorder(shape),
+                .fillMaxWidth(),
     )
 }
+
+/** Identity-friendly IME options shared by every people search field. */
+internal val RecipientSearchKeyboardOptions =
+    KeyboardOptions(
+        capitalization = KeyboardCapitalization.None,
+        autoCorrectEnabled = false,
+        imeAction = ImeAction.Search,
+    )
 
 /**
  * Returns only clipboard-owned text or the literal URI string. It deliberately never calls

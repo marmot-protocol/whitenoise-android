@@ -4,25 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Custom emoji authored labels: ChatFlowComponents",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "ComingSoonBadge",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
         "anchor": "fun ComingSoonBadge(",
-        "test_ids": [
-          "NCH-001"
-        ]
-      },
-      {
-        "surface": "ContactRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "fun ContactRow(",
         "test_ids": [
           "NCH-001"
         ]
@@ -91,15 +75,6 @@
         "test_ids": [
           "NCH-001"
         ]
-      },
-      {
-        "surface": "ContactRow public-key copy label",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "PublicKeyCopyText(",
-        "test_ids": [
-          "NCH-001",
-          "ACC-002"
-        ]
       }
     ],
     "settings_controls": [
@@ -139,14 +114,6 @@
         "surface": "string:scan_qr_code",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
         "anchor": "R.string.scan_qr_code",
-        "test_ids": [
-          "NCH-001"
-        ]
-      },
-      {
-        "surface": "string:user_search_you_follow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
-        "anchor": "R.string.user_search_you_follow",
         "test_ids": [
           "NCH-001"
         ]

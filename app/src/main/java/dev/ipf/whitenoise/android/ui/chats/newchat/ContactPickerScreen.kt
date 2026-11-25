@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
@@ -346,7 +347,7 @@ internal fun ContactPickerScreen(
                             rememberMeasuredControlClick { origin ->
                                 appState.presentProfile(candidate.npub, origin = origin)
                             }
-                        ContactRow(
+                        PersonRow(
                             modifier = profileModifier,
                             title = candidate.displayName,
                             subtitle =
@@ -377,7 +378,7 @@ internal fun ContactPickerScreen(
                         if (userSearch.isSearching) {
                             UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
                         } else {
-                            Text(
+                            WhiteNoiseEmptyState(
                                 stringResource(
                                     when {
                                         query.isBlank() -> R.string.recipient_search_empty_hint
@@ -386,15 +387,12 @@ internal fun ContactPickerScreen(
                                         else -> R.string.no_matches
                                     },
                                 ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
                             )
                         }
                     }
                 } else {
                     item { SectionHeader(stringResource(R.string.contacts)) }
-                    items(matches, key = { it.accountIdHex }) { candidate ->
+                    itemsIndexed(matches, key = { _, it -> it.accountIdHex }) { index, candidate ->
                         val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
                         val subtitleIsKey =
                             !addressQuery && !candidate.isFollowing && candidate.searchProfile == null
@@ -412,8 +410,10 @@ internal fun ContactPickerScreen(
                                     appState.presentProfile(candidate.npub, origin = origin)
                                 }
                             }
-                        ContactRow(
+                        PersonRow(
                             modifier = profileModifier,
+                            index = index,
+                            count = matches.size,
                             title = candidate.displayName,
                             subtitle =
                                 when {

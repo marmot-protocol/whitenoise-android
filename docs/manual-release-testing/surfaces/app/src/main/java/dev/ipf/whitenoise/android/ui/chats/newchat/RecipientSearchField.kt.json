@@ -1,0 +1,44 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientSearchField.kt",
+  "legacy_sha256": "f472d5b055e6f67fd68c358bcc94e56da90927619ed3cc4e8103c5f2271b9e0b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RecipientSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientSearchField.kt",
+        "anchor": "fun RecipientSearchField(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientSearchField.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientSearchField.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

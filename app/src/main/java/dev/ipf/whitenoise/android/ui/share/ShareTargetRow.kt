@@ -9,7 +9,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
@@ -18,6 +18,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersP
 /** One share destination; a DM's stored peer picture animates like any other profile picture. */
 @Composable
 internal fun ShareTargetRow(
+    index: Int,
+    count: Int,
     item: ChatListItem,
     title: String,
     selected: Boolean,
@@ -51,7 +53,9 @@ internal fun ShareTargetRow(
                 appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)
             }
         }
-    ContactRow(
+    PersonRow(
+        index = index,
+        count = count,
         title = title,
         subtitle = membersPreview,
         avatarSeed = avatarAccount ?: item.group.groupIdHex,

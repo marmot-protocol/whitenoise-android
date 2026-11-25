@@ -30,7 +30,7 @@ import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
 import dev.ipf.whitenoise.android.ui.chats.CHAT_ROW_AVATAR_SIZE
 import dev.ipf.whitenoise.android.ui.chats.ChatRowAvatarMarkers
 import dev.ipf.whitenoise.android.ui.chats.ChatRowLayout
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.FOLLOWED_PERSON_BADGE_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.FollowedPeople
@@ -169,14 +169,14 @@ class FollowedPersonAvatarScreenshotTest {
                 Text("Sender you do not follow", Modifier.padding(12.dp))
             }
         }
-        ContactRow(
+        PersonRow(
             title = "Grace Hopper",
             subtitle = "Admin",
             avatarSeed = GRACE,
             avatarUrl = null,
             followedAccount = GRACE,
         )
-        ContactRow(
+        PersonRow(
             title = "You",
             subtitle = "Member",
             avatarSeed = OWN,
@@ -195,7 +195,7 @@ class FollowedPersonAvatarScreenshotTest {
                 followedAccount = ADA,
             )
         }
-        ContactRow(
+        PersonRow(
             title = "Ada Lovelace",
             subtitle = "Member",
             avatarSeed = ADA,

@@ -3707,15 +3707,6 @@
         ]
       },
       {
-        "surface": "NewGroupRecipientSearchField",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientSearchField.kt",
-        "anchor": "fun NewGroupRecipientSearchField(",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "GroupCreationBottomAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "fun GroupCreationBottomAction(",
@@ -14169,42 +14160,6 @@
         "surface": "setting:user_search_you_follow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
         "anchor": "R.string.user_search_you_follow",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:clear",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientSearchField.kt",
-        "anchor": "R.string.clear",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:paste",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientSearchField.kt",
-        "anchor": "R.string.paste",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:scan_qr_code",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientSearchField.kt",
-        "anchor": "R.string.scan_qr_code",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:search_people_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientSearchField.kt",
-        "anchor": "R.string.search_people_hint",
         "test_ids": [
           "NCH-002",
           "ACC-017"

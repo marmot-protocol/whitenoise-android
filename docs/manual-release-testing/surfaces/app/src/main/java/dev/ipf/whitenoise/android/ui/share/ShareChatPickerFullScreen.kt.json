@@ -138,6 +138,17 @@
           "SET-051"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "SYS-001",
+          "PRO-008"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

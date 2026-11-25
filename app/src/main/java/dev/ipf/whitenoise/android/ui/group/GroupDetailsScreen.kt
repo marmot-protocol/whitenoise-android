@@ -111,12 +111,12 @@ import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorCallout
@@ -1319,7 +1319,7 @@ internal fun GroupDetailsScreen(
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {
                 // Keep the member header, identities, pending invitations and the
-                // full-roster action in one contiguous primary section. ContactRow
+                // full-roster action in one contiguous primary section. PersonRow
                 // already provides Material touch heights and internal padding.
                 Column(Modifier.testTag("chat_info.members")) {
                     if (!rosterReady) {
@@ -1499,7 +1499,8 @@ internal fun GroupDetailsScreen(
                                     nativeKey = member.memberIdHex,
                                     modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
                                 ) {
-                                    ContactRow(
+                                    PersonRow(
+                                        segmented = false,
                                         title = memberTitle,
                                         subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
                                         publicKey = profileNpub.takeIf { titleIsKey },

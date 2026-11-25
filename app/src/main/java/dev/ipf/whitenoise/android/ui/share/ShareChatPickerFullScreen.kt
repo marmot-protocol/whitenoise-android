@@ -14,11 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -61,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -395,20 +395,22 @@ private fun ShareChatPickerTargetList(
                             DestinationFilterIncomplete(pickerState::retryLoad)
                             return@item
                         }
-                        val emptyLabel =
-                            if (pickerState.targets.isEmpty()) R.string.share_no_chats else R.string.share_no_matches
-                        Text(
-                            stringResource(emptyLabel),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                        )
+                        if (pickerState.targets.isEmpty()) {
+                            WhiteNoiseEmptyState(stringResource(R.string.share_no_chats))
+                        } else {
+                            WhiteNoiseEmptyState(
+                                stringResource(R.string.no_matches),
+                                stringResource(R.string.share_no_matches),
+                            )
+                        }
                     }
                 }
             } else {
                 item { SectionHeader(stringResource(R.string.recent_chats)) }
-                items(filteredTargets, key = { it.item.group.groupIdHex }) { target ->
+                itemsIndexed(filteredTargets, key = { _, it -> it.item.group.groupIdHex }) { index, target ->
                     ShareTargetRow(
+                        index = index,
+                        count = filteredTargets.size,
                         item = target.item,
                         title = target.title,
                         selected = pickerState.selected.contains(target.item.group.groupIdHex),

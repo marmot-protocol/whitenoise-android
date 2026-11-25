@@ -23,7 +23,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
 import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
@@ -74,7 +74,8 @@ internal fun PendingGroupInviteRow(
     npub: String = "",
 ) {
     var expanded by rememberSaveable(npub) { mutableStateOf(false) }
-    ContactRow(
+    PersonRow(
+        segmented = false,
         title = title,
         subtitle = subtitle.takeUnless { expanded },
         avatarSeed = avatarSeed,

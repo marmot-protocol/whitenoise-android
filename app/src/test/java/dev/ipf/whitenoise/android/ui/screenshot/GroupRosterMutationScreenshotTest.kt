@@ -11,7 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMutationStatus
 import dev.ipf.whitenoise.android.ui.group.PendingGroupInviteRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -44,7 +44,7 @@ class GroupRosterMutationScreenshotTest {
                             avatarUrl = null,
                             onClick = {},
                         )
-                        ContactRow(
+                        PersonRow(
                             title = "Grace Hopper",
                             subtitle = "npub1grace…9k2m",
                             avatarSeed = "grace",
@@ -53,7 +53,7 @@ class GroupRosterMutationScreenshotTest {
                                 GroupMemberMutationStatus(isAdmin = true, inProgress = true)
                             },
                         )
-                        ContactRow(
+                        PersonRow(
                             title = "Linus Torvalds",
                             subtitle = "npub1linus…7p3v",
                             avatarSeed = "linus",

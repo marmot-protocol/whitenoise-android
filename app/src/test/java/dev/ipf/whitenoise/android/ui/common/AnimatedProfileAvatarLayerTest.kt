@@ -32,7 +32,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.twoFrameGif
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -300,7 +300,7 @@ class AnimatedProfileAvatarLayerTest {
         lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
         composeRule.setContent {
             Harness {
-                ContactRow(
+                PersonRow(
                     title = "Peer",
                     subtitle = null,
                     avatarSeed = "peer",

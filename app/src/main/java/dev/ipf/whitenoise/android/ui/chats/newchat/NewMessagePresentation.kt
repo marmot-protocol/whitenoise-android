@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -15,40 +14,26 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
-import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.FollowedPersonBadge
-import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
-import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.LocalMeasuredPenDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -58,8 +43,8 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /** Display-only projection; the candidate retains native identity and direct-chat provenance. */
 internal data class NewMessagePerson(
@@ -131,7 +116,6 @@ internal fun NewMessageContent(
                     onPasteRejected = actions.pasteRejected,
                     isValidNpub = isValidNpub,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_message.searchField"),
-                    shape = MaterialTheme.shapes.extraLarge,
                     enabled = !busy,
                 )
             }
@@ -249,64 +233,32 @@ internal fun NewMessagePersonRow(
     val (personModifier, personClick) = rememberMeasuredControlClick(onClick)
     val (profileModifier, profileClick) = rememberMeasuredControlClick(onLongClick)
     val candidate = person.candidate
-    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
-    val subtitle = person.subtitle?.takeUnless { titleIsKey && abbreviatesPublicKey(it, candidate.npub) }
-    val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
-    val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
-    Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
-        ListItem(
-            onClick = personClick,
-            onLongClick = profileClick,
-            enabled = enabled,
-            shapes = shapes,
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .amoledSurfaceBorder(shapes.shape)
-                    .then(personModifier)
-                    .then(profileModifier)
-                    .testTag("creation.person.${candidate.accountIdHex}")
-                    .semantics { role = Role.Button }
-                    .recipientRelationshipSemantics(followed, null),
-            leadingContent = {
-                Box(Modifier.size(48.dp)) {
-                    Avatar(
-                        candidate.displayName,
-                        candidate.accountIdHex,
-                        size = 48.dp,
-                        pictureUrl = person.avatarUrl,
-                        pictureDomain = AvatarImageLoader.publicProfiles(),
-                    )
-                    if (candidate.isFollowing) FollowedPersonBadge(Modifier.align(Alignment.BottomEnd))
-                }
+    val key = personKeyPlacement(candidate.displayName, person.subtitle, candidate.npub)
+    PersonRow(
+        title = candidate.displayName,
+        subtitle = key.subtitle,
+        avatarSeed = candidate.accountIdHex,
+        avatarUrl = person.avatarUrl,
+        modifier =
+            personModifier
+                .then(profileModifier)
+                .testTag("creation.person.${candidate.accountIdHex}"),
+        index = index,
+        count = count,
+        isFollowed = candidate.isFollowing,
+        enabled = enabled,
+        onClick = personClick,
+        onLongClick = profileClick,
+        publicKey = key.publicKey,
+        publicKeyInTitle = key.inTitle,
+        trailing =
+            if (creating) {
+                { CircularProgressIndicator(Modifier.size(WhiteNoiseSizes.ProgressInline), strokeWidth = WhiteNoiseSizes.ProgressInlineStroke) }
+            } else {
+                null
             },
-            supportingContent =
-                subtitle?.let { label ->
-                    {
-                        if (abbreviatesPublicKey(label, candidate.npub)) {
-                            PublicKeyCopyText(label, candidate.npub, enabled = enabled)
-                        } else {
-                            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                },
-            trailingContent =
-                if (creating) {
-                    { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) }
-                } else {
-                    null
-                },
-            content = {
-                if (titleIsKey) {
-                    PublicKeyCopyText(candidate.displayName, candidate.npub, enabled = enabled)
-                } else {
-                    EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            },
-        )
-        if (index < count - 1) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
-    }
+        avatarDomain = AvatarImageLoader.publicProfiles(),
+    )
 }
 
 /** Search status remains truthful when native discovery is partial; local rows stay available. */

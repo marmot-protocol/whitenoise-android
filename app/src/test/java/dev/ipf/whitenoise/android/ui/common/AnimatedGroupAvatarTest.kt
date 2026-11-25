@@ -167,7 +167,7 @@ class AnimatedGroupAvatarTest {
         var reads = 0
         composeRule.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides TestOwner()) {
-                dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow(
+                dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow(
                     title = "Group",
                     subtitle = null,
                     avatarSeed = "group",

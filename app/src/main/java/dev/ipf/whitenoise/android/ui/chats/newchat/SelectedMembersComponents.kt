@@ -256,7 +256,7 @@ internal fun SelectedMembersReviewScreen(
                 // Only an abbreviation of this member's own key is a key title; a name starting npub1 stays a name.
                 val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
                 Column(Modifier.fillMaxWidth()) {
-                    ContactRow(
+                    PersonRow(
                         title = memberName,
                         subtitle =
                             appState.shortNpub(member.accountIdHex).takeIf {
