@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 
 /** Writes public [text] to the clipboard without any feedback; false when the system refuses the clip. */
 internal fun copyToClipboard(
@@ -27,17 +29,25 @@ internal fun copyToClipboard(
 internal class ClipboardCopier(
     private val context: Context,
     private val confirmCopied: () -> Unit,
+    private val reportNotCopied: () -> Unit,
 ) {
-    /** Copies [text]; returns whether the clip was written. Only a written clip is confirmed. */
+    /** Copies [text]; true when the clip was written and confirmed, false when refused and Not copied was shown. */
     fun copy(
         text: String,
         label: String = "plain text",
-    ): Boolean = copyToClipboard(context, label, text).also { if (it) confirmCopied() }
+    ): Boolean = copyToClipboard(context, label, text).also { if (it) confirmCopied() else reportNotCopied() }
 }
 
+/**
+ * Returns the shared [ClipboardCopier] for public text, the composable way to copy anything that is not a secret.
+ * Secrets use [copySensitiveToClipboard] instead.
+ */
 @Composable
 internal fun rememberClipboardCopier(): ClipboardCopier {
     val context = LocalContext.current
     val confirmCopied = rememberCopyConfirmation()
-    return remember(context, confirmCopied) { ClipboardCopier(context, confirmCopied) }
+    val reportNotCopied = rememberTransientNoticeOf(R.string.not_copied, TransientNoticeKind.Information)
+    return remember(context, confirmCopied, reportNotCopied) {
+        ClipboardCopier(context, confirmCopied, reportNotCopied)
+    }
 }

@@ -52,6 +52,24 @@ class SensitiveClipboardCoverageTest {
         assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PUBLIC_COPY).functionBody("copyToClipboard"))
     }
 
+    /**
+     * Regression guard for #4151: public text is copied through [ClipboardCopier]. The files listed here still write
+     * directly; each is owned by a follow-up and leaves the list when it moves to the copier.
+     */
+    @Test
+    fun onlyAllowlistedFilesWriteTheClipboardDirectly() {
+        val root = appModuleFile("src/main/java")
+        val direct = Regex("""LocalClipboardManager|setClipEntry|setPrimaryClip|\bLocalClipboard\b""")
+        val writers =
+            root
+                .walkTopDown()
+                .filter { it.extension == "kt" && direct.containsMatchIn(it.motionOwnerSource()) }
+                .map { it.relativeTo(root).invariantSeparatorsPath.removePrefix("dev/ipf/whitenoise/android/ui/") }
+                .sorted()
+                .toList()
+        assertEquals(DIRECT_WRITERS, writers)
+    }
+
     /** Pairs each block-bodied function name with its body; expression bodies cannot hold two statements. */
     private fun blockFunctions(source: String): Sequence<Pair<String, String>> =
         FUNCTION.findAll(source).mapNotNull { match ->
@@ -69,6 +87,17 @@ class SensitiveClipboardCoverageTest {
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
         const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/CopyToClipboard.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
+        val DIRECT_WRITERS =
+            listOf(
+                "common/Clipboard.kt",
+                "common/CopyToClipboard.kt",
+                "common/PublicKeyCopy.kt",
+                "common/StartupScreens.kt",
+                "common/StateScreens.kt",
+                "conversation/messages/MessageBubble.kt",
+                "conversation/messages/MessageTextSelection.kt",
+                "group/GroupDetailsHeader.kt",
+            )
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }
 }

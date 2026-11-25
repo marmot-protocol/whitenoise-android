@@ -106,7 +106,7 @@ class MessageBubbleActionsConfirmedTargetTest {
                         displayedBody = "Original",
                         messageTextCopy = TEXT_COPY,
                         localReactionMotion = LocalReactionMotion(),
-                        clipboard = ClipboardCopier(RuntimeEnvironment.getApplication()) {},
+                        clipboard = ClipboardCopier(RuntimeEnvironment.getApplication(), {}, {}),
                         onActionMenuOpenChange = {},
                         onForwardMenuHandoff = {},
                     ),

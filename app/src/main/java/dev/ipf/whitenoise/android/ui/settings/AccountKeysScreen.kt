@@ -329,8 +329,7 @@ internal fun AccountKeysScreen(
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
-                copyToClipboard(context, publicKeyLabel, npub)
-                ui.copiedKey = CopiedProfileKey.Public
+                if (copyToClipboard(context, publicKeyLabel, npub)) ui.copiedKey = CopiedProfileKey.Public
             },
             onToggleReveal = {
                 if (ui.revealRequested) {
