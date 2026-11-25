@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
@@ -105,6 +106,27 @@ class AccountSetupPinnedActionsTest {
         assertEquals("Reconnect is the filled primary", primary, containerPixel("setup-action-RECONNECT_SIGNER"))
         assertEquals(
             "Remove must be outlined, showing the bar behind it, not a second filled action",
+            backgroundBeside("setup-remove-relay"),
+            containerPixel("setup-remove-relay"),
+        )
+    }
+
+    /** A failure disables Remove relay, so it turns outlined and Resume becomes the one filled action. */
+    @Test fun failureBesideRetiredRelayFillsResumeNotDisabledRemoval() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.EDIT_RELAYS))
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                setupFinding(
+                    OnboardingIssueFfi.RETIRED_RELAY,
+                    "wss://retired.example",
+                    actions = listOf(OnboardingActionFfi.EDIT_RELAYS),
+                ),
+            )
+        show(AccountSetupState(snapshot = snapshot, error = true))
+        pinned("setup-remove-relay").assertIsNotEnabled()
+        assertEquals("Resume is the filled way forward", primary, containerPixel("setup-resume-checks"))
+        assertEquals(
+            "Disabled Remove must be outlined, showing the bar behind it",
             backgroundBeside("setup-remove-relay"),
             containerPixel("setup-remove-relay"),
         )

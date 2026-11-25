@@ -78,8 +78,15 @@ internal fun SetupPinnedActions(
     onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
 ) {
     val surface = state.setupSurface()
-    val decisionActions = surface == SetupSurface.Decision && state.pinsDecisionActions
-    if (surface != SetupSurface.Editor) SetupResumeAction(state, primary = !decisionActions, onReconnect)
+    // Exactly one enabled action is filled. A failure disables Remove relay, so Resume takes the fill from it.
+    val offeredPrimary =
+        surface == SetupSurface.Decision &&
+            state.offersDecisionActions &&
+            state.decisionButtons().any { (_, primary) -> primary }
+    val removalPrimary = surface == SetupSurface.Decision && !offeredPrimary && state.directRemovalEnabled
+    if (surface != SetupSurface.Editor) {
+        SetupResumeAction(state, primary = !offeredPrimary && !removalPrimary, onReconnect)
+    }
     when (surface) {
         SetupSurface.Editor -> {
             val editor = checkNotNull(state.editor)
@@ -103,8 +110,7 @@ internal fun SetupPinnedActions(
             ) { Text(stringResource(R.string.setup_open_chats)) }
         SetupSurface.Progress -> Unit
         SetupSurface.Decision -> {
-            val offeredPrimary = state.offersDecisionActions && state.decisionButtons().any { (_, primary) -> primary }
-            SetupDirectRelayRemovalAction(state, primary = !offeredPrimary, onRemoveRelay)
+            SetupDirectRelayRemovalAction(state, primary = removalPrimary, onRemoveRelay)
             if (state.offersDecisionActions) SetupActionButtons(state, onAction, onEdit)
         }
     }
@@ -158,9 +164,21 @@ private fun SetupResumeAction(
 internal val AccountSetupState.showsSetupFailure: Boolean
     get() = error || (disconnected && snapshot?.ready != true) || staleDecision
 
+/** Direct removal is offered for one exact relay and can act only while setup is idle and connected. */
+private val AccountSetupState.directRemovalEnabled: Boolean
+    get() =
+        snapshot != null &&
+            currentStep != null &&
+            directRemovalEndpoint() != null &&
+            !busy &&
+            !error &&
+            !disconnected &&
+            !staleDecision
+
 /**
  * Removes the single exact endpoint named above; native review follows before anything is published. It is filled
- * only when no offered action is the decision's filled primary, such as Reconnect signer after a lost connection.
+ * only while it can act and no offered action is the decision's filled primary, such as Reconnect signer after a
+ * lost connection. A failure leaves it outlined and disabled, so Resume checks is the filled way forward.
  */
 @Composable
 private fun SetupDirectRelayRemovalAction(
@@ -175,7 +193,7 @@ private fun SetupDirectRelayRemovalAction(
     val revision = snapshot.revision
     val recoveryEpoch = snapshot.recoveryEpoch
     val onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) }
-    val enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision
+    val enabled = state.directRemovalEnabled
     val modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay")
     val content: @Composable () -> Unit = {
         Icon(painterResource(R.drawable.ic_delete), null)
