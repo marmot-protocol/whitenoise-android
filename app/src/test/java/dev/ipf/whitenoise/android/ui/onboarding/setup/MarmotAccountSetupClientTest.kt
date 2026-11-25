@@ -131,10 +131,11 @@ class MarmotAccountSetupClientTest {
             val marmot = nativeBoundary(failed) { name, _ -> calls += name }
             val client = MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}
 
-            val result = client.retryFailedCheck(request) {
-                assertTrue(Thread.currentThread() !== caller)
-                false
-            }
+            val result =
+                client.retryFailedCheck(request) {
+                    assertTrue(Thread.currentThread() !== caller)
+                    false
+                }
             assertEquals(failed, result)
             assertEquals(listOf("onboardingSnapshot"), calls)
             calls.clear()
