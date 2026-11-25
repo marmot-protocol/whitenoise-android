@@ -299,19 +299,6 @@
         ]
       },
       {
-        "surface": "string:retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
-        "anchor": "R.string.retry",
-        "test_ids": [
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
         "surface": "string:stored_audit_logs",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
         "anchor": "R.string.stored_audit_logs",
@@ -328,19 +315,6 @@
         "surface": "string:toast_couldnt_export_audit_logs",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
         "anchor": "R.string.toast_couldnt_export_audit_logs",
-        "test_ids": [
-          "SEC-007",
-          "SEC-008",
-          "SEC-009",
-          "SEC-010",
-          "SEC-012",
-          "SEC-013"
-        ]
-      },
-      {
-        "surface": "string:usage_diagnostics_error",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
-        "anchor": "R.string.usage_diagnostics_error",
         "test_ids": [
           "SEC-007",
           "SEC-008",

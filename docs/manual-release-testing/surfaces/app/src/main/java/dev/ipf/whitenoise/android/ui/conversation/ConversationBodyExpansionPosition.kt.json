@@ -1,0 +1,24 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBodyExpansionPosition.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Expanding a long message keeps the preview near the viewport and cancels a pending reply or search jump",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBodyExpansionPosition.kt",
+        "anchor": "fun preserveReadingPositionOnExpansion(",
+        "test_ids": [
+          "MSG-026"
+        ]
+      },
+      {
+        "surface": "Message collapse retires deferred foreground correction before viewport settlement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBodyExpansionPosition.kt",
+        "anchor": "fun preserveReadingPositionOnCollapse(",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  }
+}

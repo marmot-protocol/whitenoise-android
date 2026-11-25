@@ -3,17 +3,11 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,7 +20,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -36,11 +29,16 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.theme.Radii
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.common.ErrorCallout
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * The reviewed target of a local abandonment, captured when its confirmation opens so the acting account and the
@@ -48,7 +46,6 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
  */
 internal data class GroupAbandonmentTarget(
     val accountRef: String,
-    val accountName: String,
     val groupIdHex: String,
     val conversationTitle: String,
     val isDm: Boolean,
@@ -171,9 +168,9 @@ internal fun GroupAbandonmentDialog(
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    appState: WhiteNoiseAppState,
     error: ErrorPresentation? = null,
-    identity: (@Composable () -> Unit)? = null,
-) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, error, identity)
+) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, appState, error)
 
 /**
  * The same confirmation for the chat list's bulk action: every reviewed chat of the one acting account, captured
@@ -186,14 +183,14 @@ internal fun GroupAbandonmentDialog(
     targets: List<GroupAbandonmentTarget>,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    identity: (@Composable () -> Unit)? = null,
+    appState: WhiteNoiseAppState,
     confirmEnabled: Boolean = true,
 ) = GroupAbandonmentReviewDialog(
     targets,
     GroupAbandonmentStatus.Review,
     onConfirm,
     onDismiss,
-    identity = identity,
+    appState,
     confirmEnabled = confirmEnabled,
 )
 
@@ -205,12 +202,15 @@ internal fun GroupAbandonmentReviewDialog(
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    appState: WhiteNoiseAppState,
     error: ErrorPresentation? = null,
-    identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
 ) {
     val running = status == GroupAbandonmentStatus.Running
     val failed = status == GroupAbandonmentStatus.Failed
+    val report = error?.report.takeIf { failed }
+    val actionPadding = if (report == null) ButtonDefaults.TextButtonContentPadding else RecoveryActionPadding
+    val clipboard = LocalClipboardManager.current
     val anyDm = targets.any { it.isDm }
     val titleRes =
         when {
@@ -226,24 +226,40 @@ internal fun GroupAbandonmentReviewDialog(
             anyDm -> R.string.delete_group_confirm
             else -> R.string.group_reset_confirm
         }
-    ConfirmDialog(
-        onDismiss = onDismiss,
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
         modifier = Modifier.testTag("group.abandon.dialog"),
-        title = stringResource(titleRes),
-        message = null,
-        identity = { GroupAbandonmentBody(targets, failed, error, identity) },
+        title = { Text(stringResource(titleRes)) },
+        text = { GroupAbandonmentBody(targets, failed, error, appState) },
         icon = if (running) ({ CircularProgressIndicator() }) else null,
-        confirmLabel = stringResource(confirmLabel),
-        // Failure keeps the dialog open so the same button can retry.
-        onConfirm = onConfirm,
-        closeOnConfirm = false,
-        confirmEnabled = !running && confirmEnabled,
-        destructive = true,
-        dismissLabel = stringResource(if (failed) R.string.close else R.string.cancel),
-        confirmTag = "group.abandon.confirm",
-        cancelTag = "group.abandon.cancel",
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !running && confirmEnabled,
+                modifier = Modifier.testTag("group.abandon.confirm"),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                contentPadding = actionPadding,
+            ) { Text(stringResource(confirmLabel)) }
+        },
+        dismissButton = {
+            if (report != null) {
+                TextButton(
+                    onClick = { clipboard.setText(AnnotatedString(report)) },
+                    modifier = Modifier.testTag("group.abandon.error.copy"),
+                    contentPadding = actionPadding,
+                ) { Text(stringResource(R.string.copy)) }
+            }
+            TextButton(
+                onClick = dismiss,
+                modifier = Modifier.testTag("group.abandon.cancel"),
+                contentPadding = actionPadding,
+            ) { Text(stringResource(if (failed) R.string.close else R.string.cancel)) }
+        },
     )
 }
+
+/** Standard inner spacing lets the three recovery actions fit a narrow dialog. Material still handles wrapping. */
+private val RecoveryActionPadding = PaddingValues(horizontal = 4.dp, vertical = WhiteNoiseSpacing.Related)
 
 /** Identities first, then the consequences for each kind of chat, then any failure, scrolling as one block. */
 @Suppress("FunctionNaming")
@@ -252,21 +268,23 @@ private fun GroupAbandonmentBody(
     targets: List<GroupAbandonmentTarget>,
     failed: Boolean,
     error: ErrorPresentation?,
-    identity: (@Composable () -> Unit)?,
+    appState: WhiteNoiseAppState,
 ) {
-    val style = MaterialTheme.typography.bodyMedium
+    val style = MaterialTheme.typography.titleSmall
     val color = MaterialTheme.colorScheme.onSurface
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.testTag("group.abandon.identity"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            targets.forEach { target ->
-                val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
-                Text(stringResource(identity, target.conversationTitle), style = style, color = color)
+    Column(
+        Modifier.fadingVerticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.testTag("group.abandon.identity")) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                targets.forEach { target ->
+                    val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
+                    EmojiLabel(stringResource(identity, target.conversationTitle), style = style, color = color)
+                }
             }
-            targets.firstOrNull()?.let { first ->
-                Text(stringResource(R.string.abandon_identity_account, first.accountName), style = style, color = color)
-            }
+            targets.firstOrNull()?.let { GroupActingAccountIdentity(appState, it.accountRef, showRole = true) }
         }
-        identity?.invoke()
         if (targets.any { it.isDm }) Text(stringResource(R.string.chat_abandon_dialog_message))
         if (targets.any { !it.isDm }) Text(stringResource(R.string.group_reset_dialog_message))
         if (failed) GroupAbandonmentFailure(targets.all { it.isDm }, error)
@@ -275,7 +293,7 @@ private fun GroupAbandonmentBody(
 
 /**
  * A readable, announced failure. The journal keeps any committed cleanup, so a retry never replays the forget. With
- * an [error], its selectable detail and a Copy action for the privacy-safe report stay inside the dialog.
+ * an [error], its selectable detail stays in the body. The footer keeps the privacy-safe report accessible.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -283,46 +301,15 @@ private fun GroupAbandonmentFailure(
     isDm: Boolean,
     error: ErrorPresentation?,
 ) {
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(Radii.md),
-        border = amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth().testTag("group.abandon.error"),
-    ) {
-        Row(
-            Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite },
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(R.drawable.ic_error), contentDescription = null)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
-                Text(stringResource(summary), style = MaterialTheme.typography.bodySmall)
-                if (error != null) {
-                    SelectionContainer(Modifier.testTag("group.abandon.error.detail")) {
-                        Text(
-                            stringResource(R.string.latest_group_error, error.message.resolve(context)),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-            if (error != null) {
-                IconButton(
-                    onClick = { clipboard.setText(AnnotatedString(error.report)) },
-                    modifier = Modifier.testTag("group.abandon.error.copy"),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_content_copy),
-                        contentDescription = stringResource(R.string.copy),
-                    )
-                }
-            }
-        }
-    }
+    val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
+    ErrorCallout(
+        title = stringResource(summary),
+        message = error?.let { stringResource(R.string.latest_group_error, it.message.resolve(context)) },
+        report = null,
+        modifier = Modifier.testTag("group.abandon.error").semantics { liveRegion = LiveRegionMode.Polite },
+        messageModifier = Modifier.testTag("group.abandon.error.detail"),
+    )
 }
 
 /**
@@ -337,21 +324,16 @@ internal fun GroupLeaveBlockedNotice(
     onAbandon: () -> Unit,
 ) {
     val hint = if (isDm) R.string.leave_blocked_abandon_hint_dm else R.string.leave_blocked_abandon_hint_group
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(Radii.md),
-        border = amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth().testTag("chat_info.leave_blocked"),
+    WhiteNoiseCallout(
+        text = stringResource(hint),
+        modifier = Modifier.testTag("chat_info.leave_blocked"),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
-            TextButton(
-                onClick = onAbandon,
-                enabled = enabled,
-                modifier = Modifier.align(Alignment.End).testTag("chat_info.leave_blocked.abandon"),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
-        }
+        TextButton(
+            onClick = onAbandon,
+            enabled = enabled,
+            modifier = Modifier.align(Alignment.End).testTag("chat_info.leave_blocked.abandon"),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
     }
 }
 

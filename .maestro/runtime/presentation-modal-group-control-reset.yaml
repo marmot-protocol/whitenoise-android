@@ -5,26 +5,24 @@ name: presentation-modal-group-control-reset
 - tapOn:
     text: Reset and wait for a new invite
 - assertVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - assertVisible:
-    text: White Noise erases this group’s history and encryption state on this device
-      only\. Nothing is sent to the group\. You’ll rejoin only when an admin sends
-      a new invite created after this reset\.
+    text: Clears this group’s history and encryption state on this device\. Nothing is sent\. To rejoin, you’ll need a new invite created by an admin after the reset\.
 - tapOn:
     text: Cancel
 - assertNotVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - tapOn:
     text: Reset and wait for a new invite
 - assertVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - back
 - assertNotVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - tapOn:
     text: Reset and wait for a new invite
 - assertVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - tapOn:
     id: group.abandon.confirm
 - assertVisible:

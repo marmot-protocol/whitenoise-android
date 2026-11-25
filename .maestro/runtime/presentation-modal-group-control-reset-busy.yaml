@@ -3,7 +3,7 @@ name: presentation-modal-group-control-reset-busy
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertNotVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - assertNotVisible:
     text: Delete group\?
 - assertVisible:
@@ -13,7 +13,7 @@ name: presentation-modal-group-control-reset-busy
 - tapOn:
     text: Reset and wait for a new invite
 - assertNotVisible:
-    text: Reset this group on this device\?
+    text: Reset this group\?
 - tapOn:
     text: Finish group control check
 - assertVisible:
