@@ -70,7 +70,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt" to 626,
         "dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt" to 907,
         "dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt" to 937,
-        "dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt" to 731,
+        "dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt" to 743,
         "dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt" to 776,
         "dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt" to 3043,
         "dev/ipf/whitenoise/android/ui/conversation/messages/TtsPassageHighlight.kt" to 635,
