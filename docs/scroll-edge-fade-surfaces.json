@@ -923,6 +923,22 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "Scroll the abandonment identities, consequences and failure while Cancel, Copy and the destructive action stay reachable at large text sizes.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "GRP-010",
+        "GRP-033"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -2085,7 +2101,7 @@
         "fadingVerticalScroll": 1
       },
       "family": "common",
-      "policy": "Scroll the message and body slot (abandonment identities, consequences and failure, the sole-admin explanation) while Cancel and the confirm action stay reachable at large text sizes.",
+      "policy": "Scroll the message and body slot (the sole-admin explanation and other confirmation bodies) while Cancel and the confirm action stay reachable at large text sizes.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
