@@ -266,6 +266,16 @@ class FcmAutoInitIncompleteChangeTest {
 
                 assertTrue("the rollback must have been cancelled", job.isCancelled)
                 assertTrue("the next sync must reconcile the account", store.nativePushRegistrationSyncPending())
+                // This fake commits the rollback's `false`, so the follow-up sync finds no Push demand.
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                cancelOnRollback.set(false)
+                platform.autoInitWrites.clear()
+
+                assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+
+                assertFalse(ACCOUNT_A in fixture.upsertedPushRegistrations)
+                assertFalse("no account needs Push, so the marker clears", store.nativePushRegistrationSyncPending())
+                assertFalse(true in platform.autoInitWrites)
             } finally {
                 cancelOnRollback.set(false)
                 fixture.close()
