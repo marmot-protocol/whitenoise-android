@@ -5,7 +5,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +42,8 @@ internal fun TtsTransportRatePicker(
     val controlDescription = stringResource(R.string.tts_bar_rate_control, rateLabel)
 
     Box {
-        TextButton(
+        PlaybackSpeedChip(
+            label = rateLabel,
             onClick = { menuOpen = true },
             modifier =
                 Modifier.semantics {
@@ -51,9 +51,7 @@ internal fun TtsTransportRatePicker(
                     role = Role.Button
                     stateDescription = rateLabel
                 },
-        ) {
-            Text(rateLabel)
-        }
+        )
         val menuScrollState = rememberScrollState()
         AnimatedDropdownMenu(
             scrollState = menuScrollState,

@@ -1,36 +1,22 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextDirection
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.matchesPlaybackSession
@@ -88,12 +74,12 @@ internal fun PlaybackTransportBar(
 }
 
 /**
- * Stateless voice transport laid out like the read-aloud strip (#3381): a horizontally scrollable control row with
- * 10-second seeks around a tonal play/pause, the clip speed and stop, then the bounded source label, elapsed time and
- * progress. The source label returns to the message; every control is a separate accessible action.
+ * Stateless voice transport on the shared [PlaybackStrip]: play/pause, the source title over elapsed and total
+ * time, 10-second seeks, the clip speed and stop, with the progress line as the strip's bottom edge. Any tap
+ * outside a control returns to the message; every control is a separate accessible action.
  */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun VoiceTransportBarContent(
     state: VoicePlaybackController.PlaybackState,
     onPlayingChange: (Boolean) -> Unit,
@@ -102,47 +88,19 @@ internal fun VoiceTransportBarContent(
     onCycleSpeed: () -> Unit,
     onBodyClick: (() -> Unit)? = null,
 ) {
-    Surface(
-        Modifier.fillMaxWidth().testTag("voice-transport"),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                IconButton(onClick = { onSeekBy(-VOICE_TRANSPORT_SEEK_MS) }, enabled = state.ready) {
-                    Icon(Icons.Default.Replay10, stringResource(R.string.video_seek_back))
-                }
-                FilledTonalIconButton(onClick = { onPlayingChange(!state.isPlaying) }, enabled = state.ready) {
-                    Icon(
-                        painterResource(if (state.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                        stringResource(
-                            if (state.isPlaying) R.string.voice_message_pause else R.string.voice_message_play,
-                        ),
-                    )
-                }
-                IconButton(onClick = { onSeekBy(VOICE_TRANSPORT_SEEK_MS) }, enabled = state.ready) {
-                    Icon(Icons.Default.Forward10, stringResource(R.string.video_seek_forward))
-                }
-                val speedLabel = voiceSpeedLabel(state.speed)
-                val speedDescription = stringResource(R.string.voice_message_speed, speedLabel)
-                TextButton(
-                    onClick = onCycleSpeed,
-                    enabled = state.ready,
-                    modifier =
-                        Modifier.semantics {
-                            contentDescription = speedDescription
-                            stateDescription = speedLabel
-                        },
-                ) {
-                    Text(speedLabel)
-                }
-                IconButton(onClick = onStop) {
-                    Icon(painterResource(R.drawable.ic_stop), stringResource(R.string.tts_playback_action_stop))
-                }
-            }
+    PlaybackStrip(
+        progress = { state.positionMs.toFloat() / state.durationMs.coerceAtLeast(1) },
+        modifier = Modifier.testTag("voice-transport"),
+        leading = {
+            PlaybackStripPlayButton(
+                playing = state.isPlaying,
+                contentDescription =
+                    stringResource(if (state.isPlaying) R.string.voice_message_pause else R.string.voice_message_play),
+                onClick = { onPlayingChange(!state.isPlaying) },
+                enabled = state.ready,
+            )
+        },
+        info = {
             val sourceModifier =
                 if (onBodyClick == null) {
                     Modifier
@@ -153,31 +111,40 @@ internal fun VoiceTransportBarContent(
                         onClick = onBodyClick,
                     )
                 }
-            Row(
-                Modifier.fillMaxWidth().then(sourceModifier).padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            PlaybackStripInfo(
+                title = state.source?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.reply_media_voice),
+                modifier = sourceModifier,
             ) {
                 Text(
-                    state.source?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.reply_media_voice),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
                     "${formatVoiceTime(state.positionMs)} / ${formatVoiceTime(state.durationMs)}",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Ltr),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
-            LinearProgressIndicator(
-                progress = { (state.positionMs.toFloat() / state.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f) },
-                drawStopIndicator = {},
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        },
+        actions = {
+            IconButton(onClick = { onSeekBy(-VOICE_TRANSPORT_SEEK_MS) }, enabled = state.ready) {
+                Icon(Icons.Default.Replay10, stringResource(R.string.video_seek_back))
+            }
+            IconButton(onClick = { onSeekBy(VOICE_TRANSPORT_SEEK_MS) }, enabled = state.ready) {
+                Icon(Icons.Default.Forward10, stringResource(R.string.video_seek_forward))
+            }
+            val speedLabel = voiceSpeedLabel(state.speed)
+            val speedDescription = stringResource(R.string.voice_message_speed, speedLabel)
+            PlaybackSpeedChip(
+                label = speedLabel,
+                onClick = onCycleSpeed,
+                enabled = state.ready,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = speedDescription
+                        stateDescription = speedLabel
+                    },
             )
-        }
-    }
+            PlaybackStripCloseButton(stringResource(R.string.tts_playback_action_stop), onStop)
+        },
+    )
 }
 
 /** Static design preview uses the same stateless renderer as the live shell. */

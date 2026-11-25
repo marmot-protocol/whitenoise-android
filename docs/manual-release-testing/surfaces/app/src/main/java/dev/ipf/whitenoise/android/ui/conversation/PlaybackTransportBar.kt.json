@@ -38,14 +38,6 @@
         ]
       },
       {
-        "surface": "R.string.tts_bar_return_to_source",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
-        "anchor": "R.string.tts_bar_return_to_source",
-        "test_ids": [
-          "MED-028"
-        ]
-      },
-      {
         "surface": "R.string.tts_playback_action_stop",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
         "anchor": "R.string.tts_playback_action_stop",
