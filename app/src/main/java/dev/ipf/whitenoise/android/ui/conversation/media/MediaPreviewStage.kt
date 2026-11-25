@@ -393,7 +393,14 @@ private fun MediaPreviewThumb(
                 .testTag("conversation.media.thumbnail.target"),
         contentAlignment = Alignment.Center,
     ) {
-        val thumbModifier =
+        val bitmap =
+            (item as? StagedPreviewItem.Media)?.let { media ->
+                metadata?.let {
+                    rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, media.pick, prepared)
+                }
+            }
+        // One rounded thumbnail draws the press highlight over whichever content it shows.
+        Box(
             Modifier
                 .size(FILMSTRIP_THUMB)
                 .then(
@@ -402,31 +409,27 @@ private fun MediaPreviewThumb(
                     } else {
                         Modifier
                     },
-                ).shapedPressFeedback(press, MaterialTheme.shapes.small)
-        val bitmap =
-            (item as? StagedPreviewItem.Media)?.let { media ->
-                metadata?.let {
-                    rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, media.pick, prepared)
-                }
-            }
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
-                contentScale = ContentScale.Crop,
-                modifier = thumbModifier,
-            )
-        } else {
-            Box(
-                modifier = thumbModifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_description),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onBackground,
+                ).shapedPressFeedback(press, MaterialTheme.shapes.small),
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_description),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
             }
         }
     }
