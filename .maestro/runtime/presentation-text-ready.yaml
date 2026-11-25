@@ -4,6 +4,6 @@ name: presentation-text-ready
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible: Maestro complete filename.txt
 - assertVisible: Maestro document first line.*
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

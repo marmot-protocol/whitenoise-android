@@ -10,11 +10,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -34,7 +32,7 @@ internal fun ErrorCallout(
     onDismiss: (() -> Unit)? = null,
     messageModifier: Modifier = Modifier,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     WhiteNoiseCallout(
         modifier = modifier,
         title = title,
@@ -49,7 +47,7 @@ internal fun ErrorCallout(
                     if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
                     if (report != null) {
                         IconButton(
-                            onClick = { clipboard.setText(AnnotatedString(report)) },
+                            onClick = { clipboard.copy(report) },
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_content_copy),

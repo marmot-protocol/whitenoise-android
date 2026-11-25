@@ -37,14 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -61,7 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
-import dev.ipf.whitenoise.android.ui.common.rememberCopyConfirmation
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -245,8 +243,7 @@ internal fun SettingsExplainer(
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsVersionFooter(versionName: String) {
-    val clipboard = LocalClipboardManager.current
-    val confirmCopied = rememberCopyConfirmation()
+    val clipboard = rememberClipboardCopier()
     val copyLabel = stringResource(R.string.copy)
     Box(
         modifier =
@@ -254,17 +251,14 @@ internal fun SettingsVersionFooter(versionName: String) {
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .clickable(role = Role.Button, onClickLabel = copyLabel) {
-                    clipboard.setText(
-                        AnnotatedString(
-                            buildIdentity(
-                                versionName,
-                                BuildConfig.VERSION_CODE,
-                                AppRevision.FULL_SHA,
-                                AppRevision.SOURCE_PR,
-                            ),
+                    clipboard.copy(
+                        buildIdentity(
+                            versionName,
+                            BuildConfig.VERSION_CODE,
+                            AppRevision.FULL_SHA,
+                            AppRevision.SOURCE_PR,
                         ),
                     )
-                    confirmCopied()
                 }.padding(WhiteNoiseSpacing.CompactScreenMargin)
                 .testTag("settings.version_footer"),
         contentAlignment = Alignment.Center,

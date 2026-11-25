@@ -15,10 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
@@ -51,6 +49,7 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.account.startingAccount
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
@@ -352,7 +351,7 @@ private fun NewMessageAccountScreen(
         if (creatingHex != null || !session.isCurrent()) scannerSession = null
     }
     LaunchedEffect(query) { startChatError = null }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val context = LocalContext.current
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
@@ -751,7 +750,7 @@ private fun NewMessageAccountScreen(
                         }
                     },
                     profile = ::presentPerson,
-                    copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
+                    copyError = { if (canInteract()) clipboard.copy(it) },
                 ),
         )
     }

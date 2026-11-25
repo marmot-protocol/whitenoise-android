@@ -59,6 +59,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
+/** PDF pages rendered on demand under a white page counter on the reader's black canvas, with a retryable failure. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun PdfDocumentPages(

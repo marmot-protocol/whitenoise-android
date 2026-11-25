@@ -1,0 +1,75 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AttachmentViewerChrome",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "fun AttachmentViewerChrome(",
+        "test_ids": [
+          "MED-006",
+          "MED-010",
+          "MED-015",
+          "MED-056",
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "AttachmentViewerCloseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "fun AttachmentViewerCloseButton(",
+        "test_ids": [
+          "MED-010",
+          "MED-056",
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "AttachmentViewerTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "fun AttachmentViewerTitle(",
+        "test_ids": [
+          "MED-006",
+          "MED-015",
+          "MED-056"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-010",
+          "MED-056",
+          "RDR-001",
+          "RDR-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Viewer chrome over edge-to-edge media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "fun overlayColor()",
+        "test_ids": [
+          "MED-015",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "Chrome over media passes taps through",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
+        "anchor": "passTouchesThrough",
+        "test_ids": [
+          "RDR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

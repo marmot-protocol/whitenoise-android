@@ -20,12 +20,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -62,10 +59,10 @@ import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
-import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -104,7 +101,7 @@ internal fun messageDetailsRecipients(
 
 /**
  * The prototype's Message Details page: the message on its own card, the facts table, reactions and the
- * delivery list, presented full screen with Back like the reader.
+ * delivery list, presented full screen under the shared top bar with a Back arrow, as a pushed detail page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongParameterList")
@@ -140,36 +137,18 @@ internal fun MessageDetailsScreen(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Scaffold(
+        WhiteNoiseScaffold(
             modifier = Modifier.fillMaxSize().testTag(MESSAGE_DETAILS_TAG),
             contentWindowInsets = WindowInsets.safeDrawing,
             containerColor = MaterialTheme.colorScheme.surface,
-            topBar = {
-                // App banners sit below this screen's bar rather than over it (#3312).
-                Column {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.message_details)) },
-                        navigationIcon = {
-                            IconButton(onClick = dismiss) {
-                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-                            }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                    )
-                    TopNoticeSlot()
-                }
-            },
+            topBar = { WhiteNoiseTopBar(title = stringResource(R.string.message_details), onBack = dismiss) },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .fadingVerticalScroll(rememberScrollState())
+                            .whiteNoiseVerticalScroll(rememberScrollState())
                             .padding(WhiteNoiseSpacing.CompactScreenMargin)
                             .testTag(MESSAGE_DETAILS_LIST_TAG),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),

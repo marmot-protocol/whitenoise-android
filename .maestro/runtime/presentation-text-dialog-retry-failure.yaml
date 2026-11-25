@@ -9,6 +9,6 @@ name: presentation-text-dialog-retry-failure
 - tapOn: Retry
 - assertVisible:
     text: Couldn’t download this file.*
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete
