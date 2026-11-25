@@ -79,8 +79,10 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
         } finally {
             // Once the fallback has moved every account off native push, Firebase must stop refreshing a
             // token. A cancelled fallback may already have committed a native disable, so this always runs.
+            // A storage failure here must not replace the fallback's own result or cancellation.
             withContext(NonCancellable) {
-                if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+                val demand = runCatching { nativePushDemand(accountRefs) }.getOrNull()
+                if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)
             }
         }
     }

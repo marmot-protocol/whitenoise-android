@@ -107,11 +107,9 @@ class FcmAutoInitCoverageTest {
 
         assertTrue("the fallback must run before the settle", fallback in 0 until settle)
         assertTrue(sync.substring(fallback, settle).contains("} finally {"))
-        assertTrue(
-            sync.substring(settle).contains(
-                "if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)",
-            ),
-        )
+        val afterSettle = sync.substring(settle)
+        assertTrue(afterSettle.contains("runCatching { nativePushDemand(accountRefs) }"))
+        assertTrue(afterSettle.contains("if (demand == NativePushDemand.None) applyFcmAutoInit(enabled = false)"))
     }
 
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
