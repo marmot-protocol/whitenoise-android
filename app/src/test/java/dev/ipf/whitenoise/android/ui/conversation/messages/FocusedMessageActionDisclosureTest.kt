@@ -10,11 +10,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -93,6 +95,46 @@ class FocusedMessageActionDisclosureTest {
         rule.onNodeWithText("Select").assertDoesNotExist()
         rule.onNodeWithText("More actions").assertExists()
         assertEquals(0, dismissals)
+    }
+
+    /** A cell still fading out after Fewer actions takes no taps and is gone from accessibility at once. */
+    @Test
+    fun aFadingHiddenActionCannotBeActivated() {
+        render(first = listOf("Reply"), more = listOf("Select", "Delete"))
+        rule.onNodeWithText("More actions").performClick()
+        rule.waitForIdle()
+        val deleteCenter =
+            rule
+                .onNodeWithText("Delete")
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val replyTopLeft =
+            rule
+                .onNodeWithText("Reply")
+                .fetchSemanticsNode()
+                .boundsInRoot.topLeft
+
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithText("Fewer actions").performClick()
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithText("Delete").assertDoesNotExist()
+        // Touch through a first-level node of the same popup, at where Delete still fades.
+        rule.onNodeWithText("Reply").performTouchInput { click(deleteCenter - replyTopLeft) }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+
+        assertEquals("a fading action does nothing", emptyList<String>(), clicks)
+        assertEquals(0, dismissals)
+    }
+
+    /** Without actions the grid takes no room rather than a negative height. */
+    @Test
+    fun anEmptyMenuLaysOut() {
+        render(first = emptyList(), more = emptyList())
+
+        rule.onNodeWithTag(FOCUSED_ACTION_DISCLOSURE_TEST_TAG).assertDoesNotExist()
+        rule.onNodeWithText("The lifted message", useUnmergedTree = true).assertExists()
     }
 
     @Test

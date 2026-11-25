@@ -103,13 +103,6 @@ internal fun messageActionMenuOrder(kinds: List<MessageActionKind>): List<Messag
         firstLevelMessageActionKinds.indexOf(kind).takeIf { it >= 0 } ?: firstLevelMessageActionKinds.size
     }
 
-/** The actions the menu shows: all of them when [showAll] or no disclosure is needed, else the first level. */
-internal fun <T> visibleMessageActions(
-    actions: List<T>,
-    firstLevel: (T) -> Boolean,
-    showAll: Boolean,
-): List<T> = if (showAll || !hasMoreMessageActions(actions, firstLevel)) actions else actions.filter(firstLevel)
-
 /**
  * Whether [actions] need a More actions disclosure: at least one first-level action to show without
  * it, and at least two to hide behind it, since a disclosure for one action takes that action's room.

@@ -98,14 +98,6 @@ class MessageActionKindsTest {
             receivedMedia.filter(::isFirstLevelMessageAction),
         )
         assertTrue(hasMoreMessageActions(receivedMedia + null, ::isFirstLevelMessageAction))
-        assertEquals(
-            receivedMedia.filter(::isFirstLevelMessageAction),
-            visibleMessageActions(receivedMedia + null, ::isFirstLevelMessageAction, showAll = false),
-        )
-        assertEquals(
-            receivedMedia + null,
-            visibleMessageActions(receivedMedia + null, ::isFirstLevelMessageAction, showAll = true),
-        )
     }
 
     /** More actions sits beside the last action when its column can widen for it, and starts a row otherwise. */

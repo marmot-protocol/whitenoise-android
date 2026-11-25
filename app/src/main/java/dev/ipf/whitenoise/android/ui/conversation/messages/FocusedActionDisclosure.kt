@@ -17,6 +17,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -27,11 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -130,7 +134,8 @@ internal class FocusedActionReveal(
                     rowHeights[row] = maxOf(rowHeights[row], cell.height)
                 }
                 val rowTops = rowHeights.runningFold(0) { top, height -> top + height + gap }
-                layout(gridWidth, (rowTops.lastOrNull() ?: gap) - gap) {
+                // An empty grid has no rows, and so no gap to take back below them.
+                layout(gridWidth.coerceAtLeast(0), (rowTops.last() - gap).coerceAtLeast(0)) {
                     placeables.forEachIndexed { index, cell ->
                         val column = slots[index] % columns
                         cell.placeRelative(widths.take(column).sum() + gap * column, rowTops[slots[index] / columns])
@@ -144,14 +149,21 @@ internal class FocusedActionReveal(
     @OptIn(ExperimentalSharedTransitionApi::class)
     fun glide(scope: LookaheadScope): Modifier = Modifier.animateBounds(scope, boundsTransform = boundsTransform)
 
-    /** A hidden action, settling into its slot after the first level; [row] counts from the first hidden row. */
+    /**
+     * A hidden action, settling into its slot after the first level; [row] counts from the first hidden row.
+     *
+     * Once the full set closes, a cell still fading out takes no touches and leaves the accessibility tree,
+     * so a tap on a fading Delete cannot start a delete from the first level.
+     */
     @Composable
     fun Cell(
         visible: Boolean,
         row: Int,
         content: @Composable () -> Unit,
     ) {
-        AnimatedVisibility(visible = visible, enter = cellEnter(row), exit = cellExit) { content() }
+        AnimatedVisibility(visible = visible, enter = cellEnter(row), exit = cellExit) {
+            Box(if (visible) Modifier else LeavingCell, propagateMinConstraints = true) { content() }
+        }
     }
 
     /** The disclosure chevron's turn, in step with the panel. */
@@ -165,6 +177,18 @@ internal class FocusedActionReveal(
         return rotation
     }
 }
+
+/** Swallows every pointer event before the cell's button sees it and hides the cell from accessibility. */
+private val LeavingCell =
+    Modifier
+        .clearAndSetSemantics {}
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            }
+        }
 
 /** The reveal for this composition, honouring the system's animation setting. */
 @Composable
