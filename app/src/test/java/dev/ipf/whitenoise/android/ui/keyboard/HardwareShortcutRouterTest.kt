@@ -269,6 +269,41 @@ class HardwareShortcutRouterTest {
         assertEquals(0, runs)
     }
 
+    /**
+     * A carried command whose waiting owner leaves lapses, unless a replacement owner arrives in the same frame, so a
+     * Chats screen composed again later never runs the old press.
+     */
+    @Test
+    fun carriedCommandLapsesWhenItsLastOwnerLeaves() {
+        var runs = 0
+        val checking = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { false }, { true }) {}
+        val ready = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) { runs++ }
+        val carryNewMessage = {
+            val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+            router.dispatch(HardwareShortcutCommand.NewMessage)
+            removeConversation()
+            runAfterFrame()
+        }
+
+        var removeChecking = router.register(checking)
+        carryNewMessage()
+        removeChecking()
+        val removeReady = router.register(ready)
+        runAfterFrame()
+        router.settleCarried(ready)
+        assertEquals(1, runs)
+
+        removeReady()
+        removeChecking = router.register(checking)
+        carryNewMessage()
+        removeChecking()
+        runAfterFrame()
+        router.register(ready)
+        assertEquals(CarriedFate.None, router.carriedFate(ready))
+        router.settleCarried(ready)
+        assertEquals(1, runs)
+    }
+
     /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */
     @Test
     fun carriedWindowStartsWhenChatsIsUncovered() {

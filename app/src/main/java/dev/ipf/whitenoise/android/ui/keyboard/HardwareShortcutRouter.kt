@@ -142,10 +142,16 @@ internal class HardwareShortcutRouter(
     // Chats screen is still composed for a route transition. An in-place Chats flow covers it too.
     private val chatsCovered: Boolean get() = chatsBlockers > 0 || (!splitPanes() && chatsReturns.isNotEmpty())
 
-    /** Adds [handler] as the newest owner of its command and returns the call that removes it. */
+    /**
+     * Adds [handler] as the newest owner of its command and returns the call that removes it. When the last owner
+     * of a carried command leaves, the command lapses unless another owner arrives in the same frame.
+     */
     fun register(handler: HardwareShortcutHandler): () -> Unit {
         handlers += handler
-        return { handlers.remove(handler) }
+        return {
+            handlers.remove(handler)
+            carried?.takeIf { it.command == handler.command }?.let(lapseWithoutOwnerAfterFrame)
+        }
     }
 
     /**
@@ -162,10 +168,7 @@ internal class HardwareShortcutRouter(
             val uncovered = waiting?.let { CarriedCommand(it.command, uptimeMillis()) }
             if (uncovered != null) {
                 carried = uncovered
-                // Deferred, so an owner composed in the same frame, as when the route change has no motion, counts.
-                afterFrame {
-                    if (carried === uncovered && handlers.none { it.command == uncovered.command }) carried = null
-                }
+                lapseWithoutOwnerAfterFrame(uncovered)
             }
         }
     }
@@ -281,6 +284,16 @@ internal class HardwareShortcutRouter(
                 handlers.any { it.command == command && canRun(it) } || chatsReturnFor(command) != null
             }
         }
+
+    /**
+     * Drops [pending] if, once the current frame is applied, it is still carried and no owner of its command is
+     * registered. Deferred, so an owner composed in the same frame, as when a route change has no motion, counts.
+     */
+    private val lapseWithoutOwnerAfterFrame: (CarriedCommand) -> Unit = { pending ->
+        afterFrame {
+            if (carried === pending && handlers.none { it.command == pending.command }) carried = null
+        }
+    }
 
     /**
      * Whether [handler] may run now: available, and on the side that owns its command. In-chat search needs the
