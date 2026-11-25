@@ -45,7 +45,10 @@ private fun retainLocked(
     // A remaining read-only account owns no conversation channels; a signer that joined since may own
     // unrecorded ones, so a pending sweep waits until no signing account is present.
     val sweepUnowned = !signingAccountRemains && (retainedKeys.isEmpty() || sweepPending)
-    val departedShortcuts = runCatching { departedAccountShortcuts(appContext, retainedScopes, sweepUnowned) }.getOrNull()
+    val departedShortcuts =
+        runCatching {
+            departedAccountShortcuts(appContext, retainedScopes, sweepUnowned)
+        }.getOrNull()
     val departedIds = departedShortcuts.orEmpty().flatMapTo(HashSet()) { channelShortcutIdsFromShortcutId(it.id) }
     val orphansDeleted =
         deleteMatchingNotificationChannels(appContext) { channel ->

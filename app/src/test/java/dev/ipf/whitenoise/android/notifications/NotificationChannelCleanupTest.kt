@@ -393,7 +393,7 @@ class NotificationChannelCleanupTest {
         val untrackedId = checkNotNull(conversationShortcutId("legacy-account", "untracked-group"))
         val untrackedChannel = convChannel(NotificationChannelSpec.GROUP_MESSAGES, untrackedId, "Untracked Legacy Chat")
         assertTrue(retainConversationChannelOwners(context, listOf("new-signer"), signingAccountRemains = true))
-        assertNotNull("a newly joined signer blocks the unowned sweep", manager.getNotificationChannel(untrackedChannel))
+        assertNotNull("a signer blocks the legacy sweep", manager.getNotificationChannel(untrackedChannel))
         assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == legacyId })
 
         val readOnly = listOf("read-only-account")
