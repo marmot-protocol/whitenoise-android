@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -48,6 +49,7 @@ internal fun RecipientSearchField(
     focusRequester: FocusRequester? = null,
     onScanQr: (() -> Unit)? = null,
     enabled: Boolean = true,
+    nativeDestination: String? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager =
@@ -59,6 +61,7 @@ internal fun RecipientSearchField(
     val receiver =
         remember(state) {
             object : ReceiveContentListener {
+                /** Routes pasted clipboard text through the recipient paste policy; other sources pass through. */
                 override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
                     if (transferableContent.source != TransferableContent.Source.Clipboard) {
                         return transferableContent
@@ -122,7 +125,8 @@ internal fun RecipientSearchField(
             modifier
                 .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
                 .contentReceiver(receiver)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .nativeOutlineDestination(nativeDestination, MaterialTheme.shapes.extraLarge),
     )
 }
 

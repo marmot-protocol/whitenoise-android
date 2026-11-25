@@ -27,6 +27,14 @@
         "test_ids": [
           "MSG-037"
         ]
+      },
+      {
+        "surface": "Modifier.nativeOutlineDestination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "fun Modifier.nativeOutlineDestination(",
+        "test_ids": [
+          "NCH-001"
+        ]
       }
     ],
     "settings_controls": [

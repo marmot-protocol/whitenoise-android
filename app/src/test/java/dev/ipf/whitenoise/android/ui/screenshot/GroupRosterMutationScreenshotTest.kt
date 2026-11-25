@@ -45,6 +45,7 @@ class GroupRosterMutationScreenshotTest {
                             onClick = {},
                         )
                         PersonRow(
+                            segmented = false,
                             title = "Grace Hopper",
                             subtitle = "npub1grace…9k2m",
                             avatarSeed = "grace",
@@ -54,6 +55,7 @@ class GroupRosterMutationScreenshotTest {
                             },
                         )
                         PersonRow(
+                            segmented = false,
                             title = "Linus Torvalds",
                             subtitle = "npub1linus…7p3v",
                             avatarSeed = "linus",

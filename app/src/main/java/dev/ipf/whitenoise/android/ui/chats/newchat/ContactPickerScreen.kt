@@ -378,15 +378,16 @@ internal fun ContactPickerScreen(
                         if (userSearch.isSearching) {
                             UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
                         } else {
+                            val detail =
+                                when {
+                                    query.isBlank() -> R.string.recipient_search_empty_hint
+                                    userSearch.failed -> R.string.user_search_failed
+                                    userSearch.isIncomplete -> R.string.user_search_incomplete
+                                    else -> null
+                                }
                             WhiteNoiseEmptyState(
-                                stringResource(
-                                    when {
-                                        query.isBlank() -> R.string.recipient_search_empty_hint
-                                        userSearch.failed -> R.string.user_search_failed
-                                        userSearch.isIncomplete -> R.string.user_search_incomplete
-                                        else -> R.string.no_matches
-                                    },
-                                ),
+                                stringResource(R.string.no_matches),
+                                detail?.let { stringResource(it) },
                             )
                         }
                     }

@@ -84,6 +84,7 @@ internal fun NewGroupRecipientContent(
                         onPasteRejected = actions.pasteRejected,
                         isValidNpub = isValidNpub,
                         onScanQr = actions.scan,
+                        nativeDestination = "new-group-search",
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
                     )
                 }

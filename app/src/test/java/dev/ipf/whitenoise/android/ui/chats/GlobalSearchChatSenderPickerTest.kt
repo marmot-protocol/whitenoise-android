@@ -78,7 +78,7 @@ class GlobalSearchChatSenderPickerTest {
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextClearance()
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextInput("Nobody matches")
         assertResultCount(0)
-        composeRule.onNodeWithText(context.getString(R.string.no_results)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.no_matches)).assertExists()
         composeRule.runOnIdle { assertEquals(2, state.value.senderFilters.size) }
     }
 

@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -34,10 +35,12 @@ import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /**
  * The one person (or chat) row of every picker: a segmented list item with the picker avatar, a title, an optional
@@ -56,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
  * title, displays that key, its own text copies the whole value while the row keeps its action (#3565).
  * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying,
  * and then the key takes its own keyboard focus, since the disabled row cannot. A row without [onClick] is read-only.
+ * [nativeDestination] registers the card as an outlined destination of the settings card morph.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +89,7 @@ internal fun PersonRow(
     groupAnimation: GroupAvatarAnimation? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
     avatarDomain: MediaTrustDomain = MediaTrustDomain.Unique,
+    nativeDestination: String? = null,
 ) {
     val followed = isFollowedPerson(isFollowed, followedAccount)
     val followedStateDescription = if (followed) stringResource(R.string.user_search_you_follow) else null
@@ -97,6 +102,7 @@ internal fun PersonRow(
     val rowModifier =
         modifier
             .fillMaxWidth()
+            .nativeOutlineDestination(nativeDestination, shapes.shape)
             .let { if (segmented) it.amoledSurfaceBorder(shapes.shape) else it }
             .recipientRelationshipSemantics(followedStateDescription, selectionState)
     val leading: @Composable () -> Unit = {
@@ -210,3 +216,25 @@ internal fun personKeyPlacement(
         subtitle = visibleSubtitle,
     )
 }
+
+/**
+ * Reports an outlined native destination for the card morph between New message, New group and Set up group,
+ * or nothing when [destination] is null. The stroke follows the AMOLED surface outline.
+ */
+@Composable
+internal fun Modifier.nativeOutlineDestination(
+    destination: String?,
+    shape: Shape,
+): Modifier =
+    if (destination == null) {
+        this
+    } else {
+        then(
+            rememberSettingsNativeSurface(
+                destination = destination,
+                shape = shape,
+                strokeColor =
+                    if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outlineVariant else Color.Unspecified,
+            ).first,
+        )
+    }

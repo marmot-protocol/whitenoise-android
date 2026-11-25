@@ -63,6 +63,7 @@ internal fun GroupMemberMutationStatus(
     }
 }
 
+/** A member who was invited but has not joined; tapping copies their key and reveals the full pending line. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun PendingGroupInviteRow(

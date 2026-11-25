@@ -76,6 +76,7 @@ internal fun GroupCreationPersonRow(
         selectionState = selected,
         enabled = enabled,
         publicKeyCopyEnabled = true,
+        nativeDestination = candidate.accountIdHex,
         onClick = onClick,
         onLongClick = profileClick.takeIf { onLongClick != null },
         publicKey = key.publicKey,

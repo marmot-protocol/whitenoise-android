@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -126,6 +127,10 @@ fun WhiteNoiseCompactSearchField(
     )
 }
 
+/**
+ * The shared field chrome: search glyph, placeholder, a clear action once there is text and otherwise the caller's
+ * [emptyTrailingIcon], on the container colour, with the AMOLED outline when [outlined].
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -159,7 +164,7 @@ private fun CompactSearchDecoration(
         singleLine = true,
         visualTransformation = VisualTransformation.None,
         interactionSource = interactionSource,
-        placeholder = { Text(text = placeholder, maxLines = 1) },
+        placeholder = { Text(text = placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = leadingIcon,
         trailingIcon =
             if (value.isNotEmpty()) {

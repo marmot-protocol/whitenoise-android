@@ -114,11 +114,7 @@ fun WhiteNoiseEntityPickerSheet(
                         .fillMaxWidth()
                         .testTag("entity.list")
                         .semantics { collectionInfo = CollectionInfo(visible.size, 1) },
-                contentPadding =
-                    PaddingValues(
-                        horizontal = WhiteNoiseSpacing.CompactScreenMargin,
-                        vertical = WhiteNoiseSpacing.Related,
-                    ),
+                contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.Related),
             ) {
                 if (visible.isEmpty()) {
                     item { WhiteNoiseEmptyState(stringResource(R.string.no_matches)) }
