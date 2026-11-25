@@ -9,7 +9,10 @@
         "anchor": "fun rememberClipboardCopier(",
         "test_ids": [
           "SET-019",
-          "RDR-002"
+          "RDR-002",
+          "ACC-010",
+          "INT-004",
+          "MSG-026"
         ]
       }
     ],

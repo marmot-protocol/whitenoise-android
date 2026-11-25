@@ -53,8 +53,8 @@ class SensitiveClipboardCoverageTest {
     }
 
     /**
-     * Regression guard for #4151: public text is copied through [ClipboardCopier]. The files listed here still write
-     * directly; each is owned by a follow-up and leaves the list when it moves to the copier.
+     * Regression guard for #4151. The clipboard edge is confined to the public and sensitive writers
+     * and the Compose adapter that passes native selection clips to [ClipboardCopier].
      */
     @Test
     fun onlyAllowlistedFilesWriteTheClipboardDirectly() {
@@ -91,12 +91,8 @@ class SensitiveClipboardCoverageTest {
             listOf(
                 "common/Clipboard.kt",
                 "common/CopyToClipboard.kt",
-                "common/PublicKeyCopy.kt",
-                "common/StartupScreens.kt",
-                "common/StateScreens.kt",
                 "conversation/messages/MessageBubble.kt",
                 "conversation/messages/MessageTextSelection.kt",
-                "group/GroupDetailsHeader.kt",
             )
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }

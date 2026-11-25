@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -154,13 +155,29 @@ class MessageTextSelectionTest {
         runTest {
             val delegate = RecordingClipboard()
             var copyCompletions = 0
-            val clipboard = ExitOnCopyClipboard(delegate) { copyCompletions++ }
+            var confirmations = 0
+            var failures = 0
+            val copier = ClipboardCopier(ApplicationProvider.getApplicationContext(), { confirmations++ }, { failures++ })
+            val clipboard = ExitOnCopyClipboard(delegate, copier) { copyCompletions++ }
             val selectedText = ClipEntry(ClipData.newPlainText("message selection", "partial text"))
 
             clipboard.setClipEntry(selectedText)
 
             assertEquals(selectedText, delegate.clipEntry)
             assertEquals(1, copyCompletions)
+            assertEquals(1, confirmations)
+
+            clipboard.setClipEntry(null)
+            assertEquals(null, delegate.clipEntry)
+            assertEquals(1, copyCompletions)
+            assertEquals(1, confirmations)
+
+            delegate.refuseWrites = true
+            clipboard.setClipEntry(selectedText)
+            assertEquals(null, delegate.clipEntry)
+            assertEquals(1, copyCompletions)
+            assertEquals(1, confirmations)
+            assertEquals(1, failures)
         }
 
     @Test
@@ -488,10 +505,12 @@ class MessageTextSelectionTest {
 
     private class RecordingClipboard : Clipboard {
         var clipEntry: ClipEntry? = null
+        var refuseWrites = false
 
         override suspend fun getClipEntry(): ClipEntry? = clipEntry
 
         override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+            if (refuseWrites) throw SecurityException("Clipboard write refused")
             this.clipEntry = clipEntry
         }
     }
