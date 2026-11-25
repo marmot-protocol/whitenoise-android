@@ -218,6 +218,14 @@ class FcmAutoInitIncompleteChangeTest {
                 assertTrue("the toggle must have been cancelled", job.isCancelled)
                 assertTrue(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertTrue("the next sync must register the account", store.nativePushRegistrationSyncPending())
+                cancelOnEnable.set(false)
+                platform.autoInitWrites.clear()
+
+                assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+
+                assertTrue(ACCOUNT_A in fixture.upsertedPushRegistrations)
+                assertEquals(true, platform.autoInitWrites.lastOrNull())
+                assertFalse("the sync must acknowledge the marker", store.nativePushRegistrationSyncPending())
             } finally {
                 cancelOnEnable.set(false)
                 fixture.close()
@@ -226,10 +234,10 @@ class FcmAutoInitIncompleteChangeTest {
 
     /**
      * A reconciliation that leaves every account off native push, because rendering is off for all of them,
-     * registers nothing and never turns auto-init on.
+     * registers nothing and turns auto-init off, even when an earlier sync had turned it on.
      */
     @Test
-    fun reconciliationLeavingNoPushAccountNeverEnablesAutoInit() =
+    fun reconciliationLeavingNoPushAccountTurnsAutoInitOff() =
         runBlocking {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture =
@@ -245,6 +253,8 @@ class FcmAutoInitIncompleteChangeTest {
             try {
                 fixture.bootstrap()
                 platform.autoInitWrites.clear()
+                // As an earlier sync for the account's native flag would have left it.
+                platform.setFcmAutoInitEnabled(true)
                 val delivery = fixture.appState.notificationDelivery
                 val intent = delivery.notificationDeliveryModeIntent.capture()
                 val owner = checkNotNull(delivery.captureNotificationDeliveryModeOwner(intent))
@@ -252,8 +262,9 @@ class FcmAutoInitIncompleteChangeTest {
                 fixture.runWithMainLooperPumping { delivery.selectFcmDelivery(owner) }
 
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
-                val writes = platform.autoInitWrites.toList()
-                assertFalse("no account uses Push, so auto-init must stay off: $writes", true in writes)
+                val writes = platform.autoInitWrites.drop(1)
+                assertFalse("no account uses Push, so auto-init must not turn on: $writes", true in writes)
+                assertEquals("the reconciliation must turn it off", false, writes.lastOrNull())
             } finally {
                 fixture.close()
             }
