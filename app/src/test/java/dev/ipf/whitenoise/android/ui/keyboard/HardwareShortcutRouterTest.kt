@@ -76,6 +76,55 @@ class HardwareShortcutRouterTest {
         assertEquals(0, runs.getValue(HardwareShortcutCommand.GlobalSearch))
     }
 
+    /**
+     * Releasing Ctrl before F keeps F's auto-repeats and key-up consumed, so a held key never types into the field
+     * the command focused. The next bare press of F, and a lost key-up replaced by a new press, pass through.
+     */
+    @Test
+    fun heldShortcutKeyStaysConsumedAfterItsModifierIsReleasedFirst() {
+        val runs = registerAll()
+
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_CTRL_LEFT, 0)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, 0, repeat = 1)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, 0, repeat = 2)))
+        assertTrue(router.handle(up(KeyEvent.KEYCODE_F, 0)))
+        assertFalse(router.handle(down(KeyEvent.KEYCODE_F, 0)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_F, 0)))
+
+        // Shift released first works the same way, and an unrelated key in between is left alone.
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL or SHIFT)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_SHIFT_LEFT, CTRL)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL, repeat = 1)))
+        assertFalse(router.handle(down(KeyEvent.KEYCODE_A, 0)))
+        // Its key-up was lost: a new bare press of F ends the old press and passes through, and so do its repeats.
+        assertFalse(router.handle(down(KeyEvent.KEYCODE_F, 0)))
+        assertFalse(router.handle(down(KeyEvent.KEYCODE_F, 0, repeat = 1)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_F, 0)))
+
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.GlobalSearch))
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.ConversationSearch))
+    }
+
+    /** Overlapping shortcuts each keep their own physical key consumed until that key comes up, in either order. */
+    @Test
+    fun overlappingShortcutKeysEachStayConsumedUntilTheirOwnKeyUp() {
+        val runs = registerAll()
+
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_N, CTRL)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_CTRL_LEFT, 0)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, 0, repeat = 1)))
+        assertTrue(router.handle(up(KeyEvent.KEYCODE_N, 0)))
+        assertTrue(router.handle(down(KeyEvent.KEYCODE_F, 0, repeat = 2)))
+        assertTrue(router.handle(up(KeyEvent.KEYCODE_F, 0)))
+        assertFalse(router.handle(down(KeyEvent.KEYCODE_N, 0, repeat = 1)))
+        assertFalse(router.handle(up(KeyEvent.KEYCODE_N, 0)))
+
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.GlobalSearch))
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage))
+    }
+
     /** A command without an available owner leaves the key, its repeats and its key-up to the focused view. */
     @Test
     fun unavailableCommandsAreNotConsumed() {
@@ -343,6 +392,47 @@ class HardwareShortcutRouterTest {
         refusingAvailable = true
         assertEquals(CarriedFate.None, router.carriedFate(refusing))
         assertEquals(listOf("newer"), runs)
+    }
+
+    /**
+     * A surface that takes input while a carried command waits for its owner cancels it: a focusable sheet taking
+     * window focus, or an in-window popup blocking. The owner becoming available afterwards runs nothing, and a fresh
+     * press once input returns works as usual.
+     */
+    @Test
+    fun carriedCommandIsCancelledWhenAModalTakesInput() {
+        var available = false
+        var runs = 0
+        val button =
+            HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }, { !available }) { runs++ }
+        router.register(button)
+        val carryNewMessage = {
+            val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+            router.dispatch(HardwareShortcutCommand.NewMessage)
+            removeConversation()
+            runAfterFrame()
+        }
+
+        carryNewMessage()
+        assertEquals(CarriedFate.Wait, router.carriedFate(button))
+        router.onWindowFocusChanged(hasFocus = false)
+        available = true
+        assertEquals(CarriedFate.None, router.carriedFate(button))
+        router.onWindowFocusChanged(hasFocus = true)
+        router.settleCarried(button)
+        assertEquals(0, runs)
+
+        available = false
+        carryNewMessage()
+        val release = router.block()
+        available = true
+        release()
+        assertEquals(CarriedFate.None, router.carriedFate(button))
+        router.settleCarried(button)
+        assertEquals(0, runs)
+
+        assertTrue(router.dispatch(HardwareShortcutCommand.NewMessage))
+        assertEquals(1, runs)
     }
 
     /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */

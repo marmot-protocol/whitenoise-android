@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -44,6 +45,8 @@ fun WhiteNoiseModalBottomSheet(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // The sheet owns input from its first composition, before its window takes focus (#4005).
+    HardwareShortcutBlocker()
     CompositionLocalProvider(LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest) {
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,

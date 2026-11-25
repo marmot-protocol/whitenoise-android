@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -16,6 +18,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -24,6 +28,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,6 +38,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import dev.ipf.whitenoise.android.ui.conversation.ChatsReturnShortcut
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
@@ -101,6 +107,106 @@ class HardwareShortcutCompositionTest {
         assertEquals(1, runs.getValue(HardwareShortcutCommand.GlobalSearch).intValue)
         assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
         assertEquals(1, sends)
+    }
+
+    /**
+     * Holding Ctrl+F until the search field it focuses takes keys, then releasing Ctrl first while F still repeats,
+     * types nothing into that field. The next bare F press does reach it.
+     */
+    @Test
+    fun heldShortcutKeyNeverTypesIntoTheFieldItFocused() {
+        var text by mutableStateOf(TextFieldValue(""))
+        val search = FocusRequester()
+        setRoutedContent {
+            KeyboardShortcut(HardwareShortcutCommand.GlobalSearch, available = true) { search.requestFocus() }
+            BasicTextField(text, { text = it }, Modifier.focusRequester(search).testTag(COMPOSER))
+        }
+
+        composeRule.runOnUiThread { decorView().dispatchKeyEvent(keyDown(KeyEvent.KEYCODE_F, CTRL)) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER).assertIsFocused()
+        composeRule.runOnUiThread {
+            val decor = decorView()
+            decor.dispatchKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0, 0))
+            (1..3).forEach { decor.dispatchKeyEvent(keyDown(KeyEvent.KEYCODE_F, 0, it)) }
+            decor.dispatchKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_F, 0, 0))
+        }
+        composeRule.waitForIdle()
+        assertEquals("", text.text)
+
+        press(KeyEvent.KEYCODE_F)
+        assertEquals("f", text.text)
+    }
+
+    /**
+     * When a sheet or dialog window takes focus from the activity, the window callback cancels a command carried
+     * out of a compact conversation, so its Chats owner never runs it once it becomes ready behind that window.
+     */
+    @Test
+    fun windowFocusLossCancelsACarriedCommand() {
+        var inConversation by mutableStateOf(true)
+        var ready by mutableStateOf(false)
+        setRoutedContent {
+            TwoPaneChatFrame(twoPane = false, listPane = {}) {
+                if (inConversation) {
+                    ChatsReturnShortcut(available = true) { inConversation = false }
+                } else {
+                    val count = runs.getValue(HardwareShortcutCommand.NewMessage)
+                    KeyboardShortcut(HardwareShortcutCommand.NewMessage, ready, waiting = !ready) {
+                        count.intValue += 1
+                    }
+                }
+            }
+        }
+
+        assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
+        windowFocusChanged(false)
+        ready = true
+        composeRule.waitForIdle()
+        windowFocusChanged(true)
+        composeRule.waitForIdle()
+
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
+        assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
+    }
+
+    /**
+     * A shared modal sheet blocks shortcuts from its first composition, so a command carried out of a compact
+     * conversation is cancelled even before the sheet's window takes focus, and never runs behind the sheet.
+     */
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun sharedSheetCancelsACarriedCommandWhenItIsComposed() {
+        var inConversation by mutableStateOf(true)
+        var sheetOpen by mutableStateOf(false)
+        var ready by mutableStateOf(false)
+        setRoutedContent {
+            TwoPaneChatFrame(twoPane = false, listPane = {}) {
+                if (inConversation) {
+                    ChatsReturnShortcut(available = true) { inConversation = false }
+                } else {
+                    val count = runs.getValue(HardwareShortcutCommand.NewMessage)
+                    KeyboardShortcut(HardwareShortcutCommand.NewMessage, ready, waiting = !ready) {
+                        count.intValue += 1
+                    }
+                }
+            }
+            if (sheetOpen) WhiteNoiseModalBottomSheet(onDismissRequest = { sheetOpen = false }) { Text("Accounts") }
+        }
+
+        assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
+        sheetOpen = true
+        composeRule.waitForIdle()
+        ready = true
+        composeRule.waitForIdle()
+        assertEquals(emptyList<HardwareShortcutCommand>(), composeRule.runOnIdle { router.availableCommands() })
+        sheetOpen = false
+        composeRule.waitForIdle()
+
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
+        assertTrue(press(KeyEvent.KEYCODE_N, CTRL))
+        assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
     }
 
     /**
@@ -247,6 +353,15 @@ class HardwareShortcutCompositionTest {
             BasicTextField(text, { text = it }, Modifier.fillMaxWidth().height(48.dp).testTag(fieldTag))
         }
     }
+
+    /** Reports a window focus change through the activity window's callback, as the platform does. */
+    private fun windowFocusChanged(hasFocus: Boolean) {
+        val callback = composeRule.activity.window.callback
+        composeRule.runOnUiThread { callback.onWindowFocusChanged(hasFocus) }
+    }
+
+    /** The activity window's decor view, where hardware keys enter the window. */
+    private fun decorView() = composeRule.activity.window.decorView
 
     /**
      * Presses [keyCode] with [meta] through the activity window, holding it for [repeats] auto-repeats, and reports

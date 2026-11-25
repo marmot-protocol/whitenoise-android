@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.whitenoise.android.ui.keyboard.ChatsReturnRoute
 import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
 import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutRouter
 import dev.ipf.whitenoise.android.ui.keyboard.LocalHardwareShortcutRouter
@@ -83,6 +84,47 @@ class ChatsNewMessageFabShortcutTest {
         }
         composeRule.waitForIdle()
 
+        assertEquals(0, opens)
+    }
+
+    /** Ctrl+N carried out of a compact conversation during the relay check opens New Message once the check returns. */
+    @Test
+    fun carriedNewMessageWaitsForTheRelayCheck() {
+        val relays = CompletableDeferred<AccountRelayListsFfi?>()
+        show { relays.await() }
+
+        carryNewMessageFromConversation()
+        relays.complete(chatOrganizationRelays(configured = true))
+        composeRule.waitForIdle()
+
+        assertEquals(1, opens)
+    }
+
+    /**
+     * A selector sheet that opens during the relay check takes window focus, so the carried Ctrl+N is cancelled and
+     * New Message never opens behind it when the check returns.
+     */
+    @Test
+    fun carriedNewMessageIsCancelledWhenASheetTakesFocusDuringTheRelayCheck() {
+        val relays = CompletableDeferred<AccountRelayListsFfi?>()
+        show { relays.await() }
+
+        carryNewMessageFromConversation()
+        composeRule.runOnIdle { router.onWindowFocusChanged(hasFocus = false) }
+        relays.complete(chatOrganizationRelays(configured = true))
+        composeRule.waitForIdle()
+
+        assertEquals(0, opens)
+    }
+
+    /** Presses Ctrl+N in a compact conversation, which leaves for this Chats screen while its relay check runs. */
+    private fun carryNewMessageFromConversation() {
+        composeRule.runOnIdle {
+            val leave = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+            assertTrue(router.dispatch(HardwareShortcutCommand.NewMessage))
+            leave()
+        }
+        composeRule.waitForIdle()
         assertEquals(0, opens)
     }
 

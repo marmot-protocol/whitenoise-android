@@ -41,6 +41,12 @@ internal class HardwareShortcutWindowCallback(
         hardwareShortcutGroup(context, router.availableCommands())?.let { data?.add(it) }
     }
 
+    /** Tells [router] when a dialog, sheet or focusable menu takes input from the activity window, then forwards. */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        router.onWindowFocusChanged(hasFocus)
+        original.onWindowFocusChanged(hasFocus)
+    }
+
     /** Forwards the pointer-capture change, a default method delegation would otherwise drop. */
     override fun onPointerCaptureChanged(hasCapture: Boolean) = original.onPointerCaptureChanged(hasCapture)
 }

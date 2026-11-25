@@ -119,8 +119,9 @@ private class CarriedCommand(
  * Activity-owned dispatcher for the messaging shortcuts. The activity hands every key event to [handle] before
  * its views, and composition registers which screen owns each command. Every call runs on the main thread.
  *
- * Dialogs, sheets and focusable menus are separate windows, so their keys never reach the activity. [inputBlocked]
- * (App Lock) and [block] (nonfocusable popups and in-window flows) cover the remaining surfaces that own input.
+ * Dialogs, sheets and focusable menus are separate windows, so their keys never reach the activity, and taking
+ * focus cancels a carried command through [onWindowFocusChanged]. [inputBlocked] (App Lock) and [block]
+ * (nonfocusable popups, shared sheets and in-window flows) cover the remaining surfaces that own input.
  * The state a carried command waits on is snapshot state, so its new owner can observe when to take it.
  */
 internal class HardwareShortcutRouter(
@@ -133,7 +134,7 @@ internal class HardwareShortcutRouter(
     private var blockers by mutableIntStateOf(0)
     private var chatsBlockers by mutableIntStateOf(0)
     private var carried by mutableStateOf<CarriedCommand?>(null)
-    private var heldCommand: HardwareShortcutCommand? = null
+    private val heldKeys = mutableSetOf<Int>()
     private var splitPanes: () -> Boolean = { false }
     private var conversationPaneOwnsKeys: () -> Boolean = { false }
     private val blocked: Boolean get() = blockers > 0 || inputBlocked()
@@ -175,10 +176,16 @@ internal class HardwareShortcutRouter(
 
     /**
      * Makes every command, or with [chatsOnly] just the Chats commands, unavailable until the returned call runs.
-     * Running the returned call again has no effect.
+     * Running the returned call again has no effect. A full block comes from a surface that now owns input, so it
+     * also cancels a carried command instead of letting it run once that surface closes.
      */
     fun block(chatsOnly: Boolean = false): () -> Unit {
-        if (chatsOnly) chatsBlockers += 1 else blockers += 1
+        if (chatsOnly) {
+            chatsBlockers += 1
+        } else {
+            blockers += 1
+            carried = null
+        }
         var released = false
         return {
             if (!released) {
@@ -207,24 +214,33 @@ internal class HardwareShortcutRouter(
     }
 
     /**
+     * Receives the activity window's focus changes. A dialog, sheet or focusable menu taking focus owns input, so a
+     * command still carried from a compact conversation is cancelled rather than run behind it, for example when New
+     * Message's relay check returns after an account selector opened. Shared sheets also block as soon as they are
+     * composed, which cancels it before the platform moves focus.
+     */
+    fun onWindowFocusChanged(hasFocus: Boolean) {
+        if (!hasFocus) carried = null
+    }
+
+    /**
      * Runs the command [event] names and reports whether the event is consumed. A command runs on its first
-     * key-down only, auto-repeats and the matching key-up are consumed without running it again, and every
+     * key-down only. That physical key's auto-repeats and its key-up are then consumed without running it again,
+     * even after Ctrl or Shift is released first, so a held F never reaches the field the command focused. Every
      * other key passes through untouched.
      */
     fun handle(event: KeyEvent): Boolean {
-        val command = hardwareShortcutCommandFor(event.keyCode, event.metaState) ?: return false
+        val pressed = event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0
         return when {
-            event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 -> {
-                val handled = dispatch(command)
-                heldCommand = command.takeIf { handled }
-                handled
+            pressed -> {
+                // A new press of a held key also ends its old press, whose key-up never arrived.
+                heldKeys -= event.keyCode
+                val command = hardwareShortcutCommandFor(event.keyCode, event.metaState)
+                (command != null && dispatch(command)).also { handled -> if (handled) heldKeys += event.keyCode }
             }
-            event.action == KeyEvent.ACTION_DOWN -> heldCommand == command
-            event.action == KeyEvent.ACTION_UP && heldCommand == command -> {
-                heldCommand = null
-                true
-            }
-            else -> false
+            event.keyCode !in heldKeys -> false
+            event.action == KeyEvent.ACTION_UP -> heldKeys.remove(event.keyCode)
+            else -> event.action == KeyEvent.ACTION_DOWN
         }
     }
 
@@ -313,11 +329,12 @@ internal class HardwareShortcutRouter(
         return paneAllows && handler.available()
     }
 
-    /** The compact conversation route that can carry [command] to Chats, or null when none can. */
-    private fun chatsReturnFor(command: HardwareShortcutCommand): ChatsReturnRoute? =
+    /** The compact conversation route that can carry a command to Chats, or null when none can. */
+    private val chatsReturnFor: (HardwareShortcutCommand) -> ChatsReturnRoute? = { command ->
         if (command.runsFromChats && !splitPanes() && chatsBlockers == 0) {
             chatsReturns.lastOrNull { it.available() }
         } else {
             null
         }
+    }
 }
