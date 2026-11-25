@@ -51,8 +51,10 @@ class ProfileStartGroupNavigationTest {
 
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    /** Optional real production owners with controlled local backend data; no relay/signing work. */
-    /** Optional frame export that follows the real support, profile and group ownership handoff in one session. */
+    /**
+     * Optional frame export that follows the real support, profile and group ownership handoff in one session, using
+     * real production owners with controlled local backend data and no relay or signing work.
+     */
     @Test
     @Suppress("LongMethod")
     fun captureSupportProfileAndStartGroupOwners() {

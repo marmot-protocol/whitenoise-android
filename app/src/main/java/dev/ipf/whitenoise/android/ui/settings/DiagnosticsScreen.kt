@@ -227,10 +227,7 @@ private fun copyPerformanceLogs(clipboard: ClipboardManager) {
     if (lines.isNotEmpty()) clipboard.setText(AnnotatedString(lines.joinToString("\n")))
 }
 
-/**
- * Presents real diagnostic events in the prototype's card, split by the AMOLED-aware [AppDivider]; operational
- * data stays in Health.
- */
+/** Presents real diagnostic events in the prototype's card, split by [AppDivider]; operational data stays in Health. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun DiagnosticsContent(
