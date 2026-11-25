@@ -102,10 +102,11 @@ internal suspend fun NotificationDeliveryController.settleFcmAfterSignOut(
  * it is cancelled. The block may already have committed a native-push disable, such as a drained sign-out
  * disable, so the settle runs before the cancellation propagates.
  */
-internal suspend inline fun <T> NotificationDeliveryController.settlingFcmAutoInitOnCancel(block: () -> T): T =
+internal suspend inline fun NotificationDeliveryController.settlingFcmAutoInitOnCancel(block: () -> Boolean): Boolean {
     try {
-        block()
+        return block()
     } catch (cancelled: CancellationException) {
         withContext(NonCancellable) { disableFcmAutoInitWithoutLoadedNativeDemand() }
         throw cancelled
     }
+}
