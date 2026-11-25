@@ -99,15 +99,6 @@
         ]
       },
       {
-        "surface": "SignOutGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "fun SignOutGroup(",
-        "test_ids": [
-          "SET-001",
-          "ONB-009"
-        ]
-      },
-      {
         "surface": "SettingsHomeSearchAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHomeSearchAction(",
@@ -128,14 +119,6 @@
         "surface": "Settings home hold-to-explain: profile picture",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "explanation_settings_profile_picture",
-        "test_ids": [
-          "SET-053"
-        ]
-      },
-      {
-        "surface": "Settings home hold-to-explain: sign out",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.explanation_account_keys_sign_out",
         "test_ids": [
           "SET-053"
         ]
@@ -183,15 +166,6 @@
           "SET-001",
           "NAV-004",
           "NAV-005"
-        ]
-      },
-      {
-        "surface": "string:sign_out",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.sign_out",
-        "test_ids": [
-          "SET-001",
-          "ONB-009"
         ]
       },
       {
