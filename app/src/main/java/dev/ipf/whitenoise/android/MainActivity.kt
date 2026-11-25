@@ -519,16 +519,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Retains the setup wake across real background transitions, excluding configuration-only stops. */
     override fun onStop() {
         if (::appState.isInitialized) {
             foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
-            if (!isChangingConfigurations) {
-                appState.accountSetup.controller
-                    ?.foregroundRetry
-                    ?.onBackgrounded()
-            }
+            if (!isChangingConfigurations) appState.accountSetup.onHostBackgrounded()
             appState.setAppInForeground(false)
         }
         WarmResumeTrace.foregroundStopped(warmResumeTraceToken, warmResumeEpoch)

@@ -41,6 +41,11 @@ internal class AccountSetupCoordinator(
     private var recoveryRequired by mutableStateOf(emptySet<String>())
     private val commands = Commands()
 
+    /** Records a warm return for the active setup after the host backgrounds. */
+    fun onHostBackgrounded() {
+        controller?.foregroundRetry?.onBackgrounded()
+    }
+
     /** Account-scoped setup eligibility returned from one runtime generation. */
     internal data class AccountsState(
         val pending: Set<String>,

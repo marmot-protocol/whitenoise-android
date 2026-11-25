@@ -279,7 +279,10 @@ private fun SetupDecisionContent(state: AccountSetupState) {
                 val publicationExplained = state.stepGuidance()?.problem == R.string.setup_problem_publication_failed
                 step.findings.distinct().forEach { finding ->
                     val summarized = publicationExplained && finding.issue == OnboardingIssueFfi.PUBLICATION_FAILED
-                    SetupFindingContent(finding, showTitle = !summarized && !snapshot.deviceNoticeCovers(step.step, finding))
+                    SetupFindingContent(
+                        finding,
+                        showTitle = !summarized && !snapshot.deviceNoticeCovers(step.step, finding),
+                    )
                 }
             }
             SetupProposalContent(proposal, step.findings)
