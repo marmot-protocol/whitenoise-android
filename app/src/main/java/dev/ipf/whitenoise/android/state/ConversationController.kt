@@ -761,6 +761,10 @@ class ConversationController(
 
     internal val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     internal val timelineOrder = mutableListOf<String>()
+
+    // Last loaded rows and their display order; same immutable rows always sort the same.
+    internal var displayOrderMemo: Pair<List<TimelineMessage>, List<TimelineMessage>>? = null
+
     internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
     internal val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     internal val optimisticSendPhases =
@@ -1220,7 +1224,7 @@ class ConversationController(
         val item =
             optimisticMessages.values.firstOrNull { it.record.messageIdHex == messageId }
                 ?: retainedTimelineItem(messageId) ?: return null
-        val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
+        val order = expiryOrderFor(item)
         val gone =
             item.projected?.deleted == true ||
                 MessageProjector.isDeleted(messageId, deletedMessageIds) ||
