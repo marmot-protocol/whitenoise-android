@@ -72,15 +72,20 @@ class FcmAutoInitCoverageTest {
         assertEquals(setOf("NativePushFallbackRuntime.kt", "NotificationDeliveryControllerNativePushSync.kt"), sdkUsers)
     }
 
-    /** Every token read turns auto-init on first, and only the shared fetch reads the SDK token. */
+    /**
+     * A sync for existing Push accounts turns auto-init on before its token read, a new selection reads with it
+     * off, and only the shared fetch reads the SDK token.
+     */
     @Test
-    fun tokenReadsEnableAutoInitFirst() {
+    fun syncTokenReadsEnableAutoInitFirst() {
         val sync = appModuleSource(SYNC)
         val fetch = sync.functionBody("fetchFcmTokenOrNull")
         val enable = fetch.indexOf("applyFcmAutoInit(enabled = true)")
         val read = fetch.indexOf("this::readFcmTokenFromSdk")
 
         assertTrue("fetchFcmTokenOrNull must enable auto-init", enable >= 0)
+        val conditional = "if (current && enableAutoInit) applyFcmAutoInit(enabled = true)"
+        assertTrue("only callers that ask enable it", fetch.contains(conditional))
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)
         assertTrue("auto-init must be enabled before the token read", enable < read)
         assertEquals(2, Regex("""\breadFcmTokenFromSdk\b""").findAll(sync).count())
