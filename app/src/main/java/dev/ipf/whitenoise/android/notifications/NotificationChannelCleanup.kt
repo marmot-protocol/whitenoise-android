@@ -67,8 +67,11 @@ internal fun recordConversationChannelOwner(
         runCatching {
             val appContext = context.applicationContext
             val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-            val updated = prefs.getStringSet(ownerKey, emptySet()).orEmpty() + conversationShortcutId
-            prefs.edit().putStringSet(ownerKey, updated).commit()
+            val owned = prefs.getStringSet(ownerKey, emptySet()).orEmpty()
+            // Every routed post lands here, so skip the synchronous commit once the link is stored.
+            if (conversationShortcutId !in owned) {
+                prefs.edit().putStringSet(ownerKey, owned + conversationShortcutId).commit()
+            }
         }
     }
 }

@@ -535,6 +535,25 @@ class PinnedConversationShortcutsTest {
         assertEquals(1, platform.requests.size)
     }
 
+    /** A deferred channel cleanup relabels the group's pinned shortcut generically without disabling or revoking it. */
+    @Test
+    fun relabelGroupScrubsTheLabelWithoutDisablingTheShortcut() {
+        val platform = PinnedShortcutTestPlatform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val cap = capability
+        owner.request(cap, "Private group", null) { true }
+        platform.approve(platform.requests.single())
+        platform.updates.clear()
+
+        owner.relabelGroup(ACCOUNT, GROUP)
+
+        val relabeled = platform.updates.single().single()
+        assertEquals(cap.shortcutId, relabeled.id)
+        assertEquals(context.getString(R.string.app_name), relabeled.shortLabel.toString())
+        assertTrue(platform.disabled.isEmpty())
+        assertTrue(tokens.isValid(cap))
+    }
+
     /** The account-cleanup sequence revokes even requests absent from the OS inventory before platform removal. */
     @Test
     fun accountCleanupRevokesPendingRequestWithoutAffectingAnotherAccount() {

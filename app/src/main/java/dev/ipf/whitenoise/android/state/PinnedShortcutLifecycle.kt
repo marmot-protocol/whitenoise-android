@@ -43,7 +43,7 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     withContext(Dispatchers.IO) {
         synchronized(UserEventNotificationGroup.mutationLock) {
             // Channels go first so shortcut removal cannot soft-delete one with its private name intact. If they
-            // fail, shortcuts stay until the journal retry, which redoes channels before shortcuts.
+            // fail, shortcuts stay, relabeled, until the journal retry, which redoes channels before shortcuts.
             val channelsResult =
                 runCatching {
                     check(deleteConversationNotificationChannels(appContext, accountRef, groupIdHex)) {
@@ -54,6 +54,8 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
                 if (channelsResult.isSuccess) {
                     runCatching { PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex) }
                 } else {
+                    runCatching { PinnedConversationShortcuts(appContext).relabelGroup(accountRef, groupIdHex) }
+                        .onFailure { appStateDebug(it) { "conversation shortcut relabel failed" } }
                     Result.success(Unit)
                 }
             forgetNotificationConversationShortcut(accountRef, groupIdHex)
@@ -79,11 +81,15 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
                 val cleared =
                     runCatching { deleteConversationNotificationChannels(appContext, accountRef, groupIdHex) }
                         .getOrDefault(false)
-                // A failed channel cleanup keeps shortcuts for the journal retry so removal cannot hide one.
-                if (cleared) {
-                    runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
-                        .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
-                }
+                // Failed channel cleanup keeps shortcuts, relabeled, for the journal retry so removal cannot hide one.
+                val shortcuts = PinnedConversationShortcuts(appContext)
+                runCatching {
+                    if (cleared) {
+                        shortcuts.removeRevokedGroup(accountRef, groupIdHex)
+                    } else {
+                        shortcuts.relabelGroup(accountRef, groupIdHex)
+                    }
+                }.onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
                 forgetNotificationConversationShortcut(accountRef, groupIdHex)
                 cleared
             }
@@ -113,12 +119,17 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
  */
 internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(accountRef: String): Set<String> =
     buildSet {
+        // A failed read here cannot be retried after revocation; log it so a lingering channel is traceable.
         runCatchingCancellable {
             marmotIo { chatList(accountRef, includeArchived = true) }
-        }.getOrDefault(emptyList()).forEach { row -> add(row.groupIdHex) }
+        }.onFailure { appStateDebug(it) { "sign-out channel capture could not list chats" } }
+            .getOrDefault(emptyList())
+            .forEach { row -> add(row.groupIdHex) }
         runCatchingCancellable {
             marmotIo { quarantinedGroups(accountRef) }
-        }.getOrDefault(emptyList()).forEach { group -> add(group.groupIdHex) }
+        }.onFailure { appStateDebug(it) { "sign-out channel capture could not list quarantined groups" } }
+            .getOrDefault(emptyList())
+            .forEach { group -> add(group.groupIdHex) }
         runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
             .getOrDefault(emptySet())
             .forEach(::add)

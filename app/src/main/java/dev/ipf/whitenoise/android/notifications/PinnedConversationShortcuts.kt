@@ -228,17 +228,25 @@ internal class PinnedConversationShortcuts(
         removeRevokedGroup(accountRef, groupIdHex)
     }
 
+    /**
+     * Replaces the group's shortcut labels with the generic app label without disabling or removing them,
+     * so a pending channel cleanup retry cannot have its linked channel soft-deleted with a private name.
+     */
+    fun relabelGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) = synchronized(UserEventNotificationGroup.mutationLock) {
+        val old = platform.groupShortcuts(accountRef, groupIdHex)
+        if (old.isNotEmpty()) platform.update(old.map { genericNotificationShortcut(context, it) })
+    }
+
     /** Platform-only cleanup; the caller must already hold the durable account/group revocation fence. */
     fun removeRevokedGroup(
         accountRef: String,
         groupIdHex: String,
     ) = synchronized(UserEventNotificationGroup.mutationLock) {
-        val baseId = conversationShortcutId(accountRef, groupIdHex) ?: return@synchronized
-        val reactionId = reactionConversationShortcutId(accountRef, groupIdHex)
-        val old =
-            platform.shortcuts().filter {
-                it.id == baseId || it.id == reactionId || it.id.startsWith("$baseId-pin-")
-            }
+        val old = platform.groupShortcuts(accountRef, groupIdHex)
+        if (old.isEmpty() && conversationShortcutId(accountRef, groupIdHex) == null) return@synchronized
         val ids = old.map { it.id }
         try {
             if (old.isNotEmpty()) platform.update(old.map { genericNotificationShortcut(context, it) })
@@ -377,4 +385,14 @@ class PinnedConversationPinReceiver : BroadcastReceiver() {
     private companion object {
         const val APPROVAL_REFRESH_TIMEOUT_MS = 2_000L
     }
+}
+
+/** The group's base, reaction and pinned shortcuts currently known to the platform. */
+private fun PinnedShortcutPlatform.groupShortcuts(
+    accountRef: String,
+    groupIdHex: String,
+): List<ShortcutInfoCompat> {
+    val baseId = conversationShortcutId(accountRef, groupIdHex) ?: return emptyList()
+    val reactionId = reactionConversationShortcutId(accountRef, groupIdHex)
+    return shortcuts().filter { it.id == baseId || it.id == reactionId || it.id.startsWith("$baseId-pin-") }
 }

@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.state
 
 import android.app.NotificationManager
 import androidx.compose.material3.SnackbarResult
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
@@ -10,6 +13,7 @@ import dev.ipf.whitenoise.android.notifications.FailingDeleteNotificationManager
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.share.buildShareShortcutIntent
 import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import kotlinx.coroutines.CancellationException
@@ -466,6 +470,63 @@ class LocalGroupDeleteControllerTest {
                 assertEquals(1, deferred)
                 assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
                 assertNotNull(manager.getNotificationChannel(channelId))
+                FailingDeleteNotificationManager.reset()
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                FailingDeleteNotificationManager.reset()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A leave-path removal whose channel redaction fails stages a durable retry and keeps the shortcut, relabeled
+     * generically, until the retry deletes the channel first.
+     */
+    @Test
+    @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
+    fun revokedRemovalChannelFailureStagesRetryAndRelabelsTheShortcut() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            FailingDeleteNotificationManager.reset()
+            try {
+                val fixture = fixture()
+                val context = fixture.state.appContext
+                NotificationChannels.ensureChannels(context)
+                val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+                val channelId =
+                    checkNotNull(
+                        ConversationNotificationChannels.ensureConversationChannel(
+                            context,
+                            NotificationChannelSpec.GROUP_MESSAGES.id,
+                            shortcutId,
+                            "Secret Left Group",
+                            accountRef = ACCOUNT,
+                        ),
+                    )
+                ShortcutManagerCompat.pushDynamicShortcut(
+                    context,
+                    ShortcutInfoCompat
+                        .Builder(context, shortcutId)
+                        .setShortLabel("Secret Left Group")
+                        .setIntent(buildShareShortcutIntent(context))
+                        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                        .setLongLived(true)
+                        .build(),
+                )
+                val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+                FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
+                // The leave path runs after native removal committed.
+                fixture.present.set(false)
+
+                fixture.state.removeRevokedPinnedConversationShortcuts(ACCOUNT, GROUP)
+
+                assertNotNull(fixture.state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP))
+                assertNotNull(manager.getNotificationChannel(channelId))
+                val kept = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
+                assertEquals(context.getString(R.string.app_name), kept.shortLabel.toString())
+
                 FailingDeleteNotificationManager.reset()
                 fixture.state.reconcilePendingLocalGroupDeleteCleanups()
                 assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
