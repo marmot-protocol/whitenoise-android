@@ -1,9 +1,26 @@
 package dev.ipf.whitenoise.android.ui.common
 
-private val indicationCall = Regex("""\.(indication|pressFeedbackInsideClip|shapedPressFeedback)\s*\(""")
 private val componentCall = Regex("""\b([A-Z]\w*)\s*\(""")
 private val componentDeclaration = Regex("""\b(fun|class|interface)\s*$""")
 private const val COMPONENT_DECLARATION_LOOKBEHIND = 32
+private val modifierRoot = Regex("""^[A-Za-z_]\w*(?!\w)(?!\s*\()""")
+private val positionalModifiers =
+    mapOf(
+        "Box" to 0,
+        "BoxWithConstraints" to 0,
+        "Card" to 0,
+        "Column" to 0,
+        "ElevatedCard" to 0,
+        "Icon" to 2,
+        "IconButton" to 1,
+        "IconToggleButton" to 2,
+        "Image" to 2,
+        "OutlinedCard" to 0,
+        "Row" to 0,
+        "Spacer" to 0,
+        "Surface" to 0,
+        "Text" to 1,
+    )
 private val sourceReference = Regex("""[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*""")
 
 /**
@@ -16,16 +33,44 @@ internal class ShapedTouchIndications(
 ) {
     private val owners = code.feedbackOwners()
     private val functions = code.feedbackFunctions()
-    private val replacements =
-        indicationCall
-            .findAll(code)
-            .mapNotNull { match ->
-                val open = match.range.last
-                val args = code.substring(open + 1, code.closingBracket(open))
-                val named = topLevelNamedArguments(args)["interactionSource"]
-                val expression = named ?: topLevelArguments(args).firstOrNull()
-                expression?.trim()?.let { FeedbackReference(it, open) }
+    private val replacements by lazy {
+        owners.mapNotNull { owner ->
+            appliedReplacements(owner).takeIf { it.isNotEmpty() }?.let { owner to it }
+        }
+    }
+
+    /** Collects indications only from a modifier supplied to a component. */
+    private fun appliedReplacements(owner: FeedbackOwner): List<FeedbackReference> {
+        val args = code.substring(owner.open + 1, owner.close)
+        val modifier = modifierArgument(args, positionalModifiers[owner.name]) ?: return emptyList()
+        val offset = owner.open + 1 + modifier.offset
+        val alias = modifierRoot.find(modifier.text)?.value
+        val initializer = alias?.let { code.substring(0, offset).localBinding(it) }
+        val links =
+            initializer?.text.orEmpty().modifierLinks(initializer?.offset ?: 0) + modifier.text.modifierLinks(offset)
+        var clipped = false
+        return links
+            .mapNotNull { link ->
+                clipped = clipped || link.clipsToShape()
+                when (link.name) {
+                    "indication" -> link.feedbackReference().takeIf { clipped && link.hasIndication() }
+                    "pressFeedbackInsideClip", "shapedPressFeedback" -> link.feedbackReference()
+                    else -> null
+                }
             }.toList()
+    }
+
+    /** A raw indication must actually draw, even if its modifier is clipped. */
+    private fun ModifierLink.hasIndication(): Boolean {
+        val factory = topLevelNamedArguments(args)["indication"] ?: topLevelArguments(args).getOrNull(1)
+        return factory != null && factory.trim() != "null"
+    }
+
+    /** Reads the source observed by a replacement at the modifier's declaration location. */
+    private fun ModifierLink.feedbackReference(): FeedbackReference? {
+        val source = topLevelNamedArguments(args)["interactionSource"] ?: topLevelArguments(args).firstOrNull()
+        return source?.trim()?.let { FeedbackReference(it, argumentOffset, conditional, guardedSource) }
+    }
 
     /** A null indication passes only when this control draws feedback for this click's source binding. */
     fun replaces(
@@ -46,9 +91,11 @@ internal class ShapedTouchIndications(
         owner: FeedbackOwner,
         source: FeedbackBinding,
     ): Boolean =
-        replacements.any { reference ->
-            reference.offset in (owner.open + 1) until owner.end &&
-                binding(reference.expression, reference.offset) == source
+        replacements.any { (component, references) ->
+            component.start in owner.start until owner.end &&
+                references.any { reference ->
+                    !reference.conditional && binding(reference.expression, reference.offset) == source
+                }
         }
 
     /** Follows a named source parameter into the called component, never an unrelated function's parameter. */
@@ -62,9 +109,12 @@ internal class ShapedTouchIndications(
             val declared = parameterBinding(function, parameter)
             binding(argument.trim(), owner.open) == source &&
                 declared != null &&
-                replacements.any { reference ->
-                    reference.offset in function.body until function.end &&
-                        binding(reference.expression, reference.offset) == FeedbackBinding(parameter, declared)
+                replacements.any { (component, references) ->
+                    component.start in function.body until function.end &&
+                        references.any { reference ->
+                            (!reference.conditional || reference.guardedSource == parameter) &&
+                                binding(reference.expression, reference.offset) == FeedbackBinding(parameter, declared)
+                        }
                 }
         }
     }
@@ -134,6 +184,8 @@ private data class FeedbackFunction(
 private data class FeedbackReference(
     val expression: String,
     val offset: Int,
+    val conditional: Boolean,
+    val guardedSource: String?,
 )
 
 /** The reference text and lexical declaration identify the source, instead of its name alone. */

@@ -26,8 +26,7 @@ import org.junit.Test
  *
  * A click passes when an earlier clip in its own modifier chain is not a rectangle, or when it turns its own
  * highlight off (`indication = null`) and that control draws the press from the same source binding.
- * Audited exceptions live in [allowed] with the reason, and the counts are exact, so a fixed site has to
- * leave the list.
+ * Audited exceptions in [allowed] name each control and its click, so a fixed site has to leave the list.
  */
 class ShapedTouchFeedbackCoverageTest {
     /** Every UI source passes the shape rules apart from the audited exceptions. */
@@ -39,23 +38,22 @@ class ShapedTouchFeedbackCoverageTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
-        val wrappers =
-            sources.values
-                .map(::passThroughIconButtonWrappers)
-                .fold(emptyMap<String, Set<Int>>()) { all, next ->
-                    (all.keys + next.keys).associateWith { all[it].orEmpty() + next[it].orEmpty() }
-                }
+        val wrappers = stretchedWrapperFindings(sources)
         val found =
             sources.flatMap { (path, source) ->
-                (shapedTouchFindings(source, path) + stretchedWrapperCalls(source, wrappers)).map { "$path: $it" }
+                (shapedTouchFindings(source, path) + wrappers.getValue(path)).map { finding ->
+                    val kind = kind(finding)
+                    val line = finding.substringAfterLast(" @").toInt()
+                    val site = if (kind == ROUND_CHILD) roundChildClickSite(source, line) else null
+                    if (site == null) "$path: $finding" else "$path: $kind: $site"
+                }
             }
-        val counted = found.groupingBy { it.substringBefore(" @") }.eachCount()
         assertEquals(
             "Press feedback must follow the visible shape. Use Surface(onClick = …), clip before the click, " +
                 "or shapedTouchTarget with shapedPressFeedback (ui/common/ShapedTouch.kt). Findings:\n" +
                 found.joinToString("\n"),
             allowed,
-            counted,
+            found.sorted(),
         )
     }
 
@@ -465,14 +463,18 @@ class ShapedTouchFeedbackCoverageTest {
         const val UI_ROOT = "src/main/java/dev/ipf/whitenoise/android/ui"
 
         /**
-         * Audited exceptions, keyed by `path: kind`, with the number of sites allowed. Each control is the
-         * rectangle the user sees, so a rectangular highlight matches it, and the round shape inside it is a
-         * glyph, not a control: the video grid tile's play disc and the profile banner's camera badge.
+         * The rectangular video tile and profile banner each contain a round status or camera glyph.
+         * Their highlights match the entire control. Each exception identifies the control and its click signature.
          */
-        val allowed: Map<String, Int> =
-            mapOf(
-                "conversation/media/MediaVideoGridTile.kt: $ROUND_CHILD" to 1,
-                "profile/ProfileEditScreen.kt: $ROUND_CHILD" to 1,
+        val allowed =
+            listOf(
+                "conversation/media/MediaVideoGridTile.kt: $ROUND_CHILD: " +
+                    "MediaVideoGridTile: testTag(videoAttachmentOpenTestTag(messageIdHex,attachmentIndex)): " +
+                    "combinedClickable(onLongClick=onLongPress,onClick={onTileTap()})",
+                "profile/ProfileEditScreen.kt: $ROUND_CHILD: ProfileBannerControl: " +
+                    "testTag(PROFILE_BANNER_CONTROL_TAG): " +
+                    "clickable(enabled=!isUploading&&isProfileLoaded," +
+                    "onClickLabel=stringResource(R.string.profile_banner_edit),role=Role.Button,onClick=onClick)",
             )
     }
 }

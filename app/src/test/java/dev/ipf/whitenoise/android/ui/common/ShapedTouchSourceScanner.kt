@@ -23,7 +23,6 @@ private val clickModifier =
 private val thenOpen = Regex("""\.\s*then\s*$""")
 private val chainedCall = Regex("""\s*\.\s*(\w+)\s*([({])""")
 private val trailingLambda = Regex("""[ \t]*\{""")
-private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
 private val roundChild =
     Regex("""CircleShape|PillShape|RoundedCornerShape|shapes\.\w+|(?<![\w.])(Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
 private val roundComponentCall = Regex("""(?<![\w.])(\w*Swatch|Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
@@ -39,10 +38,15 @@ private val cardDefaultShapes =
         "ElevatedCard" to "CardDefaults.elevatedShape",
         "OutlinedCard" to "CardDefaults.outlinedShape",
     )
-private val clipCall = Regex("""\.clip\s*\(""")
 private val declaration = Regex("""fun\s+$""")
 private val modifierParameter = Regex("""^\s*(@\w+\s+)*modifier\s*:""")
 private val leadingName = Regex("""^\s*(\w+)""")
+private val privateModifier = Regex("""\bprivate\b""")
+private val functionModifiers =
+    Regex(
+        """(?:\b(?:private|public|internal|protected|inline|suspend|tailrec|operator|infix)\s+|""" +
+            """@[\w.]+(?:\([^()]*\))?\s+)+$""",
+    )
 internal val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
@@ -107,25 +111,25 @@ private fun shapedContainerClicks(
 ): List<Pair<String, Int>> {
     val (start, args) = call
     val named = topLevelNamedArguments(args)
-    val shape = named["shape"] ?: defaultShape
+    val shape = (named["shape"] ?: defaultShape)?.takeUnless { "RectangleShape" in it }
     val clickableOverload = listOf("onClick", "checked", "selected").any(named::containsKey)
-    return if (clickableOverload || shape == null || "RectangleShape" in shape) {
-        emptyList()
-    } else {
-        // A clip before the click only shapes the highlight like the container when it uses the container's own
-        // shape, which for a card with none named is its default.
-        val clicks = args.undecoratedClicks(feedback, offset = start + 1, matching = shape.trim())
-        clicks.map { SHAPED_SURFACE to start + it }
-    }
+    val modifier = modifierArgument(args)
+    if (clickableOverload || shape == null || modifier == null) return emptyList()
+    val offset = start + modifier.offset
+    return modifier.text
+        .undecoratedClicks(feedback, offset, matching = shape.trim())
+        .map { SHAPED_SURFACE to offset + it }
 }
 
 /** Rule 3: a clickable Box whose content draws a round or rounded shape without a shaped highlight. */
 private fun String.clickableBoxesAroundRoundChildren(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     calls("Box").flatMap { (start, args) ->
+        val modifier = modifierArgument(args) ?: return@flatMap emptyList()
         val lambda = trailingLambda.matchAt(this, start + args.length + 1)
         val body = lambda?.let { substring(it.range.last + 1, closingBracket(it.range.last)) }
         if (body != null && roundChild.containsMatchIn(body)) {
-            args.undecoratedClicks(feedback, offset = start + 1).map { ROUND_CHILD to start + it }
+            val offset = start + modifier.offset
+            modifier.text.undecoratedClicks(feedback, offset).map { ROUND_CHILD to offset + it }
         } else {
             emptyList()
         }
@@ -165,35 +169,22 @@ private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
  * `IconToggleButton(checked, onCheckedChange, modifier)`.
  */
 private fun String.iconButtonCalls(): List<Pair<Int, String>> =
-    calls("IconButton").map { (start, args) -> start to modifierArgument(args, position = 1) } +
-        calls("IconToggleButton").map { (start, args) -> start to modifierArgument(args, position = 2) }
-
-/**
- * The `modifier` a call receives, named or as its positional argument at [position]. A call may name its
- * leading arguments and still pass the modifier by position, so [position] counts every argument, and a
- * named argument there is not the modifier.
- */
-private fun modifierArgument(
-    args: String,
-    position: Int,
-): String =
-    topLevelNamedArguments(args)["modifier"]?.trim()
-        ?: topLevelArguments(args)
-            .getOrNull(position)
-            ?.takeUnless { namedArgument.containsMatchIn(it) }
-            ?.trim()
-            .orEmpty()
+    calls("IconButton").map { (start, args) -> start to modifierArgument(args, position = 1)?.text.orEmpty() } +
+        calls("IconToggleButton").map { (start, args) -> start to modifierArgument(args, position = 2)?.text.orEmpty() }
 
 /**
  * The functions in [source] that wrap a transparent icon button and pass their caller's `modifier` straight
  * to it, so the caller decides its size, each with the position of its `modifier` parameter.
  */
-internal fun passThroughIconButtonWrappers(source: String): Map<String, Set<Int>> {
+internal fun passThroughIconButtonWrappers(
+    source: String,
+    visibleAcrossFilesOnly: Boolean = false,
+): Map<String, Set<Int>> {
     val code = blankCommentsAndStrings(source)
     return code
         .iconButtonCalls()
         .filter { (_, modifier) -> modifier.startsWith("modifier") }
-        .mapNotNull { (start, _) -> code.functionContaining(start) }
+        .mapNotNull { (start, _) -> code.functionContaining(start, visibleAcrossFilesOnly) }
         .mapNotNull { (name, parameters) ->
             parameterList(parameters)
                 .indexOfFirst { modifierParameter.containsMatchIn(it) }
@@ -222,10 +213,24 @@ internal fun stretchedWrapperCalls(
                 !declaration.containsMatchIn(before) &&
                     modifierIndices.any { index ->
                         // Only bindings declared before this call are in scope for it.
-                        val modifier = code.substring(0, start).withLocalBinding(modifierArgument(args, index))
+                        val expression = modifierArgument(args, index)?.text.orEmpty()
+                        val modifier = code.substring(0, start).withLocalBinding(expression)
                         twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
                     }
             }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
+    }
+}
+
+/** Checks private wrappers in their own file and shares only visible wrappers with other files. */
+internal fun stretchedWrapperFindings(sources: Map<String, String>): Map<String, List<String>> {
+    val visible = sources.values.flatMap { passThroughIconButtonWrappers(it, visibleAcrossFilesOnly = true).entries }
+    return sources.mapValues { (_, source) ->
+        val declarations = enclosingFunction.findAll(blankCommentsAndStrings(source)).map { it.groupValues[1] }.toSet()
+        val wrappers =
+            (visible.filterNot { it.key in declarations } + passThroughIconButtonWrappers(source).entries)
+                .groupBy({ it.key }, { it.value })
+                .mapValues { (_, positions) -> positions.flatten().toSet() }
+        stretchedWrapperCalls(source, wrappers)
     }
 }
 
@@ -233,7 +238,7 @@ internal fun stretchedWrapperCalls(
 private fun String.withLocalBinding(expression: String): String {
     val head = leadingName.find(expression)?.groupValues?.get(1)
     val local = head?.takeUnless { it == "Modifier" || it == "modifier" }
-    val binding = local?.let { localBinding(it) }
+    val binding = local?.let { localBinding(it)?.text }
     return if (binding == null) expression else "$binding $expression"
 }
 
@@ -242,12 +247,12 @@ private fun String.withLocalBinding(expression: String): String {
  * still open there, not one in a block that has already closed — read over the lines a wrapped modifier chain
  * continues onto, or null.
  */
-private fun String.localBinding(name: String): String? {
+internal fun String.localBinding(name: String): TouchArgument? {
     val declaration =
         Regex("""\bval\s+${Regex.escape(name)}\s*=\s*""")
             .findAll(this)
             .lastOrNull { blockStaysOpen(from = it.range.last + 1) }
-    return declaration?.let { initializerFrom(it.range.last + 1) }
+    return declaration?.let { TouchArgument(it.range.last + 1, initializerFrom(it.range.last + 1)) }
 }
 
 /** Whether no brace closes the block open at [from] before the end of this text. */
@@ -262,7 +267,7 @@ internal fun String.blockStaysOpen(from: Int): Boolean {
     return true
 }
 
-/** The expression starting at [start]: up to a line break outside brackets that no `.` call continues. */
+/** Reads the expression at [start] up to its statement boundary, including continued modifier calls. */
 internal fun String.initializerFrom(start: Int): String {
     var depth = 0
     var index = start
@@ -276,11 +281,11 @@ internal fun String.initializerFrom(start: Int): String {
     return substring(start, index)
 }
 
-/** Whether a line break at [index], outside brackets at [depth], ends the statement it is in. */
+/** A semicolon or an uncontinued line break outside brackets ends the statement. */
 private fun String.endsStatementAt(
     index: Int,
     depth: Int,
-): Boolean = this[index] == '\n' && depth <= 0 && !continuesOnNextLine(index + 1)
+): Boolean = depth <= 0 && (this[index] == ';' || (this[index] == '\n' && !continuesOnNextLine(index + 1)))
 
 /** Whether the line starting at [from] continues a call chain with a leading `.`. */
 private fun String.continuesOnNextLine(from: Int): Boolean {
@@ -306,7 +311,10 @@ private fun parameterList(parameters: String): List<String> {
 }
 
 /** The name and parameter text of the function whose body contains [offset], or null. */
-private fun String.functionContaining(offset: Int): Pair<String, String>? =
+private fun String.functionContaining(
+    offset: Int,
+    visibleAcrossFilesOnly: Boolean,
+): Pair<String, String>? =
     enclosingFunction
         .findAll(substring(0, offset))
         .mapNotNull { match ->
@@ -315,11 +323,21 @@ private fun String.functionContaining(offset: Int): Pair<String, String>? =
             val bodyOpen = indexOfAny(charArrayOf('{', '='), parametersClose)
             val bodyEnd = if (bodyOpen >= 0 && this[bodyOpen] == '{') closingBracket(bodyOpen) else length
             if (bodyOpen in 0 until offset && offset < bodyEnd) {
-                match.groupValues[1] to substring(parametersOpen + 1, parametersClose)
+                match to substring(parametersOpen + 1, parametersClose)
             } else {
                 null
             }
         }.lastOrNull()
+        ?.takeUnless { (match, _) -> visibleAcrossFilesOnly && !isFileVisible(match.range.first) }
+        ?.let { (match, parameters) -> match.groupValues[1] to parameters }
+
+/** Cross-file wrappers must be top-level functions without a private modifier. */
+private fun String.isFileVisible(start: Int): Boolean {
+    val prefix = substring(0, start)
+    val topLevel = prefix.count { it == '{' } == prefix.count { it == '}' }
+    val modifierList = functionModifiers.find(prefix)?.value.orEmpty()
+    return topLevel && !privateModifier.containsMatchIn(modifierList)
+}
 
 /** Rule 6: a click modifier after a shaped background or border in the same chain, with no shaped clip. */
 private fun String.clicksOverShapedFills(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
@@ -340,7 +358,7 @@ private fun String.clicksOverShapedFills(feedback: ShapedTouchIndications): List
 /** Rule 7: a click modifier on a bare Icon, whose highlight is a square around a glyph unless it is clipped. */
 private fun String.clicksOnBareGlyphs(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     calls("Icon").flatMap { (start, args) ->
-        val clicks = args.undecoratedClicks(feedback, offset = start + 1)
+        val clicks = args.undecoratedClicks(feedback, offset = start)
         clicks.map { BARE_GLYPH to start + it }
     }
 
@@ -353,7 +371,7 @@ private fun String.chainBefore(end: Int): String {
         when (this[index]) {
             ')', '}', ']' -> depth++
             '(', '{', '[' -> if (depth == 0) atBoundary = true else depth--
-            ',', '=' -> atBoundary = depth == 0
+            ',', '=', ';' -> atBoundary = depth == 0
         }
         if (!atBoundary) index--
     }
@@ -393,12 +411,7 @@ private fun String.undecoratedClicks(
  * Whether this text clips to a shape other than a rectangle, which then shapes a later click's highlight,
  * and, given [matching], to that shape.
  */
-private fun String.hasShapedClip(matching: String? = null): Boolean =
-    clipCall.findAll(this).any { match ->
-        val open = match.range.last
-        val clip = substring(open + 1, closingBracket(open)).trim()
-        "RectangleShape" !in clip && (matching == null || clip == matching)
-    }
+private fun String.hasShapedClip(matching: String? = null): Boolean = modifierLinks().any { it.clipsToShape(matching) }
 
 /** Each call of [name] as (offset of its argument text, argument text), not counting longer names. */
 private fun String.calls(name: String): List<Pair<Int, String>> =
@@ -425,112 +438,46 @@ private fun String.chainAfter(close: Int): List<Pair<String, String>> {
     }
 }
 
-/** The top-level arguments of a call's argument text, in order. */
-internal fun topLevelArguments(args: String): List<String> {
-    val parts = mutableListOf<String>()
-    var depth = 0
-    var start = 0
-    args.forEachIndexed { index, char ->
-        when (char) {
-            '(', '{', '[' -> depth++
-            ')', '}', ']' -> depth--
-            ',' -> if (depth == 0) parts += args.substring(start, index).also { start = index + 1 }
-        }
-    }
-    parts += args.substring(start)
-    return parts.filter { it.isNotBlank() }
-}
-
-/** The top-level named arguments of a call's argument text, by name. */
-internal fun topLevelNamedArguments(args: String): Map<String, String> {
-    val parts = topLevelArguments(args)
-    return parts
-        .mapNotNull { part -> namedArgument.find(part)?.let { it.groupValues[1] to part.substring(it.range.last + 1) } }
-        .toMap()
-}
-
-/** The index of the bracket that closes the one at [open], or the end of the text when it never closes. */
-internal fun String.closingBracket(open: Int): Int {
-    var depth = 0
-    for (index in open until length) {
-        when (this[index]) {
-            '(', '{', '[' -> depth++
-            ')', '}', ']' -> if (--depth == 0) return index
-        }
-    }
-    return length
-}
-
 /** The 1-based line of [offset]. */
 private fun String.lineAt(offset: Int): Int = 1 + (0 until offset.coerceAtMost(length)).count { this[it] == '\n' }
 
-/** [source] with comments and the contents of string and character literals blanked, offsets unchanged. */
-private fun blankCommentsAndStrings(source: String): String {
-    val out = StringBuilder(source)
-    var index = 0
-    while (index < source.length) {
-        val span = literalSpan(source, index)
-        if (span == null) {
-            index++
-        } else {
-            for (position in span.blank) if (source[position] != '\n') out[position] = ' '
-            index = span.next
-        }
-    }
-    return out.toString()
-}
-
-/** A comment or literal: the range to blank, and the index where scanning resumes after it. */
-private class LiteralSpan(
-    val blank: IntRange,
-    val next: Int,
-)
-
-/** The comment or literal that starts at [index] in [source], or null when none does. */
-private fun literalSpan(
+/** Identifies an audited control by its test tag, enclosing function and click signature. */
+internal fun roundChildClickSite(
     source: String,
-    index: Int,
-): LiteralSpan? =
-    when {
-        source.startsWith("//", index) -> comment(index, source.indexOrEnd("\n", index, past = false))
-        source.startsWith("/*", index) -> comment(index, source.indexOrEnd("*/", index + 2, past = true))
-        source.startsWith(RAW_QUOTE, index) ->
-            source.indexOrEnd(RAW_QUOTE, index + RAW_QUOTE.length, past = true).let {
-                LiteralSpan(index + RAW_QUOTE.length until it - RAW_QUOTE.length, it)
-            }
-        source[index] == '"' || source[index] == '\'' ->
-            quotedEnd(source, index).let { LiteralSpan(index + 1 until it, it + 1) }
-        else -> null
-    }
-
-/** A comment from [start] until [end], blanked whole. */
-private fun comment(
-    start: Int,
-    end: Int,
-) = LiteralSpan(start until end, end)
-
-/** The index of [marker] from [from], past it when [past], or the end of the text when it is missing. */
-private fun String.indexOrEnd(
-    marker: String,
-    from: Int,
-    past: Boolean,
-): Int {
-    val found = indexOf(marker, from)
-    return when {
-        found < 0 -> length
-        past -> found + marker.length
-        else -> found
+    line: Int,
+): String? {
+    val code = blankCommentsAndStrings(source)
+    val click = code.clickOnLine(line) ?: return null
+    val function = code.functionContaining(click.range.first, visibleAcrossFilesOnly = false)?.first
+    val tag = code.roundChildTag(click.range.first)
+    return if (function == null || tag == null) {
+        null
+    } else {
+        val open = click.range.last
+        val args = code.substring(open + 1, code.closingBracket(open)).normalizedArguments()
+        "$function: testTag($tag): ${click.groupValues[1]}($args)"
     }
 }
 
-/** The index of the quote that closes the one-line literal opened at [open], skipping escapes. */
-private fun quotedEnd(
-    source: String,
-    open: Int,
-): Int {
-    var end = open + 1
-    while (end < source.length && source[end] != source[open]) end += if (source[end] == '\\') 2 else 1
-    return end.coerceAtMost(source.length)
+/** Finds the click starting on this line when it is the only candidate for the finding. */
+private fun String.clickOnLine(line: Int): MatchResult? {
+    val start = lineSequence().take(line - 1).sumOf { it.length + 1 }
+    val end = indexOf('\n', start).takeIf { it >= 0 } ?: length
+    return clickModifier.findAll(this, start).takeWhile { it.range.first < end }.singleOrNull()
 }
 
-private const val RAW_QUOTE = "\"\"\""
+/** Reads the test tag from the Box modifier that receives this click. */
+private fun String.roundChildTag(click: Int): String? =
+    calls("Box")
+        .mapNotNull { (start, args) ->
+            val modifier = modifierArgument(args) ?: return@mapNotNull null
+            val offset = start + modifier.offset
+            modifier.text.takeIf { click in offset until offset + it.length }
+        }.lastOrNull()
+        ?.modifierLinks()
+        ?.singleOrNull { it.name == "testTag" }
+        ?.args
+        ?.normalizedArguments()
+
+/** Ignores argument formatting and Kotlin's optional trailing comma in audit signatures. */
+private fun String.normalizedArguments(): String = filterNot(Char::isWhitespace).trimEnd(',')
