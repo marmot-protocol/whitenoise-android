@@ -131,7 +131,7 @@ class FcmAutoInitCoverageTest {
         assertTrue(settle.contains("throw cancelled"))
     }
 
-    /** The selection reads its token under the sync lock, and only while its owner still owns delivery. */
+    /** The selection checks ownership and stores its token under the sync lock, and reads Firebase outside it. */
     @Test
     fun selectionTokenReadIsFencedByOwnership() {
         val selection = appModuleSource(SELECTION)
