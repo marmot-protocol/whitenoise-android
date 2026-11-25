@@ -99,14 +99,13 @@ class ShareConnectScreenBehaviorTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Copied"))
     }
 
-    /** The pinned Scan QR Code button opens the scanner, and an invalid scan shows the error under the caption. */
+    /** The scanner entry and invalid-scan warning are both visible without scrolling. */
     @Test
     fun scanButtonOpensTheScannerAndInvalidScansExplain() {
         mount(scanInvalid = true)
-        composeRule.onNodeWithText("Scan QR Code").performClick()
+        composeRule.onNodeWithText("Scan QR Code").assertIsDisplayed().performClick()
         composeRule
             .onNode(hasText("That QR code doesn’t contain a White Noise profile."))
-            .performScrollTo()
             .assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(1, scannerCount) }
     }

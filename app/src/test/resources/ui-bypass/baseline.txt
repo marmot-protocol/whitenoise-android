@@ -12,7 +12,6 @@ dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt|SCAFFOL
 dev/ipf/whitenoise/android/ui/common/Avatar.kt|FONT_SIZE=1,RAW_COLOR=5
 dev/ipf/whitenoise/android/ui/common/ConfirmationBubble.kt|ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt|TOP_BAR=1
-dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt|TOAST=1
 dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt|ROUNDED_SHAPE=1,TOP_BAR=1
 dev/ipf/whitenoise/android/ui/conversation/MessageSelectionBar.kt|TOP_BAR=1
 dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt|TEXT_FIELD=1
@@ -24,7 +23,6 @@ dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt|RO
 dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt|TOAST=2
 dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt|RAW_COLOR=1,ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt|SCAFFOLD=1,TOP_BAR=1
-dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt|TOAST=1
 dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt|SCAFFOLD=1,TOP_BAR=1
 dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt|SCAFFOLD=1,TOP_BAR=1
 dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt|SCAFFOLD=1,TOP_BAR=1
@@ -33,7 +31,6 @@ dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt|BO
 dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt|FONT_SIZE=1,SCAFFOLD=1,TOP_BAR=1
 dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt|BOTTOM_SHEET=1
 dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt|ROUNDED_SHAPE=1
-dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt|TOAST=2
 dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt|BOTTOM_SHEET=1
 dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt|FONT_SIZE=1
 dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt|FONT_SIZE=3
@@ -59,10 +56,8 @@ dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt|DIVIDER=1
 dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt|BOTTOM_SHEET=1
 dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt|TOP_BAR=1
 dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt|TEXT_FIELD=1
-dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt|TOAST=1
 dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt|FONT_SIZE=1
 dev/ipf/whitenoise/android/ui/settings/NotificationProfilesScreen.kt|FONT_SIZE=1
-dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt|TOAST=1
 dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt|TOP_BAR=1
 dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt|TEXT_FIELD=1
 dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt|BOTTOM_SHEET=1

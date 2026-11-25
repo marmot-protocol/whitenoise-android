@@ -137,15 +137,17 @@ internal fun AccountSetupContent(
                 )
                 SetupEditorContent(editor, checkNotNull(fields), state.busy, randomName, step?.findings.orEmpty())
                 state.relayRemovalIssue?.let { issue ->
-                    Text(
-                        stringResource(
-                            if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
-                                R.string.setup_repair_edit_unavailable
-                            } else {
-                                R.string.setup_add_relay_before_saving
-                            },
-                        ),
-                        color = MaterialTheme.colorScheme.error,
+                    WhiteNoiseCallout(
+                        text =
+                            stringResource(
+                                if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
+                                    R.string.setup_repair_edit_unavailable
+                                } else {
+                                    R.string.setup_add_relay_before_saving
+                                },
+                            ),
+                        icon = R.drawable.ic_error,
+                        isError = true,
                     )
                 }
             }

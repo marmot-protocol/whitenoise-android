@@ -170,20 +170,19 @@
     <string name="leave_and_delete_message">Diese Gruppe verlassen und ihren Verlauf auf diesem Gerät löschen?</string>
     <string name="toast_left_chat_delete_failed">Gruppe verlassen. Lokales Löschen fehlgeschlagen.</string>
     <string name="group_reset_action">Zurücksetzen und auf neue Einladung warten</string>
-    <string name="group_reset_dialog_title">Diese Gruppe auf diesem Gerät zurücksetzen?</string>
-    <string name="group_reset_dialog_message">White Noise löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe nur auf diesem Gerät. An die Gruppe wird nichts gesendet. Du trittst erst wieder bei, wenn ein Admin nach diesem Zurücksetzen eine neue Einladung sendet.</string>
+    <string name="group_reset_dialog_title">Diese Gruppe zurücksetzen?</string>
+    <string name="group_reset_dialog_message">Löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe auf diesem Gerät. Es wird nichts gesendet. Zum erneuten Beitritt brauchst du eine Einladung, die ein Admin nach dem Zurücksetzen erstellt hat.</string>
     <string name="group_reset_confirm">Zurücksetzen</string>
     <string name="toast_group_reset_done">Gruppe zurückgesetzt. Sie erscheint wieder, wenn eine neue Einladung eintrifft.</string>
     <string name="toast_group_reset_already_waiting">Diese Gruppe wartet bereits auf eine neue Einladung.</string>
     <string name="toast_couldnt_reset_group">Die Gruppe konnte nicht zurückgesetzt werden. Versuche es erneut.</string>
-    <string name="chat_abandon_dialog_title">Diesen Chat auf diesem Gerät löschen?</string>
-    <string name="chat_abandon_dialog_message">Löscht ihn hier und stoppt neue Nachrichten. Es wird nichts gesendet.</string>
+    <string name="chat_abandon_dialog_title">Diesen Chat löschen?</string>
+    <string name="chat_abandon_dialog_message">Löscht den Chat auf diesem Gerät und stoppt neue Nachrichten. Es wird nichts gesendet.</string>
     <string name="chat_abandon_confirm">Aufgeben</string>
     <string name="abandon_identity_chat">Direktchat: %1$s</string>
     <string name="abandon_identity_group">Gruppe: %1$s</string>
-    <string name="abandon_identity_account">Dein Konto: %1$s</string>
     <string name="chats_abandon_action">Chats auf diesem Gerät aufgeben</string>
-    <string name="chats_abandon_dialog_title">Ausgewählte Chats auf diesem Gerät aufgeben?</string>
+    <string name="chats_abandon_dialog_title">Chats auf diesem Gerät aufgeben?</string>
     <string name="toast_chat_already_abandoned">Dieser Chat ist auf diesem Gerät bereits gelöscht.</string>
     <string name="leave_blocked_abandon_hint_dm">Das Verlassen wurde nicht abgeschlossen. Du kannst diesen Chat stattdessen auf diesem Gerät löschen. An die andere Person wird nichts gesendet.</string>
     <string name="leave_blocked_abandon_hint_group">Das Verlassen wurde nicht abgeschlossen. Du kannst diese Gruppe stattdessen auf diesem Gerät zurücksetzen. An die Gruppe wird nichts gesendet.</string>
@@ -1528,9 +1527,18 @@
     <string name="disappearing_1_day">1 Tag</string>
     <string name="disappearing_90_days">3 Monate</string>
     <string name="disappearing_custom">Benutzerdefinierte Zeit</string>
-    <string name="disappearing_days_format">%1$d Tage</string>
-    <string name="disappearing_hours_format">%1$d Stunden</string>
-    <string name="disappearing_minutes_format">%1$d Minuten</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tage</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d Stunde</item>
+        <item quantity="other">%d Stunden</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d Minute</item>
+        <item quantity="other">%d Minuten</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minuten</string>
     <string name="disappearing_unit_hours">Stunden</string>
     <string name="disappearing_unit_days">Tage</string>
@@ -1571,7 +1579,10 @@
     <string name="disappearing_5_minutes">5 Minuten</string>
     <string name="disappearing_30_seconds">30 Sekunden</string>
     <string name="disappearing_explainer">Ungelesene empfangene Nachrichten starten ihren Timer, wenn du sie liest. Andere neue Nachrichten werden nach der gewählten Dauer für alle endgültig gelöscht.</string>
-    <string name="disappearing_seconds_format">%1$d Sekunden</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d Sekunde</item>
+        <item quantity="other">%d Sekunden</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Sekunden</string>
     <string name="disappearing_set">Festlegen</string>
     <string name="disappearing_custom_decrease">Kürzer</string>

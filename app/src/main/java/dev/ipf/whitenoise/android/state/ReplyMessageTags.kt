@@ -47,9 +47,10 @@ internal fun ConversationController.snapshotReply(): ReplySnapshot =
  * the target. A text MDK accepted before its row was projected keeps the token on that row, so its event id
  * comes from the acceptance map instead. Until then the token is returned unchanged and stays unpublishable.
  * Only the loaded window is searched, so if the accepted row has paged out the actions stay hidden; the token
- * is never published.
+ * is never published. A message action queued on a bubble whose send has since confirmed resolves its target the
+ * same way.
  */
-private fun ConversationController.confirmedReplyTarget(selected: String): String {
+internal fun ConversationController.confirmedReplyTarget(selected: String): String {
     if (isPublishableReplyTarget(selected)) return selected
     val localSendKey = LOCAL_SEND_KEY_PREFIX + selected
     return timeline

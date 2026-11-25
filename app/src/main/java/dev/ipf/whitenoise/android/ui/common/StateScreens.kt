@@ -213,39 +213,3 @@ internal fun ErrorContent(
         }
     }
 }
-
-/** Keeps a loaded surface visible while exposing copy and optional retry actions. */
-@Composable
-internal fun InlineErrorBanner(
-    error: ErrorPresentation,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
-    Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 2.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                error.message.resolve(context),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
-                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = stringResource(R.string.copy))
-            }
-            if (error.retryable) {
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-            }
-        }
-    }
-}

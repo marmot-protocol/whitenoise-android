@@ -1966,60 +1966,18 @@ internal fun ConversationScreen(
         focusMessageRequestId = focusMessageRequestId,
     )
 
-    /**
-     * Keeps the former preview near the viewport when its row grows in the reversed list.
-     * The height increase would otherwise leave the reader at the newest end of a tall message.
-     * Expanding is the reader's own choice of position, so a reply or search jump still loading is
-     * cancelled and cannot move the viewport away when it completes.
-     */
-    fun preserveReadingPositionOnExpansion(item: TimelineMessage) {
-        val beforeLayout = timelineViewport.readingLayoutInfo()
-        val preview = beforeLayout.visibleItemsInfo.firstOrNull { it.key == item.presentationId } ?: return
-        val maxLayoutFrames = 3
-        val continuationPx = beforeLayout.viewportSize.height / 5
-        navigationState.targetNavigation.cancel()
-        scrollCoordinator.cancelForegroundRestoreForUserIntent()
-        val wasFollowingTail = scrollCoordinator.isFollowingTail
-        scrollCoordinator.settleReadingAt(currentScrollAnchor())
-        val expansionRevision = scrollCoordinator.intentToken.revision
-
-        scope.launch {
-            if (scrollCoordinator.intentToken.revision != expansionRevision) return@launch
-            val completed =
-                scrollCoordinator.programmaticJump(
-                    targetMessageId = item.record.messageIdHex,
-                    reason = ConversationScrollReason.MessageExpansion,
-                ) {
-                    repeat(maxLayoutFrames) {
-                        withFrameNanos { }
-                        val expanded =
-                            timelineViewport
-                                .readingLayoutInfo()
-                                .visibleItemsInfo
-                                .firstOrNull { it.key == item.presentationId }
-                                ?: return@programmaticJump
-                        val growth = expanded.size - preview.size
-                        if (growth > 0) {
-                            // Reveal some new text while retaining the last lines of the preview.
-                            val reveal = growth.coerceAtMost(continuationPx)
-                            scrollToItem(expanded.index, growth - preview.offset - reveal)
-                            return@programmaticJump
-                        }
-                    }
-                }
-            if (completed) {
-                scrollCoordinator.settleLandingAt(
-                    currentScrollAnchor(),
-                    atNewestEdge =
-                        wasFollowingTail &&
-                            conversationLandingAtNewestEdge(
-                                atNaturalTail = timelineViewport.isAtNaturalTail,
-                                hasMoreAfter = controller.hasMoreAfterTimeline,
-                            ),
-                )
-            }
-        }
-    }
+    val bodyExpansionPosition =
+        rememberConversationBodyExpansionPosition(
+            controller = controller,
+            scope = scope,
+            navigationState = navigationState,
+            listState = listState,
+            timelineViewport = timelineViewport,
+            scrollCoordinator = scrollCoordinator,
+            currentTimelineListIndex = ::currentTimelineListIndex,
+            currentScrollAnchor = ::currentScrollAnchor,
+            resolveScrollAnchorIndex = ::resolveScrollAnchorIndex,
+        )
 
     val tailTimelineIndex =
         conversationTimelineTailListIndex(
@@ -4482,53 +4440,10 @@ internal fun ConversationScreen(
                                                         null
                                                     },
                                                 onBeforeBodyExpand = {
-                                                    preserveReadingPositionOnExpansion(item)
+                                                    bodyExpansionPosition.preserveReadingPositionOnExpansion(item)
                                                 },
                                                 onBeforeBodyCollapse = {
-                                                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
-                                                    // Collapse cancels deferred movement while preserving
-                                                    // whether the viewport is following the tail.
-                                                    val keepFollowingTail =
-                                                        scrollCoordinator.isFollowingTail &&
-                                                            conversationLandingAtNewestEdge(
-                                                                atNaturalTail = timelineViewport.isAtNaturalTail,
-                                                                hasMoreAfter = controller.hasMoreAfterTimeline,
-                                                            )
-                                                    currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
-                                                        // Preserve a visible top edge; a deep offset into a tall body
-                                                        // must not survive after that content has been clipped away.
-                                                        val visible =
-                                                            timelineViewport
-                                                                .readingLayoutInfo()
-                                                                .visibleItemsInfo
-                                                                .firstOrNull {
-                                                                    it.index == index
-                                                                }
-                                                        val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
-                                                        val anchor =
-                                                            ConversationScrollAnchor(
-                                                                messageId = item.record.messageIdHex,
-                                                                itemId = item.presentationId,
-                                                                listIndex = index,
-                                                                pixelOffset = offset,
-                                                            )
-                                                        scrollCoordinator.settleLandingAt(
-                                                            anchor,
-                                                            atNewestEdge = keepFollowingTail,
-                                                        )
-                                                        if (!keepFollowingTail) {
-                                                            val bookmark = scrollCoordinator.bookmark(anchor)
-                                                            scope.launch {
-                                                                scrollCoordinator.restoreBookmark(
-                                                                    bookmark,
-                                                                    resolveAnchorIndex = ::resolveScrollAnchorIndex,
-                                                                )
-                                                            }
-                                                        }
-                                                    } ?: scrollCoordinator.settleLandingAt(
-                                                        currentScrollAnchor(),
-                                                        atNewestEdge = keepFollowingTail,
-                                                    )
+                                                    bodyExpansionPosition.preserveReadingPositionOnCollapse(item)
                                                 },
                                                 collapseLongMessages = collapseLongMessages,
                                                 ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
