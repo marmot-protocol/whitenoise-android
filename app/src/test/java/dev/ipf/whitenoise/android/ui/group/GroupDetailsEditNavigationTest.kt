@@ -135,7 +135,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
     }
 
-    /** Chat Info retains the disappearing-messages editor for authorized admins and keeps it disabled for non-admins. */
+    /** Chat Info keeps the disappearing-messages editor enabled for admins and disabled for non-admins. */
     @Test
     fun chatInfoDisappearingActionOpensEditorOnlyForAuthorizedAdmin() {
         val fixture = controller(group())
