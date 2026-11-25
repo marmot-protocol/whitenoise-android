@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 /** Identity of the captured creation owner, separate from recipients and the proposed group. */
 internal data class StartingAccount(
@@ -70,7 +71,7 @@ internal fun StartingAccountIndicator(account: StartingAccount?) {
             title = account.name,
             seed = account.accountIdHex,
             pictureUrl = account.pictureUrl,
-            size = 32.dp,
+            size = WhiteNoiseSizes.AvatarSmall,
             touchTargetSize = 48.dp,
             actionDescription = stringResource(R.string.starting_as),
             onClick = { expanded = true },
