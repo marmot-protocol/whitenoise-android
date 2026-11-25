@@ -84,8 +84,8 @@ import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceSendingIndicator
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -656,7 +656,7 @@ internal fun VoiceAttachmentContent(
     Surface(
         color = container,
         contentColor = content,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         Row(

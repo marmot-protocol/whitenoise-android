@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 /** Frozen destination identity for reviewing a group action. */
 internal data class MemberReviewGroup(
@@ -295,7 +296,7 @@ private fun GroupReviewActingAvatar(
         title = name,
         seed = account.accountIdHex,
         pictureUrl = appState.avatarUrl(account.accountIdHex),
-        size = 32.dp,
+        size = WhiteNoiseSizes.AvatarSmall,
         touchTargetSize = 48.dp,
         actionDescription = role,
         onClickLabel = stringResource(R.string.copy),
@@ -392,7 +393,7 @@ private fun GroupReviewDestinations(groups: List<MemberReviewGroup>) {
 private const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
 
 /** Destination and member pictures share one size and gap so their names start on the same line. */
-internal val GroupReviewAvatarSize = 40.dp
+internal val GroupReviewAvatarSize = WhiteNoiseSizes.AvatarCompact
 internal val GroupReviewAvatarGap = 12.dp
 
 /** The actor's 32dp picture sits in a 48dp target; this pulls the picture flush with the trailing switches. */

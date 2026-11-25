@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private const val BUBBLE_ENTER_MILLIS = 180
@@ -123,7 +124,7 @@ internal fun ConfirmationBubble(
     modifier: Modifier = Modifier,
     detail: String? = null,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(Radii.lg)
     val outline = amoledOutlineBorder()
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.inverseOnSurface) {
         // Keep the overlay visual only. Material Surface itself participates in touch hit testing.
