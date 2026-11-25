@@ -92,12 +92,17 @@ internal fun EmojiCategoryBar(
             }
             BoxWithConstraints(Modifier.weight(1f)) {
                 // Equal-width slots spread the toggles; they scroll only when they cannot all fit.
-                val slot = maxOf(EmojiCategoryToggleSize, maxWidth / categories.size.coerceAtLeast(1))
+                val startPadding = if (leadingActions) 0.dp else WhiteNoiseSpacing.Related
+                val endPadding = if (onBackspace == null) WhiteNoiseSpacing.Related else 0.dp
+                val slot =
+                    maxOf(
+                        EmojiCategoryToggleSize,
+                        (maxWidth - startPadding - endPadding) / categories.size.coerceAtLeast(1),
+                    )
                 LazyRow(
                     state = state,
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding =
-                        PaddingValues(start = if (leadingActions) 0.dp else WhiteNoiseSpacing.Related),
+                    contentPadding = PaddingValues(start = startPadding, end = endPadding),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     items(categories, key = { it.id }) { category ->

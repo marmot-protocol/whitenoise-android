@@ -358,6 +358,18 @@ private fun EmojiSetActions(
     val installed = set.installed
     val imageUrl = set.imageUrl ?: set.emoji.firstOrNull()?.url
     SettingsGroup {
+        if (state.artwork == null && imageUrl != null) {
+            row("load_image") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.emoji_sets_load_image),
+                    explanation = stringResource(R.string.explanation_organize_emoji_load_image),
+                    enabled = !state.busy,
+                    onClick = onLoadArtwork,
+                    leading = null,
+                )
+            }
+        }
         if (progress != null) {
             row("cancel") { context ->
                 SettingsAction(
@@ -370,18 +382,6 @@ private fun EmojiSetActions(
                 )
             }
             return@SettingsGroup
-        }
-        if (state.artwork == null && imageUrl != null) {
-            row("load_image") { context ->
-                SettingsAction(
-                    context = context,
-                    title = stringResource(R.string.emoji_sets_load_image),
-                    explanation = stringResource(R.string.explanation_organize_emoji_load_image),
-                    enabled = !state.busy,
-                    onClick = onLoadArtwork,
-                    leading = null,
-                )
-            }
         }
         if (installed == null || installed.updateAvailable) {
             val isInstall = installed == null
