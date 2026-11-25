@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Native shared-group projection; no count or avatar is inferred from a prototype fixture. */
@@ -198,19 +199,25 @@ internal fun PersonSharedGroupAvatars(
     val shown = rows.take(3)
     val remaining = (rows.size - shown.size).coerceAtLeast(0)
     val count = shown.size + if (remaining > 0) 1 else 0
-    Box(Modifier.width(32.dp + 22.dp * (count - 1)).height(32.dp)) {
+    Box(Modifier.width(WhiteNoiseSizes.AvatarSmall + 22.dp * (count - 1)).height(WhiteNoiseSizes.AvatarSmall)) {
         shown.forEachIndexed { index, row ->
             Surface(
                 Modifier.offset(x = 22.dp * index),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                Avatar(row.title, row.id, 32.dp, picture = avatar(row.id), groupAnimation = groupAnimation(row.id))
+                Avatar(
+                    row.title,
+                    row.id,
+                    WhiteNoiseSizes.AvatarSmall,
+                    picture = avatar(row.id),
+                    groupAnimation = groupAnimation(row.id),
+                )
             }
         }
         if (remaining > 0) {
             Surface(
-                Modifier.offset(x = 22.dp * shown.size).size(32.dp),
+                Modifier.offset(x = 22.dp * shown.size).size(WhiteNoiseSizes.AvatarSmall),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.performScrollTo
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -37,3 +40,13 @@ internal fun setupSnapshot(
         null,
         false,
     )
+
+/** Scrolls a setup node into view when the scrolling content owns it; a pinned action is already on screen. */
+internal fun SemanticsNodeInteraction.scrollToIfScrollable(): SemanticsNodeInteraction {
+    var parent = fetchSemanticsNode().parent
+    while (parent != null) {
+        if (SemanticsActions.ScrollBy in parent.config) return performScrollTo()
+        parent = parent.parent
+    }
+    return this
+}

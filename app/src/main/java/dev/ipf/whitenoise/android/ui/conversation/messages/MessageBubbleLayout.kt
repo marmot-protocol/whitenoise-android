@@ -2,9 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 
 private val MessageBubbleOppositeGutter = 48.dp
-internal val MessageBubbleSenderAvatarSlotWidth = 40.dp
+internal val MessageBubbleSenderAvatarSlotWidth = WhiteNoiseSizes.AvatarCompact
 
 internal fun messageBubbleColumnMaxWidth(
     containerWidth: Dp,

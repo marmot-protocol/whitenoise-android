@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,6 +27,7 @@ import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
 import dev.ipf.whitenoise.android.audio.VOICE_RECOGNITION_SERVICE_SETTING
 import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionServiceComponent
 import dev.ipf.whitenoise.android.audio.resolveConversationDictationProvider
+import dev.ipf.whitenoise.android.core.openExternalStoreListing
 import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.discoverDictationProviders
@@ -328,20 +328,17 @@ private suspend fun resolveDictationProviderPackage(
     return resolveConversationDictationProvider(androidSelected, saved, choices)?.packageName
 }
 
-/** Prefer the Zapstore app, then let Android open the same listing in a browser. */
+/** Prefer the Zapstore app, then let Android open the same listing in a browser, always in a new task. */
 internal fun openOfflineSpeechToTextListing(
     context: Context,
     startActivity: (Intent) -> Unit = context::startActivity,
-): Boolean {
-    val listingUri = Uri.parse(OSTT_ZAPSTORE_URL)
-    return runCatching {
-        startActivity(Intent(Intent.ACTION_VIEW, listingUri).setPackage(ZAPSTORE_PACKAGE))
-    }.recoverCatching {
-        startActivity(Intent(Intent.ACTION_VIEW, listingUri))
-    }.isSuccess
-}
+): Boolean =
+    openExternalStoreListing(
+        context = context,
+        listingUrl = OSTT_ZAPSTORE_URL,
+        startActivity = startActivity,
+    )
 
 private const val MILLIS_PER_SECOND = 1_000L
-internal const val ZAPSTORE_PACKAGE = "dev.zapstore.app"
 internal const val OSTT_ZAPSTORE_URL =
     "https://zapstore.dev/apps/naddr1qqtkzurs9ehkvenvd9hx2umsv4jkx6r5da6x27r5qyv8wumn8ghj7un9d3shjtn6v9c8xar0wfjjuer9wcpzpys5pkhzxd9dqp4ger8du6p5f6y43tcnzqktjzmwvahq5vumtay4qvzqqqr7pv8t57pf"

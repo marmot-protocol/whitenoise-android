@@ -7,10 +7,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -22,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPaneHorizontalPadding
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPane
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CATEGORIES_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerHeaderTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -63,6 +68,10 @@ class EmojiSetPickerScreenshotTest {
         waitForHeader(BuiltinEmojiSet.Marmot)
         composeRule.onNodeWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople)).performClick()
         composeRule.waitForIdle()
+        // 48 dp toggles scroll when the set tabs do not all fit the bar.
+        composeRule
+            .onNode(hasScrollAction() and hasAnyAncestor(hasTestTag(EMOJI_PICKER_CATEGORIES_TEST_TAG)))
+            .performScrollToNode(hasTestTag(emojiPickerCategoryTestTag(BuiltinEmojiSet.Marmot)))
         composeRule.onNodeWithTag(emojiPickerCategoryTestTag(BuiltinEmojiSet.Marmot)).performClick()
         waitForHeader(BuiltinEmojiSet.Marmot)
         val pane = composeRule.onNodeWithTag(PANE_TAG).getBoundsInRoot()

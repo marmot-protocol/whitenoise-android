@@ -13,6 +13,7 @@ import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.media.editor.nativeHandleStub
+import dev.ipf.whitenoise.android.media.pdf.pdfFixture
 import dev.ipf.whitenoise.android.state.DraftStoredFile
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
@@ -39,6 +40,20 @@ import org.junit.rules.TemporaryFolder
 class ConversationFileBackedDraftsTest {
     @get:Rule
     val folder = TemporaryFolder()
+
+    /** A newly picked signed PDF can only use the picker consent flow, even under a non-PDF name. */
+    @Test
+    fun signedPdfIsNeverPersistedAsAStoredFile() =
+        runTest {
+            val native = FileBackedDraftNative("caption")
+            val bytes = pdfFixture("signed")
+            val source = privateCopy(bytes.size)
+            source.file.writeBytes(bytes)
+
+            assertNull(stageFilePick(repositoryFor(native), "acct", pending(source)))
+            assertTrue(native.stagedRequests.isEmpty())
+            assertFalse(source.file.exists())
+        }
 
     /** A file-read pick is stored under its stable id with its metadata, and its private copy is deleted. */
     @Test

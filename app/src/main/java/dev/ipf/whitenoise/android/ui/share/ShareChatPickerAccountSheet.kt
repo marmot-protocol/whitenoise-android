@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,7 +127,7 @@ private fun ShareChatPickerAccountItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .clickable(role = Role.RadioButton) { onChooseAccount(account.label) }
                 .semantics { this.selected = selected },
         colors =

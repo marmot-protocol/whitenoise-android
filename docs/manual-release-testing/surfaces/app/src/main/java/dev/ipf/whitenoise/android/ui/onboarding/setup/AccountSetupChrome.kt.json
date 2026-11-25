@@ -1,0 +1,47 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
+  "legacy_sha256": "a451f3c107b4095d343af94d6b26c3be7453a87584e79d1094463d260635380d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SetupChecklist",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
+        "anchor": "fun SetupChecklist(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-016",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "SetupNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
+        "anchor": "fun SetupNotice(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-016",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "SetupStatusIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
+        "anchor": "fun SetupStatusIcon(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-016",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "Setup status colours",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupChrome.kt",
+        "anchor": "MaterialTheme.statusColors.success",
+        "test_ids": [
+          "ONB-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

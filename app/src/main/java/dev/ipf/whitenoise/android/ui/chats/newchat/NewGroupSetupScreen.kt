@@ -35,10 +35,10 @@ import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
@@ -85,11 +85,16 @@ private suspend fun createOrRecoverNewGroup(
         submission
             .createWith { name, members, options ->
                 val result =
-                    appState.marmotIo {
+                    appState.marmotIo(MarmotTraceSection.CREATE_GROUP) {
                         owner.ensureCurrent()
-                        createGroupWithOptions(account, name, members, options)
+                        createGroupWithOptionsDetailed(account, name, members, options)
                     }
-                owner.acceptCreatedGroup(result, appState::displayName)
+                owner.acceptCreatedGroup(
+                    result.created?.groupIdHex,
+                    result.memberOutcomes,
+                    result.created?.chatListRow,
+                    appState::displayName,
+                )
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
@@ -212,29 +217,6 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
         if (owner.isCurrent()) appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
         onAuthoritativeReadFailed(it)
     }
-}
-
-/**
- * Same authoritative projection mapper, with a captured account and an IO-boundary owner check. Also returns the
- * created roster's member IDs from that same read.
- */
-private suspend fun loadCreatedGroupForOwner(
-    appState: WhiteNoiseAppState,
-    accountRef: String,
-    groupIdHex: String,
-    owner: GroupCreationSession,
-): Pair<ChatListItem, List<String>> {
-    owner.ensureCurrent()
-    val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
-    val details =
-        appState.marmotIo {
-            owner.ensureCurrent()
-            groupDetails(accountRef, groupIdHex)
-        }
-    owner.ensureCurrent()
-    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-    return chatListItemFromAuthoritativeGroupDetails(details, accountHex) to details.members.map { it.memberIdHex }
 }
 
 /**

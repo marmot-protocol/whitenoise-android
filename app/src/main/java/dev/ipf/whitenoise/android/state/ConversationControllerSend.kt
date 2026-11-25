@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
-import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -141,20 +140,30 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
                         onProgress = retained::reportTransferProgress,
                     ) { control ->
                         appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                            uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+                            uploadComposerDraftFilesWithToken(
+                                account,
+                                group.groupIdHex,
+                                upload,
+                                control,
+                                tempId,
+                                verificationDirectory = uploadSourcesDirectory(appState.appContext.cacheDir),
+                            )
                         }
                     }
                 } catch (
                     @Suppress("TooGenericExceptionCaught") failure: Throwable,
                 ) {
                     // Copied under the lock, before another send of this chat can clear the draft.
-                    if (failure !is CancellationException && !retained.isTransferCancelRequested) {
+                    if (failure !is CancellationException &&
+                        failure !is UnverifiedStoredDraftPdf &&
+                        !retained.isTransferCancelRequested
+                    ) {
                         keepDraftFiles(account, retained)
                     }
                     throw failure
                 }
             // A send MDK already owns is recorded under the lock, as the file-backed path does.
-            outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+            outcome.acceptance?.let { recordRecoveredStoredDraft(key, it) }
             outcome
         }.also { outcome ->
             retained.draftUploadRevision = outcome.draftRevision
@@ -163,7 +172,7 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
 }
 
 /** Gives a send whose upload from the draft failed private copies of its stored files; a failed copy keeps none. */
-private suspend fun ConversationController.keepDraftFiles(
+internal suspend fun ConversationController.keepDraftFiles(
     account: String,
     retained: RetainedMediaUpload,
 ) {
@@ -174,31 +183,6 @@ private suspend fun ConversationController.keepDraftFiles(
         }
     }
 }
-
-/**
- * Admits [retained]'s uploaded [references] under the commit lock its caller holds. When MDK refuses a send of stored
- * draft files for a stale epoch, its Retry must upload the files again, so the send copies them out of the draft before
- * the lock is released and another send of this chat can clear the draft.
- */
-internal suspend fun ConversationController.admitRetainedMedia(
-    account: String,
-    references: List<MediaAttachmentReferenceFfi>,
-    retained: RetainedMediaUpload,
-    token: String,
-): SendSummaryFfi =
-    try {
-        appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-            publishRetainedMedia(account, group.groupIdHex, references, retained, token)
-        }
-    } catch (
-        @Suppress("TooGenericExceptionCaught") failure: Throwable,
-    ) {
-        // The same refusal makes the Retry drop the references and upload again, see forgetUploadAfter.
-        if (retained.isDraftStored && !retained.ownsDraftCopies && isStaleMediaReferenceEpoch(failure)) {
-            keepDraftFiles(account, retained)
-        }
-        throw failure
-    }
 
 /**
  * Uploads the private copies a failed send of stored draft files owns, as a file upload under the same lock, cancel,
@@ -235,7 +219,7 @@ private suspend fun ConversationController.uploadOwnedDraftCopies(
                             uploadOwnedDraftCopiesWithToken(account, group.groupIdHex, upload, request, control, tempId)
                         }
                     }
-                outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+                outcome.acceptance?.let { recordRecoveredStoredDraft(key, it) }
                 outcome
             }.also { outcome ->
                 outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)

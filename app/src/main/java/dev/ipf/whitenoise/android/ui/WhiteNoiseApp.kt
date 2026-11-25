@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,7 +34,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -217,7 +214,6 @@ internal fun WhiteNoiseApp(
     val diagnosticsPromptOpen = diagnosticsPromptOwner.prompt.visible || diagnosticsPromptOwner.busy
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
-    // One owner decides which top slot shows the app's temporary banners; under app lock none does.
     val topNoticeHost =
         remember(appState, snackbarHostState) {
             TopNoticeHost(
@@ -226,6 +222,7 @@ internal fun WhiteNoiseApp(
                 partial = appState::currentPartialNotice,
                 dismissNotice = appState::clearTransientNotice,
                 presentationAllowed = { !appState.appLock.screenVisible },
+                present = { titleRes, kind -> appState.presentTransient(titleRes, kind = kind) },
             )
         }
     val transientNotice = appState.transientNotice
@@ -245,7 +242,6 @@ internal fun WhiteNoiseApp(
     val dictationState = dictation.state
     val dictationPermissionRequestId = dictation.permissionRequestId
     val dictationProviderActivityRequestId = dictation.providerActivityRequestId
-    val density = LocalDensity.current
     var firstUsefulFrameRecorded by remember(warmResumeTraceToken, warmResumeEpoch) { mutableStateOf(false) }
     val visibleShareRequest = mainShellStateHolder.visibleShareRequest
     val visibleShareDirectGroupId =
@@ -267,8 +263,7 @@ internal fun WhiteNoiseApp(
         !inboundRoutePending &&
             appState.pendingWipeReport == null &&
             appState.appSelfUpdateState == AppSelfUpdateState.Idle
-    val dictationImeVisible =
-        WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
+    val dictationImeVisible = rememberDictationImeVisible()
     val firstUsefulFrameReady =
         mainShellStateHolder.prepareFirstUsefulFrame(
             phase = appState.phase,

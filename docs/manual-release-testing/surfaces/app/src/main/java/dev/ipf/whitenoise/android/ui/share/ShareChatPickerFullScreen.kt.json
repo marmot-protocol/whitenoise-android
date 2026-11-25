@@ -77,6 +77,15 @@
           "SYS-004",
           "PRO-008"
         ]
+      },
+      {
+        "surface": "Share picker Close on the shared top bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "navigation = WhiteNoiseTopBarNavigation.Close",
+        "test_ids": [
+          "SYS-001",
+          "SYS-004"
+        ]
       }
     ],
     "source_coverage": [

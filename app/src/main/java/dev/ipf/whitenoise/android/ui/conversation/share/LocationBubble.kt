@@ -1,27 +1,27 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedActionIconSize
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedCard
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedIconDisc
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedPadding
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 
 /**
  * Location bubble rendered from the shared coordinates with **no network
@@ -37,27 +37,15 @@ internal fun LocationMessageBubble(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier =
-            modifier
-                .width(260.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ConversationEmbedCard(
+        modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
+        onClick = onOpen,
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(ConversationEmbedPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Icon(
-                    painterResource(R.drawable.ic_location_on),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(10.dp).size(24.dp),
-                )
-            }
+            ConversationEmbedIconDisc(painterResource(R.drawable.ic_location_on))
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -82,7 +70,7 @@ internal fun LocationMessageBubble(
                 painterResource(R.drawable.ic_open_in_new),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ConversationEmbedActionIconSize),
             )
         }
     }

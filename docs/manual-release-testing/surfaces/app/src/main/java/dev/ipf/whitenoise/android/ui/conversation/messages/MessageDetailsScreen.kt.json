@@ -20,6 +20,14 @@
         ]
       },
       {
+        "surface": "MessageCardGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageCardGroup(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
         "surface": "MessageDeliverySection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDeliverySection(",
@@ -42,14 +50,6 @@
         "anchor": "fun MessageDetailsScreen(",
         "test_ids": [
           "MSG-001",
-          "MSG-021"
-        ]
-      },
-      {
-        "surface": "Poll label in message details",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
-        "anchor": "R.string.poll_preview",
-        "test_ids": [
           "MSG-021"
         ]
       },
@@ -84,15 +84,24 @@
         "test_ids": [
           "MSG-016"
         ]
+      },
+      {
+        "surface": "Poll label in message details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": [
+          "MSG-021"
+        ]
       }
     ],
     "settings_controls": [
       {
-        "surface": "string:back",
+        "surface": "Shared top bar: Message details",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
-        "anchor": "R.string.back",
+        "anchor": "WhiteNoiseTopBar(",
         "test_ids": [
-          "MSG-001"
+          "MSG-001",
+          "MSG-013"
         ]
       },
       {
@@ -268,12 +277,13 @@
       {
         "surface": "Scroll boundaries: MessageDetailsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
-        "anchor": ".fadingVerticalScroll(",
+        "anchor": ".whiteNoiseVerticalScroll(",
         "test_ids": [
           "SCR-001",
           "SCR-002",
           "SCR-003",
-          "SCR-004"
+          "SCR-004",
+          "MSG-013"
         ]
       }
     ]

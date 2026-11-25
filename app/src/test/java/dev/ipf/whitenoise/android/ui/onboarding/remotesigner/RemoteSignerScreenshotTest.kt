@@ -39,7 +39,7 @@ import org.robolectric.annotation.GraphicsMode
 class RemoteSignerScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Sign In gains only the quiet link under the key field. */
+    /** Sign in gains only the full-width outlined remote-signer button under the key field. */
     @Test fun signInEntryAmoled() {
         capture("remote_signer_sign_in_entry_amoled") {
             SignInContent(

@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.hasVerifiedDraftPdfMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
@@ -44,7 +45,7 @@ internal const val DRAFT_FILE_READ_CHUNK_BYTES = 1024 * 1024
  * Keeps a pick too large for memory in the native draft as a file-backed attachment, so it survives leaving the
  * chat and a process restart. [pending] carries the private, metadata-free copy the reader made; MarmotKit copies
  * it into the account's encrypted media store and that private copy is deleted whatever the outcome. Returns the
- * draft's body-less entry, or null when the draft refused the file (no room, too large, or the draft moved).
+ * draft's body-less entry, or null when the file requires PDF consent or the draft cannot keep it.
  */
 internal suspend fun stageFileBackedAttachment(
     drafts: MessageDraftRepository,
@@ -54,6 +55,8 @@ internal suspend fun stageFileBackedAttachment(
 ): DraftPreparedPhoto? {
     val source = requireNotNull(pending.sourceFile) { "only a pick read into a file is staged as a file" }
     try {
+        // A refused PDF can still be sent from its picker through the ordinary consent path.
+        if (!withContext(Dispatchers.IO) { source.file.hasVerifiedDraftPdfMetadata() }) return null
         val request =
             MessageDraftAttachmentFileRequestFfi(
                 id = target.attachmentId,

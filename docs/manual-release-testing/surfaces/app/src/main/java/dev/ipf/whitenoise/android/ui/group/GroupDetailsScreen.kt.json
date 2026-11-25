@@ -194,14 +194,6 @@
         ]
       },
       {
-        "surface": "string:copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:copy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.copy",
@@ -253,14 +245,6 @@
         "surface": "string:developer_tools",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.developer_tools",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:dismiss",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.dismiss",
         "test_ids": [
           "GRP-001"
         ]
@@ -557,15 +541,6 @@
         "anchor": "R.string.chat_bubble_colors",
         "test_ids": [
           "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
         ]
       },
       {

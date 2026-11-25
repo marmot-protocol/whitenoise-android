@@ -1,9 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -47,10 +53,26 @@ class ChatBubbleColorsPreviewScreenshotTest {
     @Test
     fun chatBubbleColorsScreenAmoled() = capture(AppThemeMode.Amoled, "chat_bubble_colors_screen_amoled.png")
 
-    /** Renders the editor, checks the preview order and records the window. */
+    /** A saved colour shows the inline Reset below the pickers, as on Action color; AMOLED keeps its outline. */
+    @Test
+    fun chatBubbleColorsResetAmoled() {
+        capture(AppThemeMode.Amoled, "chat_bubble_colors_screen_reset_amoled.png", scrollToReset = true)
+    }
+
+    /** The same inline Reset in the light theme. */
+    @Test
+    fun chatBubbleColorsResetLight() {
+        capture(AppThemeMode.Light, "chat_bubble_colors_screen_reset_light.png", scrollToReset = true)
+    }
+
+    /**
+     * Renders the editor, checks the preview order and records the window, first scrolling the inline Reset into
+     * view when [scrollToReset] is set.
+     */
     private fun capture(
         mode: AppThemeMode,
         name: String,
+        scrollToReset: Boolean = false,
     ) {
         val appState = testAppState(mode)
         composeRule.setContent {
@@ -66,6 +88,15 @@ class ChatBubbleColorsPreviewScreenshotTest {
         val otherTop = previewTop(R.string.bubble_preview_other)
         val mineTop = previewTop(R.string.bubble_preview_mine)
         assertTrue("Expected received preview above sent preview", otherTop < mineTop)
+        if (scrollToReset) {
+            // The editor is a lazy list, so Reset is composed only once the list scrolls to it.
+            composeRule
+                .onAllNodes(hasScrollToNodeAction())
+                .onFirst()
+                .performScrollToNode(hasTestTag("bubble_colors.reset"))
+            composeRule.onNodeWithTag("bubble_colors.reset").assertIsDisplayed()
+            composeRule.waitForIdle()
+        }
 
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name")
     }

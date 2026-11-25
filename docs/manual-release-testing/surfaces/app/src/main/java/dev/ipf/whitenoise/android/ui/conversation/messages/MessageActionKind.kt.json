@@ -143,6 +143,14 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "Long-press Transcribe action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.transcribe_audio",
+        "test_ids": [
+          "MED-038"
+        ]
       }
     ]
   },

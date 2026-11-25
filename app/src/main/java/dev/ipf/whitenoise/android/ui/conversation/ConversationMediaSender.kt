@@ -308,6 +308,7 @@ internal class ConversationMediaSender(
         completion: StagedMediaSendCompletion,
     ) {
         var replyAccepted = false
+        seeded.forEach { controller.retainedMediaUploads.get(it.key)?.draftSendClearToken = pendingClear }
         uploadStagedAttachments(seeded, releases) {
             if (isReply) {
                 replyAccepted = true

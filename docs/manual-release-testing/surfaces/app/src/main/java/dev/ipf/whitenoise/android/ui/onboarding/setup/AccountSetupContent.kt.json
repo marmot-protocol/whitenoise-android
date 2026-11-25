@@ -4,14 +4,6 @@
   "categories": {
     "settings_controls": [
       {
-        "surface": "R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_approval_saved_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_approval_saved_pending",
@@ -23,14 +15,6 @@
         "surface": "R.string.setup_cancellation_saved_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_cancellation_saved_pending",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_check_discovery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_check_discovery",
         "test_ids": [
           "ONB-017"
         ]
@@ -80,14 +64,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_open_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_open_chats",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_optional_profile_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_optional_profile_help",
@@ -120,25 +96,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_resume_checks",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_resume_checks",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_retry_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_retry_help",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_review_changes",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_review_changes",
         "test_ids": [
           "ONB-017"
         ]
@@ -209,14 +169,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_remove_relay",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_remove_relay",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_repair_edit_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_repair_edit_unavailable",
@@ -238,6 +190,14 @@
         "anchor": "R.string.onboarding_details_expanded",
         "test_ids": [
           "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_resume_checks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_resume_checks",
+        "test_ids": [
+          "ONB-013"
         ]
       }
     ],
@@ -338,22 +298,6 @@
         ]
       },
       {
-        "surface": "SetupEditorActions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "fun SetupEditorActions(",
-        "test_ids": [
-          "ONB-017",
-          "ONB-013",
-          "ONB-014",
-          "ONB-015",
-          "ONB-016",
-          "ONB-018",
-          "ONB-019",
-          "ONB-021",
-          "ONB-023"
-        ]
-      },
-      {
         "surface": "AccountSetupPreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "fun AccountSetupPreview(",
@@ -413,14 +357,6 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "ONB-020"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_approval_saved_pending",
         "test_ids": [
@@ -434,14 +370,6 @@
         "anchor": "R.string.setup_cancellation_saved_pending",
         "test_ids": [
           "ONB-020"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_check_discovery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_check_discovery",
-        "test_ids": [
-          "ONB-015"
         ]
       },
       {
@@ -468,16 +396,6 @@
         "test_ids": [
           "ONB-016",
           "ONB-017"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_open_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_open_chats",
-        "test_ids": [
-          "ONB-013",
-          "ONB-019",
-          "ONB-021"
         ]
       },
       {
@@ -515,30 +433,11 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_resume_checks",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_resume_checks",
-        "test_ids": [
-          "ONB-013",
-          "ONB-019",
-          "ONB-021"
-        ]
-      },
-      {
         "surface": "Imported-account setup: R.string.setup_retry_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_retry_help",
         "test_ids": [
           "ONB-015"
-        ]
-      },
-      {
-        "surface": "Imported-account setup: R.string.setup_review_changes",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_review_changes",
-        "test_ids": [
-          "ONB-016",
-          "ONB-017"
         ]
       },
       {
@@ -602,6 +501,24 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "surface": "Direct removal preserves native finding provenance",
         "anchor": ".forEach { SetupFindingEvidence(it) }",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Setup failure callout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": ".testTag(\"setup-failure\")",
+        "test_ids": [
+          "ONB-013",
+          "ONB-019",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "Retry-first relay timeout moves the full endpoint into Details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "if (focusedTimeout) SetupRelayTimeoutHosts",
         "test_ids": [
           "ONB-017"
         ]

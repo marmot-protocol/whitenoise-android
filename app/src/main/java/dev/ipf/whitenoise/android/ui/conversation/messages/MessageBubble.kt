@@ -50,7 +50,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -62,7 +61,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -122,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
@@ -140,8 +139,11 @@ import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceTranscription
+import dev.ipf.whitenoise.android.ui.conversation.media.animateTranscriptFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberReceivedAudioTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
@@ -465,7 +467,7 @@ internal fun MessageBubble(
             replySwipe.cancel()
         }
     }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val messageTextCopy = rememberMessageTextCopy()
@@ -491,19 +493,23 @@ internal fun MessageBubble(
         }
     }
 
-    /** Registers the plain-text leaf for selection once both its layout and its position are known. */
-    fun reportPlainTextLayoutIfReady() {
-        val layoutResult = textLayouts.plainTextLayoutTracker.layoutResult ?: return
-        val coordinates = textLayouts.plainTextLayoutTracker.coordinates ?: return
-        textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
-    }
+    val textSelection =
+        rememberMessageBubbleTextSelection(
+            textLayouts = textLayouts,
+            inputs =
+                MessageBubbleTextSelection.Inputs(
+                    deleted = deleted,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                ),
+        )
 
     val composerSendMotion = LocalComposerSendMotion.current
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
             composerSendMotion?.destinationText(item.presentationId, coordinates)
             textLayouts.plainTextLayoutTracker.coordinates = coordinates
-            reportPlainTextLayoutIfReady()
+            textSelection.reportPlainTextLayoutIfReady()
         }
     val textSelectionBoundsModifier =
         if (textSelectionMode) {
@@ -549,16 +555,8 @@ internal fun MessageBubble(
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
-    // A received voice message's side transcribe disc drives every recording in this bubble.
-    val audioTranscription =
-        if (mine) {
-            null
-        } else {
-            remember(record.messageIdHex) {
-                dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState(record.messageIdHex)
-            }
-        }
+    val audioTranscription = rememberReceivedAudioTranscription(record.messageIdHex, mine)
+    val voiceTranscription = LocalVoiceTranscription.current
     val translationSource =
         dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
             messageId = record.messageIdHex,
@@ -1008,15 +1006,6 @@ internal fun MessageBubble(
             }
         }
 
-    /** Enters text selection for this message with a cleared layout registry, closing the action menu. */
-    fun beginTextSelection() {
-        if (deleted) return
-        textLayouts.selectableTextLayouts.clear()
-        textLayouts.textSelectionSeeded = false
-        onActionMenuOpenChange(false)
-        onTextSelectionModeChange(true)
-    }
-
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
     val bubbleMedia = rememberBubbleMedia(messageAttachments, pendingAttachmentsForRecord)
     val mediaCaption =
@@ -1084,18 +1073,6 @@ internal fun MessageBubble(
             record.sticker == null
 
     /**
-     * Whether a press lands on this bubble's rendered text rather than a link, the row's empty width or its
-     * chrome, so a double tap there may edit without stealing a link's own activation.
-     */
-    fun ordinaryTextHitAt(pressInWindow: Offset): Boolean =
-        !markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow) &&
-            renderedTextHitAtWindowPosition(
-                textLayouts.selectableTextLayouts.snapshot(),
-                pressInWindow,
-                requireTextLineHit = true,
-            ) != null
-
-    /**
      * Double-tapping the ordinary text of your own editable message opens it for editing (#3388). While this
      * conversation's read-aloud session is active the same gesture keeps seeking there, and other messages seek or
      * start read-aloud as before.
@@ -1105,7 +1082,9 @@ internal fun MessageBubble(
         when {
             pressInWindow == null -> Unit
             canEditMessage && !readAloud.ownsActiveReadAloud() ->
-                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) messageActions.beginEdit()
+                if (recentPressesOnLink.none { it } && textSelection.ordinaryTextHitAt(pressInWindow)) {
+                    messageActions.beginEdit()
+                }
             else -> readAloud.seekSpeakAloudAt(pressInWindow)
         }
     }
@@ -1825,15 +1804,8 @@ internal fun MessageBubble(
                                 !hasMedia &&
                                 visibleTranslation == null,
                     ) { EmojiShortcodes.art(it, customEmoji, receivedEmoji.art) }
-                // Detached media keeps its own rounded Surface. When a caption
-                // is attached, each child delegates its corners and border to
-                // the shared frame so the result is one continuous message card.
-                // Download gating, footer overlays, viewers, and retry behavior
-                // remain owned by the media children.
-                // Long-press on any media tile opens the action menu (not the
-                // viewer); anchored to the bubble top like the accessibility
-                // long-click path. Hoisted so every media call site shares one
-                // definition.
+                // Captions share a frame with their media. Long presses open the
+                // message menu, anchored to the bubble as in the accessibility action.
                 val onMediaLongPress =
                     remember(
                         textSelectionMode,
@@ -1917,6 +1889,15 @@ internal fun MessageBubble(
                     }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val footerVoice =
+                    bubbleMedia.transcriptFooterVoice(
+                        showReceivedVoice = !mine && !deleted,
+                        footerAvailable = !bodyOrWarningInsideBubble && !fileFooterInCard && remoteGiphyMedia == null,
+                    )
+                val completedTranscript =
+                    footerVoice?.let {
+                        audioTranscription?.completedText(voiceTranscription, it.index, it.value.sourceEpoch)
+                    }
                 val soleCaptionedVisual =
                     if (bubbleMedia.hasConfirmedMedia) {
                         bubbleMedia.visuals.singleOrNull()?.value.takeIf {
@@ -2091,7 +2072,7 @@ internal fun MessageBubble(
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
                     composerSendMotion?.destinationLayout(item.presentationId, it)
                     textLayouts.plainTextLayoutTracker.layoutResult = it
-                    reportPlainTextLayoutIfReady()
+                    textSelection.reportPlainTextLayoutIfReady()
                 }
 
                 /** Wraps the message text in a selection container while text selection mode is active. */
@@ -2369,6 +2350,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
+                                contentModifier = Modifier.animateTranscriptFooter(footerVoice != null),
                                 media = {
                                     LookaheadScope {
                                         Column(
@@ -2401,14 +2383,12 @@ internal fun MessageBubble(
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                                 audioTranscription = audioTranscription,
+                                                transcriptFooterAttachment = footerVoice?.index,
                                             )
                                         }
                                     }
                                 },
                             ) {
-                                // No caption: the footer (time/status) for audio,
-                                // file, or multi-visual media still needs a home —
-                                // and so does the failed-send retry row.
                                 BubbleBodyFooterAndRetry(
                                     item = item,
                                     record = record,
@@ -2447,6 +2427,7 @@ internal fun MessageBubble(
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
+                                    completedTranscript = completedTranscript,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = expandBody,
@@ -2608,6 +2589,7 @@ internal fun MessageBubble(
                             translationNoticeOpen = true
                         }
                     },
+                    onTranscribe = audioTranscription?.takeUnless { deleted }?.menuAction(voiceTranscription),
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = !deleted && speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
@@ -2654,7 +2636,7 @@ internal fun MessageBubble(
                     },
                     onShare = ::shareMessage,
                     onSave = ::saveAttachments,
-                    onSelectText = ::beginTextSelection,
+                    onSelectText = textSelection::beginTextSelection,
                     onForward = messageActions::beginForward,
                     onSelect = {
                         if (batchSelectable && !actionsReadOnly) {
@@ -2763,7 +2745,8 @@ internal fun MessageBubble(
                             } else {
                                 null
                             }
-                        if (visiblePoll != null || (hasMedia && !bodyOrWarningInsideBubble)) {
+                        val mediaOnly = hasMedia && !bodyOrWarningInsideBubble && completedTranscript == null
+                        if (visiblePoll != null || mediaOnly) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
@@ -2814,6 +2797,7 @@ internal fun MessageBubble(
                                 mine = mine,
                                 text =
                                     bodyTextToRender
+                                        ?: completedTranscript
                                         ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
                                 document = displayedMarkdownDocument,
                                 time = rememberedMessageBubbleTime(record.recordedAt),
@@ -2980,7 +2964,7 @@ internal fun MessageBubble(
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
                         onDismissRequest = { surfaces.infoSheetOpen = false },
                         onCopy = { value ->
-                            clipboard.setText(AnnotatedString(value))
+                            clipboard.copy(value)
                         },
                     )
                 }

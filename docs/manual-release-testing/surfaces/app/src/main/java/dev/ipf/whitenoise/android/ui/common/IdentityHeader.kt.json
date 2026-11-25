@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityHeader.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "IdentityHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityHeader.kt",
+        "anchor": "internal fun IdentityHeader(",
+        "test_ids": [
+          "ACC-002",
+          "GRP-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "IdentityName",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityHeader.kt",
+        "anchor": "internal fun IdentityName(",
+        "test_ids": [
+          "ACC-002",
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

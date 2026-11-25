@@ -2,10 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -13,6 +11,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.confirmedReplyTarget
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
@@ -23,9 +23,11 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
  * actions, reply swipe, double tap, emoji picker, reaction sheet and delete dialog invoke them.
  *
  * An instance lasts as long as the bubble keeps its [appState], [controller], [surfaces] and [pollOwner]. Every
- * other value an action needs comes from [latest], the bubble's most recent composition. Each action reads it once
- * when it runs and uses that one set of values throughout, including inside the mutation it launches, as the local
- * functions it replaces did with the values they captured.
+ * other value an action needs comes from [latest], the most recent composition that used this instance. Each action
+ * reads it once when it runs and uses that one set of values throughout, including inside the mutation it launches,
+ * as the local functions it replaces did with the values they captured. Once a confirmed send's record id replaces
+ * [pollOwner] and so the instance, an action still holding this instance keeps the values from its own lifetime,
+ * except that Reply, Edit and a reaction target the confirmed message (see [actionRecord]).
  */
 internal class MessageBubbleActions(
     private val appState: WhiteNoiseAppState,
@@ -46,18 +48,31 @@ internal class MessageBubbleActions(
         val displayedBody: String,
         val messageTextCopy: MessageTextCopy,
         val localReactionMotion: LocalReactionMotion,
-        val clipboard: ClipboardManager,
+        val clipboard: ClipboardCopier,
         val onActionMenuOpenChange: (Boolean) -> Unit,
         val onForwardMenuHandoff: () -> Unit,
     ) {
         val record: AppMessageRecordFfi get() = item.record
     }
 
+    /**
+     * The message Reply, Edit and a reaction act on. Usually [Inputs.record]. A menu action queued behind the exit
+     * animation can run on a replaced instance after the pending send it was opened for confirmed; that send's
+     * row is then gone, and its client token resolves through the controller's local-send mapping to the confirmed
+     * row, so Edit opens the text the timeline now shows. When nothing resolves, the record is used unchanged.
+     */
+    private fun Inputs.actionRecord(): AppMessageRecordFfi {
+        if (controller.currentActionTimelineItem(record.messageIdHex) != null) return record
+        val confirmedId = controller.confirmedReplyTarget(record.messageIdHex).takeIf { it != record.messageIdHex }
+        return confirmedId?.let(controller::currentActionTimelineItem)?.record ?: record
+    }
+
     /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
     fun beginReply() {
         with(latest.value) {
             if (deleted || actionsReadOnly) return
-            val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
+            val target =
+                if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else actionRecord()
             controller.replyingTo = target
             onActionMenuOpenChange(false)
         }
@@ -132,12 +147,13 @@ internal class MessageBubbleActions(
             if (deleted || actionsReadOnly) return
             // Route via launchMutation: same survives-navigation rationale as delete/send.
             val reactionOrigin = localReactionMotion.takeOrigin(emoji)
+            val actionRecord = if (isPollRecord) record else actionRecord()
             appState.launchMutation {
                 val target =
                     if (isPollRecord) {
                         currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
                     } else {
-                        record
+                        actionRecord
                     }
                 controller.toggleReaction(emoji, target, onLocalIntent = { added ->
                     localReactionMotion.accept(emoji, added, reactionOrigin)
@@ -159,7 +175,7 @@ internal class MessageBubbleActions(
                 } else {
                     visibleTranslation ?: displayedBody
                 }
-            text?.let { clipboard.setText(AnnotatedString(it)) }
+            text?.let { clipboard.copy(it) }
             onActionMenuOpenChange(false)
         }
     }
@@ -168,7 +184,7 @@ internal class MessageBubbleActions(
     fun copyMarkdownLink(url: String) {
         with(latest.value) {
             if (deleted) return
-            clipboard.setText(AnnotatedString(url))
+            clipboard.copy(url)
             onActionMenuOpenChange(false)
         }
     }
@@ -191,7 +207,7 @@ internal class MessageBubbleActions(
             if (deleted || actionsReadOnly) return
             onActionMenuOpenChange(false)
             controller.replyingTo = null
-            controller.beginMessageEdit(record.messageIdHex)
+            controller.beginMessageEdit(actionRecord().messageIdHex)
         }
     }
 }
@@ -200,7 +216,10 @@ internal class MessageBubbleActions(
  * Remembers [MessageBubbleActions] for the bubble's owner: its app state, controller, surfaces and poll owner, the
  * values the old local functions captured that stay fixed for a mounted message. [inputs] is this composition's
  * snapshot of everything else and is only read when an action runs, so it adds no snapshot read to composition and
- * a new row, menu callback or delete state never needs a new instance.
+ * a new row, menu callback or delete state never needs a new instance. It is updated on every composition like
+ * `rememberUpdatedState`, but in a state remembered on the same keys as the instance, so a replaced instance, such
+ * as one a menu action queued behind the exit animation still holds after a pending send confirms, never sees the
+ * confirmed message's values.
  */
 @Composable
 internal fun rememberMessageBubbleActions(
@@ -210,7 +229,8 @@ internal fun rememberMessageBubbleActions(
     pollOwner: PollMessageActionOwner,
     inputs: MessageBubbleActions.Inputs,
 ): MessageBubbleActions {
-    val latest = rememberUpdatedState(inputs)
+    val latest = remember(appState, controller, surfaces, pollOwner) { mutableStateOf(inputs) }
+    latest.value = inputs
     return remember(appState, controller, surfaces, pollOwner) {
         MessageBubbleActions(
             appState = appState,

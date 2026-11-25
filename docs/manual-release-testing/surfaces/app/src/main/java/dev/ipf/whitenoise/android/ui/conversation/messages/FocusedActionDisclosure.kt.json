@@ -1,0 +1,101 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "focusedActionDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "fun focusedActionDisclosure(",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "Grid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "fun Grid(",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "Cell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "fun Cell(",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "Modifier.focusedActionDisclosureState",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "fun Modifier.focusedActionDisclosureState(",
+        "test_ids": [
+          "MSG-050"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:more_message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.more_message_actions",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:fewer_message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.fewer_message_actions",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:explanation_message_action_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.explanation_message_action_more",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:explanation_message_action_fewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.explanation_message_action_fewer",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:message_actions_all_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.message_actions_all_shown",
+        "test_ids": [
+          "MSG-050"
+        ]
+      },
+      {
+        "surface": "setting:message_actions_common_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "R.string.message_actions_common_shown",
+        "test_ids": [
+          "MSG-050"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Opening More actions unfolds the hidden rows and grows the panel on the app's open and close curves",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedActionDisclosure.kt",
+        "anchor": "class FocusedActionReveal(",
+        "test_ids": [
+          "MSG-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

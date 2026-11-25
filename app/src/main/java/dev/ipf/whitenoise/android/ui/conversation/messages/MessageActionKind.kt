@@ -16,6 +16,7 @@ internal enum class MessageActionKind {
     Speak,
     SpeakCodeLiterally,
     Translate,
+    Transcribe,
     Forward,
     KeepOnScreen,
     ShowLess,
@@ -49,6 +50,7 @@ internal fun messageActionKinds(
     canSpeak: Boolean,
     canSpeakCodeLiterally: Boolean = false,
     canTranslate: Boolean = false,
+    canTranscribe: Boolean = false,
     canForward: Boolean,
     canKeepOnScreen: Boolean = false,
     canShowLess: Boolean = false,
@@ -57,7 +59,7 @@ internal fun messageActionKinds(
     canInfo: Boolean = true,
     canReport: Boolean = false,
 ): List<MessageActionKind> =
-    // Keep on screen leads so it remains in the first row of a two-column menu.
+    // Keep on screen leads the actions behind More actions, so it opens the full set's first new row.
     listOf(
         MessageActionKind.KeepOnScreen to canKeepOnScreen,
         MessageActionKind.ShowLess to canShowLess,
@@ -69,12 +71,46 @@ internal fun messageActionKinds(
         MessageActionKind.Save to canSave,
         MessageActionKind.CopyText to canCopyText,
         MessageActionKind.Translate to canTranslate,
+        MessageActionKind.Transcribe to canTranscribe,
         MessageActionKind.Speak to canSpeak,
         MessageActionKind.SpeakCodeLiterally to (canSpeak && canSpeakCodeLiterally),
         MessageActionKind.Select to canSelect,
         MessageActionKind.Info to canInfo,
         MessageActionKind.Report to canReport,
     ).filter { (_, enabled) -> enabled }.map { (kind, _) -> kind }
+
+/**
+ * The long-press menu's first level, in display order (#4077). Reactions sit above it; every other
+ * available action, Keep on screen and Delete included, waits behind More actions. Show less stays here
+ * because collapsing an expanded long message is often why it was pressed.
+ */
+private val firstLevelMessageActionKinds =
+    listOf(
+        MessageActionKind.ShowLess,
+        MessageActionKind.Reply,
+        MessageActionKind.Edit,
+        MessageActionKind.CopyText,
+        MessageActionKind.Forward,
+        MessageActionKind.Save,
+    )
+
+/** Whether [kind] belongs on the menu's first level; null is Delete, which does not. */
+internal fun isFirstLevelMessageAction(kind: MessageActionKind?): Boolean = kind in firstLevelMessageActionKinds
+
+/** [kinds] with the first-level actions leading in their own order and the rest after them, unchanged. */
+internal fun messageActionMenuOrder(kinds: List<MessageActionKind>): List<MessageActionKind> =
+    kinds.sortedBy { kind ->
+        firstLevelMessageActionKinds.indexOf(kind).takeIf { it >= 0 } ?: firstLevelMessageActionKinds.size
+    }
+
+/**
+ * Whether [actions] need a More actions disclosure: at least one first-level action to show without
+ * it, and at least two to hide behind it, since a disclosure for one action takes that action's room.
+ */
+internal fun <T> hasMoreMessageActions(
+    actions: List<T>,
+    firstLevel: (T) -> Boolean,
+): Boolean = actions.any(firstLevel) && actions.count { !firstLevel(it) } > 1
 
 /**
  * Column widths for actions whose one-line cell widths are [cellWidths], in menu order.
@@ -134,6 +170,7 @@ private val messageActionLabelResources =
         MessageActionKind.Speak to R.string.read_aloud,
         MessageActionKind.SpeakCodeLiterally to R.string.read_code_literally,
         MessageActionKind.Translate to R.string.translation_title,
+        MessageActionKind.Transcribe to R.string.transcribe_audio,
         MessageActionKind.Forward to R.string.forward,
         MessageActionKind.KeepOnScreen to R.string.floating_keep,
         MessageActionKind.Share to R.string.shared_media_share,
@@ -157,6 +194,7 @@ private val messageActionIconResources =
         MessageActionKind.Speak to R.drawable.ic_record_voice_over,
         MessageActionKind.SpeakCodeLiterally to R.drawable.ic_code,
         MessageActionKind.Translate to R.drawable.ic_translate,
+        MessageActionKind.Transcribe to R.drawable.ic_mic,
         MessageActionKind.Forward to R.drawable.ic_forward,
         MessageActionKind.Report to R.drawable.ic_emoji_flags,
         MessageActionKind.KeepOnScreen to R.drawable.ic_floating_message,

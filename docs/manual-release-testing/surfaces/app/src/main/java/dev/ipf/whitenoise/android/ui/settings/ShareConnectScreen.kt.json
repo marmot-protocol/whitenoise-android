@@ -73,9 +73,9 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:back",
+        "surface": "Shared top bar: Share & Connect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
-        "anchor": "R.string.back",
+        "anchor": "WhiteNoiseTopBar(",
         "test_ids": [
           "SET-001",
           "NAV-004"

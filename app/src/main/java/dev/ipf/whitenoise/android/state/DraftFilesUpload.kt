@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import java.io.File
 
 /** How many times consuming a sent send's leftovers reads a draft again after another save moved it. */
 private const val MAX_SENT_DRAFT_CONSUME_ATTEMPTS = 3
@@ -33,6 +34,7 @@ internal suspend fun MarmotInterface.uploadComposerDraftFilesWithToken(
     upload: DraftFilesUpload,
     control: MediaFileTransferControlFfi,
     token: String,
+    verificationDirectory: File,
 ): DurableComposerMediaUpload {
     recoveredDraftFilesSend(account, group, upload, token)?.let { return it }
     val selected = selectedMessageDraft(account, group)
@@ -41,6 +43,7 @@ internal suspend fun MarmotInterface.uploadComposerDraftFilesWithToken(
         checkNotNull(draft?.let { heldDraftFileIds(it, upload.attachments) }) {
             "the draft no longer holds this send's stored files"
         }
+    verifySelectedDraftPdfMetadata(account, selected.revision, upload.attachments, verificationDirectory)
     return DurableComposerMediaUpload(
         upload = uploadMessageDraftAttachments(account, selected.revision, ids, null, control),
         acceptance = null,
@@ -63,6 +66,7 @@ internal suspend fun MarmotInterface.uploadOwnedDraftCopiesWithToken(
 ): DurableComposerMediaUpload {
     require(!request.send) { "owned draft copies upload before admission" }
     recoveredDraftFilesSend(account, group, upload, token)?.let { return it }
+    verifyCopiedDraftPdfMetadata(request)
     return DurableComposerMediaUpload(
         upload = uploadMediaFiles(account, group, request, control),
         acceptance = null,
@@ -92,20 +96,27 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
     group: String,
     references: List<MediaAttachmentReferenceFfi>,
     retained: RetainedMediaUpload,
-    token: String,
+    admission: DraftFilesAdmission,
 ): SendSummaryFfi =
     if (retained.isDraftStored) {
         val upload = DraftFilesUpload(retained.attachments, retained.caption)
-        val admission = DraftFilesAdmission(retained.draftUploadRevision, token)
         sendComposerDraftFiles(account, group, references, upload, admission)
     } else {
-        sendComposerMedia(account, group, references, retained.caption, token, replyRevision = retained.replyRevision)
+        sendComposerMedia(
+            account,
+            group,
+            references,
+            retained.caption,
+            admission.token,
+            replyRevision = retained.replyRevision,
+        )
     }
 
-/** The draft revision a send of stored files may consume, if any, and the client token it is admitted with. */
+/** The token, selected revision and text ownership of an admitted send. */
 internal data class DraftFilesAdmission(
     val consuming: MessageDraftRevisionFfi?,
     val token: String,
+    val ownsCaption: () -> Boolean = { false },
 )
 
 /**
@@ -132,20 +143,21 @@ internal suspend fun MarmotInterface.sendComposerDraftFiles(
                 admission.consuming,
             )
         }
-    consumeSentDraftFiles(account, group, upload)
+    consumeSentDraftFiles(account, group, upload, admission.ownsCaption)
     return summary
 }
 
 /**
  * Removes what an admitted send of stored files left in the selected draft: each of its files the draft still holds,
- * and the caption while the draft's text is still exactly it. Text typed since, a reply and attachments added since
- * stay. A draft left empty is cleared. Best effort: the send is already admitted, so a failure keeps the draft as is.
+ * and its matching caption while the send still owns the composer text. A later edit can contain identical text.
+ * Newer text, the reply and attachments added since stay. A draft left empty is cleared. Cleanup is best effort.
  */
 @Suppress("ReturnCount", "SwallowedException") // Admitted either way: a draft that cannot be tidied stays as it is.
 internal fun MarmotInterface.consumeSentDraftFiles(
     account: String,
     group: String,
     upload: DraftFilesUpload,
+    ownsCaption: () -> Boolean = { false },
 ) {
     repeat(MAX_SENT_DRAFT_CONSUME_ATTEMPTS) {
         val selected = selectedDraftOrNull(account, group) ?: return
@@ -153,7 +165,7 @@ internal fun MarmotInterface.consumeSentDraftFiles(
         val sent = draft.mediaAttachments.filter { sentFileOf(it, upload.attachments) }.mapTo(HashSet()) { it.id }
         if (sent.isEmpty()) return
         val kept = draft.mediaAttachments.filterNot { it.id in sent }
-        val text = draft.content.takeUnless { it.trim() == upload.caption.orEmpty().trim() }.orEmpty()
+        val text = draft.content.takeUnless { ownsCaption() && it.trim() == upload.caption.orEmpty().trim() }.orEmpty()
         try {
             if (kept.isEmpty() && text.isBlank() && draft.replyToMessageIdHex == null) {
                 clearMessageDraftIfRevision(account, selected.revision)

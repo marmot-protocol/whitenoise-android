@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TransientFeedback.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Copied confirmation on Android 12 and earlier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TransientFeedback.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "ACC-002",
+          "RDR-002",
+          "SET-019"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -56,7 +56,7 @@ import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import kotlinx.coroutines.CancellationException
@@ -509,7 +509,7 @@ internal fun MediaVideoBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = modifier.then(imageBubbleSizing(bubbleAspectRatio, sourceShortSideFromDim(reference.dim))),
     ) {
         Box(contentAlignment = Alignment.Center) {

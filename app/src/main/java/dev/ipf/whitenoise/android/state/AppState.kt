@@ -1495,7 +1495,7 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val retainedConversationStates =
+    internal val retainedConversationStates =
         RetainedConversationStates(
             MAX_RETAINED_CONVERSATION_STATES,
             isProtected = inFlightMediaUploads::hasUploads,

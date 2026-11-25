@@ -29,6 +29,7 @@ internal class RetainedMediaUpload(
     // The draft a send of stored draft files may consume on admission: the one it uploaded from, while that draft
     // said exactly what it sends.
     var draftUploadRevision: MessageDraftRevisionFfi? = null
+    var draftSendClearToken: DraftSendClearToken? = null
 
     // Private copies of this send's stored draft files, by draft id, taken once an upload from the draft failed.
     private var draftCopies: Map<String, StagedUploadSource> = emptyMap()

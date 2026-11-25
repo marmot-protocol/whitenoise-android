@@ -4,6 +4,6 @@ name: presentation-text-loading
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible: Maestro complete filename.txt
 - assertVisible: Loading preview…
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

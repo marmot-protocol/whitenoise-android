@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -36,7 +37,7 @@ internal fun QrCodeImage(
         value = withContext(Dispatchers.Default) { qrBitmap(content, 900).asImageBitmap() }
     }
 
-    Surface(color = Color.White, shape = RoundedCornerShape(20.dp), tonalElevation = 1.dp) {
+    Surface(color = Color.White, shape = RoundedCornerShape(Radii.lg), tonalElevation = 1.dp) {
         if (image == null) {
             Box(Modifier.size(257.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()

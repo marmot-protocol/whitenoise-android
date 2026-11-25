@@ -3,25 +3,20 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
@@ -34,7 +29,8 @@ import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 /** Lifecycle-aware route; the process-owned controller survives Activity recreation and signer handoff. */
@@ -109,12 +105,26 @@ internal fun AccountSetupContent(
         }
     }
     BackHandler(onBack = back)
-    SetupPage(stringResource(R.string.setup_title), back, actions = {}) {
+    val actions: @Composable ColumnScope.() -> Unit = {
+        SetupPinnedActions(
+            state,
+            fields,
+            onAction,
+            onEdit,
+            onEditorChange,
+            onSaveEditor,
+            onDismissEditor,
+            onReconnect,
+            onOpenChats,
+            onRemoveRelay,
+        )
+    }
+    SetupPage(stringResource(R.string.setup_title), back, actions.takeIf { state.hasPinnedActions }) {
         SetupStageProgress(state)
         SetupErrors(state, onReconnect)
-        when {
-            state.editor != null -> {
-                val editor = state.editor
+        when (state.setupSurface()) {
+            SetupSurface.Editor -> {
+                val editor = checkNotNull(state.editor)
                 Text(
                     stringResource(
                         if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
@@ -127,60 +137,30 @@ internal fun AccountSetupContent(
                 )
                 SetupEditorContent(editor, checkNotNull(fields), state.busy, randomName, step?.findings.orEmpty())
                 state.relayRemovalIssue?.let { issue ->
-                    Text(
-                        stringResource(
-                            if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
-                                R.string.setup_repair_edit_unavailable
-                            } else {
-                                R.string.setup_add_relay_before_saving
-                            },
-                        ),
-                        color = MaterialTheme.colorScheme.error,
+                    WhiteNoiseCallout(
+                        text =
+                            stringResource(
+                                if (issue == RelayRemovalIssue.UNSAFE_DECLARATION) {
+                                    R.string.setup_repair_edit_unavailable
+                                } else {
+                                    R.string.setup_add_relay_before_saving
+                                },
+                            ),
+                        icon = R.drawable.ic_error,
+                        isError = true,
                     )
                 }
-                SetupEditorActions(
-                    editor,
-                    state.busy,
-                    editor.action != OnboardingActionFfi.EDIT_RELAYS ||
-                        fields.current(editor).canReviewRelayEdit,
-                    onSave = {
-                        onEditorChange(fields.current(editor))
-                        onSaveEditor()
-                    },
-                    onDismiss = onDismissEditor,
-                )
             }
-            snapshot?.ready == true -> {
-                SetupProgress(ready = true)
-                WhiteNoiseButton(
-                    onClick = onOpenChats,
-                    enabled = !snapshot.cancellationPending && !state.busy,
-                    modifier = Modifier.fillMaxWidth().testTag("setup-open-chats"),
-                ) { Text(stringResource(R.string.setup_open_chats)) }
-            }
-            state.busy ||
-                (
-                    !state.error &&
-                        !state.disconnected &&
-                        !state.staleDecision &&
-                        (
-                            snapshot == null ||
-                                state.optionalMetadataPending ||
-                                (
-                                    step?.status == dev.ipf.marmotkit.OnboardingStatusFfi.CHECKING &&
-                                        step.actions.isEmpty() &&
-                                        snapshot.proposal == null
-                                )
-                        )
-                ) -> {
+            SetupSurface.Ready -> SetupProgress(ready = true)
+            SetupSurface.Progress -> {
                 SetupProgress()
                 if (snapshot != null && step != null) SetupOperationNotice(snapshot, step, showCancellation = true)
             }
-            else -> {
+            SetupSurface.Decision -> {
                 if (step != null) {
                     SetupDecisionHeading(state)
                     SetupDecisionContent(state)
-                    SetupDirectRelayRemoval(state, onRemoveRelay)
+                    SetupDirectRelayRemoval(state)
                     if (snapshot?.proposal?.relayRepair != null &&
                         OnboardingActionFfi.APPROVE_REPAIR in step.actions
                     ) {
@@ -188,11 +168,6 @@ internal fun AccountSetupContent(
                             stringResource(R.string.setup_relay_publication_scope),
                             style = MaterialTheme.typography.bodySmall,
                         )
-                    }
-                    val blockedByFailure = state.error || state.staleDecision || state.optionalMetadataPending
-                    val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
-                    if (!blockedByFailure && (!state.disconnected || reconnectOffered)) {
-                        SetupActionButtons(state, onAction, onEdit)
                     }
                 }
             }
@@ -219,54 +194,45 @@ internal fun AccountSetupContent(
     }
 }
 
-/** Single exact endpoint removal enters native review; all other repair choices remain below. */
+/** Names the single exact endpoint the pinned Remove action takes into native review. */
 @Composable
-private fun SetupDirectRelayRemoval(
-    state: AccountSetupState,
-    onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
-) {
-    val snapshot = state.snapshot
+private fun SetupDirectRelayRemoval(state: AccountSetupState) {
     val step = state.currentStep
     val endpoint = state.directRemovalEndpoint()
-    if (snapshot == null || step == null || endpoint == null) return
-    val revision = snapshot.revision
-    val recoveryEpoch = snapshot.recoveryEpoch
+    if (state.snapshot == null || step == null || endpoint == null) return
     Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
     step.findings
         .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint }
         .distinct()
         .forEach { SetupFindingEvidence(it) }
-    WhiteNoiseButton(
-        onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
-        enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
-        modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
-    ) {
-        Icon(painterResource(R.drawable.ic_delete), null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.setup_remove_relay))
-    }
 }
 
 /** Idle checkpoint inspection remains available even when a saved operation offers no mutation yet. */
 internal val AccountSetupState.checklistInspectionStep: OnboardingStepFfi?
     get() = currentStep?.takeIf { !busy }?.step
 
-/** Separates connection failure from a decision that became stale while it was on screen. */
+/**
+ * Separates connection failure from a decision that became stale. Resume is pinned with the other actions, except in
+ * the editor, where it stays here so the keyboard keeps room for the field being edited.
+ */
 @Composable
 private fun SetupErrors(
     state: AccountSetupState,
     onReconnect: () -> Unit,
 ) {
-    val connectionLost = state.disconnected && state.snapshot?.ready != true
-    if (state.error || connectionLost || state.staleDecision) {
-        Text(
-            stringResource(if (state.staleDecision) R.string.setup_stale else R.string.setup_retry_help),
-            color = MaterialTheme.colorScheme.error,
+    if (state.showsSetupFailure) {
+        WhiteNoiseCallout(
+            text = stringResource(if (state.staleDecision) R.string.setup_stale else R.string.setup_retry_help),
+            modifier = Modifier.testTag("setup-failure"),
+            icon = R.drawable.ic_error,
+            isError = true,
         )
-        if (state.snapshot?.ready != true) {
-            OutlinedButton(onClick = onReconnect, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.setup_resume_checks))
-            }
+        if (state.editor != null && state.snapshot?.ready != true) {
+            WhiteNoiseOutlinedButton(
+                onClick = onReconnect,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth().testTag("setup-resume-checks"),
+            ) { Text(stringResource(R.string.setup_resume_checks)) }
         }
     }
 }
@@ -302,6 +268,7 @@ private fun SetupDecisionContent(state: AccountSetupState) {
     }
 }
 
+/** Keeps findings already summarized in the heading available under Details. */
 @Composable
 private fun SetupStepFindings(
     state: AccountSetupState,
@@ -311,6 +278,8 @@ private fun SetupStepFindings(
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
     val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
+    val focusedTimeout = state.focusesRelayTimeout()
+    if (focusedTimeout) SetupRelayTimeoutHosts(step.findings)
     step.findings
         .distinct()
         .filterNot { finding ->
@@ -319,7 +288,8 @@ private fun SetupStepFindings(
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || directRemovalFinding
+            val summarizedTimeout = focusedTimeout && finding.issue == OnboardingIssueFfi.TIMED_OUT
+            routineDeviceNotice || directRemovalFinding || summarizedTimeout
         }.forEach { finding ->
             SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
         }
@@ -382,35 +352,6 @@ private fun SetupProposalContent(
             SetupNotice(proposal.writeRelays.joinToString("\n").ifEmpty { stringResource(R.string.setup_empty_list) })
         }
     }
-}
-
-/** Saving still creates a review proposal; the separate native approval remains mandatory. */
-@Composable
-private fun SetupEditorActions(
-    editor: SetupEditor,
-    busy: Boolean,
-    canSave: Boolean,
-    onSave: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    WhiteNoiseButton(
-        onClick = onSave,
-        enabled = !busy && canSave,
-        modifier = Modifier.fillMaxWidth().testTag("setup-editor-save"),
-    ) {
-        val label =
-            if (editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS) {
-                R.string.setup_check_discovery
-            } else {
-                R.string.setup_review_changes
-            }
-        Text(stringResource(label))
-    }
-    TextButton(
-        onClick = onDismiss,
-        enabled = !busy,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(stringResource(R.string.cancel)) }
 }
 
 internal val setupEditorActions =

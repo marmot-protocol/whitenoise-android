@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -40,6 +41,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.stickerFailureDetail
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
@@ -194,12 +196,7 @@ internal fun stickerPackTitle(pack: StickerPackFfi): String {
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerSectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = WhiteNoiseSpacing.Related).semantics { heading() },
-    )
+    SectionHeader(text, contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related))
 }
 
 /** Secondary explanatory text inside a sticker page. */

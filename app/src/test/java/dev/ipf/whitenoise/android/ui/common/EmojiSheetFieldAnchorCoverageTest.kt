@@ -52,8 +52,11 @@ class EmojiSheetFieldAnchorCoverageTest {
         assertTrue("fieldAnchor = anchor" in action)
 
         val newGroup = appModuleSource("$NEW_CHAT/NewGroupSetupContent.kt")
-        assertTrue(".emojiSheetFieldAnchor(draft.nameEmojiAnchor)" in newGroup)
-        assertTrue("openBelowName(actions.emoji)" in newGroup)
+        val setup = newGroup.functionBody("NewGroupSetupContent")
+        val nameField = newGroup.functionBody("GroupSetupNameField")
+        assertTrue("GroupSetupNameField(draft, state, customize, actions.emoji)" in setup)
+        assertTrue(".emojiSheetFieldAnchor(draft.nameEmojiAnchor)" in nameField)
+        assertTrue("openBelowName(onEmoji)" in nameField)
     }
 
     private companion object {

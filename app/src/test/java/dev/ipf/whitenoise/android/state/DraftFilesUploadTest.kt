@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
+import dev.ipf.marmotkit.MediaFileUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
@@ -17,16 +19,27 @@ import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.media.editor.nativeHandleStub
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
+import dev.ipf.whitenoise.android.media.pdf.pdfFixture
+import dev.ipf.whitenoise.android.ui.profile.personTestGroup
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** Pins how a send of stored draft files uploads from the draft by id and admits without overwriting a newer draft. */
 class DraftFilesUploadTest {
+    @get:Rule val verificationFiles = TemporaryFolder()
+
     /** A draft that says exactly the send uploads its stored file by id, saves nothing and may be consumed. */
     @Test
     fun exactDraftUploadsByIdAndMayBeConsumed() =
@@ -34,9 +47,9 @@ class DraftFilesUploadTest {
             val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
             val captured = engine.revision
 
-            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            val outcome = engine.upload(send("clip"))
 
-            assertEquals(listOf("localSendStatus", "selectedMessageDraft", "upload"), engine.calls)
+            assertEquals(listOf("localSendStatus", "selectedMessageDraft", "read", "upload"), engine.calls)
             assertSame(captured, engine.uploadRevision)
             assertEquals(listOf("clip"), engine.uploadedIds)
             assertSame(captured, outcome.draftRevision)
@@ -55,7 +68,7 @@ class DraftFilesUploadTest {
                 val engine = DraftUploadEngine(draft = draft)
 
                 val outcome =
-                    engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+                    engine.upload(send("clip"))
 
                 assertEquals(listOf("clip"), engine.uploadedIds)
                 assertFalse("draft $draft must not be saved", "save" in engine.calls)
@@ -78,7 +91,7 @@ class DraftFilesUploadTest {
 
                 val failure =
                     runCatching {
-                        engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+                        engine.upload(send("clip"))
                     }.exceptionOrNull()
 
                 assertTrue("draft $draft must refuse the send", failure is IllegalStateException)
@@ -92,7 +105,7 @@ class DraftFilesUploadTest {
         runBlocking {
             val engine = DraftUploadEngine(draft = content("typed later", stored("clip")), recovered = true)
 
-            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            val outcome = engine.upload(send("clip"))
 
             assertTrue(outcome.recoveredWithoutUpload)
             assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, outcome.acceptance?.acceptDisposition)
@@ -146,7 +159,7 @@ class DraftFilesUploadTest {
     fun newerDraftSavedDuringASlowUploadKeepsItsText() =
         runBlocking {
             val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
-            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            val outcome = engine.upload(send("clip"))
             engine.saveText("typed later")
 
             val admission = admission(checkNotNull(outcome.draftRevision))
@@ -158,12 +171,12 @@ class DraftFilesUploadTest {
             assertEquals(content("typed later"), reopened)
         }
 
-    /** An attachment added during the upload stays, and the unchanged caption the send carried leaves with its file. */
+    /** Staging another attachment keeps the new pick while the send's still-owned caption is removed. */
     @Test
     fun attachmentAddedDuringTheUploadStays() =
         runBlocking {
             val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
-            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            val outcome = engine.upload(send("clip"))
             engine.addAttachment(stored("added"))
 
             engine.marmot.sendComposerDraftFiles(
@@ -171,7 +184,7 @@ class DraftFilesUploadTest {
                 "group",
                 emptyList(),
                 send("clip"),
-                admission(outcome.draftRevision),
+                DraftFilesAdmission(outcome.draftRevision, "t", ownsCaption = { true }),
             )
 
             assertEquals(content("", stored("added")), engine.current)
@@ -211,6 +224,44 @@ class DraftFilesUploadTest {
             assertNull(outcome.draftRevision)
         }
 
+    /** A retained copy cannot bypass PDF privacy simply because its original upload failed. */
+    @Test
+    fun retryOnlyUploadsVerifiedCopies() =
+        runBlocking {
+            val signed = pdfFixture("signed")
+            val clean = pdfFixture("ghostscript").also { PdfMetadataScrubber.scrub(it) }
+            for (bytes in listOf(signed, clean)) {
+                val copy = verificationFiles.newFile().also { it.writeBytes(bytes) }
+                val attachment =
+                    MediaFileUploadAttachmentRequestFfi(
+                        sourcePath = copy.absolutePath,
+                        expectedSize = bytes.size.toULong(),
+                        fileName = "clip.mp4",
+                        mediaType = "video/mp4",
+                        dim = null,
+                        thumbhash = null,
+                    )
+                val request = MediaFileUploadRequestFfi(listOf(attachment), null, send = false, blossomServer = null)
+                val engine = DraftUploadEngine(draft = null)
+                val upload = send("clip")
+                val outcome =
+                    runCatching {
+                        engine.marmot.uploadOwnedDraftCopiesWithToken("acct", "group", upload, request, control(), "t")
+                    }
+                if (bytes === signed) {
+                    assertTrue(outcome.exceptionOrNull() is UnverifiedStoredDraftPdf)
+                    assertNull(engine.uploadedRequest)
+                } else {
+                    outcome.getOrThrow()
+                    assertSame(request, engine.uploadedRequest)
+                }
+            }
+        }
+
+    /** Uploads through the selected-revision path using the per-test verification directory. */
+    private suspend fun DraftUploadEngine.upload(upload: DraftFilesUpload): DurableComposerMediaUpload =
+        marmot.uploadComposerDraftFilesWithToken("acct", "group", upload, control(), "t", verificationFiles.root)
+
     /** The admission for files uploaded from [revision], if any, with the send's token. */
     private fun admission(revision: MessageDraftRevisionFfi?) = DraftFilesAdmission(revision, "t")
 
@@ -225,6 +276,45 @@ class DraftFilesUploadTest {
             fileName = "$id.mp4",
             draftFile = DraftStoredFile(id, 900L),
         )
+
+    /** Identical words typed for the next message still belong to a newer revision. */
+    @Test
+    fun newerIdenticalCaptionIsNotCleared() =
+        runBlocking {
+            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            val previous = engine.revision
+            engine.saveText("new caption")
+
+            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(previous))
+
+            assertEquals(content("new caption"), engine.current)
+        }
+
+    /** Restored drafts cannot upload a signed PDF disguised as a video, but a scrubbed PDF still uploads. */
+    @Test
+    fun restoredPdfIsVerifiedFromNativeBytesBeforeUpload() =
+        runBlocking {
+            val signed = pdfFixture("signed")
+            val clean = pdfFixture("ghostscript").also { PdfMetadataScrubber.scrub(it) }
+            for (bytes in listOf(signed, clean)) {
+                val descriptor = stored("clip").copy(plaintextSize = bytes.size.toULong())
+                val engine = DraftUploadEngine(content("new caption", descriptor), fileBody = bytes)
+                val pick = storedPick("clip").copy(draftFile = DraftStoredFile("clip", bytes.size.toLong()))
+                val upload = DraftFilesUpload(listOf(pick), "new caption")
+
+                val outcome =
+                    runCatching {
+                        engine.upload(upload)
+                    }
+                if (bytes === signed) {
+                    assertTrue(outcome.exceptionOrNull() is UnverifiedStoredDraftPdf)
+                    assertTrue(engine.uploadedIds.isEmpty())
+                } else {
+                    outcome.getOrThrow()
+                    assertEquals(listOf("clip"), engine.uploadedIds)
+                }
+            }
+        }
 
     /** An in-memory pick that happens to share [id]'s name and type. */
     private fun inlinePick(id: String) = PendingAttachment(byteArrayOf(1), "video/mp4", "$id.mp4")
@@ -247,6 +337,63 @@ class DraftFilesUploadTest {
     private fun control() = nativeHandleStub(MediaFileTransferControlFfi::class.java)
 }
 
+/** Exercises admission and the shelf refresh through the same real controller that owns an in-flight send. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class StoredDraftAcceptanceTest {
+    /** An identical edit captured by the upload cannot consume newer text or leave the reopened shelf stale. */
+    @Test
+    fun acceptedStoredFileRefreshesOnlyItsOwnShelfWithoutConsumingNewText() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val attachment =
+                SelectedMessageDraftAttachmentFfi(
+                    id = "clip",
+                    fileName = "clip.mp4",
+                    mediaType = "video/mp4",
+                    plaintextSize = 900uL,
+                    dim = null,
+                    thumbhash = null,
+                    durationSeconds = null,
+                    waveformSamples = emptyList(),
+                    fileBacked = true,
+                )
+            val engine = DraftUploadEngine(content("caption", attachment))
+            val runtime = AppMarmotRuntime("test", engine.marmot)
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val app =
+                WhiteNoiseAppState(
+                    context = context,
+                    draftStore = DraftStore.forContext(context),
+                    accountIdHexResolver = { null },
+                    accounts = emptyList(),
+                    activeAccountRef = "acct",
+                    initialMarmotRuntime = runtime,
+                    marmotRuntimeFactory = { runtime },
+                )
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val pick =
+                    PendingAttachment(ByteArray(0), "video/mp4", "clip.mp4", draftFile = DraftStoredFile("clip", 900L))
+                val retained = RetainedMediaUpload(listOf(pick), "caption")
+                retained.draftSendClearToken = checkNotNull(app.captureDraftForSend("acct", group.groupIdHex))
+                app.messageDraftRepository.coordinated.acceptMutation("acct", group.groupIdHex)
+                engine.saveText("caption")
+                retained.draftUploadRevision = engine.revision
+                val reopenedRevision = app.nativeComposerCleanupRevision("acct", group.groupIdHex)
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "token")
+
+                assertNull(engine.admittedConsuming)
+                assertEquals(content("caption"), engine.current)
+                assertTrue(app.nativeComposerCleanupRevision("acct", group.groupIdHex) > reopenedRevision)
+                assertEquals(0L, app.nativeComposerCleanupRevision("other", group.groupIdHex))
+            } finally {
+                app.mutationsScope.cancel()
+            }
+        }
+}
+
 /** Draft content holding [attachments] under [text]. */
 private fun content(
     text: String,
@@ -260,6 +407,7 @@ private fun content(
 private class DraftUploadEngine(
     draft: SelectedMessageDraftContentFfi?,
     private val recovered: Boolean = false,
+    private val fileBody: ByteArray = ByteArray(900),
 ) {
     var revision: MessageDraftRevisionFfi = newRevision()
         private set
@@ -350,6 +498,20 @@ private class DraftUploadEngine(
             current = null
             this@DraftUploadEngine.revision = newRevision()
             return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, null)
+        }
+
+        /** Checks that the privacy read uses exactly the selected revision that will be uploaded. */
+        override suspend fun readMessageDraftAttachment(
+            accountRef: String,
+            revision: MessageDraftRevisionFfi,
+            attachmentId: String,
+            offset: ULong,
+            limit: UInt,
+        ): ByteArray {
+            calls += "read"
+            requireCurrent(revision)
+            val start = offset.toInt().coerceAtMost(fileBody.size)
+            return fileBody.copyOfRange(start, minOf(fileBody.size, start + limit.toInt()))
         }
 
         /** Records the ids and revision an upload from the draft names. */

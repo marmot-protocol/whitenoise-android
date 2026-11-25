@@ -19,6 +19,13 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 
 ## Working and validation
 
+- For Android UI design, implementation, and requested design reviews, use the
+  [Android design skill](.agents/skills/white-noise-android-design/SKILL.md) and
+  [illustrated UI guide](docs/android-ui-patterns.md). Monochrome is the default
+  palette. Google Material 3 Expressive is the design standard for all UI,
+  including layout, typography, spacing, shapes, components, and interaction.
+  Use Android platform APIs for system-owned experiences.
+
 - Follow [CI request policy](docs/ci-request-policy.md): batch related fixups into
   one candidate push, reuse exact-head results and request previews only for an
   actual debugging/human-test candidate. All CI-covered compilation, tests,
@@ -73,6 +80,7 @@ Follow [code structure](docs/code-structure.md) and the ownership maps for the
 - New code goes in a topic file in the owning package, never at the end of a file over 600 lines.
 - Split an oversized file as a pure move first.
 - Never raise or add an entry in `SourceFileSizeBaseline.kt`.
+- Page chrome (top bar, scaffold, back arrow or X) follows [UI patterns](docs/ui-patterns.md).
 
 ## Task guides
 

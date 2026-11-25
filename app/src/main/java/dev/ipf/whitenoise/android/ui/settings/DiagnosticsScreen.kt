@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,16 +30,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +50,8 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bootstrapRelayCount
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
+import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -64,9 +61,11 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.statusColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -94,7 +93,7 @@ internal fun DiagnosticsScreen(
     var sendingPing by remember { mutableStateOf(false) }
     var performanceStatus by remember { mutableStateOf(PerformanceDiagnostics.status()) }
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
     val sendToSelfFailedFormat = stringResource(R.string.diagnostic_send_to_self_failed)
 
@@ -221,13 +220,12 @@ internal fun DiagnosticsScreen(
 }
 
 /** Copies only the bounded, closed-schema records retained by the current process session. */
-@Suppress("DEPRECATION")
-private fun copyPerformanceLogs(clipboard: ClipboardManager) {
+private fun copyPerformanceLogs(clipboard: ClipboardCopier) {
     val lines = PerformanceDiagnostics.exportLines()
-    if (lines.isNotEmpty()) clipboard.setText(AnnotatedString(lines.joinToString("\n")))
+    if (lines.isNotEmpty()) clipboard.copy(lines.joinToString("\n"))
 }
 
-/** Presents real diagnostic events in the prototype's card; operational data stays in Health. */
+/** Presents real diagnostic events in the prototype's card, split by [AppDivider]; operational data stays in Health. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun DiagnosticsContent(
@@ -360,7 +358,7 @@ internal fun DiagnosticsContent(
                                     )
                                 }
                                 if (index < entries.lastIndex) {
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
+                                    AppDivider()
                                 }
                             }
                         }
@@ -382,7 +380,7 @@ private fun DiagnosticsStreamIndicator(status: DiagnosticsStreamStatus) {
     ) {
         val color =
             if (status == DiagnosticsStreamStatus.Live) {
-                Color(0xFF188038)
+                MaterialTheme.statusColors.success
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             }
@@ -557,7 +555,7 @@ internal fun DiagnosticRow(
     value: String,
     copyValue: String? = null,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     // Opt-in tap-to-copy: callers provide the full value to copy.
     val copyable = !copyValue.isNullOrEmpty()
     val copyLabel = stringResource(R.string.copy)
@@ -569,7 +567,7 @@ internal fun DiagnosticRow(
                     onClickLabel = copyLabel,
                     role = Role.Button,
                 ) {
-                    clipboard.setText(AnnotatedString(copyValue.orEmpty()))
+                    clipboard.copy(copyValue.orEmpty())
                 }
         } else {
             Modifier.fillMaxWidth()

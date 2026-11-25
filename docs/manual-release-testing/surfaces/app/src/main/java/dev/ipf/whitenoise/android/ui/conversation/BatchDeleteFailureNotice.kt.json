@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+  "legacy_sha256": "75807b31a10a77de914af8392a901205387df52f82a09d30546cb0c5b8dbeb77",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BatchDeleteFailureNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+        "anchor": "fun BatchDeleteFailureNotice(",
+        "test_ids": [
+          "MSG-008"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Batch delete failure summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+        "anchor": "R.string.batch_delete_failure_progress",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "Batch delete failure copy action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "Batch delete failure dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "Batch delete failure retry action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/BatchDeleteFailureNotice.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MSG-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

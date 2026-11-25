@@ -21,7 +21,7 @@
         "test_ids": [
           "MED-003",
           "MED-009",
-          "MED-066"
+          "MED-067"
         ]
       },
       {
@@ -67,7 +67,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
         "anchor": "readDocumentDraft(uri, toFile = true)",
         "test_ids": [
-          "MED-066"
+          "MED-067"
         ]
       }
     ]

@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationDraftRestoration.kt",
         "anchor": "drafts.files.revisioned(",
         "test_ids": [
-          "MED-066"
+          "MED-067"
         ]
       }
     ]

@@ -16,8 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -33,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -107,6 +104,7 @@ internal fun SettingsScreen(
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
+    firstRunHelpRoot: SettingsDetail? = null,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -147,11 +145,20 @@ internal fun SettingsScreen(
     }
     // The profile photo on the home header opens Profile directly, so back returns home instead of Account.
     var profileFromHeader by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    var shareFromWalkthrough by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     val parentOf: (SettingsDetail) -> SettingsDetail? = { target ->
-        if (target == SettingsDetail.Profile && profileFromHeader) null else settingsDetailParent(target)
+        when {
+            target == firstRunHelpRoot -> null
+            target == SettingsDetail.Profile && profileFromHeader -> null
+            target == SettingsDetail.ShareConnect && shareFromWalkthrough -> SettingsDetail.LearnWhiteNoise
+            else -> settingsDetailParent(target)
+        }
     }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
-        if (searchOrigin != null &&
+        shareFromWalkthrough = detail == SettingsDetail.LearnWhiteNoise && destination == SettingsDetail.ShareConnect
+        if (detail != null && detail == firstRunHelpRoot && destination == null) {
+            onBackToChats()
+        } else if (searchOrigin != null &&
             detail == searchOrigin.destination &&
             destination == detail?.let(parentOf)
         ) {
@@ -177,7 +184,12 @@ internal fun SettingsScreen(
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     SettingsRouteMotion(
         target = detail,
-        depth = settingsDetailDepth(detail),
+        depth =
+            if (detail == SettingsDetail.ShareConnect && shareFromWalkthrough) {
+                settingsDetailDepth(SettingsDetail.LearnWhiteNoise) + 1
+            } else {
+                settingsDetailDepth(detail)
+            },
         ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
         suppressMotion = suppressMotion,
         contentVisible = !appState.appLock.screenVisible,
@@ -363,6 +375,11 @@ private fun SettingsDetailRoute(
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)
         SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = onBack)
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = onBack)
+        SettingsDetail.LearnWhiteNoise ->
+            LearnWhiteNoiseScreen(
+                onBack = onBack,
+                onShareProfile = { onDetailChange(SettingsDetail.ShareConnect) },
+            )
         SettingsDetail.Help ->
             HelpScreen(
                 onBack = onBack,
@@ -766,7 +783,10 @@ private fun SettingsProfileHeader(
     }
 }
 
-/** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
+/**
+ * The active profile as one tappable hero [SettingsRichRow]: avatar, name, short key that copies the full key, QR
+ * glyph and chevron.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -787,7 +807,8 @@ private fun SettingsProfileRow(
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ListItem(
+            SettingsRichRow(
+                hero = true,
                 headlineContent = {
                     EmojiLabel(
                         text = account.title,
@@ -833,7 +854,6 @@ private fun SettingsProfileRow(
                     }
                 },
                 trailingContent = { SettingsProfileTrailing() },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -878,30 +898,6 @@ internal fun SettingsHubSection(
                     )
                 }
             }
-        }
-    }
-}
-
-/** Sign out as the last group: a destructive link that opens the production sign-out sheet. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SignOutGroup(onSignOut: () -> Unit) {
-    SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
-        row("sign_out") { context ->
-            SettingsLink(
-                context = context,
-                title = stringResource(R.string.sign_out),
-                explanation = stringResource(R.string.explanation_account_keys_sign_out),
-                onClick = onSignOut,
-                destructive = true,
-                leading = {
-                    SettingsLeadingIcon(
-                        R.drawable.ic_settings_logout,
-                        tint = MaterialTheme.colorScheme.error,
-                        testTag = "settings.icon.sign_out",
-                    )
-                },
-            )
         }
     }
 }

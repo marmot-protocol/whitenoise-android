@@ -23,16 +23,6 @@
           "GRP-013"
         ]
       }
-    ],
-    "settings_controls": [
-      {
-        "surface": "R.string.invite_pending",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRosterMutationUi.kt",
-        "anchor": "R.string.invite_pending",
-        "test_ids": [
-          "GRP-005"
-        ]
-      }
     ]
   },
   "discovery_exceptions": []
