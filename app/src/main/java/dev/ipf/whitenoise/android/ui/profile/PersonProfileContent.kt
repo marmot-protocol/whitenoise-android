@@ -26,7 +26,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -494,7 +496,10 @@ internal fun PersonProfileBottomAction(
     modifier: Modifier = Modifier,
     groupAction: Boolean = false,
 ) {
-    val scrolled = (LocalWhiteNoiseHeaderScroll.current?.state?.overlappedFraction ?: 0f) > 0f
+    val headerScrollState = LocalWhiteNoiseHeaderScroll.current?.state
+    val scrolled by remember(headerScrollState) {
+        derivedStateOf { (headerScrollState?.overlappedFraction ?: 0f) > 0f }
+    }
     val color by animateColorAsState(
         if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         label = "PersonProfileBottomAction",
