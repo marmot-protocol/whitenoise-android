@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
@@ -2610,9 +2611,9 @@ internal fun ChatsScreen(
                                                 key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
                                                 contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
                                             ) {
-                                                ChatListSearchSectionHeader(
-                                                    title = stringResource(R.string.chat_list_filter_groups),
-                                                    testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                SectionHeader(
+                                                    text = stringResource(R.string.chat_list_filter_groups),
+                                                    modifier = Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG),
                                                 )
                                             }
                                         }
@@ -2893,5 +2894,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
-
-private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"

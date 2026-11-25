@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.FollowedPeople
 import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchContentFilterChips
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -111,7 +112,7 @@ class GlobalSearchPresentationScreenshotTest {
                         Column(Modifier.fillMaxWidth().testTag("global-search-preview")) {
                             ChatListTopBar(app, true, query, remember { FocusRequester() }, {}, {}, {}, {}, {}, {})
                             if (person != null) {
-                                ChatListSearchSectionHeader("People", "global-search-heading")
+                                SectionHeader("People", Modifier.testTag("global-search-heading"))
                                 GlobalPersonRow(
                                     "npub1" + "a".repeat(58),
                                     displayName = person.displayName,

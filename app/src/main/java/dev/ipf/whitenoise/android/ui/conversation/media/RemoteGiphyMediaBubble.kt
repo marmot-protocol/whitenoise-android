@@ -57,8 +57,8 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.ui.common.rememberTransientNoticeOf
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.editedLabelTarget
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -269,7 +269,7 @@ internal fun RemoteGiphyMediaCard(
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = Modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         Column {

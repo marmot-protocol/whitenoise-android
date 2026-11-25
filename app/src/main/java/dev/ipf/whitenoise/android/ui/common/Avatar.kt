@@ -33,15 +33,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
-
-private val AvatarPalette =
-    listOf(
-        Color(0xFF006A6A),
-        Color(0xFF8C4A00),
-        Color(0xFF5B5FC7),
-        Color(0xFF006D3B),
-        Color(0xFF9A4055),
-    )
+import dev.ipf.whitenoise.android.ui.theme.AvatarPalette
 
 /**
  * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
@@ -66,7 +58,7 @@ internal fun Avatar(
     onUrlImageDisplayed: ((ImageBitmap?) -> Unit)? = null,
     followedAccount: String? = null,
 ) {
-    val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
+    val color = AvatarPalette.colors[avatarPaletteIndex(seed.hashCode(), AvatarPalette.colors.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
     // re-fetch. key(seed, pictureUrl) re-creates the state holder when either
