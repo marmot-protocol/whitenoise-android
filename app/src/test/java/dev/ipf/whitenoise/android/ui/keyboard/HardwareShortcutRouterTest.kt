@@ -136,15 +136,15 @@ class HardwareShortcutRouterTest {
     fun inChatSearchFollowsThePaneThatOwnsTheKeys() {
         val runs = registerAll()
         var split = true
-        var listOwnsKeys = true
-        router.attachPanes(split = { split }, listOwnsKeys = { listOwnsKeys })
+        var conversationOwnsKeys = false
+        router.attachPanes(split = { split }, conversationOwnsKeys = { conversationOwnsKeys })
 
         assertFalse(router.dispatch(HardwareShortcutCommand.ConversationSearch))
         assertTrue(HardwareShortcutCommand.ConversationSearch !in router.availableCommands())
         assertTrue(router.dispatch(HardwareShortcutCommand.GlobalSearch))
-        listOwnsKeys = false
+        conversationOwnsKeys = true
         assertTrue(router.dispatch(HardwareShortcutCommand.ConversationSearch))
-        listOwnsKeys = true
+        conversationOwnsKeys = false
         split = false
         assertTrue(router.dispatch(HardwareShortcutCommand.ConversationSearch))
 
@@ -152,40 +152,74 @@ class HardwareShortcutRouterTest {
         assertEquals(1, runs.getValue(HardwareShortcutCommand.GlobalSearch))
     }
 
-    /** A compact conversation leaves for Chats, which then runs the carried command exactly once. */
+    /** A compact conversation leaves for Chats, which runs the carried command once the conversation is gone. */
     @Test
     fun compactConversationCarriesChatsCommandsOnce() {
         var exits = 0
-        router.registerChatsReturn(ChatsReturnRoute({ true }) { exits++ })
+        val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) { exits++ })
         var searches = 0
         val chatsSearch = HardwareShortcutHandler(HardwareShortcutCommand.GlobalSearch, { true }) { searches++ }
+        router.register(chatsSearch)
 
         assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL)))
         assertEquals(1, exits)
-        // In-chat search never leaves a compact conversation, and another command's owner cannot take Ctrl+F.
-        assertFalse(HardwareShortcutCommand.ConversationSearch.runsFromChats)
-        router.claimCarried(HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) {})
+        // The outgoing conversation still covers Chats, and another command's owner can never take Ctrl+F.
+        assertFalse(router.canTakeCarried(chatsSearch))
+        removeConversation()
+        assertFalse(router.canTakeCarried(HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) {}))
+        assertTrue(router.canTakeCarried(chatsSearch))
         router.claimCarried(chatsSearch)
         router.claimCarried(chatsSearch)
 
         assertEquals(1, searches)
+        assertEquals(1, exits)
+        assertFalse(HardwareShortcutCommand.ConversationSearch.runsFromChats)
     }
 
-    /** A carried command waits while Chats is unavailable and lapses once its window has passed. */
+    /** While a compact conversation is composed, a retained Chats screen behind it never takes Chats commands. */
     @Test
-    fun carriedCommandsLapseAfterTheirWindow() {
-        router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+    fun composedCompactConversationCoversChats() {
+        var conversationSettled = false
+        var exits = 0
+        router.registerChatsReturn(ChatsReturnRoute({ conversationSettled }) { exits++ })
+        val runs = registerAll()
+
+        assertFalse(router.dispatch(HardwareShortcutCommand.GlobalSearch))
+        assertFalse(router.dispatch(HardwareShortcutCommand.NewMessage))
+        assertEquals(listOf(HardwareShortcutCommand.ConversationSearch), router.availableCommands())
+        conversationSettled = true
+        assertTrue(router.dispatch(HardwareShortcutCommand.NewMessage))
+
+        assertEquals(1, exits)
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.GlobalSearch))
+        assertEquals(0, runs.getValue(HardwareShortcutCommand.NewMessage))
+    }
+
+    /** A carried command waits while Chats is unavailable, runs once it is, and lapses once its window has passed. */
+    @Test
+    fun carriedCommandsWaitForChatsAndLapseAfterTheirWindow() {
         var available = false
         var runs = 0
         val chatsNewMessage = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }) { runs++ }
+        val carryNewMessage = {
+            val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+            router.dispatch(HardwareShortcutCommand.NewMessage)
+            removeConversation()
+        }
 
-        router.dispatch(HardwareShortcutCommand.NewMessage)
+        carryNewMessage()
         router.claimCarried(chatsNewMessage)
-        now += CHATS_RETURN_COMMAND_WINDOW_MS + 1
-        available = true
-        router.claimCarried(chatsNewMessage)
-
         assertEquals(0, runs)
+        available = true
+        now += CHATS_RETURN_COMMAND_WINDOW_MS
+        router.claimCarried(chatsNewMessage)
+        assertEquals(1, runs)
+
+        carryNewMessage()
+        now += CHATS_RETURN_COMMAND_WINDOW_MS + 1
+        router.claimCarried(chatsNewMessage)
+        router.claimCarried(chatsNewMessage)
+        assertEquals(1, runs)
     }
 
     /** Side by side, Chats is already on screen, so a conversation never leaves to run a Chats command. */
@@ -193,7 +227,7 @@ class HardwareShortcutRouterTest {
     fun splitPanesNeverLeaveTheConversation() {
         var exits = 0
         router.registerChatsReturn(ChatsReturnRoute({ true }) { exits++ })
-        router.attachPanes(split = { true }, listOwnsKeys = { false })
+        router.attachPanes(split = { true }, conversationOwnsKeys = { true })
 
         assertFalse(router.dispatch(HardwareShortcutCommand.GlobalSearch))
         assertEquals(0, exits)
@@ -203,8 +237,8 @@ class HardwareShortcutRouterTest {
     @Test
     fun staleFrameDetachKeepsTheNewerFrame() {
         registerAll()
-        val detachOld = router.attachPanes(split = { true }, listOwnsKeys = { true })
-        router.attachPanes(split = { true }, listOwnsKeys = { true })
+        val detachOld = router.attachPanes(split = { true }, conversationOwnsKeys = { false })
+        router.attachPanes(split = { true }, conversationOwnsKeys = { false })
         detachOld()
 
         assertFalse(router.dispatch(HardwareShortcutCommand.ConversationSearch))

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.keyboard
 
 import android.view.KeyEvent
 import android.view.View
-import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,17 +60,10 @@ class HardwareShortcutCompositionTest {
     private val router = HardwareShortcutRouter()
     private val runs = HardwareShortcutCommand.entries.associateWith { mutableIntStateOf(0) }
 
-    /** Sends the activity window's keys through [router] before its views, as `MainActivity.dispatchKeyEvent` does. */
+    /** Installs [router] in front of the activity window's callback, as `MainActivity.onCreate` does. */
     @Before
     fun routeWindowKeysThroughTheRouter() {
-        composeRule.runOnUiThread {
-            val window = composeRule.activity.window
-            val original = window.callback
-            window.callback =
-                object : Window.Callback by original {
-                    override fun dispatchKeyEvent(event: KeyEvent): Boolean = router.handle(event) || original.dispatchKeyEvent(event)
-                }
-        }
+        composeRule.runOnUiThread { installHardwareShortcuts(composeRule.activity.window, router) }
     }
 
     /**
@@ -158,7 +150,10 @@ class HardwareShortcutCompositionTest {
         assertEquals(1, runs.getValue(HardwareShortcutCommand.NewMessage).intValue)
     }
 
-    /** Side by side, Ctrl+Shift+F needs the conversation pane to hold focus or, without focus, to be pressed last. */
+    /**
+     * Side by side, Ctrl+Shift+F needs the conversation pane to hold focus or, without focus, to be pressed last;
+     * before either pane is focused or pressed, neither owns it.
+     */
     @Test
     fun splitPaneFocusDecidesInChatSearch() {
         var clearFocus: () -> Unit = {}
@@ -173,6 +168,8 @@ class HardwareShortcutCompositionTest {
         }
 
         val inChatSearches = runs.getValue(HardwareShortcutCommand.ConversationSearch)
+        assertFalse(press(KeyEvent.KEYCODE_F, CTRL or SHIFT))
+        assertEquals(0, inChatSearches.intValue)
         composeRule.onNodeWithTag(LIST_FIELD).requestFocus()
         press(KeyEvent.KEYCODE_F, CTRL or SHIFT)
         assertEquals(0, inChatSearches.intValue)

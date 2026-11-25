@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 
 // focusable = false keeps the soft keyboard up while this overlay is open.
 // A focusable popup window steals window focus from the conversation's host
@@ -143,6 +144,8 @@ internal fun KeyboardSafePopup(
     Box(modifier) {
         // Keep both nonfocusable windows and the scrim until the exit is drawn.
         if (!surface.visible) return@Box
+        // Keys still reach the activity beneath a nonfocusable popup, so its shortcuts wait for it.
+        HardwareShortcutBlocker()
         if (platformBackCallbacksEnabled()) {
             KeyboardSafePopupPlatformBackHandler(
                 priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,

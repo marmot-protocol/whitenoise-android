@@ -51,9 +51,9 @@
         ]
       },
       {
-        "surface": "Keyboard Shortcuts Helper publication",
+        "surface": "Hardware keyboard shortcut installation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
-        "anchor": "override fun onProvideKeyboardShortcuts(",
+        "anchor": "installHardwareShortcuts(window, hardwareShortcuts)",
         "test_ids": [
           "AXY-021"
         ]

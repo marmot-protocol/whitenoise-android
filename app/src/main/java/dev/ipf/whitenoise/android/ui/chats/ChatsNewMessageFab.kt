@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
 import dev.ipf.whitenoise.android.ui.keyboard.rememberHardwareShortcut
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingControlShown
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
@@ -121,8 +122,9 @@ internal fun ChatsNewMessageFab(
         with(LocalDensity.current) {
             ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
         }
-    // Ctrl+N takes the button's own path, and only while the button offers New Message (#4005).
-    rememberHardwareShortcut(HardwareShortcutCommand.NewMessage, available = current() && !missing) {
+    // Ctrl+N takes the button's own path, and only while the button is shown and offers New Message (#4005).
+    val shown = LocalFloatingControlShown.current
+    rememberHardwareShortcut(HardwareShortcutCommand.NewMessage, available = shown && current() && !missing) {
         onNewMessageOrigin(null)
         onNewMessage()
     }

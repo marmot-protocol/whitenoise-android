@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -20,7 +21,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import dev.ipf.whitenoise.android.MainActivity
 
-/** Replaces [MainActivity]'s router, for tests and previews hosted by another activity. */
+/** Replaces the window's router, for tests and previews hosted by an activity without one. */
 internal val LocalHardwareShortcutRouter = staticCompositionLocalOf<HardwareShortcutRouter?> { null }
 
 /** The router for this window, or null in previews and hosts without hardware shortcuts. */
@@ -47,8 +48,12 @@ internal fun rememberHardwareShortcut(
         val unregister = router?.register(handler)
         onDispose { unregister?.invoke() }
     }
-    LaunchedEffect(router, handler, available) {
-        if (available) router?.claimCarried(handler)
+    LaunchedEffect(router, handler) {
+        // A carried command waits until this owner is available and no compact conversation covers Chats.
+        val owner = router ?: return@LaunchedEffect
+        snapshotFlow { owner.canTakeCarried(handler) }.collect { canTake ->
+            if (canTake) owner.claimCarried(handler)
+        }
     }
     return onInvoke
 }
@@ -65,21 +70,23 @@ internal fun HardwareShortcutBlocker() {
 
 /**
  * Tracks which side-by-side pane owns keyboard commands: the pane holding focus, otherwise the pane pressed
- * last. Ctrl+Shift+F belongs to the conversation pane only.
+ * last. Until either pane is focused or pressed, neither owns them. Ctrl+Shift+F belongs to the conversation pane.
  */
 @Stable
 internal class ChatPaneKeyOwner {
     var listFocused by mutableStateOf(false)
     var conversationFocused by mutableStateOf(false)
-    var listPressedLast by mutableStateOf(false)
 
-    /** True when the list pane, not the conversation pane, owns keyboard commands. */
-    val listOwnsKeys: Boolean
+    /** The pane pressed last, true for the list; null until a pane is pressed. */
+    var listPressedLast by mutableStateOf<Boolean?>(null)
+
+    /** True when the conversation pane owns keyboard commands. */
+    val conversationOwnsKeys: Boolean
         get() =
             when {
-                conversationFocused -> false
-                listFocused -> true
-                else -> listPressedLast
+                conversationFocused -> true
+                listFocused -> false
+                else -> listPressedLast == false
             }
 }
 
@@ -90,14 +97,15 @@ internal fun rememberChatPaneKeyOwner(twoPane: Boolean): ChatPaneKeyOwner {
     val owner = remember { ChatPaneKeyOwner() }
     val currentTwoPane by rememberUpdatedState(twoPane)
     DisposableEffect(router, owner) {
-        val detach = router?.attachPanes(split = { currentTwoPane }, listOwnsKeys = { owner.listOwnsKeys })
+        val detach =
+            router?.attachPanes(split = { currentTwoPane }, conversationOwnsKeys = { owner.conversationOwnsKeys })
         onDispose { detach?.invoke() }
     }
     LaunchedEffect(twoPane) {
-        // A removed list pane reports no focus loss, so a new split starts from the conversation pane.
+        // A removed list pane reports no focus loss, so a new split starts with neither pane owning the keys.
         if (!twoPane) {
             owner.listFocused = false
-            owner.listPressedLast = false
+            owner.listPressedLast = null
         }
     }
     return owner
