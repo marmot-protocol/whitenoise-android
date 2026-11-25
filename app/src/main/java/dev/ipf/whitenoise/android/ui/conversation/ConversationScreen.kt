@@ -1644,7 +1644,7 @@ internal fun ConversationScreen(
         }
         exitConversationRoute()
     }
-
+    ChatsReturnShortcut(available = !freezeRoutePresentation && !transcriptRoutedAway, exit = exitConversation)
     // Read the latest projections without changing every visible row callback when the timeline changes.
     val currentSelectableMessages by rememberUpdatedState(selectableMessages)
 
