@@ -281,6 +281,15 @@
         "test_ids": [
           "SET-054"
         ]
+      },
+      {
+        "surface": "Offline Speech to Text Zapstore launch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "fun openOfflineSpeechToTextListing(",
+        "test_ids": [
+          "DIC-021",
+          "SET-027"
+        ]
       }
     ]
   },

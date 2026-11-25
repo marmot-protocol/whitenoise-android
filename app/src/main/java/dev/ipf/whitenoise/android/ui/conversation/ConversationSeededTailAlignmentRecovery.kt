@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -34,7 +33,6 @@ internal fun ConversationSeededTailAlignmentRecovery(
             title = stringResource(R.string.couldnt_load_conversation),
             error = SeededTailAlignmentRecoveryError,
             onRetry = onRetry,
-            copyActionColor = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
