@@ -37,6 +37,14 @@
           "ACC-003",
           "ACC-017"
         ]
+      },
+      {
+        "surface": "string:clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientSearchField.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "NCH-001"
+        ]
       }
     ]
   },

@@ -117,6 +117,14 @@
         "test_ids": [
           "NCH-001"
         ]
+      },
+      {
+        "surface": "string:clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "NCH-001"
+        ]
       }
     ]
   },
