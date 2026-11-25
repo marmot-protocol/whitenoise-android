@@ -80,9 +80,10 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
     try {
         return setNativePushEnabledLocked(account, enabled, nativeDisableAttempted)
     } catch (cancelled: CancellationException) {
-        // A cancelled enable may have committed native push without registering it. The durable
-        // pending-sync marker makes the next sync register it, turning auto-init on first.
-        if (enabled && !nativeDisableAttempted.get()) {
+        // A cancelled enable may have left native push on without a registration, before its rollback or
+        // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on
+        // first. After a rollback that did commit, that sync finds no Push demand and just clears it.
+        if (enabled) {
             withContext(NonCancellable + pushWakeStorageDispatcher) {
                 runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }
             }

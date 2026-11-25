@@ -39,8 +39,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Delivery changes that do not complete still settle Firebase auto-init from the accounts' live demand (#4081):
  * a Local selection cancelled after the last account's native disable committed, a per-account native-push
  * enablement that fails and is rolled back, a per-account disable cancelled after its native commit, and a
- * reconciliation that leaves no account on Push. A cancelled per-account enable leaves a registration sync
- * pending instead.
+ * reconciliation that leaves no account on Push. A cancelled per-account enable, including one cancelled
+ * during its rollback, leaves a registration sync pending instead.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -228,6 +228,46 @@ class FcmAutoInitIncompleteChangeTest {
                 assertFalse("the sync must acknowledge the marker", store.nativePushRegistrationSyncPending())
             } finally {
                 cancelOnEnable.set(false)
+                fixture.close()
+            }
+        }
+
+    /** A failed per-account enable whose rollback is cancelled still leaves a durable registration sync pending. */
+    @Test
+    fun cancelledRollbackOfFailedEnableRecordsPendingSync() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val toggle = AtomicReference<Job?>()
+            val cancelOnRollback = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = false),
+                    nativePushFallbackPlatform = platform,
+                    onSetNativePushEnabled = { ref, enabled ->
+                        // The token read fails, and the cancellation lands on the rollback's native write.
+                        if (!enabled && cancelOnRollback.get()) toggle.get()?.cancel()
+                        settings(ref, nativeEnabled = enabled)
+                    },
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { null },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.clearPendingNativePushRegistrationSync()
+                cancelOnRollback.set(true)
+
+                val job = launch { fixture.appState.setNativePushEnabled(true) }
+                toggle.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the rollback must have been cancelled", job.isCancelled)
+                assertTrue("the next sync must reconcile the account", store.nativePushRegistrationSyncPending())
+            } finally {
+                cancelOnRollback.set(false)
                 fixture.close()
             }
         }
