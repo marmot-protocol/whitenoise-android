@@ -60,18 +60,25 @@ internal fun rememberTranslationLanguageChoices(allowDetection: Boolean): Transl
     }
 }
 
-/** Language choices are not a claim that the corresponding pack is installed. */
+/**
+ * A target-language choice that opens the searchable language sheet. [trigger] draws the control that opens it from
+ * the selected language's label, so a settings list can use its link row while a dialog keeps the default text
+ * button. Language choices are not a claim that the corresponding pack is installed.
+ */
 @Composable
 internal fun TranslationLanguagePicker(
     title: String,
     selected: String,
     onSelected: (String) -> Unit,
     allowDetection: Boolean = false,
+    trigger: @Composable (label: String, open: () -> Unit) -> Unit = { label, open ->
+        TextButton(onClick = open) { Text("$title: $label") }
+    },
 ) {
     var expanded by remember { mutableStateOf(false) }
     val choices = rememberTranslationLanguageChoices(allowDetection)
     Box {
-        TextButton(onClick = { expanded = true }) { Text("$title: ${choices.label(selected)}") }
+        trigger(choices.label(selected)) { expanded = true }
         if (expanded) {
             TranslationLanguagePickerSheet(
                 title = title,
@@ -89,17 +96,16 @@ internal fun TranslationLanguagePicker(
 
 /**
  * Global automatic translation as settings rows: the engine and provider explainers, then one group with the
- * automatic switch and a target-language link whose value names the current target. The link opens the same
- * language sheet as the chat picker; recovery for an unusable target and the engine action follow the group.
+ * automatic switch and a target-language link whose value names the current target. The link is the
+ * [TranslationLanguagePicker]'s trigger, so it opens the same language sheet as the chat dialog; recovery for an
+ * unusable target and the engine action follow the group.
  */
 @Composable
 internal fun TranslationGlobalSettingsContent(preferences: TranslationPreferences) {
     val revision by preferences.changes.collectAsState()
     val choice = remember(revision) { preferences.global() }
     val context = LocalContext.current
-    val choices = rememberTranslationLanguageChoices(allowDetection = false)
     val targetTitle = stringResource(R.string.translation_target_language)
-    var picking by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         SettingsExplainer(stringResource(R.string.translation_engine_managed))
         SettingsExplainer(stringResource(R.string.translation_privacy_warning))
@@ -115,32 +121,28 @@ internal fun TranslationGlobalSettingsContent(preferences: TranslationPreference
                 )
             }
             row("target") { rowContext ->
-                SettingsLink(
-                    context = rowContext,
+                TranslationLanguagePicker(
                     title = targetTitle,
-                    value = choices.label(choice.target.orEmpty()),
-                    onClick = { picking = true },
-                    modifier = Modifier.testTag("translation.target"),
-                    leading = { SettingsLeadingIcon(R.drawable.ic_language) },
-                )
+                    selected = choice.target.orEmpty(),
+                    onSelected = { preferences.setGlobal(choice.enabled, it) },
+                ) { label, open ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = targetTitle,
+                        value = label,
+                        onClick = open,
+                        modifier = Modifier.testTag("translation.target"),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_language) },
+                    )
+                }
             }
         }
-        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset)) {
-            if (choice.target == null) TranslationTargetRecovery()
+        if (choice.target == null) {
+            TranslationTargetRecovery(Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset))
+        }
+        Box(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
             OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })
         }
-    }
-    if (picking) {
-        TranslationLanguagePickerSheet(
-            title = targetTitle,
-            choices = choices,
-            selected = choice.target.orEmpty(),
-            onDismiss = { picking = false },
-            onSelect = {
-                preferences.setGlobal(choice.enabled, it)
-                picking = false
-            },
-        )
     }
 }
 
@@ -241,12 +243,15 @@ private fun TranslationChatTargetControls(
     }
 }
 
-/** Explicit recovery for a saved target outside the catalog, shown instead of a silent substitute. */
+/**
+ * Explicit recovery for a saved target outside the catalog, shown instead of a silent substitute. [modifier] puts it
+ * on the caller's content line.
+ */
 @Composable
-private fun TranslationTargetRecovery() {
+private fun TranslationTargetRecovery(modifier: Modifier = Modifier) {
     Text(
         stringResource(R.string.translation_unsupported_target),
-        modifier = Modifier.testTag("translation.target_recovery"),
+        modifier = modifier.testTag("translation.target_recovery"),
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodyMedium,
     )

@@ -6460,8 +6460,21 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
       "symbol": "TranslationLanguagePicker",
-      "bindings": [],
-      "remaining": "Only the per-chat translation dialog renders this picker now; Translate settings opens the language sheet from its Target language row. No flow opens the chat dialog's picker, so its language choice needs its own runtime case."
+      "bindings": [
+        {
+          "case": "settings-translation",
+          "selector": {
+            "text": "German"
+          },
+          "scope": "Audited production owner and distinctive asserted child; Translate settings opens it from its Target language link row. Controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
+          "opened_by": {
+            "id": "translation.target"
+          },
+          "entry_assertion": {
+            "text": "Search languages"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
