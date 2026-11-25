@@ -43,13 +43,19 @@ class MessageTranslationStateTest {
             assertNull(session.suggestedTarget(null, now))
             assertEquals("fr", session.suggestedTarget(recent.messageId, now))
 
-            session.remove(recent)
             session.remove(mixed)
             val unsupported = recent.copy(messageId = "unsupported", text = "af")
             session.request(unsupported)
             runCurrent()
-            assertNull(session.suggestedTarget(unsupported.messageId, now))
+            assertEquals("fr", session.suggestedTarget(unsupported.messageId, now))
             assertNull(session.suggestedTarget(null, now))
+
+            session.replyLanguage.select(old.messageId)
+            session.remove(old)
+            assertEquals("de", session.suggestedTarget(old.messageId, now))
+            session.replyLanguage.sourceChanged(old.messageId, old.copy(revision = "edit"))
+            session.remove(unsupported)
+            assertEquals("fr", session.suggestedTarget(old.messageId, now))
             current = false
             assertNull(session.suggestedTarget(old.messageId, now))
         }

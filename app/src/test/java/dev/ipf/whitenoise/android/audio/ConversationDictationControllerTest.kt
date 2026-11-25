@@ -7388,7 +7388,7 @@ class ConversationDictationControllerTest {
             val translatedSources = mutableListOf<String>()
             val sent = mutableListOf<String>()
             val translation =
-                ConversationDictationTranslation(currentEpoch = { 0L }) { source ->
+                ConversationDictationTranslation(ConversationDictationTranslationChoice("de"), currentEpoch = { 0L }) { source ->
                     translatedSources += source
                     reply.await()
                 }
@@ -7402,7 +7402,7 @@ class ConversationDictationControllerTest {
                         request.beginDispatch().also { if (it) sent += request.payload }
                     },
                 )
-            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+            f.startTranslatedDictation(translation)
             f.controller.send()
             f.platform.listener.onResult("dictated")
             runCurrent()
@@ -7436,8 +7436,11 @@ class ConversationDictationControllerTest {
                         },
                     )
                 val translation =
-                    ConversationDictationTranslation(currentEpoch = { 0L.takeIf { ownerCurrent } }) { reply.await() }
-                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+                    ConversationDictationTranslation(
+                        ConversationDictationTranslationChoice("de"),
+                        currentEpoch = { 0L.takeIf { ownerCurrent } },
+                    ) { reply.await() }
+                f.startTranslatedDictation(translation)
                 f.controller.send()
                 f.platform.listener.onResult("dictated")
                 runCurrent()
@@ -7466,8 +7469,8 @@ class ConversationDictationControllerTest {
                         request.beginDispatch().also { if (it) sent += request.payload }
                     },
                 )
-            val translation = ConversationDictationTranslation(currentEpoch = { 0L }) { reply.await() }
-            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), outgoingTranslation = translation)
+            val translation = ConversationDictationTranslation(ConversationDictationTranslationChoice("de"), currentEpoch = { 0L }) { reply.await() }
+            f.startTranslatedDictation(translation)
             f.controller.send()
             f.platform.listener.onResult("dictated")
             runCurrent()
@@ -7478,6 +7481,70 @@ class ConversationDictationControllerTest {
             assertTrue(sent.isEmpty())
             assertEquals("Draft dictated later", f.drafts.getValue(key()).text)
         }
+
+    /** Retry uses the current composer choice and retains the source if that composer is gone. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun permissionRetryDoesNotDropTheOriginTranslationChoice() =
+        runTest {
+            for ((retryLanguage, composerMounted, expected) in listOf(
+                Triple("de", true, "de: dictated"),
+                Triple("fr", true, "fr: dictated"),
+                Triple(null, true, "dictated"),
+                Triple("de", false, null),
+            )) {
+                var language: String? = "de"
+                val sent = mutableListOf<String>()
+                val platform = FakePlatform(hasPermission = false)
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        platform = platform,
+                        targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = { request ->
+                            request.beginDispatch().also { if (it) sent += request.payload }
+                        },
+                    )
+                f.controller.composerTranslationBinding =
+                    ConversationDictationTranslationBinding(ConversationDictationKey.from(ACCOUNT, GROUP)) {
+                        language?.let { code ->
+                            ConversationDictationTranslation(ConversationDictationTranslationChoice(code), { 0L }) {
+                                "$code: $it"
+                            }
+                        }
+                    }
+                f.controller.requestStart(
+                    ACCOUNT,
+                    GROUP,
+                    TextFieldValue(""),
+                    outgoingTranslation = ConversationDictationTranslationChoice("de"),
+                )
+                assertTrue(f.controller.beginPermissionRequest(f.controller.permissionRequestId))
+                f.controller.onPermissionResult(granted = false)
+                assertEquals(
+                    ConversationDictationFailure.PermissionDenied,
+                    (f.controller.state as ConversationDictationState.Failed).reason,
+                )
+
+                language = retryLanguage
+                if (!composerMounted) f.controller.composerTranslationBinding = null
+                platform.hasPermission = true
+                f.controller.retry()
+                f.controller.send()
+                platform.listener.onResult("dictated")
+                advanceUntilIdle()
+
+                assertEquals(listOfNotNull(expected), sent)
+                assertEquals(if (expected == null) "dictated" else "", f.drafts.getValue(key()).text)
+            }
+        }
+
+    private fun Fixture.startTranslatedDictation(translation: ConversationDictationTranslation) {
+        controller.composerTranslationBinding =
+            ConversationDictationTranslationBinding(ConversationDictationKey.from(ACCOUNT, GROUP)) { translation }
+        controller.requestStart(ACCOUNT, GROUP, drafts.getValue(key()), outgoingTranslation = translation.choice)
+    }
 
     /** Text pasted, typed, or removed while speaking is sent once together with the transcript. */
     @OptIn(ExperimentalCoroutinesApi::class)

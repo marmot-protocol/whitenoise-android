@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -17,7 +18,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationKey
 import dev.ipf.whitenoise.android.audio.ConversationDictationTranslation
+import dev.ipf.whitenoise.android.audio.ConversationDictationTranslationBinding
 import dev.ipf.whitenoise.android.audio.queueDictation
 
 /** Dictate starts a fresh attempt after safe local settlement, with no recovery decision pop-ups. */
@@ -32,18 +35,29 @@ internal fun rememberComposerDictationAction(
     translation: () -> ConversationDictationTranslation? = { null },
 ): () -> Unit {
     val binding = remember(controller, accountRef, groupIdHex) { ConversationDictationPanelBinding() }
-    DisposableEffect(binding) { onDispose { binding.dispose() } }
+    val currentTranslation = rememberUpdatedState(translation)
+    DisposableEffect(binding) {
+        val origin = ConversationDictationKey.from(accountRef, groupIdHex)
+        val translationBinding = ConversationDictationTranslationBinding(origin) { currentTranslation.value() }
+        controller.composerTranslationBinding = translationBinding
+        onDispose {
+            if (controller.composerTranslationBinding === translationBinding) {
+                controller.composerTranslationBinding = null
+            }
+            binding.dispose()
+        }
+    }
     return {
         if (binding.active && controller.queuesFromComposer(accountRef, groupIdHex)) {
             // Another chat's dictation is still being transcribed; this recording waits its turn.
-            controller.queueDictation(accountRef, groupIdHex, replyToMessageIdHex, translation())
+            controller.queueDictation(accountRef, groupIdHex, replyToMessageIdHex, currentTranslation.value()?.choice)
         } else if (binding.active) {
             controller.requestFreshComposerStart(
                 accountRef,
                 groupIdHex,
                 draft,
                 replyToMessageIdHex,
-                outgoingTranslation = translation(),
+                outgoingTranslation = currentTranslation.value()?.choice,
             )
         }
     }

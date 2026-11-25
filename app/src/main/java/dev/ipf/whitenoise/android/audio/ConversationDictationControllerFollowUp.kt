@@ -78,7 +78,7 @@ internal fun ConversationDictationController.queueDictation(
     accountRef: String,
     groupIdHex: String,
     replyToMessageIdHex: String?,
-    outgoingTranslation: ConversationDictationTranslation? = null,
+    outgoingTranslation: ConversationDictationTranslationChoice? = null,
 ): Boolean {
     val previous = followUp.pending?.target ?: state.target
     if (previous == null || !canQueueDictation(accountRef, groupIdHex)) return rejectFollowUp()

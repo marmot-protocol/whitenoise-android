@@ -3,7 +3,8 @@ https://raw.githubusercontent.com/greyblake/whatlang-rs/584009bbdbd715681fc1c144
 
 The ranked trigrams are stored as UTF-8 rows with a script, a language code
 and the 300 bar-separated trigrams in rank order, compressed with gzip.
-ISO 639-3 codes use their ISO 639-1 form where available.
+ISO 639-3 codes use their ISO 639-1 form where available. The reader maps
+Northern Persian (pes) to the translation catalog’s Persian code (fa).
 
 (The MIT License)
 

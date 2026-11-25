@@ -18,6 +18,7 @@ internal class IncomingLanguageDetector(
         }
     }
 
+    /** Return a suggestion only for a sufficiently long and unambiguous sample. */
     fun detect(text: String): String? {
         val withoutLinks = IncomingLinks.replace(text.take(MAX_SAMPLE_LENGTH), " ")
         val normalized = Normalizer.normalize(withoutLinks, Normalizer.Form.NFC).lowercase(Locale.ROOT)
@@ -32,6 +33,7 @@ internal class IncomingLanguageDetector(
         }
     }
 
+    /** Compare ranked trigram matches within one writing system and reject a close runner-up. */
     private fun identifyByTrigrams(
         script: UnicodeScript,
         text: String,
@@ -69,27 +71,33 @@ internal class IncomingLanguageDetector(
         val ranks: Map<String, Int>,
     )
 
+    /** Read a bundled profile and map its language code to the translation catalog. */
     private fun readProfile(line: String): Profile {
         val (script, code, trigrams) = line.split('\t', limit = 3)
         val ranks =
             trigrams.split('|').withIndex().associate { (rank, trigram) -> trigram to rank }
-        return Profile(UnicodeScript.valueOf(script), code, ranks)
+        return Profile(UnicodeScript.valueOf(script), if (code == "pes") "fa" else code, ranks)
     }
 
-    private companion object {
-        const val MAX_SAMPLE_LENGTH = 512
-        const val MIN_LETTERS = 14
-        const val MIN_DISTINCT_LETTERS = 8
-        const val PROFILE_LENGTH = 300
-        const val MIN_SIMILARITY = 0.24
-        const val GAP_FLOOR = 0.015
-        val IncomingLinks = Regex("""(?i)\b(?:(?:https?://|www\.|nostr:)\S+|[\p{L}\p{N}.-]+\.[a-z]{2,24}(?:/\S*)?)""")
-        val NonLetters = Regex("[^\\p{L}\\p{M}]+")
-        val KanaScripts = setOf(UnicodeScript.HIRAGANA, UnicodeScript.KATAKANA)
-        val JapaneseScripts = KanaScripts + UnicodeScript.HAN
-        val ScriptLanguages =
+    companion object {
+        private var sharedDetector: IncomingLanguageDetector? = null
+
+        /** Share the immutable profiles across conversations, with application resources. */
+        @Synchronized
+        fun shared(resources: Resources): IncomingLanguageDetector = sharedDetector ?: IncomingLanguageDetector(resources).also { sharedDetector = it }
+
+        private const val MAX_SAMPLE_LENGTH = 512
+        private const val MIN_LETTERS = 14
+        private const val MIN_DISTINCT_LETTERS = 8
+        private const val PROFILE_LENGTH = 300
+        private const val MIN_SIMILARITY = 0.24
+        private const val GAP_FLOOR = 0.015
+        private val IncomingLinks = Regex("""(?i)\b(?:(?:https?://|www\.|nostr:)\S+|[\p{L}\p{N}.-]+\.[a-z]{2,24}(?:/\S*)?)""")
+        private val NonLetters = Regex("[^\\p{L}\\p{M}]+")
+        private val KanaScripts = setOf(UnicodeScript.HIRAGANA, UnicodeScript.KATAKANA)
+        private val JapaneseScripts = KanaScripts + UnicodeScript.HAN
+        private val ScriptLanguages =
             mapOf(
-                UnicodeScript.BENGALI to "bn",
                 UnicodeScript.GEORGIAN to "ka",
                 UnicodeScript.GREEK to "el",
                 UnicodeScript.GUJARATI to "gu",

@@ -79,6 +79,7 @@ internal fun rememberMessageTranslationSource(
     // Session epoch, failure and capacity are watched inside the effect rather than keyed in composition: every
     // bubble reads this, and one source's removal would otherwise recompose every visible message.
     LaunchedEffect(source, session, revision, automaticEligible) {
+        session?.replyLanguage?.sourceChanged(messageId, source)
         val enabled = automaticEligible && choice?.enabled == true
         if (source == null || session == null || !enabled) return@LaunchedEffect
         if (!OfflineTranslatorLanguageCatalog.supportsTarget(source.target)) return@LaunchedEffect

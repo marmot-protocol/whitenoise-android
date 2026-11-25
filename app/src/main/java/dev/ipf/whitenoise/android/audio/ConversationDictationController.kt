@@ -243,6 +243,7 @@ internal class ConversationDictationController internal constructor(
     internal var recoveryDeadlineElapsedMillis: Long? = null
     internal var recoveryProtectionExpired = false
     internal var pendingForegroundRecoverySessionId: Long? = null
+    internal var composerTranslationBinding: ConversationDictationTranslationBinding? = null
     internal var microphoneSettingsRecovery: DictationMicrophoneRecovery? = null
     internal var microphoneHostReady: () -> Boolean = { true }
     internal var microphoneOriginValid: () -> Boolean = { true }
@@ -433,7 +434,7 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String?,
-        outgoingTranslation: ConversationDictationTranslation? = null,
+        outgoingTranslation: ConversationDictationTranslationChoice? = null,
     ): ConversationDictationComposerAccess {
         if (!runCatching { targetAvailable(accountRef, groupIdHex) }.getOrDefault(false)) {
             return composerAccess(accountRef, groupIdHex).copy(
@@ -558,7 +559,7 @@ internal class ConversationDictationController internal constructor(
         groupIdHex: String,
         draft: TextFieldValue,
         replyToMessageIdHex: String? = null,
-        outgoingTranslation: ConversationDictationTranslation? = null,
+        outgoingTranslation: ConversationDictationTranslationChoice? = null,
     ): Boolean =
         requestStart(
             accountRef = accountRef,
@@ -569,7 +570,6 @@ internal class ConversationDictationController internal constructor(
             outgoingTranslation = outgoingTranslation,
         )
 
-    /** Starts the compatibility flow that delegates microphone ownership to a provider Activity. */
     fun requestProviderActivityStart(
         accountRef: String,
         groupIdHex: String,
@@ -582,9 +582,9 @@ internal class ConversationDictationController internal constructor(
             draft = draft,
             replyToMessageIdHex = replyToMessageIdHex,
             mode = ConversationDictationMode.ProviderActivity,
+            outgoingTranslation = null,
         )
 
-    /** Captures one immutable target and replaces any safely replaceable prior session. */
     @Suppress("LongParameterList")
     private fun requestStart(
         accountRef: String,
@@ -592,7 +592,7 @@ internal class ConversationDictationController internal constructor(
         draft: TextFieldValue,
         replyToMessageIdHex: String?,
         mode: ConversationDictationMode,
-        outgoingTranslation: ConversationDictationTranslation? = null,
+        outgoingTranslation: ConversationDictationTranslationChoice?,
     ): Boolean {
         expireRetainedRecoveryIfDue()
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
@@ -913,11 +913,11 @@ internal class ConversationDictationController internal constructor(
                 draft = readDraft(failed.target.accountRef, failed.target.groupIdHex).value,
                 replyToMessageIdHex = failed.target.replyToMessageIdHex,
                 mode = failed.target.mode,
+                outgoingTranslation = retryTranslationChoice(failed.target),
             )
         conversationDictationDiagnostic("event=retry path=fresh_start accepted=$accepted")
     }
 
-    /** Cancels the session if its exact origin conversation was removed. */
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,

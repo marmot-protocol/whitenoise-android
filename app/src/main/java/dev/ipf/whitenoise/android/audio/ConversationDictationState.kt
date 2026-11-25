@@ -12,7 +12,7 @@ internal data class ConversationDictationTarget(
     val finishAfterSilenceMillis: Long? = null,
     val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val pauseOtherAudio: Boolean = true,
-    val outgoingTranslation: ConversationDictationTranslation? = null,
+    val outgoingTranslation: ConversationDictationTranslationChoice? = null,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -23,8 +23,18 @@ internal data class ConversationDictationTarget(
             this.groupIdHex.equals(groupIdHex, ignoreCase = true)
 }
 
-/** The originating composer's translation intent stays bound to this recording. */
+/** A non-null choice requires translation, even while the target language is unset. */
+internal data class ConversationDictationTranslationChoice(
+    val target: String?,
+)
+
+internal class ConversationDictationTranslationBinding(
+    val key: ConversationDictationKey,
+    val resolve: () -> ConversationDictationTranslation?,
+)
+
 internal class ConversationDictationTranslation(
+    val choice: ConversationDictationTranslationChoice,
     val currentEpoch: () -> Long?,
     val translate: suspend (String) -> String?,
 )

@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationTranslation
+import dev.ipf.whitenoise.android.audio.ConversationDictationTranslationChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -196,6 +198,7 @@ internal class ComposerTranslationState(
         if (!active) return null
         val chosen = target
         return ConversationDictationTranslation(
+            choice = ConversationDictationTranslationChoice(chosen),
             currentEpoch = {
                 epoch.takeIf { active && target == chosen && noticeAccepted() && ownerCurrent() && originCurrent() }
             },
@@ -267,6 +270,7 @@ internal fun rememberComposerTranslation(
     val preferences = rememberTranslationPreferences()
     val runtime = appState.runtimeGeneration
     val session by rememberUpdatedState(LocalConversationTranslation.current)
+    SideEffect { session?.replyLanguage?.select(replyId) }
     val currentReplyId by rememberUpdatedState(replyId)
     val state =
         remember(account, group, runtime) {
@@ -395,12 +399,14 @@ internal fun ComposerTranslationBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Icon(
-                    painterResource(R.drawable.ic_expand_more),
-                    null,
-                    Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                if (canChooseLanguage) {
+                    Icon(
+                        painterResource(R.drawable.ic_expand_more),
+                        null,
+                        Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             ComposerTranslationLine(outgoing, pending, failure, onRetry, Modifier.weight(1f))
         }

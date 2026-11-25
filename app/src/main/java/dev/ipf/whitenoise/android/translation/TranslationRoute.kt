@@ -49,7 +49,7 @@ internal fun rememberConversationTranslation(
     val scope = rememberCoroutineScope()
     val runtime = appState.runtimeGeneration
     val active by rememberUpdatedState(routeActive)
-    val detector = remember(context.resources) { IncomingLanguageDetector(context.resources) }
+    val detector = IncomingLanguageDetector.shared(context.applicationContext.resources)
     val session =
         remember(account, group, runtime) {
             ConversationTranslationSession(

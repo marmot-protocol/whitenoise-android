@@ -142,7 +142,7 @@ internal fun ConversationDictationController.launchGuardedDispatch(
         transport =
             ConversationDictationCompletionDispatchOwner.Transport(
                 timeoutMillis = PROCESSING_TIMEOUT_MILLIS,
-                send = { request -> sendWithOutgoingTranslation(request, target.outgoingTranslation) },
+                send = { request -> sendWithOutgoingTranslation(request, target) },
             ),
         callbacks =
             ConversationDictationCompletionDispatchOwner.DispatchCallbacks(
@@ -179,13 +179,16 @@ internal fun ConversationDictationController.launchGuardedDispatch(
 /** Translate the complete source before claiming the existing origin-fenced dispatch. */
 private suspend fun ConversationDictationController.sendWithOutgoingTranslation(
     request: ConversationDictationSendRequest,
-    translation: ConversationDictationTranslation?,
+    target: ConversationDictationTarget,
 ): Boolean {
-    if (translation == null) return sendTranscriptIfOriginUnchanged(request)
-    val epoch = translation.currentEpoch()
-    val outgoing = epoch?.let { translation.translate(request.payload) }
+    val choice = target.outgoingTranslation ?: return sendTranscriptIfOriginUnchanged(request)
+    val binding = translationBindingFor(target)
+    val translation = binding?.resolve()?.takeIf { it.choice == choice }
+    val epoch = translation?.currentEpoch()
+    val outgoing = translation?.takeIf { epoch != null }?.translate(request.payload)
     return !outgoing.isNullOrBlank() &&
-        translation.currentEpoch() == epoch &&
+        composerTranslationBinding === binding &&
+        translation?.currentEpoch() == epoch &&
         sendTranscriptIfOriginUnchanged(request.copy(payload = outgoing))
 }
 

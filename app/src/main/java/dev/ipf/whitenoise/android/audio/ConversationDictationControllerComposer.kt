@@ -9,7 +9,7 @@ internal fun ConversationDictationController.requestComposerStart(
     groupIdHex: String,
     draft: TextFieldValue,
     replyToMessageIdHex: String?,
-    outgoingTranslation: ConversationDictationTranslation? = null,
+    outgoingTranslation: ConversationDictationTranslationChoice? = null,
 ): ConversationDictationComposerAccess {
     expireRetainedRecoveryIfDue()
     val access = composerAccess(accountRef, groupIdHex)
@@ -94,4 +94,14 @@ internal fun ConversationDictationController.composerRecovery(access: Conversati
         composerAccess(it.target.accountRef, it.target.groupIdHex).phase ==
             ConversationDictationComposerPhase.RemainingAudio
     }
+}
+
+/** Resolve a translator only from the mounted composer that owns the captured origin. */
+internal fun ConversationDictationController.translationBindingFor(target: ConversationDictationTarget): ConversationDictationTranslationBinding? =
+    composerTranslationBinding?.takeIf { it.key == ConversationDictationKey.from(target.accountRef, target.groupIdHex) }
+
+/** A fresh in-app retry uses the current origin choice, including an explicit toggle off. */
+internal fun ConversationDictationController.retryTranslationChoice(target: ConversationDictationTarget): ConversationDictationTranslationChoice? {
+    val binding = translationBindingFor(target).takeIf { target.mode == ConversationDictationMode.InApp }
+    return if (binding == null) target.outgoingTranslation else binding.resolve()?.choice
 }

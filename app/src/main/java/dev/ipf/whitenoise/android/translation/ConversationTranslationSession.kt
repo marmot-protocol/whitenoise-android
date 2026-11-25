@@ -49,6 +49,7 @@ internal class ConversationTranslationSession(
     var capacityRevision by mutableStateOf(0L)
         private set
     private val renditionOrder = LinkedHashSet<TranslationSource>()
+    val replyLanguage = ReplyLanguageEvidence()
 
     fun request(
         source: TranslationSource,
@@ -78,6 +79,7 @@ internal class ConversationTranslationSession(
         generation: Long,
     ): Boolean = generation == epoch && ownerCurrent() && pending[source] === currentCoroutineContext().job
 
+    /** Insert the current result within the same bounded window as the visible translations. */
     private suspend fun publishRendition(
         source: TranslationSource,
         generation: Long,
@@ -87,13 +89,14 @@ internal class ConversationTranslationSession(
         if (renditions.size >= MAX_RENDITIONS) {
             renditionOrder.firstOrNull()?.let { oldest ->
                 renditionOrder.remove(oldest)
-                renditions.remove(oldest)
+                renditions.remove(oldest)?.let { replyLanguage.retain(oldest, it) }
             }
         }
         renditions[source] = rendition
         renditionOrder.add(source)
     }
 
+    /** Translate first and detect source language locally only for a successful incoming rendition. */
     private suspend fun performRequest(
         source: TranslationSource,
         from: String,
@@ -127,7 +130,7 @@ internal class ConversationTranslationSession(
 
     fun remove(source: TranslationSource) {
         pending.remove(source)?.cancel()
-        renditions.remove(source)
+        renditions.remove(source)?.let { replyLanguage.retain(source, it) }
         renditionOrder.remove(source)
         capacityRevision += 1L
     }
@@ -140,12 +143,14 @@ internal class ConversationTranslationSession(
         failure = null
     }
 
+    /** Drop all plaintext and suggestions when the route owner changes or resets. */
     fun clear() {
         epoch += 1
         pending.values.toList().forEach(Job::cancel)
         pending.clear()
         renditions.clear()
         renditionOrder.clear()
+        replyLanguage.clear()
         failure = null
     }
 
@@ -155,6 +160,7 @@ internal class ConversationTranslationSession(
     }
 }
 
+/** A detector failure leaves the translated message usable without a language suggestion. */
 private suspend fun identifyIncoming(
     text: String,
     detectIncoming: suspend (String) -> String?,
@@ -168,7 +174,49 @@ private suspend fun identifyIncoming(
         null
     }
 
-/** Use matching live results only. A reply can name an older message, while chat-wide evidence must be recent. */
+/** Retain one selected reply's language across viewport disposal, without retaining its text. */
+internal class ReplyLanguageEvidence {
+    private var replyId: String? = null
+    private var revision: String? = null
+    private var language: String? = null
+
+    /** Retire evidence when the user leaves this reply. */
+    fun select(messageId: String?) {
+        if (messageId != replyId) {
+            clear()
+            replyId = messageId
+        }
+    }
+
+    /** Keep only the language and source revision when the selected reply leaves the window. */
+    fun retain(
+        source: TranslationSource,
+        rendition: TranslationRendition,
+    ) {
+        if (source.messageId != replyId || source.incomingRecordedAt == null || rendition.sourceLanguage == null) return
+        revision = source.revision
+        language = rendition.sourceLanguage
+    }
+
+    /** Invalidate retained evidence if a returning row was edited or deleted. */
+    fun sourceChanged(
+        messageId: String,
+        source: TranslationSource?,
+    ) {
+        if (messageId == replyId && (source == null || source.revision != revision)) clear()
+    }
+
+    /** Offer retained evidence only to the same selected reply. */
+    fun forReply(messageId: String?): String? = language.takeIf { messageId == replyId }
+
+    /** Drop the evidence while keeping the currently selected reply. */
+    fun clear() {
+        language = null
+        revision = null
+    }
+}
+
+/** A reply can name an older message, while chat-wide evidence must be live and recent. */
 internal fun ConversationTranslationSession.suggestedTarget(
     replyId: String?,
     nowSeconds: ULong = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()).toULong(),
@@ -181,15 +229,20 @@ internal fun ConversationTranslationSession.suggestedTarget(
             .mapNotNull { (source, rendition) -> rendition.sourceLanguage.takeIf { source.messageId == replyId } }
             .distinct()
             .singleOrNull()
-    val language =
-        replyLanguage ?: translatedIncoming
+    val selectedLanguage = replyLanguage ?: this.replyLanguage.forReply(replyId)
+    val recentLanguage =
+        translatedIncoming
             .mapNotNull { (source, rendition) ->
                 rendition.sourceLanguage.takeIf {
-                    source.incomingRecordedAt != null && source.incomingRecordedAt in recent
+                    source.incomingRecordedAt != null &&
+                        source.incomingRecordedAt in recent &&
+                        source.messageId != replyId
                 }
             }.distinct()
             .singleOrNull()
-    return language?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+    return sequenceOf(selectedLanguage, recentLanguage)
+        .filterNotNull()
+        .firstOrNull(OfflineTranslatorLanguageCatalog::supportsTarget)
 }
 
 private const val SUGGESTION_MAX_AGE_SECONDS = 86_400uL

@@ -16,7 +16,6 @@ private val LanguageFlags =
         "et" to "🇪🇪",
         "fi" to "🇫🇮",
         "fr" to "🇫🇷",
-        "gl" to "🇪🇸",
         "he" to "🇮🇱",
         "hr" to "🇭🇷",
         "hu" to "🇭🇺",
