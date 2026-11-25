@@ -59,7 +59,8 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "preview hosts without a platform dispatcher still need Back dismissal",
-            "BackHandler(enabled = true) { requestDismiss() }" in body,
+            "BackHandler(enabled = true, onBack = onBack)" in body &&
+                "if (!currentConsumeBack()) requestDismiss()" in body,
         )
     }
 

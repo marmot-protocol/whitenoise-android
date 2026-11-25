@@ -49,7 +49,7 @@ class AgentSetupGuidanceScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = if (largeRtl) 2f else 1f) {
-                    AiAgentsContent(npub = PREVIEW_NPUB, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+                    AiAgentsContent(npub = PREVIEW_NPUB, onBack = {}, onCopy = { _, _ -> true }, onOpenDocs = { true })
                 }
             }
         }

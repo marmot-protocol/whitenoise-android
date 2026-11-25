@@ -16,9 +16,9 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:back",
+        "surface": "Shared top bar: Donate",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
-        "anchor": "R.string.back",
+        "anchor": "WhiteNoiseTopBar(",
         "test_ids": [
           "SET-022"
         ]

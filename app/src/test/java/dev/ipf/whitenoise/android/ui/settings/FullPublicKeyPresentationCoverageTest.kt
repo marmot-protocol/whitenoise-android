@@ -61,7 +61,6 @@ class FullPublicKeyPresentationCoverageTest {
                 "FullPublicKey.kt",
                 "GroupActionReviewIdentity.kt",
                 "GroupRosterMutationUi.kt",
-                "IdentityCodeComponents.kt",
                 "PublicKeyCopy.kt",
                 "SettingsProfileKey.kt",
             ),

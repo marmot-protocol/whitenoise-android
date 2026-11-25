@@ -25,12 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -52,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -76,7 +75,7 @@ internal fun ProfileQrSheet(
     showScan: Boolean = true,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val npub = appState.npubForDisplay(accountIdHex)
     val link = remember(npub) { ProfileLink.parse(npub) }
     var copied by remember { mutableStateOf(false) }
@@ -158,8 +157,7 @@ internal fun ProfileQrSheet(
                     npub = npub,
                     copied = copied,
                     onCopy = {
-                        clipboard.setText(AnnotatedString(npub))
-                        copied = true
+                        if (clipboard.copy(npub)) copied = true
                     },
                     targetTestTag = "profile_qr.copy_public_key",
                     textTestTag = "profile_qr.full_public_key",

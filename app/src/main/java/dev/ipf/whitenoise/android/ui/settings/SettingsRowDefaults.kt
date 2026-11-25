@@ -14,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -81,6 +82,9 @@ internal fun SettingsRowTrailing(
 /** Whether the row hosting a leading slot accepts activation; each settings row provides its own state. */
 internal val LocalSettingsRowEditable = compositionLocalOf { true }
 
+/** Whether the row hosting a leading slot is destructive, so its glyph takes the error role with the title. */
+internal val LocalSettingsRowDestructive = compositionLocalOf { false }
+
 /** The drawable a settings row's leading glyph draws, so tests can compare glyphs within a group. */
 internal val SettingsLeadingIconKey = SemanticsPropertyKey<Int>("SettingsLeadingIcon")
 
@@ -91,14 +95,14 @@ private var SemanticsPropertyReceiver.settingsLeadingIcon by SettingsLeadingIcon
  *
  * The title already names the action, so the icon carries no content description and adds nothing for
  * a screen reader to repeat. Direction-dependent drawables declare `autoMirrored` themselves. [tint]
- * defaults to the row's supporting colour; destructive rows pass the error role.
+ * defaults to the row's supporting colour, or the error role inside a destructive row.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsLeadingIcon(
     @DrawableRes icon: Int,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    tint: Color = Color.Unspecified,
     testTag: String? = null,
 ) {
     Icon(
@@ -109,7 +113,15 @@ internal fun SettingsLeadingIcon(
                 .size(SettingsRowDefaults.LeadingIconSize)
                 .semantics { settingsLeadingIcon = icon }
                 .then(if (testTag == null) Modifier else Modifier.testTag(testTag)),
-        tint = tint.dimmedUnless(LocalSettingsRowEditable.current),
+        tint =
+            tint
+                .takeOrElse {
+                    if (LocalSettingsRowDestructive.current) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                }.dimmedUnless(LocalSettingsRowEditable.current),
     )
 }
 
@@ -117,9 +129,16 @@ internal fun SettingsLeadingIcon(
 internal fun settingsLeadingSlot(
     leading: (@Composable () -> Unit)?,
     editable: Boolean,
+    destructive: Boolean = false,
 ): (@Composable () -> Unit)? =
     leading?.let { content ->
-        { CompositionLocalProvider(LocalSettingsRowEditable provides editable, content = content) }
+        {
+            CompositionLocalProvider(
+                LocalSettingsRowEditable provides editable,
+                LocalSettingsRowDestructive provides destructive,
+                content = content,
+            )
+        }
     }
 
 /** Blocked rows scale the token's own alpha by the disabled alpha, enabled rows keep the token untouched. */

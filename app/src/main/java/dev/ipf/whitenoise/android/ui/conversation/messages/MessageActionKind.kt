@@ -59,7 +59,7 @@ internal fun messageActionKinds(
     canInfo: Boolean = true,
     canReport: Boolean = false,
 ): List<MessageActionKind> =
-    // Keep on screen leads so it remains in the first row of a two-column menu.
+    // Keep on screen leads the actions behind More actions, so it opens the full set's first new row.
     listOf(
         MessageActionKind.KeepOnScreen to canKeepOnScreen,
         MessageActionKind.ShowLess to canShowLess,
@@ -78,6 +78,39 @@ internal fun messageActionKinds(
         MessageActionKind.Info to canInfo,
         MessageActionKind.Report to canReport,
     ).filter { (_, enabled) -> enabled }.map { (kind, _) -> kind }
+
+/**
+ * The long-press menu's first level, in display order (#4077). Reactions sit above it; every other
+ * available action, Keep on screen and Delete included, waits behind More actions. Show less stays here
+ * because collapsing an expanded long message is often why it was pressed.
+ */
+private val firstLevelMessageActionKinds =
+    listOf(
+        MessageActionKind.ShowLess,
+        MessageActionKind.Reply,
+        MessageActionKind.Edit,
+        MessageActionKind.CopyText,
+        MessageActionKind.Forward,
+        MessageActionKind.Save,
+    )
+
+/** Whether [kind] belongs on the menu's first level; null is Delete, which does not. */
+internal fun isFirstLevelMessageAction(kind: MessageActionKind?): Boolean = kind in firstLevelMessageActionKinds
+
+/** [kinds] with the first-level actions leading in their own order and the rest after them, unchanged. */
+internal fun messageActionMenuOrder(kinds: List<MessageActionKind>): List<MessageActionKind> =
+    kinds.sortedBy { kind ->
+        firstLevelMessageActionKinds.indexOf(kind).takeIf { it >= 0 } ?: firstLevelMessageActionKinds.size
+    }
+
+/**
+ * Whether [actions] need a More actions disclosure: at least one first-level action to show without
+ * it, and at least two to hide behind it, since a disclosure for one action takes that action's room.
+ */
+internal fun <T> hasMoreMessageActions(
+    actions: List<T>,
+    firstLevel: (T) -> Boolean,
+): Boolean = actions.any(firstLevel) && actions.count { !firstLevel(it) } > 1
 
 /**
  * Column widths for actions whose one-line cell widths are [cellWidths], in menu order.
