@@ -36,12 +36,11 @@ internal fun LocalHtmlView(
     modifier: Modifier = Modifier,
     onLink: (String) -> Unit,
     onUnavailable: () -> Unit,
-    backgroundColor: Int = Color.BLACK,
 ) {
     val context = LocalContext.current
     val fontScale = LocalDensity.current.fontScale
     val view =
-        remember(document, fontScale, backgroundColor) {
+        remember(document, fontScale) {
             var created: WebView? = null
             // loadDataWithBaseURL arrives as one main-frame data: request; every later request is refused.
             val documentPending = AtomicBoolean(true)
@@ -54,7 +53,7 @@ internal fun LocalHtmlView(
                         type: Int,
                     ): ActionMode? = null
                 }.also { created = it }.apply {
-                    setBackgroundColor(backgroundColor)
+                    setBackgroundColor(Color.BLACK)
                     settings.apply {
                         javaScriptEnabled = false
                         javaScriptCanOpenWindowsAutomatically = false

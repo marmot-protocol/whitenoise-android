@@ -12,23 +12,6 @@ import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.jsoup.parser.Parser
 
-/**
- * The reader page's colours as ARGB values from the app theme, never from the sender; the page's CSS uses only their
- * `0xRRGGBB` part. A document that is never themed keeps the policy's built-in dark colours.
- */
-internal data class LocalHtmlPalette(
-    val background: Int,
-    val text: Int,
-    val link: Int,
-    val border: Int,
-)
-
-/** A page ready for the reader's WebView and the ARGB canvas colour drawn behind it, chosen together. */
-internal data class LocalHtmlCanvas(
-    val document: LocalHtmlDocument,
-    val background: Int,
-)
-
 internal data class LocalHtmlDocument(
     val html: String,
     val links: List<String>,
@@ -102,84 +85,15 @@ internal object LocalHtmlPolicy {
     private const val FIRST_PRINTABLE = 0x20
     private const val DELETE = 0x7f
 
-    /** Where the policy's own style element opens; the quote keeps sender attribute text from matching it. */
-    private const val HEADER_STYLE_START = "\"><style>"
-    private const val BODY_COLOURS = "body{background:#000;color:#eee;"
-    private const val LINK_COLOUR = "a{color:#8ac7ff}"
-    private const val CELL_BORDER = "td,th{border:1px solid #888;"
-
     private const val HEAD =
         "<meta charset=\"UTF-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
             "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><meta name=\"referrer\" " +
             "content=\"no-referrer\"><meta http-equiv=\"X-DNS-Prefetch-Control\" content=\"off\"><meta " +
-            "name=\"viewport\" content=\"width=device-width, initial-scale=1" + HEADER_STYLE_START +
-            BODY_COLOURS + "font:16px sans-serif;line-height:1.5;margin:16px;" +
-            "overflow-wrap:anywhere}" + LINK_COLOUR + "table{border-collapse:collapse;max-width:100%}" +
-            CELL_BORDER + "padding:4px}pre{white-space:pre-wrap}blockquote{margin-inline:16px}" +
+            "name=\"viewport\" content=\"width=device-width, initial-scale=1\"><style>" +
+            "body{background:#000;color:#eee;font:16px sans-serif;line-height:1.5;margin:16px;" +
+            "overflow-wrap:anywhere}a{color:#8ac7ff}table{border-collapse:collapse;max-width:100%}" +
+            "td,th{border:1px solid #888;padding:4px}pre{white-space:pre-wrap}blockquote{margin-inline:16px}" +
             "img,svg{max-width:100%}</style>"
-
-    /**
-     * Recolours a sanitized document's own style header with [palette], leaving the sender's markup and styles
-     * untouched. The header is found by [HEADER_STYLE_START]. The only sender text serialized ahead of it is the root
-     * element's attribute values, and jsoup escapes `<` and `>` there (`&lt;`, `&gt;`), so a sender value cannot
-     * spell `><style>` even where the attribute's own opening quote supplies the `"`. A test pins that escaping.
-     * Replacements stay inside that one style element, and the new values are formatted here from integers, so no
-     * sender text reaches the page and the parse does not change.
-     */
-    fun themed(
-        document: LocalHtmlDocument,
-        palette: LocalHtmlPalette,
-    ): LocalHtmlDocument {
-        val html = document.html
-        val start = html.indexOf(HEADER_STYLE_START)
-        val end = html.indexOf("</style>", start)
-        if (start < 0 || end < 0) return document
-        val header =
-            html
-                .substring(start, end)
-                .replaceFirst(BODY_COLOURS, "body{background:${hex(palette.background)};color:${hex(palette.text)};")
-                .replaceFirst(LINK_COLOUR, "a{color:${hex(palette.link)}}")
-                .replaceFirst(CELL_BORDER, "td,th{border:1px solid ${hex(palette.border)};")
-        return document.copy(html = html.substring(0, start) + header + html.substring(end))
-    }
-
-    /**
-     * True when the page keeps any sender styling: a style element of its own, a non-blank `style` attribute, or
-     * inline SVG, whose `fill` and `stroke` can colour text. Such a page keeps the policy's dark canvas it was
-     * written against, because colours can hide in CSS the app does not parse (comments, escapes, variables) and a
-     * light page under sender-chosen white text would be unreadable. Only unstyled pages take the theme. The first
-     * style element is the policy's own header and is skipped.
-     */
-    fun hasAuthorStyling(document: LocalHtmlDocument): Boolean {
-        val parsed = Jsoup.parse(document.html)
-        return parsed.select("style").size > 1 ||
-            parsed.select("[style]").any { it.attr("style").isNotBlank() } ||
-            parsed.select("svg").isNotEmpty()
-    }
-
-    /**
-     * The page and the canvas behind it, decided once so they cannot disagree. A page that keeps sender styling
-     * ([styled], from [hasAuthorStyling]) stays as sanitized on the policy's black canvas, the background its colours
-     * were written against. An unstyled page takes [palette] for both its own header and the canvas.
-     */
-    fun canvas(
-        document: LocalHtmlDocument,
-        styled: Boolean,
-        palette: LocalHtmlPalette,
-    ): LocalHtmlCanvas =
-        if (styled) {
-            LocalHtmlCanvas(document, ORIGINAL_CANVAS)
-        } else {
-            LocalHtmlCanvas(themed(document, palette), palette.background)
-        }
-
-    /** A packed `0xRRGGBB` colour as a CSS hex literal. */
-    private fun hex(rgb: Int): String = "#%06x".format(rgb and RGB_MASK)
-
-    private const val RGB_MASK = 0xFFFFFF
-
-    /** Opaque black, matching the `body{background:#000}` rule in [HEAD]. */
-    private const val ORIGINAL_CANVAS = android.graphics.Color.BLACK
 
     private enum class Context { HTML, SVG, SVG_TEXT }
 

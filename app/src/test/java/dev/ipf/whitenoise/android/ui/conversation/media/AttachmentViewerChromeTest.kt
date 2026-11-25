@@ -99,7 +99,7 @@ class AttachmentViewerChromeTest {
         val chrome = rule.onNodeWithTag("chrome", useUnmergedTree = true)
         chrome.performTouchInput { click(Offset(width - 4f, height / 2f)) }
         assertEquals("a pass-through chrome lets the tap reach the media", 1, mediaTaps)
-        rule.onNodeWithTag(ATTACHMENT_VIEWER_CLOSE_TAG, useUnmergedTree = true).performClick()
+        rule.onNodeWithTag(ATTACHMENT_VIEWER_CLOSE_TAG, useUnmergedTree = true).performTouchInput { click() }
         assertEquals("Close still closes in pass-through mode", 1, closes)
         assertEquals("Close takes its own tap", 1, mediaTaps)
         rule.runOnIdle { passThrough.value = false }
@@ -107,7 +107,7 @@ class AttachmentViewerChromeTest {
         assertEquals("a bar chrome takes the tap itself", 1, mediaTaps)
     }
 
-    /** Every attachment viewer draws its toolbar through the shared chrome, and the document viewer is themed. */
+    /** Every attachment viewer draws its toolbar through the shared chrome, with no raw app bar or back arrow. */
     @Test
     fun everyViewerUsesTheSharedChrome() {
         val viewers =
@@ -128,10 +128,8 @@ class AttachmentViewerChromeTest {
         }
         val document = sourceFile("ui/conversation/media/DocumentAttachmentViewer.kt").readText()
         val frame = document.functionBody("DocumentViewerFrame")
-        assertFalse("the document viewer follows the theme, not a forced black frame", "Color.Black" in frame)
-        val viewer = document.functionBody("DocumentAttachmentViewer")
-        assertTrue("the page and its canvas come from one decision", "LocalHtmlPolicy.canvas(" in viewer)
-        assertTrue("the WebView draws the chosen canvas", "backgroundColor = canvas.background" in viewer)
+        val padsStatusBar = "AttachmentViewerChromeDefaults.topInsets()" in frame
+        assertTrue("the document chrome pads for the status bar itself", padsStatusBar)
     }
 
     /** One production source by its path below the app package, from the module or the repository root. */

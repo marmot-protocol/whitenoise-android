@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -39,7 +39,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.DocumentViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlPolicy
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalHtmlView
 import dev.ipf.whitenoise.android.ui.conversation.media.PdfPageImage
-import dev.ipf.whitenoise.android.ui.conversation.media.documentPalette
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -64,73 +63,51 @@ class DocumentAttachmentViewerScreenshotTest {
             DocumentLoading()
         }
 
-    @Test fun pdfPagesDark() = pdfPages("pdf_pages_dark", dark = true)
-
-    /** On the light reader background a hairline edge keeps the white page distinct. */
-    @Test fun pdfPagesLight() = pdfPages("pdf_pages_light", dark = false)
-
-    /** Renders one white PDF page under the page counter in the given theme. */
-    private fun pdfPages(
-        name: String,
-        dark: Boolean,
-    ) = render(name, DocumentAttachmentKind.Pdf, dark = dark) {
-        Text("3 / 12", modifier = Modifier.padding(16.dp))
-        val bitmap =
-            remember {
-                Bitmap.createBitmap(300, 420, Bitmap.Config.ARGB_8888).apply {
-                    eraseColor(android.graphics.Color.WHITE)
-                    val paint =
-                        Paint().apply {
-                            color = android.graphics.Color.BLACK
-                            textSize = 18f
-                            isAntiAlias = true
+    @Test fun pdfPagesDark() =
+        render("pdf_pages_dark", DocumentAttachmentKind.Pdf) {
+            Text("3 / 12", color = Color.White, modifier = Modifier.padding(16.dp))
+            val bitmap =
+                remember {
+                    Bitmap.createBitmap(300, 420, Bitmap.Config.ARGB_8888).apply {
+                        eraseColor(android.graphics.Color.WHITE)
+                        val paint =
+                            Paint().apply {
+                                color = android.graphics.Color.BLACK
+                                textSize = 18f
+                                isAntiAlias = true
+                            }
+                        Canvas(this).apply {
+                            drawText("Community meeting notes", 16f, 42f, paint)
+                            paint.textSize = 12f
+                            drawText("Saturday · Local library", 16f, 72f, paint)
                         }
-                    Canvas(this).apply {
-                        drawText("Community meeting notes", 16f, 42f, paint)
-                        paint.textSize = 12f
-                        drawText("Saturday · Local library", 16f, 72f, paint)
                     }
                 }
-            }
-        PdfPageImage(bitmap, "Page 3 of 12")
-    }
+            PdfPageImage(bitmap, "Page 3 of 12")
+        }
 
     @Test fun pdfErrorLargeRtl() =
         render("pdf_error_large_rtl", DocumentAttachmentKind.Pdf, rtl = true, font = 1.5f) {
             DocumentViewerError(R.string.document_pdf_unavailable, {}, {})
         }
 
-    @Test fun htmlRenderedNotice() = htmlRendered("html_rendered_notice", dark = true)
-
-    /** The rendered page takes the light theme's palette and background, like the frame around it. */
-    @Test fun htmlRenderedLight() = htmlRendered("html_rendered_light", dark = false)
-
-    /** Renders the omitted-content notice above a sanitized page themed like production. */
-    private fun htmlRendered(
-        name: String,
-        dark: Boolean,
-    ) = render(name, DocumentAttachmentKind.Html, dark = dark) {
-        Text(
-            stringResource(R.string.document_html_omitted),
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        // Robolectric covers native chrome, not Chromium layout or document-directed networking.
-        val document =
-            remember {
-                runBlocking {
-                    LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
+    @Test fun htmlRenderedNotice() =
+        render("html_rendered_notice", DocumentAttachmentKind.Html) {
+            Text(
+                stringResource(R.string.document_html_omitted),
+                color = Color.White,
+                modifier = Modifier.padding(12.dp),
+            )
+            // Robolectric covers native chrome, not Chromium layout or document-directed networking.
+            val document =
+                remember {
+                    runBlocking {
+                        LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
+                    }
                 }
-            }
-        val canvas = LocalHtmlPolicy.canvas(document, styled = false, palette = documentPalette())
-        LocalHtmlView(
-            canvas.document,
-            Modifier.fillMaxSize(),
-            {},
-            {},
-            backgroundColor = canvas.background,
-        )
-    }
+
+            LocalHtmlView(document, Modifier.fillMaxSize(), {}, {})
+        }
 
     @Test fun htmlSourceLight() =
         render("html_source_light", DocumentAttachmentKind.Html, source = true, dark = false) {

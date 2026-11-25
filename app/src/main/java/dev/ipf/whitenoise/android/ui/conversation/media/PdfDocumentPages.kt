@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.graphics.Bitmap
 import android.util.LruCache
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -43,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -61,7 +59,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
-/** PDF pages rendered on demand under a page counter in the theme's content colour, with a retryable failure. */
+/** PDF pages rendered on demand under a white page counter on the reader's black canvas, with a retryable failure. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
 internal fun PdfDocumentPages(
@@ -137,7 +135,7 @@ internal fun PdfDocumentPages(
             val placeholderRatio = pageRatio(info.width, info.height)
             val list = rememberLazyListState()
             val current by remember(list) { derivedStateOf { list.firstVisibleItemIndex + 1 } }
-            Text("$current / $count", modifier = Modifier.padding(horizontal = 16.dp))
+            Text("$current / $count", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
             WhiteNoiseLazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize(),
@@ -226,8 +224,6 @@ internal fun PdfPageImage(
         Modifier
             .fillMaxWidth()
             .aspectRatio(pageRatio(bitmap.width, bitmap.height))
-            // A hairline edge keeps white pages distinct on a light reader background.
-            .border(Dp.Hairline, MaterialTheme.colorScheme.outlineVariant)
             .clipToBounds()
             .onSizeChanged { viewport = it }
             .pointerInput(bitmap) { detectTapGestures(onDoubleTap = { toggle() }) }
