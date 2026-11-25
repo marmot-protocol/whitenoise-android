@@ -4,8 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -14,6 +12,7 @@ import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.confirmedReplyTarget
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
@@ -49,7 +48,7 @@ internal class MessageBubbleActions(
         val displayedBody: String,
         val messageTextCopy: MessageTextCopy,
         val localReactionMotion: LocalReactionMotion,
-        val clipboard: ClipboardManager,
+        val clipboard: ClipboardCopier,
         val onActionMenuOpenChange: (Boolean) -> Unit,
         val onForwardMenuHandoff: () -> Unit,
     ) {
@@ -176,7 +175,7 @@ internal class MessageBubbleActions(
                 } else {
                     visibleTranslation ?: displayedBody
                 }
-            text?.let { clipboard.setText(AnnotatedString(it)) }
+            text?.let { clipboard.copy(it) }
             onActionMenuOpenChange(false)
         }
     }
@@ -185,7 +184,7 @@ internal class MessageBubbleActions(
     fun copyMarkdownLink(url: String) {
         with(latest.value) {
             if (deleted) return
-            clipboard.setText(AnnotatedString(url))
+            clipboard.copy(url)
             onActionMenuOpenChange(false)
         }
     }

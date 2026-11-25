@@ -52,9 +52,9 @@
         ]
       },
       {
-        "surface": "R.string.close",
+        "surface": "Shared viewer chrome: document",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
-        "anchor": "R.string.close",
+        "anchor": "AttachmentViewerChrome(",
         "test_ids": [
           "MED-056"
         ]

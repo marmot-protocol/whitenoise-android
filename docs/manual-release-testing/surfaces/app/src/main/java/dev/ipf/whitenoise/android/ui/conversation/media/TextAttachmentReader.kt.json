@@ -135,9 +135,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.back",
+        "surface": "Shared viewer chrome: text reader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
-        "anchor": "R.string.back",
+        "anchor": "AttachmentViewerChrome(",
         "test_ids": [
           "MED-010",
           "MED-056"

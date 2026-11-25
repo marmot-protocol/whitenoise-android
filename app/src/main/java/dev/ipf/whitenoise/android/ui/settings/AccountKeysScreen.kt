@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
+import dev.ipf.whitenoise.android.ui.common.copyToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -330,8 +331,7 @@ internal fun AccountKeysScreen(
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
-                copyToClipboard(context, publicKeyLabel, npub)
-                ui.copiedKey = CopiedProfileKey.Public
+                if (copyToClipboard(context, publicKeyLabel, npub)) ui.copiedKey = CopiedProfileKey.Public
             },
             onToggleReveal = {
                 if (ui.revealRequested) {
