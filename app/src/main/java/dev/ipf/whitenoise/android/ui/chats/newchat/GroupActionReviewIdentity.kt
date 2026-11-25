@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -126,12 +128,19 @@ internal fun GroupActingAccountIdentity(
     appState: WhiteNoiseAppState,
     accountRef: String? = appState.activeAccountRef,
     modifier: Modifier = Modifier.fillMaxWidth(),
+    showRole: Boolean = false,
 ) {
     val account = appState.accounts.firstOrNull { it.label == accountRef } ?: return
     val identifier = appState.npubForDisplay(account.accountIdHex)
-    Box(modifier.testTag("group.action.acting_account"), contentAlignment = Alignment.CenterEnd) {
+    val alignment = if (showRole) Alignment.CenterStart else Alignment.CenterEnd
+    Box(modifier.testTag("group.action.acting_account"), contentAlignment = alignment) {
         if (identifier.isNotBlank()) {
-            GroupReviewNpub(identifier, stringResource(R.string.group_action_acting_account), compact = true)
+            GroupReviewNpub(
+                identifier,
+                stringResource(R.string.group_action_acting_account),
+                compact = true,
+                showRole = showRole,
+            )
         } else {
             Text(
                 stringResource(R.string.group_action_account_label, account.label),
@@ -165,9 +174,21 @@ private fun GroupReviewNpub(
     npub: String,
     role: String,
     compact: Boolean = false,
+    showRole: Boolean = false,
 ) {
     GroupReviewCopyRow(npub, "$role, $npub") { expanded ->
-        GroupReviewKeyText(npub, expanded, compact)
+        if (showRole) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    role,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                GroupReviewKeyText(npub, expanded, compact, textDirection = TextDirection.Ltr)
+            }
+        } else {
+            GroupReviewKeyText(npub, expanded, compact)
+        }
     }
 }
 
@@ -177,6 +198,7 @@ private fun GroupReviewKeyText(
     npub: String,
     expanded: Boolean,
     compact: Boolean = false,
+    textDirection: TextDirection = MaterialTheme.typography.bodySmall.textDirection,
 ) {
     Text(
         text =
@@ -186,7 +208,7 @@ private fun GroupReviewKeyText(
                 IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
             },
         modifier = Modifier.animatePublicKeyExpansion(expanded),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodySmall.copy(textDirection = textDirection),
         fontFamily = if (expanded) FontFamily.Monospace else null,
         textAlign = if (expanded) TextAlign.Center else null,
     )

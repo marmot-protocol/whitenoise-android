@@ -80,6 +80,7 @@ internal class TopNoticeHost(
     val partial: () -> TransientNotice? = { null },
     val dismissNotice: (TransientNotice) -> Unit = {},
     private val presentationAllowed: () -> Boolean = { true },
+    val present: (Int, TransientNoticeKind) -> Unit = { _, _ -> },
 ) {
     private val claims = mutableStateListOf<TopNoticeClaim>()
 

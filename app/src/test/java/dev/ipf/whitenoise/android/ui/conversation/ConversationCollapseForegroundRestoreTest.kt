@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -85,7 +86,14 @@ class ConversationCollapseForegroundRestoreTest {
             ).first { it.exists() }.motionOwnerSource()
         val start = source.indexOf("onBeforeBodyCollapse = {")
         assertTrue("The actual message collapse callback must exist", start >= 0)
-        val callback = source.substring(start).substringBefore("collapseLongMessages =")
+        assertTrue(
+            "The row's collapse callback must route to the shipped collapse handler",
+            source
+                .substring(start)
+                .substringBefore("collapseLongMessages =")
+                .contains("bodyExpansionPosition.preserveReadingPositionOnCollapse(item)"),
+        )
+        val callback = source.functionBody("preserveReadingPositionOnCollapse")
         val cancellation = callback.indexOf("scrollCoordinator.cancelForegroundRestoreForUserIntent()")
         val capturedIntent = callback.indexOf("val keepFollowingTail =")
         val settlement = callback.indexOf("scrollCoordinator.settleLandingAt(")

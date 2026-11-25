@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
@@ -116,16 +117,15 @@ internal fun DonateScreen(onBack: () -> Unit) {
                         Text(donateLabel)
                     }
                     if (openFailed) {
-                        Text(
-                            stringResource(R.string.donate_open_failed),
+                        WhiteNoiseCallout(
+                            text = stringResource(R.string.donate_open_failed),
                             modifier =
                                 Modifier
                                     .padding(top = WhiteNoiseSpacing.Related)
                                     .testTag("donate.open_failed")
                                     .semantics { liveRegion = LiveRegionMode.Polite },
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
+                            icon = R.drawable.ic_error,
+                            isError = true,
                         )
                     }
                 }

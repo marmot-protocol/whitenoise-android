@@ -1,0 +1,60 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ErrorCallout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "fun ErrorCallout(",
+        "test_ids": [
+          "AXY-001",
+          "GRP-001",
+          "GRP-033"
+        ]
+      },
+      {
+        "surface": "InlineErrorBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "fun InlineErrorBanner(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "Error callout actions wrap below the explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "FlowRow {",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "Error callout copy action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "AXY-001",
+          "GRP-033"
+        ]
+      },
+      {
+        "surface": "Error callout retry action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "Error callout dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ErrorCallout.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -316,10 +317,11 @@ internal fun SignUpContent(
                         else -> null
                     }
                 error?.let {
-                    Text(
-                        stringResource(it),
-                        color = MaterialTheme.colorScheme.error,
+                    WhiteNoiseCallout(
+                        text = stringResource(it),
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        icon = R.drawable.ic_error,
+                        isError = true,
                     )
                 }
                 if (stage == SignUpStage.PhotoFailed || stage == SignUpStage.PublishFailed) {
