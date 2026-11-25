@@ -28,10 +28,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatHistoryImports
 import dev.ipf.whitenoise.android.state.ChatHistoryTransfer
 import dev.ipf.whitenoise.android.state.ImportedHistorySource
-import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.chatHistoryTransfer
-import dev.ipf.whitenoise.android.state.importedHistoryBoundary
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.devices.followEventsWhileStarted
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -91,13 +88,11 @@ internal fun rememberChatHistoryImports(
  */
 @Composable
 internal fun ImportedHistoryMarkers(
-    older: TimelineMessage?,
-    item: TimelineMessage,
-    atHistoryStart: Boolean,
+    transfer: ChatHistoryTransfer?,
+    boundary: ImportedHistorySource?,
 ) {
-    val state = LocalChatHistoryImport.current()
-    if (atHistoryStart) chatHistoryTransfer(state)?.let { ChatHistoryTransferNotice(it) }
-    importedHistoryBoundary(older?.projected, item.projected, state)?.let { ImportedHistoryBoundary(it) }
+    transfer?.let { ChatHistoryTransferNotice(it) }
+    boundary?.let { ImportedHistoryBoundary(it) }
 }
 
 /** Says that earlier messages are arriving from another device, or that MDK will try again after a failed attempt. */
