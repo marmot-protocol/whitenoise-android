@@ -364,13 +364,23 @@ class NotificationChannelCleanupTest {
 
     /**
      * A failed last-signer sweep leaves a pending marker, so account-refresh retention still deletes an
-     * ownerless legacy conversation channel while a read-only account remains signed in.
+     * ownerless legacy conversation channel and shortcut while only a read-only account remains.
      */
     @Test
     @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
     fun failedLastSignerSweepIsRetriedWhileReadOnlyAccountRemains() {
         val legacyId = checkNotNull(conversationShortcutId("legacy-account", "legacy-group"))
         val legacyChannel = convChannel(NotificationChannelSpec.GROUP_MESSAGES, legacyId, "Ownerless Legacy Chat")
+        ShortcutManagerCompat.pushDynamicShortcut(
+            context,
+            ShortcutInfoCompat
+                .Builder(context, legacyId)
+                .setShortLabel("Ownerless Legacy Chat")
+                .setIntent(buildShareShortcutIntent(context))
+                .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                .setLongLived(true)
+                .build(),
+        )
 
         FailingDeleteNotificationManager.failingChannelIds = setOf(legacyChannel)
         try {
@@ -380,14 +390,19 @@ class NotificationChannelCleanupTest {
         }
         assertNotNull(manager.getNotificationChannel(legacyChannel))
 
+        val untrackedId = checkNotNull(conversationShortcutId("legacy-account", "untracked-group"))
+        val untrackedChannel = convChannel(NotificationChannelSpec.GROUP_MESSAGES, untrackedId, "Untracked Legacy Chat")
         assertTrue(retainConversationChannelOwners(context, listOf("new-signer"), signingAccountRemains = true))
-        assertNotNull("a newly joined signer blocks the unowned sweep", manager.getNotificationChannel(legacyChannel))
+        assertNotNull("a newly joined signer blocks the unowned sweep", manager.getNotificationChannel(untrackedChannel))
+        assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == legacyId })
 
         val readOnly = listOf("read-only-account")
         assertTrue(retainConversationChannelOwners(context, readOnly, signingAccountRemains = false))
 
         assertNull(manager.getNotificationChannel(legacyChannel))
-        assertNoChannelContainsText("Ownerless Legacy Chat")
+        assertNull(manager.getNotificationChannel(untrackedChannel))
+        assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == legacyId })
+        assertNoChannelContainsText("Ownerless Legacy Chat", "Untracked Legacy Chat")
         assertAllGlobalChannelsPresent()
     }
 

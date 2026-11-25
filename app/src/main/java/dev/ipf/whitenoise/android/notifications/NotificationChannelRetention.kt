@@ -42,22 +42,26 @@ private fun retainLocked(
     val staleKeys = prefs.all.keys.filter { key -> key !in retainedKeys && key != LEGACY_SWEEP_PENDING_KEY }
     val ownersPruned = staleKeys.isEmpty() || pruneStaleAccountChannelsAndOwners(appContext, prefs, staleKeys)
     val retainedIds = retainedConversationShortcutIds(prefs, retainedKeys)
-    val departedShortcuts = departedAccountShortcuts(appContext, retainedScopes)
-    val departedIds = departedShortcuts.flatMapTo(HashSet()) { channelShortcutIdsFromShortcutId(it.id) }
     // A remaining read-only account owns no conversation channels; a signer that joined since may own
     // unrecorded ones, so a pending sweep waits until no signing account is present.
-    val sweepUnowned = retainedKeys.isEmpty() || (sweepPending && !signingAccountRemains)
+    val sweepUnowned = !signingAccountRemains && (retainedKeys.isEmpty() || sweepPending)
+    val departedShortcuts = runCatching { departedAccountShortcuts(appContext, retainedScopes, sweepUnowned) }.getOrNull()
+    val departedIds = departedShortcuts.orEmpty().flatMapTo(HashSet()) { channelShortcutIdsFromShortcutId(it.id) }
     val orphansDeleted =
         deleteMatchingNotificationChannels(appContext) { channel ->
             isOrphanProfileChannel(channel, retainedKeys) ||
                 isOrphanConversationChannel(channel, sweepUnowned, retainedIds, departedIds)
         }
-    if (orphansDeleted) {
-        // Channels are gone first, so removing the departed shortcuts cannot soft-delete a named one.
-        removeDepartedShortcuts(appContext, departedShortcuts)
-        if (sweepPending && sweepUnowned) runCatching { prefs.edit().remove(LEGACY_SWEEP_PENDING_KEY).commit() }
+    // Remove shortcuts only after their channels are gone, and keep retrying if inventory or removal fails.
+    val shortcutsRemoved =
+        orphansDeleted && departedShortcuts != null &&
+            runCatching { removeDepartedShortcuts(appContext, departedShortcuts) }.isSuccess
+    val complete = ownersPruned && shortcutsRemoved
+    return if (complete && sweepPending && sweepUnowned) {
+        runCatching { prefs.edit().remove(LEGACY_SWEEP_PENDING_KEY).commit() }.getOrDefault(false)
+    } else {
+        complete
     }
-    return ownersPruned && orphansDeleted
 }
 
 /** Every conversation shortcut id variant recorded under the retained accounts' owner keys. */
@@ -90,19 +94,21 @@ private fun isOrphanConversationChannel(
     return convShortcut in departedIds || (sweepUnowned && convShortcut !in retainedIds)
 }
 
-/** Conversation shortcuts stamped with an account scope that no retained account owns. */
+/** Finds shortcuts from departed accounts and, during a last-signer sweep, unscoped legacy shortcuts. */
 private fun departedAccountShortcuts(
     appContext: Context,
     retainedScopes: Set<String>,
+    includeUnscopedLegacy: Boolean,
 ): List<ShortcutInfoCompat> {
     val flags =
         ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
             ShortcutManagerCompat.FLAG_MATCH_CACHED or
             ShortcutManagerCompat.FLAG_MATCH_PINNED
-    val shortcuts = runCatching { ShortcutManagerCompat.getShortcuts(appContext, flags) }.getOrDefault(emptyList())
+    val shortcuts = ShortcutManagerCompat.getShortcuts(appContext, flags)
     return shortcuts.filter { shortcut ->
         val scope = shortcut.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA)
-        isConversationShortcutId(shortcut.id) && !scope.isNullOrBlank() && scope !in retainedScopes
+        val departed = if (scope.isNullOrBlank()) includeUnscopedLegacy else scope !in retainedScopes
+        isConversationShortcutId(shortcut.id) && departed
     }
 }
 
@@ -114,6 +120,6 @@ private fun removeDepartedShortcuts(
     if (shortcuts.isEmpty()) return
     val ids = shortcuts.map { it.id }
     val pinned = shortcuts.filter { it.isPinned }.map { it.id }
-    if (pinned.isNotEmpty()) runCatching { ShortcutManagerCompat.disableShortcuts(appContext, pinned, "") }
-    runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(appContext, ids) }
+    if (pinned.isNotEmpty()) ShortcutManagerCompat.disableShortcuts(appContext, pinned, "")
+    ShortcutManagerCompat.removeLongLivedShortcuts(appContext, ids)
 }
