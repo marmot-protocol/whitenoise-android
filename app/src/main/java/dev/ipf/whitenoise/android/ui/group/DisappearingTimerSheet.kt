@@ -66,13 +66,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
@@ -231,6 +232,7 @@ internal fun DisappearingMessagesPickerSheet(
     }
 }
 
+/** First page of the disappearing-messages sheet: the preset durations and the custom entry. */
 @Composable
 @Suppress("LongParameterList")
 private fun DisappearingPresetsPage(
@@ -245,34 +247,33 @@ private fun DisappearingPresetsPage(
     onConfirm: (Long) -> Unit,
     onCancelConfirm: () -> Unit,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = WhiteNoiseSpacing.Section)
-            .padding(bottom = WhiteNoiseSpacing.Section),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        DisappearingSheetTitle(stringResource(R.string.disappearing_messages))
-        Text(
-            explainer,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        AnimatedVisibility(
-            visible = confirmOpen,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+    Column(Modifier.fillMaxWidth().padding(bottom = WhiteNoiseSheetInset)) {
+        WhiteNoiseSheetHeader(stringResource(R.string.disappearing_messages))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
-            DisappearingPruneConfirm(
-                secs = confirmSecs,
-                identity = confirmIdentity,
-                enabled = confirmEnabled && confirmOpen,
-                onConfirm = { onConfirm(confirmSecs) },
-                onCancel = onCancelConfirm,
+            Text(
+                explainer,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            AnimatedVisibility(
+                visible = confirmOpen,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
+                DisappearingPruneConfirm(
+                    secs = confirmSecs,
+                    identity = confirmIdentity,
+                    enabled = confirmEnabled && confirmOpen,
+                    onConfirm = { onConfirm(confirmSecs) },
+                    onCancel = onCancelConfirm,
+                )
+            }
+            Spacer(Modifier.size(WhiteNoiseSpacing.Related))
+            DisappearingPresetGrid(selected, onChoose, onCustom)
         }
-        Spacer(Modifier.size(WhiteNoiseSpacing.Related))
-        DisappearingPresetGrid(selected, onChoose, onCustom)
     }
 }
 
@@ -332,16 +333,6 @@ private fun disappearingChipColumns(): Int =
     } else {
         DEFAULT_CHIP_COLUMNS
     }
-
-@Composable
-private fun DisappearingSheetTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.semantics { heading() },
-    )
-}
 
 @Composable
 private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
@@ -492,16 +483,7 @@ private fun DisappearingCustomPage(
             .testTag(DISAPPEARING_CUSTOM_PAGE_TAG),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 4.dp, end = WhiteNoiseSpacing.Section),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-            }
-            Spacer(Modifier.width(4.dp))
-            DisappearingSheetTitle(stringResource(R.string.disappearing_custom))
-        }
+        WhiteNoiseSheetHeader(stringResource(R.string.disappearing_custom), onBack = onBack)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.Section),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),

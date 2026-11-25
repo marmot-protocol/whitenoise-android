@@ -22,6 +22,80 @@
           "NAV-011"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_hint",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_limit",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_none_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_none_selected",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_preview_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_preview_description",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_private",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_private",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_image_emoji_unsupported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_unsupported",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_prepare_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

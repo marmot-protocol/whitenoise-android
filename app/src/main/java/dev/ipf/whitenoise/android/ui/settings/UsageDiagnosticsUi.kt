@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,10 +37,11 @@ import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /**
  * Full settings disclosure as settings explainers; onboarding offers the same information in each choice's
@@ -166,9 +166,8 @@ internal fun UsageDiagnosticsPrompt(
             onDone = onDone,
             onDismissFailedClose = onDismissFailedClose,
         )
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = finish,
-        containerColor = amoledSheetContainerColor(),
         sheetState = sheetState,
     ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section)) {
@@ -197,7 +196,7 @@ private fun DiagnosticsCloseFailure(
     retry: () -> Unit,
 ) {
     if (failed) {
-        Box(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+        Box(Modifier.padding(horizontal = WhiteNoiseSheetInset)) {
             UsageDiagnosticsFailure(busy = busy, retry = retry)
         }
     }
