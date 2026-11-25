@@ -2174,7 +2174,7 @@
     <string name="setup_problem_no_usable_route">Bu listedeki röleler kullanılamadı.</string>
     <string name="setup_problem_check_failed">Bu kontrol tamamlanamadı.</string>
     <string name="setup_problem_unusable">Bu hesabın listesi bu haliyle kullanılamaz.</string>
-    <string name="setup_problem_save_refused">Son röle kontrolü tamamlanamadı. Değişiklikleriniz kaydedilmedi veya yayımlanmadı.</string>
+    <string name="setup_problem_save_refused">Son röle kontrolü tamamlanamadı. Değişiklikleriniz kaydedilmedi ve yayımlanmadı.</string>
     <string name="setup_problem_save_not_published">Değişiklikleriniz kaydedilmedi ve yayımlanmadı.</string>
     <string name="setup_problem_save_record_changed">Röle listesi değiştiği için değişiklikleriniz kaydedilmedi. Hiçbir şey yayımlanmadı.</string>
     <string name="setup_problem_publication_failed">Değişikliğin yayımlanması tamamlanamadı.</string>
