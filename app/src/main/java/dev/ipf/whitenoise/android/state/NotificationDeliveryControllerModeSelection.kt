@@ -135,19 +135,6 @@ private suspend fun NotificationDeliveryController.selectFcmTransport(
     }
 }
 
-/**
- * Reads the selection's token while [owner] still owns delivery. The ownership checks, the auto-init write
- * and the token store run under the native sync lock, and the Firebase read does not. A wipe ends ownership
- * before it takes this lock to turn auto-init off, so a selection resumed after a wipe or an account change
- * neither turns auto-init back on nor keeps a token, and a stalled read never holds up the wipe.
- */
-@Suppress("MaxLineLength")
-private suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner: NotificationDeliveryModeOwner): String? =
-    fetchFcmTokenOrNull(
-        tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) },
-        ownerFence = nativePushSyncMutex,
-    )
-
 /** Drops [owner]'s queued native-push disable, reporting whether it was cleared while the owner stays current. */
 @Suppress("MaxLineLength")
 private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(owner: NotificationDeliveryModeOwner): Boolean {
@@ -160,8 +147,9 @@ private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(o
 
 /**
  * Registers at most three accounts together while the native sync lock fences other mutations. Once all
- * are registered it writes Firebase auto-init on again under the same lock, so a sync that turned it off
- * before these accounts enabled native push cannot leave it off.
+ * are registered, and only then, it turns Firebase auto-init on under the same lock, so a selection that
+ * fails never starts the SDK's background token sync, and a sync that turned auto-init off before these
+ * accounts enabled native push cannot leave it off.
  */
 private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
     owner: NotificationDeliveryModeOwner,
@@ -215,11 +203,29 @@ private suspend fun NotificationDeliveryController.configureNativeDeliveryForAcc
     return !desiredNative || syncPushForNotificationDeliveryOwner(owner, account, config, token)
 }
 
-/** Waits for the exact foreground-service acknowledgement before disabling native delivery. */
-@Suppress("MaxLineLength", "ReturnCount", "TooGenericExceptionCaught")
+/**
+ * Selects persistent delivery for every signed-in account. If it does not complete after a native-push
+ * disable committed, including on cancellation, Firebase auto-init is settled from the accounts' live
+ * demand, since the off write at the end of the cutover may never run.
+ */
+@Suppress("MaxLineLength")
 internal suspend fun NotificationDeliveryController.selectPersistentDelivery(owner: NotificationDeliveryModeOwner): Boolean {
-    val previousPersistent = backgroundConnectionEnabled
     val nativeDisableCommitted = AtomicBoolean(false)
+    // runCatching also holds a cancellation, so the settle runs before getOrThrow rethrows it.
+    val selected = runCatching { selectPersistentTransport(owner, nativeDisableCommitted) }
+    if (selected.getOrNull() != true && nativeDisableCommitted.get()) {
+        withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
+    }
+    return selected.getOrThrow()
+}
+
+/** Waits for the exact foreground-service acknowledgement before disabling native delivery. */
+@Suppress("ReturnCount", "TooGenericExceptionCaught")
+private suspend fun NotificationDeliveryController.selectPersistentTransport(
+    owner: NotificationDeliveryModeOwner,
+    nativeDisableCommitted: AtomicBoolean,
+): Boolean {
+    val previousPersistent = backgroundConnectionEnabled
     return try {
         val fallbackOwner =
             establishPersistentMode(owner) ?: run {

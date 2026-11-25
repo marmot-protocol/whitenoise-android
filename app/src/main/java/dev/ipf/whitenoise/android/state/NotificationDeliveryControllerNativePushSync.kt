@@ -234,16 +234,20 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
 }
 
 /**
- * Turns Firebase auto-init on, then fetches and retains a non-blank FCM token when push is available.
- * A caller whose owner is no longer current gets null before auto-init is touched, and its token is not kept.
- * A caller that does not already hold the native sync lock passes it as [ownerFence]. The owner check with
- * the auto-init write, and the recheck with the token store, then run under it, while the SDK read does not.
+ * Fetches and retains a non-blank FCM token when push is available, turning Firebase auto-init on first
+ * when [enableAutoInit] is set. A caller whose owner is no longer current gets null before auto-init is
+ * touched, and its token is not kept. A caller that does not already hold the native sync lock passes it as
+ * [ownerFence]. The owner check with any auto-init write, and the recheck with the token store, then run
+ * under it, while the SDK read does not. A provisional Push selection passes `enableAutoInit = false` and
+ * reads its token explicitly, because the SDK's background sync started by turning auto-init on can retry
+ * registration after a later off write. It turns auto-init on only once its registration commits.
  */
 @Suppress("ReturnCount")
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     expectedCallbackToken: String? = null,
     tokenOwnerIsCurrent: () -> Boolean = { true },
     ownerFence: Mutex? = null,
+    enableAutoInit: Boolean = true,
 ): String? {
     val rotation = pushTokenRotationSequence.get()
     if (!nativePushCapability().isAvailable) return null
@@ -252,7 +256,7 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     val ownerAdmitted =
         fence.withLock {
             // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
-            tokenOwnerIsCurrent().also { current -> if (current) applyFcmAutoInit(enabled = true) }
+            tokenOwnerIsCurrent().also { current -> if (current && enableAutoInit) applyFcmAutoInit(enabled = true) }
         }
     if (!ownerAdmitted) return null
     val token =

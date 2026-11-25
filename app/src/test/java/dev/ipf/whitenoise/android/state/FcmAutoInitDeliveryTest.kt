@@ -60,20 +60,26 @@ class FcmAutoInitDeliveryTest {
         NotificationStreamForegroundService.stop(context)
     }
 
-    /** Selecting native push turns auto-init on before the token read and leaves it on. */
+    /**
+     * A first Push selection reads its token with auto-init still off and turns auto-init on only once every
+     * account's registration has committed, so a provisional selection never starts the SDK's background sync.
+     */
     @Test
-    fun fcmSelectionEnablesAutoInitBeforeTokenRead() =
+    fun fcmSelectionEnablesAutoInitOnlyAfterRegistration() =
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
             val writesAtTokenRead = CopyOnWriteArrayList<List<Boolean>>()
+            val writesAtUpsert = CopyOnWriteArrayList<List<Boolean>>()
+            val recordUpsert: (String) -> Unit = { writesAtUpsert += platform.autoInitWrites.toList() }
             val fixture =
-                fixture(platform, nativeEnabled = false) {
+                fixture(platform, nativeEnabled = false, onUpsert = recordUpsert) {
                     writesAtTokenRead += platform.autoInitWrites.toList()
                     TOKEN
                 }
             try {
                 fixture.bootstrap()
+                platform.autoInitWrites.clear()
 
                 assertTrue(
                     fixture.runWithMainLooperPumping {
@@ -82,7 +88,9 @@ class FcmAutoInitDeliveryTest {
                 )
 
                 assertTrue("the selection must read a token", writesAtTokenRead.isNotEmpty())
-                writesAtTokenRead.forEach { writes -> assertEquals(true, writes.lastOrNull()) }
+                writesAtTokenRead.forEach { writes -> assertFalse("on before the read: $writes", true in writes) }
+                assertTrue("the selection must register", writesAtUpsert.isNotEmpty())
+                writesAtUpsert.forEach { writes -> assertFalse("on before registration: $writes", true in writes) }
                 assertEquals(true, platform.autoInitWrites.last())
                 assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), fixture.upsertedPushRegistrations.toSet())
             } finally {
@@ -119,9 +127,12 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
-    /** A Push selection whose token read fails turns auto-init back off, since no account uses Push. */
+    /**
+     * A Push selection whose token read fails, as it would offline, never turns auto-init on, so no SDK
+     * background sync is left to retry registration when the network returns.
+     */
     @Test
-    fun failedFcmSelectionTurnsAutoInitBackOff() =
+    fun failedTokenReadNeverEnablesAutoInit() =
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
@@ -136,18 +147,17 @@ class FcmAutoInitDeliveryTest {
                     },
                 )
 
-                // A follow-up sync may repeat the `false`, but nothing may turn it back on.
-                assertEquals(listOf(true, false), platform.autoInitWrites.distinct())
-                assertEquals(false, platform.autoInitWrites.last())
+                val writes = platform.autoInitWrites.toList()
+                assertFalse("a failed selection must never turn auto-init on: $writes", true in writes)
                 assertTrue(fixture.upsertedPushRegistrations.isEmpty())
             } finally {
                 fixture.close()
             }
         }
 
-    /** A first Push selection whose registration fails rolls back and turns auto-init back off. */
+    /** A first Push selection whose registration fails rolls back without ever turning auto-init on. */
     @Test
-    fun failedRegistrationTurnsAutoInitBackOff() =
+    fun failedRegistrationNeverEnablesAutoInit() =
         runBlocking {
             BackgroundConnectionPreferences.setEnabledDurably(context, true)
             val platform = RecordingNativePushFallbackPlatform(context)
@@ -165,8 +175,8 @@ class FcmAutoInitDeliveryTest {
 
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
-                assertEquals(true, platform.autoInitWrites.first())
-                assertEquals(false, platform.autoInitWrites.last())
+                val writes = platform.autoInitWrites.toList()
+                assertFalse("a failed registration must never turn auto-init on: $writes", true in writes)
             } finally {
                 fixture.close()
             }
@@ -208,7 +218,7 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
-    /** A stale `false` write that lands after the selection's token read cannot leave Push without auto-init. */
+    /** A stale `false` write that lands during the selection's token read cannot leave Push without auto-init. */
     @Test
     fun lateDisableDuringFcmSelectionIsOverwrittenAfterRegistration() =
         runBlocking {
@@ -216,7 +226,7 @@ class FcmAutoInitDeliveryTest {
             val platform = RecordingNativePushFallbackPlatform(context)
             val fixture =
                 fixture(platform, nativeEnabled = false) {
-                    // Models a concurrent no-Push sync whose write finishes after the selection's `true`.
+                    // Models a concurrent no-Push sync whose `false` lands while the selection reads its token.
                     platform.setFcmAutoInitEnabled(false)
                     TOKEN
                 }
@@ -230,7 +240,7 @@ class FcmAutoInitDeliveryTest {
                     },
                 )
 
-                assertEquals(listOf(true, false, true), platform.autoInitWrites.take(3))
+                assertEquals(listOf(false, true), platform.autoInitWrites.take(2))
                 assertEquals(true, platform.autoInitWrites.last())
             } finally {
                 fixture.close()

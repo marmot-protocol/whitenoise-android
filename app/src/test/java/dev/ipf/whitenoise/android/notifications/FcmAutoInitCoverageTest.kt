@@ -135,16 +135,19 @@ class FcmAutoInitCoverageTest {
     @Test
     fun selectionTokenReadIsFencedByOwnership() {
         val selection = appModuleSource(SELECTION)
+        val autoInit = appModuleSource(AUTO_INIT)
         val declaration = "fun NotificationDeliveryController.fetchFcmTokenForOwner("
-        assertTrue("missing $declaration", selection.contains(declaration))
+        assertTrue("missing $declaration", autoInit.contains(declaration))
         // ktlint keeps this function expression-bodied, so functionBody would return its first lambda instead.
-        val fenced = selection.substringAfter(declaration).substringBefore("\n\n")
+        val fenced = autoInit.substringAfter(declaration).substringBefore("\n\n")
         val fetch = appModuleSource(SYNC).functionBody("fetchFcmTokenOrNull")
 
         assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
         assertTrue(fenced.contains("ownerFence = nativePushSyncMutex"))
         assertTrue(fenced.contains("tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) }"))
-        val admit = "tokenOwnerIsCurrent().also { current -> if (current) applyFcmAutoInit(enabled = true) }"
+        assertTrue("a provisional selection must not turn auto-init on", fenced.contains("enableAutoInit = false"))
+        val admit =
+            "tokenOwnerIsCurrent().also { current -> if (current && enableAutoInit) applyFcmAutoInit(enabled = true) }"
         val admitAt = fetch.indexOf(admit)
         val read = fetch.indexOf("reader()")
         val fenceAt = fetch.indexOf("fence.withLock")
@@ -174,6 +177,16 @@ class FcmAutoInitCoverageTest {
         assertTrue(settle.contains("disableFcmAutoInitWithoutLoadedNativeDemand()"))
         val loaded = autoInit.functionBody("disableFcmAutoInitWithoutLoadedNativeDemand")
         assertTrue(loaded.contains("if (accountRefs.isNotEmpty()) disableFcmAutoInitWithoutNativeDemand(accountRefs)"))
+    }
+
+    /** A Local selection that fails or is cancelled after a native disable committed settles auto-init. */
+    @Test
+    fun incompleteLocalSelectionSettlesAutoInit() {
+        val local = appModuleSource(SELECTION).functionBody("selectPersistentDelivery")
+
+        assertTrue(local.contains("runCatching { selectPersistentTransport(owner, nativeDisableCommitted) }"))
+        assertTrue(local.contains("withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }"))
+        assertTrue(local.contains("selected.getOrThrow()"))
     }
 
     /** Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. */
