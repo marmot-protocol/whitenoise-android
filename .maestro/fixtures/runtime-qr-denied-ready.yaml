@@ -17,11 +17,11 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible:
     id: qr_scanner.close
 - assertVisible:
-    text: ^Camera Access Needed$
+    text: ^Camera access needed$
 - assertVisible:
     id: qr_scanner.recovery
     enabled: true
     containsChild:
-      text: ^(Allow Camera|Open settings)$
+      text: ^(Allow camera|Open settings)$
 - assertVisible:
-    text: ^Allow Camera$
+    text: ^Allow camera$

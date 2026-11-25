@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +12,6 @@ import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Current slot winners first, then superseded events newest first, so a stale relay copy is easy to spot. */
 internal fun relayHistoryRows(events: List<AccountKeyPackageRelayEventFfi>): List<AccountKeyPackageRelayEventFfi> {
@@ -23,7 +19,11 @@ internal fun relayHistoryRows(events: List<AccountKeyPackageRelayEventFfi>): Lis
     return events.sortedWith(order)
 }
 
-/** Relay history section of the Key packages screen (MDK 0.10.0 `accountKeyPackageRelayEvents`). */
+/**
+ * Relay history section of the Key packages screen (MDK 0.10.0 `accountKeyPackageRelayEvents`): one settings group
+ * with a row per event. MDK does not promise one event per id, and the group rejects a repeated key, so each key
+ * carries the row's position as well as the event id.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun KeyPackageRelayHistory(events: List<AccountKeyPackageRelayEventFfi>) {
@@ -32,40 +32,49 @@ internal fun KeyPackageRelayHistory(events: List<AccountKeyPackageRelayEventFfi>
         SettingsExplainer(stringResource(R.string.developer_not_published))
         return
     }
-    relayHistoryRows(events).forEach { event -> KeyPackageRelayEventRow(event) }
+    SettingsGroup {
+        relayHistoryRows(events).forEachIndexed { index, event ->
+            row("relay_event.$index.${event.eventIdHex}") { context -> KeyPackageRelayEventRow(context, event) }
+        }
+    }
 }
 
 /** One observed relay event: short KeyPackage reference, publication time and relays, current or superseded. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun KeyPackageRelayEventRow(event: AccountKeyPackageRelayEventFfi) {
+internal fun KeyPackageRelayEventRow(
+    context: SettingsRowContext,
+    event: AccountKeyPackageRelayEventFfi,
+) {
     val publishedAt =
         IdentityFormatter
             .dateTime(event.createdAt, LocalConfiguration.current.locales[0], display = currentDateTimeDisplay())
             .ifEmpty { "—" }
     val relays = event.sourceRelays.joinToString().ifEmpty { "—" }
-    ListItem(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                .testTag("key_packages.relay_event.${event.eventIdHex}"),
-        headlineContent = {
-            val shortRef = IdentityFormatter.short(event.keyPackageRefHex, prefix = 12, suffix = 8)
-            Text(shortRef, fontFamily = FontFamily.Monospace)
-        },
-        supportingContent = { Text(stringResource(R.string.key_package_relay_event_summary, publishedAt, relays)) },
-        trailingContent = {
-            Text(
-                stringResource(if (event.isCurrent) R.string.key_package_current else R.string.key_package_superseded),
-                style = MaterialTheme.typography.labelMedium,
-                color =
-                    if (event.isCurrent) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-        },
-    )
+    SettingsGroupPanel(context) {
+        SettingsRichRow(
+            modifier = Modifier.testTag("key_packages.relay_event.${event.eventIdHex}"),
+            headlineContent = {
+                val shortRef = IdentityFormatter.short(event.keyPackageRefHex, prefix = 12, suffix = 8)
+                Text(shortRef, fontFamily = FontFamily.Monospace)
+            },
+            supportingContent = {
+                Text(stringResource(R.string.key_package_relay_event_summary, publishedAt, relays))
+            },
+            trailingContent = {
+                Text(
+                    stringResource(
+                        if (event.isCurrent) R.string.key_package_current else R.string.key_package_superseded,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color =
+                        if (event.isCurrent) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            },
+        )
+    }
 }

@@ -27,7 +27,8 @@
         "anchor": "fun SignOutProgressDialog(",
         "test_ids": [
           "ACC-013",
-          "ACC-014"
+          "ACC-014",
+          "SET-072"
         ]
       },
       {
@@ -36,7 +37,8 @@
         "anchor": "fun SignOutSheet(",
         "test_ids": [
           "SET-001",
-          "ACC-009"
+          "ACC-009",
+          "SET-072"
         ]
       },
       {

@@ -61,10 +61,12 @@ name: preferences-chat-bubble-colors-reset
 - assertVisible:
     id: bubble_colors.save
     enabled: false
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.reset
+    direction: DOWN
 - tapOn:
-    id: bubble_colors.menu
-- assertVisible: Reset to global colors
-- tapOn: Reset to global colors
+    id: bubble_colors.reset
 - assertVisible:
     id: bubble_colors.save
     enabled: true

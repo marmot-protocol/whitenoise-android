@@ -3248,37 +3248,35 @@ internal fun ConversationScreen(
         }
     }
     draftLoadEffect()
-    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
     val composerShareRevision =
         rememberComposerShareRevision(
             externalRevision = appState.inboundShareRevision,
             editingMessageId = controller.editingMessageId,
         )
     val composerDictationRevision =
-        draftAccountRef?.let { accountRef ->
-            appState.conversationDictation.completionRevision(
-                accountRef = accountRef,
-                groupIdHex = controller.group.groupIdHex,
-            )
+        draftAccountRef?.let {
+            appState.conversationDictation.completionRevision(it, controller.group.groupIdHex)
         } ?: 0
-    // Capture the revision for this navigation entry. A later accepted
-    // transcript must rehydrate text/selection without being mistaken for a
-    // restored draft and reopening the IME. Re-entering the conversation gets
-    // a fresh baseline, so genuine draft restoration still focuses once.
-    val composerDictationRevisionOnEntry =
-        rememberComposerDictationRevisionOnEntry(
+    val draftExternalRevision = composerShareRevision to composerDictationRevision
+    val restoredDraftSnapshot =
+        rememberRestoredDraftSnapshot(
+            appState = appState,
+            draftAccountRef = draftAccountRef,
             groupIdHex = controller.group.groupIdHex,
-            currentRevision = composerDictationRevision,
+            externalRevision = draftExternalRevision,
         )
+    // Capture the entry revision so a later accepted dictation transcript rehydrates text/selection
+    // without being mistaken for a restored draft and reopening the IME.
+    val composerDictationRevisionOnEntry =
+        rememberComposerDictationRevisionOnEntry(controller.group.groupIdHex, composerDictationRevision)
     val composerTextState =
         rememberComposerTextState(
             draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision to composerDictationRevision,
+            externalRevision = draftExternalRevision,
         )
     // Capture the baseline during composition, before either editor can receive an input event.
-    val userTextEditRevisionOnEntry =
-        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+    val userTextEditRevisionOnEntry = rememberUserTextEditRevisionOnEntry(controller, composerTextState)
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     ConversationSettingsPage(settingsMotion, routedAwayIme) { route ->

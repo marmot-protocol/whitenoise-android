@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
@@ -144,10 +145,14 @@ internal fun CustomEmojiContent(
 ) {
     SettingsScaffold(title = stringResource(R.string.custom_emoji), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(CUSTOM_EMOJI_CONTENT_TAG)) {
-            item(key = "search.CustomEmoji.1") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
             item(key = "search.CustomEmoji.2") { CustomEmojiAddActions(onChoosePhoto, onChooseFile, onOpenSets) }
             if (emoji.entries.isEmpty()) {
-                item(key = "search.CustomEmoji.3") { SettingsExplainer(stringResource(R.string.custom_emoji_empty)) }
+                item(key = "search.CustomEmoji.3") {
+                    WhiteNoiseEmptyState(
+                        title = stringResource(R.string.custom_emoji_empty),
+                        detail = stringResource(R.string.custom_emoji_detail),
+                    )
+                }
             } else {
                 item(key = "search.CustomEmoji.4") {
                     SettingsGroup(modifier = Modifier.testTag("custom_emoji.list")) {
@@ -174,6 +179,7 @@ internal fun CustomEmojiContent(
                         }
                     }
                 }
+                item(key = "custom_emoji.detail") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
             }
         }
     }

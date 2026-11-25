@@ -23,6 +23,8 @@ PAIR = Path('build/mdk-signed-preview-apks')
 NATIVE = '8a67a47805b5b78d3e9fb67c83c5b99870abb106191a83a312508897ac688b06'
 FIXTURE_NAME = 'PR3371 qualification'
 HISTORY = ('Replies and reactions work across both profiles.', 'Great — the demo conversation is ready to explore.')
+# The baseline APK may predate the sentence-case "Sign up" label, so accept both spellings.
+SIGN_UP_LABELS = ('Sign up', 'Sign Up')
 
 
 def adb(*args, binary=False, timeout=120):
@@ -117,9 +119,10 @@ class PreviewUi:
         return self.nodes
 
     def matches(self, text):
-        """Reject labels whose Compose action ancestor is disabled, even when the text itself is enabled."""
-        return [node for node in self.nodes if text in (node.get('text'), node.get('content-desc'))
-                and self.enabled(node)]
+        """Match one label or a tuple of alternatives, rejecting labels whose Compose action ancestor is disabled."""
+        labels = text if isinstance(text, tuple) else (text,)
+        return [node for node in self.nodes
+                if (node.get('text') in labels or node.get('content-desc') in labels) and self.enabled(node)]
 
     def enabled(self, node):
         """A visible text child does not override the enabled state of its containing action."""
@@ -337,7 +340,7 @@ def main():
         adb('install', '-r', str(PAIR / 'baseline.apk'), timeout=180)
         adb('shell', 'pm', 'grant', APP, 'android.permission.POST_NOTIFICATIONS')
         launch()
-        ui.click('Sign Up')
+        ui.click(SIGN_UP_LABELS)
         ui.snapshot()
         fields = [node for node in ui.nodes if node.get('class') == 'android.widget.EditText']
         if len(fields) != 2:
@@ -345,7 +348,7 @@ def main():
         ui.tap_node(fields[0])
         adb('shell', 'input', 'text', FIXTURE_NAME.replace(' ', '%s'))
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-        ui.click('Sign Up', last=True)
+        ui.click(SIGN_UP_LABELS, last=True)
         ui.open_settings(timeout=300)
         identity = ui.public_identity()
         ui.open_demo_setup()

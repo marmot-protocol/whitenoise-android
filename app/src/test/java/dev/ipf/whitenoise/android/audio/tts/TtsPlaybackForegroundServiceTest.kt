@@ -8,6 +8,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.notifications.QueuedStartShadowService
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentCandidate
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentFormat
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentPreview
@@ -17,6 +18,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,7 +31,7 @@ import org.robolectric.annotation.Config
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], shadows = [QueuedStartShadowService::class])
 class TtsPlaybackForegroundServiceTest {
     private class RejectingForegroundStartContext(
         base: Context,
@@ -37,7 +39,7 @@ class TtsPlaybackForegroundServiceTest {
         override fun startForegroundService(service: Intent): ComponentName? = throw IllegalStateException("blocked")
     }
 
-    private class ServiceHarness {
+    internal class ServiceHarness {
         val engine = FakeServiceEngine()
         var nextSentences = 0
         var previousSentences = 0
@@ -241,18 +243,24 @@ class TtsPlaybackForegroundServiceTest {
         controller.destroy()
     }
 
+    /** Starting for an already-ended session promotes before stopSelfResult accepts and removes foreground. */
     @Test
     fun startingWithNoActiveSessionStopsImmediately() {
         installHost()
 
         val controller = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
         val service = controller.get()
-        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 7)
         shadowOf(Looper.getMainLooper()).idle()
 
-        val shadowService = shadowOf(service as Service)
-        assertNotNull(shadowService.lastForegroundNotification)
+        val shadowService = shadowOf(service as Service) as QueuedStartShadowService
+        assertEquals(1, shadowService.publishedNotifications.size)
+        assertEquals(listOf("startForeground:0", "stopSelfResult:7:true", "stopForeground:true"), shadowService.events)
+        assertNull(shadowService.lastForegroundNotification)
+        assertTrue(shadowService.isForegroundStopped)
+        assertTrue(shadowService.notificationShouldRemoved)
         assertTrue(shadowService.isStoppedBySelf)
+        assertEquals(7, shadowService.stopSelfResultId)
         controller.destroy()
     }
 
@@ -588,7 +596,7 @@ class TtsPlaybackForegroundServiceTest {
         controller.destroy()
     }
 
-    private class GrantedFocus : TtsAudioFocus {
+    internal class GrantedFocus : TtsAudioFocus {
         override fun acquire(
             onFocusLoss: () -> Unit,
             onOwnerSurrender: () -> Unit,
@@ -597,7 +605,7 @@ class TtsPlaybackForegroundServiceTest {
         override fun release() = Unit
     }
 
-    private class FakeServiceEngine : TtsSpeechEngine {
+    internal class FakeServiceEngine : TtsSpeechEngine {
         private var doneCallback: ((String?) -> Unit)? = null
         private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
         private val spoken = mutableListOf<String>()

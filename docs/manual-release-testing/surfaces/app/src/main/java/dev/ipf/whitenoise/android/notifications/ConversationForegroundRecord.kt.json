@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+  "legacy_sha256": "d9f9a85a14d2674c867489133cc65bcd561a92ebdce9f65edac935af49d405ec",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "Single foreground host releases dictation while preserving connection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "fun releaseDictation(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stale capture foreground start satisfies FGS deadline before stopping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "private fun satisfyStartDeadlineBeforeStop()",
+        "test_ids": [
+          "DIC-022"
+        ]
+      },
+      {
+        "surface": "R.string.app_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "DIC-022"
+        ]
+      },
+      {
+        "surface": "R.string.notification_channel_background_connection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "R.string.notification_channel_background_connection",
+        "test_ids": [
+          "DIC-022"
+        ]
+      },
+      {
+        "surface": "R.string.notification_channel_background_connection_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "R.string.notification_channel_background_connection_description",
+        "test_ids": [
+          "DIC-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
