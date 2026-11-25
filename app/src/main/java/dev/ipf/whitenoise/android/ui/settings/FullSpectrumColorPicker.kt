@@ -194,7 +194,7 @@ private fun ColorPresetRow(
 }
 
 /**
- * One 48 dp circle, the selected preset carries a 3 dp on-surface ring, the rest a 1 dp outline. Given
+ * One 48 dp circle. The selected preset carries a 3 dp on-surface ring, the rest a 1 dp outline. Given
  * [pressSource], it draws that press highlight inside its own circle, so the ring is not clipped twice.
  */
 @Suppress("FunctionNaming")

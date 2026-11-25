@@ -148,8 +148,7 @@ private fun String.clicksOnRoundComponents(): List<Pair<String, Int>> =
  */
 private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
     iconButtonCalls()
-        .filter { (_, args) ->
-            val modifier = args
+        .filter { (_, modifier) ->
             // Only the button's own modifier sizes it, never a sized child in its `content`.
             val sized = twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
             val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
@@ -165,15 +164,19 @@ private fun String.iconButtonCalls(): List<Pair<Int, String>> =
     calls("IconButton").map { (start, args) -> start to modifierArgument(args, position = 1) } +
         calls("IconToggleButton").map { (start, args) -> start to modifierArgument(args, position = 2) }
 
-/** The `modifier` a call receives, named or as its positional argument at [position]. */
+/**
+ * The `modifier` a call receives, named or as its positional argument at [position]. A call may name its
+ * leading arguments and still pass the modifier by position, so [position] counts every argument, and a
+ * named argument there is not the modifier.
+ */
 private fun modifierArgument(
     args: String,
     position: Int,
 ): String =
     topLevelNamedArguments(args)["modifier"]?.trim()
         ?: topLevelArguments(args)
-            .filterNot { namedArgument.containsMatchIn(it) }
             .getOrNull(position)
+            ?.takeUnless { namedArgument.containsMatchIn(it) }
             ?.trim()
             .orEmpty()
 
@@ -215,22 +218,11 @@ internal fun stretchedWrapperCalls(
                 !declaration.containsMatchIn(before) &&
                     modifierIndices.any { index ->
                         // Only bindings declared before this call are in scope for it.
-                        val modifier = code.substring(0, start).withLocalBinding(wrapperModifier(args, index))
+                        val modifier = code.substring(0, start).withLocalBinding(modifierArgument(args, index))
                         twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
                     }
             }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
     }
-}
-
-/** The modifier a wrapper call passes, named or at the wrapper's `modifier` parameter position. */
-private fun wrapperModifier(
-    args: String,
-    modifierIndex: Int,
-): String {
-    val arguments = topLevelArguments(args)
-    return topLevelNamedArguments(args)["modifier"]
-        ?: arguments.getOrNull(modifierIndex)?.takeUnless { namedArgument.containsMatchIn(it) }
-        ?: ""
 }
 
 /** [expression] with the initializer of the local `val` it starts from, if any, put in front of it. */
