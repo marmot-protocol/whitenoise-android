@@ -1,0 +1,61 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: developer-agent-demo
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.about"
+- assertVisible:
+    id: "about.app"
+- repeat:
+    times: 7
+    commands:
+      - tapOn:
+          id: "about.version"
+- scrollUntilVisible:
+    element:
+      id: "about.developer"
+    direction: DOWN
+- tapOn:
+    id: "about.developer"
+- assertVisible:
+    id: "developer.warning"
+- scrollUntilVisible:
+    element:
+      id: "developer.agent_demo"
+    direction: DOWN
+- tapOn:
+    id: "developer.agent_demo"
+- assertVisible: "Demo chats"
+- assertVisible: "Maya"
+- assertVisible: "Release planning"
+- tapOn:
+    id: "agent_demo.chat.agent"
+- assertVisible:
+    id: "agent_demo.transcript"
+- tapOn:
+    id: "agent_demo.composer"
+- inputText: "Make the greeting shorter"
+- hideKeyboard
+- tapOn: "Send"
+- assertVisible:
+    text: "Send answer"
+- back
+- assertVisible: "Demo chats"
+- back
+- assertVisible:
+    id: "developer.warning"

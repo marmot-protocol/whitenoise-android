@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_request_failed">Senden an den Agenten fehlgeschlagen</string>
+    <string name="agent_turn_working">Arbeitet</string>
+    <string name="agent_turn_worked_for">Gearbeitet: %1$s</string>
+    <string name="agent_turn_finished">Fertig</string>
+    <string name="agent_turn_failed">Nicht abgeschlossen</string>
+    <string name="agent_turn_stopped">Gestoppt</string>
+    <string name="agent_turn_stop">Stopp</string>
+    <string name="agent_turn_stop_description">%1$s stoppen</string>
+    <string name="agent_turn_stopping">Wird gestoppt…</string>
+    <string name="agent_duration_seconds">%1$d s</string>
+    <string name="agent_duration_minutes">%1$d min %2$d s</string>
+    <string name="agent_duration_hours">%1$d h %2$d min</string>
+    <string name="agent_tool_exit_code">Exit-Code %1$d</string>
+    <string name="agent_item_running">Läuft</string>
+    <string name="agent_tool_cwd">Ordner: %1$s</string>
+    <string name="agent_tool_output_cut">Ausgabe gekürzt. Volle Länge: %1$d Zeichen.</string>
+    <string name="agent_tool_input">Eingabe</string>
+    <string name="agent_tool_output">Ausgabe</string>
+    <string name="agent_approval_answered">Beantwortet: %1$s</string>
+    <string name="agent_approval_declined">Abgelehnt</string>
+    <string name="agent_approval_expired">Nicht mehr nötig</string>
+    <string name="agent_request_sent">Gesendet. Warte auf %1$s.</string>
+    <string name="agent_question_send">Antwort senden</string>
+    <string name="agent_question_single_choice">Eine auswählen</string>
+    <string name="agent_question_multiple_choice">Beliebig viele auswählen</string>
+    <string name="agent_question_text_hint">Deine Antwort</string>
+    <string name="agent_question_reply_in_chat">Antworte im Chat.</string>
+    <string name="agent_question_secret">Diese Antwort ist privat. Gib sie am Computer des Agenten ein.</string>
+    <string name="agent_question_answered">Beantwortet: %1$s</string>
+    <string name="agent_question_closed">Frage geschlossen</string>
+    <string name="agent_plan_title">Arbeitsplan</string>
+    <string name="agent_plan_step_done">Erledigt: %1$s</string>
+    <string name="agent_plan_step_running">In Arbeit: %1$s</string>
+    <string name="agent_plan_step_pending">Offen: %1$s</string>
+    <string name="agent_session_started">%1$s hat eine neue Sitzung begonnen</string>
+    <string name="agent_session_model">Modell %1$s</string>
+    <string name="agent_refused_not_allowed">Das darfst du bei diesem Agenten nicht</string>
+    <string name="agent_refused_busy">Der Agent war beschäftigt</string>
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">%1$d weitere Datei ausgelassen</item>
+        <item quantity="other">%1$d weitere Dateien ausgelassen</item>
+    </plurals>
+    <string name="agent_text_show_all">Alles anzeigen</string>
+    <string name="agent_activity_show">Agentenaktivität anzeigen</string>
+    <string name="agent_activity_hide">Agentenaktivität ausblenden</string>
+    <string name="agent_activity_label">Agentenaktivität</string>
+    <string name="agent_turn_needs_attention">Aktion erforderlich</string>
+</resources>

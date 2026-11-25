@@ -73,6 +73,15 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             "review_demo",
         )
         control(
+            "Developer.agent_demo",
+            R.string.agent_demo_open,
+            R.string.settings_developer_tools,
+            SettingsDetail.Developer,
+            "search.Developer.5",
+            "agent_demo",
+            R.string.agent_demo_description,
+        )
+        control(
             "Privacy.auto_lock",
             R.string.auto_lock,
             R.string.settings_privacy_security,

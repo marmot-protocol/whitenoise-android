@@ -567,6 +567,10 @@
           "represented_by": "Developer.review_demo"
         },
         {
+          "declaration": "\"agent_demo\"",
+          "represented_by": "Developer.agent_demo"
+        },
+        {
           "declaration": "\"review_demo_clear\"",
           "excluded": "Cleanup/retry actions depend on transient demo state; Review demo management remains indexed."
         },
@@ -923,6 +927,9 @@
     },
     "QuarantinedGroups": {
       "catalog_id": "Developer.quarantined_groups"
+    },
+    "AgentDemo": {
+      "catalog_id": "Developer.agent_demo"
     },
     "Notifications": {
       "catalog_id": "home.Notifications"

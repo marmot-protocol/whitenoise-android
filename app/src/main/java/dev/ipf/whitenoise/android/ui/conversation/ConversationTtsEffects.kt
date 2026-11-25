@@ -22,7 +22,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
@@ -31,6 +30,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.captureTtsAccountOwner
 import dev.ipf.whitenoise.android.state.captureTtsAutoReadPolicy
+import dev.ipf.whitenoise.android.state.conversationAttentionTimeline
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
@@ -377,7 +377,7 @@ internal fun ConversationTtsFollowEffects(
             val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
             val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
             val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.presentationId }
-            val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val renderedForHeightSample = conversationAttentionTimeline(controller.timeline)
             val visibleTimelineHeights =
                 layoutInfo.visibleItemsInfo.mapNotNull { visible ->
                     val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0

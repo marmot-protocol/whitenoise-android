@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_request_failed">No se pudo enviar al agente</string>
+    <string name="agent_turn_working">Trabajando</string>
+    <string name="agent_turn_worked_for">Trabajó %1$s</string>
+    <string name="agent_turn_finished">Terminado</string>
+    <string name="agent_turn_failed">No terminó</string>
+    <string name="agent_turn_stopped">Detenido</string>
+    <string name="agent_turn_stop">Detener</string>
+    <string name="agent_turn_stop_description">Detener a %1$s</string>
+    <string name="agent_turn_stopping">Deteniendo…</string>
+    <string name="agent_duration_seconds">%1$d s</string>
+    <string name="agent_duration_minutes">%1$d min %2$d s</string>
+    <string name="agent_duration_hours">%1$d h %2$d min</string>
+    <string name="agent_tool_exit_code">Código de salida %1$d</string>
+    <string name="agent_item_running">En curso</string>
+    <string name="agent_tool_cwd">En %1$s</string>
+    <string name="agent_tool_output_cut">Salida recortada. Longitud completa: %1$d caracteres.</string>
+    <string name="agent_tool_input">Entrada</string>
+    <string name="agent_tool_output">Salida</string>
+    <string name="agent_approval_answered">Respondido: %1$s</string>
+    <string name="agent_approval_declined">Rechazado</string>
+    <string name="agent_approval_expired">Ya no hace falta</string>
+    <string name="agent_request_sent">Enviado. Esperando a %1$s.</string>
+    <string name="agent_question_send">Enviar respuesta</string>
+    <string name="agent_question_single_choice">Elige una</string>
+    <string name="agent_question_multiple_choice">Elige las que quieras</string>
+    <string name="agent_question_text_hint">Tu respuesta</string>
+    <string name="agent_question_reply_in_chat">Responde en el chat.</string>
+    <string name="agent_question_secret">Esta respuesta es privada. Dala en el ordenador del agente.</string>
+    <string name="agent_question_answered">Respondido: %1$s</string>
+    <string name="agent_question_closed">Pregunta cerrada</string>
+    <string name="agent_plan_title">Plan de trabajo</string>
+    <string name="agent_plan_step_done">Hecho: %1$s</string>
+    <string name="agent_plan_step_running">En curso: %1$s</string>
+    <string name="agent_plan_step_pending">Pendiente: %1$s</string>
+    <string name="agent_session_started">%1$s empezó una sesión nueva</string>
+    <string name="agent_session_model">Modelo %1$s</string>
+    <string name="agent_refused_not_allowed">No puedes hacer eso con este agente</string>
+    <string name="agent_refused_busy">El agente estaba ocupado</string>
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">%1$d archivo más omitido</item>
+        <item quantity="many">%1$d archivos más omitidos</item>
+        <item quantity="other">%1$d archivos más omitidos</item>
+    </plurals>
+    <string name="agent_text_show_all">Mostrar todo</string>
+    <string name="agent_activity_show">Mostrar actividad del agente</string>
+    <string name="agent_activity_hide">Ocultar actividad del agente</string>
+    <string name="agent_activity_label">Actividad del agente</string>
+    <string name="agent_turn_needs_attention">Requiere atención</string>
+</resources>

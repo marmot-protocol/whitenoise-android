@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentDemoFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "fun AgentDemoFooter(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "AgentDemoFooterRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "fun AgentDemoFooterRow(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "AgentDemoRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "fun AgentDemoRow(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "AgentDemoScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "fun AgentDemoScreen(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "AgentDemoTranscript",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "fun AgentDemoTranscript(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.agent_demo_footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "R.string.agent_demo_footer",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.agent_demo_restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "R.string.agent_demo_restart",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.agent_demo_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentDemoScreen.kt",
+        "anchor": "R.string.agent_demo_title",
+        "test_ids": [
+          "SET-069"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

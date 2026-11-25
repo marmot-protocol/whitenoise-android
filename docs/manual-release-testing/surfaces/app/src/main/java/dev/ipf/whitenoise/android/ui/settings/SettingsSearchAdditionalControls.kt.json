@@ -514,6 +514,22 @@
         ]
       },
       {
+        "surface": "setting:agent_demo_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.agent_demo_open",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "setting:agent_demo_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.agent_demo_description",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
         "surface": "setting:settings",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
         "anchor": "R.string.settings",

@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentItemContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "fun AgentItemContent(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentItemTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "fun AgentItemTimelineRow(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentTurnActivity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "fun AgentTurnActivity(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "R.string.agent_activity_hide",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "R.string.agent_activity_label",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_activity_show",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "R.string.agent_activity_show",
+        "test_ids": [
+          "CON-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

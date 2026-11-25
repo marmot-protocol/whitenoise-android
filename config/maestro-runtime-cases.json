@@ -910,6 +910,14 @@
       "assertions": "Quarantined Groups opens its real content and Back restores Developer Tools; no recovery mutation is submitted.",
       "postcondition": "none"
     },
+    "developer-agent-demo": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-069"
+      ],
+      "assertions": "Agent demo opens the scripted chat and reaches the question; Back restores Developer Tools; nothing is sent.",
+      "postcondition": "none"
+    },
     "developer-diagnostics": {
       "suite": "developer",
       "manual_ids": [

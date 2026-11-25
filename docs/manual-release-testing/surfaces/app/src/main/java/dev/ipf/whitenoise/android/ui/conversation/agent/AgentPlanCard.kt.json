@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentPlanCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "fun AgentPlanCard(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentPlanEntryRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "fun AgentPlanEntryRow(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "R.string.agent_plan_step_done",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "R.string.agent_plan_step_pending",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_running",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "R.string.agent_plan_step_running",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentPlanCard.kt",
+        "anchor": "R.string.agent_plan_title",
+        "test_ids": [
+          "CON-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

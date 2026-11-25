@@ -69,6 +69,8 @@ data class TimelineMessage(
      * incoming chat: it is never unread, never an unread jump target, and expires like the account's own sends.
      */
     val fromOtherOwnDevice: Boolean = false,
+    val agentWaitingForInput: Boolean = false,
+    val agentActivity: List<dev.ipf.whitenoise.android.core.agent.AgentItem> = emptyList(),
 ) {
     /** A local send that is still unconfirmed, as opposed to a sent message whose edit is pending. */
     val isPendingSend: Boolean get() = status == MessageStatus.Pending && !statusFromEdit

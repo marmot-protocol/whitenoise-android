@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_request_failed">Ajana gönderilemedi</string>
+    <string name="agent_turn_working">Çalışıyor</string>
+    <string name="agent_turn_worked_for">%1$s çalıştı</string>
+    <string name="agent_turn_finished">Bitti</string>
+    <string name="agent_turn_failed">Tamamlanmadı</string>
+    <string name="agent_turn_stopped">Durduruldu</string>
+    <string name="agent_turn_stop">Durdur</string>
+    <string name="agent_turn_stop_description">%1$s ajanını durdur</string>
+    <string name="agent_turn_stopping">Durduruluyor…</string>
+    <string name="agent_duration_seconds">%1$d sn</string>
+    <string name="agent_duration_minutes">%1$d dk %2$d sn</string>
+    <string name="agent_duration_hours">%1$d sa %2$d dk</string>
+    <string name="agent_tool_exit_code">Çıkış kodu %1$d</string>
+    <string name="agent_item_running">Çalışıyor…</string>
+    <string name="agent_tool_cwd">Konum: %1$s</string>
+    <string name="agent_tool_output_cut">Çıktı kısaltıldı. Tam uzunluk: %1$d karakter.</string>
+    <string name="agent_tool_input">Girdi</string>
+    <string name="agent_tool_output">Çıktı</string>
+    <string name="agent_approval_answered">Yanıtlandı: %1$s</string>
+    <string name="agent_approval_declined">Reddedildi</string>
+    <string name="agent_approval_expired">Artık gerekmiyor</string>
+    <string name="agent_request_sent">Gönderildi. %1$s bekleniyor.</string>
+    <string name="agent_question_send">Yanıtı gönder</string>
+    <string name="agent_question_single_choice">Birini seç</string>
+    <string name="agent_question_multiple_choice">İstediğin kadarını seç</string>
+    <string name="agent_question_text_hint">Yanıtın</string>
+    <string name="agent_question_reply_in_chat">Yanıtlamak için sohbete yaz.</string>
+    <string name="agent_question_secret">Bu yanıt gizli. Ajanın bilgisayarında ver.</string>
+    <string name="agent_question_answered">Yanıtlandı: %1$s</string>
+    <string name="agent_question_closed">Soru kapandı</string>
+    <string name="agent_plan_title">Yol haritası</string>
+    <string name="agent_plan_step_done">Bitti: %1$s</string>
+    <string name="agent_plan_step_running">Sürüyor: %1$s</string>
+    <string name="agent_plan_step_pending">Yapılacak: %1$s</string>
+    <string name="agent_session_started">%1$s yeni bir oturum başlattı</string>
+    <string name="agent_session_model">%1$s modeli</string>
+    <string name="agent_refused_not_allowed">Bu ajan için bunu yapamazsın</string>
+    <string name="agent_refused_busy">Ajan meşguldü</string>
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">%1$d dosya daha atlandı</item>
+        <item quantity="other">%1$d dosya daha atlandı</item>
+    </plurals>
+    <string name="agent_text_show_all">Tümünü göster</string>
+    <string name="agent_activity_show">Ajan etkinliğini göster</string>
+    <string name="agent_activity_hide">Ajan etkinliğini gizle</string>
+    <string name="agent_activity_label">Ajan etkinliği</string>
+    <string name="agent_turn_needs_attention">İşlem gerekiyor</string>
+</resources>

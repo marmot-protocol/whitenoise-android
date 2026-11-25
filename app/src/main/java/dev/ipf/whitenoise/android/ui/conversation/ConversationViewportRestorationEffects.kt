@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.conversationAttentionTimeline
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -106,7 +106,7 @@ private fun ConversationSavedViewportEffect(
         if (!owner.isActive) return@LaunchedEffect
         val position =
             snapshotFlow {
-                val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                val rendered = conversationAttentionTimeline(controller.timeline)
                 conversationViewportSavedPosition(
                     restore,
                     rendered.map { it.id to it.record.messageIdHex },
@@ -135,7 +135,7 @@ private fun ConversationController.savedViewportCompletion(
 ): ConversationSavedViewportCompletion {
     // Settle with the row at the committed index, exactly as the screen did,
     // retaining the saved identity fallback when a row is no longer present.
-    val rendered = timeline.filterNot { MessageProjector.isEdit(it.record) }
+    val rendered = conversationAttentionTimeline(timeline)
     val row =
         rendered.getOrNull(
             conversationTimelineIndexForListIndex(

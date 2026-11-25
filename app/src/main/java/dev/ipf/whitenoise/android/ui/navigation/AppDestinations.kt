@@ -28,6 +28,7 @@ internal enum class SettingsDetail {
     SupportRelays,
     KeyPackages,
     QuarantinedGroups,
+    AgentDemo,
     Notifications,
     DevicePrivacy,
     DiagnosticsImprovements,
