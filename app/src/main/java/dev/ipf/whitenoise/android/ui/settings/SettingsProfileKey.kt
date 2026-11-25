@@ -33,7 +33,6 @@ internal fun SettingsExpandedProfileKey(npub: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = Int.MAX_VALUE,
         keyboardFocusable = true,
-        onExpand = {},
     )
 }
 
