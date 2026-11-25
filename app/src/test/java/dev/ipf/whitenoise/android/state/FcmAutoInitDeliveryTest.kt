@@ -141,6 +141,69 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
+    /** A first Push selection whose registration fails rolls back and turns auto-init back off. */
+    @Test
+    fun failedRegistrationTurnsAutoInitBackOff() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                fixture(platform, nativeEnabled = false, onUpsert = { error("registration failed") }) { TOKEN }
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+
+                assertFalse(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
+
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
+                assertEquals(true, platform.autoInitWrites.first())
+                assertEquals(false, platform.autoInitWrites.last())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A failed Push reselection for accounts that already use Push never turns auto-init off. */
+    @Test
+    fun failedReselectionKeepsAutoInitForExistingPushAccounts() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            var failUpserts = false
+            var token = TOKEN
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = true,
+                    onUpsert = { if (failUpserts) error("registration failed") },
+                ) { token }
+            try {
+                fixture.replaceNotificationSettings(settings(ACCOUNT_B, nativeEnabled = true))
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+                // A rotated token forces a fresh registration, which now fails.
+                token = "rotated-token"
+                failUpserts = true
+
+                assertFalse(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
+
+                assertTrue(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertTrue(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
+                assertFalse("existing Push accounts must keep auto-init", false in platform.autoInitWrites)
+            } finally {
+                failUpserts = false
+                fixture.close()
+            }
+        }
+
     /** A stale `false` write that lands after the selection's token read cannot leave Push without auto-init. */
     @Test
     fun lateDisableDuringFcmSelectionIsOverwrittenAfterRegistration() =
@@ -279,6 +342,32 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
+    /** A sync that finds native push unavailable turns auto-init off and reads no token, even for a Push account. */
+    @Test
+    fun unavailableCapabilitySyncTurnsAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val tokenReads = CopyOnWriteArrayList<Unit>()
+            val unavailable = NativePushCapability.GooglePlayServicesUnavailable
+            val fixture =
+                fixture(platform, nativeEnabled = true, capability = unavailable) {
+                    tokenReads += Unit
+                    TOKEN
+                }
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+
+                fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() }
+
+                assertEquals(false, platform.autoInitWrites.firstOrNull())
+                assertFalse(true in platform.autoInitWrites)
+                assertTrue(tokenReads.isEmpty())
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** A settings read failure with no account known to need push neither reads a token nor flips auto-init. */
     @Test
     fun unreadableSettingsKeepAutoInitUntouched() =
@@ -310,21 +399,24 @@ class FcmAutoInitDeliveryTest {
             }
         }
 
-    /** Builds a two-account fixture with native push available and the given token reader. */
+    /** Builds a two-account fixture with the given push capability and token reader. */
     private fun fixture(
         platform: RecordingNativePushFallbackPlatform,
         nativeEnabled: Boolean,
         onNotificationSettings: ((String) -> NotificationSettingsFfi?)? = null,
+        capability: NativePushCapability = NativePushCapability.Available,
+        onUpsert: (String) -> Unit = {},
         fcmTokenReader: suspend () -> String?,
     ) = NotificationBootstrapTestFixture(
         context = context,
         accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B)),
         initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled),
         nativePushFallbackPlatform = platform,
+        onUpsertPushRegistration = onUpsert,
         onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = { CONFIG },
         fcmTokenReader = fcmTokenReader,
-        nativePushCapabilityResolver = { NativePushCapability.Available },
+        nativePushCapabilityResolver = { capability },
     )
 
     /** Builds a running local-signing account summary for the given ref. */

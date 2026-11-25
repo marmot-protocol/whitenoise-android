@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 internal const val FCM_REGISTRATION_BATCH_SIZE = 3
 
@@ -95,6 +96,10 @@ internal class NotificationDeliveryController(
 ) {
     internal val nativePushSyncMutex = Mutex()
     internal val pushTokenRotationSequence = AtomicLong()
+
+    // The token of the latest onNewToken callback, published before its sequence increment so a token
+    // read that sees the new sequence also sees which token caused it.
+    internal val lastRotatedFcmToken = AtomicReference<String?>()
     internal val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     internal val notificationDeliveryModeMutex = Mutex()
     internal val notificationDeliveryModeIntent = StalenessGuard()
@@ -328,6 +333,7 @@ internal class NotificationDeliveryController(
      */
     fun onPushTokenRotated(token: String): Job? {
         if (token.isBlank()) return null
+        lastRotatedFcmToken.set(token)
         val rotation = pushTokenRotationSequence.incrementAndGet()
         val runtime = marmotRuntime
         val generation = runtimeGeneration

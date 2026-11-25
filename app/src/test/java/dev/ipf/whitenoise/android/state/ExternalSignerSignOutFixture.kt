@@ -207,13 +207,15 @@ internal abstract class ExternalSignerSignOutFixture {
 
     /**
      * Installs the scripted native runtime into a real app state using the supplied preference-failure context
-     * and, when given, a scripted push token store in place of the Keystore-backed default.
+     * and, when given, a scripted push token store in place of the Keystore-backed default and a recording
+     * push platform in place of the Android one.
      */
     protected fun appState(
         ownerContext: Context = context,
         pushTokenStore: PushTokenStore? = null,
         marmotIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
+        nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(ownerContext),
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -224,6 +226,7 @@ internal abstract class ExternalSignerSignOutFixture {
             pushTokenStore = pushTokenStore,
             marmotIoDispatcher = marmotIoDispatcher,
             profileReader = profileReader,
+            nativePushFallbackPlatform = nativePushFallbackPlatform,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")

@@ -119,16 +119,21 @@ class FcmAutoInitCoverageTest {
         assertTrue(settle.contains("applyFcmAutoInit(enabled = false)"))
     }
 
-    /** Both ways of removing the last signed-in account turn auto-init off with the cached token. */
+    /** Signing out or wiping the last signed-in account turns auto-init off, and the token goes as before. */
     @Test
     fun lastAccountRemovalDisablesAutoInit() {
         val appState = appModuleSource("$STATE/AppState.kt")
 
-        assertEquals(2, Regex("""notificationDelivery\.forgetFcmTokenAfterLastAccount\(\)""").findAll(appState).count())
+        assertTrue(appState.contains("notificationDelivery.forgetFcmTokenAfterLastAccount()"))
+        assertTrue(appState.contains("notificationDelivery.settleFcmAfterSignOut(next, refreshed)"))
         assertFalse("the token must not be cleared without auto-init", appState.contains("pushTokenStore.clear()"))
-        val forget = appModuleSource(AUTO_INIT).functionBody("forgetFcmTokenAfterLastAccount")
+        val autoInit = appModuleSource(AUTO_INIT)
+        val forget = autoInit.functionBody("forgetFcmTokenAfterLastAccount")
         assertTrue(forget.contains("pushTokenStore.clear()"))
         assertTrue(forget.contains("applyFcmAutoInit(enabled = false)"))
+        val signOut = autoInit.functionBody("settleFcmAfterSignOut")
+        assertTrue(signOut.contains("remaining.any { it.isSignedInSigningAccount() }"))
+        assertTrue(signOut.contains("applyFcmAutoInit(enabled = false)"))
     }
 
     /** Leaving native push for every account, by selection or by sync, turns auto-init off. */

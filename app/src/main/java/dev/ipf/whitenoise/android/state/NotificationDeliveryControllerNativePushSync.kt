@@ -72,7 +72,11 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     }
     val config = pushServerConfigProvider()
     val capability = nativePushCapability(config)
-    if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
+    if (!capability.isAvailable) {
+        // No token can be read without the capability, so Firebase must not keep refreshing one.
+        applyFcmAutoInit(enabled = false)
+        return reconcileUnavailableNativePushFallback(capability, accountRefs)
+    }
     config ?: return false
     if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
     if (!operationIsCurrent()) return false
@@ -238,10 +242,10 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
         val retained =
             withContext(pushWakeStorageDispatcher) {
                 pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
-                    // The SDK delivers a new token to onNewToken before getToken() resolves. That
-                    // callback storing this same token does not make the read stale.
+                    // The SDK delivers a new token to onNewToken before getToken() resolves. A rotation
+                    // caused by this same token does not make the read stale.
                     val rotationCurrent =
-                        pushTokenRotationSequence.get() == rotation || pushTokenStore.lastToken() == token
+                        pushTokenRotationSequence.get() == rotation || lastRotatedFcmToken.get() == token
                     rotationCurrent && tokenOwnerIsCurrent()
                 }
             }

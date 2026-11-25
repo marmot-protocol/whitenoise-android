@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -45,8 +46,22 @@ internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterFailed
     }
 }
 
-/** Drops the cached FCM token and turns Firebase auto-init off once no signed-in account remains. */
+/** Drops the cached FCM token and turns Firebase auto-init off when a wipe leaves no signed-in signer. */
 internal suspend fun NotificationDeliveryController.forgetFcmTokenAfterLastAccount() {
     runCatching { pushTokenStore.clear() }
+    applyFcmAutoInit(enabled = false)
+}
+
+/**
+ * After a sign-out, turns Firebase auto-init off when no signed-in signing account remains, since only those
+ * can use native push. A signed-out entry can stay in the list, so the cached token is still dropped only
+ * when no account entry remains at all.
+ */
+internal suspend fun NotificationDeliveryController.settleFcmAfterSignOut(
+    nextActiveRef: String?,
+    remaining: List<AccountSummaryFfi>,
+) {
+    if (nextActiveRef != null || remaining.any { it.isSignedInSigningAccount() }) return
+    if (remaining.isEmpty()) runCatching { pushTokenStore.clear() }
     applyFcmAutoInit(enabled = false)
 }

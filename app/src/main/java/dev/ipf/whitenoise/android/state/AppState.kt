@@ -5206,7 +5206,7 @@ class WhiteNoiseAppState private constructor(
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
         wipeDecryptedMediaFromDisk()
-        if (next == null && refreshed.isEmpty()) notificationDelivery.forgetFcmTokenAfterLastAccount()
+        notificationDelivery.settleFcmAfterSignOut(next, refreshed)
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return OwnedSignOutCompletion(
