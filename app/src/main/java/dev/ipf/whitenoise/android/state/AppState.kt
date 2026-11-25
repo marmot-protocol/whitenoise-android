@@ -5206,7 +5206,7 @@ class WhiteNoiseAppState private constructor(
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
         wipeDecryptedMediaFromDisk()
-        if (next == null && refreshed.isEmpty()) runCatching { pushTokenStore.clear() }
+        if (next == null && refreshed.isEmpty()) notificationDelivery.forgetFcmTokenAfterLastAccount()
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return OwnedSignOutCompletion(
@@ -5294,7 +5294,7 @@ class WhiteNoiseAppState private constructor(
                                 val survivingSigner =
                                     accounts.any { it.label != wipedRef && it.isSignedInSigningAccount() }
                                 if (retireSession && !survivingSigner) {
-                                    runCatching { pushTokenStore.clear() }
+                                    notificationDelivery.forgetFcmTokenAfterLastAccount()
                                 }
                             }
                         }

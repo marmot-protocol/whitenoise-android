@@ -238,7 +238,11 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
         val retained =
             withContext(pushWakeStorageDispatcher) {
                 pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
-                    pushTokenRotationSequence.get() == rotation && tokenOwnerIsCurrent()
+                    // The SDK delivers a new token to onNewToken before getToken() resolves. That
+                    // callback storing this same token does not make the read stale.
+                    val rotationCurrent =
+                        pushTokenRotationSequence.get() == rotation || pushTokenStore.lastToken() == token
+                    rotationCurrent && tokenOwnerIsCurrent()
                 }
             }
         token.takeIf { retained }

@@ -66,7 +66,7 @@ class FcmAutoInitCoverageTest {
     @Test
     fun firebaseMessagingStateHasOneOwner() {
         val writers = productionSourcesMatching(Regex("""setAutoInitEnabled\s*\(|isAutoInitEnabled\s*="""))
-        val sdkUsers = productionSourcesMatching(Regex("""\bFirebaseMessaging\b(?!Service)"""))
+        val sdkUsers = productionSourcesMatching(Regex("""\bFirebaseMessaging\b"""))
 
         assertEquals(setOf("NativePushFallbackRuntime.kt"), writers)
         assertEquals(setOf("NativePushFallbackRuntime.kt", "NotificationDeliveryControllerNativePushSync.kt"), sdkUsers)
@@ -96,6 +96,39 @@ class FcmAutoInitCoverageTest {
         assertTrue("sync must check native demand", demand >= 0)
         assertTrue("sync must check demand before reading a token", demand < token)
         assertTrue(accounts.contains("NativePushDemand.None -> return completeSyncWithoutNativePush("))
+    }
+
+    /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
+    @Test
+    fun fcmSelectionOwnsAutoInitThroughRegistration() {
+        val selection = appModuleSource(SELECTION)
+        val autoInit = appModuleSource(AUTO_INIT)
+
+        assertTrue(
+            selection
+                .functionBody("enableNativeDeliveryForAccounts")
+                .contains("if (registered) applyFcmAutoInit(enabled = true)"),
+        )
+        assertTrue(
+            selection
+                .functionBody("selectFcmDelivery")
+                .contains("settleFcmAutoInitAfterFailedSelection(owner.accountRefs)"),
+        )
+        val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
+        assertTrue(settle.contains("nativePushSyncMutex.withLock"))
+        assertTrue(settle.contains("applyFcmAutoInit(enabled = false)"))
+    }
+
+    /** Both ways of removing the last signed-in account turn auto-init off with the cached token. */
+    @Test
+    fun lastAccountRemovalDisablesAutoInit() {
+        val appState = appModuleSource("$STATE/AppState.kt")
+
+        assertEquals(2, Regex("""notificationDelivery\.forgetFcmTokenAfterLastAccount\(\)""").findAll(appState).count())
+        assertFalse("the token must not be cleared without auto-init", appState.contains("pushTokenStore.clear()"))
+        val forget = appModuleSource(AUTO_INIT).functionBody("forgetFcmTokenAfterLastAccount")
+        assertTrue(forget.contains("pushTokenStore.clear()"))
+        assertTrue(forget.contains("applyFcmAutoInit(enabled = false)"))
     }
 
     /** Leaving native push for every account, by selection or by sync, turns auto-init off. */

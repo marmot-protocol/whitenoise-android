@@ -9,12 +9,14 @@ import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -28,8 +30,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Firebase auto-init is off in the manifest (#4081). The delivery controller turns it on right before
- * it reads an FCM token for native push, and off once every account leaves native push. A device that
- * only uses the persistent connection never turns it on and never reads a token.
+ * it reads an FCM token for native push and again once registration completes, and off when every
+ * account leaves native push, a selection fails or the last account is removed. A device that only
+ * uses the persistent connection never turns it on and never reads a token.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -78,6 +81,111 @@ class FcmAutoInitDeliveryTest {
                 writesAtTokenRead.forEach { writes -> assertEquals(true, writes.lastOrNull()) }
                 assertEquals(true, platform.autoInitWrites.last())
                 assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), fixture.upsertedPushRegistrations.toSet())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** The SDK's first-token callback, which arrives before getToken() resolves, does not fail the selection. */
+    @Test
+    fun firstTokenCallbackDuringSelectionKeepsSelection() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            lateinit var fixture: NotificationBootstrapTestFixture
+            fixture =
+                fixture(platform, nativeEnabled = false) {
+                    // Firebase saves a new token and calls onNewToken before completing the getToken() task.
+                    fixture.appState.onPushTokenRotated(TOKEN)
+                    TOKEN
+                }
+            try {
+                fixture.bootstrap()
+
+                assertTrue(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
+
+                assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), fixture.upsertedPushRegistrations.toSet())
+                assertEquals(true, platform.autoInitWrites.last())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A Push selection whose token read fails turns auto-init back off, since no account uses Push. */
+    @Test
+    fun failedFcmSelectionTurnsAutoInitBackOff() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform, nativeEnabled = false) { null }
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+
+                assertFalse(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
+
+                // A follow-up sync may repeat the `false`, but nothing may turn it back on.
+                assertEquals(listOf(true, false), platform.autoInitWrites.distinct())
+                assertEquals(false, platform.autoInitWrites.last())
+                assertTrue(fixture.upsertedPushRegistrations.isEmpty())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A stale `false` write that lands after the selection's token read cannot leave Push without auto-init. */
+    @Test
+    fun lateDisableDuringFcmSelectionIsOverwrittenAfterRegistration() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, true)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                fixture(platform, nativeEnabled = false) {
+                    // Models a concurrent no-Push sync whose write finishes after the selection's `true`.
+                    platform.setFcmAutoInitEnabled(false)
+                    TOKEN
+                }
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+
+                assertTrue(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    },
+                )
+
+                assertEquals(listOf(true, false, true), platform.autoInitWrites.take(3))
+                assertEquals(true, platform.autoInitWrites.last())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Removing the last signed-in account drops the cached token and turns auto-init off. */
+    @Test
+    fun lastAccountRemovalTurnsAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform, nativeEnabled = true) { TOKEN }
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.setToken(TOKEN)
+                platform.autoInitWrites.clear()
+
+                fixture.appState.notificationDelivery.forgetFcmTokenAfterLastAccount()
+
+                assertEquals(listOf(false), platform.autoInitWrites)
+                assertNull(store.lastToken())
             } finally {
                 fixture.close()
             }
@@ -158,10 +266,12 @@ class FcmAutoInitDeliveryTest {
                 }
             try {
                 fixture.bootstrap()
+                platform.autoInitWrites.clear()
 
                 assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
 
-                assertFalse("persistent delivery must never enable auto-init", true in platform.autoInitWrites)
+                val writes = platform.autoInitWrites.distinct()
+                assertEquals("a sync with no Push account turns auto-init off", listOf(false), writes)
                 assertTrue("persistent delivery must not read a token", tokenReads.isEmpty())
                 assertTrue(fixture.upsertedPushRegistrations.isEmpty())
             } finally {

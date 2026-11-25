@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Stops at the first account with native push on, and a failed read only counts when no account needs it. */
@@ -19,10 +20,11 @@ internal suspend fun NotificationDeliveryController.nativePushDemand(accountRefs
 
 /**
  * Acknowledges a sync in which no account needs native delivery, and turns Firebase auto-init off so
- * the SDK stops refreshing a token nobody registers. A selection in flight owns auto-init instead.
+ * the SDK stops refreshing a token nobody registers. A Push selection in flight writes it on again under
+ * the sync lock once its accounts are registered.
  */
 internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePush(isCurrent: () -> Boolean): Boolean {
-    if (!notificationDeliveryModeBusy) applyFcmAutoInit(enabled = false)
+    applyFcmAutoInit(enabled = false)
     return withContext(pushWakeStorageDispatcher) {
         pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = isCurrent)
     }
@@ -31,4 +33,20 @@ internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePus
 /** Applies Firebase auto-init off Main, a no-op in builds without Firebase. */
 internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Boolean) {
     withContext(Dispatchers.IO) { nativePushFallbackPlatform.setFcmAutoInitEnabled(enabled) }
+}
+
+/**
+ * Turns Firebase auto-init off after a native-push selection that did not complete, unless an account
+ * still uses native push. The sync lock orders this write after any registration or rollback.
+ */
+internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterFailedSelection(accountRefs: List<String>) {
+    nativePushSyncMutex.withLock {
+        if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+    }
+}
+
+/** Drops the cached FCM token and turns Firebase auto-init off once no signed-in account remains. */
+internal suspend fun NotificationDeliveryController.forgetFcmTokenAfterLastAccount() {
+    runCatching { pushTokenStore.clear() }
+    applyFcmAutoInit(enabled = false)
 }
