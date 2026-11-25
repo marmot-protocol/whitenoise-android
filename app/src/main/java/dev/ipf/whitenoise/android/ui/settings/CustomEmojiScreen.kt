@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.CustomEmojiSaveResult
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
@@ -361,18 +361,13 @@ internal fun ConfirmEmojiRemoval(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.custom_emoji_remove_title, emoji.shortcode)) },
-        text = { Text(stringResource(R.string.custom_emoji_remove_detail)) },
-        confirmButton = {
-            TextButton(onClick = { close(onConfirm) }) {
-                Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
+    ConfirmDialog(
+        title = stringResource(R.string.custom_emoji_remove_title, emoji.shortcode),
+        message = stringResource(R.string.custom_emoji_remove_detail),
+        confirmLabel = stringResource(R.string.remove),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
     )
 }
 

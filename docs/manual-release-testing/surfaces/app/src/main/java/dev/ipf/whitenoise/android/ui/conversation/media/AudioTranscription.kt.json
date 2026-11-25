@@ -39,6 +39,14 @@
         ]
       },
       {
+        "surface": "AudioTranscriptWithFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptWithFooter(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
         "surface": "AudioTranscriptResult",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun AudioTranscriptResult(",

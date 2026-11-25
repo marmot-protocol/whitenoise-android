@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
+import dev.ipf.whitenoise.android.ui.theme.InteractionStateOpacity
 import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
@@ -206,7 +207,6 @@ private fun Modifier.focusedStackDrag(
 }
 
 private const val FOCUSED_BACKDROP_ALPHA = 0.88f
-private const val FOCUSED_PRESSED_STATE_ALPHA = 0.12f
 private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
@@ -641,7 +641,7 @@ private fun FocusedReactionTarget(
                     .clip(CircleShape)
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },
@@ -725,7 +725,7 @@ private fun FocusedMoreReactionsTarget(
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_MORE_DISC_ALPHA))
                     .background(
                         if (pressed) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_PRESSED_STATE_ALPHA)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = InteractionStateOpacity.PRESSED_OR_FOCUSED)
                         } else {
                             Color.Transparent
                         },

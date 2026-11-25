@@ -357,6 +357,66 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /**
+     * Chat drag selection resets on the account and runtime keys its state always used, and every caller passes the
+     * values of the composition that built it: a row its own callback's inputs, the edge-scroll loop its launch inputs.
+     */
+    @Test
+    fun chatDragSelectionKeepsResetKeysAndComposedInputs() {
+        val screen = chatsScreenSource().readText()
+        val drag = sourceFile("ui/chats/ChatListDragSelection.kt").readText()
+        val holderKeys =
+            "rememberChatListDragSelection(\n" +
+                "            accountRef = appState.activeAccountRef,\n" +
+                "            runtimeGeneration = appState.runtimeGeneration,"
+        val completeSelectionKeys =
+            "val completeSelectionState =\n" +
+                "        remember(appState.activeAccountRef, appState.runtimeGeneration) {"
+        assertTrue(
+            "the holder and the complete selection it clears share the account and runtime keys",
+            "remember(accountRef, runtimeGeneration, completeSelection) {" in drag &&
+                holderKeys in screen &&
+                "completeSelection = completeSelectionState," in screen &&
+                completeSelectionKeys in screen,
+        )
+        assertFalse(
+            "no caller may read another composition's inputs",
+            "rememberUpdatedState" in drag || "latest" in drag,
+        )
+        assertTrue(
+            "row callbacks keep their identity while the drag inputs are unchanged",
+            "remember(chatListState, visibleChatIds, orderedVisibleChatIds) {" in screen,
+        )
+        assertTrue(
+            "a row resolves its range with the inputs of its own composition",
+            "chatDragSelection.moveChatDragPointer(pointerWindowY)\n" in screen &&
+                "chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)" in screen,
+        )
+        val effects =
+            drag.requiredSection("@NonRestartableComposable\n    fun chatDragSelectionEffects(", "\n    }\n}\n")
+        val datasetReset = effects.indexOf("LaunchedEffect(datasetKey) {")
+        val anchorRemoved = effects.indexOf("LaunchedEffect(inputs.visibleChatIds) {")
+        val edgeScroll = effects.indexOf("LaunchedEffect(dragAnchorChatId, inputs.chatListState) {")
+        assertTrue(
+            "drag effects keep their keys and launch order",
+            datasetReset >= 0 && datasetReset < anchorRemoved && anchorRemoved < edgeScroll,
+        )
+        assertTrue(
+            "the edge-scroll loop resolves with the inputs it launched with",
+            "updateChatDragSelection(pointerWindowY, inputs)" in effects.substring(edgeScroll),
+        )
+        val accountReset =
+            screen.indexOf(
+                "LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {\n" +
+                    "        chatDragSelection.finishChatDrag(clearSelection = true)\n" +
+                    "        actionSheetChatId = null",
+            )
+        assertTrue(
+            "the account reset still runs before the other drag effects",
+            accountReset >= 0 && accountReset < screen.indexOf("chatDragSelection.chatDragSelectionEffects("),
+        )
+    }
+
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),

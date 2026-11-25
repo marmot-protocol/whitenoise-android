@@ -73,6 +73,7 @@ internal class ConversationMessageNavigator(
     /**
      * Centers [targetMessageId] with surrounding context through the shared latest-wins owner.
      *
+     * When [skipIfFullyVisible] is true, a visible bubble stays in place even if its sender gap is clipped.
      * An unmeasured target uses one animated approach followed by a non-animated exact correction,
      * avoiding a second visible bounce.
      */
@@ -98,7 +99,9 @@ internal class ConversationMessageNavigator(
                     }
                     return@programmaticJump
                 }
-                if (skipIfFullyVisible && layoutInfo.isItemFullyVisible(targetIndex)) {
+                if (skipIfFullyVisible &&
+                    layoutInfo.isItemFullyVisible(targetIndex, timelineViewport.senderGapMeasurements::get)
+                ) {
                     return@programmaticJump
                 }
                 val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size

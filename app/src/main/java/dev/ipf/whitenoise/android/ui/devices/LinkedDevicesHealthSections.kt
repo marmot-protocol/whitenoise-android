@@ -3,16 +3,13 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -116,15 +113,13 @@ internal fun RepairDeviceLinkDialog(
     onRepair: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.devices_repair)) },
-        text = { Text(stringResource(R.string.devices_repair_confirm)) },
-        confirmButton = {
-            TextButton(onClick = onRepair, modifier = Modifier.testTag(LINKED_DEVICES_REPAIR_CONFIRM_TAG)) {
-                Text(stringResource(R.string.devices_repair), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    // Chats, messages and settings stay, so this is a neutral confirmation rather than a destructive one.
+    ConfirmDialog(
+        title = stringResource(R.string.devices_repair),
+        message = stringResource(R.string.devices_repair_confirm),
+        confirmLabel = stringResource(R.string.devices_repair),
+        onConfirm = onRepair,
+        onDismiss = onDismiss,
+        confirmTag = LINKED_DEVICES_REPAIR_CONFIRM_TAG,
     )
 }
