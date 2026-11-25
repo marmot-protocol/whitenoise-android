@@ -2168,6 +2168,7 @@
     <string name="setup_finding_retired_relay">Dieses Relay wurde stillgelegt.</string>
     <string name="setup_finding_unsafe_relay">Diese Relay-Adresse kann nicht sicher verwendet werden.</string>
     <string name="setup_finding_unreachable">Dieses Relay konnte nicht erreicht werden.</string>
+    <string name="setup_relay_timeout_title">Ein Relay hat nicht rechtzeitig geantwortet</string>
     <string name="setup_finding_timed_out">Bei dieser Prüfung wurde das Zeitlimit überschritten.</string>
     <string name="setup_finding_authentication_required">Dieses Relay erfordert eine Authentifizierung.</string>
     <string name="setup_finding_payment_required">Dieses Relay erfordert eine Zahlung.</string>
@@ -2332,6 +2333,12 @@
     <string name="new_message_no_results_detail">Prüfe die Schreibweise oder versuche eine andere Suche.</string>
     <string name="new_message_chat_created">Chat erstellt</string>
     <string name="new_message_open_chat">Chat öffnen</string>
+    <string name="group_setup_customize">Gruppe anpassen</string>
+    <string name="group_setup_hide_customization">Anpassungen ausblenden</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d Mitglied ausgewählt</item>
+        <item quantity="other">%d Mitglieder ausgewählt</item>
+    </plurals>
     <string name="group_setup_title">Gruppe einrichten</string>
     <string name="group_create_action">Gruppe erstellen</string>
     <string name="group_add_photo">Foto hinzufügen</string>
@@ -2472,6 +2479,8 @@
     <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
     <string name="error_incompatible_key_package">Der Chat-Schlüssel dieser Person ist nicht kompatibel. Bitten Sie sie, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="error_incompatible_key_package_for">Der Chat-Schlüssel von %1$s ist nicht kompatibel. Bitten Sie die Person, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
+    <string name="new_message_copy_inbox_instructions">Anleitung kopieren</string>
+    <string name="new_message_inbox_instructions">Ich konnte in White Noise keinen Chat mit dir starten. Kannst du deine Posteingangs-Relays in den Einstellungen von White Noise prüfen und mir sagen, wann ich es erneut versuchen kann?</string>
     <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_invite_welcome_too_large">Diese Einladung ist zu groß für die Posteingangs-Relays einer eingeladenen Person. Bitten Sie die Person, ein Posteingangs-Relay hinzuzufügen, das größere Nachrichten annimmt.</string>
