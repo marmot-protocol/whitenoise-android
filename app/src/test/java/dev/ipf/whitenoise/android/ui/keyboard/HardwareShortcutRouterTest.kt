@@ -166,12 +166,13 @@ class HardwareShortcutRouterTest {
         assertTrue(router.handle(down(KeyEvent.KEYCODE_F, CTRL)))
         assertEquals(1, exits)
         // The outgoing conversation still covers Chats, and another command's owner can never take Ctrl+F.
-        assertFalse(router.canTakeCarried(chatsSearch))
+        assertEquals(CarriedFate.Wait, router.carriedFate(chatsSearch))
         removeConversation()
-        assertFalse(router.canTakeCarried(HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) {}))
-        assertTrue(router.canTakeCarried(chatsSearch))
-        router.claimCarried(chatsSearch)
-        router.claimCarried(chatsSearch)
+        val otherOwner = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { true }) {}
+        assertEquals(CarriedFate.None, router.carriedFate(otherOwner))
+        assertEquals(CarriedFate.Run, router.carriedFate(chatsSearch))
+        router.settleCarried(chatsSearch)
+        router.settleCarried(chatsSearch)
 
         assertEquals(1, searches)
         assertEquals(1, exits)
@@ -227,7 +228,7 @@ class HardwareShortcutRouterTest {
         removeConversation()
         val removeButton = router.register(button)
         runAfterFrame()
-        router.claimCarried(button)
+        router.settleCarried(button)
         assertEquals(1, runs)
 
         removeButton()
@@ -236,9 +237,36 @@ class HardwareShortcutRouterTest {
         removeConversation()
         runAfterFrame()
         router.register(button)
-        assertFalse(router.canTakeCarried(button))
-        router.claimCarried(button)
+        assertEquals(CarriedFate.None, router.carriedFate(button))
+        router.settleCarried(button)
         assertEquals(1, runs)
+    }
+
+    /**
+     * Once Chats is uncovered, a carried command waits only while its owner is still finding out. An owner that is
+     * registered but hidden or refusing lets it lapse, so it never runs when that owner later becomes available.
+     */
+    @Test
+    fun carriedCommandWaitsOnlyForAnOwnerThatIsStillFindingOut() {
+        var available = false
+        var checking = true
+        var runs = 0
+        val button = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }, { checking }) { runs++ }
+        router.register(button)
+        val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
+        router.dispatch(HardwareShortcutCommand.NewMessage)
+        removeConversation()
+        runAfterFrame()
+
+        assertEquals(CarriedFate.Wait, router.carriedFate(button))
+        checking = false
+        assertEquals(CarriedFate.Lapse, router.carriedFate(button))
+        router.settleCarried(button)
+        available = true
+        assertEquals(CarriedFate.None, router.carriedFate(button))
+        router.settleCarried(button)
+
+        assertEquals(0, runs)
     }
 
     /** A carried command's window starts when Chats is uncovered, not when the key was pressed. */
@@ -253,17 +281,19 @@ class HardwareShortcutRouterTest {
         now += CHATS_RETURN_COMMAND_WINDOW_MS * 2
         removeConversation()
         now += CHATS_RETURN_COMMAND_WINDOW_MS
-        router.claimCarried(chatsSearch)
+        router.settleCarried(chatsSearch)
 
         assertEquals(1, runs)
     }
 
-    /** A carried command waits while Chats is unavailable, runs once it is, and lapses once its window has passed. */
+    /** A carried command waits while its owner is still checking, runs once it can, and lapses after its window. */
     @Test
     fun carriedCommandsWaitForChatsAndLapseAfterTheirWindow() {
         var available = false
         var runs = 0
-        val chatsNewMessage = HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }) { runs++ }
+        // The owner is still checking until it becomes available, like New Message during its relay check.
+        val chatsNewMessage =
+            HardwareShortcutHandler(HardwareShortcutCommand.NewMessage, { available }, { !available }) { runs++ }
         router.register(chatsNewMessage)
         val carryNewMessage = {
             val removeConversation = router.registerChatsReturn(ChatsReturnRoute({ true }) {})
@@ -272,17 +302,17 @@ class HardwareShortcutRouterTest {
         }
 
         carryNewMessage()
-        router.claimCarried(chatsNewMessage)
+        router.settleCarried(chatsNewMessage)
         assertEquals(0, runs)
         available = true
         now += CHATS_RETURN_COMMAND_WINDOW_MS
-        router.claimCarried(chatsNewMessage)
+        router.settleCarried(chatsNewMessage)
         assertEquals(1, runs)
 
         carryNewMessage()
         now += CHATS_RETURN_COMMAND_WINDOW_MS + 1
-        router.claimCarried(chatsNewMessage)
-        router.claimCarried(chatsNewMessage)
+        router.settleCarried(chatsNewMessage)
+        router.settleCarried(chatsNewMessage)
         assertEquals(1, runs)
     }
 

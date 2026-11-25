@@ -79,13 +79,30 @@ internal fun hardwareShortcutGroup(
 
 /**
  * One registered owner of a command. [available] is read when a key arrives or the shortcut helper opens, so it
- * always reflects the owner's latest composition.
+ * always reflects the owner's latest composition. [waiting] marks an owner that is not available yet but is still
+ * finding out, such as New Message during its relay check, so a carried command waits for it instead of lapsing.
  */
 internal class HardwareShortcutHandler(
     val command: HardwareShortcutCommand,
     val available: () -> Boolean,
+    val waiting: () -> Boolean = { false },
     val invoke: () -> Unit,
 )
+
+/** What an owner does with a command carried from a compact conversation. */
+internal enum class CarriedFate {
+    /** Nothing is carried for this owner's command. */
+    None,
+
+    /** Chats is still covered or blocked, or an owner is still finding out whether it can run the command. */
+    Wait,
+
+    /** This owner runs the command now. */
+    Run,
+
+    /** Chats is uncovered and no owner can run the command or is finding out, so it lapses. */
+    Lapse,
+}
 
 /** A compact conversation's way back to Chats, used to carry Chats commands out of it. */
 internal class ChatsReturnRoute(
@@ -223,20 +240,36 @@ internal class HardwareShortcutRouter(
         return owner != null || chatsReturn != null
     }
 
-    /** Whether a command carried from a compact conversation is waiting that [handler] could run right now. */
-    fun canTakeCarried(handler: HardwareShortcutHandler): Boolean {
-        val waiting = carried?.command == handler.command
-        return waiting && !blocked && canRun(handler)
+    /**
+     * What [handler] should do with a command carried from a compact conversation. It reads only snapshot state
+     * and owners' availability, so an owner can observe it and act through [settleCarried] when it changes.
+     */
+    fun carriedFate(handler: HardwareShortcutHandler): CarriedFate {
+        if (carried?.command != handler.command) return CarriedFate.None
+        val owners = (handlers + handler).filter { it.command == handler.command }
+        return when {
+            blocked -> CarriedFate.Wait
+            canRun(handler) -> CarriedFate.Run
+            handler.command.runsFromChats && chatsCovered -> CarriedFate.Wait
+            owners.any { it.waiting() || canRun(it) } -> CarriedFate.Wait
+            else -> CarriedFate.Lapse
+        }
     }
 
     /**
-     * Runs a command carried from a compact conversation through [handler] when [canTakeCarried] allows it. A carried
-     * command runs at most once and lapses after [CHATS_RETURN_COMMAND_WINDOW_MS], so a late Chats never acts on it.
+     * Applies [carriedFate] for [handler]: runs the carried command through it, or drops a command no owner can take.
+     * A carried command runs at most once and lapses after [CHATS_RETURN_COMMAND_WINDOW_MS] of uncovered Chats.
      */
-    fun claimCarried(handler: HardwareShortcutHandler) {
-        val pending = carried?.takeIf { canTakeCarried(handler) } ?: return
-        carried = null
-        if (uptimeMillis() - pending.atMillis <= CHATS_RETURN_COMMAND_WINDOW_MS) handler.invoke()
+    fun settleCarried(handler: HardwareShortcutHandler) {
+        val pending = carried ?: return
+        when (carriedFate(handler)) {
+            CarriedFate.Run -> {
+                carried = null
+                if (uptimeMillis() - pending.atMillis <= CHATS_RETURN_COMMAND_WINDOW_MS) handler.invoke()
+            }
+            CarriedFate.Lapse -> carried = null
+            CarriedFate.None, CarriedFate.Wait -> Unit
+        }
     }
 
     /** The commands a key press would run right now, in helper order. */

@@ -127,9 +127,13 @@ internal fun ChatsNewMessageFab(
             ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
         }
     // Ctrl+N takes the button's own path, only while the button is shown and its relay check found New Message
-    // usable, so a key cannot skip the Check relays state (#4005).
-    val offersNewMessage = LocalFloatingControlShown.current && relaysChecked && !missing
-    KeyboardShortcut(HardwareShortcutCommand.NewMessage, available = offersNewMessage && current()) {
+    // usable, so a key cannot skip the Check relays state. A shown button is waiting during its check (#4005).
+    val shown = LocalFloatingControlShown.current && current()
+    KeyboardShortcut(
+        HardwareShortcutCommand.NewMessage,
+        available = shown && relaysChecked && !missing,
+        waiting = shown && !relaysChecked,
+    ) {
         onNewMessageOrigin(null)
         onNewMessage()
     }

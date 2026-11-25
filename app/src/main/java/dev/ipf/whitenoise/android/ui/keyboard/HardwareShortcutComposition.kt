@@ -31,29 +31,33 @@ internal fun currentHardwareShortcutRouter(): HardwareShortcutRouter? =
 
 /**
  * Registers [onInvoke] as this composition's owner of [command], offered while [available]. A screen passes the
- * lambda its on-screen control already calls. A command carried from a compact conversation runs here once this
- * owner can take it.
+ * lambda its on-screen control already calls. Set [waiting] while the owner is still finding out whether it can
+ * run the command. A command carried from a compact conversation runs here once this owner can take it, and
+ * lapses when it cannot and is not waiting.
  */
 @Composable
 internal fun KeyboardShortcut(
     command: HardwareShortcutCommand,
     available: Boolean,
+    waiting: Boolean = false,
     onInvoke: () -> Unit,
 ) {
     val router = currentHardwareShortcutRouter()
     val currentAvailable by rememberUpdatedState(available)
+    val currentWaiting by rememberUpdatedState(waiting)
     val currentInvoke by rememberUpdatedState(onInvoke)
-    val handler = remember(command) { HardwareShortcutHandler(command, { currentAvailable }, { currentInvoke() }) }
+    val handler =
+        remember(command) {
+            HardwareShortcutHandler(command, { currentAvailable }, { currentWaiting }) { currentInvoke() }
+        }
     DisposableEffect(router, handler) {
         val unregister = router?.register(handler)
         onDispose { unregister?.invoke() }
     }
     LaunchedEffect(router, handler) {
-        // A carried command waits until this owner is available and no compact conversation covers Chats.
+        // A carried command waits until Chats is uncovered, then runs here or lapses.
         val owner = router ?: return@LaunchedEffect
-        snapshotFlow { owner.canTakeCarried(handler) }.collect { canTake ->
-            if (canTake) owner.claimCarried(handler)
-        }
+        snapshotFlow { owner.carriedFate(handler) }.collect { owner.settleCarried(handler) }
     }
 }
 
