@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.safeAttachmentDisplayName
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationEmbedShape
 import dev.ipf.whitenoise.android.ui.previewTake
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
@@ -238,7 +238,7 @@ internal fun ReplyPreviewCard(
     Surface(
         color = resolvedContainerColor,
         contentColor = resolvedSurfaceContentColor,
-        shape = RoundedCornerShape(10.dp),
+        shape = ConversationEmbedShape,
         border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier

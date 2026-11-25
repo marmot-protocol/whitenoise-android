@@ -17,7 +17,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -50,9 +49,8 @@ import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
-import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
@@ -217,20 +215,16 @@ internal fun ChatFolderDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
+    ConfirmDialog(
         modifier = Modifier.testTag("folder.delete_dialog"),
-        onDismissRequest = onDismiss,
-        title = { EmojiLabel(stringResource(R.string.folder_delete_title, folderName)) },
-        text = { Text(stringResource(R.string.folder_delete_detail)) },
-        confirmButton = {
-            TextButton(
-                modifier = Modifier.testTag("folder.delete_confirm"),
-                onClick = { close(onConfirm) },
-            ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
+        title = stringResource(R.string.folder_delete_title, folderName),
+        message = stringResource(R.string.folder_delete_detail),
+        confirmLabel = stringResource(R.string.delete),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
+        emojiLabels = true,
+        confirmTag = "folder.delete_confirm",
     )
 }
 
