@@ -41,11 +41,6 @@ internal class AccountSetupCoordinator(
     private var recoveryRequired by mutableStateOf(emptySet<String>())
     private val commands = Commands()
 
-    /** Records a warm return for the active setup after the host backgrounds. */
-    fun onHostBackgrounded() {
-        controller?.foregroundRetry?.onBackgrounded()
-    }
-
     /** Account-scoped setup eligibility returned from one runtime generation. */
     internal data class AccountsState(
         val pending: Set<String>,
@@ -344,6 +339,11 @@ private suspend fun recordDeviceLinkOffer(
 
 /** A cancelled or unfinished checkpoint can never certify chat readiness. */
 internal fun OnboardingSnapshotFfi.requiresSetup(): Boolean = !ready || cancellationPending
+
+/** Records a warm return for the active setup after the host backgrounds. */
+internal fun WhiteNoiseAppState.recordAccountSetupBackground() {
+    accountSetup.controller?.foregroundRetry?.onBackgrounded()
+}
 
 /** Discover existing Nostr lists beyond our messaging relays before offering additive defaults. */
 internal fun setupOptions() =
