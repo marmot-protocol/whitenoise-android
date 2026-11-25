@@ -23,7 +23,6 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.AppUpdateEmblemColors
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
-
 /** Availability ignores the retired banner dismissal while keeping actual version and distribution policy. */
 internal fun showAppUpdateEntry(
     info: AppUpdateInfo,
