@@ -22,17 +22,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -85,7 +94,7 @@ internal data class NewGroupSetupActions(
     val removeFailedRecipient: () -> Unit = {},
 )
 
-/** Target centered avatar, two authored fields, timer/members and pinned full-width creation action. */
+/** Start with the essential fields and reveal any existing draft customization on entry. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod") // Compose naming follows the framework convention.
 internal fun NewGroupSetupContent(
@@ -95,6 +104,12 @@ internal fun NewGroupSetupContent(
     photoMenu: @Composable () -> Unit = {},
     startingAs: StartingAccount? = null,
 ) {
+    var customize by rememberSaveable {
+        mutableStateOf(draft.description.text.isNotBlank() || draft.imageDraft != null || draft.imageNeedsReselection)
+    }
+    LaunchedEffect(draft.imageNeedsReselection) {
+        if (draft.imageNeedsReselection) customize = true
+    }
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.group_setup_title),
@@ -102,15 +117,7 @@ internal fun NewGroupSetupContent(
         modifier = Modifier.imePadding().testTag("group_setup.screen"),
         bottomBar = {
             GroupCreationBottomAction(
-                label =
-                    stringResource(
-                        when {
-                            draft.retryGroupIdHex != null -> R.string.new_message_open_chat
-                            state.hasUnacceptedFailure -> R.string.retry
-                            state.members.isEmpty() -> R.string.group_create_solo
-                            else -> R.string.group_create_action
-                        },
-                    ),
+                label = stringResource(groupSetupActionLabel(draft, state)),
                 enabled = state.submitEnabled,
                 busy = state.busy,
                 onClick = actions.create,
@@ -133,72 +140,134 @@ internal fun NewGroupSetupContent(
             if (state.hasUnacceptedFailure && draft.retryGroupIdHex == null) {
                 item { GroupSetupRecovery(state, actions) }
             }
-            item {
-                GroupSetupPhoto(draft, state, actions.photo, photoMenu)
+            item { GroupSetupNameField(draft, state, customize, actions.emoji) }
+            item { GroupSetupPhotoStatus(draft, state) }
+            item(key = "group_setup.customize") {
+                GroupSetupDisclosure(
+                    label =
+                        stringResource(
+                            if (customize) R.string.group_setup_hide_customization else R.string.group_setup_customize,
+                        ),
+                    expanded = customize,
+                    tag = "group_setup.customize",
+                    onClick = { customize = !customize },
+                )
             }
-            item {
-                Column(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, top = 24.dp, end = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    val openBelowName = rememberEmojiSheetOpener(draft.nameEmojiAnchor)
-                    WhiteNoiseTextField(
-                        state = draft.name,
-                        enabled = state.detailsEditable,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .emojiSheetFieldAnchor(draft.nameEmojiAnchor)
-                                .testTag("group_setup.name"),
-                        label = { Text(stringResource(R.string.group_name)) },
-                        lineLimits = TextFieldLineLimits.SingleLine,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        leadingIcon = {
-                            TextEntryEmojiAction(
-                                pickerOpen = state.emojiOpen,
-                                enabled = state.detailsEditable,
-                                onClick = { openBelowName(actions.emoji) },
-                            )
-                        },
-                    )
+            if (customize) {
+                item { GroupSetupPhoto(draft, state, actions.photo, photoMenu) }
+                item(key = "group_setup.description") {
                     WhiteNoiseTextField(
                         state = draft.description,
                         emojiAction = true,
                         enabled = state.detailsEditable,
-                        modifier = Modifier.fillMaxWidth().testTag("group_setup.description"),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("group_setup.description"),
                         label = { Text(stringResource(R.string.description)) },
                         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
                 }
-            }
-            item {
-                SettingsGroup(Modifier.padding(top = WhiteNoiseSpacing.Section)) {
-                    row("retention") { context ->
-                        SettingsLink(
-                            context,
-                            stringResource(R.string.disappearing_messages),
-                            actions.retention,
-                            value = state.retentionLabel,
-                            enabled = state.detailsEditable,
-                            leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
-                        )
+                item(key = "group_setup.retention") {
+                    SettingsGroup(Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+                        row("retention") { context ->
+                            SettingsLink(
+                                context,
+                                stringResource(R.string.disappearing_messages),
+                                actions.retention,
+                                value = state.retentionLabel,
+                                enabled = state.detailsEditable,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
+                            )
+                        }
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.members)) }
-            if (state.members.isEmpty()) {
+            if (state.members.isNotEmpty()) {
+                item(key = "group_setup.members") {
+                    val count = state.members.size
+                    SettingsSection(pluralStringResource(R.plurals.group_setup_selected_members, count, count))
+                }
+                itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
+                    GroupCreationPersonRow(person, index, state.members.size, selected = null)
+                }
+            } else {
                 item {
                     SettingsExplainer(stringResource(R.string.group_add_members_after_create))
                 }
-            }
-            itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
-                GroupCreationPersonRow(person, index, state.members.size, selected = null)
             }
         }
     }
 }
 
-/** A distinct photo action retains a 48dp target while the prototype avatar stays 120dp. */
+private fun groupSetupActionLabel(
+    draft: NewGroupDraft,
+    state: NewGroupSetupPresentation,
+): Int =
+    when {
+        draft.retryGroupIdHex != null -> R.string.new_message_open_chat
+        state.hasUnacceptedFailure -> R.string.retry
+        state.members.isEmpty() -> R.string.group_create_solo
+        else -> R.string.group_create_action
+    }
+
+/** Anchor the emoji sheet to the name and advance to the description when it is visible. */
+@Composable
+@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+private fun GroupSetupNameField(
+    draft: NewGroupDraft,
+    state: NewGroupSetupPresentation,
+    customize: Boolean,
+    onEmoji: () -> Unit,
+) {
+    val openBelowName = rememberEmojiSheetOpener(draft.nameEmojiAnchor)
+    WhiteNoiseTextField(
+        state = draft.name,
+        enabled = state.detailsEditable,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .emojiSheetFieldAnchor(draft.nameEmojiAnchor)
+                .testTag("group_setup.name"),
+        label = { Text(stringResource(R.string.group_name)) },
+        lineLimits = TextFieldLineLimits.SingleLine,
+        keyboardOptions = KeyboardOptions(imeAction = if (customize) ImeAction.Next else ImeAction.Done),
+        leadingIcon = {
+            TextEntryEmojiAction(
+                pickerOpen = state.emojiOpen,
+                enabled = state.detailsEditable,
+                onClick = { openBelowName(onEmoji) },
+            )
+        },
+    )
+}
+
+/** Expose optional setup content and announce each disclosure's state. */
+@Composable
+@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+private fun GroupSetupDisclosure(
+    label: String,
+    expanded: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    val disclosureState =
+        stringResource(if (expanded) R.string.onboarding_details_expanded else R.string.onboarding_details_collapsed)
+    val arrowRotation = if (expanded) 180f else 0f
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier.testTag(tag).semantics { stateDescription = disclosureState },
+        ) {
+            Text(label, modifier = Modifier.weight(1f, fill = false))
+            Icon(
+                painterResource(R.drawable.ic_expand_more),
+                contentDescription = null,
+                modifier = Modifier.rotate(arrowRotation),
+            )
+        }
+    }
+}
+
+/** Optional photo editing uses a compact preview and a labeled photo action. */
 @Composable
 @Suppress("FunctionNaming") // Compose naming follows the framework convention.
 private fun GroupSetupPhoto(
@@ -208,16 +277,16 @@ private fun GroupSetupPhoto(
     photoMenu: @Composable () -> Unit,
 ) {
     val photoDescription = stringResource(R.string.group_photo_label)
-    Column(
-        Modifier.padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (draft.name.text.isBlank() && state.imagePreview == null) {
             GroupSetupEmptyAvatar(photoDescription)
         } else {
             Box(Modifier.testTag("group_setup.avatar").semantics { contentDescription = photoDescription }) {
-                Avatar(draft.name.text.toString(), draft.name.text.toString(), 120.dp, picture = state.imagePreview)
+                Avatar(draft.name.text.toString(), draft.name.text.toString(), 64.dp, picture = state.imagePreview)
             }
         }
         Box {
@@ -234,6 +303,21 @@ private fun GroupSetupPhoto(
             }
             photoMenu()
         }
+    }
+}
+
+/** Photo errors remain visible when customization is collapsed. */
+@Composable
+@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+private fun GroupSetupPhotoStatus(
+    draft: NewGroupDraft,
+    state: NewGroupSetupPresentation,
+) {
+    if (!state.imagePreparing && !state.imageError && !draft.imageNeedsReselection) return
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (state.imagePreparing) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -252,7 +336,7 @@ private fun GroupSetupPhoto(
     }
 }
 
-/** The prototype's empty group avatar: the group glyph on the variant surface, in the 120 dp circle. */
+/** Placeholder for an unnamed group with no chosen photo. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupSetupEmptyAvatar(photoDescription: String) {
@@ -262,7 +346,7 @@ private fun GroupSetupEmptyAvatar(photoDescription: String) {
     ) {
         Box(
             Modifier
-                .size(120.dp)
+                .size(64.dp)
                 .testTag("group_setup.avatar")
                 .semantics { contentDescription = photoDescription },
             contentAlignment = Alignment.Center,
@@ -270,7 +354,7 @@ private fun GroupSetupEmptyAvatar(photoDescription: String) {
             Icon(
                 painterResource(R.drawable.ic_group),
                 null,
-                Modifier.size(40.dp),
+                Modifier.size(28.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

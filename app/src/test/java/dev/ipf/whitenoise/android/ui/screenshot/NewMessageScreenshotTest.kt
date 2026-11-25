@@ -4,7 +4,9 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarmotKitException
@@ -46,6 +48,8 @@ class NewMessageScreenshotTest {
 
     /** Blank discovery remains a usable action page without simulated contacts. */
     @Test fun blank() = capture("new_message_blank.png", query = "", people = emptyList())
+
+    @Test fun clearedRestoresShortcuts() = capture("new_message_cleared.png", clearQuery = true)
 
     /** Local people remain visible while native search is pending. */
     @Test fun searchingWithLocalPeople() =
@@ -191,6 +195,7 @@ class NewMessageScreenshotTest {
         identifier: Boolean = false,
         resolving: Boolean = false,
         lookupFailed: Boolean = false,
+        clearQuery: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -215,6 +220,7 @@ class NewMessageScreenshotTest {
                 }
             }
         }
+        if (clearQuery) composeRule.onNodeWithContentDescription("Clear").performClick()
         composeRule.onNodeWithTag("new_message.screen").captureRoboImage("src/test/snapshots/$file")
     }
 

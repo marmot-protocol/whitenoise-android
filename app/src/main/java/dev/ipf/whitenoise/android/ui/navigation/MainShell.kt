@@ -222,10 +222,16 @@ internal fun MainShell(
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     var sectionName by shellStateHolder.sectionState::sectionName
     var settingsDetailName by shellStateHolder.sectionState::settingsDetailName
+    var firstRunHelpRoot by rememberSaveable(appState.activeAccountRef) { mutableStateOf<SettingsDetail?>(null) }
     var settingsHomeViewport by
         rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
             mutableStateOf(SettingsHomeViewport.Top)
         }
+
+    fun updateSettingsViewport(event: SettingsHomeViewportEvent) {
+        settingsHomeViewport = reduceSettingsHomeViewport(settingsHomeViewport, event)
+    }
+
     var selectedChat by shellStateHolder.selectedChat
     // When both panes fit, or across a half-open fold, the chat list stays beside the conversation
     // (#3685). The selection above stays the single owner of which chat is open, so crossing the
@@ -610,11 +616,7 @@ internal fun MainShell(
                         ) {
                             sectionName = MainSection.Chats.name
                             settingsDetailName = null
-                            settingsHomeViewport =
-                                reduceSettingsHomeViewport(
-                                    settingsHomeViewport,
-                                    SettingsHomeViewportEvent.OpenConversation,
-                                )
+                            updateSettingsViewport(SettingsHomeViewportEvent.OpenConversation)
                             shellNavState =
                                 reduceShellNavigation(
                                     shellNavState,
@@ -943,8 +945,7 @@ internal fun MainShell(
             selectedChatListFolderId = null
             sectionName = MainSection.Chats.name
             settingsDetailName = null
-            settingsHomeViewport =
-                reduceSettingsHomeViewport(settingsHomeViewport, SettingsHomeViewportEvent.ChangeAccount)
+            updateSettingsViewport(SettingsHomeViewportEvent.ChangeAccount)
         }
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
@@ -1833,18 +1834,21 @@ internal fun MainShell(
                                     chatListReturnHeadSnap =
                                         onConversationReturnHeadHandled(chatListReturnHeadSnap)
                                 },
+                                onFirstRunHelp = { support ->
+                                    sectionName = MainSection.Settings.name
+                                    val root = firstRunHelpDetail(support)
+                                    settingsDetailName = root.name
+                                    firstRunHelpRoot = root
+                                },
                                 onOpenSettings = {
+                                    firstRunHelpRoot = null
                                     pendingConversationOpen = null
                                     supersedePendingTtsDestinationNavigation()
                                     chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                                     supersedePendingGroupCreateOpen()
                                     sectionName = MainSection.Settings.name
                                     settingsDetailName = null
-                                    settingsHomeViewport =
-                                        reduceSettingsHomeViewport(
-                                            settingsHomeViewport,
-                                            SettingsHomeViewportEvent.OpenNewSettingsVisit,
-                                        )
+                                    updateSettingsViewport(SettingsHomeViewportEvent.OpenNewSettingsVisit)
                                 },
                                 onOpenGroup = { item, focusMessageId, justCreated, visibleHead ->
                                     val alreadyOpen =
@@ -1892,27 +1896,21 @@ internal fun MainShell(
                                         routingAppUpdate ||
                                         pendingTtsDestinationNavigation != null,
                                 onBackToChats = {
+                                    firstRunHelpRoot = null
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
-                                    settingsHomeViewport =
-                                        reduceSettingsHomeViewport(
-                                            settingsHomeViewport,
-                                            SettingsHomeViewportEvent.ExitSettings,
-                                        )
+                                    updateSettingsViewport(SettingsHomeViewportEvent.ExitSettings)
                                 },
                                 onOpenDiagnostics = {
                                     // Preserve `settingsDetailName` so backing out of
                                     // Diagnostics returns to Developer (its only entry point)
                                     // rather than the Settings home, restoring the breadcrumb
                                     // the user walked in on (#412).
-                                    settingsHomeViewport =
-                                        reduceSettingsHomeViewport(
-                                            settingsHomeViewport,
-                                            SettingsHomeViewportEvent.OpenDiagnostics,
-                                        )
+                                    updateSettingsViewport(SettingsHomeViewportEvent.OpenDiagnostics)
                                     sectionName = MainSection.Diagnostics.name
                                 },
                                 onOpenSupportChat = { item ->
+                                    firstRunHelpRoot = null
                                     // Land in the conversation itself, not the chat list; no
                                     // list scroll state exists to snapshot from Settings.
                                     commitExplicitConversationOpen(item.group.groupIdHex)
@@ -1920,13 +1918,10 @@ internal fun MainShell(
                                     selectedChat = item
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
-                                    settingsHomeViewport =
-                                        reduceSettingsHomeViewport(
-                                            settingsHomeViewport,
-                                            SettingsHomeViewportEvent.OpenConversation,
-                                        )
+                                    updateSettingsViewport(SettingsHomeViewportEvent.OpenConversation)
                                 },
                                 detail = settingsDetail,
+                                firstRunHelpRoot = firstRunHelpRoot,
                                 onDetailChange = { settingsDetailName = it?.name },
                                 homeViewport = settingsHomeViewport,
                                 onHomeViewportChange = { settingsHomeViewport = it },
@@ -2218,6 +2213,3 @@ internal fun MainShell(
         }
     }
 }
-
-private const val ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED = "attachment-open-uninitialized"
-private const val ATTACHMENT_OPEN_DESTINATION_NONE = "attachment-open-none"

@@ -292,6 +292,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Search results and feedback have priority while typing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "if (query.isBlank())",
+        "test_ids": [
+          "NCH-001"
+        ]
       }
     ]
   },

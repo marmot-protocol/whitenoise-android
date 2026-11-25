@@ -226,7 +226,9 @@ private fun LazyListScope.storageChatActionItems(
                     onClick = { dialogs.olderPicker.value = true },
                     enabled = enabled,
                     modifier = Modifier.testTag("storage.chat.remove_older"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_chat_remove_older),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_chat_remove_older) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
@@ -240,15 +242,14 @@ private fun LazyListScope.storageChatActionItems(
                     enabled = enabled,
                     destructive = true,
                     modifier = Modifier.testTag("storage.chat.remove_all"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_remove_all_chat) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = {
                         SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
                     },
                 )
             }
-        }
-        Box(Modifier.padding(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Related)) {
-            SettingsExplainer(stringResource(R.string.storage_removal_help))
         }
     }
 }
