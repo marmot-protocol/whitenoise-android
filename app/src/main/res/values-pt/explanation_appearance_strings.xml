@@ -58,5 +58,6 @@
     <string name="explanation_appearance_action_color_save">Salva esta cor de ação para o perfil ativo e o tema atual neste dispositivo. Disponível quando a cor é válida e diferente da salva.</string>
     <string name="explanation_appearance_action_color_reset">Remove a sua cor de ação personalizada do tema atual e volta à padrão. Vale para o perfil ativo neste dispositivo.</string>
     <string name="explanation_appearance_bubble_colors_save">Salva as cores de balão escolhidas. Elas valem para o perfil ativo neste dispositivo, ou somente para esta conversa se você abriu a tela a partir de uma conversa.</string>
+    <string name="explanation_appearance_bubble_colors_reset">Apaga aqui as suas cores de balão personalizadas e volta às cores padrão, ou às suas cores globais numa conversa. Nada muda até guardar.</string>
     <string name="explanation_appearance_dictation_transcribe_voice_messages">O Offline Speech to Text transcreve neste dispositivo. Use o botão ao lado da mensagem para ocultar a transcrição.</string>
 </resources>
