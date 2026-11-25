@@ -32,7 +32,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
         "anchor": "fun TransferAdminSheet(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-008"
         ]
       }
     ],
@@ -50,6 +51,22 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "Transfer admin search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "R.string.conversation_search_open",
+        "test_ids": [
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "Transfer admin with no search results",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "GRP-008"
+        ]
+      },
       {
         "surface": "string:transfer_admin",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",

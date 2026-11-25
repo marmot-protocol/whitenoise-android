@@ -661,7 +661,7 @@ class PublicKeyCopyPresentationCoverageTest {
                 "ui/conversation/share/UserShare.kt" to
                     """UserShareIdentity\(title, shortened, resolvedName, user\.npub\)""",
                 "ui/group/GroupMembers.kt" to
-                    """val memberNpub = appState\.npubForDisplay\(member\.memberIdHex\)""",
+                    """npub = appState\.npubForDisplay\(member\.memberIdHex\),[\s\S]*?publicKey = keys\.publicKey,""",
                 "ui/group/GroupDetailsScreen.kt" to """publicKey = profileNpub\.takeIf \{ titleIsKey \}""",
                 "ui/chats/newchat/ContactPickerScreen.kt" to
                     """enabled = !busy && !alreadyMember,[\s\S]*?publicKeyCopyEnabled = !busy,""",
