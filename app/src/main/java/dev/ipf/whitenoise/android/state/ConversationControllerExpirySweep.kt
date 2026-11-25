@@ -34,14 +34,20 @@ internal suspend fun ConversationController.runForegroundDisappearingMessageSwee
     }
 }
 
+/** Drains stale wake signals, then waits until the next loaded-row deadline or a schedule change makes a sweep due. */
 private suspend fun ConversationController.awaitForegroundDisappearingSweepSchedule() {
     while (coroutineContext.isActive) {
         while (foregroundSweepScheduleSignals.tryReceive().isSuccess) {
             // Drop stale self-signals before sleeping; the next timeout is
             // based on the timeline/group state that is current right now.
         }
+        val delayMillis =
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = clockMillis(),
+                rows = foregroundSweepExpiryRows(),
+            )
         val wakeSignalReceived =
-            withTimeoutOrNull(foregroundDisappearingSweepDelayMillis()) {
+            withTimeoutOrNull(delayMillis) {
                 foregroundSweepScheduleSignals.receive()
                 true
             } == true
@@ -49,28 +55,50 @@ private suspend fun ConversationController.awaitForegroundDisappearingSweepSched
     }
 }
 
-/** Returns the next loaded row deadline, capped to the foreground cadence. */
-private fun ConversationController.foregroundDisappearingSweepDelayMillis(): Long =
-    DisappearingMessageSweep.nextForegroundSweepDelayMillis(
-        nowMillis = clockMillis(),
-        rows = foregroundSweepExpiryRows(),
-    )
-
-/** Projects loaded timeline messages into their row-owned expiry inputs. */
+/**
+ * Projects loaded rows in chronological display order into their row-owned expiry inputs, followed by the
+ * projected twins of optimistic rows. Both copies of a raw id contribute, so a projected deadline still schedules
+ * the sweep when its optimistic copy wins the position. The display sort runs only when some row owns a
+ * deadline, because rows without one never resolve a local expiry.
+ */
 internal fun ConversationController.foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
-    val messages = sweepExpiryMessages()
-    val messageOrder = firstMessageOrder(messages.map { it.record.messageIdHex })
-    return messages
+    val projected = loadedProjectedRows()
+    val (candidates, messageOrder) =
+        if (optimisticMessages.values.none(::hasLocalExpiryDeadline) && projected.none(::hasLocalExpiryDeadline)) {
+            // No row can resolve an expiry, so skip the display sort on this main-thread path.
+            (optimisticMessages.values + projected) to emptyMap()
+        } else {
+            val ordered = loadedTimelineMessagesInDisplayOrder()
+            val optimisticIds = optimisticMessages.values.mapTo(HashSet()) { it.record.messageIdHex }
+            // Projected twins of optimistic rows lose the display position but keep their own deadline.
+            val twins = projected.filter { it.record.messageIdHex in optimisticIds }
+            (ordered + twins) to firstMessageOrder(ordered.map { it.record.messageIdHex })
+        }
+    return candidates
         .filter { shouldApplyLocalDisappearingExpiry(it.record) }
         .map { localExpiryRow(it, messageOrder) }
 }
 
-/** Returns every loaded row so a group-system read anchor keeps its ordering position. */
-internal fun ConversationController.sweepExpiryMessages(): List<TimelineMessage> =
-    buildList {
-        addAll(optimisticMessages.values)
-        timelineOrder.mapNotNullTo(this) { timelineItemsById[it] }
+/**
+ * Returns every loaded optimistic and projected row in chronological display order so expiry
+ * deferral, sweep scheduling, and read anchoring agree with the displayed transcript while
+ * preserving optimistic precedence by raw message id before display ordering.
+ */
+internal fun ConversationController.loadedTimelineMessagesInDisplayOrder(): List<TimelineMessage> {
+    val rows = (optimisticMessages.values + loadedProjectedRows()).distinctBy { it.record.messageIdHex }
+    val memo = displayOrderMemo
+    // The publish, the sweep and per-row lookups share one sort until a loaded row changes.
+    if (memo != null && memo.first.size == rows.size && rows.indices.all { rows[it] === memo.first[it] }) {
+        return memo.second
     }
+    return orderTimelineMessagesForDisplay(rows).also { displayOrderMemo = rows to it }
+}
+
+/** The display-order index map [item]'s expiry deferral needs, or empty when [item] owns no local deadline. */
+internal fun ConversationController.expiryOrderFor(item: TimelineMessage): Map<String, Int> {
+    if (!hasLocalExpiryDeadline(item)) return emptyMap()
+    return firstMessageOrder(loadedTimelineMessagesInDisplayOrder().map { it.record.messageIdHex })
+}
 
 /** Builds expiry input without consulting the group's mutable policy. */
 internal fun ConversationController.localExpiryRow(
@@ -103,11 +131,10 @@ internal fun ConversationController.localExpiryRow(
     )
 }
 
-/** The retained row's expiry input, ordered like the timeline filter and the sweep (optimistic ids first). */
+/** The retained row's expiry input, ordered chronologically like the timeline filter and the sweep. */
 internal fun ConversationController.retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
     val item = retainedTimelineItem(messageId) ?: return null
-    val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
-    return item to localExpiryRow(item, order)
+    return item to localExpiryRow(item, expiryOrderFor(item))
 }
 
 /** The wall-clock deadline in milliseconds of the retained row [messageId], or null without a resolved deadline. */
