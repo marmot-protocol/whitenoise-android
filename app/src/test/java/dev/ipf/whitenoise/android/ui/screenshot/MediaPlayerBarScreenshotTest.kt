@@ -68,6 +68,7 @@ class MediaPlayerBarScreenshotTest {
     @Test fun statesDark() = sheet("media_player_bar_states_dark", dark = true)
 
     @Test
+    @Config(qualifiers = "en-w360dp-h1050dp-mdpi")
     fun statesLargeFontRtl() =
         sheet(
             "media_player_bar_states_large_font_rtl",

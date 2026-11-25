@@ -35,6 +35,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -97,6 +99,7 @@ internal fun PlaybackStrip(
     }
 }
 
+/** Keep the source label above the actions when it needs the full width. */
 @Composable
 @Suppress("FunctionNaming")
 private fun PlaybackStripRow(
@@ -123,7 +126,9 @@ private fun PlaybackStripRow(
             val actionsWidth = actionPlaceables.sumOf { it.width }
             val innerWidth = availableWidth - StripEdgeInset.roundToPx() * 2
             val minimumInfoWidth = StripInfoMinWidth.roundToPx()
-            val stackActions = stackForText || leadingWidth + minimumInfoWidth + actionsWidth > innerWidth
+            val inlineInfoWidth =
+                maxOf(minimumInfoWidth, infoMeasurables.maxOfOrNull { it.minIntrinsicWidth(Constraints.Infinity) } ?: 0)
+            val stackActions = stackForText || leadingWidth + inlineInfoWidth + actionsWidth > innerWidth
             val inlineActionsWidth = if (stackActions) 0 else actionsWidth
             val infoWidth = (innerWidth - leadingWidth - inlineActionsWidth).coerceAtLeast(minimumInfoWidth)
             val infoConstraints = Constraints.fixedWidth(infoWidth)
@@ -246,7 +251,7 @@ internal fun PlaybackSpeedChip(
                 1.dp,
                 MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 1f else DISABLED_ALPHA),
             ),
-        modifier = modifier,
+        modifier = modifier.semantics { role = Role.Button },
     ) {
         Box(
             Modifier.heightIn(min = 28.dp).padding(horizontal = 7.dp),

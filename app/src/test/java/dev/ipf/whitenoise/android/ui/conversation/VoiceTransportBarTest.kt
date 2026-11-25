@@ -8,6 +8,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -64,6 +68,18 @@ class VoiceTransportBarTest {
     /** Records the retained source and Resume affordance while the player is paused. */
     @Test fun paused() = renderAndCapture("paused", paused = true)
 
+    /** A narrow viewport stacks the actions before the elapsed and total time can clip. */
+    @Test fun narrowVoiceBarKeepsTheFullTimeOnTheFirstRow() {
+        render(barWidth = 308)
+
+        val time = rule.onNodeWithText("0:12 / 0:45").getUnclippedBoundsInRoot()
+        val close =
+            rule
+                .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
+                .getUnclippedBoundsInRoot()
+        assertTrue(close.top >= time.bottom)
+    }
+
     /** Source and transport buttons never trigger each other or overlap destination content. */
     @Test fun shellControlsAndFirstDestinationRowRemainIndependent() {
         render()
@@ -85,7 +101,10 @@ class VoiceTransportBarTest {
         render()
         rule.onNodeWithContentDescription(context.getString(R.string.video_seek_back)).performClick()
         rule.onNodeWithContentDescription(context.getString(R.string.video_seek_forward)).performClick()
-        rule.onNodeWithContentDescription(context.getString(R.string.voice_message_speed, "1.5×")).performClick()
+        rule
+            .onNodeWithContentDescription(context.getString(R.string.voice_message_speed, "1.5×"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
         assertEquals(listOf(-VOICE_TRANSPORT_SEEK_MS, VOICE_TRANSPORT_SEEK_MS), seeks)
         assertEquals(1, speedCycles)
         assertEquals(null, playing)
@@ -127,13 +146,14 @@ class VoiceTransportBarTest {
         rtl: Boolean = false,
         paused: Boolean = false,
         ready: Boolean = true,
+        barWidth: Int = 360,
     ) {
         rule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
-                    Column(Modifier.width(360.dp).testTag("voice-host")) {
+                    Column(Modifier.width(barWidth.dp).testTag("voice-host")) {
                         ShellTransientNoticeLayout(
                             notice = null,
                             persistentTopContent = {

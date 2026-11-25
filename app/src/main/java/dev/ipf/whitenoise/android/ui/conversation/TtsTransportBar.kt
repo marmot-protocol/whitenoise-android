@@ -60,6 +60,14 @@ internal fun TtsTransportBar(
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
     val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
+    val sessionId = displayState.sessionId
+
+    // Menu actions run after the popup closes. Recheck the queue before they navigate.
+    fun canJumpMessage(): Boolean {
+        val current = appState.ttsController.state.value
+        return current.sessionId == sessionId && ttsNavigationEnabled(current, appState.ttsHistorySession.edgeState.value)
+    }
+
     // The estimate takes the controller lock, which the speech callback thread
     // also holds during playback, so it must not run on every recomposition.
     // Its only inputs are the playback state and the active rate — recompute
@@ -79,8 +87,8 @@ internal fun TtsTransportBar(
         // the conversation instead of completing or clamping the queue.
         onPreviousSentence = { appState.ttsHistorySession.previousSentence() },
         onNextSentence = { appState.ttsHistorySession.nextSentence() },
-        onPreviousMessage = { appState.ttsHistorySession.previousMessage() },
-        onNextMessage = { appState.ttsHistorySession.nextMessage() },
+        onPreviousMessage = { if (canJumpMessage()) appState.ttsHistorySession.previousMessage() },
+        onNextMessage = { if (canJumpMessage()) appState.ttsHistorySession.nextMessage() },
         onRateSelected = appState::setTtsRateOverride,
         onStop = { appState.stopSpeaking() },
         remainingSeconds = remainingSeconds,
@@ -163,11 +171,13 @@ internal fun TtsTransportBarContent(
                     onRateSelected = onRateSelected,
                 )
             }
-            TtsMessageMenu(
-                enabled = navigationEnabled,
-                onPreviousMessage = onPreviousMessage,
-                onNextMessage = onNextMessage,
-            )
+            key(state.sessionId, navigationEnabled) {
+                TtsMessageMenu(
+                    enabled = navigationEnabled,
+                    onPreviousMessage = onPreviousMessage,
+                    onNextMessage = onNextMessage,
+                )
+            }
             PlaybackStripCloseButton(stringResource(R.string.tts_bar_stop), onStop)
         },
     )
@@ -199,6 +209,7 @@ private fun TtsLeadingControl(
     }
 }
 
+/** A sentence step with the same tap and hold actions as other conversation controls. */
 @Suppress("FunctionNaming")
 @Composable
 private fun TtsNavigationButton(
@@ -225,13 +236,14 @@ private fun TtsMessageMenu(
     onNextMessage: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
+    val dismiss = { open = false }
     Box {
-        IconButton(onClick = { open = true }) {
+        IconButton(onClick = { open = true }, enabled = enabled) {
             Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
         }
         WhiteNoiseDropdownMenu(
             expanded = open,
-            onDismissRequest = { open = false },
+            onDismissRequest = dismiss,
             items =
                 listOf(
                     WhiteNoiseMenuItem(
@@ -244,6 +256,7 @@ private fun TtsMessageMenu(
                                     R.string.tts_bar_previous_message,
                                     R.string.explanation_conversation_tts_previous_message,
                                 ),
+                                beforeShow = dismiss,
                             ),
                     ),
                     WhiteNoiseMenuItem(
@@ -256,6 +269,7 @@ private fun TtsMessageMenu(
                                     R.string.tts_bar_next_message,
                                     R.string.explanation_conversation_tts_next_message,
                                 ),
+                                beforeShow = dismiss,
                             ),
                     ),
                 ),

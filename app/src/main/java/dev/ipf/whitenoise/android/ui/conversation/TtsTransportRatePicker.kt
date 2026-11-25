@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateEditor
 import dev.ipf.whitenoise.android.ui.settings.isTtsCustomRate
 import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 
+/** Picks a playback rate and exposes its current value on the shared speed button. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun TtsTransportRatePicker(
@@ -48,7 +49,6 @@ internal fun TtsTransportRatePicker(
             modifier =
                 Modifier.semantics {
                     contentDescription = controlDescription
-                    role = Role.Button
                     stateDescription = rateLabel
                 },
         )
