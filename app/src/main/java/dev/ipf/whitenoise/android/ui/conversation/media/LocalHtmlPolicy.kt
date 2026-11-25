@@ -13,14 +13,20 @@ import org.jsoup.nodes.TextNode
 import org.jsoup.parser.Parser
 
 /**
- * The reader page's colours, as packed `0xRRGGBB` values from the app theme, never from the sender. A document
- * that is never themed keeps the policy's built-in dark colours.
+ * The reader page's colours as ARGB values from the app theme, never from the sender; the page's CSS uses only their
+ * `0xRRGGBB` part. A document that is never themed keeps the policy's built-in dark colours.
  */
 internal data class LocalHtmlPalette(
     val background: Int,
     val text: Int,
     val link: Int,
     val border: Int,
+)
+
+/** A page ready for the reader's WebView and the ARGB canvas colour drawn behind it, chosen together. */
+internal data class LocalHtmlCanvas(
+    val document: LocalHtmlDocument,
+    val background: Int,
 )
 
 internal data class LocalHtmlDocument(
@@ -151,10 +157,29 @@ internal object LocalHtmlPolicy {
             parsed.select("svg").isNotEmpty()
     }
 
+    /**
+     * The page and the canvas behind it, decided once so they cannot disagree. A page that keeps sender styling
+     * ([styled], from [hasAuthorStyling]) stays as sanitized on the policy's black canvas, the background its colours
+     * were written against. An unstyled page takes [palette] for both its own header and the canvas.
+     */
+    fun canvas(
+        document: LocalHtmlDocument,
+        styled: Boolean,
+        palette: LocalHtmlPalette,
+    ): LocalHtmlCanvas =
+        if (styled) {
+            LocalHtmlCanvas(document, ORIGINAL_CANVAS)
+        } else {
+            LocalHtmlCanvas(themed(document, palette), palette.background)
+        }
+
     /** A packed `0xRRGGBB` colour as a CSS hex literal. */
     private fun hex(rgb: Int): String = "#%06x".format(rgb and RGB_MASK)
 
     private const val RGB_MASK = 0xFFFFFF
+
+    /** Opaque black, matching the `body{background:#000}` rule in [HEAD]. */
+    private const val ORIGINAL_CANVAS = android.graphics.Color.BLACK
 
     private enum class Context { HTML, SVG, SVG_TEXT }
 

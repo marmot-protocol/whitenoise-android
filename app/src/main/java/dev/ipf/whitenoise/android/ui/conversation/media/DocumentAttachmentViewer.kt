@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -48,6 +47,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Shows a PDF or HTML attachment in the themed reader. A sanitized HTML page that keeps sender styling stays on its
+ * original dark canvas; an unstyled page takes the theme's colours.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // Optional exports keep both readers explicit.
 internal fun DocumentAttachmentViewer(
@@ -149,12 +152,13 @@ internal fun DocumentAttachmentViewer(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    // A page with its own styling keeps the dark canvas it was written against.
                     val palette = documentPalette()
-                    LocalHtmlView(
+                    val canvas =
                         remember(document, palette, authorStyling) {
-                            if (authorStyling) document else LocalHtmlPolicy.themed(document, palette)
-                        },
+                            LocalHtmlPolicy.canvas(document, authorStyling, palette)
+                        }
+                    LocalHtmlView(
+                        canvas.document,
                         Modifier.fillMaxSize(),
                         onLink = {
                             if (actions.isCurrent()) pendingLink = it
@@ -162,8 +166,7 @@ internal fun DocumentAttachmentViewer(
                         onUnavailable = {
                             error = true
                         },
-                        backgroundColor =
-                            if (authorStyling) Color.Black.toArgb() else MaterialTheme.colorScheme.background.toArgb(),
+                        backgroundColor = canvas.background,
                     )
                 }
             }

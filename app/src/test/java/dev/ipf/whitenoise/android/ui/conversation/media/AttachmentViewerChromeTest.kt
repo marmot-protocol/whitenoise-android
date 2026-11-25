@@ -80,6 +80,7 @@ class AttachmentViewerChromeTest {
     @Test
     fun passThroughChromeLetsBackgroundTapsReachTheMedia() {
         var mediaTaps = 0
+        var closes = 0
         val passThrough = mutableStateOf(true)
         rule.setContent {
             WhiteNoiseTheme {
@@ -88,7 +89,7 @@ class AttachmentViewerChromeTest {
                     Box(Modifier.fillMaxSize().clickable { mediaTaps++ })
                     AttachmentViewerChrome(
                         title = "Video",
-                        onClose = {},
+                        onClose = { closes++ },
                         modifier = Modifier.testTag("chrome"),
                         passTouchesThrough = passThrough.value,
                     )
@@ -98,6 +99,9 @@ class AttachmentViewerChromeTest {
         val chrome = rule.onNodeWithTag("chrome", useUnmergedTree = true)
         chrome.performTouchInput { click(Offset(width - 4f, height / 2f)) }
         assertEquals("a pass-through chrome lets the tap reach the media", 1, mediaTaps)
+        rule.onNodeWithTag(ATTACHMENT_VIEWER_CLOSE_TAG, useUnmergedTree = true).performClick()
+        assertEquals("Close still closes in pass-through mode", 1, closes)
+        assertEquals("Close takes its own tap", 1, mediaTaps)
         rule.runOnIdle { passThrough.value = false }
         chrome.performTouchInput { click(Offset(width - 4f, height / 2f)) }
         assertEquals("a bar chrome takes the tap itself", 1, mediaTaps)
@@ -126,11 +130,8 @@ class AttachmentViewerChromeTest {
         val frame = document.functionBody("DocumentViewerFrame")
         assertFalse("the document viewer follows the theme, not a forced black frame", "Color.Black" in frame)
         val viewer = document.functionBody("DocumentAttachmentViewer")
-        val themed = "LocalHtmlPolicy.themed(document, palette)" in viewer
-        assertTrue("the rendered HTML page takes the theme's palette", themed)
-        val themedBackground = "MaterialTheme.colorScheme.background.toArgb()" in viewer
-        assertTrue("the WebView background follows the theme", themedBackground)
-        assertTrue("a page with its own styling keeps its canvas", "if (authorStyling) document else" in viewer)
+        assertTrue("the page and its canvas come from one decision", "LocalHtmlPolicy.canvas(" in viewer)
+        assertTrue("the WebView draws the chosen canvas", "backgroundColor = canvas.background" in viewer)
     }
 
     /** One production source by its path below the app package, from the module or the repository root. */

@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -123,12 +122,13 @@ class DocumentAttachmentViewerScreenshotTest {
                     LocalHtmlPolicy.sanitize("<h1>Meeting notes</h1><p>Bring a book.</p><img src=x>")
                 }
             }
+        val canvas = LocalHtmlPolicy.canvas(document, styled = false, palette = documentPalette())
         LocalHtmlView(
-            LocalHtmlPolicy.themed(document, documentPalette()),
+            canvas.document,
             Modifier.fillMaxSize(),
             {},
             {},
-            backgroundColor = MaterialTheme.colorScheme.background.toArgb(),
+            backgroundColor = canvas.background,
         )
     }
 

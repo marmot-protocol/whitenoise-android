@@ -1,7 +1,8 @@
 # UI patterns
 
 Shared rules for Android screen chrome. They come from the UI unification
-tracker (#4049). Each slice adds its rule here when it lands.
+tracker (#4049). Each slice adds its rule here when it lands. For choosing
+a component or pattern, see the [illustrated UI guide](android-ui-patterns.md).
 
 ## Page top bar and scaffold
 

@@ -285,6 +285,23 @@ class LocalHtmlPolicyTest {
             assertFalse("the policy's own header does not count", LocalHtmlPolicy.hasAuthorStyling(plain))
         }
 
+    /** A styled page keeps its sanitized markup on black; an unstyled page and its canvas both take the palette. */
+    @Test
+    fun canvasPairsEachPageWithTheBackgroundItWasColouredFor() =
+        runBlocking {
+            val palette =
+                LocalHtmlPalette(background = 0xFFF7F7F7.toInt(), text = 0x1A1A1A, link = 0x123456, border = 0xABCDEF)
+            val styled = LocalHtmlPolicy.sanitize("<p style=\"color:white\">white text</p>")
+            val kept = LocalHtmlPolicy.canvas(styled, styled = true, palette = palette)
+            assertEquals(styled, kept.document)
+            assertEquals(android.graphics.Color.BLACK, kept.background)
+            val plain = LocalHtmlPolicy.sanitize("<p>plain words</p>")
+            val themed = LocalHtmlPolicy.canvas(plain, styled = false, palette = palette)
+            assertEquals(LocalHtmlPolicy.themed(plain, palette), themed.document)
+            assertTrue(themed.document.html.contains("background:#f7f7f7"))
+            assertEquals(palette.background, themed.background)
+        }
+
     @Test fun formattingTextAndBoundedTableSpansSurvive() =
         runBlocking {
             val doc =
