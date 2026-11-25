@@ -12,7 +12,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import dev.ipf.marmotkit.GroupCommitRefusalCauseFfi
 import dev.ipf.marmotkit.GroupCommitRefusedRelayFfi
 import dev.ipf.whitenoise.android.R
@@ -75,20 +74,20 @@ internal fun GroupCommitRefusalNotice(
     if (refusal.refusedRelays.isEmpty()) return
     Text(
         stringResource(R.string.group_commit_refused_title),
-        style = MaterialTheme.typography.titleSmall.copy(textAlign = TextAlign.Center),
+        style = MaterialTheme.typography.titleSmall,
     )
     val message =
         when (val wording = groupCommitRefusalMessage(refusal.refusedRelays)) {
             is GroupCommitRefusalMessage.Named -> stringResource(wording.resId, wording.host)
             is GroupCommitRefusalMessage.Counted -> pluralStringResource(wording.resId, wording.count, wording.count)
         }
-    Text(message, style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center))
+    Text(message, style = MaterialTheme.typography.bodyMedium)
     refusal.dismissFailure?.takeUnless { refusal.dismissing }?.let { failure ->
         Text(
             stringResource(failure),
             // The dismissal's outcome appears without focus moving, so TalkBack announces it politely.
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.error,
         )
     }
