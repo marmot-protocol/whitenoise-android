@@ -720,8 +720,7 @@ internal fun ProfileSheet(
             onPromote = { if (owner.canAct()) page = ProfileSheetPage.MAKE_ADMIN },
             onCopy = {
                 if (owner.canAct()) {
-                    clipboard.copy(presentationNpub)
-                    copied = true
+                    if (clipboard.copy(presentationNpub)) copied = true
                 }
             },
             onAvatar = { if (owner.canAct()) fullPictureOpen = true },

@@ -164,8 +164,7 @@ internal fun ProfileQrSheet(
                     npub = npub,
                     copied = copied,
                     onCopy = {
-                        clipboard.copy(npub)
-                        copied = true
+                        if (clipboard.copy(npub)) copied = true
                     },
                     targetTestTag = "profile_qr.copy_public_key",
                     textTestTag = "profile_qr.full_public_key",

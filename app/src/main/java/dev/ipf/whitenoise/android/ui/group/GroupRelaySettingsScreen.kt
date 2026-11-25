@@ -73,8 +73,7 @@ internal fun GroupRelaySettingsScreen(
                 item { SettingsSection(stringResource(R.string.group_relays_configured)) }
                 item {
                     GroupRelayRows(displayed, copiedUrl) { url ->
-                        clipboard.copy(url)
-                        copiedUrl = url
+                        if (clipboard.copy(url)) copiedUrl = url
                     }
                 }
                 item { SettingsExplainer(stringResource(R.string.group_relays_configuration_only)) }

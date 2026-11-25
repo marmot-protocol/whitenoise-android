@@ -223,8 +223,7 @@ internal fun ShareConnectScreen(
         },
         onCopy = copy@{
             if (!ownsScreen()) return@copy
-            clipboard.copy(npub)
-            copied = true
+            if (clipboard.copy(npub)) copied = true
         },
         onOpenScanner = {
             if (ownsScreen() && scannerSession == null) {

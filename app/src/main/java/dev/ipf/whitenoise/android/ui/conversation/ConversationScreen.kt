@@ -3686,8 +3686,7 @@ internal fun ConversationScreen(
                         selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
                         onCopySelection = {
                             if (batchSelectionUi.copyText.isNotBlank()) {
-                                clipboard.copy(batchSelectionUi.copyText)
-                                selectedMessages.clear()
+                                if (clipboard.copy(batchSelectionUi.copyText)) selectedMessages.clear()
                             }
                         },
                         onSelectionRouteOrigin = { action, origin ->

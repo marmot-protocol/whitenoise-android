@@ -31,7 +31,7 @@ internal class ClipboardCopier(
     /** Copies [text]; returns whether the clip was written. Only a written clip is confirmed. */
     fun copy(
         text: String,
-        label: String = "",
+        label: String = "plain text",
     ): Boolean = copyToClipboard(context, label, text).also { if (it) confirmCopied() }
 }
 
