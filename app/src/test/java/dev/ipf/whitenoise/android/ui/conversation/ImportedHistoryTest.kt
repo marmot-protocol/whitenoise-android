@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,6 +13,8 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.ImportedHistorySource
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.chatHistoryTransfer
+import dev.ipf.whitenoise.android.state.importedHistoryBoundary
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -98,7 +99,7 @@ class ImportedHistoryTest {
     /** Without a provided import state, as in builds without linked devices, a row draws nothing extra. */
     @Test
     fun withoutAnImportStateARowDrawsNothing() {
-        compose.setContent { WhiteNoiseTheme { ImportedHistoryMarkers(null, live(), atHistoryStart = true) } }
+        markers(older = null, item = live(), state = null, atHistoryStart = true)
 
         compose.onNodeWithTag(HISTORY_TRANSFER_NOTICE_TAG).assertDoesNotExist()
         compose.onNodeWithTag(IMPORTED_HISTORY_BOUNDARY_TAG).assertDoesNotExist()
@@ -113,9 +114,10 @@ class ImportedHistoryTest {
     ) {
         compose.setContent {
             WhiteNoiseTheme {
-                CompositionLocalProvider(LocalChatHistoryImport provides { state }) {
-                    ImportedHistoryMarkers(older, item, atHistoryStart)
-                }
+                ImportedHistoryMarkers(
+                    transfer = if (atHistoryStart) chatHistoryTransfer(state) else null,
+                    boundary = importedHistoryBoundary(older?.projected, item.projected, state),
+                )
             }
         }
     }

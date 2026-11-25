@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,6 +10,7 @@ import org.junit.Test
 import java.io.File
 
 class ComposeHotPathCoverageTest {
+    /** Reply preview projection and mention resolution stay remembered and avoid unguarded profile reads. */
     @Test
     fun composerReplyProjectionAndMentionResolverAreRemembered() {
         val source = source("conversation/composer/ComposerBar.kt").motionOwnerSource()
@@ -125,6 +129,105 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Draft and chat-list scroll reads stay out of ConversationScreen and ChatsScreen bodies. */
+    @Test
+    fun conversationDraftAndChatsScrollReadsStayOutOfScreenBodies() {
+        val conversationBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt")
+                .functionBody("ConversationScreen")
+        val draftRestoreLogic =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerDraftRestoreLogic.kt")
+        val restoredDraftHelper = draftRestoreLogic.functionBody("rememberRestoredDraftSnapshot")
+        val entryRevisionHelper = draftRestoreLogic.functionBody("rememberUserTextEditRevisionOnEntry")
+        assertFalse(
+            "ConversationScreen must not read DraftStore directly during composition",
+            "appState.draftSnapshotFor(" in conversationBody,
+        )
+        assertTrue(
+            "ConversationScreen must read restored drafts through rememberRestoredDraftSnapshot",
+            "rememberRestoredDraftSnapshot(" in conversationBody,
+        )
+        assertTrue(
+            "ConversationScreen must capture entry edit revision without observation",
+            "rememberUserTextEditRevisionOnEntry(" in conversationBody,
+        )
+        assertTrue(
+            "Restored draft snapshot helper must avoid snapshot observation on DraftStore",
+            "Snapshot.withoutReadObservation" in restoredDraftHelper,
+        )
+        assertTrue(
+            "Entry edit revision helper must avoid snapshot observation on the composer text state",
+            "Snapshot.withoutReadObservation" in entryRevisionHelper,
+        )
+
+        val chatsBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt")
+                .functionBody("ChatsScreen")
+        val anchorCallStart = chatsBody.indexOf("rememberSearchBodyAnchorRestoration(")
+        assertTrue("ChatsScreen must call rememberSearchBodyAnchorRestoration", anchorCallStart >= 0)
+        val anchorCall =
+            chatsBody.kotlinBlockFrom(
+                openDelimiter = chatsBody.indexOf('(', anchorCallStart),
+                description = "rememberSearchBodyAnchorRestoration call",
+                opening = '(',
+                closing = ')',
+            )
+        assertTrue(
+            "ChatsScreen must pass listState = chatListState to rememberSearchBodyAnchorRestoration",
+            Regex("""listState\s*=\s*chatListState\b""").containsMatchIn(anchorCall),
+        )
+        val atTopStart = chatsBody.indexOf("atTop = {")
+        require(atTopStart >= 0) { "Missing atTop callback in ChatsScreen" }
+        val atTopCallback =
+            chatsBody.kotlinBlockFrom(chatsBody.indexOf('{', atTopStart), "ChatsScreen unread-pull atTop callback")
+        assertFalse(
+            "ChatsScreen must not read chatListState.firstVisibleItemScrollOffset outside callbacks",
+            "chatListState.firstVisibleItemScrollOffset" in chatsBody.replace(atTopCallback, ""),
+        )
+        val anchorRestorationBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchAnchorRestoration.kt")
+                .functionBody("rememberSearchBodyAnchorRestoration")
+        assertTrue(
+            "rememberSearchBodyAnchorRestoration must snapshot LazyListState without observation",
+            "Snapshot.withoutReadObservation" in anchorRestorationBody,
+        )
+    }
+
+    /** IME and header overlap threshold reads collapse through derivedStateOf. */
+    @Test
+    fun imeAndHeaderOverlapReadsCollapseThroughDerivedStateOf() {
+        val appBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt")
+                .functionBody("WhiteNoiseApp")
+        val imeHelper =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseAppDictationIme.kt")
+                .functionBody("rememberDictationImeVisible")
+        assertFalse(
+            "WhiteNoiseApp must not read WindowInsets.ime.getBottom directly in its root body",
+            "WindowInsets.ime.getBottom(" in appBody,
+        )
+        assertTrue(
+            "WhiteNoiseApp must collapse dictation IME visibility via rememberDictationImeVisible",
+            "rememberDictationImeVisible()" in appBody && "derivedStateOf" in imeHelper,
+        )
+
+        val folderPillsBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt")
+                .functionBody("ChatFolderPills")
+        val profileActionBody =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt")
+                .functionBody("PersonProfileBottomAction")
+        assertTrue(
+            "ChatFolderPills must collapse overlappedFraction threshold reads with derivedStateOf",
+            Regex("""derivedStateOf\s*\{[^}]*overlappedFraction""").containsMatchIn(folderPillsBody),
+        )
+        assertTrue(
+            "PersonProfileBottomAction must collapse overlappedFraction threshold reads with derivedStateOf",
+            Regex("""derivedStateOf\s*\{[^}]*overlappedFraction""").containsMatchIn(profileActionBody),
+        )
+    }
+
+    /** Resolves a main UI source file relative to `ui/`. */
     private fun source(relativePath: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/$relativePath"),

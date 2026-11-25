@@ -69,7 +69,7 @@ class ConversationCompactSpacingScreenshotTest : ConversationRowSpacingFixtures(
                         )
                     },
                     message(4, 364uL, mine = true, text = "Evening readers it is."),
-                    message(5, 3964uL, mine = true, text = "See you there!"),
+                    message(5, 3964uL, text = "See you there!"),
                 )
             }
         composeRule.setContent {

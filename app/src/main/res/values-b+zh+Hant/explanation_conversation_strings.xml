@@ -44,6 +44,7 @@
     <string name="explanation_poll_multiple_choice">成員可以投多個選項。</string>
 
     <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_transcribe">在這部裝置上將這段錄音轉成文字。</string>
     <string name="explanation_message_action_reply">在輸入框中引用這則訊息，讓你的回覆與之關聯。</string>
     <string name="explanation_message_action_edit">在輸入框中開啟你的訊息，以便你修改。</string>
     <string name="explanation_message_action_select">開啟選取模式，一次選取多則訊息。</string>

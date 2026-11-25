@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -67,8 +68,10 @@ internal fun ChatFolderPills(
     modifier: Modifier = Modifier,
     chatsUnreadCount: ULong? = null,
 ) {
-    val scrolled =
-        (LocalWhiteNoiseHeaderScroll.current?.state?.overlappedFraction ?: 0f) > FOLDER_HEADER_SCROLLED_THRESHOLD
+    val headerScrollState = LocalWhiteNoiseHeaderScroll.current?.state
+    val scrolled by remember(headerScrollState) {
+        derivedStateOf { (headerScrollState?.overlappedFraction ?: 0f) > FOLDER_HEADER_SCROLLED_THRESHOLD }
+    }
     val containerColor =
         animateColorAsState(
             if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surface,
