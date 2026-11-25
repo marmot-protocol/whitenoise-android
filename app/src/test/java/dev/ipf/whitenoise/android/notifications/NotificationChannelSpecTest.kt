@@ -128,34 +128,6 @@ class NotificationChannelSpecTest {
     }
 
     @Test
-    fun agentActivityRoutesToTheLowImportanceAgentChannel() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, spec)
-        assertEquals(ChannelImportance.LOW, spec.importance)
-    }
-
-    @Test
-    fun mentionTakesPrecedenceOverAgentActivity() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.MENTIONS, spec)
-    }
-
-    @Test
     fun channelIdsAreTheFrozenStableContractWithTheOs() {
         // These IDs are a stable contract — changing one discards the user's
         // per-channel overrides, so it's only done deliberately (re-keying to

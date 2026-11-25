@@ -110,6 +110,8 @@ class TimelineMarkdownHydrationTest {
         plaintext: String,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = messageIdHex,
             sourceMessageIdHex = null,

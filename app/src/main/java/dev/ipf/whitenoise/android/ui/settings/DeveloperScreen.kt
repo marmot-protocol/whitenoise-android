@@ -49,25 +49,6 @@ internal fun developerBuildFacts(staging: Boolean): DeveloperBuildFacts {
     return DeveloperBuildFacts(BuildConfig.VERSION_NAME, buildNumber, BuildConfig.MDK_SHORT_SHA, staging)
 }
 
-/** Developer Tools as a Settings destination, whose own pages open as further Settings details. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun DeveloperDestination(
-    appState: WhiteNoiseAppState,
-    onBack: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
-    onDetailChange: (SettingsDetail?) -> Unit,
-    onOpenDemoChat: (ChatListItem) -> Unit,
-) = DeveloperScreen(
-    appState = appState,
-    onBack = onBack,
-    onOpenDiagnostics = onOpenDiagnostics,
-    onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
-    onOpenQuarantinedGroups = { onDetailChange(SettingsDetail.QuarantinedGroups) },
-    onOpenAgentDemo = { onDetailChange(SettingsDetail.AgentDemo) },
-    onOpenDemoChat = onOpenDemoChat,
-)
-
 /**
  * Developer Tools: the warning, the switch that owns developer mode, Key Packages as a recovery destination,
  * the debugging surfaces the switch reveals, and the build this app was made from. Telemetry and audit logs
@@ -81,7 +62,6 @@ internal fun DeveloperScreen(
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
     onOpenQuarantinedGroups: () -> Unit,
-    onOpenAgentDemo: () -> Unit = {},
     onOpenDemoChat: (ChatListItem) -> Unit = {},
 ) {
     val demo = appState.appReviewDemo
@@ -121,7 +101,6 @@ internal fun DeveloperScreen(
         onOpenDiagnostics = onOpenDiagnostics,
         onOpenKeyPackages = onOpenKeyPackages,
         onOpenQuarantinedGroups = onOpenQuarantinedGroups,
-        onOpenAgentDemo = onOpenAgentDemo,
         quarantineSummary = quarantineSummary,
         demoStatus = demo.status,
         demoAvailable = demo.canBegin,
@@ -153,7 +132,6 @@ internal fun DeveloperContent(
     onOpenDiagnostics: () -> Unit,
     onOpenKeyPackages: () -> Unit,
     onOpenQuarantinedGroups: () -> Unit = {},
-    onOpenAgentDemo: () -> Unit = {},
     quarantineSummary: String? = null,
     demoStatus: ReviewDemoStatus = ReviewDemoStatus.Idle,
     demoAvailable: Boolean = false,
@@ -248,18 +226,6 @@ internal fun DeveloperContent(
                             modifier = Modifier.testTag("developer.demo.action"),
                             explanation = stringResource(R.string.explanation_organize_dev_demo),
                             leading = { SettingsLeadingIcon(R.drawable.ic_science) },
-                        )
-                    }
-                    row("agent_demo") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.agent_demo_open),
-                            routeKey = SettingsDetail.AgentDemo,
-                            onClick = onOpenAgentDemo,
-                            subtitle = stringResource(R.string.agent_demo_description),
-                            modifier = Modifier.testTag("developer.agent_demo"),
-                            explanation = stringResource(R.string.explanation_organize_dev_agent_demo),
-                            leading = { SettingsLeadingIcon(R.drawable.ic_ai_agents) },
                         )
                     }
                     if (demoHasSavedSetup && demoStatus !is ReviewDemoStatus.Running) {

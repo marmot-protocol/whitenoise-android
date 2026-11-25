@@ -80,9 +80,6 @@
     "QuarantinedGroups": [
       "developer-quarantine"
     ],
-    "AgentDemo": [
-      "developer-agent-demo"
-    ],
     "Notifications": [
       "settings-notifications"
     ],

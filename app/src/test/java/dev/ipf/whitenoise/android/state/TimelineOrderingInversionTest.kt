@@ -236,6 +236,8 @@ class TimelineOrderingInversionTest {
     ): TimelineMessage {
         val projected =
             TimelineMessageRecordFfi(
+                agentItem = null,
+                agentItemFirstEventMissing = false,
                 clientToken = null,
                 messageIdHex = id,
                 sourceMessageIdHex = id,

@@ -52,7 +52,7 @@ internal fun AgentActivityLine(
     modifier: Modifier = Modifier,
 ) {
     val expandable = agentActivityExpandable(item)
-    var expanded by rememberSaveable(item.firstEventId) { mutableStateOf(false) }
+    var expanded by rememberSaveable(item.rowId) { mutableStateOf(false) }
     val failed = item.state == AgentItemState.Failed || item.body is AgentItemBody.Error
     val toggleLabel =
         stringResource(if (expanded) R.string.group_system_hide_details else R.string.group_system_show_details)

@@ -342,7 +342,6 @@ private fun SettingsDetailRoute(
                 destination = SettingsDetail.SupportRelays,
             )
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
-        SettingsDetail.AgentDemo -> AgentDemoInbox(appState, onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
                 QuarantinedGroupsScreen(appState, onBack = onBack)
@@ -398,7 +397,14 @@ private fun SettingsDetailRoute(
                 onBack = onBack,
             )
         SettingsDetail.Developer ->
-            DeveloperDestination(appState, onBack, onOpenDiagnostics, onDetailChange, onOpenSupportChat)
+            DeveloperScreen(
+                appState = appState,
+                onBack = onBack,
+                onOpenDiagnostics = onOpenDiagnostics,
+                onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+                onOpenQuarantinedGroups = { onDetailChange(SettingsDetail.QuarantinedGroups) },
+                onOpenDemoChat = onOpenSupportChat,
+            )
     }
 }
 

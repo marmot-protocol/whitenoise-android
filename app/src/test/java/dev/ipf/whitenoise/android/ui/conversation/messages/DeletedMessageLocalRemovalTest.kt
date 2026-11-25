@@ -633,6 +633,8 @@ class DeletedMessageLocalRemovalTest {
         reactions: TimelineReactionSummaryFfi = emptyReactionSummary(),
         deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = MESSAGE_ID,
         sourceMessageIdHex = null,

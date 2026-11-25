@@ -2,10 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
@@ -38,43 +35,44 @@ internal data class AgentItemActions(
     val canSend: Boolean get() = enabled && status != AgentRequestStatus.Sending
 }
 
+/**
+ * Sends one item version's answers and controls. Its progress lives in the conversation's [progress]
+ * map under [key], so a row that scrolls away and back mid-send keeps its in-flight guard.
+ */
 @Stable
 internal class AgentRequestSender(
+    private val progress: MutableMap<String, AgentRequestStatus>,
+    private val key: String,
     private val start: (AgentRequest, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
 ) {
-    var status by mutableStateOf(AgentRequestStatus.Idle)
-        private set
+    /** Progress of the last request sent for this item version. */
+    val status: AgentRequestStatus get() = progress[key] ?: AgentRequestStatus.Idle
 
+    /** Sends [request] unless one for this item version is still on its way. */
     fun send(request: AgentRequest) {
         if (status == AgentRequestStatus.Sending) return
-        status = AgentRequestStatus.Sending
-        start(request) { outcome -> status = outcome.requestStatus() }
+        progress[key] = AgentRequestStatus.Sending
+        start(request) { outcome -> progress[key] = outcome.requestStatus() }
     }
 }
 
 /**
- * Sends the row's requests to the agent that wrote [item], through [LocalAgentRequestTransport] when one
- * is provided. Keyed by the item's version, so a new version from the agent clears the local progress.
+ * Sends the row's requests to the agent that wrote [item]. Keyed by the item's version, so the
+ * agent's next version, which settles the request, starts from no progress.
  */
 @Composable
 internal fun rememberAgentRequestSender(
     item: AgentItem,
-    agentPubkeyHex: String,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
 ): AgentRequestSender {
-    val groupTransport =
-        remember(controller) {
-            AgentRequestTransport { agent, target, request -> controller.sendAgentRequest(agent, target, request) }
-        }
-    val transport = LocalAgentRequestTransport.current ?: groupTransport
-    return remember(transport, item.firstEventId, item.version, agentPubkeyHex) {
-        AgentRequestSender { request, onCompleted ->
+    val progress = LocalAgentTurnSteps.current.requests
+    return remember(progress, controller, item.rowId, item.version, item.agentPubkeyHex) {
+        AgentRequestSender(progress, "${item.rowId}:${item.version}") { request, onCompleted ->
             appState.launchMutation {
                 var outcome: SendAcceptDispositionFfi? = null
                 try {
-                    val target = item.firstEventId.takeUnless { request is AgentRequest.Interrupt }
-                    outcome = transport.send(agentPubkeyHex, target, request)
+                    outcome = controller.sendAgentRequest(item.agentPubkeyHex, item.rowId, request)
                 } finally {
                     onCompleted(outcome)
                 }

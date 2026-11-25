@@ -685,6 +685,8 @@ class GroupSystemEventsTest {
         sourceMessageIdHex: String? = null,
         groupSystem: GroupSystemEventFfi? = null,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = "message",
         sourceMessageIdHex = sourceMessageIdHex,

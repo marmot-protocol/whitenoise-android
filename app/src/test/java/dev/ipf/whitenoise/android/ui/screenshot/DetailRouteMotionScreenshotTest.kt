@@ -236,6 +236,8 @@ class DetailRouteMotionScreenshotTest {
             val url = "https://example.com/motion-fixture"
             val record =
                 dev.ipf.marmotkit.TimelineMessageRecordFfi(
+                    agentItem = null,
+                    agentItemFirstEventMissing = false,
                     clientToken = null,
                     sourceMessageIdHex = "44".repeat(32),
                     messageIdHex = "44".repeat(32),

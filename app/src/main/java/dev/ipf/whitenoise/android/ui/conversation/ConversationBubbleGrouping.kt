@@ -4,7 +4,6 @@ import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
-import dev.ipf.whitenoise.android.core.agent.AgentItemProjector
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.TimelineMessage
 
@@ -52,11 +51,11 @@ private fun timelineItemRendersAsConversationBubble(
                 invalidated = item.projected?.invalidationStatus != null,
             ) ||
                 AgentOperationProjector.project(item.record) == null
-        // An agent's items sit inside its sender run, so the run names the agent once and its
-        // avatar closes the turn instead of repeating beside every tool call.
-        TimelineRowKind.AgentItem ->
-            AgentItemProjector.version(item.record) != null && !AgentItemProjector.isSessionItem(item.record)
+        // An agent's items join its sender run; a session start is a centred divider outside it.
+        TimelineRowKind.AgentItem -> item.projected?.agentItem?.itemType != AGENT_SESSION_ITEM_TYPE
         TimelineRowKind.GroupSystem,
         TimelineRowKind.DebugRow,
         -> false
     }
+
+private const val AGENT_SESSION_ITEM_TYPE = "session"

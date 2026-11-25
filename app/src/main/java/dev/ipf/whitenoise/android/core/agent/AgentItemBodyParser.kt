@@ -3,50 +3,35 @@ package dev.ipf.whitenoise.android.core.agent
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Parses the `fields` tag of an agent item: `{"type": ..., "body": {...}}`. Unknown fields are ignored. */
+/** Parses an agent item's fields JSON: `{"type": ..., "body": {...}}`. Unknown fields are ignored. */
 internal object AgentItemBodyParser {
     fun parse(fields: JSONObject): AgentItemBody {
         val type = fields.optString("type")
         val body = fields.optJSONObject("body") ?: JSONObject()
         return when (type) {
-            "turn" -> turn(body)
+            "turn" -> AgentItemBody.Turn(durationMs = body.longOrNull("duration_ms"))
             "reasoning" -> AgentItemBody.Reasoning
             "tool" -> tool(body)
             "approval" -> approval(body)
             "question" -> question(body)
             "plan" -> plan(body)
-            "task" -> AgentItemBody.Task(kind = body.optString("kind"), description = body.stringOrNull("description"))
+            "task" -> AgentItemBody.Task(description = body.stringOrNull("description"))
             "notice" ->
                 AgentItemBody.Notice(
                     kind = AgentNoticeKind.parse(body.stringOrNull("kind")),
                     durationMs = body.longOrNull("duration_ms"),
                     reason = body.stringOrNull("reason"),
                 )
-            "error" ->
-                AgentItemBody.Error(
-                    request = body.stringOrNull("request"),
-                    code = body.longOrNull("code"),
-                    willRetry = if (body.has("will_retry")) body.optBoolean("will_retry") else null,
-                )
+            "error" -> AgentItemBody.Error(code = body.longOrNull("code"))
             "session" -> session(body)
             else -> AgentItemBody.Unknown(type)
         }
     }
 
-    private fun turn(body: JSONObject): AgentItemBody.Turn {
-        val usage = body.optJSONObject("usage")
-        return AgentItemBody.Turn(
-            startedBy = body.stringOrNull("started_by"),
-            durationMs = body.longOrNull("duration_ms"),
-            inputTokens = usage?.longOrNull("input_tokens"),
-            outputTokens = usage?.longOrNull("output_tokens"),
-        )
-    }
 
     private fun tool(body: JSONObject): AgentItemBody.Tool =
         AgentItemBody.Tool(
             kind = AgentToolKind.parse(body.stringOrNull("kind")),
-            name = body.optString("name"),
             command = body.stringOrNull("command"),
             cwd = body.stringOrNull("cwd"),
             exitCode = body.longOrNull("exit_code"),
@@ -68,7 +53,6 @@ internal object AgentItemBodyParser {
 
     private fun approval(body: JSONObject): AgentItemBody.Approval =
         AgentItemBody.Approval(
-            subjectItemId = body.stringOrNull("subject"),
             choices =
                 body.optJSONArray("choices").objects().mapNotNull { choice ->
                     val id = choice.stringOrNull("id") ?: return@mapNotNull null
@@ -133,7 +117,6 @@ internal object AgentItemBodyParser {
 
     private fun session(body: JSONObject): AgentItemBody.Session =
         AgentItemBody.Session(
-            harnessVersion = body.stringOrNull("harness_version"),
             settings =
                 body.optJSONArray("settings").objects().mapNotNull { setting ->
                     AgentSessionSetting(
@@ -141,14 +124,7 @@ internal object AgentItemBodyParser {
                         label = setting.optString("label"),
                         value = setting.stringOrNull("value"),
                     )
-                },
-            commands =
-                body.optJSONArray("commands").objects().mapNotNull { command ->
-                    AgentSessionCommand(
-                        name = command.stringOrNull("name") ?: return@mapNotNull null,
-                        description = command.stringOrNull("description"),
-                    )
-                },
+                }
         )
 
     private fun JSONArray?.objects(): List<JSONObject> {

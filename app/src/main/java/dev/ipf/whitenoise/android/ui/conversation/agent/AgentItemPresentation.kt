@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentItemState
+import dev.ipf.whitenoise.android.core.agent.AgentPlanEntryState
 import dev.ipf.whitenoise.android.core.agent.AgentQuestion
 import dev.ipf.whitenoise.android.core.agent.AgentQuestionAnswer
 
@@ -20,10 +21,7 @@ internal enum class AgentItemLayout {
     /** A card that waits for the viewer: an open question. */
     QuestionCard,
 
-    /** The agent's plan or to-do list. */
-    Plan,
-
-    /** One expandable line: tools, reasoning, tasks, notices, errors and answered requests. */
+    /** One expandable line: tools, reasoning, plans, tasks, notices, errors and answered requests. */
     Activity,
 }
 
@@ -39,8 +37,6 @@ internal fun agentItemLayout(item: AgentItem): AgentItemLayout =
             }
         is AgentItemBody.Question ->
             if (item.state == AgentItemState.Waiting) AgentItemLayout.QuestionCard else AgentItemLayout.Activity
-        is AgentItemBody.Plan ->
-            if (body.entries.isEmpty() && body.text.isNullOrBlank()) AgentItemLayout.Activity else AgentItemLayout.Plan
         else -> AgentItemLayout.Activity
     }
 
@@ -67,6 +63,7 @@ internal fun agentActivitySubject(item: AgentItem): String {
         when (body) {
             is AgentItemBody.Tool -> body.command?.let(::agentDisplayCommand) ?: body.path ?: body.query
             is AgentItemBody.Task -> body.description
+            is AgentItemBody.Plan -> body.entries.firstOrNull { it.state == AgentPlanEntryState.Running }?.text
             // An answered request's text only repeats its title ("Answered: Allow once").
             is AgentItemBody.Approval, is AgentItemBody.Question -> return ""
             else -> null
@@ -111,6 +108,7 @@ internal fun agentActivityExpandable(item: AgentItem): Boolean =
         is AgentItemBody.Tool -> true
         is AgentItemBody.Approval, is AgentItemBody.Question -> false
         is AgentItemBody.Reasoning -> item.text.isNotBlank()
+        is AgentItemBody.Plan -> body.entries.isNotEmpty() || !body.text.isNullOrBlank()
         is AgentItemBody.Error -> item.text.isNotBlank() || body.code != null
         else -> item.text.lines().size > 1
     }

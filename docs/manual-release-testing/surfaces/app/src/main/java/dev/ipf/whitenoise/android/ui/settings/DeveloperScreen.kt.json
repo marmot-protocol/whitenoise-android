@@ -12,45 +12,12 @@
         ]
       },
       {
-        "surface": "Developer Tools agent demo row: agent_demo_open",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
-        "anchor": "R.string.agent_demo_open",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "Developer Tools agent demo row: agent_demo_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
-        "anchor": "R.string.agent_demo_description",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "Developer Tools agent demo row: explanation_organize_dev_agent_demo",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
-        "anchor": "R.string.explanation_organize_dev_agent_demo",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
         "surface": "DeveloperContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
         "anchor": "fun DeveloperContent(",
         "test_ids": [
           "SET-020",
           "SET-029"
-        ]
-      },
-      {
-        "surface": "DeveloperDestination",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
-        "anchor": "fun DeveloperDestination(",
-        "test_ids": [
-          "SET-020",
-          "SET-069"
         ]
       },
       {

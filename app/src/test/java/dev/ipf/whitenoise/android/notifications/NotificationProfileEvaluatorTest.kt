@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.notifications
 
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -198,12 +197,6 @@ class NotificationProfileEvaluatorTest {
             notificationProfileSuppresses(
                 profile.copy(allowMentions = false),
                 profileTestUpdate(groupIdHex = other, isMention = true),
-            ),
-        )
-        assertTrue(
-            notificationProfileSuppresses(
-                profile,
-                profileTestUpdate(groupIdHex = other, trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY),
             ),
         )
         NotificationTriggerFfi.entries.filter { it != NotificationTriggerFfi.NEW_MESSAGE }.forEach { trigger ->

@@ -4398,6 +4398,8 @@ class ConversationSendRetryIntegrationTest {
         retentionExpiresAt: ULong?,
         sourceMessageIdHex: String? = "d4".repeat(32),
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = CONFIRMED_MESSAGE_ID,
         sourceMessageIdHex = sourceMessageIdHex,

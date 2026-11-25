@@ -1,9 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.withFrameNanos
+import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
-import dev.ipf.whitenoise.android.state.conversationAttentionTimeline
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import kotlinx.coroutines.CancellationException
 
@@ -33,7 +33,7 @@ internal suspend fun ConversationScrollCoordinator.revealSentAtLiveTail(
                 )
         },
         resolveTailIndex = {
-            val renderedTimelineSize = conversationAttentionTimeline(controller.timeline).size
+            val renderedTimelineSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
             conversationTimelineTailListIndex(
                 timelineSize = renderedTimelineSize,
                 trailingRowCount = controller.conversationTrailingRowCount(renderedTimelineSize),

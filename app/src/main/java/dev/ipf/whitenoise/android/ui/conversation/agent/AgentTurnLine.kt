@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -32,34 +36,49 @@ import dev.ipf.whitenoise.android.core.agent.AgentItemState
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
+import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 
 /**
  * The line at the start of a turn. While the agent works it says so and offers Stop; afterwards it
- * says how long the work took, that it failed, or that it was stopped. Every step of the turn
- * follows below it.
+ * says how long the work took, that it failed, or that it was stopped. When steps fold under the
+ * turn, the line says how many and opens or closes them in place.
  */
 @Composable
 internal fun AgentTurnLine(
     item: AgentItem,
     actions: AgentItemActions,
     modifier: Modifier = Modifier,
-    waitingForInput: Boolean = false,
-    trailingContent: @Composable () -> Unit = {},
 ) {
-    val turn = item.body as? AgentItemBody.Turn
+    val steps = LocalAgentTurnSteps.current
+    val stepCount = steps.stepCount(item.rowId)
+    val open = steps.isOpen(item.rowId)
     val failed = item.state == AgentItemState.Failed
-    val failureDetail =
-        item.text
-            .lineSequence()
-            .firstOrNull { it.isNotBlank() }
-            ?.takeIf { failed }
+    val status =
+        listOfNotNull(
+            turnStatusText(item.state, (item.body as? AgentItemBody.Turn)?.durationMs),
+            item.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.takeIf { failed },
+            stepCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.agent_turn_steps, it, it) },
+        ).joinToString(" · ")
+    val toggleLabel = stringResource(if (open) R.string.agent_turn_hide_steps else R.string.agent_turn_show_steps)
     Row(
-        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 32.dp).padding(start = 4.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = if (stepCount > 0) TappableLineMinHeight else LineMinHeight)
+                .clip(MaterialTheme.shapes.small)
+                .then(
+                    if (stepCount > 0) {
+                        Modifier.clickable(onClickLabel = toggleLabel, role = Role.Button) { steps.toggle(item.rowId) }
+                    } else {
+                        Modifier
+                    },
+                ).padding(start = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         when {
-            item.state.isOpen && !waitingForInput ->
+            item.state.isOpen ->
                 CircularProgressIndicator(
                     modifier = Modifier.size(12.dp),
                     strokeWidth = 1.5.dp,
@@ -73,32 +92,25 @@ internal fun AgentTurnLine(
                     modifier = Modifier.size(16.dp),
                 )
         }
-        Text(
-            text =
-                if (item.state.isOpen && waitingForInput) {
-                    stringResource(R.string.agent_turn_needs_attention)
-                } else {
-                    turnStatusText(item.state, turn?.durationMs)
-                },
-            style = MaterialTheme.typography.labelMedium,
-            color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            // The status takes the free width so Stop sits at the end; a failure detail takes it instead.
-            modifier = if (failureDetail == null) Modifier.weight(1f) else Modifier,
-        )
-        if (failureDetail != null) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = failureDetail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = status,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f, fill = false),
             )
+            if (stepCount > 0) {
+                Icon(
+                    imageVector = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp).size(18.dp),
+                )
+            }
         }
         if (item.state.isOpen && actions.enabled) AgentStopButton(actions)
-        trailingContent()
     }
 }
 
@@ -168,3 +180,6 @@ internal fun agentDurationText(durationMs: Long): String {
         else -> stringResource(R.string.agent_duration_seconds, duration.seconds.toInt())
     }
 }
+
+private val LineMinHeight = 32.dp
+private val TappableLineMinHeight = 48.dp

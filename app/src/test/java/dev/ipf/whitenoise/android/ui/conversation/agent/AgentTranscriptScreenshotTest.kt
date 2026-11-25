@@ -22,7 +22,6 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.conversationRenderedTimeline
 import dev.ipf.whitenoise.android.ui.conversation.AgentTranscriptRows
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -37,8 +36,8 @@ import java.util.TimeZone
 
 /**
  * Real recorded agent sessions drawn by the production transcript row, beside the agent's own
- * message bubbles. Each scene loads a marmot-agents recording, folds it the way the conversation
- * screen does and renders every row through `TimelineRow`.
+ * message bubbles. Each scene loads a marmot-agents recording as the rows MDK projects and renders
+ * every row through `TimelineRow`, with the conversation's turn folding.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -74,6 +73,8 @@ class AgentTranscriptScreenshotTest {
         val scene = scene("codex_approval_allowed", agentName = "Codex", prompt = RUN_PROMPT)
         render(scene, amoled = true)
         composeRule.onNodeWithText("Answered: Allow once").assertExists()
+        composeRule.onNodeWithText("Ran a command").assertDoesNotExist()
+        composeRule.onNodeWithText("1 step", substring = true).performClick()
         composeRule.onNodeWithText("Ran a command").performClick()
         capture("agent_transcript_finished_amoled")
     }
@@ -92,6 +93,7 @@ class AgentTranscriptScreenshotTest {
     fun fileEditOpensToItsDiffDark() {
         val scene = scene("claude_file_edit", agentName = "Claude", prompt = "Make greet() end with a bang")
         render(scene, amoled = false, dark = true)
+        composeRule.onNodeWithText("3 steps", substring = true).performClick()
         composeRule.onNodeWithText("Edited a file").performClick()
         capture("agent_transcript_file_edit_dark")
     }
@@ -108,6 +110,8 @@ class AgentTranscriptScreenshotTest {
     fun planAndAnsweredQuestionLight() {
         val scene = scene("codex_plan_mode", agentName = "Codex", prompt = "Plan a farewell(name) function")
         render(scene, amoled = false)
+        composeRule.onNodeWithText("3 steps", substring = true).performClick()
+        composeRule.onNodeWithText("Plan").performClick()
         capture("agent_transcript_plan_light")
     }
 
@@ -124,10 +128,10 @@ class AgentTranscriptScreenshotTest {
         prompt: String? = null,
         group: Boolean = false,
     ): Scene {
-        val records = AgentRecordingFixtures.load(recording, events = events, prompt = prompt)
+        val rows = AgentRecordingFixtures.load(recording, events = events, prompt = prompt)
         val appState = harness.appState(agentName)
         val controller = harness.controller(appState, group)
-        return Scene(conversationRenderedTimeline(AgentRecordingFixtures.timeline(records)), appState, controller)
+        return Scene(rows, appState, controller)
     }
 
     private fun render(

@@ -30,6 +30,14 @@
         ]
       },
       {
+        "surface": "R.plurals.agent_turn_steps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.plurals.agent_turn_steps",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
         "surface": "R.string.agent_duration_hours",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
         "anchor": "R.string.agent_duration_hours",
@@ -86,9 +94,17 @@
         ]
       },
       {
-        "surface": "R.string.agent_turn_needs_attention",
+        "surface": "R.string.agent_turn_hide_steps",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
-        "anchor": "R.string.agent_turn_needs_attention",
+        "anchor": "R.string.agent_turn_hide_steps",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_show_steps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_show_steps",
         "test_ids": [
           "CON-052"
         ]

@@ -777,11 +777,6 @@
     <string translatable="false" name="review_demo_resume_confirm_body">White Noise will inspect the saved account and conversation before continuing. Any remaining real events will be sent to your configured relays.</string>
     <string translatable="false" name="review_demo_resume_confirm_action">Resume setup</string>
     <string translatable="false" name="review_demo_clear">Clear saved demo setup</string>
-    <string translatable="false" name="agent_demo_open">Open agent demo</string>
-    <string translatable="false" name="agent_demo_description">Try agent turns, approvals, questions and Stop with a scripted agent on this phone. Nothing is sent.</string>
-    <string translatable="false" name="agent_demo_title">Agent demo</string>
-    <string translatable="false" name="agent_demo_footer">Scripted agent on this phone. Nothing is sent.</string>
-    <string translatable="false" name="agent_demo_restart">Restart</string>
     <string translatable="false" name="review_demo_clear_explanation">Clearing the saved setup only removes the local resume record. It does not delete either profile, the conversation, or events already published to relays.</string>
     <string translatable="false" name="review_demo_preparing">Preparing the demo</string>
     <string translatable="false" name="review_demo_creating_account">Creating the second profile</string>

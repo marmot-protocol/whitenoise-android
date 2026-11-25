@@ -590,6 +590,8 @@ class TimelineProjectorTest {
         replyToMessageIdHex: String? = replyPreview?.messageIdHex,
         media: List<MediaAttachmentOutcomeFfi> = emptyList(),
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = null,

@@ -30,7 +30,6 @@
     <string name="agent_question_secret">这个回答是私密的，请在代理所在的电脑上提供。</string>
     <string name="agent_question_answered">已回答：%1$s</string>
     <string name="agent_question_closed">问题已关闭</string>
-    <string name="agent_plan_title">计划</string>
     <string name="agent_plan_step_done">已完成：%1$s</string>
     <string name="agent_plan_step_running">进行中：%1$s</string>
     <string name="agent_plan_step_pending">待办：%1$s</string>
@@ -42,8 +41,9 @@
         <item quantity="other">另有 %1$d 个文件未显示</item>
     </plurals>
     <string name="agent_text_show_all">显示全部</string>
-    <string name="agent_activity_show">显示代理活动</string>
-    <string name="agent_activity_hide">隐藏代理活动</string>
-    <string name="agent_activity_label">代理活动</string>
-    <string name="agent_turn_needs_attention">需要处理</string>
+    <string name="agent_turn_show_steps">显示步骤</string>
+    <string name="agent_turn_hide_steps">隐藏步骤</string>
+    <plurals name="agent_turn_steps">
+        <item quantity="other">%1$d 个步骤</item>
+    </plurals>
 </resources>

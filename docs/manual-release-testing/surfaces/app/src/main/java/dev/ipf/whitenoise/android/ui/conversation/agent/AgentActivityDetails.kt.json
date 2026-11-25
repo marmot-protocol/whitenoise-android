@@ -36,6 +36,22 @@
         ]
       },
       {
+        "surface": "AgentPlanDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
+        "anchor": "fun AgentPlanDetails(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentPlanEntryRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
+        "anchor": "fun AgentPlanEntryRow(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
         "surface": "AgentProse",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentProse(",
@@ -55,6 +71,30 @@
         "surface": "AgentToolOutput",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
         "anchor": "fun AgentToolOutput(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
+        "anchor": "R.string.agent_plan_step_done",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
+        "anchor": "R.string.agent_plan_step_pending",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_plan_step_running",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityDetails.kt",
+        "anchor": "R.string.agent_plan_step_running",
         "test_ids": [
           "CON-052"
         ]

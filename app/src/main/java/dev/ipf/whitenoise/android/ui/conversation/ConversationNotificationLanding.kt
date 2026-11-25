@@ -3,16 +3,15 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.annotation.StringRes
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.TimelineMessage
-import dev.ipf.whitenoise.android.state.conversationAttentionTimeline
 import dev.ipf.whitenoise.android.state.isDerivedStateKind
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
-import dev.ipf.whitenoise.android.state.takesNoTranscriptRow
 
 /** Frames a hidden landing may spend retrying an unmeasurable row before the ordinary entry takes over. */
 private const val MAX_LANDING_COMMIT_ATTEMPTS = 24
@@ -109,7 +108,7 @@ internal suspend fun ConversationController.resolveLandingTarget(sourceId: Strin
     }
     if (availability != MessageAvailability.AVAILABLE) return NotificationLandingResolution.Unavailable(availability)
     val record =
-        timeline.firstOrNull { it.record.messageIdHex == targetId && !takesNoTranscriptRow(it.record) }?.record
+        timeline.firstOrNull { it.record.messageIdHex == targetId && !MessageProjector.isEdit(it.record) }?.record
             ?: return NotificationLandingResolution.Unavailable(MessageAvailability.MISSING)
     return if (isDerivedStateKind(record.kind)) {
         NotificationLandingResolution.KeepEntry
@@ -336,5 +335,5 @@ internal class ConversationEntryPositioning(
         structure.copy(groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0)
 
     /** The edit-filtered rows the transcript actually renders, the same projection every scroll decision uses. */
-    private fun renderedTimeline() = conversationAttentionTimeline(controller.timeline)
+    private fun renderedTimeline() = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
 }

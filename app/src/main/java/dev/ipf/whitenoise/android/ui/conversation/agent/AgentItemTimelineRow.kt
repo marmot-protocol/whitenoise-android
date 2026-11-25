@@ -4,60 +4,42 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 
 /**
- * One marmot-agents item in the transcript, at its latest version.
+ * One agent item in the transcript, at the latest version MDK holds.
  *
  * Items sit in the agent's column beside its message bubbles: indented past the avatar gutter in
  * group chats, flush in direct chats. The agent's words stay ordinary bubbles; this row draws what
- * the agent did and what it asks.
+ * the agent did and what it asks. The caller skips rows folded under a closed turn.
  */
 @Composable
 internal fun AgentItemTimelineRow(
-    item: TimelineMessage,
     agentItem: AgentItem,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     context: AgentItemRowContext,
 ) {
-    val record = item.record
-    val agentName = appState.displayName(record.sender)
-    if (agentItemLayout(agentItem) == AgentItemLayout.Session && item.agentActivity.isEmpty()) {
+    val agentName = appState.displayName(agentItem.agentPubkeyHex)
+    if (agentItemLayout(agentItem) == AgentItemLayout.Session) {
         AgentSessionDivider(agentItem, agentName)
         return
     }
     val groupChrome =
         GroupProjector.shouldShowTranscriptSenderAvatar(isDm = controller.usesDirectTranscriptChrome, mine = false)
-    val requests = rememberAgentRequestSender(agentItem, record.sender, controller, appState)
+    val requests = rememberAgentRequestSender(agentItem, controller, appState)
     val actions =
         AgentItemActions(
             agentName = agentName,
@@ -69,12 +51,7 @@ internal fun AgentItemTimelineRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(
-                    start = if (groupChrome) AgentAvatarGutter else 0.dp,
-                    end = AgentTrailingGutter,
-                    top = 2.dp,
-                    bottom = 2.dp,
-                ),
+                .padding(start = if (groupChrome) AgentAvatarGutter else 0.dp, end = AgentTrailingGutter),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (groupChrome && context.showSenderName) {
@@ -85,58 +62,7 @@ internal fun AgentItemTimelineRow(
                 modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
             )
         }
-        val contentModifier = Modifier.widthIn(max = AgentContentMaxWidth)
-        if (item.agentActivity.isEmpty() && !item.agentWaitingForInput) {
-            AgentItemContent(agentItem, actions, contentModifier)
-        } else {
-            AgentTurnActivity(agentItem, actions, item, contentModifier)
-        }
-    }
-}
-
-@Composable
-private fun AgentTurnActivity(
-    item: AgentItem,
-    actions: AgentItemActions,
-    row: TimelineMessage,
-    modifier: Modifier,
-) {
-    var expanded by rememberSaveable(item.firstEventId) { mutableStateOf(false) }
-    val toggle: @Composable () -> Unit = {
-        if (row.agentActivity.isNotEmpty()) {
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription =
-                        stringResource(
-                            if (expanded) R.string.agent_activity_hide else R.string.agent_activity_show,
-                        ),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-    }
-    Column(modifier) {
-        if (agentItemLayout(item) == AgentItemLayout.Turn) {
-            AgentTurnLine(item, actions, waitingForInput = row.agentWaitingForInput, trailingContent = toggle)
-        } else {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.agent_activity_label),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                toggle()
-            }
-        }
-        if (expanded) {
-            row.agentActivity.forEach { detail ->
-                androidx.compose.runtime.key(detail.firstEventId) {
-                    AgentItemContent(detail, actions.copy(enabled = false))
-                }
-            }
-        }
+        AgentItemContent(agentItem, actions, Modifier.widthIn(max = AgentContentMaxWidth))
     }
 }
 
@@ -152,7 +78,6 @@ internal fun AgentItemContent(
         AgentItemLayout.Session -> AgentSessionDivider(item, actions.agentName, modifier)
         AgentItemLayout.ApprovalCard -> AgentApprovalCard(item, actions, modifier)
         AgentItemLayout.QuestionCard -> AgentQuestionCard(item, actions, modifier)
-        AgentItemLayout.Plan -> AgentPlanCard(item, modifier)
         AgentItemLayout.Activity -> AgentActivityLine(item, modifier)
     }
 }

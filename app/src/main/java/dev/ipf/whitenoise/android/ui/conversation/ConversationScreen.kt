@@ -173,6 +173,8 @@ import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.conversation.agent.LocalAgentTurnSteps
+import dev.ipf.whitenoise.android.ui.conversation.agent.rememberAgentTurnSteps
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
@@ -4010,6 +4012,7 @@ internal fun ConversationScreen(
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,
+                LocalAgentTurnSteps provides rememberAgentTurnSteps(controller.timeline, chat.id),
                 // Bubbles mark their own matches while search is open, so a hit is obvious on any
                 // bubble colour rather than only on the one the jump happened to land on.
                 LocalConversationSearchMarking provides
@@ -4248,7 +4251,6 @@ internal fun ConversationScreen(
                                         contentType = { _, item ->
                                             when {
                                                 MessageProjector.isGroupSystem(item.record) -> "groupSystem"
-                                                MessageProjector.isAgentOperation(item.record) -> "agentOperation"
                                                 else -> "message"
                                             }
                                         },

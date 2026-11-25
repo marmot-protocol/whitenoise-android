@@ -280,7 +280,6 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.SupportRelays -> SettingsDetail.Support
         SettingsDetail.KeyPackages,
         SettingsDetail.QuarantinedGroups,
-        SettingsDetail.AgentDemo,
         -> SettingsDetail.Developer
         SettingsDetail.ShareConnect,
         SettingsDetail.Account,

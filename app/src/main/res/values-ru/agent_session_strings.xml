@@ -30,7 +30,6 @@
     <string name="agent_question_secret">Этот ответ личный. Введите его на компьютере агента.</string>
     <string name="agent_question_answered">Ответ: %1$s</string>
     <string name="agent_question_closed">Вопрос закрыт</string>
-    <string name="agent_plan_title">План</string>
     <string name="agent_plan_step_done">Готово: %1$s</string>
     <string name="agent_plan_step_running">Выполняется: %1$s</string>
     <string name="agent_plan_step_pending">Предстоит: %1$s</string>
@@ -45,8 +44,12 @@
         <item quantity="other">Пропущено ещё %1$d файла</item>
     </plurals>
     <string name="agent_text_show_all">Показать всё</string>
-    <string name="agent_activity_show">Показать действия агента</string>
-    <string name="agent_activity_hide">Скрыть действия агента</string>
-    <string name="agent_activity_label">Действия агента</string>
-    <string name="agent_turn_needs_attention">Требуется внимание</string>
+    <string name="agent_turn_show_steps">Показать шаги</string>
+    <string name="agent_turn_hide_steps">Скрыть шаги</string>
+    <plurals name="agent_turn_steps">
+        <item quantity="one">%1$d шаг</item>
+        <item quantity="few">%1$d шага</item>
+        <item quantity="many">%1$d шагов</item>
+        <item quantity="other">%1$d шага</item>
+    </plurals>
 </resources>

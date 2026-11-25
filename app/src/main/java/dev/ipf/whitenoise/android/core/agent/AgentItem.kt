@@ -1,38 +1,34 @@
 package dev.ipf.whitenoise.android.core.agent
 
 import androidx.compose.runtime.Immutable
+import dev.ipf.marmotkit.AgentItemStateFfi
 
 /**
- * One marmot-agents item at its latest version: a turn, a tool call, an approval and so on.
+ * One marmot-agents item at the latest version MDK holds: a turn, a tool call, an approval and so on.
  *
- * The agent sends the first version as its own event and every later version as a new event that
- * names the first. [firstEventId] is that first event, so a row keeps one identity while the agent
- * updates it. The fields mirror the kind 1201 tags (D-076); [body] holds the type-specific `fields`.
+ * MDK keeps one timeline row per item at its first event and applies every later version there, so
+ * [rowId] (the row's message id) stays the same while the agent updates the item. [body] holds the
+ * type-specific `fields`; [text] is the item's plain rendering.
  */
 @Immutable
 data class AgentItem(
-    val firstEventId: String,
+    val rowId: String,
+    val agentPubkeyHex: String,
     val version: Long,
     val state: AgentItemState,
     val title: String,
     val text: String,
-    val harness: String,
     val itemId: String,
-    val seq: Long,
     val session: String?,
     val turn: String?,
-    /** On a turn, the chat message that started it. */
-    val startedByEventId: String?,
     val body: AgentItemBody,
     /** Full output length when the agent cut a command's output to fit the 64 KB limit. */
     val outputCutLength: Long? = null,
     /** How many file diffs the agent left out to fit the 64 KB limit. */
     val diffsCut: Int = 0,
-) {
-    /** A person is needed: an approval or a question that nobody has answered yet. */
-    val waitingForPerson: Boolean get() = state == AgentItemState.Waiting
-}
+)
 
+/** An item's state, as MDK reports it. */
 enum class AgentItemState {
     Running,
     Waiting,
@@ -42,18 +38,19 @@ enum class AgentItemState {
     Cancelled,
     ;
 
+    /** True while the item can still change on its own: running, or waiting for a person. */
     val isOpen: Boolean get() = this == Running || this == Waiting
 
     companion object {
-        fun parse(value: String?): AgentItemState? =
-            when (value) {
-                "running" -> Running
-                "waiting" -> Waiting
-                "done" -> Done
-                "failed" -> Failed
-                "declined" -> Declined
-                "cancelled" -> Cancelled
-                else -> null
+        /** Maps MDK's state onto the app's. */
+        fun of(state: AgentItemStateFfi): AgentItemState =
+            when (state) {
+                AgentItemStateFfi.RUNNING -> Running
+                AgentItemStateFfi.WAITING -> Waiting
+                AgentItemStateFfi.DONE -> Done
+                AgentItemStateFfi.FAILED -> Failed
+                AgentItemStateFfi.DECLINED -> Declined
+                AgentItemStateFfi.CANCELLED -> Cancelled
             }
     }
 }
@@ -61,18 +58,17 @@ enum class AgentItemState {
 /** The type-specific part of an item, one case per marmot-agents item type. */
 @Immutable
 sealed interface AgentItemBody {
+    /** A turn: the agent's work on one request, with how long it took once it ends. */
     data class Turn(
-        val startedBy: String?,
         val durationMs: Long?,
-        val inputTokens: Long?,
-        val outputTokens: Long?,
     ) : AgentItemBody
 
+    /** The agent's visible thinking; the text is the item's plain rendering. */
     data object Reasoning : AgentItemBody
 
+    /** A tool call: a command, an edit, a read, a search and so on. */
     data class Tool(
         val kind: AgentToolKind,
-        val name: String,
         val command: String? = null,
         val cwd: String? = null,
         val exitCode: Long? = null,
@@ -85,44 +81,45 @@ sealed interface AgentItemBody {
         val error: String? = null,
     ) : AgentItemBody
 
+    /** The agent asks before it acts, offering its own choices. */
     data class Approval(
-        val subjectItemId: String?,
         val choices: List<AgentApprovalChoice>,
         val answeredChoiceId: String?,
     ) : AgentItemBody
 
+    /** The agent asks one or more questions, with options and optionally typed text. */
     data class Question(
         val answerViaMessage: Boolean,
         val questions: List<AgentQuestion>,
         val answers: List<AgentQuestionAnswer>?,
     ) : AgentItemBody
 
+    /** The agent's plan or to-do list. */
     data class Plan(
         val text: String?,
         val entries: List<AgentPlanEntry>,
     ) : AgentItemBody
 
+    /** Work handed to a subagent. */
     data class Task(
-        val kind: String,
         val description: String?,
     ) : AgentItemBody
 
+    /** Something the agent reports, such as a retry, a warning or a refused request. */
     data class Notice(
         val kind: AgentNoticeKind,
         val durationMs: Long?,
         val reason: String?,
     ) : AgentItemBody
 
+    /** A failure the agent reports, with the harness's error code when it gives one. */
     data class Error(
-        val request: String?,
         val code: Long?,
-        val willRetry: Boolean?,
     ) : AgentItemBody
 
+    /** The start of a session, with settings such as the model. */
     data class Session(
-        val harnessVersion: String?,
         val settings: List<AgentSessionSetting>,
-        val commands: List<AgentSessionCommand>,
     ) : AgentItemBody
 
     /** A type this app does not know yet. The row falls back to the plain rendering. */
@@ -225,10 +222,4 @@ data class AgentSessionSetting(
     val id: String,
     val label: String,
     val value: String?,
-)
-
-@Immutable
-data class AgentSessionCommand(
-    val name: String,
-    val description: String?,
 )

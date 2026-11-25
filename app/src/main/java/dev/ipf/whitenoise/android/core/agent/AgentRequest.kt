@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * An answer or a control a person sends to one agent (marmot-agents D-027, kind 1202 shape).
+ * An answer or a control a person sends to one agent as a kind 1202 event.
  *
  * [words] is the plain rendering a client that knows nothing about agents shows.
  */
@@ -36,23 +36,24 @@ data class AgentRequestEvent(
     val tags: List<List<String>>,
 )
 
+/** Writes requests in the shape MDK validates and agents read: `p`, `e` and a `details` JSON object. */
 object AgentRequestEncoder {
     /**
-     * Encodes [request] for the agent [agentPubkeyHex]. [targetFirstEventId] is the first event of the
-     * item it answers; an interrupt names none and acts on the chat's running turn.
+     * Encodes [request] for the agent [agentPubkeyHex]. [targetRowId] is the timeline row of the item it
+     * answers or stops: the item's first event, which MDK keeps as the row's id.
      */
     fun encode(
         agentPubkeyHex: String,
-        targetFirstEventId: String?,
+        targetRowId: String,
         request: AgentRequest,
     ): AgentRequestEvent {
         val tags =
             buildList {
                 add(listOf("p", agentPubkeyHex))
                 add(listOf("details", details(request).toString()))
-                if (targetFirstEventId != null) add(listOf("e", targetFirstEventId))
+                add(listOf("e", targetRowId))
             }
-        return AgentRequestEvent(kind = AgentItemProjector.REQUEST_KIND, content = request.words, tags = tags)
+        return AgentRequestEvent(kind = AgentItemReader.REQUEST_KIND, content = request.words, tags = tags)
     }
 
     private fun details(request: AgentRequest): JSONObject =

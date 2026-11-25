@@ -1,32 +1,29 @@
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
-import dev.ipf.marmotkit.MessageTagFfi
+import androidx.compose.runtime.mutableStateListOf
+import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
-import dev.ipf.whitenoise.android.core.agent.AgentItemProjector
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.core.agent.AgentItemState
 import dev.ipf.whitenoise.android.core.agent.AgentQuestionAnswer
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentRequestEncoder
 import dev.ipf.whitenoise.android.core.agent.AgentToolKind
-import dev.ipf.whitenoise.android.state.conversationAttentionTimeline
-import dev.ipf.whitenoise.android.state.conversationRenderedTimeline
-import dev.ipf.whitenoise.android.state.takesNoTranscriptRow
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Reads real recorded sessions the way the transcript does: one row per item, at its latest version. */
+/** Reads real recorded sessions the way the transcript does: MDK's rows, folded under their turns. */
 class AgentItemTimelineTest {
     @Test
-    fun finishedCodexTurnShowsOneRowPerItemAtItsLatestVersion() {
-        val records = AgentRecordingFixtures.load("codex_approval_allowed", prompt = "Run greet.py")
-        val rows = conversationRenderedTimeline(AgentRecordingFixtures.timeline(records))
+    fun finishedCodexTurnReadsEveryItemAtItsLatestVersion() {
+        val rows = AgentRecordingFixtures.load("codex_approval_allowed", prompt = "Run greet.py")
 
-        val items = rows.mapNotNull { AgentItemProjector.project(it.record) }
+        val items = rows.mapNotNull(::read)
         assertEquals(listOf("session", "turn", "tool", "approval"), items.map { it.body.typeName() })
         val turn = items.first { it.body is AgentItemBody.Turn }
         assertEquals(AgentItemState.Done, turn.state)
@@ -38,29 +35,15 @@ class AgentItemTimelineTest {
         val approval = items.first { it.body is AgentItemBody.Approval }
         assertEquals(AgentItemState.Done, approval.state)
         assertEquals("c0", (approval.body as AgentItemBody.Approval).answeredChoiceId)
-        // The prompt, two agent messages and four items (session, turn, tool, approval).
-        assertEquals(7, rows.size)
-        assertEquals(rows.size, records.count { !takesNoTranscriptRow(it) })
-    }
-
-    @Test
-    fun laterVersionKeepsTheFirstEventsRowIdentity() {
-        val records = AgentRecordingFixtures.load("claude_failing_command")
-        val firstToolEvent = records.first { AgentItemProjector.project(it)?.body is AgentItemBody.Tool }
-        val rows = conversationRenderedTimeline(AgentRecordingFixtures.timeline(records))
-
-        val toolRow = rows.single { AgentItemProjector.project(it.record)?.body is AgentItemBody.Tool }
-        assertEquals(firstToolEvent.messageIdHex, toolRow.record.messageIdHex)
-        val tool = AgentItemProjector.project(toolRow.record)!!
-        assertEquals(AgentItemState.Failed, tool.state)
-        assertEquals(firstToolEvent.messageIdHex, tool.firstEventId)
+        assertEquals(rows.single { it.record.messageIdHex == approval.rowId }.record.sender, approval.agentPubkeyHex)
     }
 
     @Test
     fun openApprovalAndQuestionStayWaitingMidTurn() {
         val approval =
-            rendered("codex_approval_allowed", events = 6)
-                .mapNotNull { AgentItemProjector.project(it.record) }
+            AgentRecordingFixtures
+                .load("codex_approval_allowed", events = 6)
+                .mapNotNull(::read)
                 .single { it.body is AgentItemBody.Approval }
         assertEquals(AgentItemLayout.ApprovalCard, agentItemLayout(approval))
         assertEquals(
@@ -68,10 +51,7 @@ class AgentItemTimelineTest {
             (approval.body as AgentItemBody.Approval).choices.map { it.label },
         )
 
-        val question =
-            rendered("claude_question", events = 3)
-                .mapNotNull { AgentItemProjector.project(it.record) }
-                .single { it.body is AgentItemBody.Question }
+        val question = question(events = 3)
         assertEquals(AgentItemLayout.QuestionCard, agentItemLayout(question))
         val body = question.body as AgentItemBody.Question
         assertEquals(
@@ -86,156 +66,106 @@ class AgentItemTimelineTest {
 
     @Test
     fun answeredQuestionSummarisesTheChosenOption() {
-        val question =
-            rendered("claude_question")
-                .mapNotNull { AgentItemProjector.project(it.record) }
-                .single { it.body is AgentItemBody.Question }
+        val question = question()
         val body = question.body as AgentItemBody.Question
         assertEquals(AgentItemLayout.Activity, agentItemLayout(question))
         assertEquals("Hello", agentAnswerSummary(body.questions, body.answers!!))
     }
 
     @Test
-    fun requestsAndOrphanVersionsTakeNoRow() {
-        val request =
-            record("aa".repeat(32), AgentItemProjector.REQUEST_KIND, listOf(listOf("p", "x"), listOf("details", "{}")))
-        val orphan =
-            record(
-                "bb".repeat(32),
-                AgentItemProjector.ITEM_KIND,
-                listOf(listOf("v", "2"), listOf("item", "cc".repeat(32)), listOf("state", "done")),
-            )
-        assertTrue(takesNoTranscriptRow(request))
-        assertTrue(takesNoTranscriptRow(orphan))
-        assertTrue(conversationRenderedTimeline(AgentRecordingFixtures.timeline(listOf(request, orphan))).isEmpty())
+    fun rowsWithoutAReadableItemKeepTheGenericRow() {
+        val row = AgentRecordingFixtures.load("claude_reasoning").first { it.projected?.agentItem != null }
+        val retiredShape = row.copy(projected = row.projected?.copy(agentItem = null))
+        assertNull(AgentItemReader.read(retiredShape.record, retiredShape.projected))
+
+        val malformedItem = row.projected?.agentItem?.copy(fieldsJson = "{")
+        val malformed = row.copy(projected = row.projected?.copy(agentItem = malformedItem))
+        assertNull(AgentItemReader.read(malformed.record, malformed.projected))
+
+        val deleted = row.copy(projected = row.projected?.copy(deleted = true))
+        assertNull(AgentItemReader.read(deleted.record, deleted.projected))
     }
 
     @Test
-    fun unversionedRecordNamingAnotherFirstEventTakesNoRow() {
-        val orphan =
-            record(
-                "ac".repeat(32),
-                AgentItemProjector.ITEM_KIND,
-                listOf(listOf("item", "cd".repeat(32)), listOf("item_id", "tool:x"), listOf("fields", toolFields)),
-            )
-        assertTrue(takesNoTranscriptRow(orphan))
+    fun routineStepsFoldUnderTheirTurnAndAttentionStaysInView() {
+        val rows = AgentRecordingFixtures.load("codex_plan_mode", prompt = "Plan it")
+        val turnRow = rows.single { read(it)?.body is AgentItemBody.Turn }.record.messageIdHex
+        val folded = agentTurnStepRows(rows)
+
+        val foldedTypes = rows.filter { it.record.messageIdHex in folded }.map { read(it)!!.body.typeName() }
+        assertEquals(listOf("tool", "tool", "plan"), foldedTypes)
+        assertTrue(folded.values.all { it == turnRow })
+        // The answered question, the session and the agent's words stay in the transcript.
+        assertTrue(rows.filter { read(it)?.body is AgentItemBody.Question }.none { it.record.messageIdHex in folded })
+        assertTrue(rows.filter { it.projected?.agentItem == null }.none { it.record.messageIdHex in folded })
     }
 
     @Test
-    fun versionWithoutAFirstEventReferenceTakesNoRow() {
-        val unanchored =
-            record(
-                "ab".repeat(32),
-                AgentItemProjector.ITEM_KIND,
-                listOf(
-                    listOf("v", "2"),
-                    listOf("state", "done"),
-                    listOf("item_id", "tool:x"),
-                    listOf("fields", toolFields),
-                ),
-            )
-        assertTrue(takesNoTranscriptRow(unanchored))
+    fun failedStepsAndStepsWithoutALoadedTurnStayInView() {
+        val failing = AgentRecordingFixtures.load("claude_failing_command")
+        assertTrue(agentTurnStepRows(failing).isEmpty())
+
+        val withoutTurn =
+            AgentRecordingFixtures.load("claude_file_edit").filterNot { read(it)?.body is AgentItemBody.Turn }
+        assertTrue(agentTurnStepRows(withoutTurn).isEmpty())
     }
 
     @Test
-    fun aFirstVersionNamingAnotherEventNeverFillsItsRow() {
-        val records = AgentRecordingFixtures.load("claude_failing_command")
-        val firstTool = records.first { AgentItemProjector.project(it)?.body is AgentItemBody.Tool }
-        val latest = records.last { AgentItemProjector.firstEventId(it) == firstTool.messageIdHex }
-        val bogus =
-            latest.copy(
-                messageIdHex = "fd".repeat(32),
-                tags =
-                    latest.tags.map { if (it.values.firstOrNull() == "v") MessageTagFfi(listOf("v", "1")) else it },
-                plaintext = "bogus",
-            )
-        val rows = conversationRenderedTimeline(AgentRecordingFixtures.timeline(records + bogus))
-
-        val toolRow = rows.single { AgentItemProjector.project(it.record)?.body is AgentItemBody.Tool }
-        assertNotEquals("bogus", toolRow.record.plaintext)
+    fun anotherSendersStepsNeverFoldUnderAnAgentsTurn() {
+        val rows = AgentRecordingFixtures.load("claude_file_edit")
+        val impostor =
+            rows.map { row ->
+                val tool = read(row)?.body is AgentItemBody.Tool
+                if (tool) row.copy(record = row.record.copy(sender = "33".repeat(32))) else row
+            }
+        assertTrue(agentTurnStepRows(impostor).isEmpty())
     }
 
     @Test
-    fun onlyTheFirstEventsSenderCanUpdateItsRow() {
-        val records = AgentRecordingFixtures.load("claude_failing_command")
-        val firstTool = records.first { AgentItemProjector.project(it)?.body is AgentItemBody.Tool }
-        val spoof =
-            firstTool.copy(
-                messageIdHex = "fe".repeat(32),
-                sender = "33".repeat(32),
-                tags =
-                    firstTool.tags.filterNot { it.values.firstOrNull() in setOf("v", "item") } +
-                        listOf(MessageTagFfi(listOf("v", "99")), MessageTagFfi(listOf("item", firstTool.messageIdHex))),
-                plaintext = "rm -rf /",
-            )
-        val rows = conversationRenderedTimeline(AgentRecordingFixtures.timeline(records + spoof))
+    fun aClosedTurnHidesItsStepsAndItsNeighboursAbsorbTheirSpacing() {
+        // Rows: the session, the turn, three tool steps and the agent's reply.
+        val rows = AgentRecordingFixtures.load("claude_file_edit")
+        val ids = rows.map { it.record.messageIdHex }
+        val turnRow = rows.single { read(it)?.body is AgentItemBody.Turn }
+        val reply = rows.last { it.projected?.agentItem == null }
+        val steps = AgentTurnSteps(agentTurnStepRows(rows), mutableStateListOf(), rows)
+        val turnId = turnRow.record.messageIdHex
 
-        val toolRow = rows.single { AgentItemProjector.project(it.record)?.body is AgentItemBody.Tool }
-        assertEquals(AgentItemState.Failed, AgentItemProjector.project(toolRow.record)!!.state)
-        assertFalse(toolRow.record.plaintext.contains("rm -rf"))
+        assertEquals(3, steps.stepCount(turnId))
+        assertEquals(3, ids.count(steps::isFolded))
+        // Three folded rows leave three spacings: the turn draws over two, the reply over one.
+        assertEquals(FoldedSpacing(olderRows = 0, newerRows = 2), steps.foldedSpacing(turnId))
+        assertEquals(FoldedSpacing(olderRows = 1, newerRows = 0), steps.foldedSpacing(reply.record.messageIdHex))
+        // The reply's sender run continues from the turn, past the folded steps.
+        val olderOfReply = rows[ids.indexOf(reply.record.messageIdHex) - 1]
+        assertEquals(turnRow, steps.shownOlder(reply, olderOfReply))
+        assertEquals(reply, steps.shownNewer(turnRow, rows[ids.indexOf(turnId) + 1]))
+
+        steps.toggle(turnId)
+        assertTrue(steps.isOpen(turnId))
+        assertEquals(FoldedSpacing.None, steps.foldedSpacing(turnId))
+        assertTrue(ids.none(steps::isFolded))
+
+        steps.toggle(turnId)
+        assertFalse(steps.isOpen(turnId))
     }
 
     @Test
-    fun toolUpdatesAreAvailableFromTheTurnWithoutSeparateTranscriptRows() {
-        val records = AgentRecordingFixtures.load("claude_failing_command")
-        val timeline = conversationAttentionTimeline(AgentRecordingFixtures.timeline(records))
+    fun foldedStepsAtTheNewestEndAreAbsorbedByTheTurnAlone() {
+        // Mid-turn: session, turn and a running read, nothing after it yet.
+        val rows = AgentRecordingFixtures.load("claude_file_edit", events = 3)
+        val turnId = rows.single { read(it)?.body is AgentItemBody.Turn }.record.messageIdHex
+        val steps = AgentTurnSteps(agentTurnStepRows(rows), mutableStateListOf(), rows)
 
-        val agentRows = timeline.mapNotNull { AgentItemProjector.project(it.record) }
-        assertTrue(agentRows.none { it.body is AgentItemBody.Tool })
-        val activity = timeline.flatMap { it.agentActivity }
-        assertTrue(activity.any { it.body is AgentItemBody.Tool && it.state == AgentItemState.Failed })
+        assertEquals(1, steps.stepCount(turnId))
+        assertEquals(FoldedSpacing(olderRows = 0, newerRows = 1), steps.foldedSpacing(turnId))
     }
 
     @Test
-    fun aVersionWithMalformedFieldsKeepsTheLastReadableItem() {
-        val records = AgentRecordingFixtures.load("claude_failing_command")
-        val firstTool = records.first { AgentItemProjector.project(it)?.body is AgentItemBody.Tool }
-        val malformed =
-            firstTool.copy(
-                messageIdHex = "fc".repeat(32),
-                tags =
-                    firstTool.tags.filterNot { it.values.firstOrNull() in setOf("v", "fields") } +
-                        listOf(
-                            MessageTagFfi(listOf("v", "99")),
-                            MessageTagFfi(listOf("item", firstTool.messageIdHex)),
-                            MessageTagFfi(listOf("fields", "{")),
-                        ),
-            )
-        val rows = conversationRenderedTimeline(AgentRecordingFixtures.timeline(records + malformed))
-
-        val toolRow = rows.single { it.record.messageIdHex == firstTool.messageIdHex }
-        assertEquals(AgentItemState.Failed, AgentItemProjector.project(toolRow.record)?.state)
-    }
-
-    @Test
-    fun sessionItemIsRecognisedWhateverTheFieldOrder() {
-        val reordered =
-            record(
-                "ee".repeat(32),
-                AgentItemProjector.ITEM_KIND,
-                listOf(
-                    listOf("v", "1"),
-                    listOf("state", "running"),
-                    listOf("item_id", "session:1"),
-                    listOf("fields", "{\"body\":{\"settings\":[]},\"type\":\"session\"}"),
-                ),
-            )
-        assertTrue(AgentItemProjector.isSessionItem(reordered))
-        assertTrue(AgentItemProjector.project(reordered)!!.body is AgentItemBody.Session)
-    }
-
-    @Test
-    fun oldAgentActivityShapeIsNotAnAgentItem() {
-        val legacy = record("dd".repeat(32), 1201uL, listOf(listOf("status", "working")))
-        assertFalse(AgentItemProjector.isAgentItem(legacy))
-        assertNull(AgentItemProjector.project(legacy))
-    }
-
-    @Test
-    fun requestsEncodeTheCarrierShape() {
+    fun requestsEncodeTheShapeMdkValidates() {
         val choice =
             AgentRequestEncoder.encode("ab".repeat(32), "cd".repeat(32), AgentRequest.Choice("c0", "Allow once"))
-        assertEquals(AgentItemProjector.REQUEST_KIND, choice.kind)
+        assertEquals(1202uL, choice.kind)
         assertEquals("Allow once", choice.content)
         assertEquals(listOf("p", "ab".repeat(32)), choice.tags[0])
         assertEquals(listOf("e", "cd".repeat(32)), choice.tags.last())
@@ -254,17 +184,18 @@ class AgentItemTimelineTest {
         assertEquals("o1", asked.getJSONArray("options").getString(0))
         assertEquals("Hi there", asked.getString("text"))
 
-        val stop = AgentRequestEncoder.encode("ab".repeat(32), null, AgentRequest.Interrupt("Stop"))
+        val stop = AgentRequestEncoder.encode("ab".repeat(32), "ef".repeat(32), AgentRequest.Interrupt("Stop"))
         assertEquals("interrupt", JSONObject(stop.tags.single { it[0] == "details" }[1]).getString("action"))
-        assertTrue(stop.tags.none { it[0] == "e" })
+        assertEquals(listOf("e", "ef".repeat(32)), stop.tags.single { it[0] == "e" })
+        // MDK refuses a request with more than one of p, e or details.
+        listOf(choice, answer, stop).forEach { event ->
+            assertEquals(listOf("details", "e", "p"), event.tags.map { it[0] }.sorted())
+        }
     }
 
     @Test
     fun questionAnswersNeedEveryQuestionAnswered() {
-        val question =
-            AgentItemProjector
-                .project(AgentRecordingFixtures.load("claude_question", events = 3).last())!!
-                .body as AgentItemBody.Question
+        val question = question(events = 3).body as AgentItemBody.Question
         val asked = question.questions.single()
         assertNull(agentQuestionAnswers(question.questions, emptyMap(), emptyMap()))
         assertNull(agentQuestionAnswers(question.questions, emptyMap(), mapOf(asked.id to "   ")))
@@ -298,24 +229,13 @@ class AgentItemTimelineTest {
         assertEquals(AgentDiffLine.Removed, agentDiffLine("-  return y"))
     }
 
-    private fun rendered(
-        recording: String,
-        events: Int = Int.MAX_VALUE,
-    ) = conversationRenderedTimeline(
-        AgentRecordingFixtures.timeline(AgentRecordingFixtures.load(recording, events = events)),
-    )
+    private fun read(row: TimelineMessage): AgentItem? = AgentItemReader.read(row.record, row.projected)
 
-    private val toolFields = "{\"type\":\"tool\",\"body\":{\"kind\":\"command\"}}"
+    private fun question(events: Int = Int.MAX_VALUE): AgentItem =
+        AgentRecordingFixtures
+            .load("claude_question", events = events)
+            .mapNotNull(::read)
+            .single { it.body is AgentItemBody.Question }
 
     private fun AgentItemBody.typeName(): String = javaClass.simpleName.lowercase()
-
-    private fun record(
-        id: String,
-        kind: ULong,
-        tags: List<List<String>>,
-    ) = AgentRecordingFixtures.load("claude_reasoning", events = 1).first().copy(
-        messageIdHex = id,
-        kind = kind,
-        tags = tags.map { MessageTagFfi(it) },
-    )
 }

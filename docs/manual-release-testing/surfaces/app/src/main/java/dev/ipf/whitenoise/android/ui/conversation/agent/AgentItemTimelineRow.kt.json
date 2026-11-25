@@ -18,38 +18,6 @@
         "test_ids": [
           "CON-052"
         ]
-      },
-      {
-        "surface": "AgentTurnActivity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
-        "anchor": "fun AgentTurnActivity(",
-        "test_ids": [
-          "CON-052"
-        ]
-      },
-      {
-        "surface": "R.string.agent_activity_hide",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
-        "anchor": "R.string.agent_activity_hide",
-        "test_ids": [
-          "CON-052"
-        ]
-      },
-      {
-        "surface": "R.string.agent_activity_label",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
-        "anchor": "R.string.agent_activity_label",
-        "test_ids": [
-          "CON-052"
-        ]
-      },
-      {
-        "surface": "R.string.agent_activity_show",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
-        "anchor": "R.string.agent_activity_show",
-        "test_ids": [
-          "CON-052"
-        ]
       }
     ]
   },

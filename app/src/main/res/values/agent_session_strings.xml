@@ -65,8 +65,6 @@
     <string name="agent_question_answered">Answered: %1$s</string>
     <!-- A question the agent no longer needs answered. -->
     <string name="agent_question_closed">Question closed</string>
-    <!-- Title above an AI agent's plan or to-do list. -->
-    <string name="agent_plan_title">Plan</string>
     <!-- Accessibility label for a plan step. %1$s is the step. -->
     <string name="agent_plan_step_done">Done: %1$s</string>
     <!-- Accessibility label for a plan step. %1$s is the step. -->
@@ -83,8 +81,13 @@
     <string name="agent_refused_busy">The agent was busy</string>
     <!-- Opens the rest of a long command, output or diff from an AI agent. -->
     <string name="agent_text_show_all">Show all</string>
-    <string name="agent_activity_show">Show agent activity</string>
-    <string name="agent_activity_hide">Hide agent activity</string>
-    <string name="agent_activity_label">Agent activity</string>
-    <string name="agent_turn_needs_attention">Needs attention</string>
+    <!-- Opens the steps an AI agent took during one request, folded under its status line. -->
+    <string name="agent_turn_show_steps">Show steps</string>
+    <!-- Folds the steps an AI agent took during one request back under its status line. -->
+    <string name="agent_turn_hide_steps">Hide steps</string>
+    <!-- How many steps (commands, edits, reads) an AI agent took during one request. -->
+    <plurals name="agent_turn_steps">
+        <item quantity="one">%1$d step</item>
+        <item quantity="other">%1$d steps</item>
+    </plurals>
 </resources>

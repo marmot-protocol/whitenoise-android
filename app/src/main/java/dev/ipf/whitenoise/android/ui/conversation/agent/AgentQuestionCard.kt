@@ -48,8 +48,8 @@ internal fun AgentQuestionCard(
     modifier: Modifier = Modifier,
 ) {
     val question = item.body as? AgentItemBody.Question ?: return
-    var selected by remember(item.firstEventId) { mutableStateOf(mapOf<String, Set<String>>()) }
-    var typed by remember(item.firstEventId) { mutableStateOf(mapOf<String, String>()) }
+    var selected by remember(item.rowId) { mutableStateOf(mapOf<String, Set<String>>()) }
+    var typed by remember(item.rowId) { mutableStateOf(mapOf<String, String>()) }
     val answerable = !question.answerViaMessage && question.questions.none { it.secret } && actions.enabled
     AgentWaitingCard(modifier) {
         question.questions.forEach { asked ->

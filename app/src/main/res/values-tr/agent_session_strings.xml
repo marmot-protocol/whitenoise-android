@@ -30,7 +30,6 @@
     <string name="agent_question_secret">Bu yanıt gizli. Ajanın bilgisayarında ver.</string>
     <string name="agent_question_answered">Yanıtlandı: %1$s</string>
     <string name="agent_question_closed">Soru kapandı</string>
-    <string name="agent_plan_title">Yol haritası</string>
     <string name="agent_plan_step_done">Bitti: %1$s</string>
     <string name="agent_plan_step_running">Sürüyor: %1$s</string>
     <string name="agent_plan_step_pending">Yapılacak: %1$s</string>
@@ -43,8 +42,10 @@
         <item quantity="other">%1$d dosya daha atlandı</item>
     </plurals>
     <string name="agent_text_show_all">Tümünü göster</string>
-    <string name="agent_activity_show">Ajan etkinliğini göster</string>
-    <string name="agent_activity_hide">Ajan etkinliğini gizle</string>
-    <string name="agent_activity_label">Ajan etkinliği</string>
-    <string name="agent_turn_needs_attention">İşlem gerekiyor</string>
+    <string name="agent_turn_show_steps">Adımları göster</string>
+    <string name="agent_turn_hide_steps">Adımları gizle</string>
+    <plurals name="agent_turn_steps">
+        <item quantity="one">%1$d adım</item>
+        <item quantity="other">%1$d adım</item>
+    </plurals>
 </resources>

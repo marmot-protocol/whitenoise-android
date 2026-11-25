@@ -830,6 +830,8 @@ open class MessageBubbleFileAttachmentFixtures {
             )
         val projected =
             TimelineMessageRecordFfi(
+                agentItem = null,
+                agentItemFirstEventMissing = false,
                 clientToken = null,
                 messageIdHex = messageId,
                 sourceMessageIdHex = messageId,

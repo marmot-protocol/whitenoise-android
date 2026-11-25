@@ -30,7 +30,6 @@
     <string name="agent_question_secret">Esta respuesta es privada. Dala en el ordenador del agente.</string>
     <string name="agent_question_answered">Respondido: %1$s</string>
     <string name="agent_question_closed">Pregunta cerrada</string>
-    <string name="agent_plan_title">Plan de trabajo</string>
     <string name="agent_plan_step_done">Hecho: %1$s</string>
     <string name="agent_plan_step_running">En curso: %1$s</string>
     <string name="agent_plan_step_pending">Pendiente: %1$s</string>
@@ -44,8 +43,11 @@
         <item quantity="other">%1$d archivos más omitidos</item>
     </plurals>
     <string name="agent_text_show_all">Mostrar todo</string>
-    <string name="agent_activity_show">Mostrar actividad del agente</string>
-    <string name="agent_activity_hide">Ocultar actividad del agente</string>
-    <string name="agent_activity_label">Actividad del agente</string>
-    <string name="agent_turn_needs_attention">Requiere atención</string>
+    <string name="agent_turn_show_steps">Mostrar pasos</string>
+    <string name="agent_turn_hide_steps">Ocultar pasos</string>
+    <plurals name="agent_turn_steps">
+        <item quantity="one">%1$d paso</item>
+        <item quantity="many">%1$d pasos</item>
+        <item quantity="other">%1$d pasos</item>
+    </plurals>
 </resources>
