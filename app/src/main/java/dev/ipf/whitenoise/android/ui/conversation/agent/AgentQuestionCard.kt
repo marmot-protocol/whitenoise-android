@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +36,8 @@ import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentQuestion
 import dev.ipf.whitenoise.android.core.agent.AgentQuestionOption
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * An open question from the agent. Options look and behave like poll options; Send answer stays
@@ -49,21 +51,21 @@ internal fun AgentQuestionCard(
 ) {
     val question = item.body as? AgentItemBody.Question ?: return
     var selected by remember(item.rowId) { mutableStateOf(mapOf<String, Set<String>>()) }
-    var typed by remember(item.rowId) { mutableStateOf(mapOf<String, String>()) }
+    val typing = remember(item.rowId) { question.questions.associate { it.id to TextFieldState() } }
+    val typed = typing.mapValues { (_, state) -> state.text.toString() }
     val answerable = !question.answerViaMessage && question.questions.none { it.secret } && actions.enabled
     AgentWaitingCard(modifier) {
         question.questions.forEach { asked ->
             AgentAskedQuestion(
                 asked = asked,
                 prominent = question.questions.size == 1,
-                answer = AgentAskedAnswer(selected[asked.id].orEmpty(), typed[asked.id].orEmpty()),
+                answer = AgentAskedAnswer(selected[asked.id].orEmpty(), typing.getValue(asked.id)),
                 controls =
                     AgentAskedControls(
                         enabled = answerable && actions.canSend,
                         onSelect = { optionId ->
                             selected = selected + (asked.id to toggled(asked, selected[asked.id], optionId))
                         },
-                        onType = { text -> typed = typed + (asked.id to text) },
                     ),
             )
         }
@@ -91,15 +93,14 @@ internal fun AgentQuestionCard(
     }
 }
 
-private data class AgentAskedAnswer(
+private class AgentAskedAnswer(
     val options: Set<String>,
-    val text: String,
+    val text: TextFieldState,
 )
 
 private class AgentAskedControls(
     val enabled: Boolean,
     val onSelect: (String) -> Unit,
-    val onType: (String) -> Unit,
 )
 
 private fun toggled(
@@ -158,9 +159,8 @@ private fun AgentAskedQuestion(
             }
         }
         if (asked.allowText && !asked.secret) {
-            OutlinedTextField(
-                value = answer.text,
-                onValueChange = controls.onType,
+            WhiteNoiseTextField(
+                state = answer.text,
                 enabled = controls.enabled,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text(stringResource(R.string.agent_question_text_hint)) },
@@ -179,7 +179,7 @@ private fun AgentQuestionOptionRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(Radii.xl)
     val selection =
         if (multiple) {
             Modifier.toggleable(value = selected, enabled = enabled, role = Role.Checkbox) { onClick() }

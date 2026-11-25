@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.core.agent.AgentApprovalChoice
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineButtonColors
 
@@ -166,7 +167,7 @@ internal fun AgentWaitingCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant),
