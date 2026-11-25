@@ -63,6 +63,7 @@ class AgentTranscriptScreenshotTest {
     fun approvalWaitsMidTurnAmoled() {
         val scene = scene("codex_approval_allowed", agentName = "Codex", events = 6, prompt = RUN_PROMPT)
         render(scene, amoled = true)
+        composeRule.onNodeWithText("/usr/bin/zsh -lc 'python3 greet.py'").assertExists()
         composeRule.onNodeWithText("Allow once").assertIsEnabled()
         composeRule.onNodeWithText("Stop").assertIsEnabled()
         capture("agent_transcript_approval_amoled")

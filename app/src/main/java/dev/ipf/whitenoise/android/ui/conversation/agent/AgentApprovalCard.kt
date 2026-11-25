@@ -60,7 +60,7 @@ internal fun AgentApprovalCard(
         )
         if (item.text.isNotBlank()) {
             AgentExpandableText(
-                text = AnnotatedString(agentDisplayCommand(item.text)),
+                text = AnnotatedString(item.text),
                 style =
                     MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace,
