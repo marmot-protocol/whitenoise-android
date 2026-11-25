@@ -137,8 +137,8 @@ class NewGroupScreenshotTest {
     @Test fun setupUnattributedRecovery() = setup("group_setup_unattributed_recovery.png", unknown = true)
 
     @Test
-    fun peopleKeyExpandsInPlace() {
-        picker("new_group_people_expanded_key.png", expandKey = true)
+    fun peopleKeyCopiesWithoutGrowingTheRow() {
+        picker("new_group_people_copied_key.png", copyKey = true)
     }
 
     /** The real picker composable renders controlled display states, never a fake search provider. */
@@ -151,7 +151,7 @@ class NewGroupScreenshotTest {
         partial: Boolean = false,
         largeRtl: Boolean = false,
         addressFailed: Boolean = false,
-        expandKey: Boolean = false,
+        copyKey: Boolean = false,
     ) {
         val npub = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
         val shortKey = "npub142424…4qamrcaj"
@@ -165,7 +165,7 @@ class NewGroupScreenshotTest {
                         when {
                             empty -> emptyList()
                             addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
-                            expandKey ->
+                            copyKey ->
                                 people().mapIndexed { index, person ->
                                     if (index == 0) {
                                         person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
@@ -187,9 +187,10 @@ class NewGroupScreenshotTest {
                 }
             }
         }
-        if (expandKey) {
+        if (copyKey) {
             composeRule.onNodeWithText(shortKey, useUnmergedTree = true).performTouchInput { click(center) }
-            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithText(shortKey, useUnmergedTree = true).assertExists()
         }
         composeRule.onNodeWithTag("new_group.screen").captureRoboImage("src/test/snapshots/$file")
     }
