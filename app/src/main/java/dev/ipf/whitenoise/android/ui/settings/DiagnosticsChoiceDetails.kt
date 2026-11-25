@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,9 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 
 /** Disclosure controls are separate from the switch: reading details never grants consent. */
 @Composable
@@ -56,10 +53,7 @@ internal fun DiagnosticsChoiceDetails(
                     },
         ) {
             Text(action)
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-            )
+            DisclosureChevron(expanded)
         }
         if (expanded) {
             Column(

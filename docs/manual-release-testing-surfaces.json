@@ -2921,23 +2921,6 @@
         ]
       },
       {
-        "surface": "Chat folder chip edit action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderChip.kt",
-        "anchor": "R.string.edit",
-        "test_ids": [
-          "FLD-001"
-        ]
-      },
-      {
-        "surface": "ChatFolderChip",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderChip.kt",
-        "anchor": "fun ChatFolderChip(",
-        "test_ids": [
-          "FLD-001",
-          "MSG-010"
-        ]
-      },
-      {
         "surface": "ChatFolderPickerSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
         "anchor": "fun ChatFolderPickerSheet(",
