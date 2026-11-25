@@ -17,6 +17,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HistoryBackupsControllerTest {
+    /** Shows neutral feedback for a prefix and accepts only ASCII case variants of the full word. */
+    @Test fun confirmationFeedbackMatchesCompleteAsciiWords() {
+        val setup = RecoveryWordsSetup(listOf("ripple", "river"), listOf(1, 2)).confirming()
+
+        assertNull(setup.matchesAnswer(0, "rip"))
+        assertEquals(true, setup.matchesAnswer(0, " RIPPLE "))
+        assertEquals(false, setup.matchesAnswer(0, "rıpple"))
+        assertEquals(false, setup.matchesAnswer(0, "river"))
+        assertEquals(true, setup.matchesAnswer(1, "river"))
+    }
+
     /** Tracks the enablement and writer role returned by MarmotKit. */
     @Test fun statusFollowsMdkSettings() =
         runTest {
