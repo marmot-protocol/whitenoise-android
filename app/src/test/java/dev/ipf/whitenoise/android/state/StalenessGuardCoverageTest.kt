@@ -136,7 +136,7 @@ class StalenessGuardCoverageTest {
                     listOf("isCatchUpKeyCurrent(key)", "recordPendingPushWakeCatchUp"),
                 "NotificationDeliveryController.kt:ensureNotificationRenderingEnabled" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = it"),
-                "NotificationDeliveryController.kt:selectFcmDelivery" to
+                "NotificationDeliveryController.kt:selectFcmTransport" to
                     listOf("ownsNotificationDeliveryMode(owner)", "settleFailedFcmDelivery"),
                 "NotificationDeliveryController.kt:configureNativeDeliveryForAccount" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = updated"),
