@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +27,7 @@ import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
@@ -134,12 +134,12 @@ internal fun AgentActivityList(
 ) {
     val latestTurn = rows.indexOfLast { it.projected?.agentItem?.itemType == "turn" }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = latestTurn.coerceAtLeast(0))
-    LazyColumn(
+    WhiteNoiseLazyColumn(
         state = state,
         modifier =
             modifier
                 .fillMaxWidth()
-                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * SheetListHeightShare),
+                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * SHEET_LIST_HEIGHT_SHARE),
         contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.Section, vertical = WhiteNoiseSpacing.Related),
     ) {
         itemsIndexed(rows, key = { _, row -> row.presentationId }) { index, row ->
@@ -160,4 +160,4 @@ internal fun AgentActivityList(
     }
 }
 
-private const val SheetListHeightShare = 0.7f
+private const val SHEET_LIST_HEIGHT_SHARE = 0.7f

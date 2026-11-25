@@ -81,7 +81,10 @@ internal fun AgentActivityHistory(
         ActivityPagingControls(page, history.paging) { older ->
             scope.launch {
                 if (!history.move(older)) {
-                    controller.presentConversationTransient(R.string.agent_activity_page_failed, TransientNoticeKind.Information)
+                    controller.presentConversationTransient(
+                        R.string.agent_activity_page_failed,
+                        TransientNoticeKind.Information,
+                    )
                 }
             }
         }
@@ -158,7 +161,13 @@ internal class ActivityHistoryWindow {
 
     suspend fun move(older: Boolean): Boolean {
         val active = subscription ?: return false
-        if (paging) return true
+        return paging || page(active, older)
+    }
+
+    private suspend fun page(
+        active: ConversationTimelineSubscriptionHandle,
+        older: Boolean,
+    ): Boolean {
         paging = true
         try {
             val result =
@@ -195,9 +204,9 @@ internal fun activityHistoryRows(
     nowMillis: Long = System.currentTimeMillis(),
 ): List<TimelineMessage> =
     page.messages.mapNotNull { record ->
+        val deleted = record.deleted || record.messageIdHex in deletedMessageIds
         if (record.agentItem == null ||
-            record.deleted ||
-            record.messageIdHex in deletedMessageIds ||
+            deleted ||
             isRetentionExpiredForSearch(record, nowMillis)
         ) {
             null

@@ -30,7 +30,10 @@ internal object AgentRecordingFixtures {
     fun activityRows(
         rows: List<TimelineMessage>,
         deletedIds: Set<String> = emptySet(),
-    ): List<TimelineMessage> = activityHistoryRows(TimelinePageFfi(rows.mapNotNull { it.projected }, false, false), deletedIds)
+    ): List<TimelineMessage> {
+        val page = TimelinePageFfi(rows.mapNotNull { it.projected }, false, false)
+        return activityHistoryRows(page, deletedIds)
+    }
 
     /**
      * Loads [name] from `src/test/resources/agent-recordings`. [events] keeps only the first events,

@@ -63,7 +63,10 @@ internal val LocalAgentRequestProgress =
     compositionLocalOf<MutableMap<String, AgentRequestStatus>> { mutableStateMapOf() }
 
 @Composable
-internal fun rememberAgentRequestProgress(conversationKey: Any): MutableMap<String, AgentRequestStatus> = remember(conversationKey) { mutableStateMapOf() }
+internal fun rememberAgentRequestProgress(conversationKey: Any) =
+    remember(conversationKey) {
+        mutableStateMapOf<String, AgentRequestStatus>()
+    }
 
 /**
  * Sends the row's requests to the agent that wrote [item]. Keyed by the item's version, so the
