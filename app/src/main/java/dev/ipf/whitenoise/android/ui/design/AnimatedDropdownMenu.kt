@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 
 /** One popup lifetime and growth owner; no Material DropdownMenu transition is nested inside it. */
 @Composable
@@ -78,6 +79,8 @@ internal fun AnimatedDropdownMenu(
     }
     val surface = rememberPopupSurfaceMotion(expanded, onDismissRequest)
     if (surface.visible) {
+        // A keyboard-preserving menu leaves keys with the activity, so its shortcuts wait for the menu.
+        HardwareShortcutBlocker()
         if (keyboardPreserving) {
             if (platformBackCallbacksEnabled()) {
                 KeyboardSafePopupPlatformBackHandler(

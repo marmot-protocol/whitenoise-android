@@ -16,6 +16,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -50,6 +52,9 @@ internal fun <T> floatingControlMotionSpec(): FiniteAnimationSpec<T> =
         easing = FastOutSlowInEasing,
     )
 
+/** False while a [FloatingControlVisibility] control is leaving, so it can withdraw its keyboard shortcut too. */
+internal val LocalFloatingControlShown = compositionLocalOf { true }
+
 /**
  * Grows a floating control out of its bottom-end corner and shrinks it back there, while the stack
  * closes the gap on the same clock. Reduced motion shows and removes the control at once.
@@ -83,8 +88,10 @@ internal fun FloatingControlVisibility(
                 ExitTransition.None
             },
     ) {
-        // A leaving control can no longer be tapped or reached by accessibility services.
-        Box(if (visible) Modifier else InertControl) { content() }
+        // A leaving control can no longer be tapped, reached by accessibility services or its keyboard shortcut.
+        CompositionLocalProvider(LocalFloatingControlShown provides visible) {
+            Box(if (visible) Modifier else InertControl) { content() }
+        }
     }
 }
 

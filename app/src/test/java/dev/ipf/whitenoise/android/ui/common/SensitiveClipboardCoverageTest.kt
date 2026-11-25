@@ -48,13 +48,13 @@ class SensitiveClipboardCoverageTest {
         val screen = appModuleSource(ACCOUNT_KEYS)
         assertTrue("copySensitiveToClipboard(context, privateKeyLabel, " in screen)
         assertTrue("copySensitiveToClipboard(context, encryptedBackupLabel, " in screen)
-        assertTrue("copyToClipboard(context, publicKeyLabel, " in screen)
+        assertTrue("copier.copy(npub, publicKeyLabel)" in screen)
         assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PUBLIC_COPY).functionBody("copyToClipboard"))
     }
 
     /**
-     * Regression guard for #4151: public text is copied through [ClipboardCopier]. The files listed here still write
-     * directly; each is owned by a follow-up and leaves the list when it moves to the copier.
+     * Regression guard for #4151. The clipboard edge is confined to the public and sensitive writers
+     * and the Compose adapter that passes native selection clips to [ClipboardCopier].
      */
     @Test
     fun onlyAllowlistedFilesWriteTheClipboardDirectly() {
@@ -85,18 +85,14 @@ class SensitiveClipboardCoverageTest {
     private companion object {
         val FUNCTION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?(\w+)\s*\(""")
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
-        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/CopyToClipboard.kt"
+        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/ClipboardCopier.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
         val DIRECT_WRITERS =
             listOf(
                 "common/Clipboard.kt",
-                "common/CopyToClipboard.kt",
-                "common/PublicKeyCopy.kt",
-                "common/StartupScreens.kt",
-                "common/StateScreens.kt",
+                "common/ClipboardCopier.kt",
                 "conversation/messages/MessageBubble.kt",
                 "conversation/messages/MessageTextSelection.kt",
-                "group/GroupDetailsHeader.kt",
             )
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }

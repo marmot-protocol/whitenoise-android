@@ -1643,7 +1643,7 @@ internal fun ConversationScreen(
         }
         exitConversationRoute()
     }
-
+    ChatsReturnShortcut(available = !freezeRoutePresentation && !transcriptRoutedAway, exit = exitConversation)
     // Read the latest projections without changing every visible row callback when the timeline changes.
     val currentSelectableMessages by rememberUpdatedState(selectableMessages)
 
@@ -3174,18 +3174,18 @@ internal fun ConversationScreen(
         keyboardController?.hide()
         showDetails = true
     }
-    // Chat details and the optional header shortcut open the same in-chat search.
-    val openConversationSearch: () -> Unit = {
-        showDetails = false
-        presentationState.searchState.value =
-            conversationSearchPreset(
-                conversationAccountRef,
-                appState.runtimeGeneration,
-                chat.id,
-                controller.title(groupTitleCopy),
-            )
-        navigationState.searchOpen = true
-    }
+    val openConversationSearch =
+        navigationState.searchShortcut(!freezeRoutePresentation && !transcriptRoutedAway && !selectionMode) {
+            showDetails = false
+            presentationState.searchState.value =
+                conversationSearchPreset(
+                    conversationAccountRef,
+                    appState.runtimeGeneration,
+                    chat.id,
+                    controller.title(groupTitleCopy),
+                )
+            navigationState.searchOpen = true
+        }
     val headerShortcuts = appState.headerShortcutPreferences.shortcuts
     // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
     // notification-routed open is still waiting for its account switch.
