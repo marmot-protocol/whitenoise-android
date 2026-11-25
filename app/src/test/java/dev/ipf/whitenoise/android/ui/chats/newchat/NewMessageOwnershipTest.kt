@@ -41,18 +41,21 @@ import org.robolectric.annotation.Config
 class NewMessageOwnershipTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** The real account-owned discovery row opens existing setup and preserves the recipient query on Back. */
-    @Test fun agentSettingsReturnsToTheSameNewMessageQuery() {
+    /** The account-owned discovery row opens setup once search is cleared and returns to New Message on Back. */
+    @Test fun agentSettingsReturnsToNewMessageAfterClearingSearch() {
         val state = state()
         var closes = 0
         composeRule.setContent { WhiteNoiseTheme { NewMessageScreen(state, { closes++ }, {}, { _, _ -> }) } }
-        composeRule.onNodeWithTag("new_message.searchField").performTextReplacement("Agent search")
+        val search = composeRule.onNodeWithTag("new_message.searchField")
+        search.performTextReplacement("Agent search")
+        composeRule.onNodeWithTag("new_message.agentSettings").assertDoesNotExist()
+        search.performTextReplacement("")
         composeRule.onNodeWithTag("new_message.agentSettings").performClick()
         composeRule.onNodeWithTag("new_message.screen").assertDoesNotExist()
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.onNodeWithText(context.getString(R.string.ai_agents)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-        assertEquals("Agent search", query())
+        assertEquals("", query())
         assertEquals(0, closes)
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         assertEquals(1, closes)
@@ -144,7 +147,6 @@ class NewMessageOwnershipTest {
         }
         val context = ApplicationProvider.getApplicationContext<Context>()
         val scanLabel = context.getString(R.string.new_message_connect_qr)
-        composeRule.onNodeWithTag("new_message.searchField").performTextReplacement("Alice")
         composeRule.onNodeWithText(scanLabel).performClick()
         composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.show_my_qr_code)).assertDoesNotExist()
@@ -163,7 +165,7 @@ class NewMessageOwnershipTest {
         }
         composeRule.onNodeWithTag("share_connect.screen").assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-        assertEquals("Alice", query())
+        assertEquals("", query())
         composeRule.onNodeWithText(scanLabel).performClick()
         composeRule.onNodeWithText(cameraLabel).performClick()
         composeRule.waitForIdle()

@@ -460,7 +460,7 @@ private fun HeaderTimerBadge(
             Modifier
         } else {
             Modifier
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .clickable(
                     onClickLabel = stringResource(R.string.conversation_header_timer_change),
                     role = Role.Button,

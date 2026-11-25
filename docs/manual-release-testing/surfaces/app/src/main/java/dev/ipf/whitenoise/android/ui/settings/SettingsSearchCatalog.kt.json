@@ -1085,6 +1085,7 @@
         ]
       }
     ],
-    "composable_surfaces": []
+    "composable_surfaces": [],
+    "source_coverage": []
   }
 }

@@ -25,4 +25,7 @@ object WhiteNoiseSizes {
 
     /** Avatar in the chat list. */
     val AvatarChatList: Dp = 52.dp
+
+    /** Avatar in dense rows, chips and overlapping stacks. */
+    val AvatarSmall: Dp = 32.dp
 }

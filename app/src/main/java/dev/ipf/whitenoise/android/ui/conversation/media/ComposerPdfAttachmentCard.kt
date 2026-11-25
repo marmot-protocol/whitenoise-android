@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.PictureAsPdf
 import dev.ipf.whitenoise.android.ui.icons.filled.Shield
 import dev.ipf.whitenoise.android.ui.icons.filled.WarningAmber
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.Typography as BaseTypography
 
@@ -63,7 +64,7 @@ private const val PAGE_HEIGHT = 56
 private const val COMPACT_FONT_SCALE = 1.5f
 private val PDF_CARD_SHAPE =
     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-private val PAGE_SHAPE = RoundedCornerShape(4.dp)
+private val PAGE_SHAPE = RoundedCornerShape(Radii.sm)
 
 /** What a staged PDF's card says about its metadata. */
 internal enum class ComposerPdfPrivacy {
