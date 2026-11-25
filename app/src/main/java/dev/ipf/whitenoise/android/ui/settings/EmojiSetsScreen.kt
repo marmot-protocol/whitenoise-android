@@ -19,7 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
@@ -211,7 +211,12 @@ private fun EmojiSetBrowser(
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         if (!loading && state.showsNoSets(builtinsListed = listedBuiltins != null)) {
-            item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
+            item {
+                WhiteNoiseEmptyState(
+                    title = stringResource(R.string.emoji_sets_title),
+                    detail = stringResource(R.string.emoji_sets_empty),
+                )
+            }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
         val (installed, discovered) = state.sets.partition { it.installed != null }
@@ -274,15 +279,15 @@ private fun EmojiSetPreview(
 ) {
     SettingsList {
         item(key = "set.preview") {
-            EmojiSetPreviewHeader(state, set, onLoadArtwork)
+            EmojiSetPreviewHeader(state, set)
         }
         item(key = "set.status") { EmojiSetStatus(state) }
         item(key = "set.actions") {
-            EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate)
+            EmojiSetActions(state, set, onLoadArtwork, onInstall, onCancel, onRemove, onCheckUpdate)
         }
         items(set.emoji, key = { it.shortcode }) { emoji ->
             Column(
-                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
                 verticalArrangement = Arrangement.spacedBy(EmojiSetEntrySpacing),
             ) {
                 Text(":${emoji.shortcode}:", style = MaterialTheme.typography.bodyLarge)
@@ -299,47 +304,26 @@ private fun EmojiSetPreview(
 private fun EmojiSetPreviewHeader(
     state: EmojiSetsState,
     set: EmojiSetFfi,
-    onLoadArtwork: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-    ) {
-        Text(set.displayTitle(), style = MaterialTheme.typography.headlineSmall)
-        set.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
-        Text(pluralStringResource(R.plurals.emoji_sets_item_count, set.emoji.size, set.emoji.size))
-        Text(
-            stringResource(R.string.emoji_sets_image_privacy),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        val imageUrl = set.imageUrl ?: set.emoji.firstOrNull()?.url
-        Uri.parse(imageUrl.orEmpty()).host?.let { host ->
-            Text(stringResource(R.string.emoji_sets_preview_host, host))
-        }
-        if (state.artwork != null) {
-            key(state.artwork) {
-                val art by produceState<EmojiArt?>(null) {
-                    value = withContext(Dispatchers.IO) { decodeEmojiImage(state.artwork)?.let(EmojiArt::Decoded) }
-                }
-                art?.let {
-                    EmojiArtImage(it, set.displayTitle(), Modifier.size(EmojiSetImageSize))
-                }
+    SettingsSection(set.displayTitle())
+    set.description?.takeIf { it.isNotBlank() }?.let { SettingsExplainer(it) }
+    SettingsExplainer(pluralStringResource(R.plurals.emoji_sets_item_count, set.emoji.size, set.emoji.size))
+    SettingsExplainer(stringResource(R.string.emoji_sets_image_privacy))
+    val imageUrl = set.imageUrl ?: set.emoji.firstOrNull()?.url
+    Uri.parse(imageUrl.orEmpty()).host?.let { host ->
+        SettingsExplainer(stringResource(R.string.emoji_sets_preview_host, host))
+    }
+    if (state.artwork != null) {
+        key(state.artwork) {
+            val art by produceState<EmojiArt?>(null) {
+                value = withContext(Dispatchers.IO) { decodeEmojiImage(state.artwork)?.let(EmojiArt::Decoded) }
             }
-        } else if (imageUrl != null) {
-            val label = stringResource(R.string.emoji_sets_load_image)
-            TextButton(
-                onClick = onLoadArtwork,
-                modifier =
-                    Modifier.explainOnLongPress(
-                        Explanation(
-                            label,
-                            stringResource(R.string.explanation_organize_emoji_load_image),
-                        ),
-                    ),
-                enabled = !state.busy,
-            ) {
-                Text(label)
+            art?.let {
+                EmojiArtImage(
+                    it,
+                    set.displayTitle(),
+                    Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin).size(EmojiSetImageSize),
+                )
             }
         }
     }
@@ -351,95 +335,96 @@ private fun EmojiSetPreviewHeader(
 private fun EmojiSetActions(
     state: EmojiSetsState,
     set: EmojiSetFfi,
+    onLoadArtwork: () -> Unit,
     onInstall: () -> Unit,
     onCancel: () -> Unit,
     onRemove: () -> Unit,
     onCheckUpdate: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-    ) {
-        val progress = state.progress
-        if (progress != null) {
+    val progress = state.progress
+    if (progress != null) {
+        SettingsExplainer(
             if (progress.totalEmoji == 0u) {
-                Text(stringResource(R.string.emoji_sets_preparing_install))
+                stringResource(R.string.emoji_sets_preparing_install)
             } else {
-                Text(
-                    stringResource(
-                        R.string.emoji_sets_install_progress,
-                        progress.completedEmoji.toInt(),
-                        progress.totalEmoji.toInt(),
-                    ),
+                stringResource(
+                    R.string.emoji_sets_install_progress,
+                    progress.completedEmoji.toInt(),
+                    progress.totalEmoji.toInt(),
+                )
+            },
+        )
+    }
+    val installed = set.installed
+    val imageUrl = set.imageUrl ?: set.emoji.firstOrNull()?.url
+    SettingsGroup {
+        if (state.artwork == null && imageUrl != null) {
+            row("load_image") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.emoji_sets_load_image),
+                    explanation = stringResource(R.string.explanation_organize_emoji_load_image),
+                    enabled = !state.busy,
+                    onClick = onLoadArtwork,
+                    leading = null,
                 )
             }
-            val cancelLabel = stringResource(R.string.cancel)
-            TextButton(
-                onClick = onCancel,
-                modifier =
-                    Modifier.explainOnLongPress(
-                        Explanation(
-                            cancelLabel,
-                            stringResource(R.string.explanation_organize_emoji_cancel),
+        }
+        if (progress != null) {
+            row("cancel") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.cancel),
+                    explanation = stringResource(R.string.explanation_organize_emoji_cancel),
+                    enabled = !state.cancelling,
+                    onClick = onCancel,
+                    leading = null,
+                )
+            }
+            return@SettingsGroup
+        }
+        if (installed == null || installed.updateAvailable) {
+            val isInstall = installed == null
+            row("install") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update),
+                    explanation =
+                        stringResource(
+                            if (isInstall) {
+                                R.string.explanation_organize_emoji_install
+                            } else {
+                                R.string.explanation_organize_emoji_update
+                            },
                         ),
-                    ),
-                enabled = !state.cancelling,
-            ) {
-                Text(cancelLabel)
+                    enabled = !state.busy,
+                    onClick = onInstall,
+                    leading = null,
+                )
             }
         } else {
-            val installed = set.installed
-            if (installed == null || installed.updateAvailable) {
-                val isInstall = installed == null
-                val label =
-                    stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update)
-                val body =
-                    stringResource(
-                        if (isInstall) {
-                            R.string.explanation_organize_emoji_install
-                        } else {
-                            R.string.explanation_organize_emoji_update
-                        },
-                    )
-                Button(
-                    onClick = onInstall,
-                    modifier = Modifier.explainOnLongPress(Explanation(label, body)),
-                    enabled = !state.busy,
-                ) {
-                    Text(label)
-                }
-            }
-            if (installed != null && !installed.updateAvailable) {
-                val checkLabel = stringResource(R.string.emoji_sets_check_update)
-                TextButton(
-                    onClick = onCheckUpdate,
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                checkLabel,
-                                stringResource(R.string.explanation_organize_emoji_check_update),
-                            ),
-                        ),
+            row("check_update") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.emoji_sets_check_update),
+                    explanation = stringResource(R.string.explanation_organize_emoji_check_update),
                     enabled = !state.busy && !state.discovering,
-                ) {
-                    Text(checkLabel)
-                }
+                    onClick = onCheckUpdate,
+                    leading = null,
+                )
             }
-            if (installed != null) {
-                val removeLabel = stringResource(R.string.remove)
-                TextButton(
-                    onClick = onRemove,
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                removeLabel,
-                                stringResource(R.string.explanation_organize_emoji_remove),
-                            ),
-                        ),
+        }
+        if (installed != null) {
+            row("remove") { context ->
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.remove),
+                    explanation = stringResource(R.string.explanation_organize_emoji_remove),
                     enabled = !state.busy,
-                ) {
-                    Text(removeLabel)
-                }
+                    destructive = true,
+                    onClick = onRemove,
+                    leading = null,
+                )
             }
         }
     }

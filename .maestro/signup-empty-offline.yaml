@@ -14,9 +14,9 @@ name: signup-empty-offline
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign up"
 - tapOn:
     id: "onboarding.sign_up.action"
 - scrollUntilVisible:
@@ -32,6 +32,6 @@ name: signup-empty-offline
 - assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
 - assertNotVisible: "Private key"
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signup-empty-offline

@@ -1,0 +1,156 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+  "legacy_sha256": "952eadcebf49f6af0b50d39406c6802154f58fbf50776d0d14d9aec7bc52607e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SignInKeyField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "fun SignInKeyField(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_enter_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.onboarding_enter_private_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.private_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.qr_private_key_permission_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.qr_private_key_permission_detail",
+        "test_ids": [
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "R.string.scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_secret_key_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "R.string.sign_in_secret_key_help",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Rejected QR scans report through the key field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
+        "anchor": "onErrorChange(error)",
+        "test_ids": [
+          "ONB-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -7,20 +7,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 
 /** Native actions retain exact revision and epoch, with one primary decision per state. */
 @Composable
@@ -29,18 +29,24 @@ internal fun SetupActionButtons(
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
 ) {
-    if (state.snapshot == null) return
-    val step = state.currentStep ?: return
+    state.decisionButtons().forEach { (action, primary) ->
+        SetupOfferedAction(state, action, primary, onAction, onEdit)
+    }
+}
+
+/** The native plan's visible decision buttons, each paired with whether it is the one filled primary. */
+internal fun AccountSetupState.decisionButtons(): List<Pair<OnboardingActionFfi, Boolean>> {
+    val step = currentStep
+    if (snapshot == null || step == null) return emptyList()
     val offered =
-        state.orderedRelayActions(step.actions).filterNot { action ->
-            val routineRetry = action == OnboardingActionFfi.RETRY && state.routineDeviceNotice
-            val disconnectedNonSigner = state.disconnected && action != OnboardingActionFfi.RECONNECT_SIGNER
+        orderedRelayActions(step.actions).filterNot { action ->
+            val routineRetry = action == OnboardingActionFfi.RETRY && routineDeviceNotice
+            val disconnectedNonSigner = disconnected && action != OnboardingActionFfi.RECONNECT_SIGNER
             routineRetry || disconnectedNonSigner
         }
-    val plan = state.actionPlan(offered)
-    val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
-    visible.forEach { action ->
-        SetupOfferedAction(state, action, action == plan.primary && !plan.directRemove, onAction, onEdit)
+    val plan = actionPlan(offered)
+    return listOfNotNull(plan.primary, plan.secondary).distinct().map { action ->
+        action to (action == plan.primary && !plan.directRemove)
     }
 }
 
@@ -86,7 +92,8 @@ private fun SetupResetRelayAction(
     val step = state.currentStep ?: return
     val revision = snapshot.revision
     val recoveryEpoch = snapshot.recoveryEpoch
-    TextButton(
+    val enabled = !state.busy
+    WhiteNoiseOutlinedButton(
         onClick = {
             onAction(
                 SetupRequest(
@@ -98,10 +105,9 @@ private fun SetupResetRelayAction(
                 ),
             )
         },
-        enabled = !state.busy,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-    ) { Text(stringResource(R.string.setup_reset_relays)) }
+    ) { SetupDestructiveContent(enabled) { Text(stringResource(R.string.setup_reset_relays)) } }
 }
 
 /** Dispatches only currently offered actions and proposal revision for approval. */
@@ -125,53 +131,52 @@ private fun SetupOfferedAction(
     val canApprove =
         action != OnboardingActionFfi.APPROVE_REPAIR ||
             snapshot.proposal?.step == step.step
-    SetupActionButton(
-        action,
-        primary,
-        !state.busy && canApprove,
+    val enabled = !state.busy && canApprove
+    val labelId =
         if (action == OnboardingActionFfi.CANCEL_REPAIR && state.removalReview) {
             R.string.setup_undo_removal
         } else {
             setupActionTitle(action)
-        },
-    ) {
+        }
+    val onClick = {
         if (action in setupEditorActions) {
             onEdit(step.step, action, revision)
         } else {
             onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
         }
     }
-}
-
-/** Uses one filled action, quiet alternatives, and a distinct cancellation treatment. */
-@Composable
-private fun SetupActionButton(
-    action: OnboardingActionFfi,
-    primary: Boolean,
-    enabled: Boolean,
-    labelId: Int,
-    onClick: () -> Unit,
-) {
     val modifier = Modifier.fillMaxWidth().testTag("setup-action-${action.name}")
-    val label = stringResource(labelId)
     val content: @Composable () -> Unit = {
         Icon(painterResource(setupActionIcon(action)), null)
-        Spacer(Modifier.width(8.dp))
-        Text(label)
+        SetupButtonIconGap()
+        Text(stringResource(labelId))
     }
+    // One filled action per decision; alternatives and cancellation use the shared outlined button.
     when {
         action == OnboardingActionFfi.CANCEL_ONBOARDING ->
-            TextButton(
-                onClick,
-                modifier,
-                enabled,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { content() }
+            WhiteNoiseOutlinedButton(onClick, modifier, enabled) { SetupDestructiveContent(enabled, content) }
         primary -> WhiteNoiseButton(onClick, modifier, enabled) { content() }
-        action == OnboardingActionFfi.RETRY || action == OnboardingActionFfi.CANCEL_REPAIR ->
-            TextButton(onClick, modifier, enabled) { content() }
-        else -> OutlinedButton(onClick, modifier, enabled) { content() }
+        else -> WhiteNoiseOutlinedButton(onClick, modifier, enabled) { content() }
     }
+}
+
+/** Colours an outlined button's content as destructive while it is enabled; disabled keeps Material's treatment. */
+@Composable
+private fun SetupDestructiveContent(
+    enabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (enabled) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.error, content = content)
+    } else {
+        content()
+    }
+}
+
+/** The gap between a setup button's leading icon and its label. */
+@Composable
+internal fun SetupButtonIconGap() {
+    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
 }
 
 /**

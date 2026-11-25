@@ -94,10 +94,10 @@ class DevicePrivacyScreenScreenshotTest {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, hasAccount = false)
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Onboarding)
-        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign up").assertIsDisplayed()
         composeRule.onNodeWithText("Help Improve White Noise").assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_welcome_deferred.png")
-        composeRule.onNodeWithText("Sign In").performClick()
+        composeRule.onNodeWithText("Sign in").performClick()
         composeRule
             .onNodeWithTag("onboarding.sign_in.private_key")
             .assertIsDisplayed()

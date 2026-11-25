@@ -143,6 +143,7 @@ class KeyPackagesContentTest {
             .assertIsNotEnabled()
     }
 
+    /** Revealing Publish new from search highlights it without publishing until it is tapped. */
     @Test
     fun publishSearchRevealDoesNotPublishUntilExplicitClick() {
         var calls = 0
@@ -152,11 +153,12 @@ class KeyPackagesContentTest {
         composeRule.runOnIdle { assertEquals(1, calls) }
     }
 
+    /** Revealing the top-bar refresh icon from search keeps it disabled while work runs and never refreshes. */
     @Test
     fun refreshSearchRevealPreservesWorkingDisabledState() {
         var calls = 0
         render(emptyList(), working = true, searchTarget = "KeyPackages.refresh", onAction = { calls++ })
-        composeRule.onNodeWithText(app.getString(R.string.refresh)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.refresh)).assertIsNotEnabled()
         composeRule.runOnIdle { assertEquals(0, calls) }
     }
 

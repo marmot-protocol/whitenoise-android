@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,7 +37,6 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureInputCenter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
@@ -81,12 +79,8 @@ internal fun SignInKeyField(
             scannerSession = null
         }
     }
-    var scanError by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(busy) {
-        if (busy) {
-            scannerSession = null
-            scanError = null
-        }
+        if (busy) scannerSession = null
     }
     val context = LocalContext.current
     val clipboard = remember(context) { ContextCompat.getSystemService(context, ClipboardManager::class.java) }
@@ -181,23 +175,14 @@ internal fun SignInKeyField(
                                 R.string.sign_in_error_public_key
                             else -> null
                         }
+                    // A rejected scan reports through the field's supporting text, like a rejected paste.
                     if (error != null) {
-                        scanError = error
                         onErrorChange(error)
                     } else if (scanned != null) {
                         replaceKey(scanned)
                     }
                 }
             },
-        )
-    }
-    scanError?.let { message ->
-        WhiteNoiseAlertDialog(
-            modifier = Modifier.testTag("onboarding.sign_in.scan_error"),
-            onDismissRequest = { scanError = null },
-            title = { Text(stringResource(R.string.scan_qr_code)) },
-            text = { Text(stringResource(message)) },
-            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) } },
         )
     }
 }

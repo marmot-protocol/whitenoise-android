@@ -206,7 +206,8 @@
         "anchor": "R.string.refresh",
         "test_ids": [
           "ACC-016",
-          "ACC-018"
+          "ACC-018",
+          "SET-072"
         ]
       },
       {

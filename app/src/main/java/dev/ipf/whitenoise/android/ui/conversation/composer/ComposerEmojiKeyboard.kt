@@ -4,55 +4,25 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.IconToggleButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.EmojiPickerTab
 import dev.ipf.whitenoise.android.ui.EmojiSection
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Backspace
-import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
-
-private val ComposerEmojiRailPadding = 4.dp
 
 /** Matches the pane's height glide closely enough that the search and the grid trade places in one motion. */
 private const val COMPOSER_EMOJI_SEARCH_CROSSFADE_MILLIS = 250
-private val ComposerEmojiRailToggleSize = 32.dp
-private val ComposerEmojiRailToggleShape = RoundedCornerShape(10.dp)
-private val ComposerEmojiRailIconSize = 20.dp
 
 /**
  * The composer's emoji keyboard. Browsing fills the pane with the section grid above a bottom rail:
@@ -109,118 +79,21 @@ internal fun ComposerEmojiKeyboard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
-                ComposerEmojiRail(
+                EmojiCategoryBar(
                     categories = sections.map { it.category },
                     selected = activeCategory,
                     state = categoryState,
                     onSearch = search::open,
-                    onCategory = onCategory,
+                    onConfigure = null,
                     onBackspace = onBackspace,
+                    onCategory = onCategory,
                     onBrowseSets = onBrowseSets,
                     onOpenSettings = onOpenSettings,
+                    // The pane sits inside the composer card, which has no rounded corners to clear.
+                    edgeInset = 0.dp,
                 )
             }
         }
-    }
-}
-
-/**
- * Bottom rail of the composer's emoji keyboard: search, Browse sets and the emoji settings cog at the
- * start, one rounded toggle per section in equal-width slots, and backspace alone at the end so a
- * quick delete never lands on navigation. The toggles scroll only when they cannot fit.
- */
-@Suppress("LongParameterList")
-@Composable
-internal fun ComposerEmojiRail(
-    categories: List<EmojiPickerTab>,
-    selected: EmojiPickerTab?,
-    state: LazyListState,
-    onSearch: () -> Unit,
-    onCategory: (EmojiPickerTab) -> Unit,
-    onBackspace: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-    onBrowseSets: (() -> Unit)? = null,
-    onOpenSettings: (() -> Unit)? = null,
-) {
-    val iconColors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-    Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = ComposerEmojiRailPadding),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(
-            onClick = onSearch,
-            colors = iconColors,
-            modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG),
-        ) {
-            Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.emoji_search_hint))
-        }
-        if (onBrowseSets != null) {
-            IconButton(
-                onClick = onBrowseSets,
-                colors = iconColors,
-                modifier = Modifier.testTag(EMOJI_PICKER_BROWSE_SETS_TEST_TAG),
-            ) {
-                Icon(painterResource(R.drawable.ic_add), contentDescription = stringResource(R.string.emoji_sets_title))
-            }
-        }
-        if (onOpenSettings != null) {
-            IconButton(
-                onClick = onOpenSettings,
-                colors = iconColors,
-                modifier = Modifier.testTag(EMOJI_PICKER_SETTINGS_TEST_TAG),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_emoji_settings),
-                    contentDescription = stringResource(R.string.custom_emoji),
-                )
-            }
-        }
-        BoxWithConstraints(Modifier.weight(1f)) {
-            val slot = maxOf(ComposerEmojiRailToggleSize, maxWidth / categories.size.coerceAtLeast(1))
-            LazyRow(
-                state = state,
-                modifier = Modifier.fillMaxWidth().testTag(EMOJI_PICKER_CATEGORIES_TEST_TAG),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(categories, key = { it.id }) { category ->
-                    Box(Modifier.width(slot), contentAlignment = Alignment.Center) {
-                        ComposerEmojiRailToggle(category, selected == category) { onCategory(category) }
-                    }
-                }
-            }
-        }
-        if (onBackspace != null) {
-            IconButton(onClick = onBackspace, colors = iconColors) {
-                Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = stringResource(R.string.emoji_backspace))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ComposerEmojiRailToggle(
-    category: EmojiPickerTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    IconToggleButton(
-        checked = selected,
-        onCheckedChange = { onClick() },
-        shape = ComposerEmojiRailToggleShape,
-        colors =
-            IconButtonDefaults.iconToggleButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                checkedContainerColor = outlineSelectionColor(MaterialTheme.colorScheme.primaryContainer),
-                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
-        modifier =
-            Modifier
-                .size(ComposerEmojiRailToggleSize)
-                .semantics { this.selected = selected }
-                .testTag(emojiPickerCategoryTestTag(category)),
-    ) {
-        EmojiPickerTabIcon(category, ComposerEmojiRailIconSize, LocalContentColor.current)
     }
 }
 

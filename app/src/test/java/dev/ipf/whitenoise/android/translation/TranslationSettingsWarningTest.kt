@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -145,9 +146,9 @@ class TranslationSettingsWarningTest {
         val preferences = TranslationPreferences(context)
         preferences.setGlobal(true, "es")
         composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
-        composeRule.onNodeWithText("Target language: Spanish").performClick()
+        globalTarget().assert(hasText("Spanish")).performClick()
         chooseLanguage("Slovak")
-        composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
+        globalTarget().assert(hasText("Slovak"))
         assertEquals(TranslationChoice(true, "sk"), preferences.global())
         preferences.close()
     }
@@ -163,8 +164,8 @@ class TranslationSettingsWarningTest {
         val preferences = TranslationPreferences(context)
         composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
         composeRule.onNodeWithTag("translation.target_recovery").assertIsDisplayed()
-        composeRule.onNodeWithText("Target language: English").assertDoesNotExist()
-        composeRule.onNodeWithText("Target language: Choose a language").performClick()
+        globalTarget().assert(hasText("English").not())
+        globalTarget().assert(hasText("Choose a language")).performClick()
         chooseLanguage("Chinese (Traditional)")
         composeRule.onNodeWithTag("translation.target_recovery").assertDoesNotExist()
         assertEquals("zh_hant", preferences.global().target)
@@ -197,7 +198,7 @@ class TranslationSettingsWarningTest {
         val preferences = TranslationPreferences(context)
         preferences.setGlobal(false, "en")
         composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
-        composeRule.onNodeWithText("Target language: English").performClick()
+        globalTarget().assert(hasText("English")).performClick()
         for (label in listOf("Chinese (Simplified)", "Chinese (Traditional)", "Norwegian", "Norwegian Bokmål")) {
             searchLanguages(label)
             composeRule.onNode(languageRow(label)).assertIsDisplayed()
@@ -268,4 +269,7 @@ class TranslationSettingsWarningTest {
 
     /** Matches a language row, not the search field that echoes the same text. */
     private fun languageRow(label: String) = hasText(label) and !hasSetTextAction()
+
+    /** The global settings target-language link row, whose value names the current target. */
+    private fun globalTarget() = composeRule.onNodeWithTag("translation.target")
 }

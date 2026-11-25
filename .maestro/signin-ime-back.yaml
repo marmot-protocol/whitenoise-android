@@ -13,9 +13,9 @@ name: signin-ime-back
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - tapOn: "Private key"
 - inputText: "not-a-key"
 - back
@@ -29,5 +29,5 @@ name: signin-ime-back
     id: "onboarding.sign_in.action"
     enabled: false
 - tapOn: "Back"
-- assertVisible: "Sign In"
+- assertVisible: "Sign in"
 - takeScreenshot: signin-ime-back
