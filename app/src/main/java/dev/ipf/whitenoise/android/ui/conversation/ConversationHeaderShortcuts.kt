@@ -30,10 +30,9 @@ import kotlin.math.floor
  * The optional header buttons chosen in Chat header settings, in the order the person picked them. Each one
  * calls the same handler as its chat details action. A null handler hides its button: [muteControl] and
  * [readAloudOn] while the chat's account is not the active one (and [readAloudOn] without a usable speech
- * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Buttons
- * use the composer's compact 36 dp pitch, so more fit beside the title, and each takes taps across its own
- * 36 by 48 dp cell rather than a full 48 dp square. Only the first [capacity] buttons that can show appear,
- * so the chat name always keeps its room; see [headerShortcutCapacity].
+ * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Each button
+ * takes taps across a 48 dp square. Only the first [capacity] available buttons appear, leaving room for the
+ * chat name. See [headerShortcutCapacity].
  */
 @Composable
 internal fun RowScope.ConversationHeaderShortcuts(
@@ -86,8 +85,7 @@ private class HeaderAction(
 )
 
 /**
- * One header shortcut in its 36 by 48 dp cell: a slot button, or a slot toggle for an action with a checked
- * state, so the whole cell takes the tap and the highlight stays a circle rather than a capsule.
+ * One header shortcut with a full-size tap target and a circular press highlight.
  */
 @Composable
 private fun HeaderActionButton(
@@ -102,7 +100,6 @@ private fun HeaderActionButton(
         )
     }
     val checked = action.checked
-    // Slot buttons: the header's cells are 36 by 48 dp, where an IconButton's circle stretches into a capsule.
     if (checked != null) {
         SlotIconToggleButton(
             checked = checked,

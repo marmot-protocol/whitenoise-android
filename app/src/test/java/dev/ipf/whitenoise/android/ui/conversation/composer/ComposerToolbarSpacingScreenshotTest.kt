@@ -168,7 +168,7 @@ class ComposerToolbarSpacingScreenshotTest {
         side: ComposerShortcutSide,
     ) = render(ToolbarCase(name, 360, rtl = rtl, accounts = 1, voiceSide = side, transition = true))
 
-    /** Compact discs keep 48dp touch targets, and clicks at or just past each visual edge reach only that disc. */
+    /** Adjacent full-size targets receive their own edge taps without dispatching to a neighbor. */
     @Test
     fun compactSlotsKeepExpandedTouchTargetsAndRouteAdjacentClicks() {
         val clicks = intArrayOf(0, 0)
@@ -200,10 +200,10 @@ class ComposerToolbarSpacingScreenshotTest {
         val second = nodes[1].boundsInRoot
         val points =
             listOf(
-                first.center.copy(x = first.left - 2f),
+                first.center.copy(x = first.left + 2f),
                 first.center.copy(x = first.right - 1f),
                 second.center.copy(x = second.left + 1f),
-                second.center.copy(x = second.right + 2f),
+                second.center.copy(x = second.right - 2f),
             )
         points.forEach { point ->
             composeRule.onNodeWithTag("touch-row").performTouchInput { click(point - row.topLeft) }
@@ -495,7 +495,7 @@ class ComposerToolbarSpacingScreenshotTest {
         }
     }
 
-    /** Configured controls retain compact36dp centers within each physical group. */
+    /** Configured controls have distinct 48 dp touch areas within each physical group. */
     private fun assertTargets(
         controls: List<androidx.compose.ui.geometry.Rect>,
         sign: Float,
@@ -504,7 +504,7 @@ class ComposerToolbarSpacingScreenshotTest {
             if (kotlin.math.abs(second.center.y - first.center.y) <= 1f) {
                 assertEquals(
                     "adjacent selected controls on one row",
-                    36f,
+                    48f,
                     (second.center.x - first.center.x) * sign,
                     1f,
                 )
@@ -515,9 +515,10 @@ class ComposerToolbarSpacingScreenshotTest {
         assertFootprints(controls)
     }
 
+    /** Asserts each toolbar action has a full-size touch area in both dimensions. */
     private fun assertFootprints(controls: List<androidx.compose.ui.geometry.Rect>) {
         controls.forEach {
-            assertTrue("compact visual slot width", it.width in 36f..48f)
+            assertEquals("interaction width", 48f, it.width, 1f)
             assertEquals("interaction height", 48f, it.height, 1f)
         }
     }
@@ -538,7 +539,7 @@ class ComposerToolbarSpacingScreenshotTest {
     }
 }
 
-/** Visual slots stay distinct; platform-expanded touch areas may overlap between compact neighbors. */
+/** Verifies that separate controls keep independent visual slots. */
 private fun assertDistinctFootprints(
     all: List<androidx.compose.ui.geometry.Rect>,
     labels: List<String>,

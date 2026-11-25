@@ -103,13 +103,11 @@ internal fun ConversationDictationContinueSlot(
 ) {
     val press = remember { MutableInteractionSource() }
     DictationLeadingSlot(visible) {
-        // The slot is only as wide as the pulse it replaces, so an IconButton here would stretch its circular
-        // highlight into a capsule. The whole 24 dp by 48 dp slot takes the touch, and Compose extends a
-        // target narrower than 48 dp to the minimum touch size, so the highlight can stay a circle.
+        // Continue shares the listening pulse's small circle and has its own full-size touch area.
         Box(
             modifier =
                 Modifier
-                    .width(DICTATION_LISTENING_PULSE_WIDTH)
+                    .width(ComposerShortcutPitch)
                     .height(ComposerShortcutTarget)
                     .testTag(DICTATION_CONTINUE_TAG)
                     .explainOnLongPress(

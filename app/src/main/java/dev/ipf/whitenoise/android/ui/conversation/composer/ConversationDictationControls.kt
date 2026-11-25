@@ -67,8 +67,8 @@ internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 
-/** A compact 24dp listening pulse followed by three adjacent compact commands. */
-internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 132.dp
+/** The leading listening or Continue slot followed by three full-size command slots. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = ComposerShortcutPitch * 4
 internal const val DICTATION_ACTIONS_RESIZE_MILLIS = 200
 internal val DICTATION_LISTENING_PULSE_WIDTH = 24.dp
 
@@ -229,11 +229,12 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
+/** Reserves one full target per shown command, including the optional Continue slot. */
 internal fun ConversationDictationState.compactActionsWidth(reservesLeadingSlot: Boolean) =
     when {
         !hasActiveRecognitionActions -> 96.dp
         reservesLeadingSlot -> DICTATION_ACTIVE_ACTIONS_WIDTH
-        else -> DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH
+        else -> DICTATION_ACTIVE_ACTIONS_WIDTH - ComposerShortcutPitch
     }
 
 /**
@@ -473,12 +474,13 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
         },
     )
 
+/** Keeps Continue and the passive listening pulse centered in the same leading slot. */
 @Composable
 private fun ConversationDictationLeadingActions(
     controller: ConversationDictationController,
     facts: DictationControlFacts,
 ) {
-    val slot = if (facts.keepsLeadingSlot) Modifier.width(DICTATION_LISTENING_PULSE_WIDTH) else Modifier
+    val slot = if (facts.keepsLeadingSlot) Modifier.width(ComposerShortcutPitch) else Modifier
     Box(slot, contentAlignment = Alignment.Center) {
         ConversationDictationListeningSlot(
             visible = facts.captureInProgress,

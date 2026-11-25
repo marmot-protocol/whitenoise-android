@@ -28,8 +28,8 @@ private val SlotIconButtonCircleMax = 40.dp
 private const val DISABLED_ICON_ALPHA = 0.38f
 
 /**
- * An icon button for a slot that may not be square, such as the composer's 36 by 48 dp toolbar slots
- * (#4102). An `IconButton` clips its highlight, its fill and its touch area to one shape, so in such a slot it
+ * An icon button for a slot that may not be square. An `IconButton` clips its highlight, its fill and
+ * its touch area to one shape, so in such a slot it
  * either draws a capsule or, given a circle, stops answering taps above and below it. Here the whole slot
  * answers taps, and the press highlight and [containerColor] are a circle as wide as the slot's shorter side,
  * up to [highlightMax], centred in it. A slot sized by [modifier] keeps that size, and an unsized one is
