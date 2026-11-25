@@ -142,6 +142,23 @@ internal class FcmAutoInitSignOutTest : ExternalSignerSignOutFixture() {
             assertTrue(true !in platform.autoInitWrites)
         }
 
+    /** Signing out while another signed-in account still uses Push never turns auto-init off. */
+    @Test
+    fun signOutWithAnotherPushAccountKeepsAutoInit() =
+        runBlocking {
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)))
+            additionalNativePush[otherAccountRef] = true
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val state = appState(profileReader = { null }, nativePushFallbackPlatform = platform)
+
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+
+            assertEquals(otherAccountRef, state.activeAccountRef)
+            val writes = platform.autoInitWrites.toList()
+            assertFalse("a remaining Push account must keep auto-init: $writes", false in writes)
+        }
+
     /** A remaining signed-in signer keeps auto-init and the token for the next sync to decide. */
     @Test
     fun remainingSignedInSignerLeavesAutoInit() =

@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -37,7 +38,9 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Delivery changes that do not complete still settle Firebase auto-init from the accounts' live demand (#4081):
  * a Local selection cancelled after the last account's native disable committed, a per-account native-push
- * enablement that fails and is rolled back, and a per-account disable cancelled after its native commit.
+ * enablement that fails and is rolled back, a per-account disable cancelled after its native commit, and a
+ * reconciliation that leaves no account on Push. A cancelled per-account enable leaves a registration sync
+ * pending instead.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -180,14 +183,91 @@ class FcmAutoInitIncompleteChangeTest {
             }
         }
 
+    /** A per-account Push enable cancelled after its native commit leaves a durable registration sync pending. */
+    @Test
+    fun cancelledPerAccountEnableAfterNativeCommitRecordsPendingSync() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val toggle = AtomicReference<Job?>()
+            val cancelOnEnable = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = false),
+                    nativePushFallbackPlatform = platform,
+                    onSetNativePushEnabled = { ref, enabled ->
+                        // The native enable commits, then the toggle is cancelled before it registers.
+                        if (enabled && cancelOnEnable.get()) toggle.get()?.cancel()
+                        settings(ref, nativeEnabled = enabled)
+                    },
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { "test-token" },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.clearPendingNativePushRegistrationSync()
+                cancelOnEnable.set(true)
+
+                val job = launch { fixture.appState.setNativePushEnabled(true) }
+                toggle.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the toggle must have been cancelled", job.isCancelled)
+                assertTrue(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertTrue("the next sync must register the account", store.nativePushRegistrationSyncPending())
+            } finally {
+                cancelOnEnable.set(false)
+                fixture.close()
+            }
+        }
+
+    /**
+     * A reconciliation that leaves every account off native push, because rendering is off for all of them,
+     * registers nothing and never turns auto-init on.
+     */
+    @Test
+    fun reconciliationLeavingNoPushAccountNeverEnablesAutoInit() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = true, localEnabled = false),
+                    nativePushFallbackPlatform = platform,
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { "test-token" },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                platform.autoInitWrites.clear()
+                val delivery = fixture.appState.notificationDelivery
+                val intent = delivery.notificationDeliveryModeIntent.capture()
+                val owner = checkNotNull(delivery.captureNotificationDeliveryModeOwner(intent))
+
+                fixture.runWithMainLooperPumping { delivery.selectFcmDelivery(owner) }
+
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                val writes = platform.autoInitWrites.toList()
+                assertFalse("no account uses Push, so auto-init must stay off: $writes", true in writes)
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** Builds a running local-signing account summary for the given ref. */
     private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true, false)
 
-    /** Builds notification settings with rendering on and the given native-push flag. */
+    /** Builds notification settings with the given rendering and native-push flags. */
     private fun settings(
         ref: String,
         nativeEnabled: Boolean,
-    ) = NotificationSettingsFfi(ref, "$ref-id", true, nativeEnabled)
+        localEnabled: Boolean = true,
+    ) = NotificationSettingsFfi(ref, "$ref-id", localEnabled, nativeEnabled)
 
     /** A completed, zero-group registration clear. */
     private fun completedClear() =

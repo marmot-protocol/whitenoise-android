@@ -147,9 +147,10 @@ private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(o
 
 /**
  * Registers at most three accounts together while the native sync lock fences other mutations. Once all
- * are registered, and only then, it turns Firebase auto-init on under the same lock, so a selection that
- * fails never starts the SDK's background token sync, and a sync that turned auto-init off before these
- * accounts enabled native push cannot leave it off.
+ * are registered, and only then, it turns Firebase auto-init on under the same lock if an account still uses
+ * native push, so a selection that fails never starts the SDK's background token sync, a reconciliation that
+ * leaves every account off Push leaves it off, and a sync that turned it off before these accounts enabled
+ * native push cannot leave it off.
  */
 private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
     owner: NotificationDeliveryModeOwner,
@@ -171,7 +172,10 @@ private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccoun
                     }
                 ready && ownsNotificationDeliveryMode(owner)
             }
-        if (registered) applyFcmAutoInit(enabled = true)
+        // Reconciliation can leave every account off native push, for example with rendering off.
+        if (registered && nativePushDemand(owner.accountRefs) == NativePushDemand.Required) {
+            applyFcmAutoInit(enabled = true)
+        }
         registered
     }
 

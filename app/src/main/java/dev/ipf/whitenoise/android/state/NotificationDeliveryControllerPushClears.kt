@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
@@ -66,7 +67,8 @@ internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterSignOu
  * Turns native push on or off for one account, confirming an enablement only once its registration is in
  * place and rolling it back otherwise. Once a disable or a rollback has been attempted, Firebase auto-init is
  * settled from the accounts' live demand on every exit, cancellation included, so the account's change never
- * leaves auto-init on for nobody.
+ * leaves auto-init on for nobody. A cancelled enable records a pending registration sync, so an account
+ * left on native push is registered, and auto-init turned on, by the next sync.
  */
 internal suspend fun NotificationDeliveryController.setNativePushEnabledSettlingAutoInit(
     account: String,
@@ -77,6 +79,15 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
     val nativeDisableAttempted = AtomicBoolean(!enabled)
     try {
         return setNativePushEnabledLocked(account, enabled, nativeDisableAttempted)
+    } catch (cancelled: CancellationException) {
+        // A cancelled enable may have committed native push without registering it. The durable
+        // pending-sync marker makes the next sync register it, turning auto-init on first.
+        if (enabled && !nativeDisableAttempted.get()) {
+            withContext(NonCancellable + pushWakeStorageDispatcher) {
+                runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }
+            }
+        }
+        throw cancelled
     } finally {
         if (nativeDisableAttempted.get()) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
     }

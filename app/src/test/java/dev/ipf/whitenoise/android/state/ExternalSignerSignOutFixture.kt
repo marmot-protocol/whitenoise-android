@@ -69,6 +69,9 @@ internal abstract class ExternalSignerSignOutFixture {
         )
     protected var engineWiped = false
     protected var additionalAccounts: List<AccountSummaryFfi> = emptyList()
+
+    /** Native-push flags of [additionalAccounts] by label, off when absent. */
+    protected val additionalNativePush = mutableMapOf<String, Boolean>()
     protected var beforeListAccounts: () -> Unit = {}
     protected var beforeSignOutReply: () -> Unit = {}
 
@@ -124,8 +127,16 @@ internal abstract class ExternalSignerSignOutFixture {
                         NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
                     }
                 }
-                // The native flag this fake keeps, for reads such as Firebase auto-init demand.
-                "notificationSettings" -> NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
+                // Each account's native flag, for reads such as Firebase auto-init demand.
+                "notificationSettings" -> {
+                    val requested = arguments?.get(0) as String
+                    if (requested == accountRef) {
+                        NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
+                    } else {
+                        val hex = additionalAccounts.firstOrNull { it.label == requested }?.accountIdHex.orEmpty()
+                        NotificationSettingsFfi(requested, hex, true, additionalNativePush[requested] ?: false)
+                    }
+                }
                 "signOut" -> {
                     signOutCalls.incrementAndGet()
                     nativeCallOrder += "signOut"

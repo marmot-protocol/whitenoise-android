@@ -168,10 +168,12 @@ class FcmAutoInitCoverageTest {
         val selection = appModuleSource(SELECTION)
         val autoInit = appModuleSource(AUTO_INIT)
 
+        val enableAfterRegistration = selection.functionBody("enableNativeDeliveryForAccounts")
         assertTrue(
-            selection
-                .functionBody("enableNativeDeliveryForAccounts")
-                .contains("if (registered) applyFcmAutoInit(enabled = true)"),
+            "auto-init turns on only after registration and only for native demand",
+            enableAfterRegistration.contains(
+                "if (registered && nativePushDemand(owner.accountRefs) == NativePushDemand.Required) {",
+            ),
         )
         assertTrue(
             selection
