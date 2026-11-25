@@ -287,22 +287,6 @@ internal fun ResolvingContactRow(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-internal fun SectionHeader(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(start = Dimens.spaceLg, end = Dimens.spaceLg, top = Dimens.spaceLg, bottom = Dimens.spaceSm),
-    )
-}
-
 /**
  * One standalone action row on the group surface: leading glyph (or progress), title, optional value and
  * supporting text. Disabled rows keep a button semantic and explain themselves through [disabledReason].

@@ -49,14 +49,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "NTF-049"
-        ]
-      },
-      {
         "surface": "string:delete",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
         "anchor": "R.string.delete",

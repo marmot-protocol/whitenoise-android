@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,7 +27,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountKeyPackageInventoryEntryFfi
 import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
@@ -41,8 +39,8 @@ import dev.ipf.whitenoise.android.state.fetchKeyPackageInventory
 import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
 import dev.ipf.whitenoise.android.state.publishNewKeyPackage
 import dev.ipf.whitenoise.android.state.republishKeyPackage
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -213,47 +211,40 @@ private fun KeyPackagesScreenForAccount(
     )
 
     pendingDelete?.let { kp ->
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.delete_key_package_question)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.delete_key_package_help))
-                    Text(
-                        stringResource(R.string.event_value, IdentityFormatter.short(kp.eventIdHex)),
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+        ConfirmDialog(
+            title = stringResource(R.string.delete_key_package_question),
+            message = stringResource(R.string.delete_key_package_help),
+            confirmLabel = stringResource(R.string.delete),
+            onConfirm = onConfirm@{
+                val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@onConfirm
+                val targetAccount = accountRef ?: return@onConfirm
+                pendingDelete = null
+                working = true
+                scope.launch {
+                    try {
+                        if (deleteKeyPackage(targetAccount, target.eventIdHex, target.sourceRelays)) {
+                            reload(refreshFromNetwork = true)
+                        }
+                    } finally {
+                        working = false
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@TextButton
-                        val targetAccount = accountRef ?: return@TextButton
-                        pendingDelete = null
-                        working = true
-                        scope.launch {
-                            try {
-                                if (deleteKeyPackage(targetAccount, target.eventIdHex, target.sourceRelays)) {
-                                    reload(refreshFromNetwork = true)
-                                }
-                            } finally {
-                                working = false
-                            }
-                        }
-                    },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.delete),
-                                stringResource(R.string.explanation_relays_key_package_delete_confirm),
-                            ),
-                        ),
-                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
+            onDismiss = { pendingDelete = null },
+            destructive = true,
+            confirmModifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.delete),
+                        stringResource(R.string.explanation_relays_key_package_delete_confirm),
+                    ),
+                ),
+            identity = {
+                Text(
+                    stringResource(R.string.event_value, IdentityFormatter.short(kp.eventIdHex)),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             },
         )
     }

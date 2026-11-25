@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,6 +20,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
 import dev.ipf.whitenoise.android.state.LinkedDeviceSettingsPatch
 import dev.ipf.whitenoise.android.state.deviceLabelFits
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -240,15 +240,13 @@ private fun RemoveDeviceDialog(
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.device_detail_remove)) },
-        text = { Text(stringResource(R.string.device_detail_remove_confirm, name)) },
-        confirmButton = {
-            TextButton(onClick = onRemove, modifier = Modifier.testTag(DEVICE_DETAIL_REMOVE_CONFIRM_TAG)) {
-                Text(stringResource(R.string.device_detail_remove), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    ConfirmDialog(
+        title = stringResource(R.string.device_detail_remove),
+        message = stringResource(R.string.device_detail_remove_confirm, name),
+        confirmLabel = stringResource(R.string.device_detail_remove),
+        onConfirm = onRemove,
+        onDismiss = onDismiss,
+        destructive = true,
+        confirmTag = DEVICE_DETAIL_REMOVE_CONFIRM_TAG,
     )
 }

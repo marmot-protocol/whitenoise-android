@@ -13,9 +13,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -321,6 +323,23 @@ internal fun WhiteNoiseAlertDialog(
             textContentColor = scheme.onSurfaceVariant,
         )
     }
+}
+
+/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun WhiteNoiseDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = AlertDialogDefaults.shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
+        border = amoledOutlineBorder(),
+        content = content,
+    )
 }
 
 /** One option in a speech picker: its own label, selected state, availability reason and action. */
