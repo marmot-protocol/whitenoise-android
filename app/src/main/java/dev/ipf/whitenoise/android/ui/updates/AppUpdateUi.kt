@@ -11,7 +11,6 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -21,10 +20,9 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.theme.AppUpdateEmblemColors
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
-private val AppUpdateEmblemBackground = Color(0xFF55D6C2)
-private val AppUpdateEmblemForeground = Color(0xFF00382F)
 
 /** Availability ignores the retired banner dismissal while keeping actual version and distribution policy. */
 internal fun showAppUpdateEntry(
@@ -68,14 +66,17 @@ internal fun AppUpdateIconButton(
 @Suppress("FunctionNaming")
 internal fun AppUpdateEmblem(contentDescription: String? = null) {
     Box(
-        modifier = Modifier.size(32.dp).background(AppUpdateEmblemBackground, MaterialShapes.Cookie9Sided.toShape()),
+        modifier =
+            Modifier
+                .size(32.dp)
+                .background(AppUpdateEmblemColors.background, MaterialShapes.Cookie9Sided.toShape()),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painterResource(R.drawable.ic_app_update_download),
             contentDescription = contentDescription,
             modifier = Modifier.size(20.dp),
-            tint = AppUpdateEmblemForeground,
+            tint = AppUpdateEmblemColors.foreground,
         )
     }
 }
