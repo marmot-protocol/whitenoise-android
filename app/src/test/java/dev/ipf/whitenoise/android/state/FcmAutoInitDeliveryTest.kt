@@ -10,7 +10,9 @@ import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundServ
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -27,6 +29,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Firebase auto-init is off in the manifest (#4081). The delivery controller turns it on right before
@@ -424,6 +428,43 @@ class FcmAutoInitDeliveryTest {
         }
     }
 
+    /** A sync cancelled right after it drains the last Push account's pending disable still turns auto-init off. */
+    @Test
+    fun cancelledPendingDisableDrainStillTurnsAutoInitOff() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val syncJob = AtomicReference<Job?>()
+            val cancelOnDisable = AtomicBoolean(false)
+            val fixture =
+                fixture(
+                    platform = platform,
+                    nativeEnabled = false,
+                    onSetNative = { ref, enabled ->
+                        // The native disable commits, then the sync is cancelled before the drain returns.
+                        if (!enabled && cancelOnDisable.get()) syncJob.get()?.cancel()
+                        settings(ref, nativeEnabled = enabled)
+                    },
+                ) { TOKEN }
+            try {
+                fixture.replaceNotificationSettings(settings(ACCOUNT_B, nativeEnabled = true))
+                fixture.bootstrap()
+                assertTrue(PushTokenStore.create(context).recordPendingDisable(ACCOUNT_B))
+                platform.autoInitWrites.clear()
+                cancelOnDisable.set(true)
+
+                val job = launch { fixture.appState.syncNativePushRegistrationIfEnabled() }
+                syncJob.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the sync must have been cancelled", job.isCancelled)
+                assertFalse(fixture.notificationSettings(ACCOUNT_B).nativePushEnabled)
+                assertEquals(listOf(false), platform.autoInitWrites.distinct())
+            } finally {
+                cancelOnDisable.set(false)
+                fixture.close()
+            }
+        }
+
     /** A settings read failure with no account known to need push neither reads a token nor flips auto-init. */
     @Test
     fun unreadableSettingsKeepAutoInitUntouched() =
@@ -462,6 +503,7 @@ class FcmAutoInitDeliveryTest {
         onNotificationSettings: ((String) -> NotificationSettingsFfi?)? = null,
         capability: NativePushCapability = NativePushCapability.Available,
         onUpsert: (String) -> Unit = {},
+        onSetNative: ((String, Boolean) -> NotificationSettingsFfi)? = null,
         fcmTokenReader: suspend () -> String?,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -469,6 +511,7 @@ class FcmAutoInitDeliveryTest {
         initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled),
         nativePushFallbackPlatform = platform,
         onUpsertPushRegistration = onUpsert,
+        onSetNativePushEnabled = onSetNative,
         onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = { CONFIG },
         fcmTokenReader = fcmTokenReader,

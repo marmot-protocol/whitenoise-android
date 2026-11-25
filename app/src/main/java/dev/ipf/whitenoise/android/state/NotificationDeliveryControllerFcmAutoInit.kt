@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
@@ -94,3 +96,16 @@ internal suspend fun NotificationDeliveryController.settleFcmAfterSignOut(
     if (remaining.isEmpty()) runCatching { pushTokenStore.clear() }
     applyFcmAutoInit(enabled = false)
 }
+
+/**
+ * Runs [block], which holds the native sync lock, and settles auto-init from the loaded accounts' demand if
+ * it is cancelled. The block may already have committed a native-push disable, such as a drained sign-out
+ * disable, so the settle runs before the cancellation propagates.
+ */
+internal suspend inline fun <T> NotificationDeliveryController.settlingFcmAutoInitOnCancel(block: () -> T): T =
+    try {
+        block()
+    } catch (cancelled: CancellationException) {
+        withContext(NonCancellable) { disableFcmAutoInitWithoutLoadedNativeDemand() }
+        throw cancelled
+    }

@@ -19,7 +19,9 @@ internal suspend fun NotificationDeliveryController.syncNativePushRegistration(
 ): Boolean =
     try {
         nativePushSyncMutex.withLock {
-            syncNativePushRegistrationIfEnabledLocked(freshCallbackToken, callbackOwnerIsCurrent)
+            settlingFcmAutoInitOnCancel {
+                syncNativePushRegistrationIfEnabledLocked(freshCallbackToken, callbackOwnerIsCurrent)
+            }
         }
     } catch (_: PushTokenStorageException) {
         android.util.Log.w("PushTokenStorage", "registration_deferred")
@@ -30,10 +32,12 @@ internal suspend fun NotificationDeliveryController.syncNativePushRegistration(
 internal suspend fun NotificationDeliveryController.pauseNotificationDeliveryReconciliation(): Boolean {
     nativePushFallback.invalidateAll()
     return nativePushSyncMutex.withLock {
-        drainPendingPushClears()
-        drainPendingPushDisables()
-        disableFcmAutoInitWithoutLoadedNativeDemand()
-        false
+        settlingFcmAutoInitOnCancel {
+            drainPendingPushClears()
+            drainPendingPushDisables()
+            disableFcmAutoInitWithoutLoadedNativeDemand()
+            false
+        }
     }
 }
 

@@ -117,6 +117,20 @@ class FcmAutoInitCoverageTest {
         assertTrue("the off write must recheck the live account list", unchanged.contains(liveRecheck))
     }
 
+    /** Every locked sync and permission pause settles auto-init from demand when it is cancelled. */
+    @Test
+    fun cancelledSyncsSettleAutoInit() {
+        val sync = appModuleSource(SYNC)
+        val settle = appModuleSource(AUTO_INIT).functionBody("settlingFcmAutoInitOnCancel")
+
+        listOf("syncNativePushRegistration", "pauseNotificationDeliveryReconciliation").forEach { locked ->
+            val body = sync.functionBody(locked)
+            assertTrue("$locked must settle on cancel", body.contains("settlingFcmAutoInitOnCancel {"))
+        }
+        assertTrue(settle.contains("withContext(NonCancellable) { disableFcmAutoInitWithoutLoadedNativeDemand() }"))
+        assertTrue(settle.contains("throw cancelled"))
+    }
+
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
     @Test
     fun fcmSelectionOwnsAutoInitThroughRegistration() {
