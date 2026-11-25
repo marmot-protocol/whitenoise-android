@@ -65,7 +65,8 @@ internal fun TtsTransportBar(
     // Menu actions run after the popup closes. Recheck the queue before they navigate.
     fun canJumpMessage(): Boolean {
         val current = appState.ttsController.state.value
-        return current.sessionId == sessionId && ttsNavigationEnabled(current, appState.ttsHistorySession.edgeState.value)
+        val currentEdge = appState.ttsHistorySession.edgeState.value
+        return current.sessionId == sessionId && ttsNavigationEnabled(current, currentEdge)
     }
 
     // The estimate takes the controller lock, which the speech callback thread
