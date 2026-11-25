@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -489,8 +490,10 @@ class ComposerDragAndReadingTest {
         render(longDraft, width = 280, rtl = true, fontScale = 2f, editing = true)
         drag(600f)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).assertIsDisplayed().assertShownWhole(24.dp)
+        val pencil = composeRule.onNodeWithTag(COMPOSER_EDIT_PENCIL_TAG, useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the pencil is whole or absent", (pencil.right - pencil.left).value.let { it < 0.5f || it > 15.5f })
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_edit_large_rtl.png")
-        composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).assertIsDisplayed()
         assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).performClick()
         composeRule.waitForIdle()
