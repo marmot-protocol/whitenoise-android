@@ -13,14 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
@@ -47,7 +45,7 @@ internal fun StartupFailureScreen(
     onRetry: () -> Unit,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val copier = rememberClipboardCopier()
     StartupStatusPage(Modifier.testTag(STARTUP_FAILURE_TEST_TAG)) {
         StatePage(
             title = title,
@@ -63,7 +61,7 @@ internal fun StartupFailureScreen(
             secondary =
                 StateAction(
                     stringResource(R.string.copy),
-                    { clipboard.setText(AnnotatedString(error.report)) },
+                    { copier.copy(error.report) },
                     testTag = STARTUP_COPY_TEST_TAG,
                 ),
             footer = {

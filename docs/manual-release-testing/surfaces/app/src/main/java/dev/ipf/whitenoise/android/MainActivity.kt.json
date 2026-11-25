@@ -49,6 +49,14 @@
         "test_ids": [
           "DIC-015"
         ]
+      },
+      {
+        "surface": "Hardware keyboard shortcut installation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt",
+        "anchor": "installHardwareShortcuts(window, hardwareShortcuts)",
+        "test_ids": [
+          "AXY-021"
+        ]
       }
     ]
   },
