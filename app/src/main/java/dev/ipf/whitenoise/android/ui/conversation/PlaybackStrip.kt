@@ -126,7 +126,8 @@ private fun PlaybackStripRow(
             val stackActions = stackForText || leadingWidth + minimumInfoWidth + actionsWidth > innerWidth
             val inlineActionsWidth = if (stackActions) 0 else actionsWidth
             val infoWidth = (innerWidth - leadingWidth - inlineActionsWidth).coerceAtLeast(minimumInfoWidth)
-            val infoPlaceables = infoMeasurables.map { it.measure(Constraints(minWidth = infoWidth, maxWidth = infoWidth)) }
+            val infoConstraints = Constraints.fixedWidth(infoWidth)
+            val infoPlaceables = infoMeasurables.map { it.measure(infoConstraints) }
             val firstRow = leadingPlaceables + infoPlaceables + if (stackActions) emptyList() else actionPlaceables
             val firstRowHeight = maxOf(StripControlSize.roundToPx(), firstRow.maxOfOrNull { it.height } ?: 0)
             val secondRowHeight = if (stackActions) actionPlaceables.maxOfOrNull { it.height } ?: 0 else 0
@@ -251,7 +252,11 @@ internal fun PlaybackSpeedChip(
             Modifier.heightIn(min = 28.dp).padding(horizontal = 7.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Ltr), maxLines = 1)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Ltr),
+                maxLines = 1,
+            )
         }
     }
 }

@@ -61,15 +61,25 @@ class MediaPlayerBarScreenshotTest {
 
     @Test fun statesDark() = sheet("media_player_bar_states_dark", dark = true)
 
-    @Test fun statesLargeFontRtl() = sheet("media_player_bar_states_large_font_rtl", dark = true, amoled = true, fontScale = 1.6f, rtl = true)
+    @Test
+    fun statesLargeFontRtl() =
+        sheet(
+            "media_player_bar_states_large_font_rtl",
+            dark = true,
+            amoled = true,
+            fontScale = 1.6f,
+            rtl = true,
+        )
 
     @Test fun voiceInChatListAmoled() = inChatList("media_player_bar_voice_chat_list_amoled", dark = true, voice = true)
 
-    @Test fun speechInChatListLight() = inChatList("media_player_bar_speech_chat_list_light", dark = false, voice = false)
+    @Test
+    fun speechInChatListLight() = inChatList("media_player_bar_speech_chat_list_light", dark = false, voice = false)
 
     @Test fun voiceInChatListLight() = inChatList("media_player_bar_voice_chat_list_light", dark = false, voice = true)
 
-    @Test fun speechInChatListAmoled() = inChatList("media_player_bar_speech_chat_list_amoled", dark = true, voice = false)
+    @Test
+    fun speechInChatListAmoled() = inChatList("media_player_bar_speech_chat_list_amoled", dark = true, voice = false)
 
     private fun sheet(
         name: String,

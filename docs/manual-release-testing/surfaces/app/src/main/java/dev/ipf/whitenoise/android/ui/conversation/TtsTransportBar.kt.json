@@ -99,6 +99,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "Read-aloud label when playback has no time estimate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.read_aloud",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
         "surface": "R.string.tts_bar_next_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "R.string.tts_bar_next_message",
