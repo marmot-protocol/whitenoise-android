@@ -71,6 +71,21 @@ class ChatsNewMessageFabShortcutTest {
         assertEquals(1, opens)
     }
 
+    /** A key that arrives after the account changed in the same frame opens nothing, as a captured tap does. */
+    @Test
+    fun keyAfterSameFrameAccountReplacementOpensNothing() {
+        show { chatOrganizationRelays(configured = true) }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            replaceChatOrganizationAccount(app, "bob")
+            router.dispatch(HardwareShortcutCommand.NewMessage)
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(0, opens)
+    }
+
     /** Runs Ctrl+N through the router on the main thread and reports whether something took it. */
     private fun dispatchNewMessage(): Boolean {
         val handled = composeRule.runOnIdle { router.dispatch(HardwareShortcutCommand.NewMessage) }

@@ -134,8 +134,11 @@ internal fun ChatsNewMessageFab(
         available = shown && relaysChecked && !missing,
         waiting = shown && !relaysChecked,
     ) {
-        onNewMessageOrigin(null)
-        onNewMessage()
+        // Rechecked when the key arrives, as a tap is, since the owner can change before the next composition.
+        if (current() && relaysChecked && !missing) {
+            onNewMessageOrigin(null)
+            onNewMessage()
+        }
     }
     ChatsNewMessageFabContent(missing, onBounds = { fabBounds = it }, hidePen = hidePen, onClick = {
         if (current()) {
