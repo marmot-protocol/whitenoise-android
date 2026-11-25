@@ -14,9 +14,9 @@ name: signin-whitespace
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - tapOn: "Private key"
 - inputText: "   "
 - hideKeyboard
@@ -33,6 +33,6 @@ name: signin-whitespace
     id: "onboarding.sign_in.action"
 - assertVisible: "That's a public key. Enter your secret key (nsec) to sign in."
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signin-whitespace

@@ -83,7 +83,7 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = relayDecision()))
         composeRule.onNodeWithTag("setup-action-RETRY").assertDoesNotExist()
         composeRule.onNodeWithText("Review suggested changes").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Edit relays").performScrollTo().performClick()
+        composeRule.onNodeWithText("Edit relays").scrollToIfScrollable().performClick()
         assertEquals(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, actions.single().action)
         assertEquals(listOf(OnboardingActionFfi.EDIT_RELAYS), edits)
         composeRule.onNodeWithTag("setup-reset-relays").assertDoesNotExist()
@@ -154,7 +154,7 @@ class AccountSetupContentTest {
         OnboardingActionFfi.entries.filter { it != OnboardingActionFfi.EDIT_FOLLOWS }.forEach { action ->
             composeRule
                 .onNodeWithTag("setup-action-${action.name}")
-                .performScrollTo()
+                .scrollToIfScrollable()
                 .assertIsEnabled()
                 .performClick()
         }
@@ -299,7 +299,7 @@ class AccountSetupContentTest {
             ),
         )
         composeRule.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-RETRY").scrollToIfScrollable().performClick()
         assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
     }
 
@@ -330,7 +330,7 @@ class AccountSetupContentTest {
         composeRule.onNodeWithText("wss://read.example").performScrollTo().assertExists()
         composeRule.onNodeWithText("wss://write.example").performScrollTo().assertExists()
         assertTrue(actions.isEmpty())
-        composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").scrollToIfScrollable().performClick()
         assertEquals(3uL, actions.single().revision)
     }
 
@@ -347,9 +347,9 @@ class AccountSetupContentTest {
                 disconnected = true,
             ),
         )
-        composeRule.onNodeWithTag("setup-action-RECONNECT_SIGNER").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-RECONNECT_SIGNER").scrollToIfScrollable().performClick()
         assertEquals(OnboardingActionFfi.RECONNECT_SIGNER, actions.single().action)
-        composeRule.onNodeWithText("Resume checks").performScrollTo().performClick()
+        composeRule.onNodeWithText("Resume checks").scrollToIfScrollable().performClick()
         assertEquals(1, reconnected)
     }
 
@@ -360,7 +360,7 @@ class AccountSetupContentTest {
         composeRule.onNodeWithText("Setup stopped.", substring = true).assertDoesNotExist()
         composeRule
             .onNodeWithTag("setup-open-chats")
-            .performScrollTo()
+            .scrollToIfScrollable()
             .assertIsEnabled()
             .performClick()
         assertEquals(1, opened)
@@ -384,7 +384,7 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("Your approval is saved.", substring = true).assertExists()
         composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-RETRY").scrollToIfScrollable().performClick()
         assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
     }
 
@@ -397,7 +397,7 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("Cancellation pending", substring = true).assertExists()
         composeRule.onNodeWithText("Your approval is saved.", substring = true).assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").scrollToIfScrollable().performClick()
         assertEquals(OnboardingActionFfi.CANCEL_ONBOARDING, actions.single().action)
         assertEquals(OnboardingStepFfi.INBOX_RELAYS, actions.single().step)
     }
@@ -549,6 +549,7 @@ class AccountSetupContentTest {
         )
     }
 
+    /** A Retry-first relay timeout names the host, keeps the full endpoint under Details, and Retry still submits. */
     @Test fun focusedRelayTimeoutShowsHostAndKeepsFullEndpointInDetails() {
         val endpoint = "wss://relay_edge.example:7443/inbox"
         val snapshot = focusedRelayTimeoutSnapshot(endpoint)
@@ -568,7 +569,7 @@ class AccountSetupContentTest {
 
         composeRule.onNodeWithTag("setup-details").performClick()
         composeRule.onNodeWithText(endpoint).performScrollTo().assertIsDisplayed()
-        retry.performScrollTo().performClick()
+        retry.scrollToIfScrollable().performClick()
         assertEquals(listOf(OnboardingActionFfi.RETRY), actions.map { it.action })
     }
 
@@ -612,7 +613,7 @@ class AccountSetupContentTest {
         composeRule.onNodeWithTag("setup-stage-progress").assertExists()
         composeRule.onNodeWithTag("setup-step-RELAYS").assertDoesNotExist()
         composeRule.runOnIdle { snapshot.recoveryEpoch = "later-epoch" }
-        composeRule.onNodeWithTag("setup-remove-relay").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-remove-relay").scrollToIfScrollable().performClick()
         assertEquals(listOf(Triple(3uL, "displayed-epoch", "wss://retired.example")), removals)
         assertTrue(actions.isEmpty())
     }

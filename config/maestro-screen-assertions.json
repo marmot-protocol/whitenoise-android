@@ -2826,14 +2826,14 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "shared Add Profile content shown inside secure dialog."
         }
@@ -2846,22 +2846,22 @@
         {
           "case": "presentation-surface-addprofile-welcome",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         },
         {
           "case": "presentation-surface-addprofile-signin",
           "selector": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "scope": "secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.",
           "entry_assertion": {
-            "text": "Sign Up"
+            "text": "Sign up"
           },
           "visible_on_entry": true
         }
@@ -3100,7 +3100,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
@@ -3141,7 +3141,7 @@
         {
           "case": "qr-permission-deny-close",
           "selector": {
-            "text": "^Camera Access Needed$"
+            "text": "^Camera access needed$"
           },
           "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
@@ -5681,38 +5681,6 @@
           },
           "opened_by": {
             "id": "onboarding-saved-account"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInKeyField.kt",
-      "symbol": "SignInKeyField",
-      "bindings": [
-        {
-          "case": "presentation-modal-scan-invalid",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
-          }
-        },
-        {
-          "case": "presentation-modal-scan-public",
-          "selector": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "scope": "Actual decoded-scan rejection dialog leaves original field unchanged, can reopen, rejects stale session callback; supplied decoded result, no camera or native login.",
-          "entry_assertion": {
-            "id": "onboarding.sign_in.scan_error"
-          },
-          "opened_by": {
-            "text": "Deliver decoded result"
           }
         }
       ]

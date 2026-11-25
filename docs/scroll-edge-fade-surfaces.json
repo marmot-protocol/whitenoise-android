@@ -1095,7 +1095,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -1138,20 +1138,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
-      "calls": {
-        "whiteNoiseVerticalScroll": 1
-      },
-      "family": "onboarding",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },

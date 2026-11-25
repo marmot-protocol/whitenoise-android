@@ -664,7 +664,7 @@ class AccountSetupContentScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_$name.png")
         if (name == "large_rtl") {
             composeRule.mainClock.autoAdvance = true
-            composeRule.onNodeWithTag("setup-action-CONTINUE_ANYWAY").performScrollTo()
+            composeRule.onNodeWithTag("setup-details").performScrollTo()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_large_rtl_actions.png")
         }
     }
