@@ -24,10 +24,12 @@ internal class IncomingLanguageDetector(
         val letters = normalized.codePoints().filter(Character::isLetter).toArray()
         if (letters.size < MIN_LETTERS || letters.toSet().size < MIN_DISTINCT_LETTERS) return null
         val scripts = letters.map(UnicodeScript::of).filterNot { it == UnicodeScript.COMMON }.toSet()
-        if (scripts.any { it in KanaScripts } && scripts.all { it in JapaneseScripts }) return "ja"
-        val script = scripts.singleOrNull() ?: return null
-        ScriptLanguages[script]?.let { return it }
-        return identifyByTrigrams(script, normalized)
+        val script = scripts.singleOrNull()
+        return when {
+            scripts.any { it in KanaScripts } && scripts.all { it in JapaneseScripts } -> "ja"
+            script != null -> ScriptLanguages[script] ?: identifyByTrigrams(script, normalized)
+            else -> null
+        }
     }
 
     private fun identifyByTrigrams(
@@ -49,8 +51,9 @@ internal class IncomingLanguageDetector(
                     }
                 profile.code to (1.0 - distance.toDouble() / (sample.size * PROFILE_LENGTH))
             }.sortedByDescending { it.second }
-        val (code, best) = scores.getOrNull(0) ?: return null
-        val runnerUp = scores.getOrNull(1)?.second ?: return null
+        if (scores.size < 2) return null
+        val (code, best) = scores[0]
+        val runnerUp = scores[1].second
         // Sparse or close matches are too weak to use as a composer default.
         val minimumGap = runnerUp * (3.0 / sample.size + GAP_FLOOR)
         return code.takeIf { best >= MIN_SIMILARITY && best - runnerUp > minimumGap }

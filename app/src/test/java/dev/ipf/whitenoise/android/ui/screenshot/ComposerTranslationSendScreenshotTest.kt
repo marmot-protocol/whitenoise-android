@@ -147,11 +147,11 @@ class ComposerTranslationSendScreenshotTest {
         val names =
             linkedMapOf(
                 "" to "Detect language",
+                "fr" to "French",
                 "zh" to "Chinese (Simplified)",
                 "zh_hant" to "Chinese (Traditional)",
                 "nl" to "Dutch",
                 "en" to "English",
-                "fr" to "French",
                 "de" to "German",
                 "it" to "Italian",
                 "pt" to "Portuguese",

@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
@@ -50,6 +50,7 @@ import java.text.Normalizer
 private val LanguageRowMinHeight = 48.dp
 private val CheckSize = 24.dp
 private val LanguageFlagFontSize = 18.sp
+private val LanguageFlagSlotSize = 26.sp
 private const val SHEET_HEIGHT_SHARE = 0.88f
 private const val ROWS_ABOVE_SELECTED = 2
 private val CombiningMarks = Regex("\\p{Mn}+")
@@ -158,8 +159,8 @@ private fun TranslationLanguageRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        val flagWidth = with(LocalDensity.current) { LanguageFlagFontSize.toDp() }.coerceAtLeast(CheckSize)
-        Box(Modifier.width(flagWidth).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+        val flagWidth = with(LocalDensity.current) { LanguageFlagSlotSize.toDp() }.coerceAtLeast(CheckSize)
+        Box(Modifier.widthIn(min = flagWidth).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
             if (flag == null) {
                 Icon(
                     painterResource(R.drawable.ic_language),

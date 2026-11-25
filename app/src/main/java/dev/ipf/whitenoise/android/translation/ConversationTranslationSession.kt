@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -103,7 +104,7 @@ internal class ConversationTranslationSession(
                 if (requestGeneration != epoch || !ownerCurrent()) return@withPermit
                 val translated = translateWithPrivacyGate(engine(), source.text, from, source.target)
                 if (!currentRequest(source, requestGeneration)) return@withPermit
-                val language = source.incomingRecordedAt?.let { identifyIncoming(source.text) }
+                val language = source.incomingRecordedAt?.let { identifyIncoming(source.text, detectIncoming) }
                 publishRendition(source, requestGeneration, TranslationRendition(translated, sourceLanguage = language))
             }
         } catch (cancelled: CancellationException) {
@@ -121,37 +122,6 @@ internal class ConversationTranslationSession(
     }
 
     fun isCurrent(): Boolean = ownerCurrent()
-
-    private suspend fun identifyIncoming(text: String): String? =
-        try {
-            detectIncoming(text)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            // A missing suggestion must never replace a successful incoming translation with an error.
-            null
-        }
-
-    /** Use matching live results only. A reply can name an older message, while chat-wide evidence must be recent. */
-    fun suggestedTarget(
-        replyId: String?,
-        nowSeconds: ULong = (System.currentTimeMillis() / 1_000).toULong(),
-    ): String? {
-        if (!ownerCurrent()) return null
-        val recent = (nowSeconds - minOf(nowSeconds, SUGGESTION_MAX_AGE_SECONDS))..nowSeconds
-        val translatedIncoming = renditions.entries.filter { it.key.incomingRecordedAt != null }
-        val replyLanguage =
-            translatedIncoming.mapNotNull { (source, rendition) ->
-                rendition.sourceLanguage.takeIf { source.messageId == replyId }
-            }.distinct().singleOrNull()
-        val language =
-            replyLanguage ?: translatedIncoming.mapNotNull { (source, rendition) ->
-                rendition.sourceLanguage.takeIf {
-                    source.incomingRecordedAt != null && source.incomingRecordedAt in recent
-                }
-            }.distinct().singleOrNull()
-        return language?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
-    }
 
     fun isPending(source: TranslationSource): Boolean = source in pending
 
@@ -182,6 +152,41 @@ internal class ConversationTranslationSession(
     private companion object {
         const val MAX_PENDING_REQUESTS = 16
         const val MAX_RENDITIONS = 64
-        const val SUGGESTION_MAX_AGE_SECONDS = 24uL * 60uL * 60uL
     }
 }
+
+private suspend fun identifyIncoming(
+    text: String,
+    detectIncoming: suspend (String) -> String?,
+): String? =
+    try {
+        detectIncoming(text)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        // A missing suggestion must never replace a successful incoming translation with an error.
+        null
+    }
+
+/** Use matching live results only. A reply can name an older message, while chat-wide evidence must be recent. */
+internal fun ConversationTranslationSession.suggestedTarget(
+    replyId: String?,
+    nowSeconds: ULong = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()).toULong(),
+): String? {
+    if (!isCurrent()) return null
+    val recent = (nowSeconds - minOf(nowSeconds, SUGGESTION_MAX_AGE_SECONDS))..nowSeconds
+    val translatedIncoming = renditions.entries.filter { it.key.incomingRecordedAt != null }
+    val replyLanguage =
+        translatedIncoming.mapNotNull { (source, rendition) ->
+            rendition.sourceLanguage.takeIf { source.messageId == replyId }
+        }.distinct().singleOrNull()
+    val language =
+        replyLanguage ?: translatedIncoming.mapNotNull { (source, rendition) ->
+            rendition.sourceLanguage.takeIf {
+                source.incomingRecordedAt != null && source.incomingRecordedAt in recent
+            }
+        }.distinct().singleOrNull()
+    return language?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+}
+
+private const val SUGGESTION_MAX_AGE_SECONDS = 86_400uL
