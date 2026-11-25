@@ -98,6 +98,22 @@ class FcmAutoInitCoverageTest {
         assertTrue(accounts.contains("NativePushDemand.None -> return completeSyncWithoutNativePush("))
     }
 
+    /** A sync without the capability settles auto-init from account demand even when its fallback is cancelled. */
+    @Test
+    fun unavailableCapabilitySettlesAutoInitAfterFallback() {
+        val sync = appModuleSource(SYNC).functionBody("syncNativePushRegistrationIfEnabledLocked")
+        val fallback = sync.indexOf("reconcileUnavailableNativePushFallback(capability, accountRefs)")
+        val settle = sync.indexOf("withContext(NonCancellable)", startIndex = fallback)
+
+        assertTrue("the fallback must run before the settle", fallback in 0 until settle)
+        assertTrue(sync.substring(fallback, settle).contains("} finally {"))
+        assertTrue(
+            sync.substring(settle).contains(
+                "if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)",
+            ),
+        )
+    }
+
     /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
     @Test
     fun fcmSelectionOwnsAutoInitThroughRegistration() {

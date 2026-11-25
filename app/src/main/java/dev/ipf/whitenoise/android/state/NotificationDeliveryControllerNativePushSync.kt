@@ -5,6 +5,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.withLock
@@ -73,10 +74,15 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     val config = pushServerConfigProvider()
     val capability = nativePushCapability(config)
     if (!capability.isAvailable) {
-        val reconciled = reconcileUnavailableNativePushFallback(capability, accountRefs)
-        // Once the fallback has moved every account off native push, Firebase must stop refreshing a token.
-        if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
-        return reconciled
+        try {
+            return reconcileUnavailableNativePushFallback(capability, accountRefs)
+        } finally {
+            // Once the fallback has moved every account off native push, Firebase must stop refreshing a
+            // token. A cancelled fallback may already have committed a native disable, so this always runs.
+            withContext(NonCancellable) {
+                if (nativePushDemand(accountRefs) == NativePushDemand.None) applyFcmAutoInit(enabled = false)
+            }
+        }
     }
     config ?: return false
     if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
