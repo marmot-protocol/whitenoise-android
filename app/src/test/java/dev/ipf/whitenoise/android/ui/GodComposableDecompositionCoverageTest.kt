@@ -124,6 +124,31 @@ class GodComposableDecompositionCoverageTest {
         )
     }
 
+    /**
+     * A menu action queued behind the exit animation keeps the holder it was built with. When a pending send
+     * confirms, the record id replaces the poll owner and so the holder; the old holder must keep its own inputs,
+     * never the confirmed message's.
+     */
+    @Test
+    fun messageBubbleActionsKeepInputsPerHolder() {
+        val bubbleBody =
+            source("conversation/messages/MessageBubble.kt").readText().functionBody("MessageBubble")
+        val remembered =
+            source("conversation/messages/MessageBubbleActions.kt")
+                .readText()
+                .functionBody("rememberMessageBubbleActions")
+        val keys = "remember(appState, controller, surfaces, pollOwner)"
+
+        assertTrue("MessageBubble must use the actions holder", "rememberMessageBubbleActions(" in bubbleBody)
+        assertTrue(
+            "inputs must be remembered on the holder's keys, never shared across holders",
+            remembered.contains("$keys { mutableStateOf(inputs) }") &&
+                remembered.contains("latest.value = inputs") &&
+                remembered.contains("$keys {\n        MessageBubbleActions(") &&
+                !remembered.contains("rememberUpdatedState"),
+        )
+    }
+
     private fun source(relativePath: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/$relativePath"),

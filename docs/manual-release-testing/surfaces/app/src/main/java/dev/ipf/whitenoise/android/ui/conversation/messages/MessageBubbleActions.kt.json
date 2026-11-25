@@ -10,6 +10,14 @@
         "test_ids": [
           "MSG-041"
         ]
+      },
+      {
+        "surface": "Queued menu actions keep their own bubble's values",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleActions.kt",
+        "anchor": "fun rememberMessageBubbleActions(",
+        "test_ids": [
+          "MSG-004"
+        ]
       }
     ],
     "source_coverage": [
