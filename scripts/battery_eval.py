@@ -143,7 +143,7 @@ def sample_energy(sample, scenario, config, campaign, directory):
 
 
 def summarize_scenario(scenario, config, campaign, directory, used_captures):
-    """Summarize matched pairs and retain the count of failed deliveries."""
+    """Summarize complete pairs, requiring equal event windows for total energy."""
     require(fields(config, SCENARIO_FIELDS), "invalid_scenario_config")
     require(integer(config["window_ms"], MIN_WINDOW[scenario]), "invalid_measurement_window")
     expected = config["expected_messages"]
@@ -184,6 +184,11 @@ def summarize_scenario(scenario, config, campaign, directory, used_captures):
     require(max(temperatures) - min(temperatures) <= 20, "temperature_spread")
     if any(failed_deliveries.values()):
         return {"status": "delivery_failed", "pairs": len(pairs), "delivery_failures": failed_deliveries}
+    if not scenario.endswith("_idle"):
+        require(
+            all(first["duration_ms"] == second["duration_ms"] for first, second in pairs),
+            "mismatched_event_windows",
+        )
     total_a = [sample["total"] for sample in samples["a"]]
     total_b = [sample["total"] for sample in samples["b"]]
     deltas = [100 * (b - a) / a for a, b in zip(total_a, total_b)]

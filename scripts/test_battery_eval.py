@@ -70,6 +70,23 @@ class BatteryEvalTest(unittest.TestCase):
                 self.assertEqual(expected, result["status"])
                 self.assertAlmostEqual(change, result["median_change_percent"])
 
+    def test_total_energy_requires_equal_actual_windows_in_each_pair(self):
+        """Equal power over different event windows cannot yield an energy verdict."""
+        for scenario in ("push_burst", "reconnect"):
+            with self.subTest(scenario=scenario):
+                value = campaign(scenario=scenario)
+                config = value["scenarios"][scenario]
+                if scenario == "reconnect":
+                    config["max_recovery_attempts"] = 2
+                baseline, candidate = config["pairs"][0]
+                baseline.update(duration_ms=31500)
+                candidate.update(duration_ms=28500)
+                baseline["energy_uws"]["total"] = 6_300_000
+                candidate["energy_uws"]["total"] = 5_700_000
+
+                result = report(self.write(value))["scenarios"][scenario]
+                self.assertEqual({"status": "inconclusive", "reason": "mismatched_event_windows"}, result)
+
     def test_delivery_failure_surfaces_without_a_rail_sample(self):
         aa = self.write(campaign(scenario="push_burst"), "calibration.json")
         ab = campaign(True, "push_burst", (-10,) * 5)

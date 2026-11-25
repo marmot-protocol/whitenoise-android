@@ -801,6 +801,9 @@ are identical for A/A. The `scenarios` object maps each measured scenario to:
   `receipt_before_window_end`, and `recovery_attempts`. For idle, record
   zero received and a false receipt flag. When the disabled fixture is in
   effect, record Push mode and the revoked notification permission.
+  Both arms of a Push burst or reconnect pair must use the same measured
+  duration because the report compares total energy. Idle reports average
+  power using each sample's measured duration.
 - For Macrobenchmark, set each sample's `benchmark_json` to the path of its
   unmodified one-iteration `*-benchmarkData.json` relative to the campaign
   directory. Set `capture_sha256` to that file's SHA-256. For direct Perfetto
