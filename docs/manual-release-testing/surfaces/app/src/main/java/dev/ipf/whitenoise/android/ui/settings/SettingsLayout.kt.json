@@ -25,7 +25,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
         "anchor": "fun SettingsExplainer(",
         "test_ids": [
-          "SET-002"
+          "SET-002",
+          "SET-071"
         ]
       },
       {

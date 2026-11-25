@@ -18,7 +18,8 @@
         "anchor": "fun TranslationGlobalSettingsContent(",
         "test_ids": [
           "SET-033",
-          "SET-036"
+          "SET-036",
+          "SET-071"
         ]
       },
       {
@@ -124,7 +125,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
         "anchor": "private fun TranslationOverrideOptions(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-071"
         ]
       },
       {
@@ -133,7 +135,8 @@
         "anchor": "private fun TranslationChatTargetControls(",
         "test_ids": [
           "SET-033",
-          "SET-036"
+          "SET-036",
+          "SET-071"
         ]
       },
       {
@@ -175,6 +178,16 @@
         "test_ids": [
           "SET-033",
           "SET-037"
+        ]
+      },
+      {
+        "surface": "Translate target language settings link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "testTag(\"translation.target\")",
+        "test_ids": [
+          "SET-033",
+          "SET-036",
+          "SET-071"
         ]
       }
     ]

@@ -69,6 +69,17 @@
           "AXY-001",
           "AXY-002"
         ]
+      },
+      {
+        "surface": "WhiteNoiseDialogToggleRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogToggleRow(",
+        "test_ids": [
+          "SET-010",
+          "SET-033",
+          "SEC-009",
+          "SET-071"
+        ]
       }
     ],
     "settings_controls": [

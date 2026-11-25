@@ -38,6 +38,15 @@
           "SET-005",
           "SET-006"
         ]
+      },
+      {
+        "surface": "BubbleColorsResetButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun BubbleColorsResetButton(",
+        "test_ids": [
+          "SET-005",
+          "SET-071"
+        ]
       }
     ],
     "settings_controls": [
@@ -114,14 +123,6 @@
         ]
       },
       {
-        "surface": "string:more_options",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-        "anchor": "R.string.more_options",
-        "test_ids": [
-          "SET-005"
-        ]
-      },
-      {
         "surface": "string:reset_to_default",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
         "anchor": "R.string.reset_to_default",
@@ -148,11 +149,12 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.explanation_appearance_bubble_colors_menu",
+        "surface": "R.string.explanation_appearance_bubble_colors_reset",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
-        "anchor": "R.string.explanation_appearance_bubble_colors_menu",
+        "anchor": "R.string.explanation_appearance_bubble_colors_reset",
         "test_ids": [
-          "SET-054"
+          "SET-054",
+          "SET-071"
         ]
       },
       {

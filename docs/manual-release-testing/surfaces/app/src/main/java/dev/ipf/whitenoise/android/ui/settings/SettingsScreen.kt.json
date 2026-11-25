@@ -83,7 +83,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsProfileRow(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-071"
         ]
       },
       {
