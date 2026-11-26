@@ -196,13 +196,23 @@ internal class FileBackedPickBudget(
         byteCount: Long,
         copy: suspend (File) -> Boolean,
         accept: (StagedUploadSource) -> Boolean,
-    ): FileBackedPick {
-        if (byteCount !in 1..nextPickMaxBytes()) return refused(FileBackedPickFailure.TOO_LARGE)
-        if (!hasStorageFor(byteCount, uploadWriteBytes + nativeCopies(byteCount))) {
-            return refused(FileBackedPickFailure.STORAGE)
+    ): FileBackedPick =
+        when {
+            byteCount !in 1..nextPickMaxBytes() -> refused(FileBackedPickFailure.TOO_LARGE)
+            !hasStorageFor(byteCount, uploadWriteBytes + nativeCopies(byteCount)) ->
+                refused(FileBackedPickFailure.STORAGE)
+            !prepareStagingDirectory(directory) -> refused(FileBackedPickFailure.STORAGE)
+            else -> copyStored(byteCount, copy, accept)
         }
-        if (!prepareStagingDirectory(directory)) return refused(FileBackedPickFailure.STORAGE)
-        val target = Files.createTempFile(directory.toPath(), "draft-upload-", ".part").toFile()
+
+    private suspend fun copyStored(
+        byteCount: Long,
+        copy: suspend (File) -> Boolean,
+        accept: (StagedUploadSource) -> Boolean,
+    ): FileBackedPick {
+        val target =
+            runCatching { Files.createTempFile(directory.toPath(), "draft-upload-", ".part").toFile() }
+                .getOrElse { return refused(FileBackedPickFailure.STORAGE) }
         val source = StagedUploadSource(target, byteCount)
         var adopted = false
         return try {
@@ -247,13 +257,15 @@ internal class FileBackedPickBudget(
         accept: (StagedUploadSource) -> Boolean,
     ): FileBackedPick {
         val writeAfter = uploadWriteBytes + nativeCopies(source.byteCount)
-        if (!accept(source)) {
+        val failure =
+            when {
+                !accept(source) -> FileBackedPickFailure.UNREADABLE
+                !hasStorageFor(0L, writeAfter) -> FileBackedPickFailure.STORAGE
+                else -> null
+            }
+        if (failure != null) {
             source.closeQuietly()
-            return refused(FileBackedPickFailure.UNREADABLE)
-        }
-        if (!hasStorageFor(0L, writeAfter)) {
-            source.closeQuietly()
-            return refused(FileBackedPickFailure.STORAGE)
+            return refused(failure)
         }
         uploadWriteBytes = writeAfter
         uploadsFromFiles = true

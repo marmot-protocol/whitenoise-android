@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.media.pdf
 
+private const val MAX_STRING_RANGES = 250_000
+
 /** A parsed PDF value and the byte range [start] until [end] it was read from. */
 internal sealed class PdfValue(
     val start: Int,
@@ -85,5 +87,5 @@ internal fun PdfValue.collectStringRanges(ranges: MutableList<IntRange>) {
         is PdfArray -> items.forEach { it.collectStringRanges(ranges) }
         else -> Unit
     }
-    if (ranges.size > 250_000) throw PdfLimitException()
+    if (ranges.size > MAX_STRING_RANGES) throw PdfLimitException()
 }

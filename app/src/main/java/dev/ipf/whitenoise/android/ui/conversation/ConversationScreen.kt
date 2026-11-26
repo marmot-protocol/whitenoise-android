@@ -3846,7 +3846,11 @@ internal fun ConversationScreen(
                                 null
                             },
                         onSendAttachments = { caption, onResult ->
-                            confirmAndSendStagedAttachments(caption, onResult, composerTextState.captureCaptionSettlement())
+                            confirmAndSendStagedAttachments(
+                                caption,
+                                onResult,
+                                composerTextState.captureCaptionSettlement(),
+                            )
                         },
                         onAfterSend = {
                             acceptedSendRevealedTranscript = true

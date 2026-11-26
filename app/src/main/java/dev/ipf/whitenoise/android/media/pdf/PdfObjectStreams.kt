@@ -36,19 +36,19 @@ internal fun decodeObjectStreams(
     var remainingBytes = MAX_OBJECT_STREAM_BYTES
     var remainingObjects = MAX_PACKED_OBJECTS
     val decoded = mutableListOf<PdfObjectStream>()
-    for (stream in layout.streams.filter { it.dict.name("Type") == "ObjStm" }) {
+    layout.streams.filter { it.dict.name("Type") == "ObjStm" }.forEach { stream ->
         val data = decodeStreamData(bytes, layout, stream, remainingBytes)
         val offsets = data?.let { objectOffsets(it.data, stream.dict, remainingObjects) }
         if (data == null || offsets == null) {
             plan.refuse(PdfMetadataRefusal.Unsupported)
-            break
+            return decoded
         }
         remainingBytes -= data.data.size
         remainingObjects -= offsets.size
         val objectStream = PdfObjectStream(data, offsets)
         if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
         if (containsName(objectStream.bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
-        if (plan.refusal != null) break
+        if (plan.refusal != null) return decoded
         decoded += objectStream
     }
     return decoded
@@ -77,8 +77,8 @@ private fun objectOffsets(
             val relative = offset.intOrNull() ?: return null
             if (position > first || relative !in 0 until (data.size - first)) return null
             val start = first + relative
-            val objectNumber = number.intOrNull() ?: return null
-            if (start <= previousStart || objectNumber <= 0 || offsets.put(objectNumber, start) != null) return null
+            val objectNumber = number.intOrNull()?.takeIf { it > 0 } ?: return null
+            if (start <= previousStart || offsets.put(objectNumber, start) != null) return null
             previousStart = start
         }
         offsets

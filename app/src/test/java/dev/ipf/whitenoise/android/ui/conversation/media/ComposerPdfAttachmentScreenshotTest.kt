@@ -133,7 +133,15 @@ class ComposerPdfAttachmentScreenshotTest {
         large: Boolean,
         names: List<String>,
     ) {
-        val decision = ComposerPdfDecision(names, setOf(PdfMetadataRefusal.Signed), emptyList(), {}, {})
+        val decision =
+            ComposerPdfDecision(
+                names,
+                setOf(PdfMetadataRefusal.Signed),
+                uris = emptyList(),
+                sendUris = emptyList(),
+                send = {},
+                cancel = {},
+            )
         composeRule.setContent {
             Themed(dark, large) { ComposerPdfMetadataDialogContent(decision, onConfirm = {}, onCancel = {}) }
         }
@@ -162,7 +170,15 @@ class ComposerPdfAttachmentScreenshotTest {
         privacy: ComposerPdfPrivacy?,
         onMetadataOptions: (() -> Unit)? = null,
     ) {
-        ComposerPdfAttachmentCard(label, pages, page, privacy, onPreview = {}, onRemove = {}, onMetadataOptions = onMetadataOptions)
+        ComposerPdfAttachmentCard(
+            label,
+            pages,
+            page,
+            privacy,
+            onPreview = {},
+            onRemove = {},
+            onMetadataOptions = onMetadataOptions,
+        )
     }
 
     /** A plain document page: a heading bar and lines of text, as a first-page render would show. */

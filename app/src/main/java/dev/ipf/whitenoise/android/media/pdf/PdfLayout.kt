@@ -25,12 +25,6 @@ internal class PdfGuessedStream(
     val endKeyword: Int,
 )
 
-/** One uncompressed object: where its value starts and its generation. */
-internal class PdfObjectAt(
-    val position: Int,
-    val generation: Int,
-)
-
 /** What one walk over an uncompressed PDF file found. */
 internal class PdfLayout(
     private val objects: PdfObjectIndex,
@@ -52,7 +46,7 @@ internal class PdfLayout(
     fun positions(
         number: Int,
         generation: Int,
-    ): List<Int> = objects.find(number).filter { it.generation == generation }.map { it.position }
+    ): List<Int> = objects.find(number, generation)
 }
 
 /** Uncompressed objects by number, built during the walk and sorted once. */
@@ -62,6 +56,7 @@ internal class PdfObjectIndex {
     private var generations = IntArray(INITIAL_OBJECTS)
     private var count = 0
     private var sorted: LongArray? = null
+    private val positionsByNumber = mutableMapOf<Int, Map<Int, List<Int>>>()
 
     fun add(
         number: Int,
@@ -80,8 +75,13 @@ internal class PdfObjectIndex {
         count++
     }
 
-    /** Every object numbered [number], in file order. */
-    fun find(number: Int): List<PdfObjectAt> {
+    /** Resolves a number's generations once, preserving file order within each generation. */
+    fun find(
+        number: Int,
+        generation: Int,
+    ): List<Int> = positionsByNumber.getOrPut(number) { positionsFor(number) }[generation].orEmpty()
+
+    private fun positionsFor(number: Int): Map<Int, List<Int>> {
         val index = sorted ?: keys.copyOf(count).also { it.sort() }.also { sorted = it }
         var low = 0
         var high = index.size
@@ -90,10 +90,10 @@ internal class PdfObjectIndex {
             val middle = (low + high) ushr 1
             if (index[middle] < key) low = middle + 1 else high = middle
         }
-        val found = mutableListOf<PdfObjectAt>()
+        val found = mutableMapOf<Int, MutableList<Int>>()
         while (low < index.size && (index[low] ushr INDEX_SHIFT) == number.toLong()) {
             val record = (index[low] and LOW_BITS).toInt()
-            found += PdfObjectAt(positions[record], generations[record])
+            found.getOrPut(generations[record]) { mutableListOf() } += positions[record]
             low++
         }
         return found

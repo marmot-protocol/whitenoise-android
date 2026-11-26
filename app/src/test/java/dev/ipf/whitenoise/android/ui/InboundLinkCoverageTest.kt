@@ -41,7 +41,12 @@ class InboundLinkCoverageTest {
                 running = true,
                 unlinked = false,
             )
-        val fixture = NotificationBootstrapTestFixture(context, accounts = listOf(account), emitStartupNotification = false)
+        val fixture =
+            NotificationBootstrapTestFixture(
+                context,
+                accounts = listOf(account),
+                emitStartupNotification = false,
+            )
         runBlocking { fixture.bootstrap() }
         val app = fixture.appState
         app.markDefaultNotificationsEnableAttempted()

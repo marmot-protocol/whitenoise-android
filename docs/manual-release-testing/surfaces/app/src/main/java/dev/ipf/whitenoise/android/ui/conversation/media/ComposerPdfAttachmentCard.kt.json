@@ -127,6 +127,14 @@
         "test_ids": [
           "MED-064"
         ]
+      },
+      {
+        "surface": "ComposerPdfOptionsButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfOptionsButton(",
+        "test_ids": [
+          "MED-064"
+        ]
       }
     ]
   },

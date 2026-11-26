@@ -7277,6 +7277,12 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataOptions",
+      "bindings": [],
+      "remaining": "Exercise Keep metadata for one cleanable attachment, check the shelf announces the selection, then send and verify the original bytes are preserved (MED-064)."
     }
   ]
 }

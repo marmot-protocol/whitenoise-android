@@ -70,6 +70,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Exercises the real key-screen confirmations, lifecycle observer, document launcher and returned-URI callback. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h1200dp-mdpi")
+@Suppress("LargeClass") // The export, lifecycle and provider cases share one real-screen fixture.
 class AccountKeysExportDeliveryTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -116,7 +117,7 @@ class AccountKeysExportDeliveryTest {
     fun rawDestinationDeliveredUnderAppLockWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = false)
 
     @Test
-    fun encryptedDestinationDeliveredUnderAppLockWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = true)
+    fun encryptedPickerWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = true)
 
     private fun assertDeferredPickerReturn(
         lock: Boolean,

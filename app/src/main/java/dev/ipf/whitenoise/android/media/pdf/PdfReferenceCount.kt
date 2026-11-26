@@ -19,15 +19,12 @@ internal fun countReferences(
     var stringIndex = 0
     while (position < bytes.size) {
         while (stringIndex < strings.size && strings[stringIndex].last < position) stringIndex++
-        if (stringIndex < strings.size && position in strings[stringIndex]) {
-            position = strings[stringIndex].last + 1
+        val string = strings.getOrNull(stringIndex)
+        if (string != null && position in string) {
+            position = string.last + 1
             continue
         }
-        if (!startsNumber(bytes, position)) {
-            position++
-            continue
-        }
-        val number = readInteger(bytes, position)
+        val number = if (startsNumber(bytes, position)) readInteger(bytes, position) else null
         val reference = number?.let { referenceAfter(bytes, it.second, it.first) }
         if (reference != null && reference.first in targets) {
             counts[reference.first] = (counts[reference.first] ?: 0) + 1

@@ -5,7 +5,6 @@ import android.net.Uri
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
-import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionChunkState
@@ -34,19 +33,13 @@ import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
 import dev.ipf.whitenoise.android.state.withStoredDraftAdmission
-import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfDecision
-import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
-import dev.ipf.whitenoise.android.ui.conversation.media.inspectComposerPdf
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
-import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-import kotlin.coroutines.resume
 
 /** What one Send hands to a collection operation; [caption] is already trimmed and null when blank. */
 internal data class CollectionSendRequest(
@@ -301,6 +294,7 @@ private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
  * Continues a paused operation with the same stable ids: MDK is asked about recorded tokens again, unreadable
  * items are skipped and named, and the remaining chunks are sent in order from their URIs.
  */
+@Suppress("LongMethod") // The claim spans token reconciliation, consent and journal admission.
 internal fun ConversationMediaSender.resumeCollection(
     operationId: String,
     canAskForPdfConsent: () -> Boolean = { false },
@@ -375,50 +369,6 @@ internal fun ConversationMediaSender.resumeCollection(
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
         driveResumedCollection(resumed, sessionEpoch, lease, original, keepPdfMetadata)
-    }
-}
-
-/** Checks remaining document inputs before changing a paused journal or starting its next chunk. */
-private suspend fun ConversationMediaSender.confirmResumedPdfMetadata(
-    operation: AttachmentCollectionOperation,
-    canAskForPdfConsent: () -> Boolean,
-): Set<Uri>? {
-    val documents =
-        operation.items
-            .filter { it.kind == CollectionItemKind.DOCUMENT && !it.state.isSettled && it.id !in operation.unrecoverableItemIds }
-            .map { Uri.parse(it.uri) }
-            .distinct()
-    val choices = collectionResumePdfChoices
-    val refused =
-        documents.mapNotNull { uri ->
-            val name = safeDocumentDisplayName(uri.lastPathSegment)
-            val metadata = inspectComposerPdf(context, uri, name)
-            if (metadata is PdfMetadataResult.Refused) {
-                uri to ComposerPdfState(name, metadata)
-            } else {
-                null
-            }
-        }
-    if (refused.isEmpty()) return emptySet()
-    if (!canAskForPdfConsent() ||
-        choices.decision != null ||
-        appState.appLock.screenVisible ||
-        appState.appLock.evaluationPending ||
-        latestCollectionSender(operation.accountRef, operation.groupIdHex) !== this
-    ) {
-        return null
-    }
-    var decision: ComposerPdfDecision? = null
-    try {
-        return suspendCancellableCoroutine { continuation ->
-            val uris = refused.map { it.first }
-            choices.retainOnly(emptyList())
-            refused.forEach { (uri, state) -> choices.record(uri, state) }
-            choices.confirmThen(uris, { continuation.resume(null) }) { continuation.resume(it) }
-            decision = choices.decision
-        }
-    } finally {
-        if (decision != null && choices.decision === decision) choices.cancel()
     }
 }
 

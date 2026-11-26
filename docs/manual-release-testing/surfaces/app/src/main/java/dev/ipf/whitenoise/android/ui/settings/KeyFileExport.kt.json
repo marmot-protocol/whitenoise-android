@@ -10,6 +10,14 @@
         "test_ids": [
           "ACC-011"
         ]
+      },
+      {
+        "surface": "KeyFileExportEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+        "anchor": "fun KeyFileExportEffects(",
+        "test_ids": [
+          "ACC-011"
+        ]
       }
     ],
     "source_coverage": [

@@ -161,16 +161,11 @@ internal fun ComposerPdfAttachmentCard(
                 }
             }
             if (onMetadataOptions != null) {
-                IconButton(
-                    onClick = onMetadataOptions,
-                    enabled = enabled,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_more_vert),
-                        stringResource(R.string.composer_pdf_metadata_options),
-                    )
-                }
+                ComposerPdfOptionsButton(
+                    enabled,
+                    onMetadataOptions,
+                    Modifier.align(Alignment.TopEnd).padding(end = 48.dp),
+                )
             }
             ComposerAccessoryRemoveButton(
                 onClick = onRemove,
@@ -179,6 +174,20 @@ internal fun ComposerPdfAttachmentCard(
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
+    }
+}
+
+@Composable
+private fun ComposerPdfOptionsButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+        Icon(
+            painterResource(R.drawable.ic_more_vert),
+            stringResource(R.string.composer_pdf_metadata_options),
+        )
     }
 }
 

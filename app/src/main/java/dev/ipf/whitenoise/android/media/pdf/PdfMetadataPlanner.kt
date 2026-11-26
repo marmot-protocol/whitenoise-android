@@ -28,7 +28,7 @@ internal fun planPdfMetadataRemoval(input: PdfBytes): PdfMetadataPlan {
     if (containsName(bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
     if (layout.trailers.any { it.has("Encrypt") }) plan.refuse(PdfMetadataRefusal.Encrypted)
     val objectStreams = if (plan.refusal == null) decodeObjectStreams(bytes, layout, plan) else emptyList()
-    val sources = PdfObjectSources(bytes, layout, objectStreams)
+    val sources = PdfObjectSources(bytes, layout, objectStreams, plan::replace)
     if (plan.refusal == null && !layout.guessed.all(sources::confirms)) plan.refuse(PdfMetadataRefusal.Unsupported)
     if (plan.refusal == null) planInfoDictionaries(sources, plan)
     if (plan.refusal == null) {
@@ -45,11 +45,11 @@ private class PdfObjectSources(
     val bytes: PdfBytes,
     val layout: PdfLayout,
     val objectStreams: List<PdfObjectStream>,
+    private val editFile: (Int, ByteArray) -> Unit,
 ) {
     private val fileParser = PdfValueParser(bytes)
     private val compressed = HashMap<Int, MutableList<Pair<PdfObjectStream, Int>>>()
     private val resolved = mutableMapOf<Pair<Int, Int>, List<Pair<PdfValue, (Int, ByteArray) -> Unit>>>()
-    val plainEdits = mutableListOf<Pair<Int, ByteArray>>()
 
     init {
         objectStreams.forEach { stream ->
@@ -65,10 +65,7 @@ private class PdfObjectSources(
 
     private fun parseValues(reference: Pair<Int, Int>): List<Pair<PdfValue, (Int, ByteArray) -> Unit>> {
         val (number, generation) = reference
-        val plain =
-            layout.positions(number, generation).map { position ->
-                fileParser.parse(position) to { at: Int, replacement: ByteArray -> plainEdits += at to replacement }
-            }
+        val plain = layout.positions(number, generation).map { position -> fileParser.parse(position) to editFile }
         val packed = if (generation == 0) compressed[number].orEmpty() else emptyList()
         return plain + packed.map { (stream, offset) -> stream.valueAt(offset) to stream.editor() }
     }
@@ -120,7 +117,9 @@ private class PdfObjectSources(
         val counts = countReferences(bytes, targets, plainStrings.sortedBy { it.first }).toMutableMap()
         // An unfiltered object stream's references are already in the file's own bytes.
         objectStreams.filter { it.data.compressed }.forEach { stream ->
-            countReferences(stream.bytes, targets, stream.strings.sortedBy { it.first }).forEach { (key, count) -> counts[key] = (counts[key] ?: 0) + count }
+            countReferences(stream.bytes, targets, stream.strings.sortedBy { it.first }).forEach { (key, count) ->
+                counts[key] = (counts[key] ?: 0) + count
+            }
         }
         return counts
     }
@@ -139,16 +138,20 @@ private fun planInfoDictionaries(
     val layout = sources.layout
     val references = mutableListOf<PdfRef>()
     val named = mutableSetOf<Pair<Int, Int>>()
+    val stringTargets = mutableMapOf<Pair<Int, Int>, Boolean>()
     (layout.trailers.mapNotNull { it["Info"] } + layout.embeddedInfo).forEach { info ->
-        when {
+        if (info is PdfRef) {
+            val target = info.number to info.generation
+            val isString =
+                stringTargets.getOrPut(target) {
+                    val values = sources.values(target)
+                    !values.isNullOrEmpty() && values.all { it.first is PdfString }
+                }
             // A string named indirectly, such as pdfTeX's file name, is emptied only when nothing else uses it.
-            info is PdfRef &&
-                sources.values(info.number to info.generation)?.let { values ->
-                    values.isNotEmpty() && values.all { it.first is PdfString }
-                } == true ->
-                references += info
-            info is PdfRef -> named += info.number to info.generation
-            else -> blankInfoValue(info, plan.fields, references) { at, replacement -> plan.replace(at, replacement) }
+            if (isString) references += info else named += target
+        } else if (!blankInfoValue(info, plan.fields, references, plan::replace)) {
+            plan.refuse(PdfMetadataRefusal.Unsupported)
+            return
         }
     }
     val orphans = (layout.infoLike + sources.compressedInfoLike()).toSet() - named
@@ -161,8 +164,6 @@ private fun planInfoDictionaries(
         }
     if (!blanked || !blankReferencedStrings(references, sources, plan)) {
         plan.refuse(PdfMetadataRefusal.Unsupported)
-    } else {
-        sources.plainEdits.forEach { (position, replacement) -> plan.replace(position, replacement) }
     }
 }
 

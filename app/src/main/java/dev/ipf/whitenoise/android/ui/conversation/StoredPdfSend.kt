@@ -8,7 +8,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.scrubPdfMetadata
 
 /** Stored PDFs need the same privacy policy before they can take the direct native draft upload path. */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "ReturnCount") // In-memory attachments and unbound conversations need no copy.
 internal suspend fun WhiteNoiseAppState.prepareStoredPdfForSend(
     controller: ConversationController,
     attachment: PendingAttachment,

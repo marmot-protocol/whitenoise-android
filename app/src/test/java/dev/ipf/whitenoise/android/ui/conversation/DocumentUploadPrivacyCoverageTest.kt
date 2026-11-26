@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.acceptedUploadResult
 import dev.ipf.whitenoise.android.state.finishMediaFixture
 import dev.ipf.whitenoise.android.state.mediaSendReconciliationAppState
 import dev.ipf.whitenoise.android.state.uploadCapturingController
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfState
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
 import kotlinx.coroutines.CompletableDeferred
@@ -432,7 +433,7 @@ class DocumentUploadPrivacyCoverageTest {
         }
     }
 
-    private fun dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices.approveForTest(uri: Uri): Set<Uri> {
+    private fun ComposerPdfMetadataChoices.approveForTest(uri: Uri): Set<Uri> {
         var approved = emptySet<Uri>()
         confirmThen(listOf(uri), { error("unexpected refusal") }) { approved = it }
         assertNotNull("a refused PDF asks before it is sent", decision)

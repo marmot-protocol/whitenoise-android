@@ -163,7 +163,8 @@ internal suspend fun inspectComposerPdf(
         if (attachment?.hasInlineBody() == true) {
             return@withContext PdfMetadataScrubber.inspect(attachment.plaintext)
         }
-        val named = documentAttachmentKind(safeGetType(context.contentResolver, uri), name.orEmpty()) == DocumentAttachmentKind.Pdf
+        val mediaType = safeGetType(context.contentResolver, uri)
+        val named = documentAttachmentKind(mediaType, name.orEmpty()) == DocumentAttachmentKind.Pdf
         runCatchingCancellable {
             withProviderPdfSnapshot(context, uri) { PdfMetadataScrubber.inspect(it) }
         }.getOrElse {
@@ -190,7 +191,8 @@ private suspend fun <T> withProviderPdfSnapshot(
             val header = it.readPdfHeader()
             if (!looksLikePdf(ArrayPdfBytes(header))) return@withContext null
             it.reset()
-            val copy = readStagedDocument(documentReaderDirectory(context.cacheDir), PdfPagePolicy.MAX_INPUT, { ensureActive() }) { it }
+            val directory = documentReaderDirectory(context.cacheDir)
+            val copy = readStagedDocument(directory, PdfPagePolicy.MAX_INPUT, { ensureActive() }) { it }
             val source = (copy as? StagedDocumentRead.Success)?.source ?: throw PdfSnapshotUnavailable()
             source.use { use(it.file) }
         }
@@ -241,7 +243,7 @@ internal fun ComposerPdfShelfItem(
         )
     }
     val firstPage by produceState<ComposerPdfFirstPage?>(null, uri, document, state) {
-        value = if (state != null && state.metadata != PdfMetadataResult.NotPdf) renderer.firstPage(uri, document) else null
+        value = state?.takeUnless { it.metadata == PdfMetadataResult.NotPdf }?.let { renderer.firstPage(uri, document) }
     }
     ComposerPdfAttachmentCard(
         label = label,

@@ -229,13 +229,7 @@ private fun ComposerAttachmentShelfItem(
             ?: stringResource(R.string.reply_media_document)
     val pdfMediaType = document?.attachment?.mediaType.orEmpty()
     val inspected = pdfs?.choices?.state(item.uri)?.metadata
-    if (media == null &&
-        pdfs != null &&
-        (
-            documentAttachmentKind(pdfMediaType, label) == DocumentAttachmentKind.Pdf ||
-                (inspected != null && inspected != PdfMetadataResult.NotPdf)
-        )
-    ) {
+    if (media == null && pdfs != null && isComposerPdf(pdfMediaType, label, inspected)) {
         val tag = Modifier.testTag("conversation.composer.attachment.$index")
         ComposerPdfShelfItem(item.uri, label, document, pdfs.choices, pdfs.renderer, onPreview, onRemove, tag, enabled)
         return
@@ -253,6 +247,14 @@ private fun ComposerAttachmentShelfItem(
         modifier = Modifier.testTag("conversation.composer.attachment.$index"),
     )
 }
+
+private fun isComposerPdf(
+    mediaType: String,
+    label: String,
+    inspected: PdfMetadataResult?,
+): Boolean =
+    documentAttachmentKind(mediaType, label) == DocumentAttachmentKind.Pdf ||
+        (inspected != null && inspected != PdfMetadataResult.NotPdf)
 
 /** Pure shelf presentation: optional preview actions are independent of styling and the 48dp removal target. */
 @Composable

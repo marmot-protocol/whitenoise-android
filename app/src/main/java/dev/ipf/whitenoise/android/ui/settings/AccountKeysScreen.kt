@@ -180,7 +180,8 @@ internal fun AccountKeysScreen(
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     val fileExport = LocalKeyFileExportLauncher.current ?: rememberKeyFileExport(appState)
-    val ui = remember(accountIdHex, accountRef, runtimeGeneration, fileExport.state) { ProfileKeysUiState(fileExport.state) }
+    val ui =
+        remember(accountIdHex, accountRef, runtimeGeneration, fileExport.state) { ProfileKeysUiState(fileExport.state) }
     var showSignOut by remember(ui) { mutableStateOf(false) }
     val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui, appState)
 
