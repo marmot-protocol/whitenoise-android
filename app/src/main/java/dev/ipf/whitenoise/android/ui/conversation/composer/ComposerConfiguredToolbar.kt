@@ -35,10 +35,10 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlin.math.ceil
 import kotlin.math.floor
 
-private const val COMPOSER_SHORTCUT_TARGET_DP = 36f
+private const val COMPOSER_SHORTCUT_TARGET_DP = 48f
 private const val COMPOSER_TOOLBAR_GUTTER_DP = 8f
-internal val ComposerShortcutTarget = 48.dp
-internal val ComposerShortcutPitch = COMPOSER_SHORTCUT_TARGET_DP.dp
+internal val ComposerShortcutTarget = COMPOSER_SHORTCUT_TARGET_DP.dp
+internal val ComposerShortcutPitch = ComposerShortcutTarget
 internal val ComposerShortcutIconSize = 24.dp
 internal val ComposerToolbarGutter = COMPOSER_TOOLBAR_GUTTER_DP.dp
 internal val ComposerToolbarMaximumHeight = 144.dp
@@ -117,10 +117,7 @@ internal fun composerToolbarRowCount(
         actionCount.toFloat() / floor(width / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceAtLeast(1),
     ).toInt().coerceAtLeast(1)
 
-/** Wrapped rows share the compact horizontal pitch; their 48dp targets overlap like adjacent columns. */
-internal val ComposerToolbarRowOverlap = ComposerShortcutPitch - ComposerShortcutTarget
-
-/** Height of [rows] wrapped target rows at the compact vertical pitch. */
+/** Height of [rows] wrapped target rows with no overlap between their touch areas. */
 internal fun composerToolbarStackHeight(rows: Int): Dp {
     val extraRows = (rows - 1).coerceAtLeast(0)
     return ComposerShortcutTarget + ComposerShortcutPitch * extraRows
@@ -156,7 +153,7 @@ internal data class ComposerTranslateToggle(
 )
 
 /**
- * A single root contains every configured slot. Compact centers retain overlapping nominal 48dp touch targets.
+ * A single root contains every configured slot. Adjacent actions have separate 48 dp touch areas.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -217,7 +214,6 @@ internal fun ComposerConfiguredToolbar(
                     .heightIn(max = heightLimit.coerceAtLeast(ComposerShortcutTarget))
                     .fadingVerticalScroll(scroll, enabled = scrollAllowed),
             horizontalArrangement = if (endAligned) Arrangement.End else Arrangement.Start,
-            verticalArrangement = Arrangement.spacedBy(ComposerToolbarRowOverlap),
             maxItemsInEachRow = floor(width.value / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceAtLeast(1),
         ) { slots() }
     }

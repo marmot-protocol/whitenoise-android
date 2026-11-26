@@ -2,6 +2,20 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.whitenoise.android.R
 
+internal enum class DocumentReadFailure {
+    TOO_LARGE,
+    UNREADABLE,
+    EMPTY,
+    UNPROCESSABLE_IMAGE,
+    STORAGE,
+
+    /** A video file whose private metadata could not be removed. It is refused, never sent as-is (#3376). */
+    VIDEO_METADATA,
+
+    /** A PDF whose metadata stays, which nobody chose to send as it is (#3377). */
+    PDF_METADATA,
+}
+
 internal val DocumentReadFailure.messageResource: Int
     get() =
         when (this) {

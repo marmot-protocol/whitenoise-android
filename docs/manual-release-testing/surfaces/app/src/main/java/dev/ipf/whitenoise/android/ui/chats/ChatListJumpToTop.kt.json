@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListJumpToTop.kt",
         "anchor": "fun ChatListJumpToTopButton(",
         "test_ids": [
-          "CHL-036"
+          "CHL-036",
+          "AXY-022"
         ]
       },
       {

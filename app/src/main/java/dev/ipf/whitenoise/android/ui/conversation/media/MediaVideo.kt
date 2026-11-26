@@ -4,8 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -56,6 +55,8 @@ import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
@@ -220,7 +221,7 @@ internal fun MediaVideoBubble(
     val retainedPendingVideoBytes = pendingAttachment?.takeIf { it.isPendingVideo }?.inMemoryBytes
     val retainedPlaintextOnEntry = pendingAttachment?.inMemoryBytes != null
     // A large own video is sent from its staged file, with nothing in memory or published to fetch until it lands.
-    val sendingFromStagedFile = pendingAttachment?.sourceFile != null
+    val sendingFromStagedFile = pendingAttachment?.isFileBacked == true
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
@@ -552,15 +553,15 @@ internal fun MediaVideoBubble(
                 )
             }
             if (!transferShown) {
-                Surface(
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    shape = CircleShape,
+                val discPress = remember { MutableInteractionSource() }
+                // A 48 dp target around the 44 dp disc, which draws the press highlight on its own circle.
+                Box(
                     modifier =
                         Modifier
-                            .size(VIDEO_PLAY_DISC_SIZE)
                             .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
-                            .combinedClickable(
+                            .shapedTouchTarget(
+                                discPress,
+                                role = null,
                                 onLongClick = onLongPress,
                                 onClick = {
                                     when {
@@ -574,49 +575,41 @@ internal fun MediaVideoBubble(
                                     }
                                 },
                             ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        when {
-                            uploadFailed ->
-                                Icon(
-                                    painterResource(R.drawable.ic_refresh),
-                                    contentDescription = stringResource(R.string.video_failed),
-                                    modifier =
-                                        Modifier
-                                            .size(28.dp)
-                                            .clickable { onRetryUpload?.invoke() },
-                                )
-                            uploading -> VideoUploadIndicator(uploadProgress)
-                            !cacheProbeReady ->
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
-                                    strokeWidth = 2.dp,
-                                    color = LocalContentColor.current,
-                                )
-                            !startDownload && localFile == null ->
-                                Icon(
-                                    Icons.Default.ArrowDownward,
-                                    contentDescription = stringResource(R.string.media_tap_to_download),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            loading -> VideoDownloadingRing()
-                            failed ->
-                                Icon(
-                                    painterResource(R.drawable.ic_refresh),
-                                    contentDescription = stringResource(R.string.video_failed),
-                                    modifier =
-                                        Modifier
-                                            .size(28.dp)
-                                            .clickable(enabled = !loading) { retryFailedPlayback() },
-                                )
-                            // An accepted download that has not started yet is still a download, never Play.
-                            localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
-                            else ->
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_play_arrow),
-                                    contentDescription = stringResource(R.string.reply_media_video),
-                                    modifier = Modifier.size(24.dp),
-                                )
+                    Surface(
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        shape = CircleShape,
+                        modifier = Modifier.size(VIDEO_PLAY_DISC_SIZE),
+                    ) {
+                        Box(Modifier.shapedPressFeedback(discPress, CircleShape), contentAlignment = Alignment.Center) {
+                            when {
+                                uploadFailed -> VideoRetryGlyph(onRetry = { onRetryUpload?.invoke() })
+                                uploading -> VideoUploadIndicator(uploadProgress)
+                                !cacheProbeReady ->
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
+                                        strokeWidth = 2.dp,
+                                        color = LocalContentColor.current,
+                                    )
+                                !startDownload && localFile == null ->
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = stringResource(R.string.media_tap_to_download),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                loading -> VideoDownloadingRing()
+                                failed -> VideoRetryGlyph(enabled = !loading, onRetry = ::retryFailedPlayback)
+                                // An accepted download that has not started yet is still a download, never Play.
+                                localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
+                                else ->
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_play_arrow),
+                                        contentDescription = stringResource(R.string.reply_media_video),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                            }
                         }
                     }
                 }
@@ -648,48 +641,3 @@ internal fun MediaVideoBubble(
 internal val VIDEO_PLAY_DISC_SIZE = 44.dp
 internal const val VIDEO_PLAY_DISC_ALPHA = 0.88f
 internal const val VIDEO_DURATION_CHIP_ALPHA = 0.8f
-
-/**
- * The play disc's upload ring, reading [progress] here so only the ring recomposes as bytes move. It is
- * determinate while a share of work is known and spins otherwise, and it names the step and its bytes for
- * TalkBack, as the download ring on a video tile does.
- */
-@Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-internal fun VideoUploadIndicator(progress: () -> FileUploadProgress?) {
-    val current = progress()
-    val fraction = current?.ringFraction
-    val description = current?.let { uploadProgressDescription(it) }
-    val spoken =
-        if (description != null) {
-            Modifier.semantics { contentDescription = description }
-        } else {
-            Modifier
-        }
-    if (fraction != null) {
-        CircularProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.size(24.dp).then(spoken),
-            strokeWidth = 2.5.dp,
-            color = LocalContentColor.current,
-        )
-    } else {
-        CircularProgressIndicator(
-            modifier = Modifier.size(24.dp).then(spoken),
-            strokeWidth = 2.5.dp,
-            color = LocalContentColor.current,
-        )
-    }
-}
-
-/** The video play disc's progress ring while its clip downloads, named as the voice note's Downloading state is. */
-@Composable
-@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-private fun VideoDownloadingRing() {
-    val downloading = stringResource(R.string.media_downloading)
-    CircularProgressIndicator(
-        modifier = Modifier.size(24.dp).semantics { contentDescription = downloading },
-        strokeWidth = 2.dp,
-        color = LocalContentColor.current,
-    )
-}

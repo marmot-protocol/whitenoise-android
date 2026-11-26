@@ -14,9 +14,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
@@ -33,7 +33,7 @@ internal fun StickyFormActionBar(
     Surface(
         modifier = modifier.fillMaxWidth(),
         border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
     ) {
         Row(
             modifier =

@@ -125,7 +125,7 @@ class ComposerCompactLayoutTest {
             group.sortedBy { it.boundsInRoot.center.x }.zipWithNext().forEach { (first, second) ->
                 assertEquals(
                     "icons within each physical group keep an even visual pitch",
-                    if (identity) 36f else 40f,
+                    48f,
                     second.boundsInRoot.center.x - first.boundsInRoot.center.x,
                     1f,
                 )

@@ -195,7 +195,8 @@ internal object NotificationRouteHarness {
                 }
                 "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
                 "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
-                "messageDraft" -> {
+                // Drafts are read through the selected draft since stored files arrived; both are the draft read.
+                "messageDraft", "selectedMessageDraft" -> {
                     gate.draftReadCount.incrementAndGet()
                     error("Forced draft storage failure")
                 }

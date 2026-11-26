@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -98,7 +101,10 @@ class ConversationUnreadBadgeComposeTest {
         if (expected != null) composeRule.onNodeWithText(expected).assertExists()
     }
 
-    /** The jump control announces its action plus the actual unread count, even where the badge shows `999+`. */
+    /**
+     * The jump control announces its action plus the actual unread count once, even where the badge shows `999+`:
+     * the badge adds no text to the control's label.
+     */
     @Test
     fun jumpControlAnnouncesTheActualUnreadCountBeyondTheVisualCap() {
         var count by mutableIntStateOf(1030)
@@ -107,8 +113,15 @@ class ConversationUnreadBadgeComposeTest {
                 ConversationJumpToNewestButton(unreadIncomingCount = count, onClick = {})
             }
         }
-        composeRule.onNodeWithText("999+").assertExists()
-        composeRule.onNodeWithContentDescription("Jump to newest, 1030 unread messages").assertExists()
+        // The badge shows `999+` but is hidden from accessibility services, so the control speaks its count once.
+        composeRule
+            .onNodeWithText("999+")
+            .assertExists()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        composeRule
+            .onNodeWithContentDescription("Jump to newest, 1030 unread messages")
+            .assertExists()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Text))
         composeRule.runOnIdle { count = 1 }
         composeRule.onNodeWithContentDescription("Jump to newest, 1 unread message").assertExists()
         composeRule.runOnIdle { count = 0 }

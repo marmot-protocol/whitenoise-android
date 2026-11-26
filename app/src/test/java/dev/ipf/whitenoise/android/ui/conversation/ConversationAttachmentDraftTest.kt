@@ -25,7 +25,7 @@ class ConversationAttachmentDraftTest {
                     accountRef = "alice",
                     groupIdHex = "group",
                     mediaSlotIds = emptyList(),
-                    documentUriStrings = selected,
+                    documentIdsByUri = selected.associateWith { id },
                     attachments = listOf(native),
                     removedAttachmentIds = fence.removedAttachmentIds("alice", "group"),
                 )
@@ -101,7 +101,7 @@ class ConversationAttachmentDraftTest {
                 accountRef = account,
                 groupIdHex = group,
                 mediaSlotIds = listOf(slotId),
-                documentUriStrings = listOf(unreadableDocumentUri),
+                documentIdsByUri = mapOf(unreadableDocumentUri to document.id),
                 attachments = listOf(video, document),
             )
 
@@ -139,7 +139,7 @@ class ConversationAttachmentDraftTest {
                 accountRef = account,
                 groupIdHex = group,
                 mediaSlotIds = emptyList(),
-                documentUriStrings = listOf(uri),
+                documentIdsByUri = mapOf(uri to imageDocument.id),
                 attachments = listOf(imageDocument),
             )
 
@@ -212,7 +212,7 @@ class ConversationAttachmentDraftTest {
                 account,
                 group,
                 mediaSlotIds = emptyList(),
-                documentUriStrings = listOf(uri),
+                documentIdsByUri = mapOf(uri to attachment.id),
                 attachments = listOf(attachment),
                 removedAttachmentIds = tombstones.attachmentIds(account, group),
             )
@@ -224,7 +224,7 @@ class ConversationAttachmentDraftTest {
                 account,
                 group,
                 mediaSlotIds = emptyList(),
-                documentUriStrings = listOf(uri),
+                documentIdsByUri = mapOf(uri to attachment.id),
                 attachments = listOf(attachment),
                 removedAttachmentIds = tombstones.attachmentIds(account, group),
             )

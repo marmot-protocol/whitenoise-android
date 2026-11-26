@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
@@ -143,6 +145,7 @@ internal fun ComposerAttachmentShelf(
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
     val hasVisual = items.any { it is StagedPreviewItem.Media }
+    val context = LocalContext.current
     val pdfRenderer = rememberComposerPdfPageRenderer()
     val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
     if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata)
@@ -163,21 +166,20 @@ internal fun ComposerAttachmentShelf(
                     is StagedPreviewItem.Document -> "document:$index:${item.uri}"
                 }
             }) { index, item ->
+                val document = preparedDocuments[item.uri]
                 ComposerAttachmentShelfItem(
                     item = item,
                     index = index,
                     metadata = metadata[item.uri],
                     prepared = prepared,
                     enabled = enabled,
-                    document = preparedDocuments[item.uri],
+                    document = document,
                     pdfs = pdfs,
                     onPreview =
                         when {
                             item is StagedPreviewItem.Media -> ({ onPreview(index) })
-                            !preparing &&
-                                preparedDocuments[item.uri]?.attachment?.let {
-                                    attachmentReaderTarget(it.mediaType, it.fileName)
-                                } != null -> ({ onOpenDocument(item.uri) })
+                            !preparing && composerDocumentReaderTarget(context, item.uri, document) != null ->
+                                ({ onOpenDocument(item.uri) })
                             else -> null
                         },
                     onRemove = {
@@ -265,6 +267,7 @@ internal fun ComposerAttachmentShelfCard(
         animation?.takeIf { it.intrinsicHeight > 0 }?.let { it.intrinsicWidth.toFloat() / it.intrinsicHeight }
             ?: bitmap?.let { it.width.toFloat() / it.height } ?: DEFAULT_ASPECT_RATIO
     val (cardWidth, cardHeight) = composerAttachmentCardSize(kind, ratio)
+    val press = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
@@ -272,7 +275,10 @@ internal fun ComposerAttachmentShelfCard(
                 .height(cardHeight.dp)
                 .then(
                     if (onPreview != null) {
+                        // The highlight is drawn inside the Surface's clip, so the outline is not clipped twice.
                         Modifier.clickable(
+                            interactionSource = press,
+                            indication = null,
                             enabled = enabled,
                             role = Role.Button,
                             onClickLabel = previewLabel,
@@ -286,7 +292,7 @@ internal fun ComposerAttachmentShelfCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Box {
+        Box(Modifier.pressFeedbackInsideClip(press)) {
             if (visual) {
                 ComposerAttachmentVisual(label, bitmap, animation, video, gif)
             } else {

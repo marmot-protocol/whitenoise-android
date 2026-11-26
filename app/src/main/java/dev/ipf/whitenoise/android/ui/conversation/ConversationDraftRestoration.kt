@@ -2,26 +2,75 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
-import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import kotlinx.coroutines.delay
 
 private const val DRAFT_RESTORATION_RETRY_DELAY_MILLIS = 250L
 
-/** One bounded retry keeps a transient initial read from stranding the document shelf. */
+/** How many passes one restoration makes while a stored body the draft may still hold keeps going unread. */
+private const val MAX_DRAFT_RESTORE_PASSES = 3
+
+/** The native draft state one restoration reconciled: its owner, cleanup revision and composer inputs. */
+internal data class DraftRestorationVersion(
+    val owner: DraftDocumentOwner,
+    val nativeRevision: Long,
+    val inputsRevision: Long,
+)
+
+/** The outcome of one restoration pass. */
+internal sealed interface DraftRestorePass<out T> {
+    /** The pass ran to its end: [restored] is what it publishes, or null when it publishes nothing. */
+    data class Finished<T>(
+        val restored: T?,
+    ) : DraftRestorePass<T>
+
+    /** A stored body the draft may still hold went unread, so the pass published and recorded nothing. */
+    data object Interrupted : DraftRestorePass<Nothing>
+}
+
+/**
+ * Runs [pass] again after an interruption, up to [MAX_DRAFT_RESTORE_PASSES] passes in all. Returns what the first
+ * finished pass restored, or null when every pass was interrupted, leaving the restore unrecorded so the next shelf or
+ * cleanup change tries again.
+ */
+internal suspend fun <T> restoreRetryingInterruptions(pass: suspend () -> DraftRestorePass<T>): T? {
+    repeat(MAX_DRAFT_RESTORE_PASSES) { index ->
+        if (index > 0) delay(DRAFT_RESTORATION_RETRY_DELAY_MILLIS)
+        val outcome = pass()
+        if (outcome is DraftRestorePass.Finished) return outcome.restored
+    }
+    return null
+}
+
+/** Whether a restoration of [version] may still publish under the composer's current fences and inputs. */
+internal fun restorationIsCurrent(
+    version: DraftRestorationVersion,
+    ownerFence: DraftDocumentOwnerFence,
+    cleanupRevision: Long,
+    inputsRevision: Long,
+): Boolean =
+    ownerFence.isCurrent(version.owner) &&
+        cleanupRevision == version.nativeRevision &&
+        inputsRevision == version.inputsRevision
+
+/**
+ * One bounded retry keeps a transient initial read from stranding the document shelf. The read carries its
+ * revision, so a file-backed attachment's body can be streamed from the same draft state.
+ */
 internal suspend fun readDraftForRestoration(
     drafts: MessageDraftRepository,
     accountRef: String,
     groupIdHex: String,
-): Result<MessageDraftFfi?> {
-    val initial = drafts.draft(accountRef, groupIdHex)
+): Result<RevisionedMessageDraft> {
+    val initial = drafts.files.revisioned(accountRef, groupIdHex)
     if (initial.isSuccess) return initial
     delay(DRAFT_RESTORATION_RETRY_DELAY_MILLIS)
-    return drafts.draft(accountRef, groupIdHex)
+    return drafts.files.revisioned(accountRef, groupIdHex)
 }
 
 /** A native refresh cannot replace locally editable bytes or relabel freshly prepared picks. */
@@ -77,12 +126,14 @@ internal fun restoredDocumentsMissingFrom(
 
 internal data class DraftRestorationInputs(
     val slots: List<PendingMediaSlot>,
-    val documents: List<Uri>,
+    val documentShelf: DraftDocumentShelf,
     val preparedPhotos: Map<String, DraftPreparedPhoto>,
     val preparedDocuments: Map<Uri, DraftPreparedPhoto>,
     val backedPhotos: Map<String, DraftBackedPhoto>,
     val descriptions: Map<String, String>,
-)
+) {
+    val documents: List<Uri> get() = documentShelf.uris
+}
 
 internal data class DraftRestorationPlan(
     val removedPhotos: Set<String>,
@@ -96,7 +147,11 @@ internal data class DraftRestorationProjection(
     val inputs: DraftRestorationInputs,
     val media: List<PendingMediaSlot>,
     val documents: List<Uri>,
-)
+    val relinkedDocuments: Map<Uri, Uri> = emptyMap(),
+) {
+    /** The shelf this projection shows, with each relinked document's old URI, for the screen to merge in place. */
+    fun shelf() = RestoredConversationAttachments(media, documents, relinkedDocuments)
+}
 
 /**
  * Plans which restored photos and documents to drop and which slots to keep, reconciling the composer against the
@@ -119,7 +174,10 @@ internal fun planDraftRestoration(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             mediaSlotIds = retainedSlots.map(PendingMediaSlot::id),
-            documentUriStrings = retainedDocuments.map(Uri::toString),
+            documentIdsByUri =
+                retainedDocuments.map(Uri::toString).associateWith { uri ->
+                    inputs.documentShelf.attachmentId(accountRef, groupIdHex, uri)
+                },
             attachments = attachments,
             removedAttachmentIds = removedAttachmentIds,
         )
@@ -127,15 +185,38 @@ internal fun planDraftRestoration(
 }
 
 /**
- * Applies [plan] to [inputs], adding materialized native attachments and labelling restored photos with
- * [sourceUnavailable], to produce the visible shelf.
+ * The plan's retained slots, each whose matched attachment [relinked] names showing its app-owned copy instead, and
+ * the old shelf URI of each matched document [relinked] moves, mapped to the copy it shows.
  */
+private fun relinkedShelf(
+    plan: DraftRestorationPlan,
+    relinked: Map<String, Uri>,
+): Pair<List<PendingMediaSlot>, Map<Uri, Uri>> {
+    val slots =
+        plan.retainedSlots.map { slot ->
+            val fresh = plan.reconciliation.mediaBySlotId[slot.id]?.let { relinked[it.id] }
+            if (fresh == null) slot else slot.copy(uri = fresh)
+        }
+    val documents =
+        plan.reconciliation.documentsByUriString.entries
+            .mapNotNull { (uri, attachment) -> relinked[attachment.id]?.let { Uri.parse(uri) to it } }
+            .toMap()
+    return slots to documents
+}
+
+/**
+ * Applies [plan] to [inputs], adding materialized native attachments and labelling restored photos with
+ * [sourceUnavailable], to produce the visible shelf. Each shelf entry whose attachment id [relinked] names shows the
+ * app-owned copy it gives instead of its old URI, in the same place on the shelf.
+ */
+@Suppress("LongParameterList") // One projection of the plan and everything the restore materialized for it.
 internal fun projectDraftRestoration(
     inputs: DraftRestorationInputs,
     plan: DraftRestorationPlan,
     materialized: List<Pair<MessageDraftAttachmentFfi, Uri>>,
     removedAttachmentIds: Set<String>,
     sourceUnavailable: String,
+    relinked: Map<String, Uri> = emptyMap(),
 ): DraftRestorationProjection {
     val restoredPhotos =
         nativePhotosNeedingRestoration(
@@ -154,8 +235,10 @@ internal fun projectDraftRestoration(
     restoredPhotos.forEach { (slotId, attachment) ->
         if (attachment.mediaType.startsWith("image/", ignoreCase = true)) descriptions += slotId to sourceUnavailable
     }
-    val media = plan.retainedSlots.toMutableList()
-    val documentUris = plan.retainedDocuments.toMutableList()
+    val (relinkedSlots, relinkedDocuments) = relinkedShelf(plan, relinked)
+    documents = documents.mapKeys { (uri, _) -> relinkedDocuments[uri] ?: uri }
+    val media = relinkedSlots.toMutableList()
+    val documentUris = plan.retainedDocuments.map { relinkedDocuments[it] ?: it }.toMutableList()
     materialized.forEach { (attachment, uri) ->
         if (attachment.id in removedAttachmentIds) return@forEach
         val prepared = attachment.asRestoredPhoto()
@@ -177,5 +260,5 @@ internal fun projectDraftRestoration(
             backedPhotos = inputs.backedPhotos.filterKeys { it !in plan.removedPhotos },
             descriptions = descriptions,
         )
-    return DraftRestorationProjection(projected, media, documentUris)
+    return DraftRestorationProjection(projected, media, documentUris, relinkedDocuments)
 }

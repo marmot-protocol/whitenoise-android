@@ -25,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,7 +67,6 @@ internal fun rememberAttachmentCollectionPanels(
     controller: ConversationController,
     mediaSender: ConversationMediaSender,
 ): (@Composable () -> Unit)? {
-    val context = LocalContext.current
     val account = controller.boundAccountRef
     val groupIdHex = controller.group.groupIdHex
     val gone = controller.group.disbanded || controller.group.unrecoverable
@@ -76,8 +74,6 @@ internal fun rememberAttachmentCollectionPanels(
         if (account == null) return@LaunchedEffect
         if (gone) {
             appState.attachmentCollections.invalidateConversation(account, groupIdHex)
-        } else {
-            appState.restoreCollectionOperations(account, groupIdHex, readable = { canReadCollectionUri(context, it) })
         }
     }
     // The caller only learns whether a panel exists, so a progress change recomposes just the panels.
@@ -106,7 +102,7 @@ internal fun rememberAttachmentCollectionPanels(
                         onSkipChunk = { appState.launchMutation { controller.skipCollectionChunk(operation.id, it) } },
                         onCancel = { appState.launchMutation { controller.cancelCollection(operation.id) } },
                         onResume = { mediaSender.resumeCollection(operation.id) },
-                        onDiscard = { appState.attachmentCollections.discard(operation.id) },
+                        onDiscard = { appState.discardCollection(operation.id) },
                     ),
                 modifier = Modifier.padding(8.dp),
             )
@@ -125,7 +121,9 @@ internal fun canReadCollectionUri(
 
 /** Whether an operation deserves a panel: several chunks, or any state the user must act on. */
 internal fun AttachmentCollectionOperation.needsPanel(): Boolean =
-    chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED
+    !cleanupOnly &&
+        phase != CollectionOperationPhase.FINISHED &&
+        (chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED)
 
 /**
  * The composer-side progress panel for one collection send: aggregate `sent / total` with a monotonic bar,
@@ -200,7 +198,9 @@ private fun AttachmentCollectionActionRow(
         when {
             operation.phase == CollectionOperationPhase.PAUSED -> {
                 TextButton(onClick = actions.onResume) { Text(stringResource(R.string.attachment_collection_resume)) }
-                TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                if (operation.canDiscard) {
+                    TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                }
             }
             blocked != null -> {
                 TextButton(onClick = { actions.onRetryChunk(blocked.id) }) { Text(stringResource(R.string.retry)) }

@@ -28,11 +28,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Measures the shared shell and real endpoints across retained composer heights. */
+/**
+ * Measures the shared shell and real endpoints across retained composer heights. The pen sits on the composer's
+ * bottom action row, so its top matches the composer's only while the composer has one row: at 412 dp the four
+ * configured shortcuts fit beside the editor, while 360 dp moves the editor above them (`ComposerPhoneWidthRowsTest`).
+ */
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-w412dp-h780dp-mdpi")
 internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRenderFixture() {
     @After
     fun releaseVoiceFixture() = releasePreviewVoiceController()

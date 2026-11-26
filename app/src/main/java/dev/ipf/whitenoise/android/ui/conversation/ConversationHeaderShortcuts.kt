@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,6 +18,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HeaderShortcut
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
+import dev.ipf.whitenoise.android.ui.common.SlotIconToggleButton
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerShortcutIconSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerShortcutPitch
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerShortcutTarget
@@ -30,10 +30,9 @@ import kotlin.math.floor
  * The optional header buttons chosen in Chat header settings, in the order the person picked them. Each one
  * calls the same handler as its chat details action. A null handler hides its button: [muteControl] and
  * [readAloudOn] while the chat's account is not the active one (and [readAloudOn] without a usable speech
- * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Buttons
- * use the composer's compact pitch, so their 48dp touch targets overlap the same way and more fit beside the
- * title. Only the first [capacity] buttons that can show appear, so the chat name always keeps its room; see
- * [headerShortcutCapacity].
+ * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Each button
+ * takes taps across a 48 dp square. Only the first [capacity] available buttons appear, leaving room for the
+ * chat name. See [headerShortcutCapacity].
  */
 @Composable
 internal fun RowScope.ConversationHeaderShortcuts(
@@ -85,6 +84,9 @@ private class HeaderAction(
     val checked: Boolean? = null,
 )
 
+/**
+ * One header shortcut with a full-size tap target and a circular press highlight.
+ */
 @Composable
 private fun HeaderActionButton(
     action: HeaderAction,
@@ -99,9 +101,14 @@ private fun HeaderActionButton(
     }
     val checked = action.checked
     if (checked != null) {
-        IconToggleButton(checked = checked, onCheckedChange = { action.onClick() }, modifier = modifier, content = icon)
+        SlotIconToggleButton(
+            checked = checked,
+            onCheckedChange = { action.onClick() },
+            modifier = modifier,
+            content = icon,
+        )
     } else {
-        IconButton(onClick = action.onClick, enabled = action.enabled, modifier = modifier, content = icon)
+        SlotIconButton(onClick = action.onClick, enabled = action.enabled, modifier = modifier, content = icon)
     }
 }
 

@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 import java.util.Locale
 
 /**
@@ -260,6 +261,7 @@ internal fun ContactPickerScreen(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                     },
+                elevation = floatingControlFabElevation(),
             ) {
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
