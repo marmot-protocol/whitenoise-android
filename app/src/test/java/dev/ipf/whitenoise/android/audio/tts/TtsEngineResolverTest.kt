@@ -357,34 +357,63 @@ class TtsEngineResolverTest {
         }
 
     @Test
-    fun offlineVoicePreferenceUsesHighestQualityVoiceInCurrentLanguage() {
-        val current = voice("current-network", Locale.US, quality = 300, networkRequired = true)
+    fun offlineFallbackAppliesHighestQualityInstalledVoiceInRequestedLanguage() {
+        val current = voice("current-network", Locale.US, quality = 500, networkRequired = true)
         val lowerQualityEnglish = voice("english-low", Locale.UK, quality = 200)
         val higherQualityEnglish = voice("english-high", Locale.CANADA, quality = 400)
         val unrelated = voice("french-highest", Locale.FRANCE, quality = 500)
+        val applied = mutableListOf<Voice>()
 
-        val preferred =
-            TtsEngineResolver.preferOfflineVoice(
-                current,
-                setOf(lowerQualityEnglish, higherQualityEnglish, unrelated),
+        val resolution =
+            TtsEngineResolver.applyResolvedVoice(
+                enginePackage = "engine.a",
+                locale = Locale.US,
+                voices = setOf(current, lowerQualityEnglish, higherQualityEnglish, unrelated),
+                requestedKey = null,
+                setVoice = {
+                    applied.add(it)
+                    TextToSpeech.SUCCESS
+                },
+                currentVoice = { current },
             )
 
-        assertSame(higherQualityEnglish, preferred)
+        assertSame(higherQualityEnglish, applied.single())
+        assertEquals(TtsVoiceKey("engine.a", "english-high", "en-CA"), resolution.effectiveKey)
     }
 
     @Test
-    fun offlineVoicePreferenceRetainsCurrentWithoutSameLanguageOfflineVoice() {
+    fun offlineFallbackExcludesCurrentNetworkVoiceWhenCatalogHasAnotherLanguage() {
         val current = voice("current", Locale.US, quality = 300, networkRequired = true)
         val unrelated = voice("french", Locale.FRANCE, quality = 500)
 
-        assertSame(current, TtsEngineResolver.preferOfflineVoice(current, setOf(unrelated)))
+        val resolution =
+            TtsEngineResolver.applyResolvedVoice(
+                enginePackage = "engine.a",
+                locale = Locale.US,
+                voices = setOf(unrelated),
+                requestedKey = null,
+                setVoice = { error("Unexpected voice selection: $it") },
+                currentVoice = { current },
+            )
+
+        assertNull(resolution.effectiveKey)
     }
 
     @Test
-    fun offlineVoicePreferenceRetainsCurrentForEmptyCandidates() {
+    fun offlineFallbackExcludesCurrentNetworkVoiceWhenCatalogIsEmpty() {
         val current = voice("current", Locale.US, quality = 300, networkRequired = true)
 
-        assertSame(current, TtsEngineResolver.preferOfflineVoice(current, emptySet()))
+        val resolution =
+            TtsEngineResolver.applyResolvedVoice(
+                enginePackage = "engine.a",
+                locale = Locale.US,
+                voices = emptySet(),
+                requestedKey = null,
+                setVoice = { error("Unexpected voice selection: $it") },
+                currentVoice = { current },
+            )
+
+        assertNull(resolution.effectiveKey)
     }
 
     @Test
@@ -656,18 +685,27 @@ class TtsEngineResolverTest {
         }
 
     @Test
-    fun offlineVoicePreferenceSkipsNotInstalledVoices() {
+    fun offlineFallbackSkipsVoicesThatAreNotInstalled() {
         val current = voice("current", Locale.US, quality = 300, networkRequired = true)
         val notInstalled = voice("offline-high", Locale.CANADA, quality = 500, features = setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))
         val installed = voice("offline-low", Locale.UK, quality = 200)
+        val applied = mutableListOf<Voice>()
 
-        val preferred =
-            TtsEngineResolver.preferOfflineVoice(
-                current,
-                setOf(notInstalled, installed),
+        val resolution =
+            TtsEngineResolver.applyResolvedVoice(
+                enginePackage = "engine.a",
+                locale = Locale.US,
+                voices = setOf(notInstalled, installed),
+                requestedKey = null,
+                setVoice = {
+                    applied.add(it)
+                    TextToSpeech.SUCCESS
+                },
+                currentVoice = { current },
             )
 
-        assertSame(installed, preferred)
+        assertSame(installed, applied.single())
+        assertEquals(TtsVoiceKey("engine.a", "offline-low", "en-GB"), resolution.effectiveKey)
     }
 
     private fun engineInfo(
