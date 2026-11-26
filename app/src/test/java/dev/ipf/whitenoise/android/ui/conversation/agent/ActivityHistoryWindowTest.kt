@@ -77,8 +77,8 @@ class ActivityHistoryWindowTest {
             assertTrue(history.onlyItem().state.isOpen)
 
             val running = requireNotNull(turn.agentItem)
-            val stopped =
-                turn.copy(agentItem = running.copy(state = AgentItemStateFfi.CANCELLED, version = running.version + 1uL))
+            val revision = running.copy(state = AgentItemStateFfi.CANCELLED, version = running.version + 1uL)
+            val stopped = turn.copy(agentItem = revision)
             subscription.updates.send(TimelinePageFfi(listOf(stopped), false, false))
             runCurrent()
 

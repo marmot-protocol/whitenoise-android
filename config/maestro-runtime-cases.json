@@ -428,10 +428,11 @@
     "groups-details-return": {
       "suite": "groups",
       "manual_ids": [
+        "CON-057",
         "GRP-001",
         "NAV-008"
       ],
-      "assertions": "Conversation header opens real group details and Back restores its history.",
+      "assertions": "Conversation header opens real group details and Back restores its history. Agent activity opens from Chat details for an empty activity history and closes back to the conversation.",
       "postcondition": "none"
     },
     "groups-members": {

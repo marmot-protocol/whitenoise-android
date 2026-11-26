@@ -2181,7 +2181,8 @@ internal fun ConversationScreen(
         ) {
             snapshotFlow { controller.isLoading || controller.isLoadingPage }.first { !it }
             val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
-            val timelineCannotBackfill = !navigationState.initialTimelineLoadStarted || controller.group.pendingConfirmation
+            val timelineCannotBackfill =
+                !navigationState.initialTimelineLoadStarted || controller.group.pendingConfirmation
             if (hasEstablishedInitialPosition || timelineCannotBackfill || renderedTimeline.isNotEmpty()) {
                 if (renderedTimeline.isNotEmpty()) {
                     navigationState.initialTimelineBackfillNoProgress = false
@@ -4551,8 +4552,9 @@ internal fun ConversationScreen(
                                                 jumpToNextUnreadMention()
                                             }
                                         }
+                                        val showNewestJump = !nearBottom || controller.hasMoreAfterTimeline
                                         ConversationNavigationControl(
-                                            visible = !selectionMode && (!nearBottom || controller.hasMoreAfterTimeline),
+                                            visible = !selectionMode && showNewestJump,
                                         ) {
                                             ConversationJumpToNewestButton(
                                                 unreadIncomingCount = unreadIncomingCount,

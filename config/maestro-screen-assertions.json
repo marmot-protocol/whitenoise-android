@@ -1282,14 +1282,42 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
       "symbol": "ActivitySheet",
-      "bindings": [],
-      "remaining": "CON-057 covers opening Agent activity from the conversation header and Chat details, then closing it and returning to the same chat."
+      "bindings": [
+        {
+          "case": "groups-details-return",
+          "selector": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "scope": "Opens Agent activity from Chat details in a generated native group and dismisses it back to that conversation.",
+          "entry_assertion": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "opened_by": {
+            "text": "Agent activity"
+          }
+        }
+      ],
+      "remaining": "CON-057 still exercises opening from the conversation header with live agent activity."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
       "symbol": "AgentActivitySheet",
-      "bindings": [],
-      "remaining": "CON-057 covers expanding tool and edit details and paging through history. CON-059 covers sending Stop and seeing the turn settle."
+      "bindings": [
+        {
+          "case": "groups-details-return",
+          "selector": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "scope": "The production sheet renders the empty state from the generated group's native history window.",
+          "entry_assertion": {
+            "text": "No agent activity in this part of the chat"
+          },
+          "opened_by": {
+            "text": "Agent activity"
+          }
+        }
+      ],
+      "remaining": "CON-057 still exercises tool and edit details and paging. CON-059 still exercises Stop and settlement."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",

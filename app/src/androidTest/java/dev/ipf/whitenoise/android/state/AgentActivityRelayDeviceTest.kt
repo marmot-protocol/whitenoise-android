@@ -67,16 +67,16 @@ class AgentActivityRelayDeviceTest {
         agentRuntime.start()
         val viewer = viewerRuntime.createIdentity(relays, relays)
         val agent = agentRuntime.createIdentity(relays, relays)
-        val group = viewerRuntime.createGroup(viewer.label, "", listOf(agent.accountIdHex), null).requireCreatedGroupId()
+        val group =
+            viewerRuntime.createGroup(viewer.label, "", listOf(agent.accountIdHex), null).requireCreatedGroupId()
         awaitInvite(agentRuntime, agent.label, group)
         val window =
             viewerRuntime.openTimelineWithFallback(viewer.label, group, 20u, mode = ConversationOpenModeFfi.LATEST)
         try {
             // Use the native window the activity sheet opens, even when the conversation is on a different page.
             window.snapshot()
-            val turnId =
-                agentRuntime.sendCustomEvent(agent.label, group, AgentItemReader.ITEM_KIND, turnTags, "").messageIds.single()
-            val turn = awaitTurn(window, turnId)
+            val sent = agentRuntime.sendCustomEvent(agent.label, group, AgentItemReader.ITEM_KIND, turnTags, "")
+            val turn = awaitTurn(window, sent.messageIds.single())
             assertFalse(conversationTimelineRowVisible(turn))
             val item = requireNotNull(AgentItemReader.read(turn.record, turn.projected))
             assertTrue(item.body is AgentItemBody.Turn)

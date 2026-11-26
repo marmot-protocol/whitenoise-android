@@ -18,3 +18,15 @@ name: groups-details-return
 - assertVisible: "Maestro group"
 - back
 - runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Agent activity"
+    direction: DOWN
+- tapOn: "Agent activity"
+- assertVisible: "No agent activity in this part of the chat"
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertNotVisible: "No agent activity in this part of the chat"
