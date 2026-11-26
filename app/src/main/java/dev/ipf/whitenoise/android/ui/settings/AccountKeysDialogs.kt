@@ -24,6 +24,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,6 +54,19 @@ internal fun ProfileKeysDialogs(
     onExportBackup: () -> Unit,
     cancelRawAuthentication: () -> Unit,
 ) {
+    val exportTitle: @Composable (Int) -> Unit = { title ->
+        Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+            Text(stringResource(title))
+            if (ui.exportScreenLockRequired) {
+                Text(
+                    stringResource(R.string.toast_app_lock_screen_lock_required),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
@@ -58,7 +74,7 @@ internal fun ProfileKeysDialogs(
                 ui.cancelExportPreparation()
                 cancelRawAuthentication()
             },
-            title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
+            title = { exportTitle(R.string.keep_your_private_key_safe) },
             text = {
                 Text(
                     stringResource(R.string.export_private_key_consequence),
@@ -114,6 +130,7 @@ internal fun ProfileKeysDialogs(
     }
     if (ui.passwordDialog && canExport) {
         ExportPasswordDialog(
+            title = { exportTitle(R.string.encrypted_private_key) },
             password = ui.password,
             confirmation = ui.confirmation,
             busy = ui.exportBusy,
@@ -229,6 +246,7 @@ internal fun ProfileKeyFeedbackDialogs(
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 private fun ExportPasswordDialog(
+    title: @Composable () -> Unit,
     password: TextFieldState,
     confirmation: TextFieldState,
     busy: Boolean,
@@ -243,7 +261,7 @@ private fun ExportPasswordDialog(
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         onDismissStart = onDismissStart,
-        title = { Text(stringResource(R.string.encrypted_private_key)) },
+        title = title,
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),

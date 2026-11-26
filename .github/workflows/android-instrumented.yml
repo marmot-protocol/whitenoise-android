@@ -152,6 +152,10 @@ on:
       - 'scripts/select_instrumented_lanes.py'
       - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
+      # Avatar loaders feed cached profile and cold-start direct-chat presentation.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/GroupAvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/PrivateContactAvatarLoader.kt'
       - 'app/src/androidTest/AndroidManifest.xml'
       # Every @PullRequestDeviceSmoke test starts this run when it changes (scripts/test_select_instrumented_lanes.py).
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/audio/AttachmentPcmDecoderDeviceTest.kt'

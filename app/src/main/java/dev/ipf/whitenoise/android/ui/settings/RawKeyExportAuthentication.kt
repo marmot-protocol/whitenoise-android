@@ -33,7 +33,11 @@ internal fun rememberRawKeyExportAuthentication(
     val authentication =
         remember(context, owner, appState) {
             RawKeyExportPrompt(context.findActivity()) {
-                appState.present(R.string.toast_app_lock_screen_lock_required)
+                if (owner.rawExportDialog || owner.passwordDialog) {
+                    owner.exportScreenLockRequired = true
+                } else {
+                    appState.present(R.string.toast_app_lock_screen_lock_required)
+                }
             }
         }
     DisposableEffect(authentication) {

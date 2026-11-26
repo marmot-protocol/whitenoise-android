@@ -13,8 +13,12 @@ import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
@@ -33,6 +37,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.R
@@ -55,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
 import org.robolectric.shadows.ShadowDialog
@@ -86,6 +92,54 @@ class AccountKeysExportDeliveryTest {
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun rawExportShowsScreenLockRequirementInTheDialog() {
+        val fixture = renderWithoutScreenLock()
+        beginExport(encrypted = false)
+        assertScreenLockNoticeInDialog()
+        dialogButton(R.string.cancel).performClick()
+
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.toast_app_lock_screen_lock_required)).assertDoesNotExist()
+        dialogButton(R.string.share).performClick()
+        assertScreenLockNoticeInDialog()
+        assertEquals(0, fixture.native.rawCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_raw_screen_lock.png")
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun encryptedExportShowsScreenLockRequirementInTheDialog() {
+        val fixture = renderWithoutScreenLock()
+        beginExport(encrypted = true)
+        assertScreenLockNoticeInDialog()
+        dialogButton(R.string.cancel).performClick()
+
+        beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
+        assertScreenLockNoticeInDialog()
+        assertEquals(0, fixture.native.encryptedCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_backup_screen_lock.png")
+    }
+
+    private fun renderWithoutScreenLock(): Fixture {
+        Shadow
+            .extract<ShadowBiometricManager>(context.getSystemService(BiometricManager::class.java))
+            .setCanAuthenticate(false)
+        return render(authenticator = null)
+    }
+
+    private fun assertScreenLockNoticeInDialog() {
+        composeRule
+            .onNode(
+                hasText(context.getString(R.string.toast_app_lock_screen_lock_required)) and hasAnyAncestor(isDialog()),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+    }
 
     /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
     @Test
@@ -696,7 +750,7 @@ class AccountKeysExportDeliveryTest {
         deferRaw: Boolean = false,
         deferEncrypted: Boolean = false,
         failFirstEncryption: Boolean = false,
-        authenticator: RawKeyExportAuthentication = RawKeyExportAuthentication { authenticated -> authenticated() },
+        authenticator: RawKeyExportAuthentication? = RawKeyExportAuthentication { authenticated -> authenticated() },
     ): Fixture {
         val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
