@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,35 +72,28 @@ class BatchMessageDeleteDialogBehaviorTest {
 
     private fun string(resId: Int): String = app.getString(resId)
 
-    private fun renderContent(
+    private fun renderDialog(
         selectedCount: Int,
         breakdown: BatchDeleteBreakdown,
         deleteInFlight: Boolean = false,
-        content: @Composable (
-            onEveryone: () -> Unit,
-            onMe: () -> Unit,
-            onCancel: () -> Unit,
-        ) -> Unit = { onEveryone, onMe, onCancel ->
-            BatchMessageDeleteDialogContent(
-                selectedCount = selectedCount,
-                breakdown = breakdown,
-                deleteInFlight = deleteInFlight,
-                onDeleteForEveryone = onEveryone,
-                onDeleteForMe = onMe,
-                onCancel = onCancel,
-            )
-        },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                Surface { content({}, {}, {}) }
+                BatchMessageDeleteDialog(
+                    selectedCount = selectedCount,
+                    breakdown = breakdown,
+                    deleteInFlight = deleteInFlight,
+                    onDeleteForEveryone = {},
+                    onDeleteForMe = {},
+                    onDismissRequest = {},
+                )
             }
         }
     }
 
     @Test
     fun bothChoicesRenderWhenSelectionHasForEveryoneCapableMessages() {
-        renderContent(
+        renderDialog(
             selectedCount = 3,
             breakdown = BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 1),
         )
@@ -113,7 +104,7 @@ class BatchMessageDeleteDialogBehaviorTest {
 
     @Test
     fun onlyLocalChoiceRendersWhenNoMessageCanBeDeletedForEveryone() {
-        renderContent(
+        renderDialog(
             selectedCount = 2,
             breakdown = BatchDeleteBreakdown(deleteForEveryone = 0, hideLocally = 2),
         )
@@ -124,7 +115,7 @@ class BatchMessageDeleteDialogBehaviorTest {
 
     @Test
     fun inFlightDisablesDestructiveChoicesButNotCancel() {
-        renderContent(
+        renderDialog(
             selectedCount = 3,
             breakdown = BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 1),
             deleteInFlight = true,
@@ -142,20 +133,18 @@ class BatchMessageDeleteDialogBehaviorTest {
             // which disables the option before a second tap can land.
             var inFlight by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = false) {
-                Surface {
-                    BatchMessageDeleteDialogContent(
-                        selectedCount = 2,
-                        breakdown = BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 0),
-                        deleteInFlight = inFlight,
-                        onDeleteForEveryone = {
-                            if (inFlight) return@BatchMessageDeleteDialogContent
-                            everyoneTaps += 1
-                            inFlight = true
-                        },
-                        onDeleteForMe = {},
-                        onCancel = {},
-                    )
-                }
+                BatchMessageDeleteDialog(
+                    selectedCount = 2,
+                    breakdown = BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 0),
+                    deleteInFlight = inFlight,
+                    onDeleteForEveryone = {
+                        if (inFlight) return@BatchMessageDeleteDialog
+                        everyoneTaps += 1
+                        inFlight = true
+                    },
+                    onDeleteForMe = {},
+                    onDismissRequest = {},
+                )
             }
         }
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).performClick()

@@ -1868,7 +1868,7 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "BatchMessageDeleteDialogContent",
+      "symbol": "MessageDeleteConfirmationDialog",
       "bindings": [
         {
           "case": "actions-batch-delete-cancel",
@@ -1876,6 +1876,13 @@
             "text": "Delete 1 message\\?"
           },
           "scope": "bulk confirmation body rendered by its app dialog."
+        },
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete for me"
+          },
+          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation."
         }
       ]
     },
@@ -1895,19 +1902,6 @@
           "opened_by": {
             "text": "Delete"
           }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "MessageDeleteDialogContent",
-      "bindings": [
-        {
-          "case": "actions-delete-cancel",
-          "selector": {
-            "text": "Delete for me"
-          },
-          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation."
         }
       ]
     },
