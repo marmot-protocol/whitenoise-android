@@ -12,6 +12,8 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.core.nostr.sha256
+import dev.ipf.whitenoise.android.core.nostr.toHex
 import java.io.File
 
 /** How many times consuming a sent send's leftovers reads a draft again after another save moved it. */
@@ -90,7 +92,8 @@ private fun MarmotInterface.recoveredDraftFilesSend(
 
 /**
  * Publishes a retained send. A stored-file send can consume its unchanged, fully matching upload revision.
- * Other composer selections and collection chunks admit their snapshots independently of the native draft.
+ * An exact inline selection can consume its matching revision only while it still owns the caption.
+ * Partial composer selections and collection chunks admit independently of the native draft.
  * Captured replies and callers without explicit composer ownership keep their existing admission paths.
  */
 internal suspend fun MarmotInterface.publishRetainedMedia(
@@ -107,13 +110,19 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
         }
         retained.admitsPreparedMedia ->
             admitLocalSend(account, group, admission.token) {
+                val consuming =
+                    if (retained.draftHandling == RetainedDraftHandling.COMPOSER_SELECTION && admission.ownsCaption()) {
+                        exactInlineDraftRevision(account, group, retained).takeIf { admission.ownsCaption() }
+                    } else {
+                        null
+                    }
                 sendPreparedMediaWithClientToken(
                     account,
                     group,
                     references,
                     retained.caption,
                     admission.token,
-                    consumingDraft = null,
+                    consumingDraft = consuming,
                 )
             }
         else ->
@@ -126,6 +135,41 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
                 replyRevision = retained.replyRevision,
             )
     }
+
+/**
+ * Captures a revision only when every staged inline body is the exact native row with the captured caption
+ * and there are no other rows or reply. Revision-bound reads prevent a concurrent edit from authorizing removal.
+ */
+@Suppress("SwallowedException") // If an exact match cannot be proved, admission preserves the draft revision.
+private fun MarmotInterface.exactInlineDraftRevision(
+    account: String,
+    group: String,
+    retained: RetainedMediaUpload,
+): MessageDraftRevisionFfi? {
+    val picks = retained.attachments
+    val isInlineSelection = picks.all { !it.isFileBacked && it.nativeDraftAttachmentId != null }
+    val selected = if (isInlineSelection) selectedDraftOrNull(account, group) else null
+    val draft = selected?.draft ?: return null
+    val matchingCaption = draft.content.trim() == retained.caption.orEmpty().trim()
+    val matchingShape =
+        draft.replyToMessageIdHex == null && matchingCaption && draft.mediaAttachments.size == picks.size
+    return try {
+        selected.revision.takeIf {
+            matchingShape &&
+                draft.mediaAttachments.zip(picks).all { (stored, pick) ->
+                    val sameAttachment =
+                        !stored.fileBacked &&
+                            stored.id == pick.nativeDraftAttachmentId &&
+                            stored.fileName == pick.fileName &&
+                            stored.mediaType == pick.mediaType
+                    val body = if (sameAttachment) messageDraftAttachmentIfRevision(account, it, stored.id) else null
+                    body?.contentEquals(pick.plaintextBytes) == true
+                }
+        }
+    } catch (conflict: MarmotKitException) {
+        null
+    }
+}
 
 /** The token, selected revision and text ownership of an admitted send. */
 internal data class DraftFilesAdmission(
@@ -176,7 +220,7 @@ internal fun MarmotInterface.consumeSentDraftFiles(
     consumeSelectedDraftFiles(
         account,
         group,
-        matches = { sentFileOf(it, upload.attachments) },
+        matches = { stored, _ -> sentFileOf(stored, upload.attachments) },
         consumeText = { ownsCaption() && it.trim() == upload.caption.orEmpty().trim() },
     )
 }
@@ -187,9 +231,23 @@ internal fun MarmotInterface.consumeCollectionDraftFiles(
     accepted: List<CollectionStoredDraft>,
 ): Boolean {
     val sources = accepted.associateBy { it.attachmentId }
-    return consumeSelectedDraftFiles(operation.accountRef, operation.groupIdHex, matches = { draft ->
+    return consumeSelectedDraftFiles(operation.accountRef, operation.groupIdHex, matches = { draft, revision ->
         val source = sources[draft.id]
-        source != null && source.fileBacked == draft.fileBacked && source.byteCount == draft.plaintextSize.toLong()
+        val sameDescriptor =
+            source != null && source.fileBacked == draft.fileBacked && source.byteCount == draft.plaintextSize.toLong()
+        val inlineHash = source?.inlineSha256
+        sameDescriptor &&
+            (
+                draft.fileBacked ||
+                    (
+                        inlineHash != null &&
+                            messageDraftAttachmentIfRevision(
+                                operation.accountRef,
+                                revision,
+                                draft.id,
+                            )?.let { sha256(it).toHex() == inlineHash } == true
+                    )
+            )
     })
 }
 
@@ -198,17 +256,17 @@ internal fun MarmotInterface.consumeCollectionDraftFiles(
 private fun MarmotInterface.consumeSelectedDraftFiles(
     account: String,
     group: String,
-    matches: (SelectedMessageDraftAttachmentFfi) -> Boolean,
+    matches: (SelectedMessageDraftAttachmentFfi, MessageDraftRevisionFfi) -> Boolean,
     consumeText: (String) -> Boolean = { false },
 ): Boolean {
     repeat(MAX_SENT_DRAFT_CONSUME_ATTEMPTS) {
         val selected = selectedDraftOrNull(account, group) ?: return false
         val draft = selected.draft ?: return true
-        val sent = draft.mediaAttachments.filter(matches).mapTo(HashSet()) { it.id }
-        if (sent.isEmpty()) return true
-        val kept = draft.mediaAttachments.filterNot { it.id in sent }
-        val text = draft.content.takeUnless(consumeText).orEmpty()
         try {
+            val sent = draft.mediaAttachments.filter { matches(it, selected.revision) }.mapTo(HashSet()) { it.id }
+            if (sent.isEmpty()) return true
+            val kept = draft.mediaAttachments.filterNot { it.id in sent }
+            val text = draft.content.takeUnless(consumeText).orEmpty()
             if (kept.isEmpty() && text.isBlank() && draft.replyToMessageIdHex == null) {
                 clearMessageDraftIfRevision(account, selected.revision)
             } else {

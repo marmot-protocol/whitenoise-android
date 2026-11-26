@@ -10,13 +10,13 @@ import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionDraftSourceFiles
 import dev.ipf.whitenoise.android.state.CollectionItemState
-import dev.ipf.whitenoise.android.state.CollectionStoredDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftFileCopy
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.UnverifiedStoredDraftPdf
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
+import dev.ipf.whitenoise.android.state.captureDraftSource
 import dev.ipf.whitenoise.android.state.consumeCollectionDraftFiles
 import dev.ipf.whitenoise.android.state.hasVerifiedDraftPdfMetadata
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -116,16 +116,12 @@ internal suspend fun ownCollectionDraftSources(
         operation.items.zip(prepared).mapIndexed { index, (item, body) ->
             val descriptor = body?.draftFile
             if (body == null || descriptor == null) {
-                val inline =
-                    body?.nativeDraftAttachmentId?.let { id ->
-                        CollectionStoredDraft(id, body.byteCount, body.mediaType, fileBacked = false)
-                    }
-                item.copy(storedDraft = inline)
+                item.copy(storedDraft = body?.captureDraftSource())
             } else {
                 val target = files.fileFor(context, operation, index, collectionDraftSuffix(body))
                 item.copy(
                     uri = copyStoredCollectionItem(context, target, body, copy),
-                    storedDraft = CollectionStoredDraft(descriptor.attachmentId, descriptor.byteCount, body.mediaType),
+                    storedDraft = body.captureDraftSource(),
                 )
             }
         }

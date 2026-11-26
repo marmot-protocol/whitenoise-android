@@ -241,6 +241,7 @@ private fun encodeStoredCollectionDraft(source: CollectionStoredDraft): JSONObje
         .put("mime", source.mediaType)
         .put("fileBacked", source.fileBacked)
         .put("consumed", source.consumed)
+        .put("inlineSha256", source.inlineSha256)
 
 /** Reads a record written by [encodeCollectionOperation]; a restored operation always starts paused. */
 internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOperation {
@@ -268,6 +269,7 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
                                 draft.getString("mime"),
                                 draft.optBoolean("fileBacked", true),
                                 draft.optBoolean("consumed", json.optBoolean("draftConsumed")),
+                                draft.optString("inlineSha256").takeIf { it.isNotEmpty() },
                             )
                         },
                 )

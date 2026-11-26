@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.core.nostr.sha256
+import dev.ipf.whitenoise.android.core.nostr.toHex
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -57,7 +59,21 @@ internal data class CollectionStoredDraft(
     val mediaType: String,
     val fileBacked: Boolean = true,
     val consumed: Boolean = false,
+    val inlineSha256: String? = null,
 )
+
+/** Captures the body of a native row independently of any later edit that reuses its ID. Call off Main. */
+internal fun PendingAttachment.captureDraftSource(): CollectionStoredDraft? {
+    val file = draftFile
+    val id = file?.attachmentId ?: nativeDraftAttachmentId ?: return null
+    return CollectionStoredDraft(
+        id,
+        byteCount,
+        mediaType,
+        fileBacked = file != null,
+        inlineSha256 = if (file == null) sha256(plaintextBytes).toHex() else null,
+    )
+}
 
 /** One staged occurrence: [id] is the composer's stable occurrence id, so duplicate URIs stay distinct. */
 internal data class CollectionItem(

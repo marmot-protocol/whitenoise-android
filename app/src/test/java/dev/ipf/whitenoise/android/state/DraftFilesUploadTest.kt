@@ -552,6 +552,36 @@ class StoredDraftAcceptanceTest {
             }
         }
 
+    /** A fully matching inline photo and caption are consumed by native acceptance, even before host cleanup. */
+    @Test
+    fun exactInlineSelectionConsumesItsCaptionAtAdmission() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val photo = draftAttachment("photo").copy(fileBacked = false, plaintextSize = 3uL)
+            val bytes = byteArrayOf(1, 2, 3)
+            val engine = DraftUploadEngine(content("sent caption", photo), fileBody = bytes)
+            val revision = engine.revision
+            val app = acceptanceAppState(engine)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val item = PendingAttachment(bytes, photo.mediaType, photo.fileName, nativeDraftAttachmentId = photo.id)
+                val retained =
+                    RetainedMediaUpload(listOf(item), "sent caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                        draftSendClearToken = app.captureDraftForSend("acct", group.groupIdHex)
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "inline-exact")
+                awaitAttachmentCollectionJournal()
+
+                assertSame(revision, engine.admittedConsuming)
+                assertEquals("sent caption", engine.admittedCaption)
+                assertNull(engine.current)
+            } finally {
+                app.mutationsScope.cancel()
+            }
+        }
+
     /** The accepted inline pick disappears while the unsurfaced stored file stays in the native draft. */
     @Test
     fun acceptedInlinePickKeepsHiddenStoredDraftAttachment() =
@@ -560,7 +590,7 @@ class StoredDraftAcceptanceTest {
             val hidden = draftAttachment("hidden")
             val visible = hidden.copy(id = "photo", fileBacked = false, plaintextSize = 3uL)
             val draft = content("newer caption", visible, hidden).copy(replyToMessageIdHex = "new-reply")
-            val engine = DraftUploadEngine(draft)
+            val engine = DraftUploadEngine(draft, fileBody = byteArrayOf(1, 2, 3))
             val app = acceptanceAppState(engine)
             try {
                 val controller = ConversationController(appState = app, initialGroup = group)
@@ -582,6 +612,39 @@ class StoredDraftAcceptanceTest {
                 assertEquals("sent caption", engine.admittedCaption)
                 assertNull(engine.admittedConsuming)
                 assertEquals(draft.copy(mediaAttachments = listOf(hidden)), engine.current)
+            } finally {
+                app.mutationsScope.cancel()
+            }
+        }
+
+    /** A later same-size photo edit reusing the native ID survives accepted-ID reconciliation. */
+    @Test
+    fun acceptedInlinePickKeepsAnEditedBodyAtTheSameId() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val photo = draftAttachment("photo").copy(fileBacked = false, plaintextSize = 3uL)
+            val bytes = byteArrayOf(1, 2, 3)
+            val draft = content("sent caption", photo)
+            val engine = DraftUploadEngine(draft, fileBody = bytes)
+            engine.onAdmission = {
+                engine.inlineBody = byteArrayOf(6, 5, 4)
+                engine.saveText("next caption")
+            }
+            val app = acceptanceAppState(engine)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val item = PendingAttachment(bytes, photo.mediaType, photo.fileName, nativeDraftAttachmentId = photo.id)
+                val retained =
+                    RetainedMediaUpload(listOf(item), "sent caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                        draftSendClearToken = app.captureDraftForSend("acct", group.groupIdHex)
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "edited-photo")
+                awaitAttachmentCollectionJournal()
+
+                assertEquals(draft.copy(content = "next caption"), engine.current)
+                assertFalse(engine.calls.contains("clear"))
             } finally {
                 app.mutationsScope.cancel()
             }
@@ -641,6 +704,7 @@ private class DraftUploadEngine(
     var refuseDraftCleanup: Boolean = false
     var onAdmission: () -> Unit = {}
     var beforeFullRead: () -> Unit = {}
+    var inlineBody: ByteArray = fileBody
     var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
     var uploadRevision: MessageDraftRevisionFfi? = null
     var uploadedIds: List<String> = emptyList()
@@ -725,6 +789,16 @@ private class DraftUploadEngine(
             current = null
             this@DraftUploadEngine.revision = newRevision()
             return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, null)
+        }
+
+        /** Returns inline bytes under exactly the selected opaque revision. */
+        override fun messageDraftAttachmentIfRevision(
+            accountRef: String,
+            revision: MessageDraftRevisionFfi,
+            attachmentId: String,
+        ): ByteArray? {
+            requireCurrent(revision)
+            return inlineBody.takeIf { current?.mediaAttachments?.any { row -> row.id == attachmentId } == true }
         }
 
         /** Checks that the privacy read uses exactly the selected revision that will be uploaded. */

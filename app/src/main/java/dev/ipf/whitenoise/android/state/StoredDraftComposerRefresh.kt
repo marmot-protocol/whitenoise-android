@@ -51,7 +51,7 @@ internal fun ConversationController.recordRecoveredStoredDraft(
 }
 
 /** Only the text generation captured at the send gesture can authorize removing a caption. */
-internal fun ConversationController.ownsStoredDraftCaption(retained: RetainedMediaUpload): Boolean {
+internal fun ConversationController.ownsDraftCaption(retained: RetainedMediaUpload): Boolean {
     val captured = retained.draftSendClearToken ?: return false
     return captured.accountRef == boundAccountRef &&
         captured.groupIdHex == group.groupIdHex &&
@@ -92,7 +92,7 @@ private suspend fun ConversationController.admitMediaWithDraftRecovery(
     return try {
         appState
             .marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                val ownsCaption = { ownsStoredDraftCaption(retained) }
+                val ownsCaption = { ownsDraftCaption(retained) }
                 val consuming = retained.draftUploadRevision.takeIf { ownsCaption() }
                 val admission = DraftFilesAdmission(consuming, token, ownsCaption)
                 publishRetainedMedia(account, group.groupIdHex, references, retained, admission)
@@ -133,16 +133,18 @@ private suspend fun ConversationController.recordStoredDraftAdmission(
 ): AttachmentCollectionOperation? {
     if (!retained.tracksDraftAcceptance) return null
     val items =
-        retained.attachments.mapNotNull { attachment ->
-            val stored = attachment.draftFile
-            val id = stored?.attachmentId ?: attachment.nativeDraftAttachmentId ?: return@mapNotNull null
-            CollectionItem(
-                id,
-                "",
-                CollectionItemKind.DOCUMENT,
-                CollectionItemState.UPLOADING,
-                CollectionStoredDraft(id, attachment.byteCount, attachment.mediaType, fileBacked = stored != null),
-            )
+        withContext(Dispatchers.IO) {
+            retained.attachments.mapNotNull { attachment ->
+                attachment.captureDraftSource()?.let { source ->
+                    CollectionItem(
+                        source.attachmentId,
+                        "",
+                        CollectionItemKind.DOCUMENT,
+                        CollectionItemState.UPLOADING,
+                        source,
+                    )
+                }
+            }
         }
     val registry = appState.attachmentCollections
     val groupIdHex = group.groupIdHex
