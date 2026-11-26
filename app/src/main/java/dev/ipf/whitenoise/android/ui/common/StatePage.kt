@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ internal fun StatePage(
     progressLabelModifier: Modifier = Modifier,
     primary: StateAction? = null,
     secondary: StateAction? = null,
+    scrollState: ScrollState = rememberScrollState(),
     extra: @Composable ColumnScope.() -> Unit = {},
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
@@ -68,7 +70,7 @@ internal fun StatePage(
         modifier =
             modifier
                 .fillMaxSize()
-                .whiteNoiseVerticalScroll(rememberScrollState())
+                .whiteNoiseVerticalScroll(scrollState)
                 .padding(WhiteNoiseSpacing.CompactScreenMargin),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

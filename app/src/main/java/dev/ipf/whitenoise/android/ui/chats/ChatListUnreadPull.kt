@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.getValue
@@ -14,8 +15,8 @@ import kotlin.math.abs
 private const val UNREAD_PULL_HAPTIC_REARM_RATIO = 0.9f
 
 /**
- * The unread pull arms when an unread-only list has no rows or the list rests at its first row. A pending
- * unread snapshot does not arm it, so a scrolled list keeps scrolling (#3622).
+ * The unread pull arms when an unread-only list has no rows or the list rests at its first row.
+ * A scrolled empty page or a pending unread snapshot over a scrolled list keeps its own gesture (#3622).
  */
 @Suppress("LongParameterList")
 internal fun chatListUnreadPullArmed(
@@ -25,9 +26,12 @@ internal fun chatListUnreadPullArmed(
     scrollInProgress: Boolean,
     firstVisibleItemIndex: Int,
     firstVisibleItemScrollOffset: Int,
-): Boolean =
-    (unreadOnly && listEmpty) ||
+    emptyPageScroll: ScrollState? = null,
+): Boolean {
+    if (emptyPageScroll?.canScrollBackward == true || emptyPageScroll?.isScrollInProgress == true) return false
+    return (unreadOnly && listEmpty) ||
         (!hasEarlierChats && !scrollInProgress && firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0)
+}
 
 /** A pull must begin at the logical head; scrolling or flinging into it never arms the action. */
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "NestedBlockDepth")

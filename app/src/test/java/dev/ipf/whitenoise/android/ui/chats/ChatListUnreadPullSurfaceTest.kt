@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.os.Looper
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -23,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -255,6 +259,52 @@ class ChatListUnreadPullSurfaceTest {
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(2, changes)
         assertEquals(false, unread.value)
+    }
+
+    @Test fun scrolledEmptyStateReturnsToTheTopBeforeTheUnreadPullCanToggle() {
+        var toggles = 0
+        lateinit var scroll: ScrollState
+        rule.setContent {
+            WhiteNoiseTheme {
+                val density = Density(LocalDensity.current.density, fontScale = 2f)
+                CompositionLocalProvider(LocalDensity provides density) {
+                    scroll = rememberScrollState()
+                    Box(Modifier.size(300.dp, 200.dp)) {
+                        ChatListUnreadPullSurface(
+                            unreadOnly = true,
+                            actionsAvailable = true,
+                            gestureEnabled = true,
+                            atTop = {
+                                chatListUnreadPullArmed(
+                                    unreadOnly = true,
+                                    listEmpty = true,
+                                    hasEarlierChats = false,
+                                    scrollInProgress = false,
+                                    firstVisibleItemIndex = 0,
+                                    firstVisibleItemScrollOffset = 0,
+                                    emptyPageScroll = scroll,
+                                )
+                            },
+                            onUnreadOnlyChange = { toggles++ },
+                        ) {
+                            EmptyChats(onCreate = {}, onFirstRunHelp = {}, scrollState = scroll)
+                        }
+                    }
+                }
+            }
+        }
+        val surface = rule.onNodeWithTag("chats.unread_surface")
+        rule.runOnIdle {
+            scroll.dispatchRawDelta(24f)
+            assertTrue(scroll.value > 0)
+        }
+        repeat(2) { pull ->
+            surface.performTouchInput { swipe(center, Offset(center.x, height - 1f)) }
+            rule.runOnIdle {
+                assertEquals(0, scroll.value)
+                assertEquals(pull, toggles)
+            }
+        }
     }
 
     private companion object {
