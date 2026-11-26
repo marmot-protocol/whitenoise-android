@@ -357,17 +357,6 @@ class TtsEngineResolver(
                 "com.reecedunn.espeak",
             )
 
-        fun preferOfflineVoice(
-            currentVoice: Voice,
-            voices: Collection<Voice>,
-        ): Voice = offlineVoiceCandidates(currentVoice, voices).firstOrNull() ?: currentVoice
-
-        /** Uses the framework's current locale for the established fallback path. */
-        fun offlineVoiceCandidates(
-            currentVoice: Voice,
-            voices: Collection<Voice>,
-        ): List<Voice> = offlineVoiceCandidates(currentVoice.locale, voices)
-
         /** Orders installed offline candidates deterministically for an utterance locale. */
         internal fun offlineVoiceCandidates(
             locale: Locale,
