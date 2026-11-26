@@ -1,0 +1,47 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSearchField.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseCompactSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSearchField.kt",
+        "anchor": "fun WhiteNoiseCompactSearchField(",
+        "test_ids": [
+          "NCH-001",
+          "FIND-001",
+          "FIND-004",
+          "FLD-001",
+          "FLD-002",
+          "SET-009"
+        ]
+      },
+      {
+        "surface": "CompactSearchDecoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSearchField.kt",
+        "anchor": "fun CompactSearchDecoration(",
+        "test_ids": [
+          "NCH-001",
+          "FIND-001",
+          "FIND-004",
+          "FLD-001",
+          "FLD-002",
+          "SET-009"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:clear_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSearchField.kt",
+        "anchor": "R.string.clear_search",
+        "test_ids": [
+          "NCH-001",
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      }
+    ]
+  }
+}

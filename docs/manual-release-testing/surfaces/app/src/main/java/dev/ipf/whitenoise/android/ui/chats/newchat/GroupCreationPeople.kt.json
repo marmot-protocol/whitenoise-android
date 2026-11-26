@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+  "legacy_sha256": "43c79a04ba929f4cabcfbd488a73598ddf46c1426637e33b9ef07a77c98e5070",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: GroupCreationPeople",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "GroupCreationPersonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "fun GroupCreationPersonRow(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "GroupSelectedPerson",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "fun GroupSelectedPerson(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "SelectedPersonCheck",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "fun SelectedPersonCheck(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:remove_member_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "R.string.remove_member_named",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

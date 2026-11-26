@@ -1,16 +1,22 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
@@ -66,6 +72,20 @@ class ContactPickerScreenshotTest {
         rule.onNodeWithContentDescription("Back").assertDoesNotExist()
         rule.onNodeWithContentDescription("Close").performClick()
         assertEquals(1, closes)
+    }
+
+    @Test
+    fun failedDirectorySearchShowsTheFailureStatus() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val failure = context.getString(R.string.user_search_failed)
+        setPicker()
+
+        rule.onNode(hasSetTextAction()).performTextInput("Unlisted person")
+
+        rule.waitUntil(timeoutMillis = 5_000) {
+            rule.onAllNodesWithText(failure).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText(context.getString(R.string.no_matches)).assertDoesNotExist()
     }
 
     /** Renders the picker with one selected person and records the window. */

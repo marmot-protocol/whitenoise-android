@@ -43,7 +43,7 @@ import dev.ipf.whitenoise.android.ui.account.AccountSelectorAccountState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorState
 import dev.ipf.whitenoise.android.ui.account.ProfileSwitcherSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.CandidateKeyPlacement
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.candidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
@@ -91,7 +91,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -125,7 +125,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -147,7 +147,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun aKeyWithoutARowActionKeepsItsTouchMargin() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Member",
                     subtitle = SHORT_KEY,
                     avatarSeed = "member",
@@ -205,7 +205,7 @@ class PublicKeyCopyPresentationCoverageTest {
             Themed {
                 Column {
                     listOf(ROW to FIRST_KEY, SECOND_ROW to SECOND_KEY).forEach { (tag, key) ->
-                        ContactRow(
+                        PersonRow(
                             title = SHORT_KEY,
                             subtitle = "Member",
                             avatarSeed = tag,
@@ -235,7 +235,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var longPresses = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -265,7 +265,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -293,7 +293,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Already in this group",
                     avatarSeed = "member",
@@ -330,7 +330,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun aKeyboardFocusedKeyIsVisiblyHighlighted() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Already in this group",
                     avatarSeed = "member",
@@ -357,7 +357,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun anEnabledRowKeepsTheKeyOutOfKeyboardFocus() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Member",
                     avatarSeed = "member",
@@ -382,7 +382,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun anActionlessRowLetsTheKeyboardCopyItsKey() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Member",
                     subtitle = SHORT_KEY,
                     avatarSeed = "member",

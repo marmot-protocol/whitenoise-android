@@ -99,7 +99,7 @@ class ShareChatPickerFullScreenTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.top
         assertTrue("Full-screen title must be in the top app bar", titleTop < 100f)
-        composeRule.onNodeWithText("Person 5").assertIsDisplayed()
+        composeRule.onNodeWithText("Person 4").assertIsDisplayed()
     }
 
     /** A not-yet-loaded local projection renders an honest empty state without a progress gate. */
