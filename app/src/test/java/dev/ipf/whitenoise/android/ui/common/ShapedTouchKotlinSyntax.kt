@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.common
 
 private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
+private val parameterName = Regex("""(\w+)\s*:""")
 private val typeOperator = Regex("""\b(?:as\??|is)\s+[\w.]+$""")
 private val ifCondition = Regex("""^\s*if\s*\(""")
 private val elseBlock = Regex("""\s*else\s*\{""")
+private val elseKeyword = Regex("""\s*else\b""")
 private val conditionalModifier = Regex("""^\s*(?:if|when)\b""")
 private val sourcePresentCondition = Regex("""^\s*if\s*\(\s*(\w+)\s*!=\s*null\s*\)""")
 private val emptyModifierElse = Regex("""\belse\s+Modifier\s*$""")
@@ -72,6 +74,13 @@ internal fun topLevelArgumentValues(args: String): List<TouchArgument> =
         val name = namedArgument.find(part.text)
         part.valueAfter(name?.let { it.range.last + 1 } ?: 0)
     }
+
+/** The name of a `name = value` argument, or null for a positional one. */
+internal fun argumentName(argument: String): String? = namedArgument.find(argument)?.groupValues?.get(1)
+
+/** The parameter names of a function's parameter list text, in order. */
+internal fun parameterNames(parameters: String): List<String?> =
+    topLevelArguments(parameters).map { parameter -> parameterName.find(parameter)?.groupValues?.get(1) }
 
 /** The top-level arguments of a call's argument text, in order. */
 internal fun topLevelArguments(args: String): List<String> = topLevelArgumentSpans(args).map(TouchArgument::text)
@@ -424,12 +433,38 @@ private fun String.firstTopLevelBranch(): Int {
     return branchKeyword.find(topLevel)?.range?.first ?: length
 }
 
-/** Unwraps the expression blocks in a modifier built by a braced if/else. */
+/**
+ * Whether this modifier expression keeps [root]: it is [root] itself, or [root] extended only by unconditional
+ * standard modifier calls. A scope call such as `let` or `run`, `?:`, `?.`, a branch or any other call could replace
+ * or drop it, so none of them counts.
+ */
+internal fun String.retainsRoot(root: String): Boolean {
+    val text = trim()
+    val links = text.modifierLinks().filterNot { it.nested }.toList()
+    val chained =
+        text.startsWith("$root.") &&
+            text.firstTopLevelBranch() == text.length &&
+            links.isNotEmpty() &&
+            links.all { it.name in standardModifiers && !it.conditional }
+    return text == root || chained
+}
+
+/**
+ * Unwraps the arms of a modifier built by an if/else whose first arm is braced. An unbraced `else` arm runs to the
+ * end of the expression, so it is kept whole rather than dropped.
+ */
 private fun String.bracedModifierBranches(): List<TouchArgument> {
     val condition = ifCondition.find(this) ?: return emptyList()
-    return bracedIfArms(condition.range.last).map { arm ->
-        TouchArgument(arm.first + 1, substring(arm.first + 1, arm.last))
-    }
+    val arms = bracedIfArms(condition.range.last)
+    val braced = arms.map { arm -> TouchArgument(arm.first + 1, substring(arm.first + 1, arm.last)) }
+    val unbracedElse =
+        arms
+            .singleOrNull()
+            ?.let { elseKeyword.matchAt(this, it.last + 1) }
+            ?.range
+            ?.last
+            ?.plus(1)
+    return if (unbracedElse == null) braced else braced + TouchArgument(unbracedElse, substring(unbracedElse))
 }
 
 /** Reads the braced arms after a condition, keeping each arm's opening and closing braces. */

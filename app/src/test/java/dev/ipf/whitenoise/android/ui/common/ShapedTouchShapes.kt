@@ -2,8 +2,9 @@ package dev.ipf.whitenoise.android.ui.common
 
 /**
  * The one shape rule for every clip route of the touch gate. [code] is the file being scanned, [sharedShapes] the
- * top-level shape constants of the whole scanned tree by fully qualified name, and [parameterNamed] whether a
- * function enclosing an offset declares a parameter with a given name.
+ * top-level shape constants and object members of the whole scanned tree by fully qualified name (see
+ * [topLevelShapeConstants] and [objectMemberValues]), and [parameterNamed] whether a function enclosing an offset
+ * declares a parameter with a given name.
  */
 internal class ShapedTouchShapes(
     private val code: String,
@@ -52,9 +53,10 @@ internal class ShapedTouchShapes(
     }
 
     /**
-     * Whether a corner radius is proven positive: a positive literal, a member of an object another file defines
-     * (a design token such as `Radii.md`, never `Dp.Hairline`), or, [inFile], a simple name whose single plain
-     * top-level `val` here is a positive literal.
+     * Whether a corner radius is proven positive: a positive literal; [inFile], a member of an object another file
+     * defines whose `val` there is a positive literal (a design token such as `Radii.md`, never `Dp.Hairline`), or a
+     * simple name whose single plain top-level `val` here is a positive literal; or, in a shared initializer, a token
+     * that its own file resolved to such a member (see [topLevelShapeConstants]).
      */
     private fun isProvenRadius(
         value: String,
@@ -65,7 +67,20 @@ internal class ShapedTouchShapes(
         return when {
             isPositiveRadius(value) -> true
             // A receiver declared in this file, in any form, could hold anything, so only another file's counts.
-            owner != null -> owner != "Dp" && !inFileDeclaration(owner).containsMatchIn(code)
+            // A shared initializer arrives with each token its own file resolved marked as a full key; an unmarked
+            // one stays unproven, even when a default-package object happens to share its spelling.
+            !inFile -> value.startsWith(RESOLVED_MEMBER) && isPositiveRadius(sharedMemberValue(value).trim())
+            owner != null ->
+                inFile &&
+                    owner != "Dp" &&
+                    !inFileDeclaration(owner).containsMatchIn(code) &&
+                    isPositiveRadius(
+                        code
+                            .objectMemberKey(value, sharedShapes)
+                            ?.let(sharedShapes::get)
+                            .orEmpty()
+                            .trim(),
+                    )
             simple != null ->
                 !hasOtherBinding(value, listOf(simple)) &&
                     !importsName(value) &&
@@ -73,6 +88,9 @@ internal class ShapedTouchShapes(
             else -> false
         }
     }
+
+    /** The value [members][sharedShapes] holds for a token that [topLevelShapeConstants] marked as resolved. */
+    private fun sharedMemberValue(token: String): String = sharedShapes[token.removePrefix(RESOLVED_MEMBER)].orEmpty()
 
     /** The plain top-level `val Name = …` declarations of [name] in this file. */
     private fun plainTopLevelDefinitions(name: String): List<MatchResult> =
@@ -213,7 +231,7 @@ internal fun String.isTopLevel(declaration: MatchResult): Boolean {
 }
 
 /** This file's package, or empty for a file without one. */
-private fun String.packageName(): String =
+internal fun String.packageName(): String =
     packageDeclaration
         .find(this)
         ?.groupValues
@@ -221,15 +239,82 @@ private fun String.packageName(): String =
         .orEmpty()
 
 /** [name] inside this package, or [name] alone in the default package. */
-private fun String.qualify(name: String): String = if (isEmpty()) name else "$this.$name"
+internal fun String.qualify(name: String): String = if (isEmpty()) name else "$this.$name"
 
 private val packageDeclaration = Regex("""^\s*package\s+([\w.]+)""", RegexOption.MULTILINE)
 
 /**
- * Non-private top-level shape constants across [sources] by fully qualified name, so a shape defined in another
- * file is resolved from its definition rather than trusted by name. A name defined twice is left out.
+ * The plain `val` members of the non-private top-level objects across [sources], keyed `package.Object.member`, so a
+ * design token such as `Radii.md` is resolved from its value rather than trusted by name. A key defined twice is
+ * left out. Nested brackets in each initializer are blanked, since only a plain literal can prove a radius.
  */
-internal fun topLevelShapeConstants(sources: Collection<String>): Map<String, String> {
+internal fun objectMemberValues(sources: Collection<String>): Map<String, String> {
+    val objectDeclaration = Regex("""\bobject\s+(\w+)\s*\{""")
+    val member = Regex("""\bval\s+(\w+)\s*(?::\s*[\w.<>?]+\s*)?=(?!=)\s*""")
+    val found =
+        sources.flatMap { source ->
+            val code = blankCommentsAndStrings(source)
+            objectDeclaration
+                .findAll(code)
+                .filter { code.isTopLevel(it) && !code.isPrivateDeclaration(it) }
+                .flatMap { match ->
+                    val body = code.topLevelOf(match.range.last)
+                    val owner = code.packageName().qualify(match.groupValues[1])
+                    member.findAll(body).map { value ->
+                        "$owner.${value.groupValues[1]}" to body.initializerFrom(value.range.last + 1)
+                    }
+                }.toList()
+        }
+    return found.groupBy({ it.first }, { it.second }).filterValues { it.size == 1 }.mapValues { it.value.single() }
+}
+
+/**
+ * The key in [members] of the object member [value] (`Owner.member`) as this file reaches it, in Kotlin's order:
+ * an explicit or aliased import of the owner alone; otherwise this file's package, then each star import. Null when
+ * none is a scanned member, so an owner imported from outside the scanned tree stays unproven.
+ */
+internal fun String.objectMemberKey(
+    value: String,
+    members: Map<String, String>,
+): String? {
+    val owner = value.substringBefore('.')
+    val member = value.substringAfter('.')
+    val escaped = Regex.escape(owner)
+    val imported = Regex("""^\s*import\s+([\w.]+\.$escaped)\s*$""", RegexOption.MULTILINE).find(this)
+    val aliased = Regex("""^\s*import\s+([\w.]+)\s+as\s+$escaped\s*$""", RegexOption.MULTILINE).find(this)
+    val explicit = imported?.groupValues?.get(1) ?: aliased?.groupValues?.get(1)
+    val stars = Regex("""^\s*import\s+([\w.]+)\.\*\s*$""", RegexOption.MULTILINE).findAll(this)
+    val reachable = listOf(packageName().qualify(owner)) + stars.map { "${it.groupValues[1]}.$owner" }
+    val candidates = if (explicit != null) listOf(explicit) else reachable
+    return candidates.map { "$it.$member" }.firstOrNull { it in members }
+}
+
+/**
+ * [initializer] with each `Owner.member` token that this file reaches in [members] replaced by its full key, marked
+ * with [RESOLVED_MEMBER] so a reader in another file can tell it from a token that resolved to nothing.
+ */
+private fun String.withMemberKeys(
+    initializer: String,
+    members: Map<String, String>,
+): String =
+    memberToken.replace(initializer) { token ->
+        objectMemberKey(token.value, members)?.let { RESOLVED_MEMBER + it } ?: token.value
+    }
+
+/** Marks a shared initializer's radius token that its own file resolved to a scanned object member's full key. */
+private const val RESOLVED_MEMBER = "@"
+
+private val memberToken = Regex("""(?<![\w.])[A-Z]\w*\.\w+(?![\w.(])""")
+
+/**
+ * Non-private top-level shape constants across [sources] by fully qualified name, so a shape defined in another
+ * file is resolved from its definition rather than trusted by name. A name defined twice is left out. Each
+ * `Owner.member` radius its file reaches in [members] (see [objectMemberValues]) is written as that full key.
+ */
+internal fun topLevelShapeConstants(
+    sources: Collection<String>,
+    members: Map<String, String> = emptyMap(),
+): Map<String, String> {
     val definition = Regex("""\bval\s+(${shapeConstant.pattern})\s*(?::\s*[\w.<>?]+\s*)?=\s*""")
     val found =
         sources.flatMap { source ->
@@ -238,7 +323,8 @@ internal fun topLevelShapeConstants(sources: Collection<String>): Map<String, St
                 .findAll(code)
                 .filter { code.isTopLevel(it) && !code.isPrivateDeclaration(it) }
                 .map { match ->
-                    code.packageName().qualify(match.groupValues[1]) to code.initializerFrom(match.range.last + 1)
+                    val initializer = code.initializerFrom(match.range.last + 1)
+                    code.packageName().qualify(match.groupValues[1]) to code.withMemberKeys(initializer, members)
                 }.toList()
         }
     // A name some scanned file also declares as an extension property may resolve to that instead.

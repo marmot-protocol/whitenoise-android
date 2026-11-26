@@ -31,9 +31,7 @@ private fun literalSpan(
         source.startsWith("//", index) -> comment(index, source.indexOrEnd("\n", index, past = false))
         source.startsWith("/*", index) -> comment(index, source.blockCommentEnd(index))
         source.startsWith(RAW_QUOTE, index) ->
-            source.indexOrEnd(RAW_QUOTE, index + RAW_QUOTE.length, past = true).let {
-                LiteralSpan(index + RAW_QUOTE.length until it - RAW_QUOTE.length, it)
-            }
+            rawEnd(source, index).let { LiteralSpan(index + RAW_QUOTE.length until it - RAW_QUOTE.length, it) }
         source[index] == '"' || source[index] == '\'' ->
             quotedEnd(source, index).let { LiteralSpan(index + 1 until it, it + 1) }
         else -> null
@@ -79,14 +77,58 @@ private fun String.indexOrEnd(
     }
 }
 
-/** The index of the quote that closes the one-line literal opened at [open], skipping escapes. */
+/**
+ * The index of the quote that closes the one-line literal opened at [open], skipping escapes and, in a string,
+ * whole `${…}` templates, whose expressions may hold quotes of their own.
+ */
 private fun quotedEnd(
     source: String,
     open: Int,
 ): Int {
     var end = open + 1
-    while (end < source.length && source[end] != source[open]) end += if (source[end] == '\\') 2 else 1
+    while (end < source.length && source[end] != source[open]) {
+        end =
+            when {
+                source[end] == '\\' -> end + 2
+                source[open] == '"' && source.startsWith("\${", end) -> templateEnd(source, end + 1)
+                else -> end + 1
+            }
+    }
     return end.coerceAtMost(source.length)
+}
+
+/** The index just past the `"""` that closes the raw string opened at [open], skipping whole templates. */
+private fun rawEnd(
+    source: String,
+    open: Int,
+): Int {
+    var index = open + RAW_QUOTE.length
+    while (index < source.length && !source.startsWith(RAW_QUOTE, index)) {
+        index = if (source.startsWith("\${", index)) templateEnd(source, index + 1) else index + 1
+    }
+    return minOf(index + RAW_QUOTE.length, source.length)
+}
+
+/** The index just past the brace that closes the template opened at [open], stepping over literals and comments. */
+private fun templateEnd(
+    source: String,
+    open: Int,
+): Int {
+    var depth = 0
+    var index = open
+    while (index < source.length) {
+        val literal = literalSpan(source, index)
+        when {
+            literal != null -> index = literal.next
+            source[index] == '{' -> {
+                depth++
+                index++
+            }
+            source[index] == '}' -> if (--depth == 0) return index + 1 else index++
+            else -> index++
+        }
+    }
+    return source.length
 }
 
 private const val RAW_QUOTE = "\"\"\""

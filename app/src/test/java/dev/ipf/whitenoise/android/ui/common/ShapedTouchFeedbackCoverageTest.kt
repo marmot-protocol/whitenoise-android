@@ -39,7 +39,8 @@ class ShapedTouchFeedbackCoverageTest {
                 .filter { it.isFile && it.extension == "kt" }
                 .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
         val wrappers = stretchedWrapperFindings(sources)
-        val shapes = topLevelShapeConstants(sources.values)
+        val members = objectMemberValues(sources.values)
+        val shapes = topLevelShapeConstants(sources.values, members) + members
         val found =
             sources.flatMap { (path, source) ->
                 (shapedTouchFindings(source, path, shapes) + wrappers.getValue(path)).map { finding ->

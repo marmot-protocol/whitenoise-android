@@ -164,18 +164,48 @@ internal class ShapedTouchIndications(
 
     /**
      * Links reached through the component's other arguments, such as a modifier passed by position to a component
-     * this scanner does not know. They never prove feedback, but a target among them must still find it.
+     * this scanner does not know. They never prove feedback, and they count only when the component's one
+     * implementation here hands that argument's parameter to a layout component as its modifier; a target in any
+     * other argument is left unreached, so it is reported.
      */
     private fun otherArgumentLinks(owner: FeedbackOwner): Sequence<ModifierLink> {
         val args = code.substring(owner.open + 1, owner.close)
         val modifier = modifierArgument(args, positionalModifiers[owner.name])
+        val function = componentImplementation(owner) ?: return emptySequence()
+        val parameters = parameterNames(code.substring(function.open + 1, function.close))
+        val names =
+            topLevelArguments(args).mapIndexed { index, arg -> argumentName(arg) ?: parameters.getOrNull(index) }
         return topLevelArgumentValues(args)
             .asSequence()
-            .filterNot { it.offset == modifier?.offset || it.text.startsWith("{") }
-            .flatMap { argument ->
+            .filterIndexed { index, value ->
+                value.offset != modifier?.offset &&
+                    !value.text.startsWith("{") &&
+                    appliesAsModifier(function, names[index])
+            }.flatMap { argument ->
                 val start = owner.open + 1 + argument.offset
                 argument.text.modifierLinks(start, LinkScope(conditional = true))
             }
+    }
+
+    /**
+     * Whether [function] hands its [parameter] itself, not a local that shadows it, to a layout component as that
+     * component's modifier, alone or extended only by standard modifiers that keep it (see [retainsRoot]), on a path
+     * its body always composes: never in an uncalled lambda or an optional branch.
+     */
+    private fun appliesAsModifier(
+        function: FeedbackFunction,
+        parameter: String?,
+    ): Boolean {
+        if (parameter == null) return false
+        val declared = parameterBinding(function, parameter)
+        return owners.any { owner ->
+            owner.start in function.body until function.end &&
+                owner.name in drawingComponents &&
+                appliedModifierText(owner).retainsRoot(parameter) &&
+                // A local of the same name declared before the component would be what it reads instead.
+                binding(parameter, owner.open)?.declaration == declared &&
+                isComposedFrom(function.body, owner.start, emptyList())
+        }
     }
 
     /** Whether this match is the `fun Modifier.shapedTouchTarget(` declaration itself rather than a call. */
@@ -277,6 +307,12 @@ internal class ShapedTouchIndications(
         val source = topLevelNamedArguments(args)["interactionSource"] ?: topLevelArguments(args).firstOrNull()
         return source?.trim()?.let { FeedbackReference(it, argumentOffset, conditional, guardedSource) }
     }
+
+    /** Whether [shape] at [useOffset] resolves to a rounded shape under the gate's one shape rule. */
+    fun isKnownRounded(
+        shape: String,
+        useOffset: Int,
+    ): Boolean = shapes.isKnownRounded(shape, useOffset)
 
     /** A null indication passes only when this control draws feedback for this click's source binding. */
     fun replaces(
@@ -447,7 +483,8 @@ internal class ShapedTouchIndications(
         val name = expression.substringBefore('.')
         val prefix = code.substring(0, offset)
         val local =
-            Regex("""\b(?:val|var)\s+${Regex.escape(name)}\b""")
+            // A destructured entry such as `val (name, other) = …` binds the name too.
+            Regex("""\b(?:val|var)\s+${Regex.escape(name)}\b|\b(?:val|var)\s*\([^)]*\b${Regex.escape(name)}\b""")
                 .findAll(prefix)
                 .lastOrNull { prefix.blockStaysOpen(it.range.last + 1) }
                 ?.range

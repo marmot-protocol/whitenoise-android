@@ -237,6 +237,178 @@ class ShapedTouchScannerRegressionTest {
         }
     }
 
+    /** A target passed in an argument the component never applies as a modifier installs no click, so it fails. */
+    @Test
+    fun aTargetInAnUnappliedArgumentIsReported() {
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        val header = "fun Tile(ignored: Modifier, press: MutableInteractionSource)"
+        val call = "Tile(ignored = Modifier.shapedTouchTarget(press, go), press = press)\n"
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings("$call$header { $feedback }"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("$call$header { Box(ignored) { $feedback } }"))
+        val extended = "$call$header { Box(ignored.padding(4.dp).testTag(TAG)) { $feedback } }"
+        assertEquals(emptyList<String>(), shapedTouchFindings(extended))
+        val positional = "Tile(Modifier.shapedTouchTarget(press, go), press = press)\n"
+        assertEquals(emptyList<String>(), shapedTouchFindings("$positional$header { Box(ignored) { $feedback } }"))
+        val unapplied =
+            listOf(
+                "val unused: @Composable () -> Unit = { Box(ignored) }",
+                "if (shown) Box(ignored)",
+                "val ignored = Modifier\nBox(ignored)",
+                "val (ignored, other) = Modifier to Modifier\nBox(ignored)",
+                "Box(ignored.let { Modifier })",
+                "Box(ignored.run { Modifier })",
+                "Box(ignored.takeIf { false } ?: Modifier)",
+                "Box(ignored.padding(4.dp).let { Modifier })",
+            )
+        for (handOff in unapplied) {
+            val body = "$call$header { $feedback\n$handOff }"
+            assertEquals(handOff, listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(body))
+        }
+    }
+
+    /** An unbraced `else` arm after a braced `if` arm is still read, so its target can find feedback. */
+    @Test
+    fun anUnbracedElseArmIsRead() {
+        val target = "Box(Modifier.then(if (useDefault) { Modifier } else Modifier.shapedTouchTarget(press, go)))"
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        assertEquals(emptyList<String>(), shapedTouchFindings("$target { $feedback }"))
+        assertEquals(listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(target))
+    }
+
+    /** A quote inside a string template opens a nested literal rather than closing the outer one. */
+    @Test
+    fun stringsInsideTemplatesStayBlank() {
+        val example = "val example = \"\${\"IconButton(go, Modifier.width(36.dp)) {}\"}\""
+        assertEquals(emptyList<String>(), shapedTouchFindings(example, "conversation/composer/Toolbar.kt"))
+        val commented = "val example = \"\${/* } */ \"IconButton(go, Modifier.width(36.dp)) {}\"}\""
+        assertEquals(emptyList<String>(), shapedTouchFindings(commented, "conversation/composer/Toolbar.kt"))
+        val quote = "\""
+        val raw = quote.repeat(3)
+        val templates =
+            listOf(
+                quote to "\${\"x\" + \"}\"}",
+                quote to "\${/* } */ \"x\"}",
+                raw to "\${${raw}IconButton(go)$raw} and",
+            )
+        for ((open, inner) in templates) {
+            val source = "val a = $open$inner$open + next"
+            val blank = "val a = $open${" ".repeat(inner.length)}$open + next"
+            assertEquals(source, blank, blankCommentsAndStrings(source))
+        }
+    }
+
+    /**
+     * A design token proves a radius only when the object its file reaches holds a positive value: by explicit
+     * import, this package or a star import, never an object of the same name the file does not import.
+     */
+    @Test
+    fun qualifiedRadiiResolveToTheirValues() {
+        val corners = "package ext\nobject Corners {\n    val None = 0.dp\n    val Md = 12.dp\n}"
+        val tokens = objectMemberValues(listOf(corners))
+        val shape = { radius: String ->
+            "Box(Modifier.shapedTouchTarget(press, go)) { " +
+                "Box(Modifier.shapedPressFeedback(press, RoundedCornerShape($radius))) }"
+        }
+        val missing = listOf("$MISSING_TOUCH_FEEDBACK @2")
+        val proven = listOf("import ext.Corners", "import ext.*", "import ext.Corners as Corners")
+        for (directive in proven) {
+            val source = "$directive\n${shape("Corners.Md")}"
+            assertEquals(directive, emptyList<String>(), shapedTouchFindings(source, "", tokens))
+        }
+        val unproven =
+            listOf(
+                "import ext.Corners\n" + shape("Corners.None"),
+                "import ext.Corners\n" + shape("Tokens.Md"),
+                "import outside.Corners\n" + shape("Corners.Md"),
+                "\n" + shape("Corners.Md"),
+            )
+        for (source in unproven) {
+            assertEquals(source, missing, shapedTouchFindings(source, "", tokens))
+        }
+        // A shared shape's token is resolved through the imports of the file that declares the shape.
+        val tile = { radius: String -> "package ui\nimport ext.Corners\nval TileShape = RoundedCornerShape($radius)" }
+        val user =
+            "import ui.TileShape\nBox(Modifier.shapedTouchTarget(press, go)) { " +
+                "Box(Modifier.shapedPressFeedback(press, TileShape)) }"
+        val rounded = topLevelShapeConstants(listOf(tile("Corners.Md")), tokens) + tokens
+        val flat = topLevelShapeConstants(listOf(tile("Corners.None")), tokens) + tokens
+        // An unresolved token stays unproven even when a default-package object shares its spelling.
+        val nearby = tokens + objectMemberValues(listOf("object Corners {\n    val Md = 8.dp\n}"))
+        val outside = tile("Corners.Md").replace("ext.", "outside.")
+        val unresolved = topLevelShapeConstants(listOf(outside), nearby) + nearby
+        assertEquals(emptyList<String>(), shapedTouchFindings(user, "", rounded))
+        assertEquals(missing, shapedTouchFindings(user, "", flat))
+        assertEquals(missing, shapedTouchFindings(user, "", unresolved))
+    }
+
+    /** A content lambda passed by name or by position is the Box's content as much as a trailing one is. */
+    @Test
+    fun namedBoxContentIsChecked() {
+        val named = "Box(modifier = Modifier.clickable(onClick = go), content = { Avatar(title) })"
+        assertEquals(listOf("$ROUND_CHILD @1"), shapedTouchFindings(named))
+        val positional = "Box(Modifier.clickable(onClick = go), Alignment.Center, false, { Avatar(title) })"
+        assertEquals(listOf("$ROUND_CHILD @1"), shapedTouchFindings(positional))
+        for (content in listOf("@Composable { Avatar(title) }", "({ Avatar(title) })")) {
+            val box = "Box(modifier = Modifier.clickable(onClick = go), content = $content)"
+            assertEquals(content, listOf("$ROUND_CHILD @1"), shapedTouchFindings(box))
+        }
+        val clickInContent =
+            "Box(modifier = Modifier.size(48.dp), content = { Box(Modifier.clickable(onClick = go)); Avatar(title) })"
+        assertEquals(emptyList<String>(), shapedTouchFindings(clickInContent))
+    }
+
+    /** A named clip excuses a click only once it resolves to a rounded shape. */
+    @Test
+    fun aNamedClipMustResolveToARoundedShape() {
+        val box = "Box(Modifier.clip(TileShape).clickable(onClick = go)) { Avatar(title) }"
+        assertEquals(listOf("$ROUND_CHILD @2"), shapedTouchFindings("val TileShape = RectangleShape\n$box"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("val TileShape = RoundedCornerShape(8.dp)\n$box"))
+        assertEquals(listOf("$ROUND_CHILD @1"), shapedTouchFindings(box))
+        val fill = "Box(Modifier.background(Color.Red, CircleShape).clip(TileShape).clickable(onClick = go))"
+        assertEquals(listOf("$CLICK_OVER_SHAPED_FILL @2"), shapedTouchFindings("val TileShape = RectangleShape\n$fill"))
+        assertEquals(emptyList<String>(), shapedTouchFindings("val TileShape = CircleShape\n$fill"))
+    }
+
+    /** A wrapper call matches the function the caller's imports or package reach, not any same-named one. */
+    @Test
+    fun crossFileWrappersResolveByImport() {
+        val signature = "fun ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier)"
+        val call = "fun Screen() { ActionButton(go, Modifier.width(36.dp)) }"
+        val files =
+            mapOf(
+                "A.kt" to "package a\n$signature { IconButton(onClick, modifier) {} }",
+                "B.kt" to "package b\n$signature { SlotIconButton(onClick, modifier) {} }",
+                "ImportsB.kt" to "package c\nimport b.ActionButton\n$call",
+                "ImportsA.kt" to "package d\nimport a.ActionButton\n$call",
+                "Aliased.kt" to "package e\nimport a.ActionButton as Act\n${call.replace("ActionButton", "Act")}",
+                "SamePackage.kt" to "package a\n\n$call",
+                "Star.kt" to "package g\nimport a.*\n$call",
+                "StarAndExplicit.kt" to "package h\nimport a.*\nimport b.ActionButton\n\n$call",
+                "Unreached.kt" to "package i\n\n$call",
+                "LocalElsewhere.kt" to "package j\nimport a.ActionButton\n$call\nfun Other() { fun ActionButton() {} }",
+                "OwnTopLevel.kt" to "package a\nfun ActionButton() {}\n$call",
+                "LocalStar.kt" to "package k\nimport a.*\n$call\nfun Other() { fun ActionButton() {} }",
+            )
+        val findings = stretchedWrapperFindings(files)
+        val stretched = listOf("$STRETCHED_ICON_BUTTON @3")
+        val reached =
+            listOf("ImportsA.kt", "Aliased.kt", "SamePackage.kt", "Star.kt", "LocalElsewhere.kt", "LocalStar.kt")
+        for (file in reached) {
+            assertEquals(file, stretched, findings.getValue(file))
+        }
+        for (file in listOf("ImportsB.kt", "StarAndExplicit.kt", "Unreached.kt", "OwnTopLevel.kt")) {
+            assertEquals(file, emptyList<String>(), findings.getValue(file))
+        }
+        // A local function shadows an imported wrapper at the calls in its scope; a local wrapper still counts.
+        val slot = "fun ActionButton(onClick: () -> Unit, modifier: Modifier) { SlotIconButton(onClick, modifier) {} }"
+        val screen = "fun Screen() {\n$slot\nActionButton(go, Modifier.width(36.dp))\n}"
+        val shadowed = "package m\nimport a.ActionButton\n$screen"
+        val localWrapper = "package n\n\n" + screen.replace("SlotIconButton", "IconButton")
+        val local = stretchedWrapperFindings(files + ("Shadowed.kt" to shadowed) + ("LocalWrapper.kt" to localWrapper))
+        assertEquals(emptyList<String>(), local.getValue("Shadowed.kt"))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), local.getValue("LocalWrapper.kt"))
+    }
+
     /** Builds a shaped control whose click needs replacement feedback in the supplied content. */
     private fun surfaceWith(content: String): String =
         "Surface(shape = CircleShape, modifier = Modifier.clickable(" +

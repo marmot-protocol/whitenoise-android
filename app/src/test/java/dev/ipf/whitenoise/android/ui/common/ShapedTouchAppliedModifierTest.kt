@@ -535,7 +535,7 @@ class ShapedTouchAppliedModifierTest {
         assertEquals(emptyMap<String, String>(), split)
     }
 
-    /** A radius name must resolve to a positive literal here, or be a design token another file defines. */
+    /** A radius name must resolve to a positive literal here, or to a positive design token another file defines. */
     @Test
     fun radiusNamesMustResolveToPositiveValues() {
         val shape = { radius: String -> "Box($TARGET) { Box(Modifier.shapedPressFeedback(press, $radius)) }" }
@@ -560,8 +560,11 @@ class ShapedTouchAppliedModifierTest {
         assertEquals(emptyList<String>(), kinds(shape("RoundedCornerShape(Radii.sm)")))
     }
 
-    /** The finding kinds for [source], without their line numbers. */
-    private fun kinds(source: String): List<String> = shapedTouchFindings(source).map { it.substringBefore(" @") }
+    /** The finding kinds for [source], with the `Radii` design tokens in scope, without their line numbers. */
+    private fun kinds(source: String): List<String> {
+        val findings = shapedTouchFindings(source, sharedShapes = radii)
+        return findings.map { it.substringBefore(" @") }
+    }
 
     /** Builds a shaped control whose click needs replacement feedback in the supplied content. */
     private fun surfaceWith(content: String): String =
@@ -569,6 +572,8 @@ class ShapedTouchAppliedModifierTest {
             "interactionSource = press, indication = null, onClick = go)) {$content}"
 
     private companion object {
+        val radii =
+            objectMemberValues(listOf("object Radii {\n    val sm = 8.dp\n    val md = 12.dp\n}"))
         const val TARGET = "Modifier.shapedTouchTarget(press, go)"
         const val FEEDBACK = "Modifier.shapedPressFeedback(press, CircleShape)"
         const val GUARDED = "Modifier.shapedPressFeedback(press, CircleShape)"

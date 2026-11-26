@@ -48,6 +48,8 @@ private val functionModifiers =
         """(?:\b(?:private|public|internal|protected|inline|suspend|tailrec|operator|infix)\s+|""" +
             """@[\w.]+(?:\([^()]*\))?\s+)+$""",
     )
+private val importDirective =
+    Regex("""^\s*import\s+([\w.]+(?:\.\*)?)(?:\s+as\s+(\w+))?\s*$""", RegexOption.MULTILINE)
 internal val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
@@ -124,13 +126,19 @@ private fun shapedContainerClicks(
         .map { SHAPED_SURFACE to offset + it }
 }
 
-/** Rule 3: a clickable Box whose content draws a round or rounded shape without a shaped highlight. */
+/**
+ * Rule 3: a clickable Box whose content, a trailing lambda or one passed as an argument, draws a round or rounded
+ * shape without a shaped highlight. Only the Box's own modifier is checked for clicks.
+ */
 private fun String.clickableBoxesAroundRoundChildren(feedback: ShapedTouchIndications): List<Pair<String, Int>> =
     calls("Box").flatMap { (start, args) ->
         val modifier = modifierArgument(args) ?: return@flatMap emptyList()
         val lambda = trailingLambda.matchAt(this, start + args.length + 1)
-        val body = lambda?.let { substring(it.range.last + 1, closingBracket(it.range.last)) }
-        if (body != null && roundChild.containsMatchIn(body)) {
+        val trailing = lambda?.let { substring(it.range.last + 1, closingBracket(it.range.last)) }
+        // Besides its modifier, only Box's content can draw, so every other argument is read as content: named or
+        // positional, annotated such as `@Composable { … }` or parenthesized.
+        val passed = topLevelArgumentValues(args).filterNot { it.offset == modifier.offset }.map { it.text }
+        if ((listOfNotNull(trailing) + passed).any(roundChild::containsMatchIn)) {
             val offset = start + modifier.offset
             modifier.text.undecoratedClicks(feedback, offset).map { ROUND_CHILD to offset + it }
         } else {
@@ -200,11 +208,13 @@ internal fun passThroughIconButtonWrappers(
 /**
  * Rule 5, across files: a call that hands one of [wrappers] (see [passThroughIconButtonWrappers]) a modifier
  * with a width, a height or two sizes, written in the call or in a local `val` it starts from, so the icon
- * button inside stretches into a capsule. Reported as "<kind> @<line>".
+ * button inside stretches into a capsule. Reported as "<kind> @<line>". When the wrappers come [fromOtherFiles], a
+ * call that a local function of the same name shadows reaches that function instead, so it is skipped.
  */
 internal fun stretchedWrapperCalls(
     source: String,
     wrappers: Map<String, Set<Int>>,
+    fromOtherFiles: Boolean = false,
 ): List<String> {
     val code = blankCommentsAndStrings(source)
     return wrappers.flatMap { (name, modifierIndices) ->
@@ -213,7 +223,10 @@ internal fun stretchedWrapperCalls(
             .filter { (start, args) ->
                 val nameStart = start - 1 - name.length
                 val before = code.substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
+                // A local function declared earlier in an enclosing block is what a bare call reaches instead.
+                val shadowed = fromOtherFiles && code.substring(0, nameStart).declaresLocalFunction(name)
                 !declaration.containsMatchIn(before) &&
+                    !shadowed &&
                     modifierIndices.any { index ->
                         // Only bindings declared before this call are in scope for it.
                         val expression = modifierArgument(args, index)?.text.orEmpty()
@@ -224,17 +237,73 @@ internal fun stretchedWrapperCalls(
     }
 }
 
-/** Checks private wrappers in their own file and shares only visible wrappers with other files. */
+/**
+ * Checks private wrappers in their own file and shares visible wrappers, by fully qualified name, only with the
+ * files whose imports or package make a call reach that very function.
+ */
 internal fun stretchedWrapperFindings(sources: Map<String, String>): Map<String, List<String>> {
-    val visible = sources.values.flatMap { passThroughIconButtonWrappers(it, visibleAcrossFilesOnly = true).entries }
+    val visible =
+        sources.values
+            .flatMap { source ->
+                val pkg = blankCommentsAndStrings(source).packageName()
+                passThroughIconButtonWrappers(source, visibleAcrossFilesOnly = true).map { (name, positions) ->
+                    pkg.qualify(name) to positions
+                }
+            }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, positions) -> positions.flatten().toSet() }
     return sources.mapValues { (_, source) ->
-        val declarations = enclosingFunction.findAll(blankCommentsAndStrings(source)).map { it.groupValues[1] }.toSet()
-        val wrappers =
-            (visible.filterNot { it.key in declarations } + passThroughIconButtonWrappers(source).entries)
-                .groupBy({ it.key }, { it.value })
-                .mapValues { (_, positions) -> positions.flatten().toSet() }
-        stretchedWrapperCalls(source, wrappers)
+        val code = blankCommentsAndStrings(source)
+        // Only this file's own top-level functions take a name from its package and star imports; a local one
+        // shadows a wrapper only inside its own function, so it cannot hide every call in the file.
+        val ownTopLevel =
+            enclosingFunction
+                .findAll(code)
+                .filter { code.isTopLevel(it) }
+                .map { it.groupValues[1] }
+                .toSet()
+        val reached =
+            visible.flatMap { (qualified, positions) ->
+                code.callNamesOf(qualified, visible.keys, ownTopLevel).map { it to positions }
+            }
+        val imported = reached.groupBy({ it.first }, { it.second }).mapValues { (_, it) -> it.flatten().toSet() }
+        val local = passThroughIconButtonWrappers(source)
+        (stretchedWrapperCalls(source, imported, fromOtherFiles = true) + stretchedWrapperCalls(source, local))
+            .distinct()
     }
+}
+
+/** Whether a local `fun [name]` is declared in a block of this text that is still open at its end. */
+private fun String.declaresLocalFunction(name: String): Boolean =
+    Regex("""\bfun\s+${Regex.escape(name)}\s*\(""")
+        .findAll(this)
+        .any { !isTopLevel(it) && blockStaysOpen(from = it.range.first) }
+
+/**
+ * The names this file calls the top-level function [qualified] by, in Kotlin's order: an aliased or explicit
+ * import of it; else, unless an explicit import or one of this file's own top-level functions ([ownTopLevel])
+ * takes the simple name, this file's package and then a star import of its package, where a [known] function of
+ * the same name in this file's package wins over the star import. Overloads are not told apart: any own top-level
+ * function of that name takes it, even one whose parameters a call could not match, so such a call goes unchecked.
+ * Local functions are resolved at each call (see [stretchedWrapperCalls]).
+ */
+private fun String.callNamesOf(
+    qualified: String,
+    known: Set<String>,
+    ownTopLevel: Set<String>,
+): List<String> {
+    val simple = qualified.substringAfterLast('.')
+    val owner = qualified.substringBeforeLast('.', "")
+    val imports = importDirective.findAll(this).map { it.groupValues[1] to it.groupValues[2] }.toList()
+    val aliases = imports.filter { (path, alias) -> path == qualified && alias.isNotEmpty() }.map { it.second }
+    val explicit = imports.any { (path, alias) -> path == qualified && alias.isEmpty() }
+    val taken =
+        simple in ownTopLevel ||
+            imports.any { (path, alias) -> alias == simple || (alias.isEmpty() && path.endsWith(".$simple")) }
+    val pkg = packageName()
+    val viaPackage = owner == pkg
+    val viaStar = imports.any { it.first == "$owner.*" } && pkg.qualify(simple) !in known
+    val bySimpleName = explicit || (!taken && (viaPackage || viaStar))
+    return aliases + listOfNotNull(simple.takeIf { bySimpleName })
 }
 
 /** [expression] with the initializer of the local `val` it starts from, if any, put in front of it. */
@@ -355,7 +424,7 @@ private fun String.clicksOverShapedFills(feedback: ShapedTouchIndications): List
             val open = match.groups[2]!!.range.first
             val before = ownChainBefore(match.range.first)
             !feedback.replaces(match.range.first, substring(open + 1, closingBracket(open))) &&
-                !before.hasShapedClip() &&
+                !before.hasShapedClip { shape -> feedback.isKnownRounded(shape, match.range.first) } &&
                 shapedFill.findAll(before).any { fill ->
                     val fillArgs = before.substring(fill.range.last + 1, before.closingBracket(fill.range.last))
                     shapeName.containsMatchIn(fillArgs) && "RectangleShape" !in fillArgs
@@ -411,15 +480,26 @@ private fun String.undecoratedClicks(
         .filter { match ->
             val open = match.groups[2]!!.range.first
             !feedback.replaces(offset + match.range.first, substring(open + 1, closingBracket(open))) &&
-                !ownChainBefore(match.range.first).hasShapedClip(matching)
+                !ownChainBefore(match.range.first).hasShapedClip(matching) { shape ->
+                    feedback.isKnownRounded(shape, offset + match.range.first)
+                }
         }.map { it.range.first }
         .toList()
 
 /**
  * Whether this text clips to a shape other than a rectangle, which then shapes a later click's highlight,
- * and, given [matching], to that shape.
+ * and, given [matching], to that shape. Without [matching], a named shape constant counts only once [isRounded]
+ * resolves it, since a name such as `TileShape` can hold a rectangle.
  */
-private fun String.hasShapedClip(matching: String? = null): Boolean = modifierLinks().any { it.clipsToShape(matching) }
+private fun String.hasShapedClip(
+    matching: String? = null,
+    isRounded: ((String) -> Boolean)? = null,
+): Boolean =
+    modifierLinks().any { link ->
+        val shape = link.args.trim()
+        val resolved = isRounded == null || matching != null || !shapeConstant.matches(shape) || isRounded(shape)
+        link.clipsToShape(matching) && resolved
+    }
 
 /** Each call of [name] as (offset of its argument text, argument text), not counting longer names. */
 private fun String.calls(name: String): List<Pair<Int, String>> =
