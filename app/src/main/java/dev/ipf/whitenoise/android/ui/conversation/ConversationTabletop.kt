@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.translation.ConversationTranslationSession
+import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
 import dev.ipf.whitenoise.android.ui.common.LocalWindowFolds
 import dev.ipf.whitenoise.android.ui.common.WindowFold
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
@@ -54,11 +56,15 @@ internal fun conversationTabletop(
 internal fun ConversationBottomBarFrame(
     routeMorph: SettingsCardMorph?,
     bottomPadding: Dp = 0.dp,
+    translation: ConversationTranslationSession,
     content: @Composable () -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
     val reserve = conversationTabletop(LocalWindowFolds.current.tabletop, windowHeight - bottomPadding)
-    CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+    CompositionLocalProvider(
+        LocalSettingsCardMorph provides routeMorph,
+        LocalConversationTranslation provides translation,
+    ) {
         Box(
             Modifier.fillMaxWidth().heightIn(min = reserve.minHeight).padding(top = reserve.hingeGap),
             contentAlignment = Alignment.TopCenter,

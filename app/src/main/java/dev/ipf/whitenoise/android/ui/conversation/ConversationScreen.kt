@@ -157,7 +157,6 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
@@ -238,12 +237,9 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
-import dev.ipf.whitenoise.android.ui.group.DisappearingTimerEditor
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.group.MuteDurationHost
-import dev.ipf.whitenoise.android.ui.group.applyDisappearingTimer
 import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
-import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
@@ -607,7 +603,7 @@ internal fun ConversationScreen(
     var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
     var bottomInputRevision by bottomInsetState.bottomInputRevision
     var routePresentationFrozen by bottomInsetState.routePresentationFrozen
-    val translationSession =
+    val translator =
         dev.ipf.whitenoise.android.translation.rememberConversationTranslation(
             appState,
             conversationAccountRef,
@@ -3220,23 +3216,6 @@ internal fun ConversationScreen(
             null
         }
     headerMuteControl?.let { MuteDurationHost(it) }
-    var showHeaderTimerPicker by remember(controller) { mutableStateOf(false) }
-    val headerTimerRuntime = remember(controller) { appState.runtimeGeneration }
-    val headerTimerEditable =
-        disappearingTimerEditable(
-            canEdit = controller.canEditGroupSettings,
-            mutationsBlocked =
-                controller.mutationInFlight || !controller.isCurrentGroupMutationOwner(appState, headerTimerRuntime),
-        )
-    DisappearingTimerEditor(
-        open = showHeaderTimerPicker && headerTimerEditable,
-        currentSecs = controller.group.disappearingMessageSecs.toLong(),
-        editable = headerTimerEditable,
-        identity = { GroupActingAccountIdentity(appState, controller.boundAccountRef) },
-        resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
-        onDismiss = { showHeaderTimerPicker = false },
-        onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
-    )
     // The composer and long-message reader share a draft, including while chat settings covers it.
     val draftAccountRef = controller.boundAccountRef
 
@@ -3621,7 +3600,6 @@ internal fun ConversationScreen(
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,
                                         onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
-                                        onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                                         onMembers =
                                             if (controller.isDm) {
                                                 null
@@ -3642,7 +3620,6 @@ internal fun ConversationScreen(
                                             },
                                     )
                                 },
-                                onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                             )
                         }
                     },
@@ -3650,7 +3627,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }, translator) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             settingsMotion.launchFromComposer(
@@ -4004,7 +3981,7 @@ internal fun ConversationScreen(
         ) { padding ->
             val reactionArtwork = remember(appState, controller) { conversationReactionArtwork(appState, controller) }
             CompositionLocalProvider(
-                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
+                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translator,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,

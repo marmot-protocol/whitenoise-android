@@ -23,6 +23,7 @@ internal enum class SettingsDetail {
     ManageStorage,
     Profile,
     AccountKeys,
+    HistoryBackups,
     Relays,
     Support,
     SupportRelays,

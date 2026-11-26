@@ -116,6 +116,14 @@
         "test_ids": [
           "CON-045"
         ]
+      },
+      {
+        "surface": "Outgoing language suggestion on opening composer translation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "suggestedTarget = { session?.suggestedTarget(currentReplyId) }",
+        "test_ids": [
+          "CON-045"
+        ]
       }
     ]
   },

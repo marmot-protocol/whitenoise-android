@@ -247,7 +247,7 @@ jobs:
       - name: Test PR GitHub scripts
         run: >-
           node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
-          .github/scripts/check-invariant-gate.test.js
+          .github/scripts/check-invariant-gate.test.js .github/scripts/report-pr-merge-order.test.js
 
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py

@@ -94,7 +94,7 @@ class OnboardingRelayRepairUiIntegrationTest {
     ) {
         val cancelLabel = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.cancel)
         compose.setContent {
-            WhiteNoiseTheme { AccountSetupScreen(setup, { "Fixture" }, {}) }
+            WhiteNoiseTheme { AccountSetupScreen(setup, { "Fixture" }) {} }
         }
         compose.runOnIdle { setup.reconnect() }
         compose.waitUntil(30_000L) {
