@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
@@ -358,12 +359,9 @@ internal fun WhiteNoiseApp(
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
-        // Stale share-temp janitor. Runs once per process start, off the
-        // main thread because directory walks on cold cache can take a
-        // moment. Files in `shared_media` from earlier sessions that
-        // any external reader has long since finished with are deleted.
         withContext(Dispatchers.IO) {
             sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
+            appState.attachmentCollections.sweepExpired()
         }
     }
     LaunchedEffect(

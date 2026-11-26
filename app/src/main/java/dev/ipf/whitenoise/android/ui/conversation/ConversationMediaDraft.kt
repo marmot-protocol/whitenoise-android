@@ -30,7 +30,6 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitResult
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitter
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
-import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.AppText
@@ -44,7 +43,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PendingCameraCaptureFile
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
-import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
@@ -57,7 +55,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.util.UUID
 
 internal data class PhotoEditorMessages(
@@ -120,6 +117,7 @@ internal class ConversationMediaDraftState(
 
     private var currentSlots: List<PendingMediaSlot> = emptyList()
     private var currentDocumentUris: List<Uri> = emptyList()
+    private var currentDocumentIds: Map<String, String> = emptyMap()
     private var currentAccountRef: String? = null
 
     private var restoredDraftRevision: DraftRestorationVersion? = null
@@ -157,8 +155,11 @@ internal class ConversationMediaDraftState(
         slots: List<PendingMediaSlot>,
         documentUris: List<Uri>,
         accountRef: String?,
+        documentIds: Map<String, String> = emptyMap(),
     ) {
-        if (slots != currentSlots || documentUris != currentDocumentUris) inputsRevision += 1L
+        if (slots != currentSlots || documentUris != currentDocumentUris || documentIds != currentDocumentIds) {
+            inputsRevision += 1L
+        }
         val ownerChanged = documentOwnerFence.update(accountRef)
         if (ownerChanged) documentRemovalFence = DraftDocumentRemovalFence()
         documentRemovalFence.updateInputs(
@@ -174,6 +175,12 @@ internal class ConversationMediaDraftState(
         activeEditor?.takeIf { editor -> ownerChanged || editor.slot !in slots }?.let(::dismissEditor)
         currentSlots = slots
         currentDocumentUris = documentUris
+        if (documentIds != currentDocumentIds) {
+            preparedDocuments = preparedDocuments.filter { (uri, prepared) ->
+                documentIds[uri.toString()]?.let { id -> id == prepared.attachment.id } != false
+            }
+        }
+        currentDocumentIds = documentIds
         currentAccountRef = accountRef
         // A sent pick that left the composer releases its draft, and an empty composer ends the current one.
         controller.retainOutgoingPicks(slots.mapTo(HashSet()) { it.id } + documentUris.map(Uri::toString))
@@ -198,12 +205,7 @@ internal class ConversationMediaDraftState(
         // Saved document grants may still work; restore their native ownership before staging.
         if (restoredDraftRevision == null) return
         currentDocumentUris.forEach { uri ->
-            val documentId =
-                stagedDocumentAttachmentId(
-                    owner.accountRef,
-                    controller.group.groupIdHex,
-                    uri.toString(),
-                )
+            val documentId = documentAttachmentId(owner.accountRef, uri)
             if (
                 uri !in preparedDocuments &&
                 documentId !in preparingSlotIds &&
@@ -402,9 +404,7 @@ internal class ConversationMediaDraftState(
         val owner = ownedRemoval.owner
         val accountRef = owner.accountRef
         val groupId = controller.group.groupIdHex
-        val attachmentId =
-            document?.attachment?.id
-                ?: stagedDocumentAttachmentId(accountRef, groupId, uriString)
+        val attachmentId = document?.attachment?.id ?: documentAttachmentId(accountRef, uri)
         val sharedRemoval =
             appState.draftAttachmentRemovalTombstones.begin(
                 accountRef,
@@ -428,7 +428,7 @@ internal class ConversationMediaDraftState(
                     uri !in preparedDocuments &&
                     canPublishDocument(uriString, currentUris, owner, removalFence)
                 ) {
-                    prepareDocument(uri, attachmentId, owner, removalFence)
+                    prepareDocument(uri, documentAttachmentId(accountRef, uri), owner, removalFence)
                 }
             }
         }
@@ -533,7 +533,7 @@ internal class ConversationMediaDraftState(
     private fun restorationInputs() =
         DraftRestorationInputs(
             currentSlots,
-            currentDocumentUris,
+            DraftDocumentShelf(currentDocumentUris, currentDocumentIds),
             preparedPhotos,
             preparedDocuments,
             backedPhotos,
@@ -542,8 +542,23 @@ internal class ConversationMediaDraftState(
 
     /** Combines this composer's fences with process-owned cleanup still running for the account. */
     private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
-        documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex) +
+        documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex, currentDocumentIds) +
             appState.draftAttachmentRemovalTombstones.attachmentIds(accountRef, controller.group.groupIdHex)
+
+    /** Preserves native identity for shelf entries relinked to a presentation file during restoration. */
+    fun savedDocumentIds(uris: List<Uri>): Map<String, String> =
+        uris.mapNotNull { uri ->
+            val id = currentDocumentIds[uri.toString()] ?: preparedDocuments[uri]?.attachment?.id
+            id?.let { uri.toString() to it }
+        }.toMap()
+
+    /** Resolves the selected document's identity for both staging and explicit removal. */
+    private fun documentAttachmentId(
+        accountRef: String,
+        uri: Uri,
+    ): String =
+        currentDocumentIds[uri.toString()]
+            ?: stagedDocumentAttachmentId(accountRef, controller.group.groupIdHex, uri.toString())
 
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {
@@ -655,7 +670,8 @@ internal class ConversationMediaDraftState(
                     pending,
                 ) ?: return
             val currentUris = currentDocumentUris.map(Uri::toString)
-            if (canPublishDocument(uri.toString(), currentUris, owner, removalFence)) {
+            val stillSelected = documentAttachmentId(accountRef, uri) == attachmentId
+            if (stillSelected && canPublishDocument(uri.toString(), currentUris, owner, removalFence)) {
                 preparedDocuments += uri to prepared
             } else {
                 stager.removePrepared(accountRef, controller.group.groupIdHex, prepared)
@@ -759,13 +775,14 @@ internal class ConversationMediaDraftState(
     }
 }
 
+/** Retains the staged shelf and its native identities for this conversation. */
 @Composable
 internal fun rememberConversationMediaDraftState(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     chatId: String,
     mediaSlots: List<PendingMediaSlot>,
-    documentUris: List<Uri>,
+    documentShelf: DraftDocumentShelf,
 ): ConversationMediaDraftState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -792,10 +809,10 @@ internal fun rememberConversationMediaDraftState(
             ConversationMediaDraftState(appState, controller, context, scope, messages, pendingCameraFiles)
         }
     SideEffect {
-        state.updateInputs(mediaSlots, documentUris, controller.boundAccountRef)
+        state.updateInputs(mediaSlots, documentShelf.uris, controller.boundAccountRef, documentShelf.ids)
     }
 
-    LaunchedEffect(state, mediaSlots, documentUris, controller.boundAccountRef) {
+    LaunchedEffect(state, mediaSlots, documentShelf, controller.boundAccountRef) {
         state.prepareMissingAttachments()
     }
     DisposableEffect(state, chatId) {
@@ -983,26 +1000,3 @@ private suspend fun PhotoEditorCommitter.commitPhoto(
         quality = edit.quality,
         domain = domain,
     )
-
-/** Deletes composer presentation copies, clearing every media temp file only when the draft is [empty]. */
-private fun releaseDraftPresentationFiles(
-    context: Context,
-    empty: Boolean,
-) {
-    if (empty) {
-        clearMediaTempFiles(context)
-    } else {
-        runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
-    }
-}
-
-/** Picks the shelf description that explains why a staged photo cannot be edited. */
-private fun nonEditablePhotoDescription(
-    result: PhotoDraftStageResult.NotEditable,
-    messages: PhotoEditorMessages,
-): String =
-    if (result.reason == PhotoEditorSourceFailure.Animated) {
-        messages.animationNotEditable
-    } else {
-        messages.sourceNotEditable
-    }

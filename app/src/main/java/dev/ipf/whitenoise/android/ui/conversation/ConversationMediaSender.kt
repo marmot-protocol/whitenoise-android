@@ -212,8 +212,8 @@ internal class ConversationMediaSender(
                     imageSlots,
                     documentUris,
                     trimmedCaption,
-                    preparedImageAttachments.withoutStoredFiles(),
-                    preparedDocumentAttachments.withoutStoredFiles(),
+                    preparedImageAttachments,
+                    preparedDocumentAttachments,
                     pendingDraftClear,
                     keepPdfMetadata,
                 )

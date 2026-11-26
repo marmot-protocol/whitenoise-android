@@ -27,6 +27,7 @@ internal class AttachmentCollectionJournal(
     noBackupDirectory: File,
     private val clock: () -> Long = System::currentTimeMillis,
     private val ttlMs: Long = ATTACHMENT_COLLECTION_JOURNAL_TTL_MS,
+    private val draftSources: CollectionDraftSourceFiles? = null,
 ) {
     private val root = File(noBackupDirectory, JOURNAL_DIRECTORY)
 
@@ -69,7 +70,7 @@ internal class AttachmentCollectionJournal(
                     operation?.takeIf {
                         it.accountRef == accountRef && it.groupIdHex == groupIdHex && now - it.updatedAtMs <= ttlMs
                     }
-                if (live == null) file.delete()
+                if (live == null) deleteRecord(file)
                 live
             }.sortedBy { it.createdAtMs }
     }
@@ -81,7 +82,7 @@ internal class AttachmentCollectionJournal(
         groupIdHex: String,
         operationId: String,
     ) {
-        fileFor(accountRef, groupIdHex, operationId).delete()
+        deleteRecord(fileFor(accountRef, groupIdHex, operationId))
     }
 
     /** Deletes every record of a conversation whose destination is gone. */
@@ -90,24 +91,42 @@ internal class AttachmentCollectionJournal(
         accountRef: String,
         groupIdHex: String,
     ) {
-        conversationDirectory(accountRef, groupIdHex).deleteRecursively()
+        deleteRecordsUnder(conversationDirectory(accountRef, groupIdHex))
     }
 
     /** Deletes every record of a signed-out account. */
     @Synchronized
     fun deleteAccount(accountRef: String) {
-        File(root, journalHash(accountRef)).deleteRecursively()
+        deleteRecordsUnder(File(root, journalHash(accountRef)))
     }
 
     /** Deletes every expired or unreadable record in every conversation. */
     @Synchronized
     fun sweepExpired() {
         val now = clock()
-        root.walkBottomUp().filter { it.isFile }.forEach { file ->
+        val held = mutableSetOf<String>()
+        root.walkBottomUp().filter(File::isFile).forEach { file ->
             val operation = runCatching { decodeCollectionOperation(file.readBytes()) }.getOrNull()
-            if (operation == null || now - operation.updatedAtMs > ttlMs) file.delete()
+            if (operation == null || now - operation.updatedAtMs > ttlMs || file.extension != "json") {
+                deleteRecord(file)
+            } else {
+                held += file.nameWithoutExtension
+            }
         }
+        draftSources?.sweepOrphans(held, now - ttlMs)
         root.walkBottomUp().filter { it.isDirectory && it != root && it.list().isNullOrEmpty() }.forEach(File::delete)
+    }
+
+    /** Removes a metadata record and the corresponding operation's private plaintext sources. */
+    private fun deleteRecord(file: File) {
+        if (file.extension == "json") draftSources?.deleteKey(file.nameWithoutExtension)
+        file.delete()
+    }
+
+    /** Releases every operation-owned body before removing the enclosing account or conversation metadata. */
+    private fun deleteRecordsUnder(directory: File) {
+        directory.walkBottomUp().filter(File::isFile).forEach(::deleteRecord)
+        directory.deleteRecursively()
     }
 
     /** The directory that holds one conversation's records, named by hashes rather than raw ids. */
@@ -125,7 +144,7 @@ internal class AttachmentCollectionJournal(
 }
 
 /** A short, filesystem-safe name for an identifier. */
-private fun journalHash(value: String): String =
+internal fun journalHash(value: String): String =
     MessageDigest
         .getInstance("SHA-256")
         .digest(value.toByteArray(StandardCharsets.UTF_8))

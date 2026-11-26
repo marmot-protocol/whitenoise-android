@@ -138,6 +138,25 @@ class AttachmentCollectionJournalTest {
         assertTrue(folder.root.walkTopDown().none { it.isFile })
     }
 
+    /** Account or conversation removal during copying cannot recreate its journal after cleanup. */
+    @Test
+    fun destinationRemovalInvalidatesWaitingAdmissionsOnlyForThatDestination() {
+        val registry = AttachmentCollectionRegistry(journal(), clock = { now })
+        val leaving = registry.admissions.begin("account", "group")
+        val deleting = registry.admissions.begin("second", "deleted")
+        val retained = registry.admissions.begin("second", "retained")
+        registry.forgetAccount("account")
+        registry.invalidateConversation("second", "deleted")
+
+        assertFalse(registry.start(operation(), leaving))
+        assertFalse(registry.start(operation(id = "deleted", account = "second", group = "deleted"), deleting))
+        assertTrue(registry.start(operation(id = "retained", account = "second", group = "retained"), retained))
+
+        assertEquals(setOf("retained"), registry.operations.value.keys)
+        assertTrue(journal().read("account", "group").isEmpty())
+        assertTrue(journal().read("second", "deleted").isEmpty())
+    }
+
     /** A second Resume of the same operation is refused until the first one ends its claim. */
     @Test
     fun resumeClaimAdmitsOneResumeAtATime() {

@@ -81,7 +81,7 @@ internal suspend fun MarmotInterface.copyDraftFiles(
 }
 
 /** One stored draft file read out under whichever selected revision still holds it. */
-private class DraftFileCopy(
+internal class DraftFileCopy(
     private val marmot: MarmotInterface,
     private val account: String,
     private val group: String,

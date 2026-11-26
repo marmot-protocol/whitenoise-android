@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
+import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import org.junit.Assert.assertEquals
@@ -66,7 +67,7 @@ class ConversationDraftRestorationPlanTest {
         val freshUri = Uri.parse("content://picker/fresh-document")
         val inputs =
             emptyInputs().copy(
-                documents = listOf(staleUri, freshUri),
+                documentShelf = DraftDocumentShelf(listOf(staleUri, freshUri), emptyMap()),
                 preparedDocuments =
                     mapOf(
                         staleUri to DraftPreparedPhoto(stale, "restored", true),
@@ -106,7 +107,7 @@ class ConversationDraftRestorationPlanTest {
         val otherUri = Uri.parse("content://picker/notes")
         val report = attachment(stagedDocumentAttachmentId("account", "group", pickerUri.toString()), "application/pdf")
         val notes = attachment(stagedDocumentAttachmentId("account", "group", otherUri.toString()), "application/pdf")
-        val inputs = emptyInputs().copy(documents = listOf(pickerUri, otherUri))
+        val inputs = emptyInputs().copy(documentShelf = DraftDocumentShelf(listOf(pickerUri, otherUri), emptyMap()))
         val plan = planDraftRestoration(inputs, "account", "group", listOf(report, notes), emptySet())
         assertEquals(listOf(report to pickerUri), matchedStoredEntries(inputs, plan, setOf(report.id)))
 
@@ -136,7 +137,11 @@ class ConversationDraftRestorationPlanTest {
         val notes = attachment(stagedDocumentAttachmentId("account", "group", notesUri.toString()), "application/pdf")
         val report = attachment(stagedDocumentAttachmentId("account", "group", reportUri.toString()), "application/pdf")
         val shelf = listOf(PendingMediaSlot(video.id, Uri.parse("content://picker/video")), slot(photo.id))
-        val inputs = emptyInputs().copy(slots = shelf, documents = listOf(notesUri, reportUri))
+        val inputs =
+            emptyInputs().copy(
+                slots = shelf,
+                documentShelf = DraftDocumentShelf(listOf(notesUri, reportUri), emptyMap()),
+            )
         val plan = planDraftRestoration(inputs, "account", "group", listOf(video, photo, notes, report), emptySet())
         val videoCopy = Uri.parse("content://app/video")
         val reportCopy = Uri.parse("content://app/report")
@@ -185,11 +190,36 @@ class ConversationDraftRestorationPlanTest {
         return projectDraftRestoration(inputs, plan, emptyList(), removedIds, "source unavailable")
     }
 
+    /** A reselection keeps its new identity after the first send consumes a previous pick of the same URI. */
+    @Test
+    fun sameUriReselectionKeepsItsOwnStoredNativeAttachment() {
+        val uri = Uri.parse("content://picker/document/report.zip")
+        val previous = newPickerDocumentIds(emptyMap(), emptyList(), listOf(uri))
+        val current = newPickerDocumentIds(previous, emptyList(), listOf(uri))
+        val previousId = previous.getValue(uri.toString())
+        val currentId = current.getValue(uri.toString())
+        assertTrue(previousId != currentId)
+        assertEquals(current, newPickerDocumentIds(current, listOf(uri), listOf(uri)))
+        val body = attachment(currentId, "application/zip")
+        val prepared = DraftPreparedPhoto(body, body.editorDigest(), restoredFromNative = true)
+        val inputs =
+            emptyInputs().copy(
+                documentShelf = DraftDocumentShelf(listOf(uri), current),
+                preparedDocuments = mapOf(uri to prepared),
+            )
+
+        val afterConsumption = planDraftRestoration(inputs, "account", "group", listOf(body), setOf(previousId))
+
+        assertEquals(listOf(uri), afterConsumption.retainedDocuments)
+        assertEquals(body, afterConsumption.reconciliation.documentsByUriString[uri.toString()])
+        assertTrue(afterConsumption.removedDocuments.isEmpty())
+    }
+
     /** Builds restoration inputs with an empty shelf. */
     private fun emptyInputs() =
         DraftRestorationInputs(
             slots = emptyList(),
-            documents = emptyList(),
+            documentShelf = DraftDocumentShelf(emptyList(), emptyMap()),
             preparedPhotos = emptyMap(),
             preparedDocuments = emptyMap(),
             backedPhotos = emptyMap(),

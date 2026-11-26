@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionChunkState
+import dev.ipf.whitenoise.android.state.CollectionDraftSourceFiles
 import dev.ipf.whitenoise.android.state.CollectionItem
 import dev.ipf.whitenoise.android.state.CollectionItemKind
 import dev.ipf.whitenoise.android.state.CollectionItemState
@@ -15,16 +17,19 @@ import dev.ipf.whitenoise.android.state.DraftSendClearToken
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.PlannedCollectionItem
+import dev.ipf.whitenoise.android.state.UnverifiedStoredDraftPdf
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.cancelUnaccepted
 import dev.ipf.whitenoise.android.state.claimCollectionResume
 import dev.ipf.whitenoise.android.state.collectionDocumentIds
+import dev.ipf.whitenoise.android.state.journalHash
 import dev.ipf.whitenoise.android.state.planAttachmentChunks
 import dev.ipf.whitenoise.android.state.releaseCollectionResume
 import dev.ipf.whitenoise.android.state.replanned
 import dev.ipf.whitenoise.android.state.resumedWithout
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -32,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.util.UUID
 
 /** What one Send hands to a collection operation; [caption] is already trimmed and null when blank. */
@@ -78,6 +84,7 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
  * [onAfterSend] runs once, when the first chunk's bubble appears. [send] keeps the items' outgoing draft open
  * until the operation stops running here, so its later chunks and their thumbnails decode in that draft's worker.
  */
+@Suppress("LongMethod") // The journal and plaintext copies have one cancellation-safe admission.
 internal fun ConversationMediaSender.startCollectionSend(
     request: CollectionSendRequest,
     completion: StagedMediaSendCompletion,
@@ -89,9 +96,13 @@ internal fun ConversationMediaSender.startCollectionSend(
     val groupIdHex = controller.group.groupIdHex
     val sessionEpoch = appState.mediaUploadSessionEpoch()
     val sourceAccount = appState.accounts.firstOrNull { it.label == account }?.accountIdHex
+    val permit = captureSharedPlaintextWrite(account)
+    val registry = appState.attachmentCollections
+    val admission = registry.admissions.begin(account, groupIdHex)
     val original = this
     appState.launchMutation {
         var lease: PrivateShareSendLease? = null
+        var stagedOperation: AttachmentCollectionOperation? = null
         var started = false
         try {
             val uris = request.imageSlots.map { it.uri } + request.documentUris
@@ -102,9 +113,18 @@ internal fun ConversationMediaSender.startCollectionSend(
                 }
             val operation =
                 withContext(Dispatchers.IO) {
-                    planCollectionOperation(context, account, groupIdHex, request, appState.attachmentCollections.now())
+                    val plan = planCollectionOperation(context, account, groupIdHex, request, registry.now())
+                    stagedOperation = plan
+                    appState.copyStoredCollectionSources(context, plan, request, permit)
                 }
-            started = withContext(Dispatchers.IO) { appState.attachmentCollections.start(operation) }
+            // Record the handoff inside I/O so cancellation during return cannot delete a journal-owned source.
+            withContext(Dispatchers.IO) {
+                started = registry.start(operation, admission) {
+                    val active = appState.activeAccountRef
+                    val epoch = appState.mediaUploadSessionEpoch()
+                    shouldAcceptMediaUploadForAccount(account, sessionEpoch, active, epoch)
+                }
+            }
             if (!started) return@launchMutation appState.present(R.string.share_import_storage)
             completion.accept()
             val run =
@@ -114,18 +134,30 @@ internal fun ConversationMediaSender.startCollectionSend(
                     groupIdHex,
                     sessionEpoch,
                     request.caption,
-                    request.preparedImages,
-                    request.preparedDocuments,
+                    request.preparedImages.withoutStoredFiles(),
+                    request.preparedDocuments.withoutStoredFiles(),
                     request.draftClear,
                     onAfterSend,
                     keepPdfMetadata = request.keepPdfMetadata,
                 )
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)
+        } catch (_: UnverifiedStoredDraftPdf) {
+            appState.present(R.string.media_file_pdf_metadata_kept)
+        } catch (_: IOException) {
+            appState.present(R.string.share_import_storage)
         } finally {
+            registry.admissions.release(admission)
             controller.endOutgoingSend(send)
             lease?.let { withContext(NonCancellable + Dispatchers.IO) { it.release() } }
-            if (!started) completion.reject()
+            if (!started) {
+                stagedOperation?.let { plan ->
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        CollectionDraftSourceFiles(context.cacheDir).deleteKey(journalHash(plan.id))
+                    }
+                }
+                completion.reject()
+            }
         }
     }
 }

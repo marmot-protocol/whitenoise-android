@@ -126,12 +126,14 @@ internal fun restoredDocumentsMissingFrom(
 
 internal data class DraftRestorationInputs(
     val slots: List<PendingMediaSlot>,
-    val documents: List<Uri>,
+    val documentShelf: DraftDocumentShelf,
     val preparedPhotos: Map<String, DraftPreparedPhoto>,
     val preparedDocuments: Map<Uri, DraftPreparedPhoto>,
     val backedPhotos: Map<String, DraftBackedPhoto>,
     val descriptions: Map<String, String>,
-)
+) {
+    val documents: List<Uri> get() = documentShelf.uris
+}
 
 internal data class DraftRestorationPlan(
     val removedPhotos: Set<String>,
@@ -172,7 +174,10 @@ internal fun planDraftRestoration(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             mediaSlotIds = retainedSlots.map(PendingMediaSlot::id),
-            documentUriStrings = retainedDocuments.map(Uri::toString),
+            documentIdsByUri =
+                retainedDocuments.map(Uri::toString).associateWith { uri ->
+                    inputs.documentShelf.attachmentId(accountRef, groupIdHex, uri)
+                },
             attachments = attachments,
             removedAttachmentIds = removedAttachmentIds,
         )

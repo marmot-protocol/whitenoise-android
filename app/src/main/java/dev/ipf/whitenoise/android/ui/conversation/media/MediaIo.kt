@@ -5,6 +5,7 @@ import androidx.compose.runtime.saveable.Saver
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.state.isCollectionDraftSource
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.share.ForeignContentSource
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -164,7 +165,7 @@ internal fun sweepStaleSharedMedia(
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
-                if (entry.isFile && entry.lastModified() < cutoff) {
+                if (entry.isFile && entry.lastModified() < cutoff && !isCollectionDraftSource(entry.name)) {
                     runCatching { entry.delete() }
                 }
             }

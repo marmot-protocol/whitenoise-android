@@ -9,12 +9,15 @@ import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
+import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -96,4 +99,27 @@ internal fun preparedPhotoQualities(
                 dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
             hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
         )
+    }
+
+/** Deletes composer presentation copies, clearing every media temp file only when the draft is [empty]. */
+internal fun releaseDraftPresentationFiles(
+    context: Context,
+    empty: Boolean,
+) {
+    if (empty) {
+        clearMediaTempFiles(context)
+    } else {
+        runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
+    }
+}
+
+/** Picks the shelf description that explains why a staged photo cannot be edited. */
+internal fun nonEditablePhotoDescription(
+    result: PhotoDraftStageResult.NotEditable,
+    messages: PhotoEditorMessages,
+): String =
+    if (result.reason == PhotoEditorSourceFailure.Animated) {
+        messages.animationNotEditable
+    } else {
+        messages.sourceNotEditable
     }

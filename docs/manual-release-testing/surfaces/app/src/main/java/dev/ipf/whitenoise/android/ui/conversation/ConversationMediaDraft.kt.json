@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "A fresh selection of the same document keeps a separate native identity from an in-flight send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "fun savedDocumentIds(",
+        "test_ids": [
+          "MED-067"
+        ]
+      },
+      {
         "surface": "ConversationMediaDraftContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
         "anchor": "fun ConversationMediaDraftContent(",

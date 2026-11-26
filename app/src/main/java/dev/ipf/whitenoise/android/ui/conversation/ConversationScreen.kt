@@ -1616,6 +1616,9 @@ internal fun ConversationScreen(
     var pendingDocumentUris by rememberSaveable(conversationAccountRef, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
+    var documentDraftIds by rememberSaveable(conversationAccountRef, chat.id, stateSaver = ComposerDocumentIdsSaver) {
+        mutableStateOf<Map<String, String>>(emptyMap())
+    }
     val importedShareFiles =
         remember(context) {
             dev.ipf.whitenoise.android.share
@@ -1910,15 +1913,7 @@ internal fun ConversationScreen(
     }
     voicePlaybackHosts()
 
-    // Documents take a separate launcher because `OpenMultipleDocuments`
-    // accepts any MIME — the image picker can't surface PDFs, archives, etc.
-    // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
-    // same staging shelf as image picks; one Send dispatches both sides
-    // through one kind:9 album. Non-image bytes pass through without
-    // recompression, while detected images use the same metadata-safe policy
-    // as Photo Picker. The send-quality audio bitrate is intentionally scoped
-    // to recorded voice notes until this client grows a general audio
-    // transcode path.
+    // The document picker admits any MIME to the same send shelf as image picks.
     val documentPickerLauncher =
         rememberOriginGuardedResultLauncher(
             ActivityResultContracts.OpenMultipleDocuments(),
@@ -1926,12 +1921,10 @@ internal fun ConversationScreen(
             attachmentOwnerCurrent,
         ) { uris ->
             if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
-            // Append into the document side of the staging shelf rather than
-            // sending immediately. The preview sheet renders both lists and
-            // a single Send dispatches both decoders into one kind-9 album.
             // Every occurrence counts, a file picked twice included, so nothing leaves the pick unreported.
             val admission =
                 admitComposerAttachments(uris, pendingMediaSlots.size, pendingDocumentUris.size, MEDIA_PICKER_MAX_ITEMS)
+            documentDraftIds = newPickerDocumentIds(documentDraftIds, pendingDocumentUris, admission.accepted)
             pendingDocumentUris = pendingDocumentUris + admission.accepted
             appState.presentAdmission(context, admission)
         }
@@ -2970,7 +2963,7 @@ internal fun ConversationScreen(
             controller = controller,
             chatId = chat.id,
             mediaSlots = pendingMediaSlots,
-            documentUris = pendingDocumentUris,
+            documentShelf = DraftDocumentShelf(pendingDocumentUris, documentDraftIds),
         )
 
     val nativeComposerCleanupRevision =
@@ -2989,12 +2982,14 @@ internal fun ConversationScreen(
         ) {
             val capturedSlots = pendingMediaSlots
             val capturedDocuments = pendingDocumentUris
+            val capturedIds = documentDraftIds
             val capturedAccount = controller.boundAccountRef
-            mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount)
+            mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount, capturedIds)
             val restored =
                 mediaDraftState.restorePersistedAttachments {
                     pendingMediaSlots == capturedSlots &&
                         pendingDocumentUris == capturedDocuments &&
+                        documentDraftIds == capturedIds &&
                         controller.boundAccountRef == capturedAccount
                 } ?: return@LaunchedEffect
             val merged =
@@ -3006,7 +3001,8 @@ internal fun ConversationScreen(
                 )
             pendingMediaSlots = merged.mediaSlots
             pendingDocumentUris = merged.documentUris
-            mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount)
+            documentDraftIds = mediaDraftState.savedDocumentIds(merged.documentUris)
+            mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount, documentDraftIds)
             mediaDraftState.prepareMissingAttachments()
         }
     }

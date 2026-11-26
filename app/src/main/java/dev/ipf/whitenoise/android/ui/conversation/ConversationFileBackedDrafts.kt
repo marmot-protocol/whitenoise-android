@@ -125,9 +125,8 @@ internal fun <K> Map<K, DraftPreparedPhoto>.withStoredSizes(read: RevisionedMess
     }
 
 /**
- * The prepared items a collection send may reuse. A stored draft file is left out, so the collection reads its
- * shelf file: each chunk is admitted by an upload that sends, and MarmotKit admits stored files under a token only
- * through the whole draft.
+ * The prepared items a collection can pass directly to a chunk. Stored bodies are copied to operation-owned URIs,
+ * because MarmotKit admits stored files under a token only through the whole draft.
  */
 internal fun <K> Map<K, PendingAttachment>.withoutStoredFiles(): Map<K, PendingAttachment> =
     filterValues { attachment ->
