@@ -72,14 +72,16 @@ internal fun ProseTextField(
             }
         }
     val editorLabel: @Composable (TextFieldLabelScope.() -> Unit)? = label?.let { { it() } }
-    val labelTop =
+    val cutout =
         if (label == null) {
-            0.dp
+            Modifier
         } else {
-            with(LocalDensity.current) {
-                MaterialTheme.typography.bodySmall.lineHeight
-                    .toDp() / 2
-            }
+            val halfLabelHeight =
+                with(LocalDensity.current) {
+                    MaterialTheme.typography.bodySmall.lineHeight
+                        .toDp() / 2
+                }
+            Modifier.semantics(mergeDescendants = true) {}.padding(top = halfLabelHeight)
         }
     val decorator =
         OutlinedTextFieldDefaults.decorator(
