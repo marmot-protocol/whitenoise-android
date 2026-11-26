@@ -154,12 +154,18 @@ def parse_case_fragment(path: str, fragment: str) -> tuple[str, str, str]:
     lines = fragment.strip().splitlines()
     if path != f"{CASE_DIR}/{test_id}.md" or not ID_RE.fullmatch(test_id):
         raise FragmentError(f"{path}: expected a permanent-ID .md filename")
-    if len(lines) != 3 or lines[1] or not (header := HEADER_RE.fullmatch(lines[0])):
+    if len(lines) < 3 or lines[1] or not (header := HEADER_RE.fullmatch(lines[0])):
         raise FragmentError(f"{path}: expected legacy hash, blank line and one unchecked scenario")
-    match = DEFINITION_RE.fullmatch(lines[2])
+    parts = [lines[2]]
+    for line in lines[3:]:
+        if not re.fullmatch(r" {4}\S.*", line) or re.match(r"(?:[-+*]|\d+[.)])\s", line[4:]):
+            raise FragmentError(f"{path}: expected scenario text indented by four spaces")
+        parts.append(line[4:])
+    definition = " ".join(parts)
+    match = DEFINITION_RE.fullmatch(definition)
     if not match or match["id"] != test_id or match[1] != "1":
         raise FragmentError(f"{path}: expected exactly one matching unchecked scenario with ordinal 1")
-    return test_id, header[1], lines[2]
+    return test_id, header[1], definition
 
 
 def historical_definitions(root: Path, revision: str) -> dict[str, str]:
