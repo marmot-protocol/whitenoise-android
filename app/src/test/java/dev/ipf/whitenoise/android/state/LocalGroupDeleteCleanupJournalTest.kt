@@ -44,6 +44,18 @@ class LocalGroupDeleteCleanupJournalTest {
         assertFalse(restarted.hasPending())
     }
 
+    /** Sign-out capture reads only the departing account's pending group ids. */
+    @Test
+    fun groupIdsForAccountReturnsOnlyThatAccountsPendingGroups() {
+        val journal = LocalGroupDeleteCleanupJournal(folder.newFolder("local-delete-groups"))
+        journal.stage(pending)
+        journal.stage(pending.copy(groupIdHex = "group-b"))
+        journal.stage(pending.copy(account = "account-b", groupIdHex = "group-c"))
+
+        assertEquals(setOf("group-a", "group-b"), journal.groupIdsForAccount("account-a"))
+        assertEquals(emptySet<String>(), journal.groupIdsForAccount("account-z"))
+    }
+
     @Test
     fun failedJournalStageCannotAuthorizeNativeMutation() {
         val blockedDirectory = folder.newFile("not-a-directory")

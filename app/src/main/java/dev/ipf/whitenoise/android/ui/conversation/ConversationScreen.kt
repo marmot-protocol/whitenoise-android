@@ -8,7 +8,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -4057,11 +4056,11 @@ internal fun ConversationScreen(
                             )
                         renderedTimeline.isEmpty() &&
                             controller.conversationGroupRecoveryRowVisible() ->
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            EmptyConversationRecoveryContent(
+                                state = conversationEmptyState(controller.group.disappearingMessageSecs),
+                                modifier = Modifier.fillMaxSize().padding(bottom = overlayPadding),
+                            ) {
                                 ConversationGroupRecoveryCard(controller, appState)
-                                ConversationEmptyMessage(
-                                    conversationEmptyState(controller.group.disappearingMessageSecs),
-                                )
                             }
                         renderedTimeline.isEmpty() &&
                             controller.pendingMembershipActivity == null &&

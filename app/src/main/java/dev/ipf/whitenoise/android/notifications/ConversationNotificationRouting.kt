@@ -38,6 +38,7 @@ internal data class NotificationConversationDescriptor(
     val isDm: Boolean,
     val title: String?,
     val primaryVibrationPattern: ConversationVibrationPattern,
+    val accountRef: String? = null,
 )
 
 internal sealed interface AndroidNotificationSettingsTarget {
@@ -89,11 +90,15 @@ internal class ConversationNotificationRouting(
     val state: StateFlow<Map<ConversationNotificationRoutingKey, ConversationNotificationScope>> =
         preferences.state
 
+    /** Resolves the channel for a post, materializing and recording ownership of `:conv:` children. */
+    @Suppress("LongParameterList") // Post routing inputs plus lock-guarded write predicate.
     fun resolveForPost(
         channel: NotificationChannelSpec,
         conversationShortcutId: String?,
         conversationTitle: String?,
         primaryVibrationPattern: ConversationVibrationPattern,
+        accountRef: String? = null,
+        isWriteAllowed: () -> Boolean = { true },
     ): ConversationNotificationPostRoute {
         if (conversationShortcutId == null || channel.conversationPolicy == ConversationChannelPolicy.GLOBAL_ONLY) {
             return globalRoute(channel, conversationShortcutId)
@@ -107,6 +112,8 @@ internal class ConversationNotificationRouting(
                         conversationShortcutId = conversationShortcutId,
                         conversationTitle = conversationTitle,
                         vibrationPattern = primaryVibrationPattern,
+                        accountRef = accountRef,
+                        isWriteAllowed = isWriteAllowed,
                     )
                 ConversationNotificationPostRoute(
                     channelId = child ?: channel.id,
@@ -128,6 +135,8 @@ internal class ConversationNotificationRouting(
                                 parentChannelId = channel.id,
                                 conversationShortcutId = conversationShortcutId,
                                 conversationTitle = conversationTitle,
+                                accountRef = accountRef,
+                                isWriteAllowed = isWriteAllowed,
                             )
                         } else {
                             null
@@ -203,8 +212,10 @@ internal class ConversationNotificationRouting(
         conversation: NotificationConversationDescriptor,
         category: OverridableConversationNotificationCategory,
         scope: ConversationNotificationScope,
+        isWriteAllowed: () -> Boolean = { true },
     ): Result<ConversationNotificationCategorySetting> =
         runCatching {
+            check(isWriteAllowed()) { "Notification scope write is no longer current" }
             // Establish a durable pre-override state before creating a new
             // child. Otherwise a failed custom write would leave a child with
             // no preference, and the legacy migration probe would activate it
@@ -233,8 +244,11 @@ internal class ConversationNotificationRouting(
                                     parentChannelId = category.channel.id,
                                     conversationShortcutId = conversation.shortcutId,
                                     conversationTitle = conversation.title,
+                                    accountRef = conversation.accountRef,
+                                    isWriteAllowed = isWriteAllowed,
                                 ),
                             ) { "Global notification channel is unavailable" }
+                        check(isWriteAllowed()) { "Notification scope write is no longer current" }
                         check(preferences.set(conversation.shortcutId, category, scope)) {
                             "Could not persist notification scope"
                         }
@@ -242,6 +256,7 @@ internal class ConversationNotificationRouting(
                     }
 
                     ConversationNotificationScope.USE_GLOBAL_DEFAULT -> {
+                        check(isWriteAllowed()) { "Notification scope write is no longer current" }
                         check(preferences.set(conversation.shortcutId, category, scope)) {
                             "Could not persist notification scope"
                         }

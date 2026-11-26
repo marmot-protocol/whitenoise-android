@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateFormatPreference
@@ -178,10 +179,14 @@ internal fun DaySeparator(
 internal fun ConversationEmptyMessage(
     state: ConversationEmptyState,
     modifier: Modifier = Modifier,
+    verticalPadding: Dp = WhiteNoiseSpacing.Section,
 ) {
     // A chat with nothing local yet says so while its earlier messages are still arriving from another device.
     chatHistoryTransfer(LocalChatHistoryImport.current())?.let { ChatHistoryTransferNotice(it) }
-    Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.fillMaxSize().padding(horizontal = WhiteNoiseSpacing.Section, vertical = verticalPadding),
+        contentAlignment = Alignment.Center,
+    ) {
         when (state) {
             ConversationEmptyState.NoMessages ->
                 Text(

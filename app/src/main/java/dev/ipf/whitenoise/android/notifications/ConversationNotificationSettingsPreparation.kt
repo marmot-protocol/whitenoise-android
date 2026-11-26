@@ -23,6 +23,7 @@ internal data class ConversationNotificationSettingsPreparationRequest(
     val conversationAvatarUrl: String?,
     val primaryVibrationPattern: ConversationVibrationPattern,
     val requestedParents: List<NotificationChannelSpec>,
+    val isWriteAllowed: () -> Boolean = { true },
 )
 
 /** Exact Android-owned identifiers that a later tap may launch without preparation work. */
@@ -56,15 +57,19 @@ internal interface ConversationNotificationSettingsPlatform {
         context: Context,
         shortcut: ShortcutInfoCompat,
         existing: Boolean,
+        isWriteAllowed: () -> Boolean = { true },
     )
 
     /** Resolves the active channel version for one prepared parent and vibration choice. */
+    @Suppress("LongParameterList") // Platform boundary mirroring channel-creation parameters plus owner scope.
     suspend fun ensureChannel(
         context: Context,
         parent: NotificationChannelSpec,
         shortcutId: String,
         conversationTitle: String,
         vibrationPattern: ConversationVibrationPattern,
+        accountRef: String?,
+        isWriteAllowed: () -> Boolean = { true },
     ): String?
 }
 
@@ -78,8 +83,10 @@ internal object AndroidConversationNotificationSettingsPlatform : ConversationNo
         context: Context,
         shortcut: ShortcutInfoCompat,
         existing: Boolean,
+        isWriteAllowed: () -> Boolean,
     ) {
         synchronized(UserEventNotificationGroup.mutationLock) {
+            check(isWriteAllowed()) { "Conversation shortcut write is no longer current" }
             val payload =
                 if (shortcutPreviewAllowed(context, shortcut)) {
                     shortcut
@@ -97,12 +104,15 @@ internal object AndroidConversationNotificationSettingsPlatform : ConversationNo
     }
 
     /** Delegates channel creation/version resolution to the notification channel owner. */
+    @Suppress("LongParameterList") // Platform boundary mirroring channel-creation parameters plus owner scope.
     override suspend fun ensureChannel(
         context: Context,
         parent: NotificationChannelSpec,
         shortcutId: String,
         conversationTitle: String,
         vibrationPattern: ConversationVibrationPattern,
+        accountRef: String?,
+        isWriteAllowed: () -> Boolean,
     ): String? =
         ConversationNotificationChannels.ensureConversationChannel(
             context = context,
@@ -110,6 +120,8 @@ internal object AndroidConversationNotificationSettingsPlatform : ConversationNo
             conversationShortcutId = shortcutId,
             conversationTitle = conversationTitle,
             vibrationPattern = vibrationPattern,
+            accountRef = accountRef,
+            isWriteAllowed = isWriteAllowed,
         )
 }
 
@@ -343,7 +355,12 @@ internal class ConversationNotificationSettingsPreparer(
             operationId,
             if (existing == null) STAGE_SHORTCUT_PUSH else STAGE_SHORTCUT_UPDATE,
         ) {
-            platform.publishShortcut(context, shortcut, existing = existing != null)
+            platform.publishShortcut(
+                context = context,
+                shortcut = shortcut,
+                existing = existing != null,
+                isWriteAllowed = request.isWriteAllowed,
+            )
         }
         return shortcut
     }
@@ -377,6 +394,8 @@ internal class ConversationNotificationSettingsPreparer(
                             shortcutId = shortcut.id,
                             conversationTitle = shortcut.longLabel.toString(),
                             vibrationPattern = vibrationPattern,
+                            accountRef = request.accountRef,
+                            isWriteAllowed = request.isWriteAllowed,
                         ),
                     ) { "The active Android notification channel is unavailable" }
                 parent.id to
