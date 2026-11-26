@@ -182,9 +182,10 @@ class ConversationShortcutLifecycleCoverageTest {
                 .functionBody("captureAccountKnownGroupIds")
         val appState = appStateSource().readText()
 
+        val captureArgs = "appContext, accountRef, groupIds, includeUnscopedLegacy"
         assertTrue(
             "captureAccountKnownGroupIds must save the departing account's channel owners",
-            "recordDepartingConversationChannelOwners(appContext, accountRef, groupIds, includeUnscopedLegacy)" in capture,
+            "recordDepartingConversationChannelOwners($captureArgs)" in capture,
         )
         assertTrue(
             "captureAccountKnownGroupIds must guard incomplete multi-account reads against unowned :conv: channels",
