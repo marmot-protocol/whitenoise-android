@@ -97,7 +97,10 @@ private fun quotedEnd(
     return end.coerceAtMost(source.length)
 }
 
-/** The index just past the `"""` that closes the raw string opened at [open], skipping whole templates. */
+/**
+ * The index just past the `"""` that closes the raw string opened at [open], skipping whole templates. Quotes just
+ * before the closing three belong to the string, so the whole run of quotes is consumed.
+ */
 private fun rawEnd(
     source: String,
     open: Int,
@@ -106,7 +109,8 @@ private fun rawEnd(
     while (index < source.length && !source.startsWith(RAW_QUOTE, index)) {
         index = if (source.startsWith("\${", index)) templateEnd(source, index + 1) else index + 1
     }
-    return minOf(index + RAW_QUOTE.length, source.length)
+    while (index < source.length && source[index] == '"') index++
+    return index
 }
 
 /** The index just past the brace that closes the template opened at [open], stepping over literals and comments. */

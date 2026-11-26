@@ -289,7 +289,14 @@ class ShapedTouchScannerRegressionTest {
                 quote to "\${\"x\" + \"}\"}",
                 quote to "\${/* } */ \"x\"}",
                 raw to "\${${raw}IconButton(go)$raw} and",
+                // Kotlin closes a raw string with the last three quotes of a run, so the ones before stay content.
+                raw to "q$quote$quote",
+                raw to "",
+                raw to "$quote",
             )
+        val quotedEnd = "val label = $raw" + "quoted$quote$raw\nIconButton(go, Modifier.width(36.dp)) {}"
+        val composer = "conversation/composer/Toolbar.kt"
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @2"), shapedTouchFindings(quotedEnd, composer))
         for ((open, inner) in templates) {
             val source = "val a = $open$inner$open + next"
             val blank = "val a = $open${" ".repeat(inner.length)}$open + next"
@@ -324,6 +331,21 @@ class ShapedTouchScannerRegressionTest {
             )
         for (source in unproven) {
             assertEquals(source, missing, shapedTouchFindings(source, "", tokens))
+        }
+        // Any binding named like the object is what the body may read, whatever the import says, so it fails closed.
+        val shadowing =
+            listOf(
+                "fun Tile(Corners: CornerValues) {\n%s\n}",
+                "fun Tile() { all.forEach { Corners ->\n%s\n} }",
+                "fun Tile() { val Corners = other\n%s\n}",
+                "fun Tile() { val (Corners, rest) = pair\n%s\n}",
+                "fun Tile() { for (Corners in all) {\n%s\n} }",
+                "class Tile(val Corners: CornerValues) { fun Draw() {\n%s\n} }",
+                "class Tile { fun Draw() {\n%s\n}\n val Corners = other }",
+            )
+        for (form in shadowing) {
+            val source = "import ext.Corners\n" + form.replace("%s", shape("Corners.Md"))
+            assertEquals(form, listOf("$MISSING_TOUCH_FEEDBACK @3"), shapedTouchFindings(source, "", tokens))
         }
         // A shared shape's token is resolved through the imports of the file that declares the shape.
         val tile = { radius: String -> "package ui\nimport ext.Corners\nval TileShape = RoundedCornerShape($radius)" }
@@ -367,50 +389,172 @@ class ShapedTouchScannerRegressionTest {
         val fill = "Box(Modifier.background(Color.Red, CircleShape).clip(TileShape).clickable(onClick = go))"
         assertEquals(listOf("$CLICK_OVER_SHAPED_FILL @2"), shapedTouchFindings("val TileShape = RectangleShape\n$fill"))
         assertEquals(emptyList<String>(), shapedTouchFindings("val TileShape = CircleShape\n$fill"))
+        // A rounded top-level constant does not prove a clip whose name a local binding shadows at the use.
+        val rounded = "val TileShape = RoundedCornerShape(8.dp)\n"
+        val shadowedClips =
+            listOf(
+                "fun Tile(TileShape: Shape) { $box }",
+                "fun Tile() { all.forEach { TileShape -> $box } }",
+                "fun Tile() { val TileShape = RectangleShape; $box }",
+            )
+        for (form in shadowedClips) {
+            assertEquals(form, listOf("$ROUND_CHILD @2"), shapedTouchFindings(rounded + form))
+        }
+        assertEquals(emptyList<String>(), shapedTouchFindings(rounded + "fun Tile() { $box }"))
     }
 
     /** A wrapper call matches the function the caller's imports or package reach, not any same-named one. */
     @Test
     fun crossFileWrappersResolveByImport() {
-        val signature = "fun ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier)"
-        val call = "fun Screen() { ActionButton(go, Modifier.width(36.dp)) }"
         val files =
             mapOf(
-                "A.kt" to "package a\n$signature { IconButton(onClick, modifier) {} }",
-                "B.kt" to "package b\n$signature { SlotIconButton(onClick, modifier) {} }",
-                "ImportsB.kt" to "package c\nimport b.ActionButton\n$call",
-                "ImportsA.kt" to "package d\nimport a.ActionButton\n$call",
-                "Aliased.kt" to "package e\nimport a.ActionButton as Act\n${call.replace("ActionButton", "Act")}",
-                "SamePackage.kt" to "package a\n\n$call",
-                "Star.kt" to "package g\nimport a.*\n$call",
-                "StarAndExplicit.kt" to "package h\nimport a.*\nimport b.ActionButton\n\n$call",
-                "Unreached.kt" to "package i\n\n$call",
-                "LocalElsewhere.kt" to "package j\nimport a.ActionButton\n$call\nfun Other() { fun ActionButton() {} }",
+                "ImportsB.kt" to "package c\nimport b.ActionButton\n$WRAPPER_CALL",
+                "ImportsA.kt" to "package d\nimport a.ActionButton\n$WRAPPER_CALL",
+                "Aliased.kt" to
+                    "package e\nimport a.ActionButton as Act\n${WRAPPER_CALL.replace("ActionButton", "Act")}",
+                "SamePackage.kt" to "package a\n\n$WRAPPER_CALL",
+                "Star.kt" to "package g\nimport a.*\n$WRAPPER_CALL",
+                "StarAndExplicit.kt" to "package h\nimport a.*\nimport b.ActionButton\n\n$WRAPPER_CALL",
+                "Unreached.kt" to "package i\n\n$WRAPPER_CALL",
+                "AliasOnly.kt" to "package w\nimport a.ActionButton as Act\n$WRAPPER_CALL",
+            )
+        assertWrapperCalls(
+            files,
+            reached = listOf("ImportsA.kt", "Aliased.kt", "SamePackage.kt", "Star.kt"),
+            unreached = listOf("ImportsB.kt", "StarAndExplicit.kt", "Unreached.kt", "AliasOnly.kt"),
+        )
+    }
+
+    /**
+     * Kotlin skips a function the call cannot apply to, so an own or local overload with other parameters does not
+     * hide the wrapper, while one with the wrapper's parameter types, or one the wrapper cannot take the call from,
+     * does. A vararg, a trailing lambda into a non-function slot or a parameter type the wrapper does not share
+     * leaves it unsure, so the search fails closed, and a local function counts only in its scope after it.
+     */
+    @Test
+    fun wrapperCallsSkipOverloadsTheyCannotApplyTo() {
+        val call = WRAPPER_CALL
+        val files =
+            mapOf(
                 "OwnTopLevel.kt" to "package a\nfun ActionButton() {}\n$call",
+                "OwnOverload.kt" to "package p\nimport a.*\n$call\nfun ActionButton(count: Int) {}",
+                "OwnApplies.kt" to
+                    "package o\nimport a.*\n$call\nfun ActionButton(onClick: () -> Unit, modifier: Modifier) {}",
+                "NamedMismatch.kt" to
+                    "package t\nimport a.*\nActionButton(onClick = go, modifier = Modifier.width(36.dp))\n" +
+                    "fun ActionButton(onClick: () -> Unit, label: String) {}",
+                "TrailingLambda.kt" to
+                    "package u\nimport a.*\nActionButton(go, Modifier.width(36.dp)) {}\n" +
+                    "fun ActionButton(onClick: () -> Unit, modifier: Modifier, content: () -> Unit) {}",
+                "Vararg.kt" to "package v\nimport a.*\n$call\nfun ActionButton(vararg parts: Any) {}",
+                // Argument types are not read, so an overload with other parameter types leaves the wrapper reachable.
+                "TypeMismatch.kt" to
+                    "package x\nimport a.ActionButton\nfun Screen() { fun ActionButton(onClick: () -> Unit, " +
+                    "modifier: String) {}; $call }",
+                "PackageMismatch.kt" to
+                    "package y\nimport a.*\n$call\nfun ActionButton(onClick: () -> Unit, modifier: String) {}",
+                "ReceiverOverload.kt" to
+                    "package rr\nimport a.*\n$call\n" +
+                    "fun RowScope.ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier) {}",
+                "LambdaIntoInt.kt" to
+                    "package z\nimport a.*\nActionButton(go, Modifier.width(36.dp)) {}\n" +
+                    "fun ActionButton(onClick: () -> Unit, modifier: Modifier, count: Int) {}",
+                "LocalOverload.kt" to
+                    "package q\nimport a.ActionButton\nfun Screen() { fun ActionButton(count: Int) {}; $call }",
+                "LocalLater.kt" to "package r\nimport a.ActionButton\nfun Screen() { $call; fun ActionButton() {} }",
+                "LocalClosed.kt" to
+                    "package s\nimport a.ActionButton\nfun Screen() { if (x) { fun ActionButton(onClick: () -> Unit, " +
+                    "modifier: Modifier) {} }; $call }",
+                "LocalElsewhere.kt" to "package j\nimport a.ActionButton\n$call\nfun Other() { fun ActionButton() {} }",
                 "LocalStar.kt" to "package k\nimport a.*\n$call\nfun Other() { fun ActionButton() {} }",
             )
-        val findings = stretchedWrapperFindings(files)
-        val stretched = listOf("$STRETCHED_ICON_BUTTON @3")
         val reached =
-            listOf("ImportsA.kt", "Aliased.kt", "SamePackage.kt", "Star.kt", "LocalElsewhere.kt", "LocalStar.kt")
-        for (file in reached) {
-            assertEquals(file, stretched, findings.getValue(file))
-        }
-        for (file in listOf("ImportsB.kt", "StarAndExplicit.kt", "Unreached.kt", "OwnTopLevel.kt")) {
-            assertEquals(file, emptyList<String>(), findings.getValue(file))
-        }
-        // A local function shadows an imported wrapper at the calls in its scope; a local wrapper still counts.
+            listOf(
+                "OwnTopLevel.kt",
+                "OwnOverload.kt",
+                "NamedMismatch.kt",
+                "Vararg.kt",
+                "TypeMismatch.kt",
+                "PackageMismatch.kt",
+                "LambdaIntoInt.kt",
+                "ReceiverOverload.kt",
+                "LocalOverload.kt",
+                "LocalLater.kt",
+                "LocalClosed.kt",
+                "LocalElsewhere.kt",
+                "LocalStar.kt",
+            )
+        assertWrapperCalls(files, reached, unreached = listOf("OwnApplies.kt", "TrailingLambda.kt"))
+    }
+
+    /** A local function shadows an imported wrapper at the calls in its scope, and a local wrapper still counts. */
+    @Test
+    fun localFunctionsShadowImportedWrappers() {
         val slot = "fun ActionButton(onClick: () -> Unit, modifier: Modifier) { SlotIconButton(onClick, modifier) {} }"
         val screen = "fun Screen() {\n$slot\nActionButton(go, Modifier.width(36.dp))\n}"
         val shadowed = "package m\nimport a.ActionButton\n$screen"
         val localWrapper = "package n\n\n" + screen.replace("SlotIconButton", "IconButton")
-        val local = stretchedWrapperFindings(files + ("Shadowed.kt" to shadowed) + ("LocalWrapper.kt" to localWrapper))
+        val local = stretchedWrapperFindings(WRAPPER_FILES + ("Shadowed.kt" to shadowed) + ("Local.kt" to localWrapper))
         assertEquals(emptyList<String>(), local.getValue("Shadowed.kt"))
-        assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), local.getValue("LocalWrapper.kt"))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @5"), local.getValue("Local.kt"))
+    }
+
+    /** Checks each of [files], beside the two wrapper packages, for a stretched call on line 3 or none. */
+    private fun assertWrapperCalls(
+        files: Map<String, String>,
+        reached: List<String>,
+        unreached: List<String>,
+    ) {
+        val findings = stretchedWrapperFindings(WRAPPER_FILES + files)
+        for (file in reached) assertEquals(file, listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue(file))
+        for (file in unreached) assertEquals(file, emptyList<String>(), findings.getValue(file))
+    }
+
+    /** A same-file wrapper call reaches the local function in scope first, else the top-level one. */
+    @Test
+    fun sameFileWrapperCallsResolveToTheFunctionInScope() {
+        val iconButton = "fun Action(onTap: () -> Unit, modifier: Modifier) { IconButton(onTap, modifier) {} }"
+        val slot = iconButton.replace("IconButton", "SlotIconButton")
+        val call = "Action(go, Modifier.width(36.dp))"
+        val file = { topLevel: String, local: String ->
+            "private $topLevel\nfun Screen() {\n    $local\n    $call\n}\nfun Other() { $call }"
+        }
+        val localSlot = stretchedWrapperFindings(mapOf("F.kt" to file(iconButton, slot)))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @6"), localSlot.getValue("F.kt"))
+        val localWrapper = stretchedWrapperFindings(mapOf("F.kt" to file(slot, iconButton)))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @4"), localWrapper.getValue("F.kt"))
+    }
+
+    /** Feedback for a source that a local binding in the content shadows observes a different source. */
+    @Test
+    fun aShadowedSourceDrawsNoFeedback() {
+        val feedback = "Box(Modifier.shapedPressFeedback(press, CircleShape))"
+        val target = { content: String -> "Box(Modifier.shapedTouchTarget(press, go)) { $content }" }
+        val shadowing =
+            listOf(
+                "val press = remember { MutableInteractionSource() }; $feedback",
+                "val (press, other) = sources; $feedback",
+            )
+        for (content in shadowing) {
+            assertEquals(content, listOf("$MISSING_TOUCH_FEEDBACK @1"), shapedTouchFindings(target(content)))
+        }
+        assertEquals(emptyList<String>(), shapedTouchFindings(target(feedback)))
     }
 
     /** Builds a shaped control whose click needs replacement feedback in the supplied content. */
     private fun surfaceWith(content: String): String =
         "Surface(shape = CircleShape, modifier = Modifier.clickable(" +
             "interactionSource = press, indication = null, onClick = go)) {$content}"
+
+    private companion object {
+        const val WRAPPER_SIGNATURE = "fun ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier)"
+        const val WRAPPER_CALL = "fun Screen() { ActionButton(go, Modifier.width(36.dp)) }"
+
+        /** `a.ActionButton` wraps a plain IconButton, `b.ActionButton` a slot-aware one with the same signature. */
+        val WRAPPER_FILES =
+            mapOf(
+                "A.kt" to "package a\n$WRAPPER_SIGNATURE { IconButton(onClick, modifier) {} }",
+                "B.kt" to "package b\n$WRAPPER_SIGNATURE { SlotIconButton(onClick, modifier) {} }",
+            )
+    }
 }

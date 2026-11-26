@@ -102,7 +102,8 @@ internal class ShapedTouchIndications(
     private val sharedShapes: Map<String, String> = emptyMap(),
 ) {
     private val owners = code.feedbackOwners()
-    private val shapes = ShapedTouchShapes(code, sharedShapes, ::parameterNamed)
+    private val names = ShapedTouchNames(code)
+    private val shapes = ShapedTouchShapes(code, sharedShapes)
     private val functions = code.feedbackFunctions()
     private val replacements by lazy {
         // Only a known layout component draws its modifier; any other uppercase call could be a stored value.
@@ -290,12 +291,6 @@ internal class ShapedTouchIndications(
         return shape != null && shapes.isKnownRounded(shape, surface.open)
     }
 
-    /** Whether a function enclosing [useOffset] declares a parameter named [name]. */
-    private fun parameterNamed(
-        name: String,
-        useOffset: Int,
-    ): Boolean = functions.any { useOffset in it.body until it.end && parameterBinding(it, name) != null }
-
     /** A raw indication must always draw, even if its modifier is clipped: no null or conditional factory. */
     private fun ModifierLink.hasIndication(): Boolean {
         val factory = topLevelNamedArguments(args)["indication"] ?: topLevelArguments(args).getOrNull(1)
@@ -474,39 +469,24 @@ internal class ShapedTouchIndications(
             topLevel && plain && code.getOrNull(owner.start - 1) != '.'
         }
 
-    /** Resolves ordinary source references to their nearest still-open local or function parameter declaration. */
+    /**
+     * Resolves an ordinary source reference to the declaration [ShapedTouchNames.localAt] finds for its root at
+     * [offset]: a parameter of an enclosing function or lambda, or a local, destructured or loop binding in scope. A
+     * top-level or unresolved root shares one identity, -1.
+     */
     private fun binding(
         expression: String,
         offset: Int,
     ): FeedbackBinding? {
         if (!sourceReference.matches(expression)) return null
-        val name = expression.substringBefore('.')
-        val prefix = code.substring(0, offset)
-        val local =
-            // A destructured entry such as `val (name, other) = …` binds the name too.
-            Regex("""\b(?:val|var)\s+${Regex.escape(name)}\b|\b(?:val|var)\s*\([^)]*\b${Regex.escape(name)}\b""")
-                .findAll(prefix)
-                .lastOrNull { prefix.blockStaysOpen(it.range.last + 1) }
-                ?.range
-                ?.first ?: -1
-        val parameter =
-            functions
-                .filter { offset in it.body until it.end }
-                .mapNotNull { parameterBinding(it, name) }
-                .maxOrNull() ?: -1
-        return FeedbackBinding(expression, maxOf(local, parameter))
+        return FeedbackBinding(expression, names.localAt(expression.substringBefore('.'), offset) ?: -1)
     }
 
     /** The declaration offset distinguishes parameters with the same name in different component functions. */
     private fun parameterBinding(
         function: FeedbackFunction,
         name: String,
-    ): Int? =
-        Regex("""\b${Regex.escape(name)}\s*:""")
-            .find(code.substring(function.open + 1, function.close))
-            ?.range
-            ?.first
-            ?.plus(function.open + 1)
+    ): Int? = names.parameterIn(function.open, function.close, name)
 }
 
 /** Collects the enclosing syntax scopes between the start of a composition and a candidate call. */

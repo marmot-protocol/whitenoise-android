@@ -48,8 +48,6 @@ private val functionModifiers =
         """(?:\b(?:private|public|internal|protected|inline|suspend|tailrec|operator|infix)\s+|""" +
             """@[\w.]+(?:\([^()]*\))?\s+)+$""",
     )
-private val importDirective =
-    Regex("""^\s*import\s+([\w.]+(?:\.\*)?)(?:\s+as\s+(\w+))?\s*$""", RegexOption.MULTILINE)
 internal val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
@@ -193,117 +191,80 @@ internal fun passThroughIconButtonWrappers(
 ): Map<String, Set<Int>> {
     val code = blankCommentsAndStrings(source)
     return code
-        .iconButtonCalls()
+        .wrapperDeclarations(visibleAcrossFilesOnly)
+        .groupBy({ it.name }, { it.modifierIndex })
+        .mapValues { (_, indices) -> indices.toSet() }
+}
+
+/** One pass-through icon button wrapper: where its `fun` starts, its name and its `modifier` parameter's position. */
+internal data class WrapperDeclaration(
+    val start: Int,
+    val name: String,
+    val modifierIndex: Int,
+)
+
+/** The pass-through icon button wrappers declared in this code (see [passThroughIconButtonWrappers]). */
+internal fun String.wrapperDeclarations(visibleAcrossFilesOnly: Boolean): List<WrapperDeclaration> =
+    iconButtonCalls()
         .filter { (_, modifier) -> modifier.startsWith("modifier") }
-        .mapNotNull { (start, _) -> code.functionContaining(start, visibleAcrossFilesOnly) }
-        .mapNotNull { (name, parameters) ->
+        .mapNotNull { (start, _) -> functionMatchContaining(start, visibleAcrossFilesOnly) }
+        .mapNotNull { (match, parameters) ->
             parameterList(parameters)
                 .indexOfFirst { modifierParameter.containsMatchIn(it) }
                 .takeIf { it >= 0 }
-                ?.let { name to it }
-        }.groupBy({ it.first }, { it.second })
-        .mapValues { (_, indices) -> indices.toSet() }
-}
+                ?.let { WrapperDeclaration(match.range.first, match.groupValues[1], it) }
+        }
 
 /**
  * Rule 5, across files: a call that hands one of [wrappers] (see [passThroughIconButtonWrappers]) a modifier
  * with a width, a height or two sizes, written in the call or in a local `val` it starts from, so the icon
- * button inside stretches into a capsule. Reported as "<kind> @<line>". When the wrappers come [fromOtherFiles], a
- * call that a local function of the same name shadows reaches that function instead, so it is skipped.
+ * button inside stretches into a capsule. Reported as "<kind> @<line>". Every call of each name counts as given;
+ * [stretchedWrapperFindings] resolves which function a call reaches.
  */
 internal fun stretchedWrapperCalls(
     source: String,
     wrappers: Map<String, Set<Int>>,
-    fromOtherFiles: Boolean = false,
-): List<String> {
-    val code = blankCommentsAndStrings(source)
-    return wrappers.flatMap { (name, modifierIndices) ->
-        code
-            .calls(name)
-            .filter { (start, args) ->
-                val nameStart = start - 1 - name.length
-                val before = code.substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
-                // A local function declared earlier in an enclosing block is what a bare call reaches instead.
-                val shadowed = fromOtherFiles && code.substring(0, nameStart).declaresLocalFunction(name)
-                !declaration.containsMatchIn(before) &&
-                    !shadowed &&
-                    modifierIndices.any { index ->
+): List<String> = blankCommentsAndStrings(source).stretchedCalls(wrappers.keys) { name, _, _ -> wrappers[name] }
+
+/**
+ * The rule 5 findings for the calls of [names] in this code: [reached] gives, for one call, the `modifier`
+ * positions of the wrapper it reaches, or null when it reaches none.
+ */
+private fun String.stretchedCalls(
+    names: Set<String>,
+    reached: (name: String, nameStart: Int, call: WrapperCall) -> Set<Int>?,
+): List<String> =
+    names
+        .flatMap { name ->
+            calls(name)
+                .filter { (start, args) ->
+                    val nameStart = start - 1 - name.length
+                    val before = substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
+                    val trailing = trailingLambda.matchAt(this, start + args.length + 1) != null
+                    val call = WrapperCall(args, trailing)
+                    val indices = if (declaration.containsMatchIn(before)) null else reached(name, nameStart, call)
+                    indices.orEmpty().any { index ->
                         // Only bindings declared before this call are in scope for it.
                         val expression = modifierArgument(args, index)?.text.orEmpty()
-                        val modifier = code.substring(0, start).withLocalBinding(expression)
+                        val modifier = substring(0, start).withLocalBinding(expression)
                         twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
                     }
-            }.map { (start, _) -> "$STRETCHED_ICON_BUTTON @${code.lineAt(start)}" }
-    }
-}
+                }.map { (start, _) -> start }
+        }.distinct()
+        .sorted()
+        .map { "$STRETCHED_ICON_BUTTON @${lineAt(it)}" }
 
 /**
- * Checks private wrappers in their own file and shares visible wrappers, by fully qualified name, only with the
- * files whose imports or package make a call reach that very function.
+ * Checks every file's wrapper calls, resolving each call through [WrapperResolver] against the functions its own
+ * file declares and the visible ones every file declares (see [sharedFunctions]), by fully qualified name.
  */
 internal fun stretchedWrapperFindings(sources: Map<String, String>): Map<String, List<String>> {
-    val visible =
-        sources.values
-            .flatMap { source ->
-                val pkg = blankCommentsAndStrings(source).packageName()
-                passThroughIconButtonWrappers(source, visibleAcrossFilesOnly = true).map { (name, positions) ->
-                    pkg.qualify(name) to positions
-                }
-            }.groupBy({ it.first }, { it.second })
-            .mapValues { (_, positions) -> positions.flatten().toSet() }
+    val shared = sources.values.flatMap(::sharedFunctions).groupBy({ it.first }, { it.second })
     return sources.mapValues { (_, source) ->
         val code = blankCommentsAndStrings(source)
-        // Only this file's own top-level functions take a name from its package and star imports; a local one
-        // shadows a wrapper only inside its own function, so it cannot hide every call in the file.
-        val ownTopLevel =
-            enclosingFunction
-                .findAll(code)
-                .filter { code.isTopLevel(it) }
-                .map { it.groupValues[1] }
-                .toSet()
-        val reached =
-            visible.flatMap { (qualified, positions) ->
-                code.callNamesOf(qualified, visible.keys, ownTopLevel).map { it to positions }
-            }
-        val imported = reached.groupBy({ it.first }, { it.second }).mapValues { (_, it) -> it.flatten().toSet() }
-        val local = passThroughIconButtonWrappers(source)
-        (stretchedWrapperCalls(source, imported, fromOtherFiles = true) + stretchedWrapperCalls(source, local))
-            .distinct()
+        val resolver = WrapperResolver(code, shared)
+        code.stretchedCalls(resolver.callNames(), resolver::reached)
     }
-}
-
-/** Whether a local `fun [name]` is declared in a block of this text that is still open at its end. */
-private fun String.declaresLocalFunction(name: String): Boolean =
-    Regex("""\bfun\s+${Regex.escape(name)}\s*\(""")
-        .findAll(this)
-        .any { !isTopLevel(it) && blockStaysOpen(from = it.range.first) }
-
-/**
- * The names this file calls the top-level function [qualified] by, in Kotlin's order: an aliased or explicit
- * import of it; else, unless an explicit import or one of this file's own top-level functions ([ownTopLevel])
- * takes the simple name, this file's package and then a star import of its package, where a [known] function of
- * the same name in this file's package wins over the star import. Overloads are not told apart: any own top-level
- * function of that name takes it, even one whose parameters a call could not match, so such a call goes unchecked.
- * Local functions are resolved at each call (see [stretchedWrapperCalls]).
- */
-private fun String.callNamesOf(
-    qualified: String,
-    known: Set<String>,
-    ownTopLevel: Set<String>,
-): List<String> {
-    val simple = qualified.substringAfterLast('.')
-    val owner = qualified.substringBeforeLast('.', "")
-    val imports = importDirective.findAll(this).map { it.groupValues[1] to it.groupValues[2] }.toList()
-    val aliases = imports.filter { (path, alias) -> path == qualified && alias.isNotEmpty() }.map { it.second }
-    val explicit = imports.any { (path, alias) -> path == qualified && alias.isEmpty() }
-    val taken =
-        simple in ownTopLevel ||
-            imports.any { (path, alias) -> alias == simple || (alias.isEmpty() && path.endsWith(".$simple")) }
-    val pkg = packageName()
-    val viaPackage = owner == pkg
-    val viaStar = imports.any { it.first == "$owner.*" } && pkg.qualify(simple) !in known
-    val bySimpleName = explicit || (!taken && (viaPackage || viaStar))
-    return aliases + listOfNotNull(simple.takeIf { bySimpleName })
 }
 
 /** [expression] with the initializer of the local `val` it starts from, if any, put in front of it. */
@@ -319,6 +280,15 @@ private fun String.functionContaining(
     offset: Int,
     visibleAcrossFilesOnly: Boolean,
 ): Pair<String, String>? =
+    functionMatchContaining(offset, visibleAcrossFilesOnly)?.let { (match, parameters) ->
+        match.groupValues[1] to parameters
+    }
+
+/** The declaration match and parameter text of the function whose body contains [offset], or null. */
+private fun String.functionMatchContaining(
+    offset: Int,
+    visibleAcrossFilesOnly: Boolean,
+): Pair<MatchResult, String>? =
     enclosingFunction
         .findAll(substring(0, offset))
         .mapNotNull { match ->
@@ -333,10 +303,9 @@ private fun String.functionContaining(
             }
         }.lastOrNull()
         ?.takeUnless { (match, _) -> visibleAcrossFilesOnly && !isFileVisible(match.range.first) }
-        ?.let { (match, parameters) -> match.groupValues[1] to parameters }
 
 /** Cross-file wrappers must be top-level functions without a private modifier. */
-private fun String.isFileVisible(start: Int): Boolean {
+internal fun String.isFileVisible(start: Int): Boolean {
     val prefix = substring(0, start)
     val topLevel = prefix.count { it == '{' } == prefix.count { it == '}' }
     val modifierList = functionModifiers.find(prefix)?.value.orEmpty()
