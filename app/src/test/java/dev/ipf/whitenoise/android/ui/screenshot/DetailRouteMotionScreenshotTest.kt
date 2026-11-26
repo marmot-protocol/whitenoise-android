@@ -83,7 +83,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Suppress("LargeClass")
 class DetailRouteMotionScreenshotTest {
     @get:Rule val rule = createComposeRule()
+
     @get:Rule val visualErrors = ErrorCollector()
+
     private val app: Application = ApplicationProvider.getApplicationContext()
     private val transitionSources = mutableMapOf<String, Bitmap>()
     private val captureFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
