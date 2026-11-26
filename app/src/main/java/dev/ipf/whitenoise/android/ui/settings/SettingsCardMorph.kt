@@ -390,12 +390,6 @@ internal fun Modifier.settingsMorphAnchorOutline(
     }
 }
 
-@Composable
-private fun permitsContourMotion(
-    morph: SettingsCardMorph?,
-    motion: Boolean,
-): Boolean = motion && (morph?.page == null || isAmoledSurfaceTheme())
-
 /**
  * Starts [morph] whenever [target] changes and returns whether it is running, with the host modifier
  * for the route layer. A null [morph] never morphs.
@@ -411,10 +405,11 @@ internal fun <T> rememberSettingsCardMorphHost(
     captureContent: Boolean = true,
 ): Pair<Boolean, Modifier> {
     // Native control borders do not opt borderless settings themes into contour motion.
-    val animateContours = permitsContourMotion(morph, motion)
-    // Only a contour transition replays the settled frame, which borderless themes never run. Motion is not part of
-    // this: a leg entered without motion must still record for the next leave.
-    morph?.captureContent = captureContent && (morph?.page == null || isAmoledSurfaceTheme())
+    val contourTheme = morph?.page == null || isAmoledSurfaceTheme()
+    val animateContours = motion && contourTheme
+    // Only a contour transition replays the settled frame, so borderless themes never record it. Motion is not part
+    // of this: a leg entered without motion must still record for the next leave.
+    morph?.captureContent = captureContent && contourTheme
     DisposableEffect(morph, ownerKey) {
         val releaseChild = morph?.observeChildContours()
         onDispose {
