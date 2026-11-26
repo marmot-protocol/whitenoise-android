@@ -15,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -39,7 +38,6 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private const val FOLDER_HEADER_SCROLLED_THRESHOLD = 0.01f
-private val FOLDER_MANAGER_BUTTON_SIZE = 32.dp
 private val FOLDER_MANAGER_ICON_SIZE = 18.dp
 private const val FOLDER_PILL_MAX_VISIBLE_COUNT = 99
 
@@ -126,12 +124,11 @@ internal fun ChatFolderPills(
         }
         if (onFolders != null) {
             item(key = "manage") {
+                // A full 48 dp IconButton: a size set outside it would shrink the touch target with the visual.
                 IconButton(
                     onClick = onFolders,
                     modifier =
                         Modifier
-                            .minimumInteractiveComponentSize()
-                            .size(FOLDER_MANAGER_BUTTON_SIZE)
                             .testTag("chats.manageFolders")
                             .explainOnLongPress(
                                 chatsExplanation(

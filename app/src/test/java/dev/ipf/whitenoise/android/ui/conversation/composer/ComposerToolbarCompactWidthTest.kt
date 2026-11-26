@@ -10,7 +10,7 @@ class ComposerToolbarCompactWidthTest {
     @Test
     fun wideCompressedViewportsKeepAllDefaultActionsReachable() {
         val toolbar = composerToolbarCompactWidth(780f, 3, 52f, 96f)
-        assertEquals(108f, toolbar, 0f)
+        assertEquals(144f, toolbar, 0f)
         assertTrue(toolbar + 52f + 96f + 8f <= 780f)
     }
 
@@ -25,14 +25,14 @@ class ComposerToolbarCompactWidthTest {
     /** Avoids losing actions during the initial unconstrained measurement. */
     @Test
     fun unboundedInitialMeasurementRetainsEveryConfiguredTarget() {
-        assertEquals(468f, composerToolbarCompactWidth(Float.POSITIVE_INFINITY, 13, 48f, 96f), 0f)
+        assertEquals(624f, composerToolbarCompactWidth(Float.POSITIVE_INFINITY, 13, 48f, 96f), 0f)
     }
 
     /** The end group beside Send is exactly as wide as its actions, leaving no gap before Send. */
     @Test
     fun expandedEndGroupHugsSendWithOnlyItsOwnColumns() {
-        assertEquals(72f, composerExpandedTrailingWidth(300f, 2, 2), 0f)
-        assertEquals(36f, composerExpandedTrailingWidth(300f, 0, 1), 0f)
+        assertEquals(96f, composerExpandedTrailingWidth(300f, 2, 2), 0f)
+        assertEquals(48f, composerExpandedTrailingWidth(300f, 0, 1), 0f)
         assertEquals(0f, composerExpandedTrailingWidth(300f, 3, 0), 0f)
     }
 
@@ -40,16 +40,16 @@ class ComposerToolbarCompactWidthTest {
     @Test
     fun expandedEndGroupWrapsOnWholeColumnsWithinItsShare() {
         val width = composerExpandedTrailingWidth(200f, 4, 6)
-        assertEquals(108f, width, 0f)
-        assertEquals(0f, width % 36f, 0f)
-        assertEquals(36f, composerExpandedTrailingWidth(40f, 1, 3), 0f)
+        assertEquals(96f, width, 0f)
+        assertEquals(0f, width % 48f, 0f)
+        assertEquals(48f, composerExpandedTrailingWidth(40f, 1, 3), 0f)
     }
 
     /** Draft jumps join a compact row only when every configured action keeps a full-pitch target. */
     @Test
     fun compactRowAdmitsActionsOnlyAtFullPitch() {
-        assertTrue(composerCompactRowFits(4 * 36f + 8f, 4))
-        assertFalse(composerCompactRowFits(4 * 36f + 7f, 4))
+        assertTrue(composerCompactRowFits(4 * 48f + 8f, 4))
+        assertFalse(composerCompactRowFits(4 * 48f + 7f, 4))
         assertTrue(composerCompactRowFits(8f, 0))
         assertFalse(composerCompactRowFits(-1f, 0))
     }

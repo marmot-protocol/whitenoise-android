@@ -72,4 +72,5 @@ internal fun Modifier.expandedComposerActionRow(reserveEndInset: Boolean = true)
         }
     }
 
-internal val ComposerToolbarSlotWidth = 40.dp
+/** Default action slot width, matching the minimum height of the action row. */
+internal val ComposerToolbarSlotWidth = ComposerActionRowHeight

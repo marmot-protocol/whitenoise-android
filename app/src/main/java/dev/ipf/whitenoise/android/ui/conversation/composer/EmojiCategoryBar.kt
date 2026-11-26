@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.EmojiPickerTab
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Backspace
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 
@@ -76,7 +77,7 @@ internal fun EmojiCategoryBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
     ) {
         Row(
             modifier =

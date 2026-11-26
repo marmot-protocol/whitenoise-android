@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -35,6 +34,7 @@ import dev.ipf.whitenoise.android.media.ImageSearchResult
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
+/** One image search result as a selectable rounded tile, outlined in the primary colour while staged. */
 @Composable
 internal fun GroupImageSearchTile(
     hit: ImageSearchResult,
@@ -53,7 +53,9 @@ internal fun GroupImageSearchTile(
     val borderColor =
         if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     val resultDescription = hit.title.ifBlank { hit.sourceHost.orEmpty() }
+    // Surface(onClick) clips the press highlight to the tile's rounded corners.
     Surface(
+        onClick = onTap,
         modifier =
             Modifier
                 .aspectRatio(1f)
@@ -63,7 +65,7 @@ internal fun GroupImageSearchTile(
                 .semantics {
                     selected = isSelected
                     contentDescription = resultDescription
-                }.clickable(onClick = onTap),
+                },
         shape = RoundedCornerShape(Radii.sm),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),

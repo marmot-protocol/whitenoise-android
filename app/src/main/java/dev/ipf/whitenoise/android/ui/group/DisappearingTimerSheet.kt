@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -368,11 +368,15 @@ private fun DisappearingChip(
         if (selected) scheme.primary else scheme.outlineVariant,
         label = "disappearing-chip-border",
     )
+    // The selectable Surface clips its press highlight to the chip's rounded corners.
     Surface(
+        selected = selected,
+        onClick = onClick,
+        enabled = enabled,
         modifier =
             modifier
                 .heightIn(min = timerChoiceMinHeight)
-                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+                .semantics { role = Role.RadioButton },
         shape = MaterialTheme.shapes.medium,
         color = container,
         contentColor = content,
