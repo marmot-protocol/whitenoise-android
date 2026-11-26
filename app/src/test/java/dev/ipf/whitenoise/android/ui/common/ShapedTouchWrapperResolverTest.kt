@@ -214,6 +214,8 @@ class ShapedTouchWrapperResolverTest {
                 "Spaced.kt" to "Spaced(go, emptyMap(), Modifier.width(36.dp))",
                 "TrailingComma.kt" to "Trailing<Int,>(go, Modifier.width(36.dp), 1)",
                 "TrailingInferred.kt" to "Trailing(go, Modifier.width(36.dp), 1)",
+                "TrailingDeclarationOnly.kt" to "Trailing<Int>(go, Modifier.width(36.dp), 1)",
+                "TrailingCallOnly.kt" to "Gen<Int,>(go, Modifier.width(36.dp), 1)",
             ).mapValues { (_, call) -> "package gc\nimport gw.*\nfun Screen() { $call }" }
         val findings = stretchedWrapperFindings(calls + ("Generic.kt" to wrappers))
         for (file in calls.keys) assertEquals(file, listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue(file))
