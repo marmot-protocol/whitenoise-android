@@ -102,7 +102,7 @@ internal fun rememberAttachmentCollectionPanels(
                         onSkipChunk = { appState.launchMutation { controller.skipCollectionChunk(operation.id, it) } },
                         onCancel = { appState.launchMutation { controller.cancelCollection(operation.id) } },
                         onResume = { mediaSender.resumeCollection(operation.id) },
-                        onDiscard = { appState.attachmentCollections.discard(operation.id) },
+                        onDiscard = { appState.discardCollection(operation.id) },
                     ),
                 modifier = Modifier.padding(8.dp),
             )

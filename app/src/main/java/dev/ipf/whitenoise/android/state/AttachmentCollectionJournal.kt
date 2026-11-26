@@ -19,8 +19,9 @@ private const val JOURNAL_NAME_HEX_CHARS = 32
 
 /**
  * Metadata-only record of in-progress collection sends, so a restarted process can tell what MDK already
- * accepted and what still needs sending. It holds ids, provider URIs, states and MDK send tokens — never
- * attachment bytes, captions or file names — and lives under no-backup storage, one file per operation,
+ * accepted and what still needs sending. It holds ids, provider URIs, states, MDK send tokens and the save times
+ * of the draft a sent caption was read from — never attachment bytes, captions or file names — and lives under
+ * no-backup storage, one file per operation,
  * grouped by hashed account and conversation. Once no live operation holds them, sources expire after [ttlMs].
  * IDs needed to consume a native draft survive expiry until their acceptance can be reconciled.
  */
@@ -228,6 +229,7 @@ internal fun encodeCollectionOperation(
         .put("updated", operation.updatedAtMs)
         .put("items", items)
         .put("cleanupOnly", operation.cleanupOnly)
+        .put("sentCaption", operation.sentCaption?.let(::encodeSentCaption))
         .put("chunks", chunks)
         .toString()
         .toByteArray(StandardCharsets.UTF_8)
@@ -242,6 +244,19 @@ private fun encodeStoredCollectionDraft(source: CollectionStoredDraft): JSONObje
         .put("fileBacked", source.fileBacked)
         .put("consumed", source.consumed)
         .put("inlineSha256", source.inlineSha256)
+
+/** Keeps the token and the draft save a caption was read from; never the caption itself. */
+private fun encodeSentCaption(caption: CollectionSentCaption): JSONObject =
+    JSONObject()
+        .put("token", caption.clientToken)
+        .put("draftCreated", caption.draftCreatedAtMs)
+        .put("draftUpdated", caption.draftUpdatedAtMs)
+
+/** Reads a caption record, or null from a record written before captions were journaled. */
+private fun decodeSentCaption(json: JSONObject?): CollectionSentCaption? =
+    json?.let {
+        CollectionSentCaption(it.getString("token"), it.getLong("draftCreated"), it.getLong("draftUpdated"))
+    }
 
 /** Reads a record written by [encodeCollectionOperation]; a restored operation always starts paused. */
 internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOperation {
@@ -291,5 +306,6 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
         updatedAtMs = json.getLong("updated"),
         paused = true,
         cleanupOnly = json.optBoolean("cleanupOnly"),
+        sentCaption = decodeSentCaption(json.optJSONObject("sentCaption")),
     )
 }

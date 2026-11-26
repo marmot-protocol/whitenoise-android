@@ -85,6 +85,20 @@ internal class CollectionRun(
     }
 }
 
+/**
+ * Marks a queued send as a collection chunk. The caption chunk also carries [captionOwner], the composer text
+ * captured at Send, so its admission can record which draft save a restart may clear the caption from.
+ */
+private fun markCollectionChunk(
+    controller: ConversationController,
+    queued: ConversationController.QueuedAttachmentSend,
+    captionOwner: DraftSendClearToken?,
+) {
+    val retained = controller.retainedMediaUploads.get(queued.key) ?: return
+    retained.draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
+    if (captionOwner != null) retained.draftSendClearToken = captionOwner
+}
+
 /** One chunk's attachments in send order, and the items that could not be prepared. */
 private class PreparedChunk(
     val images: List<PendingAttachment>,
@@ -211,8 +225,7 @@ internal class AttachmentCollectionSender(
             }
             return
         }
-        val uploads = current.controller.retainedMediaUploads
-        uploads.get(queued.key)?.draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
+        markCollectionChunk(current.controller, queued, run.draftClear.takeIf { chunk.carriesCaption })
         val recorded = registry.recordChunkToken(run.operationId, chunk.id, queued.tempId)
         // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
         // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.

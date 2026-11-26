@@ -88,7 +88,9 @@ private suspend fun ConversationController.admitMediaWithDraftRecovery(
     retained: RetainedMediaUpload,
     token: String,
 ): SendSummaryFfi {
-    val cleanup = recordStoredDraftAdmission(account, retained, token)
+    val caption = captureSentCaption(account, retained, token)
+    val cleanup = recordStoredDraftAdmission(account, retained, token, caption)
+    if (cleanup == null) recordCollectionCaption(token, caption)
     return try {
         appState
             .marmotIo(MarmotTraceSection.MEDIA_SEND) {
@@ -113,23 +115,15 @@ private suspend fun ConversationController.admitMediaWithDraftRecovery(
     }
 }
 
-/** Collection chunks already carry ownership in the collection journal. */
-private val RetainedMediaUpload.tracksDraftAcceptance: Boolean
-    get() =
-        draftHandling != RetainedDraftHandling.COLLECTION_CHUNK &&
-            (
-                isDraftStored ||
-                    (
-                        draftHandling == RetainedDraftHandling.COMPOSER_SELECTION &&
-                            attachments.any { it.nativeDraftAttachmentId != null }
-                    )
-            )
-
-/** Records exact native draft IDs with the client token before sending to MDK; retries use the same key. */
+/**
+ * Records exact native draft IDs, and the draft save [caption] names, with the client token before sending to MDK.
+ * Retries use the same key.
+ */
 private suspend fun ConversationController.recordStoredDraftAdmission(
     account: String,
     retained: RetainedMediaUpload,
     token: String,
+    caption: CollectionSentCaption?,
 ): AttachmentCollectionOperation? {
     if (!retained.tracksDraftAcceptance) return null
     val items =
@@ -162,6 +156,7 @@ private suspend fun ConversationController.recordStoredDraftAdmission(
             now,
             now,
             cleanupOnly = true,
+            sentCaption = caption,
         )
     var recorded = false
     try {

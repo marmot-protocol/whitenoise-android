@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.whitenoise.android.core.nostr.sha256
-import dev.ipf.whitenoise.android.core.nostr.toHex
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -62,18 +60,33 @@ internal data class CollectionStoredDraft(
     val inlineSha256: String? = null,
 )
 
-/** Captures the body of a native row independently of any later edit that reuses its ID. Call off Main. */
+/**
+ * Captures the native row this attachment was sent from, independently of any later edit that reuses its ID. An inline
+ * row is named by the body the draft holds, not by bytes send preparation cleaned or moved to a file. Call off Main.
+ */
 internal fun PendingAttachment.captureDraftSource(): CollectionStoredDraft? {
     val file = draftFile
     val id = file?.attachmentId ?: nativeDraftAttachmentId ?: return null
+    val inline = nativeInlineBody()
     return CollectionStoredDraft(
         id,
-        byteCount,
+        inline?.byteCount ?: byteCount,
         mediaType,
         fileBacked = file != null,
-        inlineSha256 = if (file == null) sha256(plaintextBytes).toHex() else null,
+        inlineSha256 = inline?.sha256,
     )
 }
+
+/**
+ * The saved state of the native draft a send's caption was read from, bound to the send token that carried it.
+ * The draft's creation and update times name that exact save without putting any of its text on disk, so a restart
+ * can clear the caption MDK accepted only while nothing has saved the draft since.
+ */
+internal data class CollectionSentCaption(
+    val clientToken: String,
+    val draftCreatedAtMs: Long,
+    val draftUpdatedAtMs: Long,
+)
 
 /** One staged occurrence: [id] is the composer's stable occurrence id, so duplicate URIs stay distinct. */
 internal data class CollectionItem(
@@ -199,6 +212,7 @@ internal data class AttachmentCollectionOperation(
     val unrecoverableItemIds: Set<String> = emptySet(),
     val cancelRequested: Boolean = false,
     val cleanupOnly: Boolean = false,
+    val sentCaption: CollectionSentCaption? = null,
 ) {
     /** Every item the operation started with; it never shrinks, so progress cannot run backwards. */
     val total: Int
@@ -229,9 +243,16 @@ internal data class AttachmentCollectionOperation(
                     }
                 }
 
-    /** Some accepted originals have not yet been removed from their native draft. */
+    /** The captured caption once MDK accepted the chunk that carried it, until its native draft is cleaned. */
+    val pendingSentCaption: CollectionSentCaption?
+        get() =
+            sentCaption?.takeIf { caption ->
+                chunks.any { it.clientToken == caption.clientToken && it.state == CollectionChunkState.ACCEPTED }
+            }
+
+    /** Some accepted originals, or the accepted caption, have not yet been removed from their native draft. */
     val needsStoredDraftCleanup: Boolean
-        get() = pendingDraftFiles.isNotEmpty()
+        get() = pendingDraftFiles.isNotEmpty() || pendingSentCaption != null
 
     /** A chunk MDK might still own must remain probeable while it can account for a native draft attachment. */
     private val hasUnresolvedDraftToken: Boolean
@@ -242,9 +263,16 @@ internal data class AttachmentCollectionOperation(
             }
         }
 
+    /** The token a captured caption is bound to is still one MDK might own. */
+    private val hasUnresolvedCaptionToken: Boolean
+        get() {
+            val token = sentCaption?.clientToken ?: return false
+            return chunks.any { it.clientToken == token && !it.state.isSettled }
+        }
+
     /** Accepted IDs and unresolved tokens can still establish ownership after process death. */
     val mayNeedStoredDraftCleanup: Boolean
-        get() = needsStoredDraftCleanup || hasUnresolvedDraftToken
+        get() = needsStoredDraftCleanup || hasUnresolvedDraftToken || hasUnresolvedCaptionToken
 
     /** A paused native token must resolve before its stored draft can safely regain ownership. */
     val canDiscard: Boolean

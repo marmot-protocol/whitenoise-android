@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.captureDraftSource
 import dev.ipf.whitenoise.android.state.consumeCollectionDraftFiles
 import dev.ipf.whitenoise.android.state.hasVerifiedDraftPdfMetadata
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.sendOwnedDraftIds
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.prepareStagingDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
@@ -27,17 +28,20 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Records accepted ownership before removing stored originals. A failed draft read or write leaves the
- * journal recoverable, and repeating a successful removal finds no matching native IDs.
+ * Records accepted ownership before removing stored originals and the accepted caption. A failed draft read or write
+ * leaves the journal recoverable, and repeating a successful removal finds no matching native IDs or draft save.
+ * A caption a restored record clears, after a restart, is reloaded out of an editor that still shows it.
  */
 internal suspend fun WhiteNoiseAppState.finishCollectionDraftCleanup(operationId: String) {
     val registry = attachmentCollections
     if (registry.operations.value[operationId]?.needsStoredDraftCleanup != true) return
     val recorded = registry.updateDurably(operationId) { it } ?: return
     val accepted = recorded.pendingDraftFiles
+    val caption = recorded.pendingSentCaption
+    var captionCleared = false
     val consumed =
         runCatchingCancellable {
-            marmotIo { consumeCollectionDraftFiles(recorded, accepted) }
+            marmotIo { consumeCollectionDraftFiles(recorded, accepted, caption) { captionCleared = true } }
         }.getOrDefault(false)
     if (consumed) {
         val ids = accepted.mapTo(HashSet()) { it.attachmentId }
@@ -51,9 +55,16 @@ internal suspend fun WhiteNoiseAppState.finishCollectionDraftCleanup(operationId
                         item
                     }
                 }
-            operation.copy(items = remaining, updatedAtMs = registry.now())
+            operation.copy(
+                items = remaining,
+                sentCaption = operation.sentCaption.takeUnless { it == caption },
+                updatedAtMs = registry.now(),
+            )
         }
         retainedConversationStates.recordNativeComposerCleanup(recorded.accountRef, recorded.groupIdHex)
+        // A live send clears its own editor on acceptance. A record restored after a restart has no such owner, and
+        // the reopened editor may already show the caption this just removed.
+        if (captionCleared && recorded.paused) loadDraft(recorded.accountRef, recorded.groupIdHex)
     }
 }
 
@@ -68,21 +79,41 @@ internal suspend fun WhiteNoiseAppState.reconcileDraftSends(
     }
 }
 
-/** Original draft IDs currently covered by a collection or still awaiting a single-send acceptance lookup. */
+/**
+ * Original draft IDs the composer shelf must not offer: those covered by a collection or awaiting a single-send
+ * acceptance lookup, and those a send of this chat still owns in this process.
+ */
 internal fun WhiteNoiseAppState.collectionOwnedDraftIds(
     account: String,
     group: String,
 ): Set<String> =
     attachmentCollections.operations.value.values
         .filter { it.accountRef == account && it.groupIdHex == group }
-        .flatMap { operation ->
+        .flatMapTo(HashSet()) { operation ->
             operation.items.mapNotNull { item ->
                 item.storedDraft?.attachmentId.takeUnless {
                     item.state == CollectionItemState.SKIPPED ||
                         item.state == CollectionItemState.CANCELLED
                 }
             }
-        }.toSet()
+        } + sendOwnedDraftIds(account, group)
+
+/**
+ * Lets the composer read its native draft again once [operation] stops hiding originals from the shelf: a discarded or
+ * cancelled collection keeps its unsent originals in the draft, and nothing else tells a mounted shelf to show them.
+ */
+internal fun WhiteNoiseAppState.showReleasedCollectionOriginals(operation: AttachmentCollectionOperation) {
+    if (operation.items.any { it.storedDraft?.consumed == false }) {
+        retainedConversationStates.recordNativeComposerCleanup(operation.accountRef, operation.groupIdHex)
+    }
+}
+
+/** Discards [operationId] at the user's request and returns the originals it was hiding to the shelf. */
+internal fun WhiteNoiseAppState.discardCollection(operationId: String) {
+    val operation = attachmentCollections.operations.value[operationId] ?: return
+    attachmentCollections.discard(operationId)
+    showReleasedCollectionOriginals(operation)
+}
 
 /** Copies stored bodies from their selected native revision before the collection accepts the composer shelf. */
 internal suspend fun WhiteNoiseAppState.copyStoredCollectionSources(

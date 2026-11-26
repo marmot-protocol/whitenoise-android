@@ -162,6 +162,12 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Waits for the queued save of one draft, leaving every other draft's debounce running. */
+    suspend fun flush(
+        accountRef: String,
+        groupIdHex: String,
+    ) = flush(Key(accountRef, groupIdHex))
+
     /** Flush accepted edits, retry each retained failure once, and report unsaved text before deactivation. */
     suspend fun flushAccount(accountRef: String): Boolean {
         val retried = mutableSetOf<Key>()

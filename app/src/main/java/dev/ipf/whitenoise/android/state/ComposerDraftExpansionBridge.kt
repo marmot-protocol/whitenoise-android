@@ -30,6 +30,9 @@ internal class ComposerDraftExpansionBridge(
 ) {
     internal val sentPresentation = SentComposerDraftPresentation()
 
+    /** Waits until every keystroke already accepted for one draft has been written to MDK or superseded. */
+    val flushText: suspend (accountRef: String, groupIdHex: String) -> Unit = draftWriter::flush
+
     /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
         accountRef: String,

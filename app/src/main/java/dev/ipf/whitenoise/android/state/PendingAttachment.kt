@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.core.nostr.sha256
+import dev.ipf.whitenoise.android.core.nostr.toHex
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 
 /**
@@ -22,6 +24,11 @@ data class PendingAttachment(
     val outgoingDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     val nativeDraftAttachmentId: String? = null,
+    /**
+     * The body the native draft holds under [nativeDraftAttachmentId], kept once send preparation replaced these
+     * bytes: cleaned of metadata, or moved into a staged file. Null while the bytes are still the draft's own.
+     */
+    val nativeDraftBody: NativeDraftBody? = null,
 ) {
     init {
         val representations = listOf(plaintextBytes.isNotEmpty(), sourceFile != null, draftFile != null)
@@ -65,6 +72,32 @@ data class PendingAttachment(
         return result
     }
 }
+
+/** The size and SHA-256 of an inline body as the native draft holds it. */
+data class NativeDraftBody(
+    val byteCount: Long,
+    val sha256: String,
+)
+
+/**
+ * The inline body the native draft holds for this attachment: the one remembered before a rewrite, else these bytes.
+ * Null for an attachment the draft does not hold inline, and for one whose bytes left memory unremembered. Hashes the
+ * bytes, so call off Main.
+ */
+internal fun PendingAttachment.nativeInlineBody(): NativeDraftBody? =
+    when {
+        nativeDraftAttachmentId == null || draftFile != null -> null
+        nativeDraftBody != null -> nativeDraftBody
+        plaintextBytes.isEmpty() -> null
+        else -> NativeDraftBody(plaintextBytes.size.toLong(), sha256(plaintextBytes).toHex())
+    }
+
+/**
+ * This attachment before send preparation replaces its bytes, remembering the body its native draft holds so the
+ * draft's original can still be recognized and removed once the send is accepted. Call off Main.
+ */
+internal fun PendingAttachment.rememberingNativeDraftBody(): PendingAttachment =
+    if (nativeDraftBody != null) this else copy(nativeDraftBody = nativeInlineBody())
 
 /**
  * A large attachment the composer's native draft holds as a stored file: [attachmentId] names it in the draft and

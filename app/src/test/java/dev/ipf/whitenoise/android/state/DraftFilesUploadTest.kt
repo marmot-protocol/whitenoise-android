@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.media.editor.nativeHandleStub
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.media.pdf.pdfFixture
 import dev.ipf.whitenoise.android.ui.conversation.CollectionTokenStatus
+import dev.ipf.whitenoise.android.ui.conversation.finishCollectionDraftCleanup
 import dev.ipf.whitenoise.android.ui.conversation.restoreCollectionOperations
 import dev.ipf.whitenoise.android.ui.profile.personTestGroup
 import kotlinx.coroutines.cancel
@@ -169,8 +170,7 @@ class DraftFilesUploadTest {
 
             assertEquals("new caption", engine.admittedCaption)
             assertEquals("t", engine.admittedToken)
-            val reopened = engine.marmot.selectedMessageDraft("acct", "group").draft
-            assertEquals(content("typed later"), reopened)
+            assertEquals(content("typed later"), engine.current)
         }
 
     /** Staging another attachment keeps the new pick while the send's still-owned caption is removed. */
@@ -318,24 +318,44 @@ class DraftFilesUploadTest {
             }
         }
 
-    /** Moving the caption revision during a clean PDF copy remains a retryable revision conflict. */
+    /** A caption saved during a clean PDF check is followed: the send reads the draft again and uploads from it. */
     @Test
-    fun cleanPdfReadKeepsItsRevisionConflict() =
+    fun saveDuringThePdfCheckIsFollowed() =
         runBlocking {
             val body = pdfFixture("ghostscript").also { PdfMetadataScrubber.scrub(it) }
             val descriptor = stored("clip").copy(plaintextSize = body.size.toULong())
             val engine = DraftUploadEngine(content("caption", descriptor), fileBody = body)
             val pick = storedPick("clip").copy(draftFile = DraftStoredFile("clip", body.size.toLong()))
             val upload = DraftFilesUpload(listOf(pick), "caption")
-            engine.beforeFullRead = { engine.saveText("later caption") }
+            engine.beforeFullRead = {
+                engine.beforeFullRead = {}
+                engine.saveText("later caption")
+            }
 
-            val failure = runCatching { engine.upload(upload) }.exceptionOrNull()
+            val outcome = engine.upload(upload)
+
+            assertEquals(listOf(descriptor.id), engine.uploadedIds)
+            assertSame(engine.revision, engine.uploadRevision)
+            assertNull("a draft that moved on is never consumed", outcome.draftRevision)
+            assertEquals(content("later caption", descriptor), engine.current)
+        }
+
+    /** A draft that moves on every read fails the send with the conflict instead of checking it forever. */
+    @Test
+    fun draftThatKeepsMovingFailsTheUpload() =
+        runBlocking {
+            val body = pdfFixture("ghostscript").also { PdfMetadataScrubber.scrub(it) }
+            val descriptor = stored("clip").copy(plaintextSize = body.size.toULong())
+            val engine = DraftUploadEngine(content("caption", descriptor), fileBody = body)
+            val pick = storedPick("clip").copy(draftFile = DraftStoredFile("clip", body.size.toLong()))
+            var saves = 0
+            engine.beforeFullRead = { engine.saveText("caption ${++saves}") }
+
+            val failure = runCatching { engine.upload(DraftFilesUpload(listOf(pick), "caption")) }.exceptionOrNull()
 
             assertTrue(failure is MarmotKitException.MessageDraftRevisionConflict)
+            assertEquals(3, saves)
             assertTrue(engine.uploadedIds.isEmpty())
-            engine.beforeFullRead = {}
-            engine.upload(upload)
-            assertEquals(listOf(descriptor.id), engine.uploadedIds)
         }
 
     /** An in-memory pick that happens to share [id]'s name and type. */
@@ -650,6 +670,202 @@ class StoredDraftAcceptanceTest {
             }
         }
 
+    /** A partial send stopped after native acceptance loses its photo and caption on restart, not its hidden file. */
+    @Test
+    fun acceptedPartialSendClearsItsCaptionAfterRestart() =
+        runBlocking {
+            val hidden = draftAttachment("hidden")
+            val visible = hidden.copy(id = "photo", fileBacked = false, plaintextSize = 3uL)
+            val draft = content("sent caption", visible, hidden)
+            val engine = DraftUploadEngine(draft, fileBody = byteArrayOf(1, 2, 3))
+
+            stopAfterAcceptance(engine, inlinePick(visible, byteArrayOf(1, 2, 3)), "partial")
+            assertEquals(draft, engine.current)
+            restartAndReconcile(engine)
+
+            assertEquals(content("", hidden), engine.current)
+        }
+
+    /** Text saved again after Send, even the same words, is newer than the accepted caption and survives a restart. */
+    @Test
+    fun captionSavedAgainAfterSendSurvivesRestart() =
+        runBlocking {
+            val hidden = draftAttachment("hidden")
+            val visible = hidden.copy(id = "photo", fileBacked = false, plaintextSize = 3uL)
+            val engine = DraftUploadEngine(content("sent caption", visible, hidden), fileBody = byteArrayOf(1, 2, 3))
+
+            stopAfterAcceptance(engine, inlinePick(visible, byteArrayOf(1, 2, 3)), "retyped")
+            engine.saveText("sent caption")
+            restartAndReconcile(engine)
+
+            assertEquals(content("sent caption", hidden), engine.current)
+        }
+
+    /** A stored-file Retry admits with no consuming revision, so a restart clears file and caption by record. */
+    @Test
+    fun storedFileRetryClearsItsCaptionAfterRestart() =
+        runBlocking {
+            val stored = draftAttachment("stored-file")
+            val engine = DraftUploadEngine(content("sent caption", stored))
+            val pick =
+                PendingAttachment(
+                    byteArrayOf(),
+                    stored.mediaType,
+                    stored.fileName,
+                    draftFile = DraftStoredFile(stored.id, 900L),
+                )
+
+            stopAfterAcceptance(engine, pick, "retry")
+            assertNull(engine.admittedConsuming)
+            assertEquals(content("sent caption", stored), engine.current)
+            restartAndReconcile(engine)
+
+            assertNull(engine.current)
+        }
+
+    /** A send no longer owning the composer text records no caption, so a restart removes only its attachment. */
+    @Test
+    fun unownedCaptionIsNeverRecordedForRestart() =
+        runBlocking {
+            val visible = draftAttachment("photo").copy(fileBacked = false, plaintextSize = 3uL)
+            val hidden = draftAttachment("hidden")
+            val engine = DraftUploadEngine(content("sent caption", visible, hidden), fileBody = byteArrayOf(1, 2, 3))
+
+            stopAfterAcceptance(engine, inlinePick(visible, byteArrayOf(1, 2, 3)), "unowned", ownsText = false)
+            restartAndReconcile(engine)
+
+            assertEquals(content("sent caption", hidden), engine.current)
+        }
+
+    /** A draft original whose metadata was removed for the send is recognized by its own bytes and leaves the draft. */
+    @Test
+    fun scrubbedInlineOriginalLeavesTheDraftOnAcceptance() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val original = byteArrayOf(1, 2, 3, 4)
+            val video = draftAttachment("clip").copy(fileBacked = false, plaintextSize = 4uL)
+            val engine = DraftUploadEngine(content("kept text", video), fileBody = original)
+            val app = acceptanceAppState(engine)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val cleaned =
+                    inlinePick(video, original).rememberingNativeDraftBody().copy(plaintextBytes = byteArrayOf(9))
+                val retained =
+                    RetainedMediaUpload(listOf(cleaned), "sent caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "scrubbed")
+                awaitAttachmentCollectionJournal()
+
+                assertNull(engine.admittedConsuming)
+                assertEquals(content("kept text"), engine.current)
+            } finally {
+                app.mutationsScope.cancel()
+            }
+        }
+
+    /** A collection's caption chunk binds the caption's draft to its token, and its acceptance clears that caption. */
+    @Test
+    fun acceptedCollectionCaptionChunkClearsItsCaption() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val waiting = draftAttachment("later-chunk")
+            val engine = DraftUploadEngine(content("album caption", waiting))
+            val app = acceptanceAppState(engine)
+            val registry = app.attachmentCollections
+            val items =
+                listOf("first", "second").map {
+                    CollectionItem(it, "content://fixture/$it", CollectionItemKind.MEDIA)
+                }
+            val chunks =
+                listOf(
+                    CollectionChunk("c0", 0, listOf("first"), true, "caption-token", CollectionChunkState.UPLOADING),
+                    CollectionChunk("c1", 1, listOf("second"), false),
+                )
+            val operation = AttachmentCollectionOperation("album", "acct", group.groupIdHex, items, chunks, 1L, 1L)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val admission = registry.admissions.begin("acct", group.groupIdHex)
+                assertTrue(registry.start(operation, admission) { true })
+                val photo = PendingAttachment(byteArrayOf(7), "image/jpeg", "a.jpg")
+                val retained =
+                    RetainedMediaUpload(listOf(photo), "album caption").apply {
+                        draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
+                        draftSendClearToken = app.captureDraftForSend("acct", group.groupIdHex)
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "caption-token")
+                val bound = registry.operations.value["album"]
+                assertEquals("caption-token", bound?.sentCaption?.clientToken)
+                assertEquals("album caption", engine.current?.content)
+                registry.update("album") {
+                    it.withChunkState("c0", CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, 2L)
+                }
+                app.finishCollectionDraftCleanup("album")
+
+                assertEquals(content("", waiting), engine.current)
+                val cleaned = checkNotNull(registry.operations.value["album"])
+                assertNull(cleaned.sentCaption)
+            } finally {
+                registry.discard("album")
+                awaitAttachmentCollectionJournal()
+                app.mutationsScope.cancel()
+            }
+        }
+
+    /** An inline pick of [row] carrying [bytes], as the composer shelf hands a native draft attachment to a send. */
+    private fun inlinePick(
+        row: SelectedMessageDraftAttachmentFfi,
+        bytes: ByteArray,
+    ) = PendingAttachment(bytes, row.mediaType, row.fileName, nativeDraftAttachmentId = row.id)
+
+    /**
+     * Admits [pick] with the caption "sent caption" under [token] and leaves the state a process stopped right after
+     * native acceptance would: the draft untouched and only the record written before admission on disk.
+     */
+    private suspend fun stopAfterAcceptance(
+        engine: DraftUploadEngine,
+        pick: PendingAttachment,
+        token: String,
+        ownsText: Boolean = true,
+    ) {
+        val group = personTestGroup("group", "Team", members = null).group
+        val app = acceptanceAppState(engine)
+        val journal = AttachmentCollectionJournal(app.appContext.noBackupFilesDir)
+        var writeAhead: AttachmentCollectionOperation? = null
+        engine.onAdmission = { writeAhead = journal.read("acct", group.groupIdHex).single() }
+        engine.refuseDraftCleanup = true
+        try {
+            val controller = ConversationController(appState = app, initialGroup = group)
+            val retained =
+                RetainedMediaUpload(listOf(pick), "sent caption").apply {
+                    draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                    if (ownsText) draftSendClearToken = app.captureDraftForSend("acct", group.groupIdHex)
+                }
+            controller.admitRetainedMedia("acct", emptyList(), retained, token)
+            awaitAttachmentCollectionJournal()
+            assertTrue(journal.write(checkNotNull(writeAhead)))
+        } finally {
+            engine.refuseDraftCleanup = false
+            engine.onAdmission = {}
+            app.mutationsScope.cancel()
+        }
+    }
+
+    /** Opens a fresh app state over [engine]'s draft and settles every journaled send of the chat, as a reopen does. */
+    private suspend fun restartAndReconcile(engine: DraftUploadEngine) {
+        val reopened = acceptanceAppState(engine)
+        val journal = AttachmentCollectionJournal(reopened.appContext.noBackupFilesDir)
+        try {
+            reopened.restoreCollectionOperations("acct", "group", readable = { false })
+            awaitAttachmentCollectionJournal()
+            assertTrue(journal.read("acct", "group").isEmpty())
+        } finally {
+            reopened.mutationsScope.cancel()
+        }
+    }
+
     /** A native stored-file descriptor that can be reselected under a different identity. */
     private fun draftAttachment(id: String) =
         SelectedMessageDraftAttachmentFfi(
@@ -697,8 +913,12 @@ private class DraftUploadEngine(
 ) {
     var revision: MessageDraftRevisionFfi = newRevision()
         private set
-    var current = draft
-        private set
+    private var saved = draft
+    private var savedAtMs = draft?.updatedAtMs ?: 1L
+
+    /** The draft as tests wrote it: every save moves its update time on, which assertions do not name. */
+    val current: SelectedMessageDraftContentFfi?
+        get() = saved?.copy(updatedAtMs = 1L)
     val calls = mutableListOf<String>()
     var beforeSave: () -> Unit = {}
     var refuseDraftCleanup: Boolean = false
@@ -717,13 +937,20 @@ private class DraftUploadEngine(
 
     /** Saves [text] over the draft and keeps its attachments, as the composer's text save does. */
     fun saveText(text: String) {
-        current = current?.copy(content = text)
-        revision = newRevision()
+        saved = saved?.copy(content = text)
+        moveOn()
     }
 
     /** Appends [attachment] to the draft, as staging another pick does. */
     fun addAttachment(attachment: SelectedMessageDraftAttachmentFfi) {
-        current = current?.let { it.copy(mediaAttachments = it.mediaAttachments + attachment) }
+        saved = saved?.let { it.copy(mediaAttachments = it.mediaAttachments + attachment) }
+        moveOn()
+    }
+
+    /** Moves the draft to a new revision and update time, as every MarmotKit save does. */
+    private fun moveOn() {
+        savedAtMs += 1
+        saved = saved?.copy(updatedAtMs = savedAtMs)
         revision = newRevision()
     }
 
@@ -750,7 +977,7 @@ private class DraftUploadEngine(
             groupIdHex: String,
         ): SelectedMessageDraftFfi {
             calls += "selectedMessageDraft"
-            return SelectedMessageDraftFfi(revision, current)
+            return SelectedMessageDraftFfi(revision, saved)
         }
 
         /** Applies retained and removed inputs under the current revision and moves the draft on. */
@@ -767,16 +994,16 @@ private class DraftUploadEngine(
             requireCurrent(revision)
             savedInputs = mediaAttachments
             val removed = mediaAttachments.filterIsInstance<MessageDraftAttachmentInputFfi.Removed>().map { it.id }
-            current =
-                current?.let { draft ->
+            saved =
+                saved?.let { draft ->
                     draft.copy(
                         content = content,
                         replyToMessageIdHex = replyToMessageIdHex,
                         mediaAttachments = draft.mediaAttachments.filterNot { it.id in removed },
                     )
                 }
-            this@DraftUploadEngine.revision = newRevision()
-            return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, current)
+            moveOn()
+            return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, saved)
         }
 
         /** Clears the draft under the current revision. */
@@ -785,9 +1012,10 @@ private class DraftUploadEngine(
             revision: MessageDraftRevisionFfi,
         ): SelectedMessageDraftFfi {
             calls += "clear"
+            if (refuseDraftCleanup) throw MarmotKitException.MessageDraftRevisionConflict()
             requireCurrent(revision)
-            current = null
-            this@DraftUploadEngine.revision = newRevision()
+            saved = null
+            moveOn()
             return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, null)
         }
 
@@ -798,7 +1026,7 @@ private class DraftUploadEngine(
             attachmentId: String,
         ): ByteArray? {
             requireCurrent(revision)
-            return inlineBody.takeIf { current?.mediaAttachments?.any { row -> row.id == attachmentId } == true }
+            return inlineBody.takeIf { saved?.mediaAttachments?.any { row -> row.id == attachmentId } == true }
         }
 
         /** Checks that the privacy read uses exactly the selected revision that will be uploaded. */
@@ -857,8 +1085,8 @@ private class DraftUploadEngine(
             admittedToken = clientToken
             admittedConsuming = consumingDraft
             if (consumingDraft != null && consumingDraft === revision) {
-                current = null
-                revision = newRevision()
+                saved = null
+                moveOn()
             }
             return LocalSendAcceptanceFfi(clientToken, "m".repeat(64))
         }

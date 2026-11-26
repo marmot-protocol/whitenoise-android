@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.media.VideoContent
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
 import dev.ipf.whitenoise.android.media.VideoScrubResult
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.rememberingNativeDraftBody
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
@@ -154,7 +155,11 @@ private fun <K> recheckPrepared(
                 DocumentVideoAction.Refuse -> null
                 DocumentVideoAction.Scrub ->
                     VideoMetadataScrubber.scrubbedOrNull(attachment.plaintextBytes)?.let { clean ->
-                        if (clean === attachment.plaintextBytes) attachment else attachment.copy(plaintextBytes = clean)
+                        if (clean === attachment.plaintextBytes) {
+                            attachment
+                        } else {
+                            attachment.rememberingNativeDraftBody().copy(plaintextBytes = clean)
+                        }
                     }
             }
         if (checked == null) refused += key else ready[key] = checked

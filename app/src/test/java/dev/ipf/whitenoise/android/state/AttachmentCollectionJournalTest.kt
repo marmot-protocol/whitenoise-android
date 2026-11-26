@@ -65,6 +65,44 @@ class AttachmentCollectionJournalTest {
         assertFalse("captions or names never reach the journal", text.contains("caption\":\""))
     }
 
+    /** A caption's token and draft save times survive the journal, and its text never reaches the record. */
+    @Test
+    fun sentCaptionRoundTripsWithoutItsText() {
+        val journal = journal()
+        val base = operation()
+        val token = "token-0"
+        val caption = CollectionSentCaption(token, draftCreatedAtMs = 7L, draftUpdatedAtMs = 9L)
+        val written = base.withChunkToken(base.chunks[0].id, token, now).copy(sentCaption = caption)
+
+        assertTrue(journal.write(written))
+
+        assertEquals(caption, journal.read("account", "group").single().sentCaption)
+        assertNull(decodeCollectionOperation(encodeCollectionOperation(base, withUris = true)).sentCaption)
+    }
+
+    /** A captured caption waits for cleanup only once MDK accepted the chunk its token names. */
+    @Test
+    fun sentCaptionIsPendingOnlyAfterItsTokenIsAccepted() {
+        val base = operation()
+        val first = base.chunks[0]
+        val bound =
+            base
+                .withChunkToken(first.id, "token-0", now)
+                .copy(sentCaption = CollectionSentCaption("token-0", 7L, 9L))
+        assertNull(bound.pendingSentCaption)
+        assertFalse(bound.needsStoredDraftCleanup)
+        assertTrue("an unresolved caption token outlives expiry", bound.mayNeedStoredDraftCleanup)
+
+        val accepted =
+            bound.withChunkState(first.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, now)
+        assertEquals(bound.sentCaption, accepted.pendingSentCaption)
+        assertTrue(accepted.needsStoredDraftCleanup)
+
+        val otherToken = accepted.copy(sentCaption = CollectionSentCaption("another", 7L, 9L))
+        assertNull(otherToken.pendingSentCaption)
+        assertFalse(otherToken.needsStoredDraftCleanup)
+    }
+
     /** Records are scoped: another account or conversation sees nothing. */
     @Test
     fun recordsAreScopedToAccountAndConversation() {

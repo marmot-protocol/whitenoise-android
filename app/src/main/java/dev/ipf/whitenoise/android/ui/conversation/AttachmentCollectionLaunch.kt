@@ -406,6 +406,8 @@ internal suspend fun ConversationController.cancelCollection(operationId: String
     val registry = appState.attachmentCollections
     val before = registry.operations.value[operationId] ?: return
     val cancelled = registry.update(operationId) { it.cancelUnaccepted(registry.now()) }
+    // Whatever was cancelled stays in the native draft, so the shelf that was hiding it reads the draft again.
+    appState.showReleasedCollectionOriginals(before)
     if (before.paused || cancelled == null) return registry.discard(operationId)
     // Tokens come from the cancelled snapshot, so one recorded after `before` is withdrawn as well, and a chunk
     // MDK accepted meanwhile is never touched.
