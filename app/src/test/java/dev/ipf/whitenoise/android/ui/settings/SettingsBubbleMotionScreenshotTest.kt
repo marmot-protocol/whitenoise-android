@@ -35,6 +35,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.navigation.CHATS_ROOT
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavDisplay
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
+import dev.ipf.whitenoise.android.ui.navigation.ShellSectionMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -173,15 +177,22 @@ class SettingsBubbleMotionScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = dark && measuredAvatar) {
                     Surface(Modifier.fillMaxSize()) {
-                        SettingsRouteMotion(
-                            target = depth.value,
-                            depth = depth.value,
-                            ownerKey = "account",
-                            animationsEnabled = animations.value,
-                            topLevelBubble = true,
-                            cardMorph = measuredAvatar,
+                        // The shell's own list pane: its route display, with the section motion as its frame.
+                        val stack = if (depth.value == 0) CHATS_ROOT else CHATS_ROOT + ShellRoute.Settings(null)
+                        ShellNavDisplay(
+                            stack = stack,
+                            frame = { route, entry ->
+                                ShellSectionMotion(
+                                    route = route,
+                                    ownerKey = "account",
+                                    suppressMotion = false,
+                                    animationsEnabled = animations.value,
+                                    cardMorph = measuredAvatar,
+                                    content = entry,
+                                )
+                            },
                         ) { route ->
-                            Route(route, measuredAvatar) { depth.value = 1 }
+                            Route(if (route == ShellRoute.Chats) 0 else 1, measuredAvatar) { depth.value = 1 }
                         }
                     }
                 }

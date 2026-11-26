@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.os.Parcel
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -74,8 +77,7 @@ class WarmResumeStateHolderTest {
         val processState = MainShellProcessState(state)
         val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
-        holder.sectionState.sectionName = MainSection.Settings.name
-        holder.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
         val snapshotController =
             ChatsController(
                 appState = state,
@@ -83,7 +85,7 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        holder.selectedChat.value = snapshotController.items.single()
+        holder.openForTest(snapshotController.items.single())
 
         val onboardingFrameReady =
             holder.prepareFirstUsefulFrame(
@@ -124,8 +126,7 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(appState(), SavedStateHandle())
         try {
             holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
-            holder.sectionState.sectionName = MainSection.Settings.name
-            holder.sectionState.settingsDetailName = SettingsDetail.AccountKeys.name
+            holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
             holder.prepareFirstUsefulFrame(
                 phase = AppPhase.Ready,
                 activeAccountRef = "second-account",
@@ -161,7 +162,7 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        firstActivityHolder.selectedChat.value = snapshotController.items.single()
+        firstActivityHolder.openForTest(snapshotController.items.single())
 
         val freshActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
 
@@ -307,7 +308,7 @@ class WarmResumeStateHolderTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
         val selected = snapshotController.items.single()
-        holder.selectedChat.value = selected
+        holder.openForTest(selected)
         val retainedConversation =
             holder.conversationController(
                 chatId = GROUP_ID,
@@ -349,12 +350,13 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value =
+        holder.openForTest(
+            snapshotController.items.single(),
             ConversationOpenContext(
                 notificationRouteTraceRequestId = 41L,
                 pinnedAccountRef = ACCOUNT_REF,
-            )
+            ),
+        )
 
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 5)
 
@@ -384,8 +386,7 @@ class WarmResumeStateHolderTest {
                 notificationRouteTraceRequestId = 23L,
                 pinnedAccountRef = SECOND_ACCOUNT_REF,
             )
-        holder.selectedChat.value = selected
-        holder.selectedChatOpenContext.value = routeContext
+        holder.openForTest(selected, routeContext)
         holder.selectedChatJustCreated.value = true
         holder.selectedChatOpenedAsDmHint.value = true
         holder.conversationScrollSnapshots[conversationScrollKey(SECOND_ACCOUNT_REF, GROUP_ID)] =
@@ -433,8 +434,10 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(state, SavedStateHandle())
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
         val snapshotController = snapshotController(state)
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value = ConversationOpenContext(pinnedAccountRef = SECOND_ACCOUNT_REF)
+        holder.openForTest(
+            snapshotController.items.single(),
+            ConversationOpenContext(pinnedAccountRef = SECOND_ACCOUNT_REF),
+        )
         holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
 
         assertNull(holder.selectedChat.value)
@@ -450,12 +453,13 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(state, SavedStateHandle())
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
         val snapshotController = snapshotController(state)
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value =
+        holder.openForTest(
+            snapshotController.items.single(),
             ConversationOpenContext(
                 notificationRouteTraceRequestId = 23L,
                 pinnedAccountRef = "another-account",
-            )
+            ),
+        )
 
         holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
 
@@ -593,6 +597,43 @@ class WarmResumeStateHolderTest {
         restoredHolder.release()
     }
 
+    /**
+     * Clearing the holder's ViewModel, as the system does when its Activity is finished, stops the process-retained
+     * navigator from writing into that Activity's saved state, while the route itself goes on.
+     */
+    @Test
+    fun aClearedHolderNoLongerSavesTheSection() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val saved = SavedStateHandle()
+        val store = ViewModelStore()
+        val factory =
+            object : ViewModelProvider.Factory {
+                /** Builds the one holder under test over [saved] and the shared process state. */
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val built = MainShellStateHolder(state, saved, processState)
+                    return built as T
+                }
+            }
+        val holder = ViewModelProvider(store, factory)[MainShellStateHolder::class.java]
+        holder.chatsController(ACCOUNT_REF, state.runtimeGeneration)
+        holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.Appearance))
+        // Saving works before the clear, so its absence afterwards is the clear's doing.
+        assertEquals(SettingsDetail.Appearance.name, saved.get<String>(SECTION_DETAIL_KEY))
+
+        store.clear()
+        processState.shellNavigator.dispatch(ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Relays))
+
+        assertEquals(SettingsDetail.Relays.name, holder.sectionState.settingsDetailName)
+        assertEquals(
+            "a cleared holder's saved state is no longer written",
+            SettingsDetail.Appearance.name,
+            saved.get<String>(SECTION_DETAIL_KEY),
+        )
+        processState.release()
+    }
+
     /** Recreates a Bundle through Android's parcel wire format before owner restoration. */
     private fun Bundle.parcelRoundTrip(): Bundle {
         val parcel = Parcel.obtain()
@@ -702,5 +743,6 @@ class WarmResumeStateHolderTest {
         const val ACCOUNT_REF = "warm-resume-account"
         const val SECOND_ACCOUNT_REF = "second-account"
         val GROUP_ID = "1".repeat(64)
+        const val SECTION_DETAIL_KEY = "main_shell_section_detail"
     }
 }

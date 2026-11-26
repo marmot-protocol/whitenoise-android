@@ -1,0 +1,226 @@
+package dev.ipf.whitenoise.android.ui.navigation
+
+import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.SavedStateHandle
+import androidx.test.ext.junit.rules.ActivityScenarioRule
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.WindowLayout
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.robolectric.Shadows.shadowOf
+
+/** The production shell mounted over [ReturnFixture] for the route contract tests, with their shared waits. */
+internal class MountedContractShell(
+    private val composeRule: AndroidComposeTestRule<ActivityScenarioRule<ComponentActivity>, ComponentActivity>,
+) {
+    private val restoration = StateRestorationTester(composeRule)
+    private val commits = mutableListOf<CommittedRoute>()
+
+    /**
+     * The route each committed composition of the mounted shell left behind, in commit order, with the account that
+     * was active when it was composed. Written on the main thread only.
+     */
+    val committedRoutes: List<CommittedRoute>
+        get() = commits.toList()
+
+    /**
+     * The route of the first composition committed with [accountRef] active, which is the first frame a reader can
+     * see after a switch to it. Fails when no such composition was committed.
+     */
+    fun firstCommitFor(accountRef: String): CommittedRoute =
+        requireNotNull(commits.firstOrNull { it.activeAccountRef == accountRef }) { "no commit for $accountRef" }
+
+    /** Recreates the shell's composition from its saved instance state, as Activity recreation does. */
+    fun recreate() {
+        restoration.emulateSavedInstanceStateRestore()
+        settle()
+    }
+
+    /** Mounts the production shell under a test-controlled window width and always releases its jobs. */
+    fun withMountedShell(
+        width: MutableState<Dp>,
+        fixture: ReturnFixture = ReturnFixture(),
+        exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
+    ) = withMountedShell(
+        width = width,
+        fixture = fixture,
+        shell = { MainShell(appState = fixture.appState, stateHolder = it) },
+        exercise = exercise,
+    )
+
+    /**
+     * Mounts the shell through the test's own [shell] call, for a test that feeds it an inbound route, and always
+     * releases its jobs. [savedState] is the holder's Activity saved state, empty unless a test restores one.
+     */
+    fun withMountedShell(
+        width: MutableState<Dp>,
+        fixture: ReturnFixture,
+        shell: @Composable (MainShellStateHolder) -> Unit,
+        savedState: SavedStateHandle = SavedStateHandle(),
+        exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
+    ) {
+        withGlobalSnapshotApply {
+            val mounted = mutableStateOf(true)
+            val holder = MainShellStateHolder(fixture.appState, savedState)
+            val controller =
+                holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+            fixture.appState.setAppInForeground(true)
+            restoration.setContent {
+                if (mounted.value) {
+                    CompositionLocalProvider(
+                        LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
+                    ) {
+                        WhiteNoiseTheme { shell(holder) }
+                        RecordCommittedRoute(fixture.appState, holder, commits)
+                    }
+                }
+            }
+            try {
+                awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+                composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+                composeRule.waitForIdle()
+                exercise(fixture, holder)
+            } finally {
+                composeRule.runOnIdle {
+                    mounted.value = false
+                    holder.release()
+                }
+                composeRule.waitForIdle()
+            }
+        }
+    }
+
+    /**
+     * Mounts the production shell like [withMountedShell] and hands [exercise] a way to emulate process death: the
+     * composition's saved instance state and the holder's saved keys survive into a fresh holder over a fresh
+     * process state, so nothing process-retained, the route owner included, comes back. The saved section is marked
+     * as written by another process, as it is after a real process death, so the section state takes its
+     * different-process branch. Returns the fresh holder.
+     */
+    fun withRestartableShell(
+        width: MutableState<Dp>,
+        fixture: ReturnFixture,
+        exercise: (ReturnFixture, MainShellStateHolder, () -> MainShellStateHolder) -> Unit,
+    ) {
+        withGlobalSnapshotApply {
+            val mounted = mutableStateOf(true)
+            var saved = SavedStateHandle()
+            var process = MainShellProcessState(fixture.appState)
+            val holders = mutableListOf(MainShellStateHolder(fixture.appState, saved, process))
+            // A plain field, read only when the restored composition is created, so a restart never recomposes.
+            var current = holders.single()
+            val controller =
+                current.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+            fixture.appState.setAppInForeground(true)
+            restoration.setContent {
+                if (mounted.value) {
+                    CompositionLocalProvider(
+                        LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
+                    ) {
+                        WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = current) }
+                    }
+                }
+            }
+            val restart = {
+                saved = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
+                if (saved.contains(SECTION_PROCESS_KEY)) saved[SECTION_PROCESS_KEY] = DEAD_PROCESS
+                val previousProcess = process
+                process = MainShellProcessState(fixture.appState)
+                current = MainShellStateHolder(fixture.appState, saved, process)
+                holders += current
+                recreate()
+                // The old process is gone: its conversation controllers end here, not when the exercise ends. Its
+                // chats controller stays attached because this fixture shares one app state with the new process.
+                composeRule.runOnIdle { previousProcess.retainConversationControllers(emptyList()) }
+                current
+            }
+            try {
+                awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+                composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+                composeRule.waitForIdle()
+                exercise(fixture, holders.first(), restart)
+            } finally {
+                composeRule.runOnIdle {
+                    mounted.value = false
+                    holders.asReversed().forEach { it.release() }
+                }
+                composeRule.waitForIdle()
+            }
+        }
+    }
+
+    /** Opens the fixture's target chat from its list row and waits for the route to settle. */
+    fun openTarget(
+        fixture: ReturnFixture,
+        holder: MainShellStateHolder,
+    ) {
+        composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").assertIsDisplayed().performClick()
+        awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
+        settle()
+    }
+
+    /** Lets route transitions and their one-frame retention finish. */
+    fun settle() {
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+    }
+
+    /** Polls only for observable asynchronous shell/controller settlement. */
+    fun awaitCondition(condition: () -> Boolean) {
+        composeRule.waitUntil(10_000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            condition()
+        }
+        composeRule.waitForIdle()
+    }
+
+    private companion object {
+        val SHELL_HEIGHT = 800.dp
+
+        /** The saved key naming the process that wrote the section. */
+        const val SECTION_PROCESS_KEY = "main_shell_section_process"
+
+        /** A process epoch no live process has. */
+        const val DEAD_PROCESS = "a process that died"
+    }
+}
+
+/** One committed composition of the mounted shell: the account active then and the route stack it composed. */
+internal data class CommittedRoute(
+    val activeAccountRef: String?,
+    val stack: List<ShellRoute>,
+)
+
+/**
+ * Records, after every committed composition in which the active account or the route stack changed, the stack the
+ * shell composed with. It is composed after the shell, so it sees every route change the shell made while composing,
+ * such as an owner rebind, and since it reads the active account it also records the first frame after a switch even
+ * when the stack itself did not change in that frame.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun RecordCommittedRoute(
+    appState: WhiteNoiseAppState,
+    holder: MainShellStateHolder,
+    commits: MutableList<CommittedRoute>,
+) {
+    val activeAccountRef = appState.activeAccountRef
+    val stack = holder.shellNavigator.stack
+    SideEffect { commits += CommittedRoute(activeAccountRef, stack) }
+}

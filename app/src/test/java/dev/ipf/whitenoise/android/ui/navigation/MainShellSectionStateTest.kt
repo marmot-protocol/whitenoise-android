@@ -16,8 +16,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val first = MainShellSectionState(savedState)
         first.bind("personal", 4)
-        first.sectionName = MainSection.Settings.name
-        first.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        first.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
 
         val restored =
             MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
@@ -70,8 +69,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val first = MainShellSectionState(savedState)
         first.bind("personal", 4)
-        first.sectionName = MainSection.Settings.name
-        first.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        first.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
 
         val restored =
             MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
@@ -83,8 +81,7 @@ class MainShellSectionStateTest {
     fun signedOutScopeCannotSaveOrRecoverAProtectedDestination() {
         val route = privacyDestination()
         route.bind(null, 4)
-        route.sectionName = MainSection.Settings.name
-        route.settingsDetailName = SettingsDetail.AccountKeys.name
+        route.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
         assertChats(route)
         route.bind("personal", 4)
         assertChats(route)
@@ -95,8 +92,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val route = MainShellSectionState(savedState)
         route.bind("personal", 4)
-        route.sectionName = MainSection.Settings.name
-        route.settingsDetailName = SettingsDetail.AccountKeys.name
+        route.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
         route.clear()
 
         val restored = MainShellSectionState(savedState)
@@ -121,6 +117,37 @@ class MainShellSectionStateTest {
         assertChats(route)
     }
 
+    /**
+     * Two holders over one process-retained navigator: the newer one takes the saving over, and clearing the older
+     * one leaves the newer one saving. Once the newer one is cleared too, nothing writes into its saved state.
+     */
+    @Test
+    fun aClearedHolderDetachesOnlyItsOwnPersistence() {
+        val navigator = ShellNavigator()
+        val olderSaved = SavedStateHandle()
+        val older = MainShellSectionState(olderSaved, navigator)
+        older.bind("personal", 4)
+        val newerSaved = SavedStateHandle()
+        val newer = MainShellSectionState(newerSaved, navigator)
+        newer.bind("personal", 4)
+
+        older.detach()
+        newer.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.Appearance))
+        assertEquals(MainSection.Settings.name, newerSaved.get<String>("main_shell_section_name"))
+        assertEquals(SettingsDetail.Appearance.name, newerSaved.get<String>("main_shell_section_detail"))
+        val olderDetail = olderSaved.get<String>("main_shell_section_detail")
+        assertNull("the older holder stopped saving when the newer one attached", olderDetail)
+
+        newer.detach()
+        navigator.dispatch(ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Relays))
+        assertEquals(SettingsDetail.Relays.name, newer.settingsDetailName)
+        assertEquals(
+            "a cleared holder's saved state is no longer written",
+            SettingsDetail.Appearance.name,
+            newerSaved.get<String>("main_shell_section_detail"),
+        )
+    }
+
     @Test
     fun savedDestinationWithoutOwnershipIsDiscarded() {
         val route =
@@ -139,8 +166,7 @@ class MainShellSectionStateTest {
     private fun privacyDestination(): MainShellSectionState =
         MainShellSectionState(SavedStateHandle()).apply {
             bind("personal", 4)
-            sectionName = MainSection.Settings.name
-            settingsDetailName = SettingsDetail.DevicePrivacy.name
+            dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
         }
 
     private fun assertChats(route: MainShellSectionState) {

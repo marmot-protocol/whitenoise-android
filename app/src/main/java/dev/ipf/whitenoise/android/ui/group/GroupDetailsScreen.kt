@@ -305,14 +305,14 @@ internal fun GroupDetailsScreen(
             BackHandler { onBack() }
             return@PreparedGroupAvatarContent
         }
-        var showChatRelays by remember(controller) { mutableStateOf(false) }
+        val subScreens = rememberChatDetailsSubScreens(controller) // On the shell's route stack inside the shell.
         var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        val showGroupInfo = subScreens.current == ChatDetailsDestination.GroupInfo
+        val showNotificationSettings = subScreens.current == ChatDetailsDestination.NotificationSettings
         var showVibrationPatternDialog by remember { mutableStateOf(false) }
         var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
-        var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        val showBubbleColors = subScreens.current == ChatDetailsDestination.BubbleColors
         var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         // A requested picker stays closed until the roster is authoritative. This
@@ -506,7 +506,7 @@ internal fun GroupDetailsScreen(
                 showAddMember && canAdministerMembers -> "add-members"
                 showGroupInfo -> "group-info"
                 membersExpanded && !isDm -> "members"
-                showChatRelays -> "relays"
+                subScreens.current == ChatDetailsDestination.Relays -> "relays"
                 else -> "details"
             }
         val detailsOwner = controller to appState.runtimeGeneration
@@ -826,11 +826,11 @@ internal fun GroupDetailsScreen(
         }
 
         if (showBubbleColors) {
-            BackHandler { showBubbleColors = false }
+            BackHandler { subScreens.close() }
             detailsRoute {
                 ChatBubbleColorsScreen(
                     appState = appState,
-                    onBack = { showBubbleColors = false },
+                    onBack = subScreens::close,
                     groupIdHex = controller.group.groupIdHex,
                     destination = "bubble-colors",
                 )
@@ -841,7 +841,7 @@ internal fun GroupDetailsScreen(
         MuteDurationHost(muteControl)
 
         if (showNotificationSettings) {
-            BackHandler { showNotificationSettings = false }
+            BackHandler { subScreens.close() }
             detailsRoute {
                 ConversationNotificationSettingsScreen(
                     appState = appState,
@@ -854,7 +854,7 @@ internal fun GroupDetailsScreen(
                     muteExpiryMillis = muteControl.mutedUntilMs,
                     notifyForMode = muteControl.restoreMode,
                     vibrationPattern = conversationVibrationPattern,
-                    onBack = { showNotificationSettings = false },
+                    onBack = subScreens::close,
                     onToggleMute = { turnOn ->
                         if (turnOn) muteControl.requestMute() else muteControl.unmute()
                     },
@@ -995,12 +995,12 @@ internal fun GroupDetailsScreen(
         }
 
         if (showGroupInfo) {
-            BackHandler { showGroupInfo = false }
+            BackHandler { subScreens.close() }
             detailsRoute {
                 GroupInfoScreen(
                     groupIdHex = controller.group.groupIdHex,
                     nostrGroupIdHex = controller.group.nostrGroupIdHex,
-                    onBack = { showGroupInfo = false },
+                    onBack = subScreens::close,
                 )
             }
             return@PreparedGroupAvatarContent
@@ -1593,14 +1593,14 @@ internal fun GroupDetailsScreen(
             }
             return@PreparedGroupAvatarContent
         }
-        if (showChatRelays) {
-            BackHandler { showChatRelays = false }
+        if (subScreens.current == ChatDetailsDestination.Relays) {
+            BackHandler { subScreens.close() }
             detailsRoute {
                 GroupRelaySettingsScreen(
                     relays = controller.group.relays,
                     isDm = isDm,
                     isAdmin = controller.isSelfAdmin,
-                    onBack = { showChatRelays = false },
+                    onBack = subScreens::close,
                     feedback = groupFeedback,
                 )
             }
@@ -1981,7 +1981,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.sounds_and_notifications),
                                 routeKey = "notifications",
-                                onClick = { showNotificationSettings = true },
+                                onClick = { subScreens.open(ChatDetailsDestination.NotificationSettings) },
                                 modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
                                 value =
                                     conversationNotificationSummary(
@@ -1997,7 +1997,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.chat_bubble_colors),
                                 routeKey = "bubble-colors",
-                                onClick = { showBubbleColors = true },
+                                onClick = { subScreens.open(ChatDetailsDestination.BubbleColors) },
                                 leading = { SettingsLeadingIcon(R.drawable.ic_palette) },
                             )
                         }
@@ -2188,7 +2188,7 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(groupRelaysTitleRes(isDm)),
                                 routeKey = "relays",
                                 explanation = stringResource(R.string.explanation_chat_info_relays),
-                                onClick = { showChatRelays = true },
+                                onClick = { subScreens.open(ChatDetailsDestination.Relays) },
                                 modifier = Modifier.testTag("chat_info.relays"),
                                 subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_tune) },
@@ -2200,7 +2200,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.developer_tools),
                                     routeKey = "group-info",
-                                    onClick = { showGroupInfo = true },
+                                    onClick = { subScreens.open(ChatDetailsDestination.GroupInfo) },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {
                                         SettingsLeadingIcon(R.drawable.ic_bug_report)
@@ -2404,7 +2404,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.developer_tools),
                                     routeKey = "group-info",
-                                    onClick = { showGroupInfo = true },
+                                    onClick = { subScreens.open(ChatDetailsDestination.GroupInfo) },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {
                                         SettingsLeadingIcon(R.drawable.ic_bug_report)

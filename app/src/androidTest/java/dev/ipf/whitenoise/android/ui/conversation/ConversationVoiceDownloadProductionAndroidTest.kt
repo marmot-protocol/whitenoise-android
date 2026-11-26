@@ -74,7 +74,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.VoiceAttachmentMateriali
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceAttachmentPresentationRuntime
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
+import dev.ipf.whitenoise.android.ui.navigation.ConversationOpenContext
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavEvent
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
+import dev.ipf.whitenoise.android.ui.navigation.dispatchShellNav
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
@@ -255,7 +259,16 @@ class ConversationVoiceDownloadProductionAndroidTest {
         var productionHost: InstrumentedConversationHost? = null
         try {
             fixture.awaitLoaded()
-            firstHolder.selectedChat.value = fixture.chat
+            firstHolder.dispatchShellNav(
+                ShellNavEvent.OpenConversation(
+                    ShellRoute.Conversation(
+                        accountRef = fixture.controller.boundAccountRef.orEmpty(),
+                        groupIdHex = fixture.chat.group.groupIdHex,
+                        open = ConversationOpenContext(),
+                        item = fixture.chat,
+                    ),
+                ),
+            )
             firstHolder.persistConversationRoute(fixture.controller.boundAccountRef)
             val host =
                 showProductionConversation(
