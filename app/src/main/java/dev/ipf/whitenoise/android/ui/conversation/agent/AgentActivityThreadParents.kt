@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import dev.ipf.marmotkit.ConversationOpenModeFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.agent.isAgentOwnThreadMessage
@@ -47,7 +48,8 @@ internal suspend fun agentThreadParentRecords(
     val known = rows.associateBy { it.messageIdHex }
     val additional = mutableMapOf<String, TimelineMessageRecordFfi?>()
 
-    suspend fun lookup(id: String): TimelineMessageRecordFfi? = known[id] ?: if (id in additional) additional[id] else find(id).also { additional[id] = it }
+    suspend fun lookup(id: String): TimelineMessageRecordFfi? =
+        known[id] ?: if (id in additional) additional[id] else findRetainedThreadParent(id, find).also { additional[id] = it }
 
     val replies = rows.filter { it.isAgentThreadRow() && it.agentItem == null && !it.isAgentOwnThreadMessage() }
     if (replies.isEmpty() && rows.none { it.agentItemFirstEventMissing && it.isAgentThreadRow() }) return emptyMap()
@@ -64,6 +66,16 @@ internal suspend fun agentThreadParentRecords(
     }
     return additional.mapNotNull { (id, row) -> row?.let { id to it } }.toMap()
 }
+
+private suspend fun findRetainedThreadParent(
+    id: String,
+    find: suspend (String) -> TimelineMessageRecordFfi?,
+): TimelineMessageRecordFfi? =
+    try {
+        find(id)
+    } catch (_: MarmotKitException.ConversationWindowMessageNotRetained) {
+        null
+    }
 
 private suspend fun MarmotInterface.retainedThreadParent(
     account: String,

@@ -28,6 +28,7 @@ data class AgentItem(
     val diffsCut: Int = 0,
     val firstEventMissing: Boolean = false,
     val recordedAt: ULong = 0uL,
+    val receivedAt: ULong = 0uL,
 )
 
 /** An item's state, as MDK reports it. */

@@ -10,7 +10,12 @@ import org.json.JSONObject
 internal data class AgentRequestTarget(
     val rowId: String,
     val agent: String,
-    val sessionStartedAt: ULong? = null,
+    val sessionTime: AgentSessionTime? = null,
+)
+
+internal data class AgentSessionTime(
+    val timelineAt: ULong,
+    val receivedAt: ULong,
 )
 
 internal data class AgentRequestAdmission(
@@ -35,8 +40,8 @@ internal class AgentNativeRequestHistory(
             .latestFor(target)
             ?.takeUnless { concluded(target.agent, it.messageIdHex) }
             ?.let { request ->
-                val sentAtMillis = request.recordedAt.toLong() * 1000
-                val expiry = target.sessionStartedAt?.let { untargetedAgentRequestDeadline(sentAtMillis) }
+                val sentAtMillis = request.receivedAt.toLong() * 1000
+                val expiry = target.sessionTime?.let { untargetedAgentRequestDeadline(sentAtMillis) }
                 AgentRequestAdmission(request.messageIdHex, expiry)
             }
 
@@ -58,8 +63,12 @@ internal fun MarmotInterface.agentNativeRequestHistory(
 ): AgentNativeRequestHistory {
     val requests = ownAgentRequests(account, group)
     val relevant = targets.mapNotNull(requests::latestFor) + requests.filter { it.messageIdHex in admittedIds }
-    val oldest = relevant.filterNot { it.invalidated }.minOfOrNull { it.recordedAt }
-    val settlements = oldest?.let { readAgentSettlements(account, group, it) }.orEmpty()
+    val awaiting =
+        relevant
+            .filterNot { it.invalidated }
+            .mapNotNull { request -> request.singleTag("p")?.let { it to request.messageIdHex } }
+            .toSet()
+    val settlements = readAgentSettlements(awaiting) { limit -> messages(account, group, limit, AGENT_SETTLEMENT_KINDS) }
     return AgentNativeRequestHistory(relevant + settlements)
 }
 
@@ -73,16 +82,25 @@ private fun List<AppMessageRecordFfi>.latestFor(target: AgentRequestTarget): App
         .filter { it.matchesTarget(target) }
         .maxWithOrNull(compareBy({ it.recordedAt }, { it.receivedAt }, { it.messageIdHex }))
 
-private fun MarmotInterface.readAgentSettlements(
-    account: String,
-    group: String,
-    oldestRequest: ULong,
+/** Agent-created timestamps can predate the request by any amount. Stop on a match or exhaustion. */
+internal fun readAgentSettlements(
+    awaiting: Set<Pair<String, String>>,
+    read: (UInt) -> List<AppMessageRecordFfi>,
 ): List<AppMessageRecordFfi> {
-    val start = oldestRequest - minOf(oldestRequest, SETTLEMENT_CLOCK_SKEW_SECONDS)
+    if (awaiting.isEmpty()) return emptyList()
     var limit = AGENT_SETTLEMENT_REPLAY_PAGE
     while (true) {
-        val replay = messages(account, group, limit, AGENT_SETTLEMENT_KINDS)
-        if (replay.size.toUInt() < limit || replay.first().recordedAt <= start) return replay
+        val replay = read(limit)
+        val unmatched = awaiting.toMutableSet()
+        val matched = mutableListOf<AppMessageRecordFfi>()
+        for (row in replay) {
+            if (row.invalidated) continue
+            val count = unmatched.size
+            row.tags.agentSettlementIds().forEach { unmatched.remove(row.sender to it) }
+            if (unmatched.size < count) matched.add(row)
+            if (unmatched.isEmpty()) break
+        }
+        if (unmatched.isEmpty() || replay.size.toUInt() < limit) return matched
         limit *= 2u
     }
 }
@@ -90,11 +108,11 @@ private fun MarmotInterface.readAgentSettlements(
 private fun AppMessageRecordFfi.matchesTarget(target: AgentRequestTarget): Boolean {
     val details = singleTag("details")?.takeIf { singleTag("p") == target.agent } ?: return false
     val action = runCatching { JSONObject(details).optString("action") }.getOrNull()
-    val startedAt = target.sessionStartedAt
-    return if (startedAt == null) {
+    val sessionTime = target.sessionTime
+    return if (sessionTime == null) {
         singleTag("e") == target.rowId && action in TARGETED_ACTIONS
     } else {
-        recordedAt >= startedAt && tags.none { it.values.firstOrNull() == "e" } && action in SESSION_ACTIONS
+        receivedAt >= sessionTime.receivedAt && tags.none { it.values.firstOrNull() == "e" } && action in SESSION_ACTIONS
     }
 }
 
@@ -109,5 +127,4 @@ private val TARGETED_ACTIONS = setOf("choice", "questions", "interrupt")
 private val SESSION_ACTIONS = setOf("set", "new_session", "own")
 internal val AGENT_SETTLEMENT_KINDS = listOf(9uL, 1009uL, 1111uL, AgentItemReader.ITEM_KIND)
 private const val AGENT_SETTLEMENT_REPLAY_PAGE = 400u
-private const val SETTLEMENT_CLOCK_SKEW_SECONDS = 300uL
 private const val UNTARGETED_CONTROL_TIMEOUT_MILLIS = 301_000L

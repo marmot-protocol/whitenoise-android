@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.state.AgentRequestAdmission
 import dev.ipf.whitenoise.android.state.AgentRequestProgress
 import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.state.AgentRequestTarget
+import dev.ipf.whitenoise.android.state.AgentSessionTime
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.retainedAgentRequestProgress
@@ -67,8 +68,8 @@ internal fun rememberAgentRequestSender(
     appState: WhiteNoiseAppState,
 ): AgentRequestSender {
     val progress = LocalAgentRequestProgress.current
-    val sessionStartedAt = item.recordedAt.takeIf { item.body is AgentItemBody.Session }
-    val target = AgentRequestTarget(item.rowId, item.agentPubkeyHex, sessionStartedAt)
+    val sessionTime = if (item.body is AgentItemBody.Session) AgentSessionTime(item.recordedAt, item.receivedAt) else null
+    val target = AgentRequestTarget(item.rowId, item.agentPubkeyHex, sessionTime)
     return remember(progress, controller, target) {
         AgentRequestSender(progress, item.rowId, item.agentPubkeyHex) { request, token, onCompleted ->
             appState.launchMutation {

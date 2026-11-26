@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import dev.ipf.marmotkit.AgentItemStateFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -71,15 +72,23 @@ class AgentThreadPresentationTest {
                     .copy(messageIdHex = "68".repeat(32), agentItemFirstEventMissing = true)
                     .inThread(root)
                     .let { it.copy(tags = it.tags + MessageTagFfi(listOf("subagent", "inner"))) }
-            val loaded = listOf(reply, held)
+            val replyToHeld = reply.copy(messageIdHex = "69".repeat(32)).inThread(held.messageIdHex)
+            val missingParent = "70".repeat(32)
+            val replyToMissing = reply.copy(messageIdHex = "71".repeat(32)).inThread(missingParent)
+            val loaded = listOf(replyToMissing, reply, held, replyToHeld)
             val retained = listOf(nested, waiting, oldNote).associateBy { it.messageIdHex }
-            val extra = agentThreadParentRecords(loaded, child) { retained[it] }
+            val extra =
+                agentThreadParentRecords(loaded, child) { id ->
+                    if (id == missingParent) throw MarmotKitException.ConversationWindowMessageNotRetained()
+                    retained[id]
+                }
             val page = TimelinePageFfi(loaded, true, false)
 
             assertEquals(
-                listOf(reply.messageIdHex, held.messageIdHex),
+                listOf(reply.messageIdHex, held.messageIdHex, replyToHeld.messageIdHex),
                 activityHistoryRows(page, emptySet(), threadTaskId = child, threadParents = extra).map { it.id },
             )
+            assertTrue(activityHistoryRows(page, emptySet(), threadTaskId = root).isEmpty())
         }
 
     @Test

@@ -21,7 +21,7 @@ internal suspend fun ConversationController.sendAgentRequest(
     request: AgentRequest,
     token: String,
 ): AgentRequestAdmission? {
-    val targetRowId = target.rowId.takeIf { target.sessionStartedAt == null }
+    val targetRowId = target.rowId.takeIf { target.sessionTime == null }
     val event = AgentRequestEncoder.encode(target.agent, targetRowId, request)
     // The chat and account are fixed before the first suspension and checked again under the lock.
     val groupId = group.groupIdHex
@@ -50,7 +50,7 @@ internal suspend fun ConversationController.sendAgentRequest(
                             }
                         AgentRequestAdmission(
                             accepted.messageIds.single(),
-                            target.sessionStartedAt?.let { untargetedAgentRequestDeadline(now) },
+                            target.sessionTime?.let { untargetedAgentRequestDeadline(now) },
                         )
                     }
                 }
@@ -71,7 +71,7 @@ private fun MarmotInterface.isCurrentAgentSession(
     group: String,
     target: AgentRequestTarget,
 ): Boolean {
-    val startedAt = target.sessionStartedAt ?: return true
+    val startedAt = target.sessionTime?.timelineAt ?: return true
     var query =
         TimelineMessageQueryFfi
             .page(group, null, null, null, null, null, CONVERSATION_WINDOW_MAX_ROWS)

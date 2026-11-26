@@ -7,6 +7,8 @@ import dev.ipf.whitenoise.android.state.AgentRequestAdmission
 import dev.ipf.whitenoise.android.state.AgentRequestProgress
 import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.state.AgentRequestTarget
+import dev.ipf.whitenoise.android.state.AgentSessionTime
+import dev.ipf.whitenoise.android.state.readAgentSettlements
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -40,6 +42,52 @@ class AgentRequestProgressTest {
 
         progress.reconcile(sequenceOf(fresh.copy(agentItem = item.copy(settles = listOf(requestId)))))
         assertEquals(AgentRequestStatus.Idle, sender.status)
+    }
+
+    @Test
+    fun rawReplayFindsAnOldSettlementFromTheIntendedAgent() {
+        val rows = AgentRecordingFixtures.load("codex_approval_allowed", events = 6)
+        val approval = rows.single { it.projected?.agentItem?.itemType == "approval" }.record
+        val requestId = "90".repeat(32)
+        val confirmation =
+            approval.copy(
+                recordedAt = 1uL,
+                kind = 1009uL,
+                tags = listOf(MessageTagFfi(listOf("settles", requestId))),
+            )
+        val unrelated = confirmation.copy(sender = "91".repeat(32), recordedAt = 1001uL)
+        val invalidated = confirmation.copy(invalidated = true, recordedAt = 1002uL)
+        val history = listOf(confirmation) + List(400) { unrelated.copy(messageIdHex = it.toString(16).padStart(64, '0')) } + invalidated
+        val limits = mutableListOf<UInt>()
+        val matches =
+            readAgentSettlements(setOf(approval.sender to requestId)) { limit ->
+                limits += limit
+                history.takeLast(limit.toInt())
+            }
+
+        assertEquals(listOf(400u, 800u), limits)
+        assertEquals(listOf(confirmation), matches)
+    }
+
+    @Test
+    fun untargetedControlRecoversWhenTheAgentClockIsAhead() {
+        val session = AgentRecordingFixtures.load("codex_approval_allowed", events = 6).first().record
+        val request =
+            session.copy(
+                messageIdHex = "92".repeat(32),
+                recordedAt = 102uL,
+                receivedAt = 102uL,
+                direction = "sent",
+                kind = 1202uL,
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("p", session.sender)),
+                        MessageTagFfi(listOf("details", """{"action":"new_session"}""")),
+                    ),
+            )
+        val target = AgentRequestTarget(session.messageIdHex, session.sender, AgentSessionTime(timelineAt = 120uL, receivedAt = 100uL))
+
+        assertEquals(request.messageIdHex, AgentNativeRequestHistory(listOf(request)).outstanding(target)?.eventId)
     }
 
     @Test
