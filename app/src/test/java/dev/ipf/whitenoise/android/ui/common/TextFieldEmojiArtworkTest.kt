@@ -97,11 +97,8 @@ class TextFieldEmojiArtworkTest {
         field.performClick()
 
         composeRule.runOnIdle { state.edit { selection = TextRange(5, length) } }
-        field.performKeyInput {
-            keyDown(Key.CtrlLeft)
-            pressKey(Key.C)
-            keyUp(Key.CtrlLeft)
-        }
+        field.performKeyInput { pressKey(Key.Copy) }
+        composeRule.waitUntil(5_000) { clipboard.hasPrimaryClip() }
         composeRule.runOnIdle {
             assertEquals(
                 ":party:",
@@ -112,12 +109,12 @@ class TextFieldEmojiArtworkTest {
             )
         }
 
-        composeRule.runOnIdle { state.edit { selection = TextRange(5, length) } }
-        field.performKeyInput {
-            keyDown(Key.CtrlLeft)
-            pressKey(Key.X)
-            keyUp(Key.CtrlLeft)
+        composeRule.runOnIdle {
+            clipboard.clearPrimaryClip()
+            state.edit { selection = TextRange(5, length) }
         }
+        field.performKeyInput { pressKey(Key.Cut) }
+        composeRule.waitUntil(5_000) { clipboard.hasPrimaryClip() }
         composeRule.runOnIdle {
             assertEquals(
                 ":party:",
@@ -171,6 +168,7 @@ class TextFieldEmojiArtworkTest {
         }
         val customLeft = isLeftOfEnglishLetter(":party:")
         composeRule.runOnIdle { state.edit { replace(0, length, "אב A 🙂 אב") } }
+        composeRule.waitUntil(5_000) { actualLayout.get()?.layoutInput?.text?.text?.contains("🙂") == true }
         assertTrue(isLeftOfEnglishLetter("🙂"))
         assertTrue(customLeft)
     }
