@@ -192,6 +192,7 @@ internal suspend fun WhiteNoiseAppState.retainProfileAlertsForAccounts(
             runCatching {
                 profileNotificationOverrides.retainAccounts(retained, canRetain)
             }.getOrDefault(false)
+        val claimsRevalidated = runCatchingCancellable { revalidateDepartedChatClaims(accounts) }.getOrDefault(false)
         val ownersSaved =
             runCatching {
                 retainConversationChannelOwners(
@@ -199,9 +200,10 @@ internal suspend fun WhiteNoiseAppState.retainProfileAlertsForAccounts(
                     retainedAccountRefs = retained,
                     signingAccountRemains = accounts.any { it.isSignedInSigningAccount() },
                     canRetain = canRetain,
+                    departedChatClaimsRevalidated = claimsRevalidated,
                 )
             }.getOrDefault(false)
-        val saved = alertsSaved && ownersSaved
+        val saved = alertsSaved && ownersSaved && claimsRevalidated
         if (!saved) appStateDebug { "profile alert preference retention failed; retry on the next account refresh" }
         saved
     }

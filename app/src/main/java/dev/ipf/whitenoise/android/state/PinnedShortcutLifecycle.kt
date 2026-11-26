@@ -7,8 +7,6 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationChannels
-import dev.ipf.whitenoise.android.notifications.departedChatConversationShortcutIds
-import dev.ipf.whitenoise.android.notifications.groupChannelShortcutIds
 import dev.ipf.whitenoise.android.notifications.hasUnaccountedConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +17,7 @@ private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
 private const val SIGN_OUT_OWNER_SAVE_ATTEMPTS = 3
 
 /** Captured departing-account group inventory together with whether every native listing succeeded. */
-private data class AccountGroupInventory(
+internal data class AccountGroupInventory(
     val groupIds: Set<String>,
     val nativeInventoryComplete: Boolean,
 )
@@ -130,7 +128,7 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
                     accountRef,
                     groupIds,
                     includeUnscopedLegacy,
-                    departedChatShortcutIds = departed.orEmpty(),
+                    departedChatShortcutIds = departed,
                 )
             }
         } -> {
@@ -138,32 +136,6 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
             null
         }
         else -> groupIds
-    }
-}
-
-/**
- * Shortcut ids of `:conv:` channels whose chat no account lists any more, such as a chat an older build deleted
- * after its vibration was reset to Default. Every other signing account's chats are read first, so none of their
- * channels is ever counted. Null when any of them cannot be listed, or Android's channels cannot be read, since such a
- * channel could still be theirs.
- */
-private suspend fun WhiteNoiseAppState.departedChatChannelShortcutIds(
-    accountRef: String,
-    groupIds: Set<String>,
-): Set<String>? {
-    val kept = HashSet<String>()
-    // A signed-out or read-only profile cannot list chats natively, and its own sign-out already cleaned its channels.
-    val others = accounts.filter { it.label != accountRef && it.isSignedInSigningAccount() }.map { it.label }
-    for (other in others.distinct()) {
-        val inventory = readAccountKnownGroupIds(other)
-        if (!inventory.nativeInventoryComplete) {
-            appStateDebug { "sign-out could not list another account's chats for unlisted chat channels" }
-            return null
-        }
-        kept += groupChannelShortcutIds(other, inventory.groupIds)
-    }
-    return withContext(Dispatchers.IO) {
-        departedChatConversationShortcutIds(appContext, accountRef, groupIds, kept)
     }
 }
 
@@ -177,7 +149,7 @@ private suspend fun retrySignOutOwnerSave(save: suspend () -> Boolean): Boolean 
 }
 
 /** Reads every group id the account's channels may be named after, retrying transient native reads before fallback. */
-private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
+internal suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
     val chats = readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
     val quarantined =
         readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }

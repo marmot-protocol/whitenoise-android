@@ -11,7 +11,9 @@ import dev.ipf.marmotkit.RelayFailureFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_CHANNEL_OWNERS_PREFS
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.channelOwnerAccountHash
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.departedChatOwnerKey
 import dev.ipf.whitenoise.android.notifications.sha256Hex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -327,6 +329,42 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             try {
                 assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
                 assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                chatListFailsFor = emptySet()
+                manager.deleteNotificationChannel(channelId)
+                ownerPrefs.edit().clear().commit()
+            }
+        }
+
+    /**
+     * A retried capture whose remaining account cannot list its chats aborts instead of treating its own earlier
+     * inferred claims as proof, and keeps those claims rather than replacing them with nothing.
+     */
+    @Test
+    fun incompleteRetryKeepsTheEarlierInferredClaims() =
+        runBlocking {
+            val deletedGroup = "ad".repeat(16)
+            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
+            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
+            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)))
+            chatListReply = { emptyList() }
+            quarantinedGroupsReply = { emptyList() }
+            val state = appState(profileReader = { null })
+            val claimKey = checkNotNull(channelOwnerAccountHash(accountRef)).departedChatOwnerKey
+            try {
+                assertNotNull(state.captureAccountKnownGroupIds(accountRef))
+                assertEquals(setOf(shortcutId), ownerPrefs.getStringSet(claimKey, emptySet()))
+
+                chatListFailsFor = setOf(otherAccountRef)
+                assertNull(state.captureAccountKnownGroupIds(accountRef))
+                assertEquals(setOf(shortcutId), ownerPrefs.getStringSet(claimKey, emptySet()))
             } finally {
                 chatListFailsFor = emptySet()
                 manager.deleteNotificationChannel(channelId)

@@ -16,32 +16,20 @@ private const val SHA256_HEX_LENGTH = 64
  * earlier record. [includeUnscopedLegacy] also records a last-signer sweep before native work.
  * Startup waits to sweep until no signer remains, so a failed sign-out cannot erase a live signer's channels.
  * [departedChatShortcutIds] (see [departedChatConversationShortcutIds]) replace the account's earlier inferred set
- * under [departedChatOwnerKey], so the departing account's cleanup also deletes channels of chats no account still
- * lists, and a retried sign-out never keeps a claim on a chat another account lists again. Returns false when the
- * record could not be saved.
+ * under [departedChatOwnerKey], or leave it when null, so retention later deletes channels of chats no account
+ * still lists, and a retried sign-out never keeps a claim on a chat another account lists again. Returns false
+ * when the record could not be saved.
  */
 internal fun recordDepartingConversationChannelOwners(
     context: Context,
     accountRef: String,
     groupIds: Collection<String>,
     includeUnscopedLegacy: Boolean = false,
-    departedChatShortcutIds: Set<String> = emptySet(),
+    departedChatShortcutIds: Set<String>? = emptySet(),
 ): Boolean {
     val shortcutIds = groupChannelShortcutIds(accountRef, groupIds).mapTo(HashSet(), ::canonicalConversationShortcutId)
-    val inferredKey = channelOwnerAccountHash(accountRef)?.departedChatOwnerKey ?: return false
     return recordConversationChannelOwners(context, accountRef, shortcutIds, includeUnscopedLegacy) &&
-        synchronized(UserEventNotificationGroup.mutationLock) {
-            runCatching {
-                val prefs =
-                    context.applicationContext
-                        .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-                val inferred = departedChatShortcutIds.filterTo(HashSet(), ::isConversationShortcutId)
-                val editor = prefs.edit()
-                if (inferred.isEmpty()) editor.remove(inferredKey) else editor.putStringSet(inferredKey, inferred)
-                // An unchanged set needs no write: the account's own record was just committed.
-                prefs.getStringSet(inferredKey, emptySet()).orEmpty() == inferred || editor.commit()
-            }.getOrDefault(false)
-        }
+        recordDepartedChatClaims(context, accountRef, departedChatShortcutIds)
 }
 
 /**
@@ -99,10 +87,13 @@ internal fun hasUnaccountedConversationNotificationChannels(
                 convShortcutIds == null -> true
                 convShortcutIds.isEmpty() -> false
                 else -> {
+                    // This account's own earlier inferred claims are not proof: they are what is being recomputed.
+                    val ownClaims = channelOwnerAccountHash(accountRef)?.departedChatOwnerKey
                     val ownerEntries =
                         appContext
                             .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
                             .all
+                            .filterKeys { it != ownClaims }
                     val accountedIds =
                         accountedConversationShortcutIds(appContext, ownerEntries, accountRef, knownGroupIds)
                     convShortcutIds.any { it !in accountedIds }
@@ -146,34 +137,49 @@ private fun accountedConversationShortcutIds(
  * belongs to no retained account, and the channels and then shortcuts of departed accounts that sign-out left
  * relabeled. Ownerless `:conv:` channels are swept once no account remains, or while a failed last-signer
  * sweep is pending and no signing account has joined since. Any failed enumeration, redaction, or deletion
- * keeps its record and returns false so account refresh retries until cleanup succeeds.
+ * keeps its record and returns false so account refresh retries until cleanup succeeds. Channels a sign-out
+ * inferred from chats no account listed are deleted only when [departedChatClaimsRevalidated], after every signing
+ * account's chats were read again and any chat listed since was dropped from the claims.
  */
 internal fun retainConversationChannelOwners(
     context: Context,
     retainedAccountRefs: Collection<String>,
     signingAccountRemains: Boolean = retainedAccountRefs.isNotEmpty(),
+    departedChatClaimsRevalidated: Boolean = false,
     canRetain: () -> Boolean = { true },
 ): Boolean {
     val retainedKeys = retainedAccountRefs.mapNotNull(::channelOwnerAccountHash).toSet()
     val retainedScopes = retainedAccountRefs.mapNotNullTo(HashSet(), ::conversationShortcutAccountScope)
     return synchronized(UserEventNotificationGroup.mutationLock) {
         canRetain().not() ||
-            retainLocked(context.applicationContext, retainedKeys, retainedScopes, signingAccountRemains)
+            retainLocked(
+                context.applicationContext,
+                retainedKeys,
+                retainedScopes,
+                signingAccountRemains,
+                departedChatClaimsRevalidated,
+            )
     }
 }
 
 /** Runs retention under [UserEventNotificationGroup.mutationLock]; see [retainConversationChannelOwners]. */
+@Suppress("LongParameterList") // Retention's inputs are all read under one mutation lock.
 private fun retainLocked(
     appContext: Context,
     retainedKeys: Set<String>,
     retainedScopes: Set<String>,
     signingAccountRemains: Boolean,
+    departedChatClaimsRevalidated: Boolean,
 ): Boolean {
     val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
     val sweepPending = prefs.contains(LEGACY_SWEEP_PENDING_KEY)
+    // Inferred departed-chat claims are deleted only once every signing account's chats were read again.
     val staleKeys =
         prefs.all.keys.filter { key ->
-            key != LEGACY_SWEEP_PENDING_KEY && key.removePrefix(DEPARTED_CHAT_KEY_PREFIX) !in retainedKeys
+            val claims = key.startsWith(DEPARTED_CHAT_KEY_PREFIX)
+            key != LEGACY_SWEEP_PENDING_KEY &&
+                key.removePrefix(DEPARTED_CHAT_KEY_PREFIX) !in retainedKeys &&
+                (!claims || departedChatClaimsRevalidated)
         }
     val ownersPruned = staleKeys.isEmpty() || pruneStaleAccountChannelsAndOwners(appContext, prefs, staleKeys)
     val retainedIds = retainedConversationShortcutIds(prefs, retainedKeys)

@@ -22,21 +22,12 @@ import java.util.WeakHashMap
  * removed. Other signing accounts' channels and global channels are never deleted.
  */
 internal const val LEGACY_SWEEP_PENDING_KEY = "legacy_conversation_sweep_pending"
-
-// Prefixes an owner hash for the channels a departing account's sign-out inferred, from chats no account lists.
-// They are kept apart from the account's own record and replaced on every capture, so a retried sign-out claims
-// only what is still unlisted then.
-internal const val DEPARTED_CHAT_KEY_PREFIX = "departed_chats:"
-
-/** The owner-store key for the departed-chat channels inferred for this owner hash; see [DEPARTED_CHAT_KEY_PREFIX]. */
-internal val String.departedChatOwnerKey: String
-    get() = "$DEPARTED_CHAT_KEY_PREFIX$this"
 internal const val CONVERSATION_CHANNEL_OWNERS_PREFS = "whitenoise.conversation_channel_owners"
 private const val CONVERSATION_CHANNEL_INFIX = ":conv:"
 private const val VIBRATION_SUFFIX_MARKER = ":vibration:"
 
 /** Tracks owner keys whose latest in-memory mutation has not yet been durably committed to disk. */
-private object UncommittedChannelOwners {
+internal object UncommittedChannelOwners {
     private val byContext = WeakHashMap<Context, MutableSet<String>>()
 
     /** Returns the mutable uncommitted-key set for [appContext] under `UserEventNotificationGroup.mutationLock`. */
@@ -231,16 +222,13 @@ private fun updateOwnerStoreAfterAccountCleanup(
         val uncommitted = UncommittedChannelOwners.keys(appContext)
         when {
             allMatchedDeleted && ownerKey != null -> {
-                val editor = prefs.edit().remove(ownerKey).remove(ownerKey.departedChatOwnerKey)
+                val editor = prefs.edit().remove(ownerKey)
                 // Retention clears this only after both the legacy channels and launcher shortcuts are gone.
                 if (includeUnscopedLegacy) editor.putStringSet(LEGACY_SWEEP_PENDING_KEY, emptySet())
                 if (editor.commit()) uncommitted.remove(ownerKey)
             }
             !allMatchedDeleted && ownerKey != null -> {
-                // Inferred departed-chat channels stay under their own key, never merged into the account's.
-                val inferred = prefs.getStringSet(ownerKey.departedChatOwnerKey, emptySet()).orEmpty()
-                val canonicalLeaving =
-                    leavingShortcutIds.mapTo(mutableSetOf(), ::canonicalConversationShortcutId) - inferred
+                val canonicalLeaving = leavingShortcutIds.mapTo(mutableSetOf(), ::canonicalConversationShortcutId)
                 val editor = prefs.edit().putStringSet(ownerKey, canonicalLeaving)
                 // A failed last-signer sweep cannot record ownerless legacy channels; retention retries it.
                 if (includeUnscopedLegacy) editor.putStringSet(LEGACY_SWEEP_PENDING_KEY, emptySet())
@@ -340,15 +328,17 @@ private fun otherAccountShortcutIds(
 }
 
 /**
- * Returns every conversation shortcut id variant recorded for [accountRef] in the hashed owner store, with the
- * departed-chat channels its sign-out inferred.
+ * Returns every conversation shortcut id variant recorded for [accountRef] in the hashed owner store. Channels
+ * its sign-out inferred from chats no account lists are not among them: retention deletes those only after
+ * every signing account's chats are read again (see [departedChatOwnerKey]).
  */
 private fun storedAccountShortcutIds(
     preferences: SharedPreferences,
     accountRef: String,
 ): Set<String> {
     val ownerKey = channelOwnerAccountHash(accountRef) ?: return emptySet()
-    return listOf(ownerKey, ownerKey.departedChatOwnerKey)
-        .flatMap { key -> preferences.getStringSet(key, emptySet()).orEmpty() }
+    return preferences
+        .getStringSet(ownerKey, emptySet())
+        .orEmpty()
         .flatMapTo(mutableSetOf(), ::channelShortcutIdsFromShortcutId)
 }

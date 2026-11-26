@@ -328,7 +328,14 @@ class NotificationChannelCleanupRegressionTest {
                 departedChatShortcutIds = checkNotNull(departed),
             ),
         )
-        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+        assertTrue(
+            retainConversationChannelOwners(
+                context,
+                listOf("account-b"),
+                signingAccountRemains = true,
+                departedChatClaimsRevalidated = true,
+            ),
+        )
 
         assertNull(manager.getNotificationChannel(known))
         assertNull(manager.getNotificationChannel(deleted))
@@ -370,9 +377,85 @@ class NotificationChannelCleanupRegressionTest {
                 departedChatShortcutIds = retried,
             ),
         )
-        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+        assertTrue(
+            retainConversationChannelOwners(
+                context,
+                listOf("account-b"),
+                signingAccountRemains = true,
+                departedChatClaimsRevalidated = true,
+            ),
+        )
 
         assertNotNull(manager.getNotificationChannel(restored))
+    }
+
+    /**
+     * A chat restored after a sign-out inferred its channel keeps that channel: retention never deletes inferred
+     * claims until every signing account's chats were read again, and that read drops the restored chat's claim.
+     */
+    @Test
+    fun chatRestoredAfterCaptureKeepsItsChannelThroughRetention() {
+        val restoredId = checkNotNull(conversationShortcutId("account-b", "group-b-back"))
+        val restored = convChannel(NotificationChannelSpec.GROUP_MESSAGES, restoredId, "B Back Chat")
+        val claimKey = sha256Hex("account-a").departedChatOwnerKey
+        assertTrue(
+            recordDepartingConversationChannelOwners(
+                context,
+                "account-a",
+                emptySet(),
+                departedChatShortcutIds = setOf(restoredId),
+            ),
+        )
+
+        // Before revalidation, as on a restart that cannot read the chats yet, the claim is kept and nothing goes.
+        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+        assertNotNull(manager.getNotificationChannel(restored))
+        assertEquals(setOf(restoredId), ownerPrefs().getStringSet(claimKey, emptySet()))
+
+        // The chat came back: revalidation drops its claim, so the revalidated pass keeps its channel.
+        assertTrue(pruneDepartedChatClaims(context, groupChannelShortcutIds("account-b", setOf("group-b-back"))))
+        assertFalse(ownerPrefs().contains(claimKey))
+        assertTrue(
+            retainConversationChannelOwners(
+                context,
+                listOf("account-b"),
+                signingAccountRemains = true,
+                departedChatClaimsRevalidated = true,
+            ),
+        )
+        assertNotNull(manager.getNotificationChannel(restored))
+    }
+
+    /** A failed claim commit, already applied in memory, is written again on retry instead of reported saved. */
+    @Test
+    fun failedClaimCommitIsRetriedRatherThanTakenFromMemory() {
+        val shortcutId = checkNotNull(conversationShortcutId("account-a", "group-claim-uncommitted"))
+        val failingPrefs = MemoryRetainingFailingCommitPrefs(ownerPrefs())
+        val failingContext =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences =
+                    if (name == CONVERSATION_CHANNEL_OWNERS_PREFS) {
+                        failingPrefs
+                    } else {
+                        super.getSharedPreferences(name, mode)
+                    }
+            }
+
+        assertFalse(recordDepartedChatClaims(failingContext, "account-a", setOf(shortcutId)))
+        val attempts = failingPrefs.commitAttempts
+        assertFalse(recordDepartedChatClaims(failingContext, "account-a", setOf(shortcutId)))
+        assertEquals(attempts + 1, failingPrefs.commitAttempts)
+
+        failingPrefs.failCommits = false
+        assertTrue(recordDepartedChatClaims(failingContext, "account-a", setOf(shortcutId)))
+        assertEquals(attempts + 2, failingPrefs.commitAttempts)
+        assertTrue(recordDepartedChatClaims(failingContext, "account-a", setOf(shortcutId)))
+        assertEquals(attempts + 2, failingPrefs.commitAttempts)
     }
 
     /**
