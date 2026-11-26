@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationRetryPolicy.kt",
+  "legacy_sha256": "983a087e217dc05cb09aee1925b2ccd9b8fe24ef2ee46365e3a0efaac1804234",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Pending-send retries use a caller-owned safety classifier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationRetryPolicy.kt",
+        "anchor": "retryableFailure: (Throwable) -> Boolean",
+        "test_ids": [
+          "MSG-017"
+        ]
+      },
+      {
+        "surface": "Validated connectivity wakes a pending send before its backoff expires",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationRetryPolicy.kt",
+        "anchor": "connectivityRecoveryGeneration: StateFlow<Long>?",
+        "test_ids": [
+          "MSG-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
