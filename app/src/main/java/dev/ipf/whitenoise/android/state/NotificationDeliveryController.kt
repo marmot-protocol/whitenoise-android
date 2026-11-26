@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -100,6 +101,11 @@ internal class NotificationDeliveryController(
     // The token of the latest onNewToken callback, published before its sequence increment so a token
     // read that sees the new sequence also sees which token caused it.
     internal val lastRotatedFcmToken = AtomicReference<String?>()
+
+    // Native-push enables that can still roll back: a Push selection before its cutover commits, or a
+    // per-account enable before it is confirmed. While any is open a sync leaves Firebase auto-init alone,
+    // since turning it on starts an SDK token sync that no later off write cancels. Each sets it on commit.
+    internal val uncommittedNativePushEnables = AtomicInteger()
     internal val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     internal val notificationDeliveryModeMutex = Mutex()
     internal val notificationDeliveryModeIntent = StalenessGuard()

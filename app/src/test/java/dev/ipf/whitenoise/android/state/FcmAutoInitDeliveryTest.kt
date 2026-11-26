@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Firebase auto-init is off in the manifest (#4081). A sync for accounts already on Push turns it on right
  * before it reads an FCM token. A new Push selection reads its token with auto-init still off and turns it on
- * only once registration commits. It goes off when every account leaves native push, a change fails or the
+ * only once its cutover commits. It goes off when every account leaves native push, a change fails or the
  * last account is removed. A device that only uses the persistent connection never turns it on and never
  * reads a token.
  */

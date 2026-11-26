@@ -120,16 +120,22 @@ internal suspend inline fun NotificationDeliveryController.settlingFcmAutoInitOn
 }
 
 /**
- * Reads the selection's token explicitly, with Firebase auto-init still off, while [owner] still owns
- * delivery. The ownership checks and the token store run under the native sync lock, and the Firebase read
- * does not. A wipe ends ownership before it takes this lock, so a selection resumed after a wipe or an
- * account change keeps no token, and a stalled read never holds up the wipe. Auto-init is turned on only
- * once the owned registration commits in [enableNativeDeliveryForAccounts].
+ * Sets Firebase auto-init once a native-push enable has committed, a Push cutover or a confirmed per-account
+ * enable, under the native sync lock: on when a loaded account uses native push, off when none does, for
+ * example after reconciliation with rendering off. When the enable is no longer [isCurrent], because a newer
+ * change took over, or demand is unreadable, it records the pending registration sync, so the next sync
+ * settles auto-init from live demand even if the newer change fails before touching it.
  */
-@Suppress("MaxLineLength")
-internal suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner: NotificationDeliveryModeOwner): String? =
-    fetchFcmTokenOrNull(
-        tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) },
-        ownerFence = nativePushSyncMutex,
-        enableAutoInit = false,
-    )
+internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable(isCurrent: () -> Boolean) {
+    nativePushSyncMutex.withLock {
+        if (!isCurrent()) {
+            recordPendingRegistrationSync()
+            return@withLock
+        }
+        when (disableFcmAutoInitWithoutLoadedNativeDemand()) {
+            NativePushDemand.Required -> applyFcmAutoInit(enabled = true)
+            NativePushDemand.None -> Unit
+            NativePushDemand.Unknown, null -> recordPendingRegistrationSync()
+        }
+    }
+}

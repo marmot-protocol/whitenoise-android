@@ -113,10 +113,12 @@ internal suspend fun NotificationDeliveryController.recordPendingRegistrationSyn
 
 /**
  * Turns native push on or off for one account, confirming an enablement only once its registration is in
- * place and rolling it back otherwise. Once a disable or a rollback has been attempted, Firebase auto-init is
- * settled from the accounts' live demand on every exit, cancellation included, so the account's change never
- * leaves auto-init on for nobody. A cancelled enable records a pending registration sync, so an account
- * left on native push is registered, and auto-init turned on, by the next sync.
+ * place and rolling it back otherwise. Until it is confirmed the enable counts as uncommitted, so no sync
+ * turns Firebase auto-init on for it, and only the confirmed enable does. Once a disable or a rollback has
+ * been attempted, auto-init is settled from the accounts' live demand on every exit, cancellation included,
+ * so the account's change never leaves auto-init on for nobody. A cancelled enable records a pending
+ * registration sync, so an account left on native push is registered, and auto-init turned on, by the next
+ * sync.
  */
 internal suspend fun NotificationDeliveryController.setNativePushEnabledSettlingAutoInit(
     account: String,
@@ -126,7 +128,15 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
     // A native disable can commit before a cancellation surfaces, so the settle runs in finally.
     val nativeDisableAttempted = AtomicBoolean(!enabled)
     try {
-        return setNativePushEnabledLocked(account, enabled, nativeDisableAttempted)
+        if (enabled) uncommittedNativePushEnables.incrementAndGet()
+        val changed =
+            try {
+                setNativePushEnabledLocked(account, enabled, nativeDisableAttempted)
+            } finally {
+                if (enabled) uncommittedNativePushEnables.decrementAndGet()
+            }
+        if (enabled && changed) commitFcmAutoInitAfterEnable { true }
+        return changed
     } catch (cancelled: CancellationException) {
         // A cancelled enable may have left native push on without a registration, before its rollback or
         // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on
@@ -170,7 +180,7 @@ private suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
                     activeAccountRegistered = hasConfirmedNativePushRegistration(account),
                 )
             if (!confirmed) {
-                // The sync turned auto-init on before its token read, so the rollback settles it on exit.
+                // A rollback is a native disable, so auto-init is settled from live demand on exit.
                 nativeDisableAttempted.set(true)
                 val rollbackSettings = host.marmotIo { setNativePushEnabled(account, false) }
                 localNotificationSettings = rollbackSettings

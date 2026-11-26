@@ -112,7 +112,13 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
         NativePushDemand.None -> return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)
         NativePushDemand.Required -> Unit
     }
-    val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false
+    // An enable that can still roll back sets auto-init itself once it commits. While one is open, read after
+    // demand so it covers any flag that demand saw, this sync leaves auto-init alone and keeps the pending
+    // marker, so the next sync settles auto-init even if that enable fails before touching it.
+    val autoInitDeferred = uncommittedNativePushEnables.get() > 0
+    val token =
+        tokenForNativePushSync(freshCallbackToken, operationIsCurrent, enableAutoInit = !autoInitDeferred)
+            ?: return false
     val tokenIsCurrent: suspend () -> Boolean = {
         operationIsCurrent() &&
             (
@@ -124,9 +130,12 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
     return tokenIsCurrent() &&
         accountRefs.all { account -> syncPushForAccount(account, config, token, tokenIsCurrent) } &&
         tokenIsCurrent() &&
-        withContext(pushWakeStorageDispatcher) {
-            pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
-        }
+        (
+            autoInitDeferred ||
+                withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+                }
+        )
 }
 
 /**
@@ -144,8 +153,9 @@ internal enum class NativePushDemand {
 private suspend fun NotificationDeliveryController.tokenForNativePushSync(
     freshCallbackToken: String?,
     operationIsCurrent: () -> Boolean,
+    enableAutoInit: Boolean,
 ): String? =
-    fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent)
+    fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent, enableAutoInit = enableAutoInit)
         ?: freshCallbackToken?.takeIf {
             operationIsCurrent() &&
                 withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == it }
@@ -240,7 +250,7 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
  * [ownerFence]. The owner check with any auto-init write, and the recheck with the token store, then run
  * under it, while the SDK read does not. A provisional Push selection passes `enableAutoInit = false` and
  * reads its token explicitly, because the SDK's background sync started by turning auto-init on can retry
- * registration after a later off write. It turns auto-init on only once its registration commits.
+ * registration after a later off write. It turns auto-init on only once its whole cutover commits.
  */
 @Suppress("ReturnCount")
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
@@ -306,3 +316,18 @@ private suspend fun NotificationDeliveryController.readFcmTokenFromSdk(): String
                 }
             }
     }
+
+/**
+ * Reads a Push selection's token explicitly, with Firebase auto-init still off, while [owner] still owns
+ * delivery. The ownership checks and the token store run under the native sync lock, and the Firebase read
+ * does not. A wipe ends ownership before it takes this lock, so a selection resumed after a wipe or an
+ * account change keeps no token, and a stalled read never holds up the wipe. Auto-init is turned on only
+ * once the whole cutover commits, in [commitFcmAutoInitAfterEnable].
+ */
+@Suppress("MaxLineLength")
+internal suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner: NotificationDeliveryModeOwner): String? =
+    fetchFcmTokenOrNull(
+        tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) },
+        ownerFence = nativePushSyncMutex,
+        enableAutoInit = false,
+    )

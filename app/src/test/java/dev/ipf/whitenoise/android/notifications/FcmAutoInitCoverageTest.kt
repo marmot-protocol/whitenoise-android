@@ -74,8 +74,9 @@ class FcmAutoInitCoverageTest {
     }
 
     /**
-     * A sync for existing Push accounts turns auto-init on before its token read, a new selection reads with it
-     * off, and only the shared fetch reads the SDK token.
+     * A sync for existing Push accounts turns auto-init on before its token read, unless a native-push enable
+     * that can still roll back is open, a new selection reads with it off, and only the shared fetch reads the
+     * SDK token.
      */
     @Test
     fun syncTokenReadsEnableAutoInitFirst() {
@@ -87,6 +88,10 @@ class FcmAutoInitCoverageTest {
         assertTrue("fetchFcmTokenOrNull must enable auto-init", enable >= 0)
         val conditional = "if (current && enableAutoInit) applyFcmAutoInit(enabled = true)"
         assertTrue("only callers that ask enable it", fetch.contains(conditional))
+        val forAccounts = sync.functionBody("syncNativePushRegistrationForAccountsLocked")
+        assertTrue(forAccounts.contains("val autoInitDeferred = uncommittedNativePushEnables.get() > 0"))
+        assertTrue("an open enable defers auto-init", forAccounts.contains("enableAutoInit = !autoInitDeferred"))
+        assertTrue("and keeps the pending marker", forAccounts.contains("autoInitDeferred ||"))
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)
         assertTrue("auto-init must be enabled before the token read", enable < read)
         assertEquals(2, Regex("""\breadFcmTokenFromSdk\b""").findAll(sync).count())
@@ -141,12 +146,12 @@ class FcmAutoInitCoverageTest {
     @Test
     fun selectionTokenReadIsFencedByOwnership() {
         val selection = appModuleSource(SELECTION)
-        val autoInit = appModuleSource(AUTO_INIT)
+        val sync = appModuleSource(SYNC)
         val declaration = "fun NotificationDeliveryController.fetchFcmTokenForOwner("
-        assertTrue("missing $declaration", autoInit.contains(declaration))
+        assertTrue("missing $declaration", sync.contains(declaration))
         // ktlint keeps this function expression-bodied, so functionBody would return its first lambda instead.
-        val fenced = autoInit.substringAfter(declaration).substringBefore("\n\n")
-        val fetch = appModuleSource(SYNC).functionBody("fetchFcmTokenOrNull")
+        val fenced = sync.substringAfter(declaration).substringBefore("\n\n")
+        val fetch = sync.functionBody("fetchFcmTokenOrNull")
 
         assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
         assertTrue(fenced.contains("ownerFence = nativePushSyncMutex"))
@@ -162,22 +167,35 @@ class FcmAutoInitCoverageTest {
         assertTrue("the token store must run under the fence", fetch.indexOf("fence.withLock", read) > read)
     }
 
-    /** A completed Push selection writes auto-init on under the sync lock, and an incomplete one settles it. */
+    /**
+     * Only a committed Push cutover turns auto-init on, under the sync lock while the owner still owns delivery,
+     * and an incomplete one settles it. Registration alone never turns it on, since the cutover can still fail.
+     */
     @Test
     fun fcmSelectionOwnsAutoInitThroughRegistration() {
         val selection = appModuleSource(SELECTION)
         val autoInit = appModuleSource(AUTO_INIT)
 
-        val enableAfterRegistration = selection.functionBody("enableNativeDeliveryForAccounts")
-        assertTrue(
-            "auto-init is set after registration from the accounts' registration results",
-            enableAfterRegistration.contains("if (registered) applyFcmAutoInit(enabled = pushRegistered.get())"),
+        assertFalse(
+            "registration must not set auto-init before the cutover commits",
+            selection.functionBody("enableNativeDeliveryForAccounts").contains("applyFcmAutoInit"),
         )
-        assertTrue(
-            selection
-                .functionBody("selectFcmDelivery")
-                .contains("settleFcmAutoInitAfterFailedSelection()"),
-        )
+        val select = selection.functionBody("selectFcmDelivery")
+        val opened = select.indexOf("uncommittedNativePushEnables.incrementAndGet()")
+        val closed = select.indexOf("uncommittedNativePushEnables.decrementAndGet()")
+        val committed = select.indexOf("commitFcmAutoInitAfterEnable { ownsNotificationDeliveryMode(owner) }")
+        assertTrue("the selection stays uncommitted until its cutover returns", opened in 0 until closed)
+        assertTrue("only a cutover that returned true commits auto-init", closed < committed)
+        assertTrue(select.contains("if (selected.getOrNull() == true) {"))
+        assertTrue(select.contains("settleFcmAutoInitAfterFailedSelection()"))
+        val commit = autoInit.functionBody("commitFcmAutoInitAfterEnable")
+        assertTrue(commit.contains("nativePushSyncMutex.withLock"))
+        val superseded = commit.substringAfter("if (!isCurrent()) {").substringBefore("return@withLock")
+        assertTrue("a superseded commit leaves a sync pending", "recordPendingRegistrationSync()" in superseded)
+        assertTrue(commit.contains("NativePushDemand.Required -> applyFcmAutoInit(enabled = true)"))
+        val toggle = appModuleSource(PUSH_CLEARS).functionBody("setNativePushEnabledSettlingAutoInit")
+        assertTrue(toggle.contains("if (enabled) uncommittedNativePushEnables.incrementAndGet()"))
+        assertTrue("only a confirmed enable commits", toggle.contains("if (enabled && changed) commitFcmAutoInit"))
         val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
         assertTrue(settle.contains("nativePushSyncMutex.withLock"))
         assertTrue(

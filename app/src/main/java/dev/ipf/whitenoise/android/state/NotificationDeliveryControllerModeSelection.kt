@@ -65,16 +65,29 @@ private suspend fun NotificationDeliveryController.ensureNotificationRenderingEn
 }
 
 /**
- * Selects native push for every notification-enabled account. A selection that does not complete,
- * including a cancelled one, turns Firebase auto-init back off unless an account still uses native push.
+ * Selects native push for every notification-enabled account. Firebase auto-init is turned on only once the
+ * whole cutover has committed, since turning it on starts the SDK's background token sync, which no later off
+ * write can cancel. A selection that does not complete, including a cancelled one, settles auto-init instead.
  */
 internal suspend fun NotificationDeliveryController.selectFcmDelivery(
     owner: NotificationDeliveryModeOwner,
     explicit: Boolean = false,
 ): Boolean {
-    // runCatching also holds a cancellation, so the settle runs before getOrThrow rethrows it.
-    val selected = runCatching { selectFcmTransport(owner, explicit) }
-    if (selected.getOrNull() != true) withContext(NonCancellable) { settleFcmAutoInitAfterFailedSelection() }
+    // runCatching also holds a cancellation, so auto-init is settled before getOrThrow rethrows it.
+    uncommittedNativePushEnables.incrementAndGet()
+    val selected =
+        try {
+            runCatching { selectFcmTransport(owner, explicit) }
+        } finally {
+            uncommittedNativePushEnables.decrementAndGet()
+        }
+    withContext(NonCancellable) {
+        if (selected.getOrNull() == true) {
+            commitFcmAutoInitAfterEnable { ownsNotificationDeliveryMode(owner) }
+        } else {
+            settleFcmAutoInitAfterFailedSelection()
+        }
+    }
     return selected.getOrThrow()
 }
 
@@ -146,11 +159,9 @@ private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(o
 }
 
 /**
- * Registers at most three accounts together while the native sync lock fences other mutations. Once all
- * are registered, and only then, it sets Firebase auto-init under the same lock from what those accounts
- * ended up with: on if one registered for native push, off if reconciliation left every account off Push. A
- * selection that fails never starts the SDK's background token sync, and a sync that turned auto-init off
- * before these accounts enabled native push cannot leave it off.
+ * Registers at most three accounts together while the native sync lock fences other mutations. It leaves
+ * Firebase auto-init alone: the selection can still roll back after this, so only the committed cutover
+ * turns it on.
  */
 private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
     owner: NotificationDeliveryModeOwner,
@@ -161,38 +172,29 @@ private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccoun
     nativePushSyncMutex.withLock {
         val orderedAccounts =
             listOf(owner.activeAccountRef) + owner.accountRefs.filterNot { it == owner.activeAccountRef }
-        val pushRegistered = AtomicBoolean(false)
         val configure: suspend (String) -> Boolean = { account ->
-            configureNativeDeliveryForAccount(owner, account, config, token, previous, pushRegistered)
+            configureNativeDeliveryForAccount(owner, account, config, token, previous)
         }
-        val registered =
-            orderedAccounts.chunked(FCM_REGISTRATION_BATCH_SIZE).all { batch ->
-                val ready =
-                    coroutineScope {
-                        batch
-                            .map { async { configure(it) } }
-                            .awaitAll()
-                            .all { it }
-                    }
-                ready && ownsNotificationDeliveryMode(owner)
-            }
-        // Reconciliation can leave every account off native push, for example with rendering off.
-        if (registered) applyFcmAutoInit(enabled = pushRegistered.get())
-        registered
+        orderedAccounts.chunked(FCM_REGISTRATION_BATCH_SIZE).all { batch ->
+            val ready =
+                coroutineScope {
+                    batch
+                        .map { async { configure(it) } }
+                        .awaitAll()
+                        .all { it }
+                }
+            ready && ownsNotificationDeliveryMode(owner)
+        }
     }
 
-/**
- * Applies one account's authoritative notification preference and confirms its registration, marking
- * [pushRegistered] when the account ends up registered for native push.
- */
-@Suppress("ReturnCount", "LongParameterList")
+/** Applies one account's authoritative notification preference and confirms its registration. */
+@Suppress("ReturnCount")
 private suspend fun NotificationDeliveryController.configureNativeDeliveryForAccount(
     owner: NotificationDeliveryModeOwner,
     account: String,
     config: PushServerConfig,
     token: String,
     previous: MutableMap<String, NotificationSettingsFfi>,
-    pushRegistered: AtomicBoolean,
 ): Boolean {
     if (!ownsNotificationDeliveryMode(owner)) return false
     val settings = withContext(Dispatchers.IO) { owner.runtime.marmot.notificationSettings(account) }
@@ -211,9 +213,7 @@ private suspend fun NotificationDeliveryController.configureNativeDeliveryForAcc
     if (!ownsNotificationDeliveryMode(owner) || updated.nativePushEnabled != desiredNative) return false
     if (account == owner.activeAccountRef) localNotificationSettings = updated
     if (!desiredNative) return true
-    return syncPushForNotificationDeliveryOwner(owner, account, config, token).also { synced ->
-        if (synced) pushRegistered.set(true)
-    }
+    return syncPushForNotificationDeliveryOwner(owner, account, config, token)
 }
 
 /**
