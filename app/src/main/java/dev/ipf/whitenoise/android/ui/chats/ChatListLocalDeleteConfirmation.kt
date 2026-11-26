@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
@@ -19,8 +20,9 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentit
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 
-/** Hosts the local-delete review for the request captured by the chat list. */
+/** Keeps the confirmation's bind-epoch check in the chat screen's recomposition scope. */
 @Composable
+@NonRestartableComposable
 @Suppress("FunctionNaming", "LongParameterList") // Compose naming and explicit caller-owned state.
 internal fun ChatListLocalDeleteConfirmation(
     appState: WhiteNoiseAppState,
