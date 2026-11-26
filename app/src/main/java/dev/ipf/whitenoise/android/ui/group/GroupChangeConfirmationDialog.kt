@@ -65,7 +65,7 @@ internal fun GroupChangeConfirmationDialog(
                         Text(
                             stringResource(
                                 R.string.disappearing_confirm_message,
-                                disappearingMessagesLabel(it.toLong()),
+                                disappearingMessagesLabel(it),
                             ),
                         )
                     }

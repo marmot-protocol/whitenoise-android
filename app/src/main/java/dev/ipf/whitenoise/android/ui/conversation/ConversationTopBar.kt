@@ -331,8 +331,8 @@ internal fun ConversationTopBar(
                                         } else {
                                             null
                                         }
-                                    val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
-                                    val showTimer = disappearingSecs > 0L
+                                    val disappearingSecs = presentedGroup.disappearingMessageSecs
+                                    val showTimer = disappearingSecs > 0uL
                                     if (membersSubtitle != null || showTimer) {
                                         val labelStyle = MaterialTheme.typography.labelSmall
                                         val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
