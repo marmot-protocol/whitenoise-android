@@ -55,7 +55,10 @@ private fun MarmotInterface.matchingReplyDraftAttachmentIds(
     attachments: List<PendingAttachment>,
 ): List<String>? {
     val descriptors = selected.draft?.mediaAttachments ?: return null
-    return if (descriptors.size == attachments.size && descriptors.map { it.id }.distinct().size == descriptors.size) {
+    // A reply holds its picks in memory, so a file-backed draft attachment is never one of them; MDK also
+    // refuses to read one whole.
+    val comparable = descriptors.none { it.fileBacked } && descriptors.size == attachments.size
+    return if (comparable && descriptors.map { it.id }.distinct().size == descriptors.size) {
         val remaining = attachments.withIndex().toMutableList()
         val matches = arrayOfNulls<String>(attachments.size)
         descriptors.forEach { descriptor ->

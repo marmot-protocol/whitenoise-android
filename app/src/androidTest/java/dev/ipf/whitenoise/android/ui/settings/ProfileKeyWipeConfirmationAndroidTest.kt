@@ -101,7 +101,10 @@ class ProfileKeyWipeConfirmationAndroidTest {
         field.performTextClearance()
         field.performTextInput("  " + keyword.lowercase(Locale.ROOT) + "  ")
         confirm.assertIsEnabled()
+        // Editing the keyword can change the IME geometry after the original focus has settled.
+        awaitKeyboard()
         field.performScrollTo()
+        awaitKeyboard()
         assertInVisibleWindow(field)
         assertActionsInWindow(cancel)
         saveScreenshot(if (largeRtl) "amoled_200_percent_rtl_enabled" else "light_normal_enabled")

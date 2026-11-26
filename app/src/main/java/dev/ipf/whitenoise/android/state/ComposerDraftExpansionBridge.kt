@@ -28,7 +28,10 @@ internal class ComposerDraftExpansionBridge(
     ) -> Unit,
     private val onCleanupFailure: (groupIdHex: String, cause: Throwable) -> Unit,
 ) {
-    private val sentPresentation = SentComposerDraftPresentation()
+    internal val sentPresentation = SentComposerDraftPresentation()
+
+    /** Waits until every keystroke already accepted for one draft has been written to MDK or superseded. */
+    val flushText: suspend (accountRef: String, groupIdHex: String) -> Unit = draftWriter::flush
 
     /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
@@ -139,18 +142,26 @@ internal class ComposerDraftExpansionBridge(
     }
 
     /**
-     * Evicts only the durably accepted generation, then deletes its MDK draft
-     * asynchronously without allowing an older hydration to resurrect it.
+     * Evicts only the accepted generation, then clears its native draft asynchronously. Text-only cleanup
+     * preserves unsent files and still completes the same send presentation and expansion lifecycle.
      */
-    fun clearAfterDurableAcceptance(token: DraftSendClearToken) {
+    fun clearAfterDurableAcceptance(
+        token: DraftSendClearToken,
+        keepAttachments: Boolean = false,
+    ) {
         val accountRef = token.accountRef
         val groupIdHex = token.groupIdHex
         val sentGeneration = token.generation
+        val current = if (keepAttachments) draftWriter.generation(accountRef, groupIdHex) else sentGeneration
+        if (keepAttachments) {
+            val ownsText = draftRepository.coordinated.isTextCurrent(accountRef, groupIdHex, sentGeneration)
+            if (!ownsText) return
+        }
         val cleanupGeneration =
-            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
+            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, current) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             } ?: return
-        sentPresentation.hide(token, cleanupGeneration)
+        sentPresentation.hide(token, cleanupGeneration, accepted = true)
         expansionRetention.onSendDurablyAccepted(
             accountRef,
             groupIdHex,
@@ -158,7 +169,8 @@ internal class ComposerDraftExpansionBridge(
             token.composerExpansionRevision,
         )
         scope.launch {
-            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration)) {
+            val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration, keepAttachments)
+            when (deletion) {
                 is MessageDraftConditionalDeleteResult.Applied -> {
                     when (val result = deletion.result) {
                         is MessageDraftMutationResult.Success -> {

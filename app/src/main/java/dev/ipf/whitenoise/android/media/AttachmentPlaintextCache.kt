@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import androidx.annotation.VisibleForTesting
+import dev.ipf.whitenoise.android.state.isCollectionDraftSource
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -135,7 +136,7 @@ internal object AttachmentPlaintextCache {
             val entries =
                 directory
                     .listFiles()
-                    ?.filter { it.isFile }
+                    ?.filter { it.isFile && !isCollectionDraftSource(it.name) }
                     ?.map(::CacheEntry)
                     .orEmpty()
             val totalBytes = entries.fold(0L) { total, entry -> saturatingAdd(total, entry.length) }

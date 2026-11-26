@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.net.Uri
+import androidx.compose.runtime.saveable.mapSaver
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -39,7 +41,7 @@ internal fun MessageDraftAttachmentFfi.isComposerVisual(): Boolean =
 /** Stable document identity wins over MIME so document-picker images stay documents. */
 internal fun MessageDraftAttachmentFfi.isComposerDocument(): Boolean = id.startsWith(DOCUMENT_ATTACHMENT_ID_PREFIX)
 
-/** Stable identity lets URI restoration and duplicate mutation retries resolve the same native attachment. */
+/** Restores identities for selections made before the picker assigned each new shelf lifetime an id. */
 internal fun stagedDocumentAttachmentId(
     accountRef: String,
     groupIdHex: String,
@@ -49,6 +51,38 @@ internal fun stagedDocumentAttachmentId(
         UUID.nameUUIDFromBytes(
             "$accountRef\u0000$groupIdHex\u0000$uri".toByteArray(StandardCharsets.UTF_8),
         )
+
+/** Saves the native identity with the picker shelf so an activity restart can reconnect its current selection. */
+internal val ComposerDocumentIdsSaver =
+    mapSaver<Map<String, String>>(
+        save = { it },
+        restore = { saved -> saved.mapValues { (_, id) -> id as String } },
+    )
+
+/** Assigns one identity per newly present picker URI, also when a previous send of that URI is still uploading. */
+internal fun newPickerDocumentIds(
+    ids: Map<String, String>,
+    current: List<Uri>,
+    picked: List<Uri>,
+): Map<String, String> {
+    val currentUris = current.mapTo(HashSet(), Uri::toString)
+    val fresh = picked.map(Uri::toString).toSet() - currentUris
+    return ids.filterKeys { it in currentUris } +
+        fresh.associateWith { DOCUMENT_ATTACHMENT_ID_PREFIX + UUID.randomUUID() }
+}
+
+/** The visible document shelf and its explicit native identities where known. */
+internal data class DraftDocumentShelf(
+    val uris: List<Uri>,
+    val ids: Map<String, String>,
+) {
+    /** Keeps legacy URI-based matching only for selections without a recorded native id. */
+    fun attachmentId(
+        accountRef: String,
+        groupIdHex: String,
+        uri: String,
+    ): String = ids[uri] ?: stagedDocumentAttachmentId(accountRef, groupIdHex, uri)
+}
 
 /** Native draft matches for saved picker selections plus attachments absent from saved state. */
 internal data class PersistedDraftAttachmentReconciliation(
@@ -65,14 +99,13 @@ internal fun reconcilePersistedDraftAttachments(
     accountRef: String,
     groupIdHex: String,
     mediaSlotIds: List<String>,
-    documentUriStrings: List<String>,
+    documentIdsByUri: Map<String, String>,
     attachments: List<MessageDraftAttachmentFfi>,
     removedAttachmentIds: Set<String> = emptySet(),
 ): PersistedDraftAttachmentReconciliation {
     val mediaSlotByAttachmentId =
         mediaSlotIds.associateBy { slotId -> stagedPhotoAttachmentId(accountRef, groupIdHex, slotId) }
-    val documentUriByAttachmentId =
-        documentUriStrings.associateBy { uri -> stagedDocumentAttachmentId(accountRef, groupIdHex, uri) }
+    val documentUriByAttachmentId = documentIdsByUri.entries.associate { (uri, id) -> id to uri }
     val mediaBySlotId = linkedMapOf<String, MessageDraftAttachmentFfi>()
     val documentsByUriString = linkedMapOf<String, MessageDraftAttachmentFfi>()
     val unmatched = mutableListOf<MessageDraftAttachmentFfi>()
@@ -188,12 +221,13 @@ internal class DraftDocumentRemovalFence {
     fun removedAttachmentIds(
         accountRef: String,
         groupIdHex: String,
+        names: Map<String, String> = emptyMap(),
     ): Set<String> =
         generationByUri
             .filter { (uri, generation) ->
                 generation in removedGenerationsByUri[uri].orEmpty() || pendingCleanups.any { it.uri == uri }
             }.keys
-            .mapTo(mutableSetOf()) { stagedDocumentAttachmentId(accountRef, groupIdHex, it) }
+            .mapTo(mutableSetOf()) { names[it] ?: stagedDocumentAttachmentId(accountRef, groupIdHex, it) }
 
     /** Allows the selected lifetime only after every older cleanup for its URI has completed. */
     @Synchronized

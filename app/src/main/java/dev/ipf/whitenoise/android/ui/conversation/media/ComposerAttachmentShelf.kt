@@ -143,6 +143,7 @@ internal fun ComposerAttachmentShelf(
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
     val hasVisual = items.any { it is StagedPreviewItem.Media }
+    val context = LocalContext.current
     val pdfRenderer = rememberComposerPdfPageRenderer()
     val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
     if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata)
@@ -163,21 +164,20 @@ internal fun ComposerAttachmentShelf(
                     is StagedPreviewItem.Document -> "document:$index:${item.uri}"
                 }
             }) { index, item ->
+                val document = preparedDocuments[item.uri]
                 ComposerAttachmentShelfItem(
                     item = item,
                     index = index,
                     metadata = metadata[item.uri],
                     prepared = prepared,
                     enabled = enabled,
-                    document = preparedDocuments[item.uri],
+                    document = document,
                     pdfs = pdfs,
                     onPreview =
                         when {
                             item is StagedPreviewItem.Media -> ({ onPreview(index) })
-                            !preparing &&
-                                preparedDocuments[item.uri]?.attachment?.let {
-                                    attachmentReaderTarget(it.mediaType, it.fileName)
-                                } != null -> ({ onOpenDocument(item.uri) })
+                            !preparing && composerDocumentReaderTarget(context, item.uri, document) != null ->
+                                ({ onOpenDocument(item.uri) })
                             else -> null
                         },
                     onRemove = {

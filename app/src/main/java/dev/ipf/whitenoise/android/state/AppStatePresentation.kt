@@ -27,6 +27,7 @@ internal data class DraftSendClearToken(
     val generation: MessageDraftGeneration,
     val recoveryDraft: ComposerDraftSnapshot?,
     val composerExpansionRevision: Long?,
+    val keepAttachments: Boolean = false,
 )
 
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")

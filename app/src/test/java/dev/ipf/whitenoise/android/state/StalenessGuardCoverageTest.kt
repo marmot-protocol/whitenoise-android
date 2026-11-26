@@ -55,7 +55,7 @@ class StalenessGuardCoverageTest {
                 "ConversationInitialPresentationWarm.kt" to listOf("preparations"),
                 "ConversationCardPostSynchronizer.kt" to listOf("dismissals", "shows"),
                 "TtsPaceTracker.kt" to listOf("engineQueueLifetime"),
-                "MessageDraftRepository.kt" to listOf("lifetimes"),
+                "MessageDraftLocks.kt" to listOf("lifetimes"),
             )
         migratedOwners.forEach { (fileName, owners) ->
             val source = sources.getValue(fileName)
@@ -600,7 +600,7 @@ class StalenessGuardCoverageTest {
             "ConversationCardPostSynchronizer.kt",
             "TtsController.kt",
             "TtsPaceTracker.kt",
-            "MessageDraftRepository.kt",
+            "MessageDraftLocks.kt",
             "MessageForwarding.kt",
             "DirectChatResolution.kt",
         ).associateWith(::productionSource)

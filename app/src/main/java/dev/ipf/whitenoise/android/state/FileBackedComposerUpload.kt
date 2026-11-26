@@ -30,6 +30,10 @@ internal typealias MediaFileUploader =
 internal val RetainedMediaUpload.isFileBacked: Boolean
     get() = attachments.any { it.sourceFile != null }
 
+/** Whether a retained send carries files the composer's draft stores, which upload from the draft by id. */
+internal val RetainedMediaUpload.isDraftStored: Boolean
+    get() = attachments.any { it.draftFile != null }
+
 /**
  * Builds the native request for one file-backed send and keeps every source path pinned until [upload]
  * returns. In-memory album items become private snapshots for this call only and are deleted afterwards;
