@@ -89,7 +89,7 @@ internal fun QuickInfoAction(
 }
 
 /** Overview actions wrap as available width and caption size require. */
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun ChatInfoQuickActions(
     onOpenProfile: ((Rect?) -> Unit)?,

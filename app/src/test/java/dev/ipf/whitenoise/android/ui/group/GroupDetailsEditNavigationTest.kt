@@ -127,7 +127,9 @@ class GroupDetailsEditNavigationTest {
         val search = composeRule.onNodeWithContentDescription(context.getString(R.string.quick_action_search))
         val actions = listOf(addMembers, mute, timer, search)
         actions.forEach { it.assertIsDisplayed().assertHeightIsAtLeast(56.dp) }
-        val (addBounds, muteBounds, timerBounds, searchBounds) = actions.map { it.fetchSemanticsNode().boundsInRoot }
+        val bounds = actions.map { it.fetchSemanticsNode().boundsInRoot }
+        val (addBounds, muteBounds, timerBounds) = bounds
+        val searchBounds = bounds.last()
         assertEquals(addBounds.top, muteBounds.top, 1f)
         assertEquals(timerBounds.top, searchBounds.top, 1f)
         assertTrue(addBounds.bottom < timerBounds.top)

@@ -198,6 +198,7 @@ class DetailsSurfacePolishScreenshotTest {
     }
 
     /** Renders the details screen and records the full viewport once every asynchronous row settled. */
+    @Suppress("LongParameterList") // Capture each variant with its explicit accessibility and theme settings.
     private fun captureGroupDetails(
         snapshot: String,
         group: AppGroupRecordFfi,
@@ -212,6 +213,7 @@ class DetailsSurfacePolishScreenshotTest {
     }
 
     /** Composes the details screen for [group]; empty recent media still exposes the complete-history entry. */
+    @Suppress("LongParameterList") // Keep screen data and display settings clear at each call site.
     private fun renderGroupDetails(
         group: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>,
