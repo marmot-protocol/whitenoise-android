@@ -98,8 +98,21 @@ class TtsTransportBarTest {
         )
     }
 
+    /** A pending popup action cannot navigate a replacement speech queue. */
     @Test
-    fun replacingTheSpeechSessionCancelsTheExitingMessageMenuAction() {
+    fun replacingTheSpeechSessionCancelsTheExitingMessageMenuAction() =
+        checkExitingMessageActionCancelled(R.string.tts_bar_previous_message) { it.copy(sessionId = 2) }
+
+    /** Natural advancement during the popup exit cannot skip the next message. */
+    @Test
+    fun advancingWithinTheSpeechSessionCancelsTheExitingMessageMenuAction() =
+        checkExitingMessageActionCancelled(R.string.tts_bar_next_message) { it.copy(messageIndex = 2) }
+
+    /** Changes playback after the tap and confirms that the menu accepts a fresh tap afterward. */
+    private fun checkExitingMessageActionCancelled(
+        actionLabel: Int,
+        advance: (TtsState.Speaking) -> TtsState,
+    ) {
         val original = speakingTts(1, 4, 1, 3, "Preview").copy(sessionId = 1)
         var state by mutableStateOf<TtsState>(original)
         var jumps = 0
@@ -114,7 +127,7 @@ class TtsTransportBarTest {
                     onPreviousSentence = {},
                     onNextSentence = {},
                     onPreviousMessage = { jumps++ },
-                    onNextMessage = {},
+                    onNextMessage = { jumps++ },
                     onRateSelected = {},
                     onStop = {},
                     modifier = Modifier.width(360.dp),
@@ -122,20 +135,20 @@ class TtsTransportBarTest {
             }
         }
 
-        val previous = messageAction(R.string.tts_bar_previous_message).assertIsDisplayed()
+        val action = messageAction(actionLabel).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = false
-        previous.performClick()
+        action.performClick()
         composeRule.runOnIdle {
             assertEquals(0, jumps)
-            state = original.copy(sessionId = 2)
+            state = advance(original)
         }
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(label(R.string.tts_bar_previous_message)).assertDoesNotExist()
+        composeRule.onNodeWithText(label(actionLabel)).assertDoesNotExist()
         assertEquals(0, jumps)
         composeRule.mainClock.autoAdvance = true
-        messageAction(R.string.tts_bar_previous_message).performClick()
+        messageAction(actionLabel).performClick()
         composeRule.waitForIdle()
         assertEquals(1, jumps)
     }

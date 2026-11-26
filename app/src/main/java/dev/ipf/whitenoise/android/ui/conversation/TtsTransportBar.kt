@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
@@ -60,15 +61,6 @@ internal fun TtsTransportBar(
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
     val activeRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate()
-    val sessionId = displayState.sessionId
-
-    // Menu actions run after the popup closes. Recheck the queue before they navigate.
-    fun canJumpMessage(): Boolean {
-        val current = appState.ttsController.state.value
-        val currentEdge = appState.ttsHistorySession.edgeState.value
-        return current.sessionId == sessionId && ttsNavigationEnabled(current, currentEdge)
-    }
-
     // The estimate takes the controller lock, which the speech callback thread
     // also holds during playback, so it must not run on every recomposition.
     // Its only inputs are the playback state and the active rate — recompute
@@ -88,14 +80,19 @@ internal fun TtsTransportBar(
         // the conversation instead of completing or clamping the queue.
         onPreviousSentence = { appState.ttsHistorySession.previousSentence() },
         onNextSentence = { appState.ttsHistorySession.nextSentence() },
-        onPreviousMessage = { if (canJumpMessage()) appState.ttsHistorySession.previousMessage() },
-        onNextMessage = { if (canJumpMessage()) appState.ttsHistorySession.nextMessage() },
+        onPreviousMessage = appState.ttsHistorySession::previousMessage,
+        onNextMessage = appState.ttsHistorySession::nextMessage,
         onRateSelected = appState::setTtsRateOverride,
         onStop = { appState.stopSpeaking() },
         remainingSeconds = remainingSeconds,
         modifier = modifier,
         historyEdge = historyEdge,
         onBodyClick = onBodyClick,
+        currentNavigableState = {
+            appState.ttsController.state.value.takeIf {
+                ttsNavigationEnabled(it, appState.ttsHistorySession.edgeState.value)
+            }
+        },
     )
 }
 
@@ -122,10 +119,22 @@ internal fun TtsTransportBarContent(
     modifier: Modifier = Modifier,
     historyEdge: TtsHistoryEdgeState? = null,
     onBodyClick: (() -> Unit)? = null,
+    currentNavigableState: (() -> TtsState?)? = null,
 ) {
     val isError = state is TtsState.Error
     val isPreparing = state is TtsState.Preparing
     val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
+    val latestState by rememberUpdatedState(state)
+
+    /** Keeps an accepted menu action anchored to the message that was playing at the tap. */
+    fun canJumpMessage(): Boolean {
+        val current = if (currentNavigableState == null) latestState else currentNavigableState() ?: return false
+        return current.sessionId == state.sessionId &&
+            ttsNavigationEnabled(current) &&
+            current.messageIndex == state.messageIndex &&
+            current.messageProgressGeneration == state.messageProgressGeneration
+    }
+
     val showProgress = !isError && !isPreparing && ttsMessageCount(state) > 0
     val targetProgress = if (showProgress) ttsMessageProgressFraction(state) else 0f
     val animatedProgress =
@@ -175,8 +184,8 @@ internal fun TtsTransportBarContent(
             key(state.sessionId, navigationEnabled) {
                 TtsMessageMenu(
                     enabled = navigationEnabled,
-                    onPreviousMessage = onPreviousMessage,
-                    onNextMessage = onNextMessage,
+                    onPreviousMessage = { if (canJumpMessage()) onPreviousMessage() },
+                    onNextMessage = { if (canJumpMessage()) onNextMessage() },
                 )
             }
             PlaybackStripCloseButton(stringResource(R.string.tts_bar_stop), onStop)
