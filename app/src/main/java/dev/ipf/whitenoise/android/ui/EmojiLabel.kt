@@ -33,7 +33,7 @@ internal fun EmojiLabel(
     Text(
         text =
             remember(text, suffix, custom, resources) {
-                val label = EmojiShortcodes.speak(EmojiShortcodes.annotate(AnnotatedString(text)), custom, resources)
+                val label = EmojiShortcodes.annotate(AnnotatedString(text)).withSpokenEmojiNames(custom, resources)
                 if (suffix.isEmpty()) {
                     label
                 } else {

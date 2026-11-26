@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerEmojiDeletion
 import dev.ipf.whitenoise.android.ui.rememberEmojiArtPainter
+import dev.ipf.whitenoise.android.ui.withSpokenEmojiNames
 
 private val shortcodeSlotStyle by lazy {
     // A monospace colon provides the advance for the artwork. Scale it to one em.
@@ -172,7 +173,7 @@ internal fun emojiEditableText(state: TextFieldState): Modifier {
     val custom = LocalCustomEmoji.current
     val resources = LocalContext.current.resources
     return Modifier.semantics {
-        editableText = EmojiShortcodes.speak(AnnotatedString(state.text.toString()), custom, resources)
+        editableText = AnnotatedString(state.text.toString()).withSpokenEmojiNames(custom, resources)
     }
 }
 

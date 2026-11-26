@@ -190,33 +190,19 @@ internal object EmojiShortcodes {
     ): String {
         if (':' !in text) return text
         val ranges = presentationRanges(text).filter { art(it.item, custom, received) != null }
-        if (ranges.isEmpty()) return text
-        return buildString {
-            var source = 0
-            for (range in ranges) {
-                append(text, source, range.start)
-                if (lastOrNull()?.isLetterOrDigit() == true) append(' ')
-                append(plainLabel(range.item, resources))
-                source = range.end
-                if (text.getOrNull(source)?.isLetterOrDigit() == true) append(' ')
-            }
-            append(text, source, text.length)
-        }
-    }
-
-    /** Supplies spoken names while keeping the text and its selection offsets intact. */
-    fun speak(
-        text: AnnotatedString,
-        custom: CustomEmojiSet,
-        resources: Resources,
-    ): AnnotatedString {
-        if (':' !in text.text) return text
-        val ranges = presentationRanges(text.text).filter { art(it.item, custom, emptyMap()) != null }
-        if (ranges.isEmpty()) return text
-        return buildAnnotatedString {
-            append(text)
-            for (range in ranges) {
-                addTtsAnnotation(VerbatimTtsAnnotation(plainLabel(range.item, resources)), range.start, range.end)
+        return if (ranges.isEmpty()) {
+            text
+        } else {
+            buildString {
+                var source = 0
+                for (range in ranges) {
+                    append(text, source, range.start)
+                    if (lastOrNull()?.isLetterOrDigit() == true) append(' ')
+                    append(plainLabel(range.item, resources))
+                    source = range.end
+                    if (text.getOrNull(source)?.isLetterOrDigit() == true) append(' ')
+                }
+                append(text, source, text.length)
             }
         }
     }
@@ -284,6 +270,28 @@ internal object EmojiShortcodes {
                 InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
                     EmojiArtImage(art, contentDescription = null, modifier = Modifier.fillMaxSize())
                 }
+            }
+        }
+    }
+}
+
+/** Supplies spoken names while keeping the text and its selection offsets intact. */
+internal fun AnnotatedString.withSpokenEmojiNames(
+    custom: CustomEmojiSet,
+    resources: Resources,
+): AnnotatedString {
+    if (':' !in text) return this
+    val ranges =
+        EmojiShortcodes
+            .presentationRanges(text)
+            .filter { EmojiShortcodes.art(it.item, custom, emptyMap()) != null }
+    return if (ranges.isEmpty()) {
+        this
+    } else {
+        buildAnnotatedString {
+            append(this@withSpokenEmojiNames)
+            for (range in ranges) {
+                addTtsAnnotation(VerbatimTtsAnnotation(EmojiShortcodes.plainLabel(range.item, resources)), range.start, range.end)
             }
         }
     }
