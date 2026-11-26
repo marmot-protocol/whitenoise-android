@@ -4084,7 +4084,7 @@ internal fun ConversationScreen(
                             )
                         renderedTimeline.isEmpty() &&
                             controller.conversationGroupRecoveryRowVisible() ->
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize().padding(bottom = overlayPadding)) {
                                 ConversationGroupRecoveryCard(controller, appState)
                                 ConversationEmptyMessage(
                                     conversationEmptyState(controller.group.disappearingMessageSecs),
