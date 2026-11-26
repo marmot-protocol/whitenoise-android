@@ -333,6 +333,7 @@ internal fun ConversationTopBar(
                                         }
                                     val disappearingSecs = presentedGroup.disappearingMessageSecs
                                     val showTimer = disappearingSecs > 0uL
+                                    val timerLabel = disappearingMessagesLabel(disappearingSecs)
                                     if (membersSubtitle != null || showTimer) {
                                         val labelStyle = MaterialTheme.typography.labelSmall
                                         val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,7 +358,7 @@ internal fun ConversationTopBar(
                                                         Text("·", style = labelStyle, color = labelColor)
                                                     }
                                                     HeaderTimerBadge(
-                                                        label = disappearingMessagesLabel(disappearingSecs),
+                                                        label = timerLabel,
                                                         labelStyle = labelStyle,
                                                         labelColor = labelColor,
                                                     )
@@ -395,13 +396,16 @@ internal fun ConversationTopBar(
                                                                 .testTag("conversation.timer.tooltip")
                                                                 .heightIn(max = tooltipMaxHeight),
                                                     ) {
-                                                        Text(
-                                                            timerTooltipText,
+                                                        // Repeats the full duration the header may shorten.
+                                                        Column(
                                                             modifier =
                                                                 Modifier
                                                                     .testTag("conversation.timer.tooltip.text")
                                                                     .fadingVerticalScroll(rememberScrollState()),
-                                                        )
+                                                        ) {
+                                                            Text(timerTooltipText)
+                                                            Text(timerLabel)
+                                                        }
                                                     }
                                                 },
                                                 state = timerTooltipState,
@@ -467,7 +471,7 @@ private fun HeaderTimerBadge(
             },
             label = "header-timer-label",
         ) { shown ->
-            // A timer too long for the header ends in an ellipsis — Chat details shows the full duration.
+            // A timer too long for the header ends in an ellipsis — its tooltip shows the full duration.
             Text(
                 shown,
                 style = labelStyle,

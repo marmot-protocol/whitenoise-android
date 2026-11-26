@@ -29,6 +29,7 @@ import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -171,6 +172,20 @@ class ConversationTopBarSemanticsTest {
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
 
         assertTrue("the shortened timer must end in an ellipsis", layouts.single().isLineEllipsized(0))
+    }
+
+    /** The header timer's tooltip spells out a duration too long for the header, so anyone can read it in full. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerReadsInFullInItsTooltip() {
+        val appState = appState()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller)
+
+        composeRule
+            .onNode(hasText("$retention seconds") and hasAnyAncestor(hasTestTag("conversation.timer.tooltip")))
+            .assertExists()
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
