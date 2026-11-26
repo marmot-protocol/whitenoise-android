@@ -287,7 +287,7 @@ class ComposerToolbarScreenshotTest {
         }
     }
 
-    /** Checks visible dense-toolbar slot bounds and logs their actual rendered centers. */
+    /** Checks dense-toolbar slot bounds, scrolling short layouts to each action. */
     private fun assertDenseToolbarGeometry(
         name: String,
         settings: ComposerToolbarSettings,
@@ -305,19 +305,22 @@ class ComposerToolbarScreenshotTest {
                 .onNode(hasTestTag(COMPOSER_PILL_SURFACE_TAG) and ancestor)
                 .fetchSemanticsNode()
                 .boundsInRoot
+        val scrollToAction = name.endsWith("_short_height")
         val centers =
             settings.normalized().shortcuts.map { shortcut ->
-                val bounds =
-                    composeRule
-                        .onNode(hasTestTag("composer.shortcut.${shortcut.id}") and ancestor)
-                        .fetchSemanticsNode()
-                        .boundsInRoot
+                val node = composeRule.onNode(hasTestTag("composer.shortcut.${shortcut.id}") and ancestor)
+                if (scrollToAction) node.performScrollTo().assertIsDisplayed()
+                val bounds = node.fetchSemanticsNode().boundsInRoot
                 assertTrue(
                     "$name ${shortcut.id} center outside $surface: $bounds",
                     bounds.center.x >= surface.left && bounds.center.x <= surface.right,
                 )
                 shortcut.id to bounds.center
             }
+        if (scrollToAction) {
+            val first = settings.normalized().shortcuts.first()
+            composeRule.onNode(hasTestTag("composer.shortcut.${first.id}") and ancestor).performScrollTo()
+        }
         println("Dense toolbar actual centers $name surface=$surface slots=$centers")
     }
 

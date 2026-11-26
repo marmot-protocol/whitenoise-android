@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -33,7 +32,7 @@ internal fun SystemPasteIconButton(
     val pasteAccepted = rememberSystemPasteGuard(enabled)
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
-    IconButton(
+    SlotIconButton(
         onClick = {
             if (!latestOnPaste()) {
                 toolbar.showMenu(

@@ -82,12 +82,12 @@ class ConversationDictationPersistentControlTest {
                 composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
             }
         val centers = actions.map { it.getUnclippedBoundsInRoot().let { bounds -> (bounds.left + bounds.right) / 2 } }
-        centers.zipWithNext().forEach { (first, second) -> assertEquals(36.dp, second - first) }
+        centers.zipWithNext().forEach { (first, second) -> assertEquals(48.dp, second - first) }
         actions.forEach { action ->
             val touch = action.fetchSemanticsNode().touchBoundsInRoot
             assertTrue("nominal touch width", touch.width >= with(composeRule.density) { 48.dp.toPx() })
             val bounds = action.getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 36.dp)
+            assertTrue(bounds.right - bounds.left >= 48.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()

@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.settings.settingsPenSource
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
 
@@ -229,7 +230,7 @@ internal fun ChatsNewMessageFabContent(
             shape = if (morphing) RectangleShape else FloatingActionButtonDefaults.shape,
             containerColor = chatsFabContainerColor(morphing, MaterialTheme.colorScheme.surfaceContainerHigh),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
+            elevation = chatsFabElevation(),
         ) {
             Icon(
                 painterResource(if (missingRelays) R.drawable.ic_warning else R.drawable.ic_edit),
@@ -273,3 +274,18 @@ private fun chatsFabContainerColor(
 ): Color = if (morphing) Color.Transparent else settledColor
 
 private val ChatFabIconSize = 24.dp
+
+/**
+ * The pen stays flat in every state, so pressing it no longer lifts it (#4101). It is the one FAB without the
+ * floating-control shadow, by the owner's decision: it hands off to the shell's flat morph surface, and the two
+ * must paint the same pixels on the handoff's first frame (`ComposerFabHandoffScreenshotTest`), which a shadow
+ * would break.
+ */
+@Composable
+private fun chatsFabElevation() =
+    FloatingActionButtonDefaults.elevation(
+        defaultElevation = WhiteNoiseElevation.None,
+        pressedElevation = WhiteNoiseElevation.None,
+        focusedElevation = WhiteNoiseElevation.None,
+        hoveredElevation = WhiteNoiseElevation.None,
+    )

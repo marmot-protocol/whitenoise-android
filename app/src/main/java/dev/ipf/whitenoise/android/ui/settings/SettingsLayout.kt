@@ -44,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
@@ -61,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -304,15 +304,19 @@ internal fun SettingsCallout(
     )
 }
 
-/** Pinned action area above the navigation bar and keyboard; a Save button lives here. */
+/**
+ * Pinned action area above the navigation bar and keyboard, where a Save button lives. It takes the docked
+ * tint unless [elevated] is false, for a page whose own colour already sets the area apart.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsBottomAction(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.surface,
-    tonalElevation: Dp = SettingsBottomActionElevation,
+    elevated: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tonalElevation = if (elevated) WhiteNoiseElevation.Docked else WhiteNoiseElevation.None
     Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
         Box(Modifier.fillMaxWidth().floatingDictationFooter()) {
             AdaptiveContent {
@@ -347,8 +351,6 @@ internal fun SettingsGroupPanel(
         Column(Modifier.fillMaxWidth(), content = content)
     }
 }
-
-private val SettingsBottomActionElevation = 2.dp
 
 /** Free-form content on the group surface at the screen margin, for panels that are not a row list. */
 @Suppress("FunctionNaming")

@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.chats.NotificationProfileBanner
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickActions
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickSheetContent
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileTapClock
+import dev.ipf.whitenoise.android.ui.settings.NOTIFICATION_PROFILE_EDIT_LIST_TAG
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditActions
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditContent
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditFormState
@@ -117,12 +120,14 @@ class NotificationProfilesScreenshotTest {
 
     @Test fun editorNewAmoled() = captureEditor("notification_profile_editor_new_amoled", newForm(), Theme.Amoled)
 
+    /** Captures the schedule editor and its wrapped weekday targets at a compact width. */
     @Test fun editorScheduleLight() {
         captureEditor(
             "notification_profile_editor_schedule_light",
             scheduleForm(),
             Theme.Light,
         )
+        captureWeekdays("notification_profile_editor_weekdays_light")
     }
 
     @Test fun editorScheduleDark() {
@@ -137,9 +142,11 @@ class NotificationProfilesScreenshotTest {
         captureEditor("notification_profile_editor_schedule_amoled", scheduleForm(), Theme.Amoled)
     }
 
+    /** Captures the compact weekday layout with right-to-left direction and large text. */
     @Test
     fun editorScheduleRtlLargeFont() {
         captureEditor("notification_profile_editor_schedule_rtl_large_font", scheduleForm(), Theme.LightRtlLarge)
+        captureWeekdays("notification_profile_editor_weekdays_rtl_large_font")
     }
 
     @Test
@@ -239,6 +246,15 @@ class NotificationProfilesScreenshotTest {
         val actions = NotificationProfileEditActions({}, {}, {}, {}, {}, {}, {}, {}, {})
         render(theme) { NotificationProfileEditContent(form, actions) }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Scrolls the entire weekday grid into view so both rows are included in the golden. */
+    private fun captureWeekdays(name: String) {
+        composeRule.onNodeWithTag(NOTIFICATION_PROFILE_EDIT_LIST_TAG).performScrollToKey("schedule")
+        composeRule
+            .onNodeWithTag("notification-profile.days")
+            .performScrollTo()
+            .captureRoboImage("src/test/snapshots/$name.png")
     }
 
     private fun captureSheet(

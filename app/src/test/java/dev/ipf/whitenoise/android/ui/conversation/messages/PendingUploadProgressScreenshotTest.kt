@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -170,7 +172,7 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
 
     /**
      * A pending large video is sent from its staged file, so its bubble never resolves a file for it, and a tap on
-     * its play disc opens nothing.
+     * its play disc, whose touch target is at least 48 dp, opens nothing.
      */
     @Test
     fun stagedFileVideoBubbleNeverResolvesAFileAndATapOpensNothing() {
@@ -194,7 +196,11 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
             }
         }
 
-        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, entry.index)).performClick()
+        composeRule
+            .onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, entry.index))
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
         composeRule.waitForIdle()
         assertEquals(0, resolved.get())
         assertEquals(0, opened.get())

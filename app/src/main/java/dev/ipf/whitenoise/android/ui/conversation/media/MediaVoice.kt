@@ -4,9 +4,9 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +83,8 @@ import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceSendingIndicator
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
@@ -665,12 +667,15 @@ internal fun VoiceAttachmentContent(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(ConversationMessageMetrics.RichComponentInset),
         ) {
+            val actionPress = remember { MutableInteractionSource() }
             Box(
                 modifier =
                     Modifier
                         .size(48.dp)
                         .semantics(mergeDescendants = true) { contentDescription = actionDescription }
-                        .combinedClickable(
+                        .shapedTouchTarget(
+                            actionPress,
+                            role = null,
                             onClickLabel = action.clickLabel,
                             onLongClick = onLongPress,
                             onClick = action.onClick,
@@ -685,7 +690,7 @@ internal fun VoiceAttachmentContent(
                     shape = CircleShape,
                     modifier = Modifier.size(40.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.shapedPressFeedback(actionPress, CircleShape), contentAlignment = Alignment.Center) {
                         if (action.transfer != null) {
                             TileTransferGlyph(
                                 action.transfer,

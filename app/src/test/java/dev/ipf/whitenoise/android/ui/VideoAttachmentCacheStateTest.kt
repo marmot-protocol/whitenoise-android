@@ -342,6 +342,7 @@ class VideoAttachmentCacheStateTest {
         }
     }
 
+    /** A video bubble that already has a cached poster reads only duration metadata and extracts no poster frame. */
     @Test
     fun cachedPosterSkipsPosterFrameExtraction() {
         val source =
@@ -351,7 +352,7 @@ class VideoAttachmentCacheStateTest {
             ).firstOrNull { it.exists() }?.readText()
                 ?: error("Missing MediaVideo.kt source file")
         val bubbleStart = source.indexOf("internal fun MediaVideoBubble(")
-        val bubbleEnd = source.indexOf("internal fun VideoUploadIndicator(", bubbleStart)
+        val bubbleEnd = source.indexOf("internal val VIDEO_PLAY_DISC_SIZE", bubbleStart)
         check(bubbleStart >= 0 && bubbleEnd > bubbleStart) {
             "Could not locate MediaVideoBubble boundaries in MediaVideo.kt; update this regression test"
         }

@@ -62,6 +62,7 @@ class EmojiSetPickerScreenshotTest {
         BuiltinEmojiSet.entries.forEach { composeRule.onNodeWithTag(emojiPickerCategoryTestTag(it)).assertExists() }
     }
 
+    /** Tapping a set's tab scrolls the pane to that set's section. */
     @Test
     fun setTabScrollsToItsSection() {
         render()

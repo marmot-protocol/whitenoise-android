@@ -25,6 +25,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -36,6 +38,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
@@ -153,7 +156,11 @@ internal fun TtsTransportBarContent(
                                 ),
                             ),
                     ) {
-                        Icon(Icons.Default.SkipPrevious, stringResource(R.string.tts_bar_previous_message))
+                        Icon(
+                            Icons.Default.SkipPrevious,
+                            stringResource(R.string.tts_bar_previous_message),
+                            Modifier.mirrorInRtl(),
+                        )
                     }
                     IconButton(
                         onClick = onPreviousSentence,
@@ -210,7 +217,11 @@ internal fun TtsTransportBarContent(
                                 ),
                             ),
                     ) {
-                        Icon(Icons.Default.SkipNext, stringResource(R.string.tts_bar_next_message))
+                        Icon(
+                            Icons.Default.SkipNext,
+                            stringResource(R.string.tts_bar_next_message),
+                            Modifier.mirrorInRtl(),
+                        )
                     }
                     if (!isError) {
                         TtsTransportRatePicker(
@@ -315,4 +326,14 @@ private fun TtsTransportProgress(
             }
         }
     }
+}
+
+/**
+ * Flips a directional glyph in a right-to-left layout, where the transport row runs the other way, so the
+ * previous and next message skips point outward like the sentence arrows beside them (#4065).
+ */
+@Composable
+private fun Modifier.mirrorInRtl(): Modifier {
+    val rightToLeft = LocalLayoutDirection.current == LayoutDirection.Rtl
+    return if (rightToLeft) scale(scaleX = -1f, scaleY = 1f) else this
 }

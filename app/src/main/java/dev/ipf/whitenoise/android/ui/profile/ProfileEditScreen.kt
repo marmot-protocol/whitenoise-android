@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -288,14 +289,12 @@ internal fun ProfileHeroHeader(
                             .offset(y = 58.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp,
-                        modifier =
+                    // Clicks inside the Surface, whose own clip shapes the highlight without cutting its shadow away.
+                    Surface(shape = CircleShape, shadowElevation = WhiteNoiseElevation.ProfileAvatar) {
+                        Box(
                             Modifier
-                                .clip(CircleShape)
                                 .testTag(PROFILE_HEADER_AVATAR_TAG)
+                                .clip(CircleShape)
                                 .clickable(
                                     enabled = contentReady,
                                     onClickLabel =
@@ -308,9 +307,8 @@ internal fun ProfileHeroHeader(
                                         ),
                                     role = Role.Button,
                                     onClick = onOpenPicture,
-                                ),
-                    ) {
-                        Box(Modifier.padding(4.dp)) {
+                                ).padding(4.dp),
+                        ) {
                             Box {
                                 Avatar(
                                     title = if (avatarLoadFinished && avatarImage == null) title else "",
