@@ -67,6 +67,7 @@ import dev.ipf.whitenoise.android.ui.keyboard.installHardwareShortcuts
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeLifecycleClass
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeActivityLifecycleClass
+import dev.ipf.whitenoise.android.ui.onboarding.setup.recordAccountSetupBackground
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 import java.util.concurrent.atomic.AtomicLong
@@ -529,6 +530,7 @@ class MainActivity : AppCompatActivity() {
         if (::appState.isInitialized) {
             foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
+            if (!isChangingConfigurations) appState.recordAccountSetupBackground()
             appState.setAppInForeground(false)
         }
         WarmResumeTrace.foregroundStopped(warmResumeTraceToken, warmResumeEpoch)

@@ -141,6 +141,26 @@ class FragmentTest(unittest.TestCase):
         active, retired, errors = checker.parse_guide(rendered)
         self.assertEqual((active, retired, errors), ({"MSG-001", "MSG-002"}, set(), []))
 
+    def test_wrapped_case_preserves_rendered_guide_and_historical_definition(self):
+        self.init_git()
+        self.seed()
+        before = fragments.load_guide(self.root)
+        path = self.case_path()
+        path.write_text(path.read_text().replace(" → ", "\n    → "))
+        self.assertEqual(fragments.load_guide(self.root), before)
+        revision = self.commit("wrap a case without changing its wording")
+        self.assertEqual(fragments.historical_definitions(self.root, revision)["MSG-001"], FIRST)
+
+    def test_case_continuations_cannot_add_a_second_checklist_item(self):
+        self.seed()
+        path = self.case_path()
+        original = path.read_text()
+        for continuation in ("extra unindented text", "\n    another paragraph", f"    {SECOND}", "    - [ ] another task"):
+            with self.subTest(continuation=continuation):
+                path.write_text(original + continuation + "\n")
+                with self.assertRaisesRegex(fragments.FragmentError, "indented by four spaces"):
+                    fragments.load_guide(self.root)
+
     def test_legacy_case_edits_cannot_be_silently_masked(self):
         self.seed()
         self.write(fragments.GUIDE_PATH, guide(FIRST.replace("Send hello", "Send goodbye")))
