@@ -90,6 +90,8 @@ class FcmAutoInitCoverageTest {
         assertTrue("only callers that ask enable it", fetch.contains(conditional))
         val forAccounts = sync.functionBody("syncNativePushRegistrationForAccountsLocked")
         assertTrue(forAccounts.contains("val autoInitDeferred = uncommittedNativePushEnables.get() > 0"))
+        val deferredRetry = "if (autoInitDeferred) recordPendingRegistrationSync()"
+        assertTrue("a deferred sync records its retry", deferredRetry in forAccounts)
         assertTrue("an open enable defers auto-init", forAccounts.contains("enableAutoInit = !autoInitDeferred"))
         assertTrue("and keeps the pending marker", forAccounts.contains("autoInitDeferred ||"))
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)
@@ -138,7 +140,9 @@ class FcmAutoInitCoverageTest {
             val body = sync.functionBody(locked)
             assertTrue("$locked must settle on cancel", body.contains("settlingFcmAutoInitOnCancel {"))
         }
-        assertTrue(settle.contains("withContext(NonCancellable) { disableFcmAutoInitWithoutLoadedNativeDemand() }"))
+        assertTrue(settle.contains("withContext(NonCancellable) {"))
+        val retry = "!= NativePushDemand.None) recordPendingRegistrationSync()"
+        assertTrue("a cancelled sync with Push demand keeps a retry", retry in settle)
         assertTrue(settle.contains("throw cancelled"))
     }
 

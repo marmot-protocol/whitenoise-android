@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -106,6 +107,10 @@ internal class NotificationDeliveryController(
     // per-account enable before it is confirmed. While any is open a sync leaves Firebase auto-init alone,
     // since turning it on starts an SDK token sync that no later off write cancels. Each sets it on commit.
     internal val uncommittedNativePushEnables = AtomicInteger()
+
+    // Whether the latest Firebase auto-init write failed. A failed write records the pending registration
+    // sync, and no sync acknowledges it until a later write succeeds, so the next sync retries the write.
+    internal val fcmAutoInitWriteFailed = AtomicBoolean()
     internal val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     internal val notificationDeliveryModeMutex = Mutex()
     internal val notificationDeliveryModeIntent = StalenessGuard()

@@ -77,8 +77,13 @@ internal class RecordingNativePushFallbackPlatform(
         return result && recorded
     }
 
-    /** Records the write instead of touching the Firebase SDK. */
+    /** When set, every auto-init write fails as an SDK failure would, without being recorded. */
+    @Volatile
+    var failAutoInitWrites = false
+
+    /** Records the write instead of touching the Firebase SDK, or fails while [failAutoInitWrites] is set. */
     override fun setFcmAutoInitEnabled(enabled: Boolean) {
+        check(!failAutoInitWrites) { "auto-init write failed" }
         autoInitWrites += enabled
     }
 }

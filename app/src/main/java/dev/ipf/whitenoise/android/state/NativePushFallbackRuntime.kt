@@ -66,14 +66,13 @@ internal class AndroidNativePushFallbackPlatform(
 
     /**
      * Writes auto-init only when this build initialized Firebase and the value changes. The SDK persists
-     * every write, so an unchanged value costs no disk write or token-sync check.
+     * every write, so an unchanged value costs no disk write or token-sync check. An SDK failure propagates,
+     * so the delivery controller can keep a retry pending.
      */
     override fun setFcmAutoInitEnabled(enabled: Boolean) {
         if (FirebaseApp.getApps(appContext).isEmpty()) return
-        runCatching {
-            val messaging = FirebaseMessaging.getInstance()
-            if (messaging.isAutoInitEnabled != enabled) messaging.isAutoInitEnabled = enabled
-        }.onFailure { appStateDebug(it) { "FCM auto-init update failed enabled=$enabled" } }
+        val messaging = FirebaseMessaging.getInstance()
+        if (messaging.isAutoInitEnabled != enabled) messaging.isAutoInitEnabled = enabled
     }
 }
 

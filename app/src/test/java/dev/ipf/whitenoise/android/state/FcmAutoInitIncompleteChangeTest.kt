@@ -377,6 +377,56 @@ class FcmAutoInitIncompleteChangeTest {
             }
         }
 
+    /**
+     * A sync for an account already on Push that is cancelled after reading its demand, before its auto-init
+     * write, leaves the durable registration sync pending, and the next sync turns auto-init on.
+     */
+    @Test
+    fun cancelledSyncWithPushDemandRecordsPendingSync() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val sync = AtomicReference<Job?>()
+            val cancelOnRead = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    initialNotificationSettings = settings(ACCOUNT_A, nativeEnabled = true),
+                    nativePushFallbackPlatform = platform,
+                    // The demand read returns, then the sync is cancelled before its auto-init write.
+                    onNotificationSettings = {
+                        if (cancelOnRead.getAndSet(false)) sync.get()?.cancel()
+                        null
+                    },
+                    pushServerConfigProvider = { CONFIG },
+                    fcmTokenReader = { "test-token" },
+                    nativePushCapabilityResolver = { NativePushCapability.Available },
+                )
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.clearPendingNativePushRegistrationSync()
+                platform.autoInitWrites.clear()
+                cancelOnRead.set(true)
+
+                val job = launch { fixture.appState.syncNativePushRegistrationIfEnabled() }
+                sync.set(job)
+                fixture.runWithMainLooperPumping { job.join() }
+
+                assertTrue("the sync must have been cancelled", job.isCancelled)
+                assertFalse("a cancelled sync never turns auto-init on", true in platform.autoInitWrites)
+                assertTrue("the next sync must settle auto-init", store.nativePushRegistrationSyncPending())
+
+                assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
+
+                assertEquals(true, platform.autoInitWrites.lastOrNull())
+                assertFalse("the sync must acknowledge the marker", store.nativePushRegistrationSyncPending())
+            } finally {
+                cancelOnRead.set(false)
+                fixture.close()
+            }
+        }
+
     /** Builds a running local-signing account summary for the given ref. */
     private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true, false)
 

@@ -215,8 +215,8 @@ class FcmAutoInitUncommittedEnableTest {
 
     /**
      * A sync for an account already on Push that runs while another enable is still uncommitted leaves auto-init
-     * alone and keeps the durable registration sync pending, so a later sync turns auto-init on even if that
-     * enable fails without touching it.
+     * alone and records the durable registration sync, so a later sync turns auto-init on even if that enable
+     * fails without touching it.
      */
     @Test
     fun syncDuringOpenEnableKeepsPendingSync() =
@@ -227,7 +227,7 @@ class FcmAutoInitUncommittedEnableTest {
             try {
                 fixture.bootstrap()
                 val store = PushTokenStore.create(context)
-                store.recordPendingNativePushRegistrationSync()
+                store.clearPendingNativePushRegistrationSync()
                 platform.autoInitWrites.clear()
                 val delivery = fixture.appState.notificationDelivery
 
@@ -241,7 +241,7 @@ class FcmAutoInitUncommittedEnableTest {
                 }
 
                 assertTrue("an open enable defers auto-init", platform.autoInitWrites.isEmpty())
-                assertTrue("the marker must survive the deferred sync", store.nativePushRegistrationSyncPending())
+                assertTrue("the deferred sync must leave its retry pending", store.nativePushRegistrationSyncPending())
 
                 assertTrue(fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() })
 

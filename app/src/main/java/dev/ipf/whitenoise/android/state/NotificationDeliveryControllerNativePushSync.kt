@@ -113,9 +113,11 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
         NativePushDemand.Required -> Unit
     }
     // An enable that can still roll back sets auto-init itself once it commits. While one is open, read after
-    // demand so it covers any flag that demand saw, this sync leaves auto-init alone and keeps the pending
-    // marker, so the next sync settles auto-init even if that enable fails before touching it.
+    // demand so it covers any flag that demand saw, this sync leaves auto-init alone and records the pending
+    // marker without acknowledging it, so the next sync settles auto-init even if that enable fails before
+    // touching it. A failed auto-init write keeps the marker the same way.
     val autoInitDeferred = uncommittedNativePushEnables.get() > 0
+    if (autoInitDeferred) recordPendingRegistrationSync()
     val token =
         tokenForNativePushSync(freshCallbackToken, operationIsCurrent, enableAutoInit = !autoInitDeferred)
             ?: return false
@@ -132,6 +134,7 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
         tokenIsCurrent() &&
         (
             autoInitDeferred ||
+                fcmAutoInitWriteFailed.get() ||
                 withContext(pushWakeStorageDispatcher) {
                     pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
                 }

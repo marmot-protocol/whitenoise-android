@@ -31,14 +31,25 @@ internal suspend fun NotificationDeliveryController.completeSyncWithoutNativePus
     isCurrent: () -> Boolean,
 ): Boolean {
     disableFcmAutoInitIfUnchanged(accountRefs)
+    // A failed off write keeps its pending marker for the next sync to retry.
+    if (fcmAutoInitWriteFailed.get()) return false
     return withContext(pushWakeStorageDispatcher) {
         pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = isCurrent)
     }
 }
 
-/** Applies Firebase auto-init off Main, a no-op in builds without Firebase. */
+/**
+ * Applies Firebase auto-init off Main, a no-op in builds without Firebase. A failed SDK write records the
+ * pending registration sync and marks the write failed, so syncs keep that marker until a write succeeds.
+ */
 internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Boolean) {
-    withContext(Dispatchers.IO) { nativePushFallbackPlatform.setFcmAutoInitEnabled(enabled) }
+    val applied =
+        withContext(Dispatchers.IO) { runCatching { nativePushFallbackPlatform.setFcmAutoInitEnabled(enabled) } }
+    fcmAutoInitWriteFailed.set(applied.isFailure)
+    applied.onFailure { failure ->
+        appStateDebug(failure) { "FCM auto-init update failed enabled=$enabled" }
+        recordPendingRegistrationSync()
+    }
 }
 
 /**
@@ -108,13 +119,16 @@ internal suspend fun NotificationDeliveryController.settleFcmAfterSignOut(
 /**
  * Runs [block], which holds the native sync lock, and settles auto-init from the loaded accounts' demand if
  * it is cancelled. The block may already have committed a native-push disable, such as a drained sign-out
- * disable, so the settle runs before the cancellation propagates.
+ * disable, so the settle runs before the cancellation propagates. Push demand that the cancelled sync left
+ * without its auto-init write, or demand it cannot read, records the pending registration sync.
  */
 internal suspend inline fun NotificationDeliveryController.settlingFcmAutoInitOnCancel(block: () -> Boolean): Boolean {
     try {
         return block()
     } catch (cancelled: CancellationException) {
-        withContext(NonCancellable) { disableFcmAutoInitWithoutLoadedNativeDemand() }
+        withContext(NonCancellable) {
+            if (disableFcmAutoInitWithoutLoadedNativeDemand() != NativePushDemand.None) recordPendingRegistrationSync()
+        }
         throw cancelled
     }
 }
