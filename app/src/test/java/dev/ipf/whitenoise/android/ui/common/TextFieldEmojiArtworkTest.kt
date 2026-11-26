@@ -168,7 +168,10 @@ class TextFieldEmojiArtworkTest {
         }
         val customLeft = isLeftOfEnglishLetter(":party:")
         composeRule.runOnIdle { state.edit { replace(0, length, "אב A 🙂 אב") } }
-        composeRule.waitUntil(5_000) { actualLayout.get()?.layoutInput?.text?.text?.contains("🙂") == true }
+        composeRule.waitUntil(5_000) {
+            val layout = actualLayout.get()
+            layout != null && "🙂" in layout.layoutInput.text.text
+        }
         assertTrue(isLeftOfEnglishLetter("🙂"))
         assertTrue(customLeft)
     }
