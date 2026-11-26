@@ -183,7 +183,8 @@ class ShapedTouchWrapperResolverTest {
     }
 
     /**
-     * A generic wrapper is a wrapper, whether its call infers or spells out the type arguments, and whitespace before
+     * A generic wrapper is a wrapper, whether its call infers or spells out the type arguments, even with arrows or
+     * deep nesting in them; a labeled or next-line trailing lambda still fills the last slot; and whitespace before
      * a default's type arguments keeps its commas inside one parameter.
      */
     @Test
@@ -193,6 +194,10 @@ class ShapedTouchWrapperResolverTest {
             listOf(
                 "fun <T> Gen(onClick: () -> Unit, modifier: Modifier, value: T)",
                 "fun <T : kotlin.Any> Bound(onClick: () -> Unit, modifier: Modifier, value: T)",
+                "fun <T : () -> Unit> Arrow(onClick: () -> Unit, modifier: Modifier, value: T)",
+                "fun <T : kotlin.collections.MutableMap<String, List<Map<String, Int>>>> " +
+                    "Long(modifier: Modifier, v: T)",
+                "fun Slot(onClick: () -> Unit, modifier: Modifier, content: () -> Unit)",
                 "fun Spaced(onClick: () -> Unit, values: Map<String, Int> = mapOf <String, Int>(), modifier: Modifier)",
             ).joinToString("\n", prefix = "package gw\n") { "$it $handOff" }
         val calls =
@@ -200,6 +205,11 @@ class ShapedTouchWrapperResolverTest {
                 "Inferred.kt" to "Gen(go, Modifier.width(36.dp), 1)",
                 "Explicit.kt" to "Gen<Int>(go, Modifier.width(36.dp), 1)",
                 "Bound.kt" to "Bound<String>(go, Modifier.width(36.dp), \"x\")",
+                "Arrow.kt" to "Arrow<() -> Unit>(go, Modifier.width(36.dp), {})",
+                "Deep.kt" to "Gen<Map<String, List<List<Int>>>>(go, Modifier.width(36.dp), emptyMap())",
+                "Labeled.kt" to "Slot(go, Modifier.width(36.dp)) content@{}",
+                "NextLine.kt" to "Slot(go, Modifier.width(36.dp))\n{}",
+                "LongBound.kt" to "Long(Modifier.width(36.dp), mutableMapOf())",
                 "Spaced.kt" to "Spaced(go, emptyMap(), Modifier.width(36.dp))",
             ).mapValues { (_, call) -> "package gc\nimport gw.*\nfun Screen() { $call }" }
         val findings = stretchedWrapperFindings(calls + ("Generic.kt" to wrappers))

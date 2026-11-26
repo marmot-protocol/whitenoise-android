@@ -24,6 +24,9 @@ private val clickModifier =
 private val thenOpen = Regex("""\.\s*then\s*$""")
 private val chainedCall = Regex("""\s*\.\s*(\w+)\s*([({])""")
 private val trailingLambda = Regex("""[ \t]*\{""")
+
+// A wrapper call's trailing lambda may carry a label, `content@{`, or start on the next line.
+private val wrapperTrailingLambda = Regex("""\s*(?:\w+@\s*)?\{""")
 private val roundChild =
     Regex("""CircleShape|PillShape|RoundedCornerShape|shapes\.\w+|(?<![\w.])(Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
 private val roundComponentCall = Regex("""(?<![\w.])(\w*Swatch|Avatar|ProfileAvatar|GroupAvatar)\s*\(""")
@@ -49,13 +52,16 @@ private val functionModifiers =
             """@[\w.]+(?:\([^()]*\))?\s+)+$""",
     )
 
-/** A declaration's or call's `<…>` type parameters or arguments, nested up to three levels deep. */
-internal const val TYPE_PARAMETERS = """<(?:[^<>]|<(?:[^<>]|<[^<>]*>)*>)*>"""
+/**
+ * A declaration's or call's `<…>` type parameters or arguments, nested up to four levels deep, stepping over the `>`
+ * of a function type's arrow, as in `<T : () -> Unit>`.
+ */
+internal const val TYPE_PARAMETERS = """<(?:->|[^<>]|<(?:->|[^<>]|<(?:->|[^<>]|<(?:->|[^<>])*>)*>)*>)*>"""
 
 internal val enclosingFunction = Regex("""\bfun\s+(?:$TYPE_PARAMETERS\s*)?(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
-private const val DECLARATION_LOOKBEHIND = 64
+private const val DECLARATION_LOOKBEHIND = 256
 
 /**
  * Every shape-rule finding in [source], as "<kind> @<line>". [path] is the file's path below `ui/`, with `/`
@@ -243,7 +249,7 @@ private fun String.stretchedCalls(
             callSites(name)
                 .filter { (nameStart, start, args) ->
                     val before = substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
-                    val trailing = trailingLambda.matchAt(this, start + args.length + 1) != null
+                    val trailing = wrapperTrailingLambda.matchAt(this, start + args.length + 1) != null
                     val call = WrapperCall(args, trailing)
                     val indices = if (declaration.containsMatchIn(before)) null else reached(name, nameStart, call)
                     indices.orEmpty().any { index ->

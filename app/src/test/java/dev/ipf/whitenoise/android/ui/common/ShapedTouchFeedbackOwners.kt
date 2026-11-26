@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 private val componentCall = Regex("""\b([A-Z]\w*)\s*\(""")
 private val componentDeclaration = Regex("""\b(fun|class|interface)\s*(?:$TYPE_PARAMETERS\s*)?$""")
-private const val COMPONENT_DECLARATION_LOOKBEHIND = 32
+private const val COMPONENT_DECLARATION_LOOKBEHIND = 256
 
 /** One component call, including its trailing content lambda when present. */
 internal data class FeedbackOwner(
