@@ -70,6 +70,16 @@ class BatteryEvalTest(unittest.TestCase):
                 self.assertEqual(expected, result["status"])
                 self.assertAlmostEqual(change, result["median_change_percent"])
 
+    def test_rejects_balanced_but_non_alternating_acquisition_order(self):
+        """Balanced counts do not protect captures grouped in the same acquisition order."""
+        value = campaign()
+        pairs = value["scenarios"]["push_idle"]["pairs"]
+        pairs[:] = [pairs[index] for index in (0, 2, 4, 1, 3)]
+
+        result = report(self.write(value))["scenarios"]["push_idle"]
+
+        self.assertEqual({"status": "inconclusive", "reason": "unbalanced_order"}, result)
+
     def test_total_energy_requires_equal_actual_windows_in_each_pair(self):
         """Equal power over different event windows cannot yield an energy verdict."""
         for scenario in ("push_burst", "reconnect"):

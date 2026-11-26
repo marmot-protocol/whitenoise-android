@@ -143,7 +143,7 @@ def sample_energy(sample, scenario, config, campaign, directory):
 
 
 def summarize_scenario(scenario, config, campaign, directory, used_captures):
-    """Summarize complete pairs, requiring equal event windows for total energy."""
+    """Summarize alternating pairs, requiring equal event windows for total energy."""
     require(fields(config, SCENARIO_FIELDS), "invalid_scenario_config")
     require(integer(config["window_ms"], MIN_WINDOW[scenario]), "invalid_measurement_window")
     expected = config["expected_messages"]
@@ -158,7 +158,7 @@ def summarize_scenario(scenario, config, campaign, directory, used_captures):
     )
     pairs = config["pairs"]
     require(isinstance(pairs, list) and MIN_PAIRS <= len(pairs) <= 100, "insufficient_or_excess_pairs")
-    a_first = 0
+    previous_first_arm = None
     samples = {"a": [], "b": []}
     temperatures = []
     failed_deliveries = {"a": 0, "b": 0}
@@ -170,7 +170,9 @@ def summarize_scenario(scenario, config, campaign, directory, used_captures):
             and pair[0]["arm"] != pair[1]["arm"],
             "invalid_pair",
         )
-        a_first += pair[0]["arm"] == "a"
+        first_arm = pair[0]["arm"]
+        require(first_arm != previous_first_arm, "unbalanced_order")
+        previous_first_arm = first_arm
         for sample in pair:
             energy, delivery_ok = sample_energy(sample, scenario, config, campaign, directory)
             digest = sample["capture_sha256"]
@@ -180,7 +182,6 @@ def summarize_scenario(scenario, config, campaign, directory, used_captures):
             samples[arm].append(energy)
             temperatures.append(sample["temperature_decicelsius"])
             failed_deliveries[arm] += not delivery_ok
-    require(abs(2 * a_first - len(pairs)) <= 1, "unbalanced_order")
     require(max(temperatures) - min(temperatures) <= 20, "temperature_spread")
     if any(failed_deliveries.values()):
         return {"status": "delivery_failed", "pairs": len(pairs), "delivery_failures": failed_deliveries}
