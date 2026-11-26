@@ -9,7 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -17,7 +19,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
@@ -28,19 +33,30 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppLockController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.flow.first
 
 /** Lifecycle-aware route; the process-owned controller survives Activity recreation and signer handoff. */
 @Composable
 internal fun AccountSetupScreen(
     controller: AccountSetupController,
     randomName: (String?) -> String,
+    appLock: AppLockController? = null,
     onLater: () -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(controller, lifecycleOwner, appLock) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            // The lock decision can still be pending when the Activity resumes.
+            snapshotFlow { appLock?.screenVisible != true && appLock?.evaluationPending != true }.first { it }
+            controller.foregroundRetry.onForegrounded()
+        }
+    }
     AccountSetupContent(
         state,
         controller::submit,
@@ -159,6 +175,7 @@ internal fun AccountSetupContent(
             SetupSurface.Decision -> {
                 if (step != null) {
                     SetupDecisionHeading(state)
+                    SetupStepExplanation(state)
                     SetupDecisionContent(state)
                     SetupDirectRelayRemoval(state)
                     if (snapshot?.proposal?.relayRepair != null &&
@@ -187,7 +204,7 @@ internal fun AccountSetupContent(
                 Text(stringResource(if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details))
             }
             if (state.detailsExpanded) {
-                SetupDetails(state)
+                SetupDetails(state, onAction, onEdit)
                 SetupAlternativeActions(state, onAction, onEdit)
             }
         }
@@ -259,8 +276,13 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { proposal ->
             if (OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
+                val publicationExplained = state.stepGuidance()?.problem == R.string.setup_problem_publication_failed
                 step.findings.distinct().forEach { finding ->
-                    SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
+                    val summarized = publicationExplained && finding.issue == OnboardingIssueFfi.PUBLICATION_FAILED
+                    SetupFindingContent(
+                        finding,
+                        showTitle = !summarized && !snapshot.deviceNoticeCovers(step.step, finding),
+                    )
                 }
             }
             SetupProposalContent(proposal, step.findings)
