@@ -28,9 +28,9 @@
         ]
       },
       {
-        "surface": "AgentSessionSettingMenu",
+        "surface": "AgentSessionSettingControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
-        "anchor": "fun AgentSessionSettingMenu(",
+        "anchor": "fun AgentSessionSettingControl(",
         "test_ids": [
           "CON-057"
         ]
@@ -71,6 +71,22 @@
         "surface": "R.string.group_system_hide_details",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
         "anchor": "R.string.group_system_hide_details",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.onboarding_details_expanded",
         "test_ids": [
           "CON-057"
         ]

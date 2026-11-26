@@ -2150,7 +2150,7 @@ internal fun ConversationScreen(
         LaunchedEffect(
             controller,
             navigationState.initialTimelineLoadStarted,
-            controller.group.pendingConfirmation,
+            controller.inviteBlocksHistory,
             controller.timeline.isEmpty(),
             latestTimelineItemId,
             navigationState.initialTimelineBackfillRetryGeneration,
@@ -2158,9 +2158,9 @@ internal fun ConversationScreen(
             snapshotFlow { controller.isLoading || controller.isLoadingPage }.first { !it }
             val hasEstablishedInitialPosition = initialTimelineAnchored || scrollRestore != null
             val timelineCannotBackfill =
-                !navigationState.initialTimelineLoadStarted || controller.group.pendingConfirmation
+                !navigationState.initialTimelineLoadStarted || controller.inviteBlocksHistory
             if (hasEstablishedInitialPosition || timelineCannotBackfill || renderedTimeline.isNotEmpty()) {
-                if (renderedTimeline.isNotEmpty() || controller.group.pendingConfirmation) {
+                if (renderedTimeline.isNotEmpty() || controller.inviteBlocksHistory) {
                     navigationState.initialTimelineBackfillNoProgress = false
                 }
                 return@LaunchedEffect
@@ -2169,9 +2169,9 @@ internal fun ConversationScreen(
                 backfillInitialConversationTimeline(
                     snapshot = controller::initialTimelineBackfillSnapshot,
                     loadOlder = controller::loadOlderTimelinePage,
-                    isCurrent = { currentController === controller && !controller.group.pendingConfirmation },
+                    isCurrent = { currentController === controller && !controller.inviteBlocksHistory },
                 )
-            if (currentController !== controller || controller.group.pendingConfirmation) return@LaunchedEffect
+            if (currentController !== controller || controller.inviteBlocksHistory) return@LaunchedEffect
             when (result) {
                 ConversationInitialTimelineBackfillResult.Exhausted -> {
                     navigationState.initialTimelineBackfillNoProgress = false
@@ -4001,7 +4001,7 @@ internal fun ConversationScreen(
                             .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
                     when {
-                        navigationState.initialTimelineBackfillNoProgress && !controller.group.pendingConfirmation ->
+                        navigationState.initialTimelineBackfillNoProgress && !controller.inviteBlocksHistory ->
                             ConversationLoadErrorContent(
                                 error = InitialTimelineBackfillNoProgressError,
                                 onRetry = {
@@ -4022,7 +4022,7 @@ internal fun ConversationScreen(
                                     }
                                 },
                             )
-                        (controller.group.pendingConfirmation || controller.inviteAcceptanceResolutionPending) &&
+                        controller.inviteBlocksHistory &&
                             !controller.terminalConversationUnavailable &&
                             renderedTimeline.isEmpty() ->
                             InvitePreviewPlaceholder(

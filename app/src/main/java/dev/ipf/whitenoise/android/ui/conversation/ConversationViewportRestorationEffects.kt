@@ -99,13 +99,13 @@ private fun ConversationSavedViewportEffect(
     callbacks: ConversationViewportRestorationCallbacks,
 ) {
     val restore = inputs.scrollRestore
-    val invitePending = controller.group.pendingConfirmation
+    val invitePending = controller.inviteBlocksHistory
     LaunchedEffect(controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration) {
         // A replacement coordinator must not replay an old saved position after
         // this screen has established its current reading position.
         if (restore == null || inputs.presentation.anchored || invitePending) return@LaunchedEffect
         controller.awaitSavedViewportTimeline()
-        val isCurrent = { owner.isActive && !controller.group.pendingConfirmation }
+        val isCurrent = { owner.isActive && !controller.inviteBlocksHistory }
         if (!isCurrent()) return@LaunchedEffect
         restore.anchorMessageIdHex?.takeIf { it.isNotBlank() }?.let { controller.loadUntilMessageAvailable(it) }
         val result = backfillSavedViewport(controller, isCurrent)
@@ -123,10 +123,14 @@ private fun ConversationSavedViewportEffect(
     }
 }
 
+internal val ConversationController.inviteBlocksHistory: Boolean
+    get() = group.pendingConfirmation || inviteAcceptanceResolutionPending
+
 private suspend fun ConversationController.awaitSavedViewportTimeline() {
     snapshotFlow {
+        // The roster can still be loading after the timeline is safe to restore.
         val published = hasPublishedAuthoritativeTimeline || error != null
-        val busy = initialTimelineSeedActive || isLoading || isLoadingPage
+        val busy = initialTimelineSeedActive || isLoadingPage
         published && !busy
     }.first { it }
 }

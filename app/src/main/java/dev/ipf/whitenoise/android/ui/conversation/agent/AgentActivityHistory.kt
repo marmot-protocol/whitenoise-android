@@ -186,9 +186,12 @@ internal fun MarmotEventFfi.affectsAgentSessions(
     account: String,
     group: String,
 ): Boolean {
-    val projection = (this as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+    val projection =
+        (this as? MarmotEventFfi.ProjectionUpdated)
+            ?.update
+            ?.takeIf { it.accountLabel == account && it.update.groupIdHex == group }
+            ?: return false
     val update = projection.update
-    if (projection.accountLabel != account || update.groupIdHex != group) return false
     return update.messages.any(TimelineMessageRecordFfi::mayChangeAgentSession) ||
         update.changes.any { change ->
             when (change) {

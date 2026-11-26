@@ -490,6 +490,15 @@ class AppStateSendLockCoverageTest {
                 .resolve("ConversationViewportRestorationEffects.kt")
                 .motionOwnerSource()
                 .replace(Regex("\\s+"), " ")
+        val savedRestore =
+            effects
+                .substringAfter("private suspend fun ConversationController.commitSavedViewport(")
+                .substringBefore("private fun savedViewportPosition(")
+        val savedRestoreKeys =
+            effects
+                .substringAfter("private fun ConversationSavedViewportEffect(")
+                .substringAfter("LaunchedEffect(")
+                .substringBefore(")")
 
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",
@@ -499,7 +508,11 @@ class AppStateSendLockCoverageTest {
                 "ConversationViewportStructureEffect(" in source &&
                 "coordinator.commitInitialAnchor(" in owner &&
                 "coordinator.commitInitialTailAnchor(" in owner &&
-                "while (!owner.commitInitialPosition(" in effects &&
+                savedRestoreKeys == "controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration" &&
+                "while (isCurrent())" in savedRestore &&
+                "owner.commitInitialPosition(position," in savedRestore &&
+                "viewport.initialAnchorLayout(position.index)" in savedRestore &&
+                "withFrameNanos { }" in savedRestore &&
                 "reanchorGate.commit(" in owner &&
                 "reanchorGate.onStructure(" in owner &&
                 "anchored && changed" in owner &&

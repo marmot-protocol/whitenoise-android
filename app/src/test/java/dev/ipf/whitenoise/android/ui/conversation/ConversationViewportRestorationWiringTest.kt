@@ -89,6 +89,7 @@ class ConversationViewportRestorationWiringTest {
     fun savedEffectWaitsForSeedThenWinsOverUnreadAndDoesNotReplayOnOwnerReplacement() {
         val fixture = EffectFixture()
         try {
+            composeRule.runOnUiThread { fixture.controller.isLoading = true }
             setEffectContent(fixture)
             composeRule.waitForIdle()
             assertTrue(fixture.writer.writes.isEmpty())
@@ -97,6 +98,7 @@ class ConversationViewportRestorationWiringTest {
             assertEquals(listOf(1 to 23, 1 to 23), fixture.writer.writes)
             assertEquals(1, fixture.completions)
             assertTrue(fixture.anchored.value)
+            assertTrue(fixture.controller.isLoading)
             assertEquals(ConversationScrollMode.ReadingHistory("2".repeat(64), 23), fixture.coordinator.value.mode)
             composeRule.runOnUiThread {
                 fixture.coordinator.value = ConversationScrollCoordinator(fixture.writer)
@@ -105,6 +107,29 @@ class ConversationViewportRestorationWiringTest {
             assertEquals(2, fixture.writer.writes.size)
             assertEquals(1, fixture.completions)
             assertEquals(0, fixture.scripted.timelineSubscriptionOpenCount)
+        } finally {
+            fixture.controller.onCleared()
+        }
+    }
+
+    @Test
+    fun savedEffectWaitsForInviteAuthorityAfterTimelinePublication() {
+        val fixture = EffectFixture()
+        try {
+            composeRule.runOnUiThread {
+                fixture.controller.inviteConfirmationUnresolved = true
+                fixture.publishAuthoritativePage()
+            }
+            setEffectContent(fixture)
+            composeRule.waitForIdle()
+            assertFalse(fixture.controller.group.pendingConfirmation)
+            assertTrue(fixture.writer.writes.isEmpty())
+            assertFalse(fixture.anchored.value)
+
+            composeRule.runOnUiThread { fixture.controller.inviteConfirmationUnresolved = false }
+            composeRule.waitForIdle()
+            assertTrue(fixture.anchored.value)
+            assertEquals(1, fixture.completions)
         } finally {
             fixture.controller.onCleared()
         }
@@ -134,11 +159,13 @@ class ConversationViewportRestorationWiringTest {
     fun savedEffectCompletesWithoutMeasuringAnExhaustedBackgroundOnlyWindow() {
         val fixture = EffectFixture()
         try {
+            composeRule.runOnUiThread { fixture.controller.isLoading = true }
             setEffectContent(fixture)
             composeRule.runOnUiThread { fixture.publishAuthoritativePage(listOf(backgroundRecord())) }
             composeRule.waitForIdle()
             assertTrue(fixture.writer.writes.isEmpty())
             assertTrue(fixture.anchored.value)
+            assertTrue(fixture.controller.isLoading)
             assertEquals(1, fixture.completions)
             assertEquals(ConversationScrollMode.FollowingTail, fixture.coordinator.value.mode)
         } finally {

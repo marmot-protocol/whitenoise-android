@@ -2,10 +2,10 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,13 +19,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentSessionSetting
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -63,7 +64,7 @@ private fun AgentSessionControls(
         TextButton(enabled = actions.canSend, onClick = { actions.onSend(AgentRequest.NewSession(newSession)) }) {
             Text(newSession)
         }
-        session.settings.forEach { setting -> AgentSessionSettingMenu(setting, actions) }
+        session.settings.forEach { setting -> AgentSessionSettingControl(setting, actions) }
         session.actions.forEach { action ->
             TextButton(
                 enabled = actions.canSend,
@@ -81,59 +82,61 @@ private fun AgentSessionControls(
 }
 
 @Composable
-private fun AgentSessionSettingMenu(
+private fun AgentSessionSettingControl(
     setting: AgentSessionSetting,
     actions: AgentItemActions,
 ) {
     var expanded by rememberSaveable(setting.id) { mutableStateOf(false) }
     val label = listOfNotNull(setting.label, setting.value).joinToString(" · ")
-    if (setting.options.isEmpty()) {
-        AgentSessionSettingInput(setting, label, actions)
-        return
+    val disclosureState =
+        stringResource(if (expanded) R.string.onboarding_details_expanded else R.string.onboarding_details_collapsed)
+    TextButton(
+        enabled = actions.canSend,
+        onClick = { expanded = !expanded },
+        modifier = Modifier.semantics { stateDescription = disclosureState },
+    ) {
+        Text(label)
     }
-    Box {
-        TextButton(enabled = actions.canSend, onClick = { expanded = true }) { Text(label) }
-        WhiteNoiseDropdownMenu(
-            expanded = expanded && actions.canSend,
-            onDismissRequest = { expanded = false },
-            items =
-                setting.options.map { value ->
-                    WhiteNoiseMenuItem(
-                        label = value,
-                        enabled = value != setting.value,
-                        onClick = { actions.onSend(AgentRequest.Set(setting.id, value, "${setting.label} · $value")) },
-                    )
-                },
-        )
+    if (!expanded) return
+    val apply: (String) -> Unit = { value ->
+        expanded = false
+        actions.onSend(AgentRequest.Set(setting.id, value, "${setting.label} · $value"))
+    }
+    if (setting.options.isEmpty()) {
+        AgentSessionSettingInput(setting, actions.canSend, apply)
+    } else {
+        Column(Modifier.selectableGroup()) {
+            setting.options.forEach { value ->
+                WhiteNoiseChoiceRow(
+                    title = value,
+                    selected = value == setting.value,
+                    onClick = { apply(value) },
+                    enabled = actions.canSend && value != setting.value,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun AgentSessionSettingInput(
     setting: AgentSessionSetting,
-    label: String,
-    actions: AgentItemActions,
+    enabled: Boolean,
+    onApply: (String) -> Unit,
 ) {
-    var expanded by rememberSaveable(setting.id) { mutableStateOf(false) }
-    TextButton(enabled = actions.canSend, onClick = { expanded = !expanded }) { Text(label) }
-    if (expanded) {
-        val input = remember(setting.id, setting.value) { TextFieldState(initialText = setting.value.orEmpty()) }
-        val value = input.text.toString().trim()
-        WhiteNoiseTextField(
-            state = input,
-            enabled = actions.canSend,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(setting.label) },
-        )
-        TextButton(
-            enabled = actions.canSend && value.isNotEmpty() && value != setting.value,
-            onClick = {
-                expanded = false
-                actions.onSend(AgentRequest.Set(setting.id, value, "${setting.label} · $value"))
-            },
-        ) {
-            Text(stringResource(R.string.agent_session_apply))
-        }
+    val input = remember(setting.id, setting.value) { TextFieldState(initialText = setting.value.orEmpty()) }
+    val value = input.text.toString().trim()
+    WhiteNoiseTextField(
+        state = input,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(setting.label) },
+    )
+    TextButton(
+        enabled = enabled && value.isNotEmpty() && value != setting.value,
+        onClick = { onApply(value) },
+    ) {
+        Text(stringResource(R.string.agent_session_apply))
     }
 }
 

@@ -25,7 +25,7 @@ internal fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
         hasRenderableRows = timeline.any(::conversationTimelineRowVisible),
         hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingPage,
+        loadInFlight = isLoadingPage || (isLoading && !hasPublishedAuthoritativeTimeline),
         hasLoadFailure = error != null,
         rawWindowMessageIds =
             timelineSubscription

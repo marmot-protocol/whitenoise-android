@@ -1280,12 +1280,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
-      "symbol": "AgentSessionSettingMenu",
-      "bindings": [],
-      "remaining": "CON-057 covers selecting an offered setting. The generated group journey only reaches the empty activity sheet."
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
       "symbol": "ActivitySheet",
       "bindings": [
