@@ -38,7 +38,9 @@ class AgentSessionControlsScreenshotTest {
     fun sessionControlsLight() = record(dark = false, direction = LayoutDirection.Ltr, fontScale = 1f, suffix = "light")
 
     @Test
-    fun sessionControlsAmoledRtlLarge() = record(dark = true, direction = LayoutDirection.Rtl, fontScale = 1.3f, suffix = "amoled_rtl_large")
+    fun sessionControlsAmoledRtlLarge() {
+        record(dark = true, direction = LayoutDirection.Rtl, fontScale = 1.3f, suffix = "amoled_rtl_large")
+    }
 
     private fun record(
         dark: Boolean,
@@ -46,8 +48,8 @@ class AgentSessionControlsScreenshotTest {
         fontScale: Float,
         suffix: String,
     ) {
-        val row =
-            AgentRecordingFixtures.load("codex_approval_allowed").first { it.projected?.agentItem?.itemType == "session" }
+        val recording = AgentRecordingFixtures.load("codex_approval_allowed")
+        val row = recording.first { it.projected?.agentItem?.itemType == "session" }
         val item = requireNotNull(AgentItemReader.read(row.record, row.projected))
         val requests = mutableListOf<AgentRequest>()
         composeRule.setContent {
@@ -57,7 +59,12 @@ class AgentSessionControlsScreenshotTest {
                         Column(Modifier.width(360.dp).padding(WhiteNoiseSpacing.Related).testTag(TAG)) {
                             AgentSessionContent(
                                 item,
-                                AgentItemActions("Codex", enabled = true, onSend = { requests += it }, sessionControls = true),
+                                AgentItemActions(
+                                    agentName = "Codex",
+                                    enabled = true,
+                                    onSend = { requests += it },
+                                    sessionControls = true,
+                                ),
                             )
                         }
                     }

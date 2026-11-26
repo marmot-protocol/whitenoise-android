@@ -8,6 +8,10 @@
     <string name="agent_activity_newer">Daha yeni</string>
     <string name="agent_activity_retry">Etkinliği yeniden yükle</string>
     <string name="agent_activity_page_failed">Daha fazla ajan etkinliği yüklenemedi</string>
+    <string name="agent_activity_earlier">Önceki etkinlik</string>
+    <string name="agent_thread_title">Ajanın ileti dizisi</string>
+    <string name="agent_thread_open">İleti dizisini aç</string>
+    <string name="agent_thread_back">Etkinliğe dön</string>
     <string name="agent_turn_working">Çalışıyor</string>
     <string name="agent_turn_worked_for">%1$s çalıştı</string>
     <string name="agent_turn_finished">Bitti</string>
@@ -29,6 +33,7 @@
     <string name="agent_approval_declined">Reddedildi</string>
     <string name="agent_approval_expired">Artık gerekmiyor</string>
     <string name="agent_request_sent">%1$s bekleniyor.</string>
+    <string name="agent_request_unconfirmed">Ajan isteği onaylamadı. Tekrar deneyebilirsin.</string>
     <string name="agent_question_send">Yanıtı gönder</string>
     <string name="agent_question_single_choice">Birini seç</string>
     <string name="agent_question_multiple_choice">İstediğin kadarını seç</string>
@@ -36,12 +41,16 @@
     <string name="agent_question_reply_in_chat">Yanıtlamak için sohbete yaz.</string>
     <string name="agent_question_secret">Bu yanıt gizli. Ajanın bilgisayarında ver.</string>
     <string name="agent_question_answered">Yanıtlandı: %1$s</string>
+    <string name="agent_answered_by">Yanıtlayan: %1$s</string>
     <string name="agent_question_closed">Soru kapandı</string>
     <string name="agent_plan_step_done">Bitti: %1$s</string>
     <string name="agent_plan_step_running">Sürüyor: %1$s</string>
     <string name="agent_plan_step_pending">Yapılacak: %1$s</string>
     <string name="agent_session_started">%1$s yeni bir oturum başlattı</string>
     <string name="agent_session_model">%1$s modeli</string>
+    <string name="agent_session_controls">Oturum denetimleri</string>
+    <string name="agent_session_new">Yeni oturum</string>
+    <string name="agent_session_apply">Uygula</string>
     <string name="agent_refused_not_allowed">Bu ajan için bunu yapamazsın</string>
     <string name="agent_refused_busy">Ajan meşguldü</string>
     <plurals name="agent_tool_diffs_cut">

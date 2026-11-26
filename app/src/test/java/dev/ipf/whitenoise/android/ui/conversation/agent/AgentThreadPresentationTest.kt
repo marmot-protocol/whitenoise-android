@@ -65,7 +65,10 @@ class AgentThreadPresentationTest {
                     .copy(messageIdHex = child, agentItem = item.copy(itemType = "task", itemId = "inner"))
                     .inThread(root)
             val waiting = base.inThread(child)
-            val oldNote = base.copy(messageIdHex = "59".repeat(32), agentItem = null, kind = 1111uL).inThread(waiting.messageIdHex)
+            val oldNote =
+                base
+                    .copy(messageIdHex = "59".repeat(32), agentItem = null, kind = 1111uL)
+                    .inThread(waiting.messageIdHex)
             val reply = oldNote.copy(messageIdHex = "67".repeat(32)).inThread(oldNote.messageIdHex)
             val held =
                 base
@@ -95,9 +98,8 @@ class AgentThreadPresentationTest {
     fun waitingThreadRequestRemainsVisibleInTheMainChat() {
         val base = requireNotNull(approval.projected).inThread(root)
         assertTrue(conversationTimelineRowVisible(approval.copy(projected = base)))
-        assertFalse(
-            conversationTimelineRowVisible(approval.copy(projected = base.copy(agentItem = item.copy(state = AgentItemStateFfi.DONE)))),
-        )
+        val settled = base.copy(agentItem = item.copy(state = AgentItemStateFfi.DONE))
+        assertFalse(conversationTimelineRowVisible(approval.copy(projected = settled)))
         val message = recording.first()
         val words = requireNotNull(message.projected).copy(kind = 1111uL)
         assertTrue(conversationTimelineRowVisible(message.copy(projected = words)))
@@ -109,9 +111,8 @@ class AgentThreadPresentationTest {
                 tags = humanReply.tags + MessageTagFfi(listOf("P", AgentRecordingFixtures.AGENT_ID)),
             )
         assertFalse(conversationTimelineRowVisible(message.copy(projected = agentWords)))
-        assertFalse(
-            message.copy(record = message.record.copy(kind = 1111uL, direction = "received"), projected = agentWords).isUnreadEligible(),
-        )
+        val received = message.record.copy(kind = 1111uL, direction = "received")
+        assertFalse(message.copy(record = received, projected = agentWords).isUnreadEligible())
     }
 
     @Test

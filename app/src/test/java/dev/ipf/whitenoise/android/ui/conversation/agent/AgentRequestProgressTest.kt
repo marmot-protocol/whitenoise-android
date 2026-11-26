@@ -56,7 +56,8 @@ class AgentRequestProgressTest {
             )
         val unrelated = confirmation.copy(sender = "91".repeat(32), recordedAt = 1001uL)
         val invalidated = confirmation.copy(invalidated = true, recordedAt = 1002uL)
-        val history = listOf(confirmation) + List(400) { unrelated.copy(messageIdHex = it.toString(16).padStart(64, '0')) } + invalidated
+        val newer = List(400) { unrelated.copy(messageIdHex = it.toString(16).padStart(64, '0')) }
+        val history = listOf(confirmation) + newer + invalidated
         val limits = mutableListOf<UInt>()
         val matches =
             readAgentSettlements(setOf(approval.sender to requestId)) { limit ->

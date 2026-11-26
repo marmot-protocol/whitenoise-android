@@ -49,22 +49,32 @@ internal suspend fun agentThreadParentRecords(
     val additional = mutableMapOf<String, TimelineMessageRecordFfi?>()
 
     suspend fun lookup(id: String): TimelineMessageRecordFfi? =
-        known[id] ?: if (id in additional) additional[id] else findRetainedThreadParent(id, find).also { additional[id] = it }
+        when {
+            id in known -> known[id]
+            id in additional -> additional[id]
+            else -> findRetainedThreadParent(id, find).also { additional[id] = it }
+        }
 
     val replies = rows.filter { it.isAgentThreadRow() && it.agentItem == null && !it.isAgentOwnThreadMessage() }
     if (replies.isEmpty() && rows.none { it.agentItemFirstEventMissing && it.isAgentThreadRow() }) return emptyMap()
     val task = lookup(selectedTask)
     val root = task?.thread?.rootMessageIdHex ?: selectedTask
-    for (reply in replies) {
-        val place = reply.thread?.takeIf { it.rootMessageIdHex == root } ?: continue
-        var parent = place.parentMessageIdHex
-        val seen = hashSetOf(reply.messageIdHex)
-        while (parent != root && seen.add(parent)) {
-            val row = lookup(parent)?.takeUnless { it.agentItem != null || it.isAgentOwnThreadMessage() }
-            parent = row?.thread?.takeIf { it.rootMessageIdHex == root }?.parentMessageIdHex ?: break
-        }
-    }
+    replies.forEach { rememberThreadAncestors(it, root, ::lookup) }
     return additional.mapNotNull { (id, row) -> row?.let { id to it } }.toMap()
+}
+
+private suspend fun rememberThreadAncestors(
+    reply: TimelineMessageRecordFfi,
+    root: String,
+    lookup: suspend (String) -> TimelineMessageRecordFfi?,
+) {
+    val place = reply.thread?.takeIf { it.rootMessageIdHex == root } ?: return
+    var parent = place.parentMessageIdHex
+    val seen = hashSetOf(reply.messageIdHex)
+    while (parent != root && seen.add(parent)) {
+        val row = lookup(parent)?.takeUnless { it.agentItem != null || it.isAgentOwnThreadMessage() }
+        parent = row?.thread?.takeIf { it.rootMessageIdHex == root }?.parentMessageIdHex ?: break
+    }
 }
 
 private suspend fun findRetainedThreadParent(

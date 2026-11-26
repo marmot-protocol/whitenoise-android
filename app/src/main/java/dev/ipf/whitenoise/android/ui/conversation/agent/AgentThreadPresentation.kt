@@ -68,17 +68,16 @@ private fun TimelineMessageRecordFfi.taskAncestor(
     val seen = hashSetOf(messageIdHex)
     var id = parent
     while (id != root && seen.add(id)) {
-        val row = rowsById[id] ?: break
-        val placement = row.thread?.takeIf { it.rootMessageIdHex == root } ?: break
-        return when {
-            row.agentItem?.itemType == "task" -> id
-            row.agentItemFirstEventMissing -> row.heldAgentTask(root, rowsById.values)
-            row.hasAgentTaskParent() -> placement.parentMessageIdHex
-            else -> {
-                id = placement.parentMessageIdHex
-                continue
+        val row = rowsById[id]
+        val placement = row?.thread?.takeIf { it.rootMessageIdHex == root } ?: break
+        if (row.hasAgentTaskParent() || row.agentItemFirstEventMissing) {
+            return when {
+                row.agentItem?.itemType == "task" -> id
+                row.agentItemFirstEventMissing -> row.heldAgentTask(root, rowsById.values)
+                else -> placement.parentMessageIdHex
             }
         }
+        id = placement.parentMessageIdHex
     }
     return id.takeIf { it == root }
 }

@@ -9,14 +9,19 @@ import org.json.JSONObject
 /** The same visible rows back painting, navigation and viewport measurements. */
 internal fun conversationTimelineRowVisible(row: TimelineMessage): Boolean {
     if (MessageProjector.isEdit(row.record)) return false
-    val projected = row.projected ?: return true
-    val item = projected.agentItem ?: return !projected.isAgentOwnThreadMessage()
-    if (projected.deleted) return false
-    return when (item.itemType) {
-        "approval", "question" -> item.state == AgentItemStateFfi.WAITING
-        "turn" -> item.state == AgentItemStateFfi.FAILED
-        "notice" -> isAgentRefusal(item.fieldsJson)
-        else -> false
+    val projected = row.projected
+    val item = projected?.agentItem
+    return when {
+        projected == null -> true
+        item == null -> !projected.isAgentOwnThreadMessage()
+        projected.deleted -> false
+        else ->
+            when (item.itemType) {
+                "approval", "question" -> item.state == AgentItemStateFfi.WAITING
+                "turn" -> item.state == AgentItemStateFfi.FAILED
+                "notice" -> isAgentRefusal(item.fieldsJson)
+                else -> false
+            }
     }
 }
 

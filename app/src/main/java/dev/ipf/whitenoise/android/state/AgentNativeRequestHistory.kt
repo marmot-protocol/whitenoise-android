@@ -63,14 +63,20 @@ internal fun MarmotInterface.agentNativeRequestHistory(
             .filterNot { it.invalidated }
             .mapNotNull { request -> request.singleTag("p")?.let { it to request.messageIdHex } }
             .toSet()
-    val settlements = readAgentSettlements(awaiting) { limit -> messages(account, group, limit, AGENT_SETTLEMENT_KINDS) }
+    val settlements =
+        readAgentSettlements(awaiting) { limit ->
+            messages(account, group, limit, AGENT_SETTLEMENT_KINDS)
+        }
     return AgentNativeRequestHistory(relevant + settlements)
 }
 
 internal fun MarmotInterface.ownAgentRequests(
     account: String,
     group: String,
-): List<AppMessageRecordFfi> = messages(account, group, null, listOf(AgentItemReader.REQUEST_KIND)).filter { it.direction == "sent" }
+): List<AppMessageRecordFfi> {
+    val kinds = listOf(AgentItemReader.REQUEST_KIND)
+    return messages(account, group, null, kinds).filter { it.direction == "sent" }
+}
 
 private fun List<AppMessageRecordFfi>.latestFor(target: AgentRequestTarget): AppMessageRecordFfi? =
     asSequence()
@@ -88,8 +94,7 @@ internal fun readAgentSettlements(
         val replay = read(limit)
         val unmatched = awaiting.toMutableSet()
         val matched = mutableListOf<AppMessageRecordFfi>()
-        for (row in replay) {
-            if (row.invalidated) continue
+        for (row in replay.asSequence().filterNot { it.invalidated }) {
             val count = unmatched.size
             row.tags.agentSettlementIds().forEach { unmatched.remove(row.sender to it) }
             if (unmatched.size < count) matched.add(row)
@@ -110,7 +115,10 @@ private fun AppMessageRecordFfi.matchesTarget(target: AgentRequestTarget): Boole
     }
 }
 
-private fun AppMessageRecordFfi.singleTag(name: String): String? = tags.singleOrNull { it.values.firstOrNull() == name }?.values?.getOrNull(1)
+private fun AppMessageRecordFfi.singleTag(name: String): String? {
+    val tag = tags.singleOrNull { it.values.firstOrNull() == name }
+    return tag?.values?.getOrNull(1)
+}
 
 internal fun List<MessageTagFfi>.agentSettlementIds(): Sequence<String> =
     asSequence().mapNotNull { tag ->

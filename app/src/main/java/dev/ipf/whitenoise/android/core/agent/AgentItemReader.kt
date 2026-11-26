@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.core.agent
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.core.THREAD_MESSAGE_KIND
 import org.json.JSONObject
+
+private const val CHAT_MESSAGE_KIND = 9uL
 
 /**
  * Reads the agent item MDK projected onto a timeline row.
@@ -19,7 +22,10 @@ internal object AgentItemReader {
     /** Kind of an answer or a control a person sends to an agent. */
     const val REQUEST_KIND: ULong = 1202uL
 
-    fun isCommentary(record: AppMessageRecordFfi): Boolean = record.kind == 9uL && record.tags.any { it.values == listOf("phase", "commentary") }
+    fun isCommentary(record: AppMessageRecordFfi): Boolean {
+        val commentary = listOf("phase", "commentary")
+        return record.kind == CHAT_MESSAGE_KIND && record.tags.any { it.values == commentary }
+    }
 
     /** The item on [projected], or null when the row holds none or its fields cannot be read. */
     fun read(
@@ -29,23 +35,26 @@ internal object AgentItemReader {
         if (projected == null || projected.deleted) return null
         val item = projected.agentItem
         val fields = item?.let { runCatching { JSONObject(it.fieldsJson) }.getOrNull() }
-        if (item == null || fields == null) return null
-        return AgentItem(
-            rowId = record.messageIdHex,
-            agentPubkeyHex = record.sender,
-            version = item.version.toLong(),
-            state = AgentItemState.of(item.state),
-            title = item.title,
-            text = record.plaintext,
-            itemId = item.itemId,
-            session = item.session,
-            turn = item.turn,
-            body = AgentItemBodyParser.parse(fields),
-            outputCutLength = record.cutValue("output"),
-            diffsCut = record.cutValue("diffs")?.toInt() ?: 0,
-            firstEventMissing = projected.agentItemFirstEventMissing,
-            recordedAt = record.recordedAt,
-        )
+        return if (item == null || fields == null) {
+            null
+        } else {
+            AgentItem(
+                rowId = record.messageIdHex,
+                agentPubkeyHex = record.sender,
+                version = item.version.toLong(),
+                state = AgentItemState.of(item.state),
+                title = item.title,
+                text = record.plaintext,
+                itemId = item.itemId,
+                session = item.session,
+                turn = item.turn,
+                body = AgentItemBodyParser.parse(fields),
+                outputCutLength = record.cutValue("output"),
+                diffsCut = record.cutValue("diffs")?.toInt() ?: 0,
+                firstEventMissing = projected.agentItemFirstEventMissing,
+                recordedAt = record.recordedAt,
+            )
+        }
     }
 }
 
@@ -54,7 +63,8 @@ internal fun TimelineMessageRecordFfi.isAgentThreadRow(): Boolean =
     thread != null && tags.any { it.values == listOf("K", AgentItemReader.ITEM_KIND.toString()) }
 
 /** A person's thread reply still has a normal chat destination for notifications and search. */
-internal fun TimelineMessageRecordFfi.isAgentOwnThreadMessage(): Boolean = kind == 1111uL && isAgentThreadRow() && tags.any { it.values == listOf("P", sender) }
+internal fun TimelineMessageRecordFfi.isAgentOwnThreadMessage(): Boolean =
+    kind == THREAD_MESSAGE_KIND && isAgentThreadRow() && tags.any { it.values == listOf("P", sender) }
 
 /** The number a `cut` tag gives for [name]: how much the agent left out of that field. */
 private fun AppMessageRecordFfi.cutValue(name: String): Long? =

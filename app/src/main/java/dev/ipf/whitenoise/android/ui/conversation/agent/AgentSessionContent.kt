@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +24,8 @@ import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentSessionSetting
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -41,7 +41,8 @@ internal fun AgentSessionContent(
         AgentSessionDivider(item, actions.agentName)
         if (actions.sessionControls) {
             TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(stringResource(if (expanded) R.string.group_system_hide_details else R.string.agent_session_controls))
+                val label = if (expanded) R.string.group_system_hide_details else R.string.agent_session_controls
+                Text(stringResource(label))
             }
             if (expanded) {
                 AgentSessionControls(session, actions, Modifier.padding(horizontal = WhiteNoiseSpacing.Related))
@@ -73,7 +74,8 @@ private fun AgentSessionControls(
             action.description?.let { AgentSessionHelp(it) }
         }
         session.commands.forEach { command ->
-            AgentSessionHelp(listOf("/${command.name}", command.hint, command.description).filterNotNull().joinToString(" "))
+            val help = listOfNotNull("/${command.name}", command.hint, command.description).joinToString(" ")
+            AgentSessionHelp(help)
         }
     }
 }
@@ -91,18 +93,18 @@ private fun AgentSessionSettingMenu(
     }
     Box {
         TextButton(enabled = actions.canSend, onClick = { expanded = true }) { Text(label) }
-        DropdownMenu(expanded = expanded && actions.canSend, onDismissRequest = { expanded = false }) {
-            setting.options.forEach { value ->
-                DropdownMenuItem(
-                    text = { Text(value) },
-                    enabled = value != setting.value,
-                    onClick = {
-                        expanded = false
-                        actions.onSend(AgentRequest.Set(setting.id, value, "${setting.label} · $value"))
-                    },
-                )
-            }
-        }
+        WhiteNoiseDropdownMenu(
+            expanded = expanded && actions.canSend,
+            onDismissRequest = { expanded = false },
+            items =
+                setting.options.map { value ->
+                    WhiteNoiseMenuItem(
+                        label = value,
+                        enabled = value != setting.value,
+                        onClick = { actions.onSend(AgentRequest.Set(setting.id, value, "${setting.label} · $value")) },
+                    )
+                },
+        )
     }
 }
 

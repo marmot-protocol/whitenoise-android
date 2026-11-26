@@ -283,11 +283,8 @@ internal fun activityHistoryRows(
             } else {
                 record.isAgentThreadRow() && record.agentThreadTask(recordsById) == threadTaskId
             }
-        if (!belongs ||
-            deleted ||
-            record.invalidationStatus != null ||
-            isRetentionExpiredForSearch(record, nowMillis)
-        ) {
+        val unavailable = deleted || record.invalidationStatus != null || isRetentionExpiredForSearch(record, nowMillis)
+        if (!belongs || unavailable) {
             null
         } else {
             TimelineMessage(

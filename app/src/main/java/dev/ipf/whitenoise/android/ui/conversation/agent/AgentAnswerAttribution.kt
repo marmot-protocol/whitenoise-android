@@ -110,6 +110,7 @@ private fun AnswerEvent.isAnswerTo(reply: SettledAnswer): Boolean {
         targets.singleOrNull()?.values?.getOrNull(1) == reply.rowId &&
             agents.singleOrNull()?.values?.getOrNull(1) == reply.agent
     if (!addressesReply) return false
-    val details = tags.singleOrNull { it.values.firstOrNull() == "details" }?.values?.getOrNull(1) ?: return false
-    return runCatching { JSONObject(details).optString("action") == reply.action }.getOrDefault(false)
+    val details = tags.singleOrNull { it.values.firstOrNull() == "details" }?.values?.getOrNull(1)
+    val action = details?.let { runCatching { JSONObject(it).optString("action") }.getOrNull() }
+    return action == reply.action
 }

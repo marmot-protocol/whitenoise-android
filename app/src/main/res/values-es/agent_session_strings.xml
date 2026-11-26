@@ -8,6 +8,10 @@
     <string name="agent_activity_newer">Más reciente</string>
     <string name="agent_activity_retry">Volver a cargar la actividad</string>
     <string name="agent_activity_page_failed">No se pudo cargar más actividad del agente</string>
+    <string name="agent_activity_earlier">Actividad anterior</string>
+    <string name="agent_thread_title">Hilo del agente</string>
+    <string name="agent_thread_open">Abrir hilo</string>
+    <string name="agent_thread_back">Volver a la actividad</string>
     <string name="agent_turn_working">Trabajando</string>
     <string name="agent_turn_worked_for">Trabajó %1$s</string>
     <string name="agent_turn_finished">Terminado</string>
@@ -29,6 +33,7 @@
     <string name="agent_approval_declined">Rechazado</string>
     <string name="agent_approval_expired">Ya no hace falta</string>
     <string name="agent_request_sent">Esperando a %1$s.</string>
+    <string name="agent_request_unconfirmed">El agente no ha confirmado la solicitud. Puedes volver a intentarlo.</string>
     <string name="agent_question_send">Enviar respuesta</string>
     <string name="agent_question_single_choice">Elige una</string>
     <string name="agent_question_multiple_choice">Elige las que quieras</string>
@@ -36,12 +41,16 @@
     <string name="agent_question_reply_in_chat">Responde en el chat.</string>
     <string name="agent_question_secret">Esta respuesta es privada. Dala en el ordenador del agente.</string>
     <string name="agent_question_answered">Respondido: %1$s</string>
+    <string name="agent_answered_by">Respondió %1$s</string>
     <string name="agent_question_closed">Pregunta cerrada</string>
     <string name="agent_plan_step_done">Hecho: %1$s</string>
     <string name="agent_plan_step_running">En curso: %1$s</string>
     <string name="agent_plan_step_pending">Pendiente: %1$s</string>
     <string name="agent_session_started">%1$s empezó una sesión nueva</string>
     <string name="agent_session_model">Modelo %1$s</string>
+    <string name="agent_session_controls">Controles de sesión</string>
+    <string name="agent_session_new">Nueva sesión</string>
+    <string name="agent_session_apply">Aplicar</string>
     <string name="agent_refused_not_allowed">No puedes hacer eso con este agente</string>
     <string name="agent_refused_busy">El agente estaba ocupado</string>
     <plurals name="agent_tool_diffs_cut">

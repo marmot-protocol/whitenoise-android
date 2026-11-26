@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.core.THREAD_MESSAGE_KIND
 
 /**
  * Local progress of the viewer's answer or control. Admission and agent confirmation are separate.
@@ -121,7 +122,7 @@ internal class AgentRequestProgress {
 private fun TimelineMessageRecordFfi.agentSettlements(): Sequence<String> {
     if (deleted || invalidationStatus != null) return emptySequence()
     return when (kind) {
-        9uL, 1111uL -> tags.agentSettlementIds()
+        MARMOT_CHAT_EVENT_KIND, THREAD_MESSAGE_KIND -> tags.agentSettlementIds()
         else -> agentItem?.settles.orEmpty().asSequence()
     }
 }
