@@ -3681,14 +3681,12 @@ class WhiteNoiseAppState private constructor(
             bootstrapCompleted = true
             scheduleDisplayThumbnailReconciliation()
         } catch (error: Throwable) {
-            if (error is CancellationException) {
-                // The process-owned listener keeps retrying independently, but
-                // a cancelled UI bootstrap must not strand the splash forever.
-                phase = AppPhase.Failed(bootstrapFailure(error))
-                throw error
-            }
-            appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            if (error !is CancellationException) appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            // A cancelled bootstrap must release the splash before cancellation reaches its caller.
             phase = AppPhase.Failed(bootstrapFailure(error))
+            if (error is CancellationException) throw error
+        } finally {
+            abandonStartupChatListPrefetch()
         }
     }
 
@@ -3802,10 +3800,12 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             start = { runtime ->
+                beginStartupChatListPrefetch(runtime.marmot)
                 startMarmotWithNotificationListener(runtime)
                 appStateDebug { "marmot started" }
             },
             closeAfterFailure = { runtime ->
+                abandonStartupChatListPrefetch()
                 startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                     notificationDelivery.notificationDeliveryModeMutex.withLock {
                         notificationDelivery.nativePushSyncMutex.withLock {
@@ -4547,18 +4547,7 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
             restored: PreparedAccountSessionActivation,
-        ): PreparedAccountSessionActivation {
-            val target = accounts.firstOrNull { it.label == request.label }
-            val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
-            val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
-            val profile =
-                preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
-                    loadAccountSwitchProfileSeed(it)
-                }
-            val snapshot =
-                if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
-            return restored.copy(profilePresentation = profile, snapshot = snapshot)
-        }
+        ): PreparedAccountSessionActivation = projectActivation(request, generation, switchingAccounts, restored)
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
         override fun canPublish(
@@ -4683,6 +4672,15 @@ class WhiteNoiseAppState private constructor(
             startupPerformance.record(PerformancePhase.CACHED_CHAT_ROWS_READY)
         }
         recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
+    }
+
+    /** Records how many stored chat images are available and decoded at activation. */
+    internal fun recordStartupAvatarPreparation(
+        renderableAssets: Int,
+        decodedAssets: Int,
+    ) {
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_RENDERABLE, count = renderableAssets)
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_DECODED, count = decodedAssets)
     }
 
     /** Records the point where every cached row has a local member projection. */

@@ -143,6 +143,8 @@ internal class NotificationBootstrapTestFixture(
     private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
     private val onUsageDiagnosticsRead: (() -> Unit)? = null,
     private val onCreateIdentity: (() -> AccountSummaryFfi)? = null,
+    private val onRuntimeStart: (() -> Unit)? = null,
+    private val onListAccountsAfterStart: (() -> Unit)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     // Separate activation's presented-row boundary from concurrent raw unread folds.
@@ -162,6 +164,7 @@ internal class NotificationBootstrapTestFixture(
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi?)? = null,
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
+    private val onSetChatMuted: ((String, String, Long?) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
     fcmTokenReader: suspend () -> String? = { null },
@@ -339,6 +342,7 @@ internal class NotificationBootstrapTestFixture(
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
                     runtimeStartGate.await()
+                    onRuntimeStart?.invoke()
                     runtimeStarted.set(true)
                     Unit
                 }
@@ -411,6 +415,12 @@ internal class NotificationBootstrapTestFixture(
                             updatedAtMs = 0L,
                         )
                 }
+                "setChatMuted" ->
+                    onSetChatMuted?.invoke(
+                        arguments?.get(0) as String,
+                        arguments[1] as String,
+                        arguments[2] as Long?,
+                    ) ?: throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
                 "groupRecoveryStatus" ->
                     GroupRecoveryStatusFfi(
                         groupIdHex = arguments?.get(1) as String,
@@ -524,7 +534,10 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "createIdentity" -> checkNotNull(onCreateIdentity) { "Unexpected identity creation" }.invoke()
-                "listAccounts" -> accounts.toList()
+                "listAccounts" -> {
+                    if (runtimeStarted.get()) onListAccountsAfterStart?.invoke()
+                    accounts.toList()
+                }
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
