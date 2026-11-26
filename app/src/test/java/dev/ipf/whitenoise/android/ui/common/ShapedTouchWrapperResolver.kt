@@ -36,7 +36,7 @@ internal class WrapperResolver(
         // A function the call surely cannot apply to, wrapper or not, is never what Kotlin picks, so it is dropped.
         val levels =
             (locals + names.functionCandidates(name).flatMap { levelsFor(it).toList() })
-                .map { level -> level.filterNot { it.parameters != null && call.cannotApplyTo(it.parameters) } }
+                .map { level -> level.filterNot(call::cannotReach) }
                 .filter { it.isNotEmpty() }
         val decisive =
             levels.indices.firstOrNull { index ->
@@ -73,7 +73,7 @@ internal class WrapperResolver(
                     call.surelyAppliesTo(parameters) &&
                     wrappers.all { wrapper ->
                         val wrapped = wrapper.parameters
-                        wrapped != null && (call.cannotApplyTo(wrapped) || sameParameterTypes(parameters, wrapped))
+                        wrapped != null && (call.cannotReach(wrapper) || sameParameterTypes(parameters, wrapped))
                     }
             }
     }
@@ -97,6 +97,7 @@ internal class WrapperResolver(
             wrappers[start]?.let { setOf(it.modifierIndex) },
             function?.parameters,
             hasReceiver = function?.hasReceiver ?: true,
+            typeParameters = function?.typeParameters,
         )
     }
 }
@@ -114,26 +115,33 @@ internal fun sharedFunctions(source: String): List<Pair<String, FunctionCandidat
         .filter { code.isFileVisible(it.start) }
         .map { function ->
             val positions = wrappers[function.start]?.let { setOf(it.modifierIndex) }
-            pkg.qualify(function.name) to FunctionCandidate(positions, function.parameters, function.hasReceiver)
+            val candidate =
+                FunctionCandidate(positions, function.parameters, function.hasReceiver, function.typeParameters)
+            pkg.qualify(function.name) to candidate
         }
 }
 
 /**
- * A function a call may reach: its wrapper `modifier` positions, if it is one, its parameter text, if known, and
- * whether it is declared on a receiver.
+ * A function a call may reach: its wrapper `modifier` positions, if it is one, its parameter text, if known,
+ * whether it is declared on a receiver, and how many type parameters it declares, if known.
  */
 internal data class FunctionCandidate(
     val modifierPositions: Set<Int>?,
     val parameters: String?,
     val hasReceiver: Boolean,
+    val typeParameters: Int? = null,
 )
 
-/** A function declared in this code: where its `fun` starts, its name, its parameter list text and its receiver. */
+/**
+ * A function declared in this code: where its `fun` starts, its name, its parameter list text, its receiver and
+ * how many type parameters it declares.
+ */
 private data class DeclaredFunction(
     val start: Int,
     val name: String,
     val parameters: String,
     val hasReceiver: Boolean,
+    val typeParameters: Int,
 )
 
 /** Every function declared in this code, top-level or local. */
@@ -142,10 +150,12 @@ private fun String.declaredFunctions(): List<DeclaredFunction> =
         .findAll(this)
         .map { match ->
             val open = match.range.last
+            val typeParameters = leadingTypeParameters.find(match.value)?.groupValues?.get(1)
             // Dots in type parameters, such as `<T : kotlin.Any>`, are not a receiver.
-            val receiver = '.' in match.value.replace(Regex("""^fun\s+$TYPE_PARAMETERS"""), "fun ")
+            val receiver = '.' in match.value.replace(leadingTypeParameters, "fun ")
             val parameters = substring(open + 1, closingBracket(open))
-            DeclaredFunction(match.range.first, match.groupValues[1], parameters, receiver)
+            val typeCount = typeParameters?.typeArgumentCount() ?: 0
+            DeclaredFunction(match.range.first, match.groupValues[1], parameters, receiver, typeCount)
         }.toList()
 
 /**
@@ -155,6 +165,7 @@ private fun String.declaredFunctions(): List<DeclaredFunction> =
 internal class WrapperCall(
     args: String,
     private val trailingLambda: Boolean,
+    private val typeArguments: Int? = null,
 ) {
     private val arguments = topLevelArguments(args).filter { it.isNotBlank() }
     private val named = arguments.mapNotNull(::argumentName).toSet()
@@ -168,6 +179,17 @@ internal class WrapperCall(
 
     /** Whether this call surely cannot apply to a function with [parameters]; see [fit]. */
     fun cannotApplyTo(parameters: String): Boolean = fit(parameters) == Fit.NEVER
+
+    /**
+     * Whether this call surely cannot reach [candidate]: explicit type arguments such as `Chip<Int>(…)` name exactly
+     * as many type parameters as the function declares, and the arguments must [fit] its parameters.
+     */
+    fun cannotReach(candidate: FunctionCandidate): Boolean {
+        val typeParameters = candidate.typeParameters
+        val parameters = candidate.parameters
+        val wrongTypeCount = typeArguments != null && typeParameters != null && typeArguments != typeParameters
+        return wrongTypeCount || (parameters != null && cannotApplyTo(parameters))
+    }
 
     /**
      * How surely this call fits a parameter list. It never fits when [fitsArity] fails. A `vararg`, a positional
@@ -203,6 +225,32 @@ internal class WrapperCall(
             named.all { it in parameterNames } &&
             declared.indices.all { index -> filled(index) || declared[index].hasDefault }
     }
+}
+
+/** The `<…>` type-parameter list right after `fun`, brackets included, in group 1. */
+private val leadingTypeParameters = Regex("""^fun\s+($TYPE_PARAMETERS)""")
+
+/**
+ * How many entries the `<…>` type-argument or type-parameter list starting this text holds, counting commas outside
+ * nested `<…>` lists and brackets; an arrow's `>` closes nothing. Null when the text does not start with a list,
+ * such as a call without type arguments.
+ */
+internal fun String.typeArgumentCount(): Int? {
+    var depth = 0
+    var entries = 1
+    var closed = false
+    var index = 0
+    while (startsWith('<') && !closed && index < length) {
+        val char = this[index]
+        when {
+            char in "([{" -> index = closingBracket(index)
+            char == '<' -> depth++
+            char == '>' && getOrNull(index - 1) != '-' -> closed = --depth == 0
+            char == ',' && depth == 1 -> entries++
+        }
+        index++
+    }
+    return entries.takeIf { closed }
 }
 
 /** How surely a call fits a parameter list: it surely does, surely does not, or the text cannot tell. */

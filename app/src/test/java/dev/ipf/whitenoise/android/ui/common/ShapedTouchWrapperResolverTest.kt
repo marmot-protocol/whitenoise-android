@@ -234,6 +234,30 @@ class ShapedTouchWrapperResolverTest {
         assertEquals(listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue("Plain.kt"))
     }
 
+    /**
+     * Explicit type arguments reach only the overloads with that many type parameters, so `Chip<Int>(…)` takes the
+     * generic overload and never reports the non-generic one beside it, whichever of the two wraps `IconButton`.
+     */
+    @Test
+    fun explicitTypeArgumentsSkipOverloadsWithOtherTypeParameterCounts() {
+        val plain = "fun Chip(onClick: () -> Unit, modifier: Modifier) { BUTTON(onClick, modifier) {} }"
+        val generic = "fun <T> Chip(onClick: () -> Unit, modifier: Modifier) { BUTTON(onClick, modifier) {} }"
+        val slotGeneric =
+            "package gs\n" + plain.replace("BUTTON", "IconButton") + "\n" + generic.replace("BUTTON", "SlotIconButton")
+        val iconGeneric =
+            "package gi\n" + plain.replace("BUTTON", "SlotIconButton") + "\n" + generic.replace("BUTTON", "IconButton")
+        val calls =
+            mapOf(
+                "SlotExplicit.kt" to ("gs" to "Chip<Int>(go, Modifier.width(36.dp))"),
+                "IconExplicit.kt" to ("gi" to "Chip<Int>(go, Modifier.width(36.dp))"),
+                "TwoArguments.kt" to ("gi" to "Chip<Int, String>(go, Modifier.width(36.dp))"),
+            ).mapValues { (_, call) -> "package gc\nimport ${call.first}.Chip\nfun Screen() { ${call.second} }" }
+        val findings = stretchedWrapperFindings(calls + ("Slot.kt" to slotGeneric) + ("Icon.kt" to iconGeneric))
+        assertEquals(emptyList<String>(), findings.getValue("SlotExplicit.kt"))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue("IconExplicit.kt"))
+        assertEquals(emptyList<String>(), findings.getValue("TwoArguments.kt"))
+    }
+
     /** A local function shadows an imported wrapper at the calls in its scope, and a local wrapper still counts. */
     @Test
     fun localFunctionsShadowImportedWrappers() {

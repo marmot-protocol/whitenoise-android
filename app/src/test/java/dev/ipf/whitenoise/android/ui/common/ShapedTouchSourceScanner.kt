@@ -250,7 +250,8 @@ private fun String.stretchedCalls(
                 .filter { (nameStart, start, args) ->
                     val before = substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
                     val trailing = wrapperTrailingLambda.matchAt(this, start + args.length + 1) != null
-                    val call = WrapperCall(args, trailing)
+                    val typeArguments = substring(nameStart + name.length, start - 1).trim().typeArgumentCount()
+                    val call = WrapperCall(args, trailing, typeArguments)
                     val indices = if (declaration.containsMatchIn(before)) null else reached(name, nameStart, call)
                     indices.orEmpty().any { index ->
                         // Only bindings declared before this call are in scope for it.
