@@ -30,8 +30,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ActiveNotificationProfile
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveDetail
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveLabel
 import dev.ipf.whitenoise.android.ui.settings.rememberActiveNotificationProfile
@@ -55,7 +57,9 @@ internal fun NotificationProfileQuickAction(appState: WhiteNoiseAppState) {
     val active = rememberActiveNotificationProfile(store)
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     val label =
-        active?.let { stringResource(R.string.notification_profile_quick_open_active, it.profile.label) }
+        active?.let {
+            stringResource(R.string.notification_profile_quick_open_active, emojiPlainText(it.profile.label))
+        }
             ?: stringResource(R.string.notification_profiles_title)
     IconButton(
         onClick = { sheetOpen = true },
@@ -131,7 +135,7 @@ internal fun NotificationProfileBanner(
                 tint = MaterialTheme.colorScheme.primary,
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.bodyMedium)
+                EmojiLabel(title, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     detail,
                     style = MaterialTheme.typography.bodySmall,

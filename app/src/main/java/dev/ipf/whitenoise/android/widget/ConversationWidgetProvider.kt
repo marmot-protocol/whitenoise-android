@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.notifications.emojiPlainText
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -105,7 +106,7 @@ private fun conversationWidgetRowViews(
     allAccounts: Boolean,
 ): RemoteViews {
     val item = RemoteViews(context.packageName, R.layout.conversation_widget_row)
-    val title = row.title.ifBlank { context.getString(R.string.widget_conversation) }
+    val title = context.emojiPlainText(row.title).ifBlank { context.getString(R.string.widget_conversation) }
     item.setTextViewText(
         R.id.widget_row_title,
         if (allAccounts) {

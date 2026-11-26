@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.VerbatimTtsAnnotation
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.IntOffset
@@ -176,6 +177,50 @@ internal object EmojiShortcodes {
             emoji
         }
 
+    /**
+     * [text] as a text-only surface (an accessibility description, a notification, a window title) should read
+     * it: every shortcode that renders as artwork becomes its [plainLabel], the way a Unicode emoji is read by name.
+     * Codes without artwork and codes in code spans stay exactly as written.
+     */
+    fun plainText(
+        text: String,
+        custom: CustomEmojiSet,
+        resources: Resources,
+        received: Map<String, EmojiArt> = emptyMap(),
+    ): String {
+        if (':' !in text) return text
+        val ranges = presentationRanges(text).filter { art(it.item, custom, received) != null }
+        if (ranges.isEmpty()) return text
+        return buildString {
+            var source = 0
+            for (range in ranges) {
+                append(text, source, range.start)
+                if (lastOrNull()?.isLetterOrDigit() == true) append(' ')
+                append(plainLabel(range.item, resources))
+                source = range.end
+                if (text.getOrNull(source)?.isLetterOrDigit() == true) append(' ')
+            }
+            append(text, source, text.length)
+        }
+    }
+
+    /** Supplies spoken names while keeping the text and its selection offsets intact. */
+    fun speak(
+        text: AnnotatedString,
+        custom: CustomEmojiSet,
+        resources: Resources,
+    ): AnnotatedString {
+        if (':' !in text.text) return text
+        val ranges = presentationRanges(text.text).filter { art(it.item, custom, emptyMap()) != null }
+        if (ranges.isEmpty()) return text
+        return buildAnnotatedString {
+            append(text)
+            for (range in ranges) {
+                addTtsAnnotation(VerbatimTtsAnnotation(plainLabel(range.item, resources)), range.start, range.end)
+            }
+        }
+    }
+
     /** Bundled shortcodes keep their canonical artwork across local files and received attachments. */
     fun art(
         shortcode: String,
@@ -247,6 +292,22 @@ internal object EmojiShortcodes {
 /** [EmojiShortcodes.plainLabel] in composition, so accessibility text never reads a raw `:shortcode:`. */
 @Composable
 internal fun emojiPlainLabel(emoji: String): String = EmojiShortcodes.plainLabel(emoji, LocalContext.current.resources)
+
+/** [EmojiShortcodes.plainText] with the device's own emoji, for descriptions built from authored labels. */
+@Composable
+internal fun emojiPlainText(text: String): String {
+    val custom = LocalCustomEmoji.current
+    val resources = LocalContext.current.resources
+    return remember(text, custom, resources) { EmojiShortcodes.plainText(text, custom, resources) }
+}
+
+/** [EmojiShortcodes.plainText] as a function, for descriptions built in loops and callbacks. */
+@Composable
+internal fun rememberEmojiPlainText(): (String) -> String {
+    val custom = LocalCustomEmoji.current
+    val resources = LocalContext.current.resources
+    return remember(custom, resources) { { text -> EmojiShortcodes.plainText(text, custom, resources) } }
+}
 
 /** Draws one emoji's artwork. */
 @Suppress("FunctionNaming")

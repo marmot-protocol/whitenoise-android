@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGO
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -720,6 +721,29 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(1, posts.size)
         assertTrue(manager.activeNotifications.isEmpty())
     }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun firstVisibleNotificationReadsDeviceEmojiFromDisk() =
+        runBlocking {
+            val directory = context.filesDir.resolve(CustomEmojiStore.DIRECTORY).apply { mkdirs() }
+            val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            directory.resolve("office_parrot.png").outputStream().use {
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+            val label = "Work :office_parrot:"
+            assertEquals(label, context.emojiPlainText(label))
+            presenter.ensureChannels()
+            assertTrue(
+                presenter.show(
+                    update(false, trigger = NotificationTriggerFfi.GROUP_INVITE),
+                    recipientAccountSubtext = label,
+                    shortNpub = { "Maya" },
+                ),
+            )
+            val posted = manager.activeNotifications.single().notification
+            assertEquals("Work office parrot", posted.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
+        }
 
     /** A resolved inviter refreshes the live invite in place without alerting again, and the card never names them. */
     @Test

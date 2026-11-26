@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** What a held control does, in the words of its visible [title]. */
@@ -125,7 +126,7 @@ private fun ExplanationSheet(
         }
     } else {
         KeyboardPreservingBottomSheet(
-            paneTitle = explanation.title,
+            paneTitle = emojiPlainText(explanation.title),
             onDismissRequest = onDismiss,
             modifier = sheet,
             bottomWindowY = bottomWindowY,

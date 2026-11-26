@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import java.text.BreakIterator
 
 private val WHITESPACE = Regex("\\s+")
+private val LEADING_SHORTCODE = Regex("^:[A-Za-z0-9_-]{1,64}:")
 
 // BreakIterator is not thread-safe, so keep one per thread rather than
 // allocating a fresh instance on every initials() call.
@@ -10,9 +11,13 @@ private val graphemeBreaker = ThreadLocal.withInitial { BreakIterator.getCharact
 
 /**
  * Single-glyph monogram for a display name: the first letter, else the first emoji grapheme, else the DM
- * fallback.
+ * fallback. A leading `:shortcode:` that [emojiShortcode] accepts counts as one emoji grapheme, so a custom
+ * emoji is chosen or skipped exactly like a Unicode one.
  */
-internal fun formatIdentityMonogram(name: String): String {
+internal fun formatIdentityMonogram(
+    name: String,
+    emojiShortcode: (String) -> Boolean = { false },
+): String {
     val words =
         name
             .trim()
@@ -24,8 +29,12 @@ internal fun formatIdentityMonogram(name: String): String {
     // the first two words, or the first two graphemes of a single word.
     val candidates =
         when {
-            words.size >= 2 -> listOfNotNull(firstGrapheme(words[0]), firstGrapheme(words[1]))
-            words.size == 1 -> firstGraphemes(words[0], limit = 2)
+            words.size >= 2 ->
+                listOfNotNull(
+                    leadingUnits(words[0], 1, emojiShortcode).firstOrNull(),
+                    leadingUnits(words[1], 1, emojiShortcode).firstOrNull(),
+                )
+            words.size == 1 -> leadingUnits(words[0], limit = 2, emojiShortcode)
             else -> emptyList()
         }
     if (candidates.isEmpty()) return "DM"
@@ -41,8 +50,18 @@ internal fun formatIdentityMonogram(name: String): String {
     }
 }
 
-/** First grapheme cluster of [value], or null when empty. */
-private fun firstGrapheme(value: String): String? = firstGraphemes(value, limit = 1).firstOrNull()
+/** Up to [limit] leading units of [value]: grapheme clusters, with an accepted `:shortcode:` as one unit. */
+private fun leadingUnits(
+    value: String,
+    limit: Int,
+    emojiShortcode: (String) -> Boolean,
+): List<String> {
+    val code = LEADING_SHORTCODE.find(value)?.value?.takeIf(emojiShortcode)
+    if (code == null) return firstGraphemes(value, limit)
+    val rest =
+        if (limit > 1) leadingUnits(value.substring(code.length), limit - 1, emojiShortcode) else emptyList()
+    return listOf(code) + rest
+}
 
 /** Up to [limit] leading grapheme clusters of [value]. */
 private fun firstGraphemes(

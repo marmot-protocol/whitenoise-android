@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerTarget
 import dev.ipf.whitenoise.android.ui.chats.connectivityBannerTarget
 import dev.ipf.whitenoise.android.ui.profile.ProfileAvatar
@@ -47,7 +48,7 @@ internal fun AccountKeysIdentityHeader(identity: AccountKeysIdentity) {
         androidx.compose.foundation.layout.Box(Modifier.size(AccountKeysAvatarSize)) {
             ProfileAvatar(identity.name, identity.publicKey, identity.picture)
         }
-        Text(
+        EmojiLabel(
             identity.name,
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.semantics { heading() },

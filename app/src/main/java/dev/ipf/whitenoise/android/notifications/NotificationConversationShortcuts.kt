@@ -181,7 +181,7 @@ internal class NotificationConversationShortcuts(
                     sender,
                     reaction,
                 )
-            val candidateTitle = content.conversationTitle ?: content.title
+            val candidateTitle = context.emojiPlainText(content.conversationTitle ?: content.title)
             val existingTitle =
                 shortcutSnapshots[shortcutId]?.longLabel
                     ?: ShortcutManagerCompat

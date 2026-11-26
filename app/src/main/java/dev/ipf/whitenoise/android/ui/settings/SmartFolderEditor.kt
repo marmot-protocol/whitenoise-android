@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
@@ -514,12 +515,9 @@ internal fun SmartFolderConditionDialog(
                                 stringResource(R.string.smart_folder_select_people) + " (${keys.size})",
                             )
                         }
-                        Text(
+                        EmojiLabel(
                             keys.joinToString { hex ->
-                                people
-                                    .firstOrNull {
-                                        it.id == hex
-                                    }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
+                                people.firstOrNull { it.id == hex }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
                             },
                         )
                         if (optionsExpanded) {

@@ -1,28 +1,42 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldColors
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextFieldLabelPosition
+import androidx.compose.material3.TextFieldLabelScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 
 /**
- * A string-model field with a caret and selection. Pass parent layout data such as Row weight through
- * [containerModifier] and field modifiers such as semantics and focus through [modifier].
+ * A state-backed outlined field with an anchored emoji picker. [containerModifier] takes parent layout data such
+ * as Row weight, and [modifier] decorates the editor itself.
  */
 @Composable
-@Suppress("FunctionNaming", "LongParameterList")
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun ProseTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     modifier: Modifier = Modifier,
     label: @Composable (() -> Unit)? = null,
     placeholder: @Composable (() -> Unit)? = null,
@@ -30,62 +44,84 @@ internal fun ProseTextField(
     singleLine: Boolean = false,
     maxLines: Int = Int.MAX_VALUE,
     minLines: Int = 1,
-    isError: Boolean = false,
-    filled: Boolean = false,
-    colors: TextFieldColors? = null,
-    emojiOwner: Any? = null,
-    emojiMaxLength: Int? = null,
+    errorMessage: String? = null,
+    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
+    maxLength: Int? = null,
     containerModifier: Modifier = Modifier,
 ) {
-    var field by remember { mutableStateOf(TextFieldValue(value)) }
-    if (field.text != value) {
-        field = TextFieldValue(value, field.selection)
-    }
+    val isError = errorMessage != null
     val emojiAnchor = rememberEmojiSheetFieldAnchor()
-    val change: (TextFieldValue) -> Unit = { updated ->
-        field = updated
-        onValueChange(updated.text)
-    }
-    val emoji: @Composable () -> Unit = {
-        TextEntryEmojiFieldAction(field, enabled, emojiOwner to onValueChange, emojiAnchor) { updated ->
-            if (emojiMaxLength != null && updated.text.length > emojiMaxLength) {
-                false
-            } else {
-                change(updated)
-                true
+    val artwork = rememberTextFieldEmojiArtwork(state, enabled = true)
+    val layout = remember { TextLayoutHolder() }
+    val scroll = rememberScrollState()
+    val interactions = remember { MutableInteractionSource() }
+    val focused by interactions.collectIsFocusedAsState()
+    val inputLimit =
+        remember(maxLength) {
+            maxLength?.let { limit -> InputTransformation { if (length > limit) replace(limit, length, "") } }
+        }
+    val limits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.MultiLine(minLines, maxLines)
+    val style = LocalTextStyle.current
+    val textColor =
+        style.color.takeOrElse {
+            when {
+                !enabled -> colors.disabledTextColor
+                isError -> colors.errorTextColor
+                focused -> colors.focusedTextColor
+                else -> colors.unfocusedTextColor
             }
         }
-    }
-    Box(containerModifier.emojiSheetFieldAnchor(emojiAnchor), propagateMinConstraints = true) {
-        if (filled) {
-            TextField(
-                field,
-                change,
-                modifier,
-                enabled = enabled,
-                label = label,
-                placeholder = placeholder,
-                leadingIcon = emoji,
-                singleLine = singleLine,
-                maxLines = maxLines,
-                minLines = minLines,
-                isError = isError,
-                colors = colors ?: TextFieldDefaults.colors(),
-            )
+    val editorLabel: @Composable (TextFieldLabelScope.() -> Unit)? = label?.let { { it() } }
+    val labelTop =
+        if (label == null) {
+            0.dp
         } else {
-            OutlinedTextField(
-                field,
-                change,
-                modifier,
+            with(LocalDensity.current) {
+                MaterialTheme.typography.bodySmall.lineHeight
+                    .toDp() / 2
+            }
+        }
+    val decorator =
+        OutlinedTextFieldDefaults.decorator(
+            state = state,
+            enabled = enabled,
+            lineLimits = limits,
+            outputTransformation = artwork.output,
+            interactionSource = interactions,
+            labelPosition = TextFieldLabelPosition.Cutout(),
+            label = editorLabel,
+            placeholder = placeholder,
+            leadingIcon = {
+                TextEntryEmojiFieldAction(
+                    TextFieldValue(state.text.toString(), state.selection, state.composition),
+                    enabled,
+                    owner = state,
+                    anchor = emojiAnchor,
+                ) { (maxLength == null || it.text.length <= maxLength) && insertTextEntryEmoji(state, it, null) }
+            },
+            isError = isError,
+            colors = colors,
+        )
+    Box(containerModifier.emojiSheetFieldAnchor(emojiAnchor), propagateMinConstraints = true) {
+        CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
+            BasicTextField(
+                state = state,
+                modifier =
+                    modifier
+                        .then(cutout)
+                        .textFieldErrorSemantics(errorMessage)
+                        .defaultMinSize(OutlinedTextFieldDefaults.MinWidth, OutlinedTextFieldDefaults.MinHeight)
+                        .then(emojiEditableText(state)),
                 enabled = enabled,
-                label = label,
-                placeholder = placeholder,
-                leadingIcon = emoji,
-                singleLine = singleLine,
-                maxLines = maxLines,
-                minLines = minLines,
-                isError = isError,
-                colors = colors ?: OutlinedTextFieldDefaults.colors(),
+                textStyle = style.merge(TextStyle(color = textColor)),
+                cursorBrush = SolidColor(if (isError) colors.errorCursorColor else colors.cursorColor),
+                lineLimits = limits,
+                interactionSource = interactions,
+                inputTransformation = artwork.inputWith(inputLimit),
+                outputTransformation = artwork.output,
+                onTextLayout = { layout.result = it },
+                scrollState = scroll,
+                decorator = artwork.decorate(decorator, { layout.result?.invoke() }, scroll, horizontal = singleLine),
             )
         }
     }

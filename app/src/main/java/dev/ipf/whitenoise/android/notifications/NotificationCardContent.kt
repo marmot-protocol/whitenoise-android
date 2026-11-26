@@ -105,9 +105,10 @@ internal class NotificationCardContent(
     fun renamedSenderNotification(
         notification: Notification,
         senderAccountIdHex: String,
-        senderName: String,
-    ): Notification? =
-        if (
+        rawSenderName: String,
+    ): Notification? {
+        val senderName = context.emojiPlainText(rawSenderName)
+        return if (
             notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
             notification.shortcutId?.let(::isReactionShortcutId) == true
         ) {
@@ -118,6 +119,7 @@ internal class NotificationCardContent(
                 ?.let { renamedMessagingNotification(notification, it, senderAccountIdHex, senderName) }
                 ?: renamedExpandedSingleNotification(notification, senderAccountIdHex, senderName)
         }
+    }
 
     /** Rebuilds MessagingStyle history only when at least one stable sender key matches. */
     private fun renamedMessagingNotification(

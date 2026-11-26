@@ -22,6 +22,7 @@ import androidx.core.text.BidiFormatter
 import androidx.core.text.TextDirectionHeuristicsCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
@@ -87,7 +88,7 @@ internal fun StartingAccountIndicator(account: StartingAccount?) {
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .testTag("creation.starting_account.disclosure"),
                 ) {
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    EmojiLabel(label, style = MaterialTheme.typography.bodyLarge)
                     if (isCanonicalNpub(account.npub)) {
                         PublicKeyCopyText(
                             account.identifier,

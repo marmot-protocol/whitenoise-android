@@ -18,8 +18,9 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 /**
  * A yes/no confirmation on the app dialog; a destructive confirm takes the error role, and [dismissLabel] replaces
  * Cancel. [identity] is the body-content slot shown below [message] (the acting identity, an identifier, or the whole
- * body when [message] is null). [emojiLabels] renders the title and message with authored emoji artwork. The tags,
- * [confirmModifier] and [closeOnConfirm] exist for the few flows that keep the dialog open while they run.
+ * body when [message] is null). The title and message draw custom emoji artwork, since they often quote a folder,
+ * chat or person name. The tags, [confirmModifier] and [closeOnConfirm] exist for the few flows that keep the dialog
+ * open while they run.
  */
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
@@ -36,7 +37,6 @@ internal fun ConfirmDialog(
     ownerKey: Any? = dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph.current,
     modifier: Modifier = Modifier,
     icon: (@Composable () -> Unit)? = null,
-    emojiLabels: Boolean = false,
     closeOnConfirm: Boolean = true,
     confirmModifier: Modifier = Modifier,
     confirmTag: String = "confirmation.confirm",
@@ -65,24 +65,15 @@ internal fun ConfirmDialog(
                 Text(dismissLabel ?: stringResource(R.string.cancel))
             }
         },
-        title = { ConfirmText(title, emojiLabels) },
+        title = { EmojiLabel(title) },
         text = {
             Column(
                 Modifier.fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                message?.let { ConfirmText(it, emojiLabels) }
+                message?.let { EmojiLabel(it) }
                 identity?.invoke()
             }
         },
     )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun ConfirmText(
-    text: String,
-    emoji: Boolean,
-) {
-    if (emoji) EmojiLabel(text) else Text(text)
 }

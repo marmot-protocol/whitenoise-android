@@ -285,10 +285,10 @@ object LocalNotificationFormatter {
     ): LocalNotificationContent? {
         val kind = contentKind(update) ?: return null
         val isGroupConversation = !update.isDm && !useDirectLayout
-        val senderName = senderName(update.sender, senderNameOverride, shortNpub)
+        val senderName = plainEmojiText(context, senderName(update.sender, senderNameOverride, shortNpub))
         val conversationTitle =
             if (isGroupConversation) {
-                clean(conversationTitleOverride) ?: clean(update.groupName)
+                (clean(conversationTitleOverride) ?: clean(update.groupName))?.let { plainEmojiText(context, it) }
             } else {
                 null
             }
@@ -329,7 +329,7 @@ object LocalNotificationFormatter {
             body = body,
             senderName = senderName,
             senderKey = update.sender.accountIdHex,
-            selfName = displayName(update.receiver, shortNpub),
+            selfName = plainEmojiText(context, displayName(update.receiver, shortNpub)),
             selfKey = update.receiver.accountIdHex,
             isGroupConversation = isGroupConversation,
             conversationTitle = conversationTitle,
@@ -450,7 +450,7 @@ object LocalNotificationFormatter {
         sender: String,
         isGroupConversation: Boolean,
     ): String {
-        val group = clean(update.groupName)
+        val group = clean(update.groupName)?.let { plainEmojiText(context, it) }
         return when {
             group != null && isGroupConversation ->
                 text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
@@ -525,7 +525,7 @@ object LocalNotificationFormatter {
         update: NotificationUpdateFfi,
         context: Context?,
     ): String {
-        val group = clean(update.groupName)
+        val group = clean(update.groupName)?.let { plainEmojiText(context, it) }
         return if (group == null) {
             text(context, R.string.notification_open_to_view_invite, "Open White Noise to view the invite")
         } else {

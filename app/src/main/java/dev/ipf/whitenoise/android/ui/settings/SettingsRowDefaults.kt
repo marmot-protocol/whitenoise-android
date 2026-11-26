@@ -8,7 +8,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -21,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
@@ -50,7 +50,7 @@ internal fun SettingsRowTitle(
     destructive: Boolean = false,
 ) {
     val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-    Text(title, color = color.dimmedUnless(editable))
+    EmojiLabel(title, color = color.dimmedUnless(editable))
 }
 
 /** Supporting values wrap onto as many lines as they need instead of truncating. */
@@ -60,7 +60,7 @@ internal fun SettingsRowSupportingText(
     text: String,
     editable: Boolean,
 ) {
-    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable))
+    EmojiLabel(text, color = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable))
 }
 
 /** A busy row shows the existing Material indicator in place of its decorative trailing control. */

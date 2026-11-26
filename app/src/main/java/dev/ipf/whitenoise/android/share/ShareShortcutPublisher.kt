@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.conversationShortcutIsRich
+import dev.ipf.whitenoise.android.notifications.emojiPlainText
 import dev.ipf.whitenoise.android.notifications.genericNotificationShortcut
 import dev.ipf.whitenoise.android.notifications.isConversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
@@ -125,7 +126,7 @@ internal fun buildShareShortcut(
     previewToken: NotificationPreviewToken? = null,
 ): ShortcutInfoCompat? {
     val shortcutId = conversationShortcutId(target.accountRef, target.groupIdHex) ?: return null
-    val title = preferredConversationShortcutTitle(target.title, existingTitle)
+    val title = preferredConversationShortcutTitle(context.emojiPlainText(target.title), existingTitle)
     return ShortcutInfoCompat
         .Builder(context, shortcutId)
         .setShortLabel(title.take(SHARE_SHORTCUT_SHORT_LABEL_MAX).ifBlank { context.getString(R.string.app_name) })
@@ -208,7 +209,7 @@ private fun rebuildCardBackedShortcut(
     return rebuildShortcut(
         context = context,
         existing = existing,
-        title = if (label.isNullOrBlank()) context.getString(R.string.app_name) else label,
+        title = if (label.isNullOrBlank()) context.getString(R.string.app_name) else context.emojiPlainText(label),
         avatarBitmap = null,
         rank = rank,
         categories = existing.categories.orEmpty() - CONVERSATION_SHARE_TARGET_CATEGORY,

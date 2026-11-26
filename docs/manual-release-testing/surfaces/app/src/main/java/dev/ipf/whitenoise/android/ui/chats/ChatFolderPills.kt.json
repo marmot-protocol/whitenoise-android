@@ -9,7 +9,8 @@
         "anchor": "fun FolderPillLabel(",
         "test_ids": [
           "FLD-001",
-          "SYS-004"
+          "SYS-004",
+          "FLD-011"
         ]
       },
       {
@@ -19,7 +20,8 @@
         "test_ids": [
           "FLD-001",
           "CHL-002",
-          "MSG-010"
+          "MSG-010",
+          "FLD-011"
         ]
       },
       {

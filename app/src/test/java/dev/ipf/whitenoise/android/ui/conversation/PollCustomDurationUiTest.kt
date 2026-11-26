@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +40,8 @@ class PollCustomDurationUiTest {
                 var selection by remember { mutableStateOf(PollDeadlineSelection()) }
                 Surface(Modifier.width(320.dp)) {
                     PollCreateForm(
-                        question = "Where?",
-                        options = listOf("Home", "Cafe"),
+                        question = TextFieldState("Where?"),
+                        options = listOf("Home", "Cafe").map { TextFieldState(it) },
                         multiple = false,
                         deadlineSelection = selection,
                         enabled = true,
@@ -50,8 +51,6 @@ class PollCustomDurationUiTest {
                             } else {
                                 null
                             },
-                        onQuestionChange = {},
-                        onOptionChange = { _, _ -> },
                         onRemoveOption = {},
                         onAddOption = {},
                         onMultipleChange = {},

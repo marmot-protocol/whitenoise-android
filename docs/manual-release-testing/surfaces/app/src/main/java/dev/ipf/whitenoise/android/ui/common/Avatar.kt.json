@@ -29,7 +29,8 @@
         "anchor": "fun AvatarMonogram(",
         "test_ids": [
           "AXY-001",
-          "CHL-017"
+          "CHL-017",
+          "FLD-011"
         ]
       },
       {
@@ -57,6 +58,15 @@
         "test_ids": [
           "AXY-001",
           "PRO-012"
+        ]
+      },
+      {
+        "surface": "IdentityMonogram",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "internal fun IdentityMonogram(",
+        "test_ids": [
+          "AXY-001",
+          "FLD-011"
         ]
       }
     ]
