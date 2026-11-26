@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
+import dev.ipf.whitenoise.android.state.withStoredDraftAdmission
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import kotlinx.coroutines.Dispatchers
@@ -239,12 +240,14 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
     readable: (String) -> Boolean,
     tokenStatus: suspend (String) -> CollectionTokenStatus? = mdkCollectionTokenStatus(accountRef, groupIdHex),
 ) {
-    val registry = attachmentCollections
-    registry.operations.value.values
-        .filter { it.accountRef == accountRef && it.groupIdHex == groupIdHex && it.needsStoredDraftCleanup }
-        .forEach { finishCollectionDraftCleanup(it.id) }
-    withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
-        restoreCollectionOperation(journaled, readable, tokenStatus)
+    withStoredDraftAdmission(accountRef, groupIdHex) {
+        val registry = attachmentCollections
+        registry.operations.value.values
+            .filter { it.accountRef == accountRef && it.groupIdHex == groupIdHex && it.needsStoredDraftCleanup }
+            .forEach { finishCollectionDraftCleanup(it.id) }
+        withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
+            restoreCollectionOperation(journaled, readable, tokenStatus)
+        }
     }
 }
 
@@ -271,8 +274,12 @@ private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
         if (!registry.adopt(restored, admission)) return
         when {
             reconciled.needsStoredDraftCleanup -> finishCollectionDraftCleanup(reconciled.id)
-            !unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null) ->
+            !unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null) -> {
                 registry.discard(reconciled.id)
+                if (journaled.items.any { it.storedDraft != null }) {
+                    retainedConversationStates.recordNativeComposerCleanup(journaled.accountRef, journaled.groupIdHex)
+                }
+            }
         }
     } finally {
         registry.admissions.release(admission)
@@ -314,6 +321,10 @@ internal fun ConversationMediaSender.resumeCollection(
                     // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
                     registry.update(operationId) { it.withTokenStatuses(statuses, registry.now()) }
                     registry.discard(operationId)
+                    appState.retainedConversationStates.recordNativeComposerCleanup(
+                        paused.accountRef,
+                        paused.groupIdHex,
+                    )
                     return@launchMutation
                 }
                 withContext(Dispatchers.IO) {

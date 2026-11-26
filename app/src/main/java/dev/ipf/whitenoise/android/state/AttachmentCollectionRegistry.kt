@@ -161,6 +161,15 @@ internal class AttachmentCollectionRegistry(
         accountRef: String,
         groupIdHex: String,
     ): List<AttachmentCollectionOperation> {
+        synchronized(lock) {
+            state.update { current ->
+                current.filterValues {
+                    val sameChat = it.accountRef == accountRef && it.groupIdHex == groupIdHex
+                    val deferred = it.cleanupOnly && it.paused && !it.needsStoredDraftCleanup
+                    !(sameChat && deferred)
+                }
+            }
+        }
         val records =
             JOURNAL_EFFECTS
                 .submit(
@@ -202,6 +211,17 @@ internal class AttachmentCollectionRegistry(
         return withContext(Dispatchers.IO) { effect.get() }
     }
 }
+
+/** Whether a current collection still owns native originals that an unrelated send must preserve. */
+internal fun WhiteNoiseAppState.hasCollectionDrafts(
+    account: String,
+    group: String,
+): Boolean =
+    attachmentCollections.operations.value.values.any { operation ->
+        operation.accountRef == account &&
+            operation.groupIdHex == group &&
+            operation.items.any { it.storedDraft?.consumed == false }
+    }
 
 /** One pre-journal collection attempt, invalidated by removal of its account or conversation. */
 internal class CollectionAdmission(

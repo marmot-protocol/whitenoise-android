@@ -347,20 +347,11 @@ class StoredDraftAcceptanceTest {
     @Test
     fun acceptedCollectionTokenRecoversOriginalFileWithoutConsumingLaterDraft() =
         runBlocking {
-            val old =
-                SelectedMessageDraftAttachmentFfi(
-                    "sent",
-                    "same.bin",
-                    "application/octet-stream",
-                    900uL,
-                    null,
-                    null,
-                    null,
-                    emptyList(),
-                    true,
-                )
+            val old = draftAttachment("sent")
             val replacement = old.copy(id = "picked-again")
-            val updatedDraft = content("same caption", old, replacement).copy(replyToMessageIdHex = "new-reply")
+            val skipped = old.copy(id = "skipped-for-storage")
+            val updatedDraft =
+                content("same caption", old, replacement, skipped).copy(replyToMessageIdHex = "new-reply")
             val engine = DraftUploadEngine(updatedDraft)
             val app = acceptanceAppState(engine)
             val journal = AttachmentCollectionJournal(app.appContext.noBackupFilesDir)
@@ -372,7 +363,15 @@ class StoredDraftAcceptanceTest {
                     CollectionItemState.UPLOADING,
                     CollectionStoredDraft(old.id, 900L, old.mediaType),
                 )
-            val chunk = CollectionChunk("chunk", 0, listOf(item.id), true, "accepted", CollectionChunkState.UPLOADING)
+            val skippedItem =
+                item.copy(
+                    id = "skipped-pick",
+                    state = CollectionItemState.SKIPPED,
+                    storedDraft = CollectionStoredDraft(skipped.id, 900L, skipped.mediaType),
+                )
+            val items = listOf(item, skippedItem)
+            val chunk =
+                CollectionChunk("chunk", 0, items.map { it.id }, true, "accepted", CollectionChunkState.UPLOADING)
             val now = System.currentTimeMillis()
             val expired = now - ATTACHMENT_COLLECTION_JOURNAL_TTL_MS - 1
             val operation =
@@ -380,7 +379,7 @@ class StoredDraftAcceptanceTest {
                     "recovery",
                     "acct",
                     "group",
-                    listOf(item),
+                    items,
                     listOf(chunk),
                     expired,
                     expired,
@@ -390,7 +389,7 @@ class StoredDraftAcceptanceTest {
                 app.restoreCollectionOperations("acct", "group", { true }) { CollectionTokenStatus.ACCEPTED }
                 awaitAttachmentCollectionJournal()
 
-                assertEquals(updatedDraft.copy(mediaAttachments = listOf(replacement)), engine.current)
+                assertEquals(updatedDraft.copy(mediaAttachments = listOf(replacement, skipped)), engine.current)
                 assertTrue(app.nativeComposerCleanupRevision("acct", "group") > 0)
                 assertTrue(journal.read("acct", "group").isEmpty())
             } finally {
@@ -440,6 +439,73 @@ class StoredDraftAcceptanceTest {
             }
         }
 
+    /** A single-file write-ahead record survives accepted admission when native draft cleanup is unavailable. */
+    @Test
+    fun acceptedSingleStoredFileRecoversAfterCleanupWasInterrupted() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val original = draftAttachment("sent")
+            val newer = original.copy(id = "picked-again")
+            val updated = content("later caption", original, newer).copy(replyToMessageIdHex = "reply")
+            val engine = DraftUploadEngine(updated).apply { refuseDraftCleanup = true }
+            val initial = acceptanceAppState(engine)
+            val journal = AttachmentCollectionJournal(initial.appContext.noBackupFilesDir)
+            var beforeAcceptance: AttachmentCollectionOperation? = null
+            engine.onAdmission = { beforeAcceptance = journal.read("acct", group.groupIdHex).single() }
+            try {
+                val controller = ConversationController(appState = initial, initialGroup = group)
+                val pending =
+                    PendingAttachment(
+                        byteArrayOf(),
+                        original.mediaType,
+                        original.fileName,
+                        draftFile = DraftStoredFile(original.id, 900L),
+                    )
+                controller.admitRetainedMedia("acct", emptyList(), RetainedMediaUpload(listOf(pending), "sent"), "one")
+                awaitAttachmentCollectionJournal()
+                assertEquals(updated, engine.current)
+                assertTrue(journal.read("acct", group.groupIdHex).single().needsStoredDraftCleanup)
+                val writeAhead = checkNotNull(beforeAcceptance)
+                assertEquals("one", writeAhead.chunks.single().clientToken)
+                assertEquals(
+                    original.id,
+                    writeAhead.items
+                        .single()
+                        .storedDraft
+                        ?.attachmentId,
+                )
+                // Keep only the journal state we would have if Android stopped immediately after native acceptance.
+                assertTrue(journal.write(writeAhead))
+                engine.refuseDraftCleanup = false
+                val reopened = acceptanceAppState(engine)
+                try {
+                    reopened.restoreCollectionOperations("acct", group.groupIdHex, readable = { false })
+                    awaitAttachmentCollectionJournal()
+                    assertEquals(updated.copy(mediaAttachments = listOf(newer)), engine.current)
+                    assertTrue(journal.read("acct", group.groupIdHex).isEmpty())
+                } finally {
+                    reopened.mutationsScope.cancel()
+                }
+            } finally {
+                journal.delete("acct", group.groupIdHex, "stored-one")
+                initial.mutationsScope.cancel()
+            }
+        }
+
+    /** A native stored-file descriptor that can be reselected under a different identity. */
+    private fun draftAttachment(id: String) =
+        SelectedMessageDraftAttachmentFfi(
+            id,
+            "same.bin",
+            "application/octet-stream",
+            900uL,
+            null,
+            null,
+            null,
+            emptyList(),
+            true,
+        )
+
     /** Provides the test engine through the real app state and its coordinated draft shelf. */
     private fun acceptanceAppState(engine: DraftUploadEngine): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -477,6 +543,8 @@ private class DraftUploadEngine(
         private set
     val calls = mutableListOf<String>()
     var beforeSave: () -> Unit = {}
+    var refuseDraftCleanup: Boolean = false
+    var onAdmission: () -> Unit = {}
     var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
     var uploadRevision: MessageDraftRevisionFfi? = null
     var uploadedIds: List<String> = emptyList()
@@ -513,7 +581,7 @@ private class DraftUploadEngine(
             clientToken: String,
         ): LocalSendStatusFfi? {
             calls += "localSendStatus"
-            return if (recovered) LocalSendStatusFfi.Completed(summary()) else null
+            return if (recovered || admittedToken == clientToken) LocalSendStatusFfi.Completed(summary()) else null
         }
 
         /** Returns the draft under its current revision. */
@@ -534,6 +602,7 @@ private class DraftUploadEngine(
             mediaAttachments: List<MessageDraftAttachmentInputFfi>,
         ): SelectedMessageDraftFfi {
             calls += "save"
+            if (refuseDraftCleanup) throw MarmotKitException.MessageDraftRevisionConflict()
             beforeSave().also { beforeSave = {} }
             requireCurrent(revision)
             savedInputs = mediaAttachments
@@ -613,6 +682,7 @@ private class DraftUploadEngine(
         ): LocalSendAcceptanceFfi {
             calls += "admit"
             admittedCaption = caption
+            onAdmission()
             admittedToken = clientToken
             admittedConsuming = consumingDraft
             if (consumingDraft != null && consumingDraft === revision) {

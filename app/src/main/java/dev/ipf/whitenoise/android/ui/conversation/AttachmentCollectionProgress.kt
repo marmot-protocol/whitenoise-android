@@ -25,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,7 +67,6 @@ internal fun rememberAttachmentCollectionPanels(
     controller: ConversationController,
     mediaSender: ConversationMediaSender,
 ): (@Composable () -> Unit)? {
-    val context = LocalContext.current
     val account = controller.boundAccountRef
     val groupIdHex = controller.group.groupIdHex
     val gone = controller.group.disbanded || controller.group.unrecoverable
@@ -76,8 +74,6 @@ internal fun rememberAttachmentCollectionPanels(
         if (account == null) return@LaunchedEffect
         if (gone) {
             appState.attachmentCollections.invalidateConversation(account, groupIdHex)
-        } else {
-            appState.restoreCollectionOperations(account, groupIdHex, readable = { canReadCollectionUri(context, it) })
         }
     }
     // The caller only learns whether a panel exists, so a progress change recomposes just the panels.
@@ -125,7 +121,8 @@ internal fun canReadCollectionUri(
 
 /** Whether an operation deserves a panel: several chunks, or any state the user must act on. */
 internal fun AttachmentCollectionOperation.needsPanel(): Boolean =
-    phase != CollectionOperationPhase.FINISHED &&
+    !cleanupOnly &&
+        phase != CollectionOperationPhase.FINISHED &&
         (chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED)
 
 /**

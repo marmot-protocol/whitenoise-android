@@ -9,7 +9,9 @@ import dev.ipf.whitenoise.android.media.sharedPlaintextSuffix
 import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionDraftSourceFiles
+import dev.ipf.whitenoise.android.state.CollectionItemState
 import dev.ipf.whitenoise.android.state.CollectionStoredDraft
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftFileCopy
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.UnverifiedStoredDraftPdf
@@ -32,12 +34,55 @@ internal suspend fun WhiteNoiseAppState.finishCollectionDraftCleanup(operationId
     val registry = attachmentCollections
     if (registry.operations.value[operationId]?.needsStoredDraftCleanup != true) return
     val recorded = registry.updateDurably(operationId) { it } ?: return
-    val consumed = runCatchingCancellable { marmotIo { consumeCollectionDraftFiles(recorded) } }.getOrDefault(false)
+    val accepted = recorded.pendingDraftFiles
+    val consumed =
+        runCatchingCancellable {
+            marmotIo { consumeCollectionDraftFiles(recorded, accepted) }
+        }.getOrDefault(false)
     if (consumed) {
-        registry.update(operationId) { it.copy(storedDraftConsumed = true, updatedAtMs = registry.now()) }
+        val ids = accepted.mapTo(HashSet()) { it.attachmentId }
+        registry.update(operationId) { operation ->
+            val remaining =
+                operation.items.map { item ->
+                    val source = item.storedDraft
+                    if (source != null && source.attachmentId in ids) {
+                        item.copy(storedDraft = source.copy(consumed = true))
+                    } else {
+                        item
+                    }
+                }
+            operation.copy(items = remaining, updatedAtMs = registry.now())
+        }
         retainedConversationStates.recordNativeComposerCleanup(recorded.accountRef, recorded.groupIdHex)
     }
 }
+
+/** Resolves collection and single-file admission records before opening a sendable native shelf. */
+internal suspend fun WhiteNoiseAppState.reconcileDraftSends(
+    account: String,
+    controller: ConversationController,
+) {
+    val group = controller.group
+    if (!group.disbanded && !group.unrecoverable) {
+        restoreCollectionOperations(account, group.groupIdHex, readable = { canReadCollectionUri(appContext, it) })
+    }
+}
+
+/** Original draft IDs currently covered by a collection or still awaiting a single-send acceptance lookup. */
+internal fun WhiteNoiseAppState.collectionOwnedDraftIds(
+    account: String,
+    group: String,
+): Set<String> =
+    attachmentCollections.operations.value.values
+        .filter { it.accountRef == account && it.groupIdHex == group }
+        .flatMap { operation ->
+            operation.items.mapNotNull { item ->
+                item.storedDraft?.attachmentId.takeUnless {
+                    item.state == CollectionItemState.SKIPPED ||
+                        item.state == CollectionItemState.CANCELLED
+                }
+            }
+        }.toSet()
 
 /** Copies stored bodies from their selected native revision before the collection accepts the composer shelf. */
 internal suspend fun WhiteNoiseAppState.copyStoredCollectionSources(
@@ -71,7 +116,11 @@ internal suspend fun ownCollectionDraftSources(
         operation.items.zip(prepared).mapIndexed { index, (item, body) ->
             val descriptor = body?.draftFile
             if (body == null || descriptor == null) {
-                item
+                val inline =
+                    body?.nativeDraftAttachmentId?.let { id ->
+                        CollectionStoredDraft(id, body.byteCount, body.mediaType, fileBacked = false)
+                    }
+                item.copy(storedDraft = inline)
             } else {
                 val target = files.fileFor(context, operation, index, collectionDraftSuffix(body))
                 item.copy(

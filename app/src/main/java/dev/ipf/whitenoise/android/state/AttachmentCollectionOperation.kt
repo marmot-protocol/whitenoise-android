@@ -50,11 +50,13 @@ internal enum class CollectionChunkState {
         get() = this == ACCEPTED || this == CANCELLED || this == SKIPPED
 }
 
-/** Native identity and media type of an operation-owned copy of a stored draft file. */
+/** Native draft identity used to settle an attachment independently of newer edits. */
 internal data class CollectionStoredDraft(
     val attachmentId: String,
     val byteCount: Long,
     val mediaType: String,
+    val fileBacked: Boolean = true,
+    val consumed: Boolean = false,
 )
 
 /** One staged occurrence: [id] is the composer's stable occurrence id, so duplicate URIs stay distinct. */
@@ -180,7 +182,7 @@ internal data class AttachmentCollectionOperation(
     val paused: Boolean = false,
     val unrecoverableItemIds: Set<String> = emptySet(),
     val cancelRequested: Boolean = false,
-    val storedDraftConsumed: Boolean = false,
+    val cleanupOnly: Boolean = false,
 ) {
     /** Every item the operation started with; it never shrinks, so progress cannot run backwards. */
     val total: Int
@@ -198,20 +200,29 @@ internal data class AttachmentCollectionOperation(
     val nextChunk: CollectionChunk?
         get() = chunks.firstOrNull { !it.state.isSettled }
 
-    /** Stored originals can be released after MDK owns at least one chunk and all copies are journaled. */
-    val needsStoredDraftCleanup: Boolean
+    /** Only accepted originals may be removed. Several shelf occurrences can share one native ID. */
+    val pendingDraftFiles: List<CollectionStoredDraft>
         get() =
-            !storedDraftConsumed &&
-                chunks.any { it.state == CollectionChunkState.ACCEPTED } &&
-                items.any { it.storedDraft != null }
+            items
+                .filter { it.storedDraft != null }
+                .groupBy { it.storedDraft?.attachmentId }
+                .values
+                .mapNotNull { picks ->
+                    picks.first().storedDraft?.takeIf {
+                        !it.consumed && picks.all { pick -> pick.state == CollectionItemState.PUBLISHED }
+                    }
+                }
+
+    /** Some accepted originals have not yet been removed from their native draft. */
+    val needsStoredDraftCleanup: Boolean
+        get() = pendingDraftFiles.isNotEmpty()
 
     /** A recorded native token can still establish accepted ownership after process death. */
     val mayNeedStoredDraftCleanup: Boolean
         get() =
             needsStoredDraftCleanup ||
                 (
-                    !storedDraftConsumed &&
-                        items.any { it.storedDraft != null } &&
+                    items.any { it.storedDraft?.consumed == false } &&
                         chunks.any { !it.state.isSettled && it.clientToken != null }
                 )
 

@@ -13,6 +13,8 @@ import dev.ipf.whitenoise.android.state.ATTACHMENT_CHUNK_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureDraftForSend
+import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
@@ -314,7 +316,7 @@ internal class ConversationMediaSender(
                 replyAccepted = true
                 completion.accept()
             }
-            pendingClear?.let(appState::clearDraftAfterSuccessfulSend)
+            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it) }
         }
         if (isReply && !replyAccepted) completion.reject()
     }

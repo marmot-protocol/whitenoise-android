@@ -1679,7 +1679,7 @@ class WhiteNoiseAppState private constructor(
             onFailed = { present(R.string.toast_reply_draft_restore_failed) },
         ) { draftHydrationRevision += 1 }
     }
-    private val composerDraftExpansionBridge =
+    internal val composerDraftExpansionBridge =
         ComposerDraftExpansionBridge(
             draftWriter = draftWriter,
             draftStore = draftStore,
@@ -2251,16 +2251,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    internal fun captureDraftForSend(
-        accountRef: String?,
-        groupIdHex: String,
-    ): DraftSendClearToken? = composerDraftExpansionBridge.captureForSend(accountRef, groupIdHex)
-
-    /** Clears only the draft and geometry generation durably accepted by MDK. */
-    internal fun clearDraftAfterSuccessfulSend(pendingClear: DraftSendClearToken) {
-        composerDraftExpansionBridge.clearAfterDurableAcceptance(pendingClear)
-    }
-
     internal suspend fun sendConversationText(
         controller: ConversationController,
         text: String,
@@ -2281,7 +2271,7 @@ class WhiteNoiseAppState private constructor(
             },
             onDurablyAccepted = {
                 durablyAccepted = true
-                pendingClear?.let(::clearDraftAfterSuccessfulSend)
+                pendingClear?.let { clearDraftAfterSuccessfulSend(it, textOnly = true) }
                 onSendSettled(true)
             },
             onTerminalFailure = {

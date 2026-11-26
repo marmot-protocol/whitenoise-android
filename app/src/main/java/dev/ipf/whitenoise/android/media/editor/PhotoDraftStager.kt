@@ -36,6 +36,7 @@ internal data class DraftBackedPhoto(
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
             plaintextBytes = attachment.plaintext,
+            nativeDraftAttachmentId = attachment.id,
             mediaType = attachment.mediaType,
             fileName = attachment.fileName,
             dim = attachment.dim,
@@ -55,6 +56,7 @@ internal data class DraftPreparedPhoto(
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
             plaintextBytes = attachment.plaintext,
+            nativeDraftAttachmentId = attachment.id,
             mediaType = attachment.mediaType,
             fileName = attachment.fileName,
             dim = attachment.dim,

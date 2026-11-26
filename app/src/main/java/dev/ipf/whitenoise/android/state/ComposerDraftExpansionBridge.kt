@@ -142,10 +142,22 @@ internal class ComposerDraftExpansionBridge(
      * Evicts only the durably accepted generation, then deletes its MDK draft
      * asynchronously without allowing an older hydration to resurrect it.
      */
-    fun clearAfterDurableAcceptance(token: DraftSendClearToken) {
+    fun clearAfterDurableAcceptance(
+        token: DraftSendClearToken,
+        keepAttachments: Boolean = false,
+    ) {
         val accountRef = token.accountRef
         val groupIdHex = token.groupIdHex
         val sentGeneration = token.generation
+        if (keepAttachments) {
+            val current = draftWriter.generation(accountRef, groupIdHex)
+            if (draftRepository.coordinated.isTextCurrent(accountRef, groupIdHex, sentGeneration) &&
+                setDraftIfCurrent(accountRef, groupIdHex, current.value, TextFieldValue(""))
+            ) {
+                onDraftPresentationChanged(accountRef, groupIdHex, false)
+            }
+            return
+        }
         val cleanupGeneration =
             draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))

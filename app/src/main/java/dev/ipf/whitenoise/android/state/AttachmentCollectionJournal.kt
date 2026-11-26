@@ -197,7 +197,7 @@ internal fun encodeCollectionOperation(
         items.put(
             JSONObject()
                 .put("id", item.id)
-                .put("uri", if (withUris || item.storedDraft != null) item.uri else "")
+                .put("uri", if (withUris || item.storedDraft?.fileBacked == true) item.uri else "")
                 .put("kind", item.kind.name)
                 .put("state", item.state.name)
                 .put("draft", item.storedDraft?.let(::encodeStoredCollectionDraft)),
@@ -223,7 +223,7 @@ internal fun encodeCollectionOperation(
         .put("created", operation.createdAtMs)
         .put("updated", operation.updatedAtMs)
         .put("items", items)
-        .put("draftConsumed", operation.storedDraftConsumed)
+        .put("cleanupOnly", operation.cleanupOnly)
         .put("chunks", chunks)
         .toString()
         .toByteArray(StandardCharsets.UTF_8)
@@ -235,6 +235,8 @@ private fun encodeStoredCollectionDraft(source: CollectionStoredDraft): JSONObje
         .put("id", source.attachmentId)
         .put("bytes", source.byteCount)
         .put("mime", source.mediaType)
+        .put("fileBacked", source.fileBacked)
+        .put("consumed", source.consumed)
 
 /** Reads a record written by [encodeCollectionOperation]; a restored operation always starts paused. */
 internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOperation {
@@ -260,6 +262,8 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
                                 draft.getString("id"),
                                 draft.getLong("bytes"),
                                 draft.getString("mime"),
+                                draft.optBoolean("fileBacked", true),
+                                draft.optBoolean("consumed", json.optBoolean("draftConsumed")),
                             )
                         },
                 )
@@ -280,6 +284,6 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
         createdAtMs = json.getLong("created"),
         updatedAtMs = json.getLong("updated"),
         paused = true,
-        storedDraftConsumed = json.optBoolean("draftConsumed"),
+        cleanupOnly = json.optBoolean("cleanupOnly"),
     )
 }

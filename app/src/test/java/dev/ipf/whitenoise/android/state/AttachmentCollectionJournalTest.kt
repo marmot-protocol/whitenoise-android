@@ -94,9 +94,10 @@ class AttachmentCollectionJournalTest {
         val registry = AttachmentCollectionRegistry(journal) { now }
         val planned = operation()
         val original = CollectionStoredDraft("native", 42L, "application/example")
+        val items = planned.items.map { item -> item.copy(storedDraft = original.copy(attachmentId = item.id)) }
         val accepted =
             planned
-                .copy(items = planned.items.map { it.copy(storedDraft = original) })
+                .copy(items = items)
                 .withChunkState(
                     planned.chunks.first().id,
                     CollectionChunkState.ACCEPTED,
@@ -113,8 +114,33 @@ class AttachmentCollectionJournalTest {
         val restored = coldRegistry.journaledFor(accepted.accountRef, accepted.groupIdHex).single()
         assertEquals(CollectionOperationPhase.FINISHED, restored.phase)
         assertTrue(restored.needsStoredDraftCleanup)
-        assertEquals(original, restored.items.first().storedDraft)
+        assertEquals(original.copy(attachmentId = planned.items.first().id), restored.items.first().storedDraft)
         assertTrue(restored.items.all { it.uri.isEmpty() })
+    }
+
+    /** A skipped pick still owns a shared native ID even when a separate occurrence was accepted. */
+    @Test
+    fun skippedAliasPreservesSharedOriginal() {
+        val planned = operation()
+        val shared = CollectionStoredDraft("shared", 10L, "application/example")
+        val first = planned.items[0].copy(state = CollectionItemState.PUBLISHED, storedDraft = shared)
+        val skipped = planned.items[1].copy(state = CollectionItemState.SKIPPED, storedDraft = shared)
+        val sent =
+            planned.items[2].copy(
+                state = CollectionItemState.PUBLISHED,
+                storedDraft =
+                    shared.copy(
+                        attachmentId = "sent",
+                    ),
+            )
+        val restored =
+            decodeCollectionOperation(
+                encodeCollectionOperation(
+                    planned.copy(items = listOf(first, skipped, sent)),
+                    withUris = true,
+                ),
+            )
+        assertEquals(listOf(sent.storedDraft), restored.pendingDraftFiles)
     }
 
     /** A record too large with URIs is kept without them, under 256 KiB; more than 100 items is refused. */

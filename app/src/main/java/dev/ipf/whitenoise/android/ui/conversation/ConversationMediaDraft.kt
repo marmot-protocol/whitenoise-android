@@ -458,6 +458,7 @@ internal class ConversationMediaDraftState(
     private suspend fun restorePass(canPublish: () -> Boolean): DraftRestorePass<RestoredConversationAttachments> =
         preparationMutex.withLock {
             val owner = documentOwnerFence.current() ?: return@withLock DraftRestorePass.Finished(null)
+            appState.reconcileDraftSends(owner.accountRef, controller)
             val cleanupRevision = appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex)
             val requested = DraftRestorationVersion(owner, cleanupRevision, inputsRevision)
             val restored = restoredDraftRevision
@@ -544,7 +545,8 @@ internal class ConversationMediaDraftState(
     /** Combines this composer's fences with process-owned cleanup still running for the account. */
     private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
         documentRemovalFence.removedAttachmentIds(accountRef, controller.group.groupIdHex, currentDocumentIds) +
-            appState.draftAttachmentRemovalTombstones.attachmentIds(accountRef, controller.group.groupIdHex)
+            appState.draftAttachmentRemovalTombstones.attachmentIds(accountRef, controller.group.groupIdHex) +
+            appState.collectionOwnedDraftIds(accountRef, controller.group.groupIdHex)
 
     /** Preserves native identity for shelf entries relinked to a presentation file during restoration. */
     fun savedDocumentIds(uris: List<Uri>): Map<String, String> =

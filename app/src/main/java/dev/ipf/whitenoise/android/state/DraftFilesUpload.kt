@@ -169,10 +169,14 @@ internal fun MarmotInterface.consumeSentDraftFiles(
 }
 
 /** Removes just the original stored attachment IDs of an accepted, journaled collection. */
-internal fun MarmotInterface.consumeCollectionDraftFiles(operation: AttachmentCollectionOperation): Boolean {
-    val sources = operation.items.mapNotNull { it.storedDraft }.associateBy { it.attachmentId }
-    return consumeSelectedDraftFiles(operation.accountRef, operation.groupIdHex, matches = { descriptor ->
-        descriptor.fileBacked && sources[descriptor.id]?.byteCount == descriptor.plaintextSize.toLong()
+internal fun MarmotInterface.consumeCollectionDraftFiles(
+    operation: AttachmentCollectionOperation,
+    accepted: List<CollectionStoredDraft>,
+): Boolean {
+    val sources = accepted.associateBy { it.attachmentId }
+    return consumeSelectedDraftFiles(operation.accountRef, operation.groupIdHex, matches = { draft ->
+        val source = sources[draft.id]
+        source != null && source.fileBacked == draft.fileBacked && source.byteCount == draft.plaintextSize.toLong()
     })
 }
 

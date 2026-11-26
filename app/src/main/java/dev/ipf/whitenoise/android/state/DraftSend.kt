@@ -54,7 +54,7 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
     // Without a projected message, retained native ownership still needs dictation recovery.
     // False keeps delivery unknown and the existing claim; it never authorizes another send.
     if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
-    pendingClear?.let(::clearDraftAfterSuccessfulSend)
+    pendingClear?.let { clearDraftAfterSuccessfulSend(it, textOnly = true) }
     runCatching(request.onPendingShown)
     if (summary.acceptDisposition == SendAcceptDispositionFfi.PUBLISHED ||
         summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING

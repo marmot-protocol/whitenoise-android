@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.DraftSendClearToken
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.attachmentCollections
+import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
 import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
@@ -177,6 +178,7 @@ internal class AttachmentCollectionSender(
         if (prepared.skipped.isNotEmpty()) {
             persist(run) { op, now -> op.skipItems(prepared.skipped, now) }
             appState.presentSkippedAttachments(prepared.skipped.size, prepared.reason)
+            appState.retainedConversationStates.recordNativeComposerCleanup(run.accountRef, run.groupIdHex)
         }
         val current = sender
         var seeded: ConversationController.QueuedAttachmentSend? = null
@@ -241,7 +243,15 @@ internal class AttachmentCollectionSender(
                     registry.now(),
                 )
             }
-        if (chunk.carriesCaption) run.draftClear?.let(appState::clearDraftAfterSuccessfulSend)
+        if (chunk.carriesCaption && accepted != null) {
+            run.draftClear?.let { draft ->
+                if (accepted.items.any { it.storedDraft != null }) {
+                    appState.composerDraftExpansionBridge.clearAfterDurableAcceptance(draft, keepAttachments = true)
+                } else {
+                    appState.clearDraftAfterSuccessfulSend(draft)
+                }
+            }
+        }
         if (accepted?.needsStoredDraftCleanup == true) {
             appState.launchMutation { appState.finishCollectionDraftCleanup(run.operationId) }
         }
@@ -284,7 +294,11 @@ internal class AttachmentCollectionSender(
                         staging = FileBackedSendStaging { staged += it },
                         keepPdfMetadata = run.keepPdfMetadata,
                         pickKey = run::pickKey,
-                        ownedMime = item.storedDraft?.let { mapOf(uri to it.mediaType) }.orEmpty(),
+                        ownedMime =
+                            item.storedDraft
+                                ?.takeIf { it.fileBacked }
+                                ?.let { mapOf(uri to it.mediaType) }
+                                .orEmpty(),
                     )
                 val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
                 val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L

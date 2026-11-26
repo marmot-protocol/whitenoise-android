@@ -21,6 +21,7 @@ data class PendingAttachment(
      */
     val outgoingDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    val nativeDraftAttachmentId: String? = null,
 ) {
     init {
         val representations = listOf(plaintextBytes.isNotEmpty(), sourceFile != null, draftFile != null)
