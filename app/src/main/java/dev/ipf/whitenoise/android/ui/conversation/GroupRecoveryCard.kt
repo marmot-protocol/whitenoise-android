@@ -36,7 +36,22 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+
+/** Lets a tall recovery card scroll inside the space left by the composer. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun EmptyConversationRecoveryContent(
+    state: ConversationEmptyState,
+    modifier: Modifier = Modifier,
+    recovery: @Composable () -> Unit,
+) {
+    Column(modifier) {
+        Column(Modifier.fadingVerticalScroll()) { recovery() }
+        ConversationEmptyMessage(state, verticalPadding = 0.dp)
+    }
+}
 
 /** Wires the conversation-owned recovery actions consistently in empty and populated timelines. */
 @Composable
