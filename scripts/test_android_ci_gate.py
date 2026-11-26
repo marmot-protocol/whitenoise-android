@@ -350,6 +350,14 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
+    def test_coverage_floor_failure_still_writes_the_reports(self):
+        """A failed coverage floor still lets Gradle write the XML and HTML reports the upload step publishes."""
+        coverage = self.named_step(self.coverage, 'Coverage gate and report (Kover)')
+        self.assertIn('--continue', coverage)
+        upload = self.named_step(self.coverage, 'Upload coverage report')
+        self.assertIn('if: always()', upload)
+        self.assertIn('app/build/reports/kover/', upload)
+
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
         floor = self.named_step(self.coverage, 'Runtime listener and viewport restoration coverage floors')
         self.assertIn("!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true'", floor)
