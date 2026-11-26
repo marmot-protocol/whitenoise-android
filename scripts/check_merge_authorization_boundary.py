@@ -15,8 +15,6 @@ WRITE_ALLOW = {
     ('android-release-distribute.yml', 'github-draft'): {'contents'},
     ('dependency-submission.yml', None): {'contents'},
     ('pr-screenshots.yml', None): {'issues', 'pull-requests'},
-    # Updates the advisory comment using the trusted base-branch checker.
-    ('pr-merge-order.yml', 'report'): {'pull-requests'},
     ('codeql.yml', None): {'security-events'},
 }
 

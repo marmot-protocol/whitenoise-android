@@ -4,7 +4,6 @@ const { mkdtempSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 
-const COMMENT_MARKER = '<!-- whitenoise-android:pr-merge-order -->'
 const MAX_PRS_PER_PLAN = 5
 const MAX_PATHS_PER_PR = 6
 const MAX_INVENTORY = 100
@@ -32,14 +31,33 @@ function gitAt(cwd, args, allowedStatuses = [0]) {
   return result
 }
 
+/** Collect conflicted files plus paths that Git reports only in structured messages. */
+function conflictPaths(fields) {
+  const separator = fields.indexOf('')
+  if (separator < 0) throw new Error('Git omitted the merge conflict message separator')
+  const paths = new Set(fields.slice(0, separator))
+  for (let index = separator + 1; index < fields.length - 1;) {
+    const count = Number(fields[index])
+    const messageType = index + count + 1
+    if (!Number.isSafeInteger(count) || count < 0 || messageType + 1 >= fields.length - 1) {
+      throw new Error('Git returned an invalid merge conflict message')
+    }
+    if (fields[messageType].startsWith('CONFLICT')) {
+      for (const path of fields.slice(index + 1, messageType)) paths.add(path)
+    }
+    index = messageType + 2
+  }
+  return [...paths]
+}
+
 /** Simulate one squash merge and report conflict paths without checking out the candidate. */
 function squashMerge(cwd, base, head) {
   const result = gitAt(cwd, [
-    'merge-tree', '--write-tree', '--name-only', '--no-messages', '-z', base, head,
+    'merge-tree', '--write-tree', '--name-only', '--messages', '-z', base, head,
   ], [0, 1])
   const [tree, ...paths] = result.stdout.split('\0')
   if (!/^[0-9a-f]{40}$/.test(tree)) throw new Error('Git returned an invalid merge tree')
-  if (result.status === 1) return { conflicts: [...new Set(paths.filter(Boolean))] }
+  if (result.status === 1) return { conflicts: conflictPaths(paths) }
 
   const commit = gitAt(cwd, [
     '-c', 'commit.gpgsign=false', 'commit-tree', tree, '-p', base, '-m', `Simulated squash merge ${SIMULATION_ID}`,
@@ -136,9 +154,10 @@ function renderReport(base, candidates, { order, waiting }, omitted, unscanned) 
     lines.push('', order.length ? '**Wait until the sequence above lands, then update from `master`.**'
       : '**Conflicts**', '')
     for (const pr of waiting) {
-      const paths = pr.paths.slice(0, MAX_PATHS_PER_PR).map(formatPath).join(', ')
+      const paths = pr.paths.slice(0, MAX_PATHS_PER_PR).map(formatPath).join(', ') ||
+        'Git reported a conflict without a specific path.'
       const extra = pr.paths.length - MAX_PATHS_PER_PR
-      lines.push(`- #${pr.number}${paths ? ` · ${paths}` : ''}${extra > 0 ? ` and ${extra} more` : ''}`)
+      lines.push(`- #${pr.number} · ${paths}${extra > 0 ? ` and ${extra} more` : ''}`)
     }
   }
   const shared = candidates.filter(pr => pr.shared)
@@ -200,29 +219,12 @@ function inventoryFor(open, focus) {
   return [focus, ...open.filter(pr => pr.number !== focus.number).slice(0, MAX_INVENTORY - 1)]
 }
 
-/** Identify the ordered PR heads that determine one simulation. */
+/** Identify the ordered PR heads and review states that determine one simulation. */
 function candidateKey(candidates) {
-  return candidates.map(pr => `${pr.number}:${pr.head}`).join(',')
+  return candidates.map(pr => `${pr.number}:${pr.head}:${pr.draft}`).join(',')
 }
 
-/** Update the one comment owned by this workflow, or remove it when overlaps clear. */
-async function updateComment(github, repo, number, comments, report) {
-  const existing = comments.find(comment => comment.user?.login === 'github-actions[bot]' &&
-    comment.body?.startsWith(`${COMMENT_MARKER}\n`))
-  if (!report) {
-    if (existing) await github.rest.issues.deleteComment({ ...repo, comment_id: existing.id })
-    return
-  }
-  const body = `${COMMENT_MARKER}\n${report}`
-  if (existing?.body === body) return
-  if (existing) {
-    await github.rest.issues.updateComment({ ...repo, comment_id: existing.id, body })
-  } else {
-    await github.rest.issues.createComment({ ...repo, issue_number: number, body })
-  }
-}
-
-/** Inspect one open PR using trusted workflow inputs and publish an advisory report. */
+/** Inspect one open PR using trusted workflow inputs and write its Actions job summary. */
 async function run({ github, context, core }) {
   const repo = context.repo
   const eventPR = context.payload.pull_request
@@ -231,7 +233,7 @@ async function run({ github, context, core }) {
   const open = await openPulls(github, repo)
   const focus = open.find(pr => pr.number === number)
   if (!focus || (eventPR && eventPR.head.sha !== focus.head)) {
-    core.notice('This event is stale or its pull request does not target master.')
+    await core.summary.addRaw('This event is stale or its pull request does not target master.').write()
     return
   }
 
@@ -243,13 +245,10 @@ async function run({ github, context, core }) {
     let { candidates } = selectCandidates(focus, inventory, pathsByHead)
     for (let attempt = 0; attempt < 2; attempt++) {
       const plan = longestCleanOrder(cwd, base, candidates)
-      const [latest, comments] = await Promise.all([
-        openPulls(github, repo),
-        github.paginate(github.rest.issues.listComments, { ...repo, issue_number: number, per_page: 100 }),
-      ])
+      const latest = await openPulls(github, repo)
       const currentFocus = latest.find(pr => pr.number === number)
       if (currentFocus?.head !== focus.head) {
-        core.notice('The focus pull request changed or no longer targets master.')
+        await core.summary.addRaw('The focus pull request changed or no longer targets master.').write()
         return
       }
       const currentInventory = inventoryFor(latest, currentFocus)
@@ -260,7 +259,7 @@ async function run({ github, context, core }) {
       const current = selectCandidates(currentFocus, currentInventory, pathsByHead)
       const { data: master } = await github.rest.git.getRef({ ...repo, ref: 'heads/master' })
       if (master.object.sha !== base) {
-        core.notice('Master changed during the run. Rerun for a current plan.')
+        await core.summary.addRaw('Master changed during the run. Rerun for a current plan.').write()
         return
       }
       if (candidateKey(candidates) !== candidateKey(current.candidates)) {
@@ -272,14 +271,13 @@ async function run({ github, context, core }) {
       const report = candidates.length > 1 || unscanned
         ? renderReport(base, candidates, plan, current.omitted, unscanned)
         : null
-      await updateComment(github, repo, number, comments, report)
       await core.summary.addRaw(report ?? 'No other open pull request targeting master touches the same paths.').write()
       return
     }
-    core.notice('The overlapping candidates changed twice during the run. Rerun for a current plan.')
+    await core.summary.addRaw('The overlapping candidates changed twice during the run. Rerun for a current plan.').write()
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }
 }
 
-module.exports = { changedPaths, longestCleanOrder, renderReport, selectCandidates, squashMerge, updateComment, run }
+module.exports = { changedPaths, longestCleanOrder, renderReport, selectCandidates, squashMerge, run }

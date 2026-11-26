@@ -1,12 +1,12 @@
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 const { test } = require('node:test')
 const { pathToFileURL } = require('node:url')
 const {
-  changedPaths, longestCleanOrder, renderReport, run, selectCandidates, squashMerge, updateComment,
+  changedPaths, longestCleanOrder, renderReport, run, selectCandidates, squashMerge,
 } = require('./report-pr-merge-order')
 
 /** Create independent pull request tips from one base in a real Git repository. */
@@ -136,6 +136,32 @@ test('uses both sides of a rename when comparing changed paths', t => {
   assert.deepEqual(changedPaths(cwd, base, renamed), ['AppState.kt', 'Renamed.kt'])
 })
 
+test('reports the original path of a split directory rename conflict', t => {
+  const { cwd, git } = fixture(t, ['base'])
+  for (const dir of ['old', 'new-a', 'new-b']) mkdirSync(join(cwd, dir))
+  writeFileSync(join(cwd, 'old/a.txt'), 'First unique file\n')
+  writeFileSync(join(cwd, 'old/b.txt'), 'Second unique file\n')
+  git('add', 'old')
+  git('commit', '--quiet', '-m', 'Original directory')
+  const base = git('rev-parse', 'HEAD')
+
+  git('mv', 'old/a.txt', 'new-a/a.txt')
+  git('mv', 'old/b.txt', 'new-b/b.txt')
+  git('commit', '--quiet', '-m', 'Split directory')
+  const split = git('rev-parse', 'HEAD')
+
+  git('checkout', '--quiet', '--detach', base)
+  writeFileSync(join(cwd, 'old/added.txt'), 'New file in original directory\n')
+  git('add', 'old/added.txt')
+  git('commit', '--quiet', '-m', 'Add to original directory')
+  const added = git('rev-parse', 'HEAD')
+
+  const candidates = [{ number: 10, head: split }, { number: 11, head: added }]
+  assert.deepEqual(squashMerge(cwd, split, added).conflicts, ['old'])
+  const plan = longestCleanOrder(cwd, base, candidates)
+  assert.match(renderReport(base, candidates, plan, [], 0), /#11 · <code>old<\/code>/)
+})
+
 /** Exercise the workflow lifecycle against a local Git remote and fixed API snapshots. */
 async function runFixture({ cwd, git, base }, snapshots) {
   git('update-ref', 'refs/heads/master', base)
@@ -153,8 +179,7 @@ async function runFixture({ cwd, git, base }, snapshots) {
   try {
     let reads = 0
     const pulls = Symbol('pulls')
-    const comments = []
-    const notices = []
+    const summaries = []
     const github = {
       paginate: async method => {
         if (method !== pulls) return []
@@ -163,15 +188,14 @@ async function runFixture({ cwd, git, base }, snapshots) {
       rest: {
         pulls: { list: pulls },
         git: { getRef: async () => ({ data: { object: { sha: base } } }) },
-        issues: { createComment: async ({ body }) => comments.push(body) },
       },
     }
     await run({
       github,
       context: { repo: { owner: 'test', repo: 'fixture' }, payload: { inputs: { pr_number: 10 } } },
-      core: { notice: message => notices.push(message), summary: { addRaw: () => ({ write: async () => {} }) } },
+      core: { summary: { addRaw: report => ({ write: async () => summaries.push(report) }) } },
     })
-    return { reads, comments, notices }
+    return { reads, summaries }
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key]
@@ -187,12 +211,11 @@ test('publishes through unrelated PR opens, closes and pushes', async t => {
   const peer = pr(11, ['overlap'])
   const previous = [focus, peer, pr(12, ['old'], 'Other.kt'), pr(13, ['closed'], 'Closed.kt')]
   const latest = [focus, peer, pr(12, ['new revision'], 'Other.kt'), pr(14, ['just opened'], 'New.kt')]
-  const { reads, comments, notices } = await runFixture(repo, [previous, latest])
+  const { reads, summaries } = await runFixture(repo, [previous, latest])
   assert.equal(reads, 2)
-  assert.deepEqual(notices, [])
-  assert.equal(comments.length, 1)
-  assert.match(comments[0], /#11 · <code>AppState\.kt<\/code>/)
-  assert.doesNotMatch(comments[0], /#1[234]/)
+  assert.equal(summaries.length, 1)
+  assert.match(summaries[0], /#11 · <code>AppState\.kt<\/code>/)
+  assert.doesNotMatch(summaries[0], /#1[234]/)
 })
 
 test('replans once when a peer starts overlapping during the run', async t => {
@@ -201,30 +224,21 @@ test('replans once when a peer starts overlapping during the run', async t => {
   const focus = pr(10, ['focus'])
   const previous = [focus, pr(11, ['old'], 'Other.kt')]
   const latest = [focus, pr(11, ['new overlap'])]
-  const { reads, comments, notices } = await runFixture(repo, [previous, latest, latest])
+  const { reads, summaries } = await runFixture(repo, [previous, latest, latest])
   assert.equal(reads, 3)
-  assert.deepEqual(notices, [])
-  assert.equal(comments.length, 1)
-  assert.match(comments[0], /#11 · <code>AppState\.kt<\/code>/)
+  assert.equal(summaries.length, 1)
+  assert.match(summaries[0], /#11 · <code>AppState\.kt<\/code>/)
 })
 
-test('updates only the existing workflow comment and clears it when there is no overlap', async () => {
-  const calls = []
-  const github = { rest: { issues: {
-    createComment: args => calls.push(['create', args.issue_number]),
-    updateComment: args => calls.push(['update', args.comment_id]),
-    deleteComment: args => calls.push(['delete', args.comment_id]),
-  } } }
-  const marker = '<!-- whitenoise-android:pr-merge-order -->\n'
-  const comments = [
-    { user: { login: 'user' }, id: 1, body: marker + 'lookalike' },
-    { user: { login: 'github-actions[bot]' }, id: 2, body: 'another workflow' },
-    { user: { login: 'github-actions[bot]' }, id: 3, body: marker + 'old report' },
-  ]
-  const repo = { owner: 'marmot-protocol', repo: 'whitenoise-android' }
-  await updateComment(github, repo, 42, comments.slice(0, 2), 'new report')
-  await updateComment(github, repo, 42, comments, 'new report')
-  await updateComment(github, repo, 42, comments, 'old report')
-  await updateComment(github, repo, 42, comments, null)
-  assert.deepEqual(calls, [['create', 42], ['update', 3], ['delete', 3]])
+test('replans when a same-head peer becomes a draft even if the preferred order stays the same', async t => {
+  const original = Array.from({ length: 20 }, (_, index) => `line ${index}`)
+  const repo = fixture(t, original)
+  const focus = repo.pr(10, original.with(2, 'first edit'))
+  const peer = repo.pr(11, original.with(17, 'second edit'))
+  const previous = [focus, peer]
+  const latest = [focus, { ...peer, draft: true }]
+  const { reads, summaries } = await runFixture(repo, [previous, latest, latest])
+  assert.equal(reads, 3)
+  assert.equal(summaries.length, 1)
+  assert.match(summaries[0], /\*\*Land first\*\* · #10 → #11/)
 })
