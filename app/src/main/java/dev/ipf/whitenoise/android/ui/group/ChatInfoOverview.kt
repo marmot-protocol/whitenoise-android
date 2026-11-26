@@ -155,9 +155,14 @@ internal fun ChatInfoQuickActions(
     }
 }
 
-private fun quickActionWidth(availableWidth: Dp, gap: Dp, actions: Int, density: Density): Dp =
+private fun quickActionWidth(
+    availableWidth: Dp,
+    gap: Dp,
+    actions: Int,
+    density: Density,
+): Dp =
     with(density) {
-        val minimumWidth = 80.dp * fontScale.coerceAtLeast(1f)
+        val minimumWidth = 72.dp * fontScale.coerceAtLeast(1f)
         val columns = ((availableWidth + gap) / (minimumWidth + gap)).toInt().coerceIn(1, actions)
         val gapsInPixels = ceil(gap.toPx()).toInt() * (columns - 1)
         ((availableWidth.roundToPx() - gapsInPixels) / columns).toDp()
