@@ -6,9 +6,7 @@
     <string name="explanation_header_shortcut_mute">Muestra un botón de silencio en la cabecera de cada chat. Al silenciar se pregunta por cuánto tiempo; al reactivar el sonido se aplica al momento. Solo se aplica en este dispositivo.</string>
     <string name="explanation_header_shortcut_read_aloud">Muestra un botón de lectura en voz alta en la cabecera de cada chat. Activa o desactiva la lectura en voz alta de los mensajes nuevos de ese chat, igual que en los detalles del chat. Solo se aplica en este dispositivo.</string>
     <string name="header_shortcuts_hint">La cabecera muestra los que quepan junto al nombre del chat, en el orden en que los marques.</string>
-    <string name="conversation_header_timer_change">Cambiar el temporizador de mensajes temporales</string>
     <string name="header_shortcut_members">Miembros</string>
-    <string name="explanation_header_shortcut_disappearing">Muestra un botón de temporizador en los chats donde puedes cambiar el temporizador de mensajes temporales. Abre el mismo selector que los detalles del chat. Solo se aplica en este dispositivo.</string>
     <string name="explanation_header_shortcut_members">Muestra un botón de miembros en la cabecera de los chats de grupo. Abre la lista de miembros. Solo se aplica en este dispositivo.</string>
     <string name="explanation_header_shortcut_add_members">Muestra un botón para añadir miembros en los chats de grupo donde puedes añadir personas. Solo se aplica en este dispositivo.</string>
 </resources>

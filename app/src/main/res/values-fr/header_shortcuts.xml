@@ -6,9 +6,7 @@
     <string name="explanation_header_shortcut_mute">Affiche un bouton pour couper le son dans l\'en-tête de chaque discussion. Couper le son demande une durée ; le réactiver s\'applique immédiatement. S\'applique uniquement sur cet appareil.</string>
     <string name="explanation_header_shortcut_read_aloud">Affiche un bouton de lecture à voix haute dans l\'en-tête de chaque discussion. Il active ou désactive la lecture à voix haute des nouveaux messages de cette discussion, comme dans les détails de la discussion. S\'applique uniquement sur cet appareil.</string>
     <string name="header_shortcuts_hint">L\'en-tête affiche ceux qui tiennent à côté du nom de la discussion, dans l\'ordre où vous les cochez.</string>
-    <string name="conversation_header_timer_change">Modifier le minuteur des messages éphémères</string>
     <string name="header_shortcut_members">Membres</string>
-    <string name="explanation_header_shortcut_disappearing">Affiche un bouton de minuterie dans les discussions où vous pouvez modifier la minuterie des messages éphémères. Il ouvre le même sélecteur que les détails de la discussion. S’applique uniquement à cet appareil.</string>
     <string name="explanation_header_shortcut_members">Affiche un bouton Membres dans l’en-tête des discussions de groupe. Il ouvre la liste des membres. S’applique uniquement à cet appareil.</string>
     <string name="explanation_header_shortcut_add_members">Affiche un bouton d’ajout de membres dans les discussions de groupe où vous pouvez ajouter des personnes. S’applique uniquement à cet appareil.</string>
 </resources>
