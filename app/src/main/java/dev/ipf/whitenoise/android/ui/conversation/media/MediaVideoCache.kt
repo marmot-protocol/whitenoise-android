@@ -374,7 +374,7 @@ internal fun ConversationController.isSendingFromStagedFile(
     messageIdHex: String,
     attachmentIndex: Int,
     mine: Boolean,
-): Boolean = mine && pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.sourceFile != null
+): Boolean = mine && pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.isFileBacked == true
 
 private fun videoAttachmentCacheFile(
     context: android.content.Context,

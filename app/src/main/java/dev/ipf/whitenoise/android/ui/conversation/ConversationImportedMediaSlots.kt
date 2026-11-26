@@ -151,16 +151,32 @@ internal fun mergeRestoredComposerAttachments(
     )
 }
 
-/** Apply authoritative ordinary reconciliation while retaining independent imported picks in place. */
+/**
+ * A restored composer shelf: its media slots and document URIs, and each document whose old shelf URI the restore
+ * moved to an app-owned copy, old URI to copy, so a merge can apply the move where the document stands.
+ */
+internal data class RestoredConversationAttachments(
+    val mediaSlots: List<PendingMediaSlot>,
+    val documentUris: List<Uri>,
+    val relinkedDocuments: Map<Uri, Uri> = emptyMap(),
+)
+
+/**
+ * Apply authoritative ordinary reconciliation while retaining independent imported picks in place. A slot or document
+ * the reconciliation relinked to an app-owned copy takes the copy's URI where it stands on the shelf.
+ */
 internal fun mergeReconciledComposerAttachments(
     currentMedia: List<PendingMediaSlot>,
     currentDocuments: List<Uri>,
     reconciled: RestoredConversationAttachments,
     owns: (Uri) -> Boolean,
 ): RestoredConversationAttachments {
-    val survivingIds = reconciled.mediaSlots.map(PendingMediaSlot::id).toSet()
-    val retainedMedia = currentMedia.filter { owns(it.uri) || it.id in survivingIds }
-    val retainedDocuments = currentDocuments.filter { owns(it) || it in reconciled.documentUris }
+    val reconciledSlots = reconciled.mediaSlots.associateBy(PendingMediaSlot::id)
+    val retainedMedia = currentMedia.mapNotNull { if (owns(it.uri)) it else reconciledSlots[it.id] }
+    val retainedDocuments =
+        currentDocuments.mapNotNull { uri ->
+            if (owns(uri)) uri else (reconciled.relinkedDocuments[uri] ?: uri).takeIf { it in reconciled.documentUris }
+        }
     val currentIds = retainedMedia.map(PendingMediaSlot::id).toSet()
     return RestoredConversationAttachments(
         reconciled.mediaSlots.filter { !owns(it.uri) && it.id !in currentIds } + retainedMedia,

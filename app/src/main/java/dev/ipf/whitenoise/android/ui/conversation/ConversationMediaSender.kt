@@ -12,7 +12,11 @@ import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ATTACHMENT_CHUNK_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.RetainedDraftHandling
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureDraftForSend
+import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
+import dev.ipf.whitenoise.android.state.isDraftStored
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
@@ -308,12 +312,15 @@ internal class ConversationMediaSender(
         completion: StagedMediaSendCompletion,
     ) {
         var replyAccepted = false
+        val uploads = seeded.mapNotNull { controller.retainedMediaUploads.get(it.key) }
+        uploads.forEach { it.draftSendClearToken = pendingClear }
+        val sendsStoredFiles = uploads.any { it.isDraftStored }
         uploadStagedAttachments(seeded, releases) {
             if (isReply) {
                 replyAccepted = true
                 completion.accept()
             }
-            pendingClear?.let(appState::clearDraftAfterSuccessfulSend)
+            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = !isReply || sendsStoredFiles) }
         }
         if (isReply && !replyAccepted) completion.reject()
     }
@@ -356,6 +363,7 @@ internal class ConversationMediaSender(
         staging: FileBackedSendStaging,
         keepPdfMetadata: Set<android.net.Uri> = emptySet(),
         pickKey: (String) -> String = { it },
+        ownedMime: Map<android.net.Uri, String> = emptyMap(),
     ): PreparedStagedAttachments {
         // Reading the native limit is a binding call, so it stays off Main.
         val albumFileBudget =
@@ -365,7 +373,7 @@ internal class ConversationMediaSender(
                 null
             }
         val checkedImages = withContext(Dispatchers.IO) { removePreparedVideoMetadata(preparedImageAttachments) }
-        val rawImages = readStagedImages(imageSlots, checkedImages, albumFileBudget, pickKey)
+        val rawImages = readStagedImages(imageSlots, checkedImages, albumFileBudget, pickKey, ownedMime)
         val images = limitAttachmentsToBudget(rawImages.attachments, MEDIA_ALBUM_MAX_TOTAL_BYTES)
         val documentBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - images.totalBytes).coerceAtLeast(0L)
         val documents =
@@ -380,6 +388,7 @@ internal class ConversationMediaSender(
                     staging,
                     keepPdfMetadata,
                     pickKey,
+                    ownedMime,
                 )
             }
         // Only a missing visual pick reads the notice. getType is provider IPC that may stall
@@ -389,7 +398,7 @@ internal class ConversationMediaSender(
                 withContext(Dispatchers.IO) {
                     imageSlots.any {
                         ensureActive()
-                        isVideoMediaType(safeGetType(context.contentResolver, it.uri))
+                        isVideoMediaType(ownedMime[it.uri] ?: safeGetType(context.contentResolver, it.uri))
                     }
                 }
         return PreparedStagedAttachments(
@@ -423,6 +432,7 @@ internal class ConversationMediaSender(
         staging: FileBackedSendStaging,
         keepPdfMetadata: Set<android.net.Uri>,
         pickKey: (String) -> String,
+        ownedMime: Map<android.net.Uri, String>,
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var totalBytes = 0L
@@ -455,7 +465,14 @@ internal class ConversationMediaSender(
                 failures += copied.failures
             } else {
                 val read =
-                    attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, staging, pickKey)
+                    attachmentReader.readPickedDocuments(
+                        listOf(uri),
+                        remaining,
+                        allowFileBacked,
+                        staging,
+                        pickKey,
+                        ownedMime,
+                    )
                 attachments += read.attachments.map { it.copy(outgoingDomain = domain) }
                 totalBytes += read.totalBytes
                 failures += read.failures
@@ -480,6 +497,7 @@ internal class ConversationMediaSender(
         preparedImages: PreparedVideoCheck<String>,
         fileBacked: FileBackedPickBudget?,
         pickKey: (String) -> String,
+        ownedMime: Map<android.net.Uri, String>,
     ): VisualReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var overflowed = false
@@ -496,7 +514,7 @@ internal class ConversationMediaSender(
             // The disk check asks the filesystem for free space, so it runs on the IO pool rather than Main.
             val refusal =
                 if (prepared != null && fileBacked != null) {
-                    withContext(Dispatchers.IO) { fileBacked.admit(prepared.byteCount, prepared.sourceFile == null) }
+                    withContext(Dispatchers.IO) { fileBacked.admit(prepared.byteCount, !prepared.isFileBacked) }
                 } else {
                     null
                 }
@@ -509,13 +527,15 @@ internal class ConversationMediaSender(
                 attachments += prepared.copy(outgoingDomain = domain)
                 inMemoryBytes += prepared.plaintextBytes.size
             } else {
+                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - inMemoryBytes).coerceAtLeast(0L)
                 val read =
-                    if (fileBacked == null) {
-                        attachmentReader.readPickedImages(listOf(slot.uri), pick = pick)
-                    } else {
-                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - inMemoryBytes).coerceAtLeast(0L)
-                        attachmentReader.readPickedImages(listOf(slot.uri), fileBacked, remaining, pick = pick)
-                    }
+                    attachmentReader.readPickedImages(
+                        listOf(slot.uri),
+                        fileBacked,
+                        if (fileBacked == null) MEDIA_ALBUM_MAX_TOTAL_BYTES else remaining,
+                        pick,
+                        ownedMime[slot.uri],
+                    )
                 attachments += read.attachments.map { it.copy(outgoingDomain = domain) }
                 inMemoryBytes += read.attachments.sumOf { it.plaintextBytes.size.toLong() }
                 overflowed = overflowed || read.albumOverflowed
@@ -602,6 +622,9 @@ internal class ConversationMediaSender(
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
         }
+        seeded.forEach { queued ->
+            controller.retainedMediaUploads.get(queued.key)?.draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+        }
         return seeded
     }
 }
@@ -626,7 +649,7 @@ internal suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>)
         withContext(Dispatchers.Default) {
             attachments.map { attachment ->
                 val needsThumbhash =
-                    attachment.sourceFile == null &&
+                    !attachment.isFileBacked &&
                         attachment.mediaType.startsWith("image/", ignoreCase = true) &&
                         attachment.thumbhash == null
                 if (!needsThumbhash) {

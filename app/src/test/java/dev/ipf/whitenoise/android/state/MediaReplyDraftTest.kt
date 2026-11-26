@@ -42,6 +42,22 @@ class MediaReplyDraftTest {
         }
     }
 
+    /** A draft holding a stored file is never a reply's slot, and no attachment body is read to find out. */
+    @Test
+    fun draftWithStoredFileIsPreserved() {
+        val calls = mutableListOf<String>()
+        val stored = descriptor().copy(fileBacked = true)
+        val engine =
+            nativeBoundary { method, _ ->
+                calls += method
+                check(method == "selectedMessageDraft")
+                SelectedMessageDraftFfi(revision(), content("", attachments = listOf(stored)))
+            }
+
+        assertNull(engine.stageMediaReply("account", "group", "poll-original", null, listOf(attachment())))
+        assertEquals(listOf("selectedMessageDraft"), calls)
+    }
+
     /** A newer text draft or a different reply is never overwritten to manufacture an outbound slot. */
     @Test
     fun conflictingComposerDraftIsPreserved() {

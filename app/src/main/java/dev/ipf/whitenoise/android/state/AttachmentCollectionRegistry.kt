@@ -28,6 +28,7 @@ internal class AttachmentCollectionRegistry(
 
     // Orders each transition's state change with the queuing of its journal effect.
     private val lock = Any()
+    val admissions = CollectionAdmissionFence(lock)
 
     /** Every live operation by id. */
     val operations: StateFlow<Map<String, AttachmentCollectionOperation>> = state.asStateFlow()
@@ -39,21 +40,38 @@ internal class AttachmentCollectionRegistry(
      * Adds [operation] and journals it; false when the journal could not hold it, and the operation is removed
      * again. Blocks on the journal, so it is called off the main thread.
      */
-    fun start(operation: AttachmentCollectionOperation): Boolean {
+    fun start(
+        operation: AttachmentCollectionOperation,
+        admission: CollectionAdmission? = null,
+        canStart: () -> Boolean = { true },
+    ): Boolean {
         // Live before its record exists, so a concurrent restore never adopts and deletes it as a stray record.
-        val effect =
+        val (previous, effect) =
             synchronized(lock) {
+                if (!canStart() || (admission != null && !admissions.accept(admission, operation))) return false
+                val old = state.value[operation.id]
                 state.update { it + (operation.id to operation) }
-                journaled { journal.write(operation) }
+                old to journaled { journal.write(operation) }
             }
         val written = effect.get()
-        if (!written) discard(operation.id)
+        if (!written) {
+            // An earlier attempt may still have a durable token under this ID. Only undo the failed publication.
+            synchronized(lock) {
+                state.update { current ->
+                    when {
+                        current[operation.id] !== operation -> current
+                        previous == null -> current - operation.id
+                        else -> current + (operation.id to previous)
+                    }
+                }
+            }
+        }
         return written
     }
 
     /**
-     * Applies [transform] to one operation and queues its journal effect. A finished operation is removed and
-     * its record deleted. Returns the result, or null when the operation is gone.
+     * Applies [transform] to one operation and queues its journal effect. A finished operation is removed
+     * once any pending native draft cleanup completes. Returns the result, or null when the operation is gone.
      */
     fun update(
         operationId: String,
@@ -80,7 +98,7 @@ internal class AttachmentCollectionRegistry(
     ): Pair<AttachmentCollectionOperation, Future<Boolean>>? {
         val next = state.value[operationId]?.let(transform) ?: return null
         val effect =
-            if (next.phase == CollectionOperationPhase.FINISHED) {
+            if (next.phase == CollectionOperationPhase.FINISHED && !next.needsStoredDraftCleanup) {
                 state.update { it - operationId }
                 journaled {
                     journal.delete(next.accountRef, next.groupIdHex, next.id)
@@ -96,7 +114,20 @@ internal class AttachmentCollectionRegistry(
     /** Forgets one operation and its record, after an explicit discard or a lost destination. */
     fun discard(operationId: String) {
         synchronized(lock) {
-            val removed = state.value[operationId] ?: return
+            val removed = state.value[operationId]?.takeIf { it.canDiscard } ?: return
+            if (removed.needsStoredDraftCleanup) {
+                apply(operationId) { current ->
+                    current.chunks.fold(current) { op, chunk ->
+                        op.withChunkState(
+                            chunk.id,
+                            CollectionChunkState.CANCELLED,
+                            CollectionItemState.CANCELLED,
+                            now(),
+                        )
+                    }
+                }
+                return
+            }
             state.update { it - operationId }
             journaled {
                 journal.delete(removed.accountRef, removed.groupIdHex, removed.id)
@@ -111,6 +142,7 @@ internal class AttachmentCollectionRegistry(
         groupIdHex: String,
     ) {
         synchronized(lock) {
+            admissions.invalidate(accountRef, groupIdHex)
             state.update { current ->
                 current.filterValues { it.accountRef != accountRef || it.groupIdHex != groupIdHex }
             }
@@ -124,6 +156,7 @@ internal class AttachmentCollectionRegistry(
     /** Forgets every operation of a signed-out account. */
     fun forgetAccount(accountRef: String) {
         synchronized(lock) {
+            admissions.invalidate(accountRef)
             state.update { current -> current.filterValues { it.accountRef != accountRef } }
             journaled {
                 journal.deleteAccount(accountRef)
@@ -140,24 +173,109 @@ internal class AttachmentCollectionRegistry(
         accountRef: String,
         groupIdHex: String,
     ): List<AttachmentCollectionOperation> {
+        synchronized(lock) {
+            state.update { current ->
+                current.filterValues {
+                    val sameChat = it.accountRef == accountRef && it.groupIdHex == groupIdHex
+                    val deferred = it.cleanupOnly && it.paused && !it.needsStoredDraftCleanup
+                    !(sameChat && deferred)
+                }
+            }
+        }
         val records =
             JOURNAL_EFFECTS
                 .submit(
                     Callable {
-                        journal.sweepExpired()
-                        journal.read(accountRef, groupIdHex)
+                        val liveIds = state.value.keys
+                        journal.sweepExpired(liveIds)
+                        journal.read(accountRef, groupIdHex, liveIds)
                     },
                 ).get()
         val live = state.value.keys
         return records.filter { it.id !in live }
     }
 
-    /** Adopts a restored operation without rewriting its record until it next changes. */
-    fun adopt(operation: AttachmentCollectionOperation) {
-        synchronized(lock) {
-            state.update { current ->
-                if (operation.id in current) current else current + (operation.id to operation)
+    /** Runs the early-startup cache sweep behind any in-flight journal effects. Call from I/O. */
+    fun sweepExpired() {
+        journaled {
+            journal.sweepExpired(state.value.keys)
+            true
+        }.get()
+    }
+
+    /** Publishes a restore only if its record survived while MDK was being queried. */
+    suspend fun adopt(
+        operation: AttachmentCollectionOperation,
+        admission: CollectionAdmission,
+    ): Boolean {
+        val effect =
+            journaled {
+                journal.contains(operation) &&
+                    synchronized(lock) {
+                        if (operation.id in state.value || !admissions.accept(admission, operation)) {
+                            false
+                        } else {
+                            state.update { it + (operation.id to operation) }
+                            true
+                        }
+                    }
             }
+        return withContext(Dispatchers.IO) { effect.get() }
+    }
+}
+
+/** Whether a current collection still owns native originals that an unrelated send must preserve. */
+internal fun WhiteNoiseAppState.hasCollectionDrafts(
+    account: String,
+    group: String,
+): Boolean =
+    attachmentCollections.operations.value.values.any { operation ->
+        operation.accountRef == account &&
+            operation.groupIdHex == group &&
+            operation.items.any { it.storedDraft?.consumed == false }
+    }
+
+/** One pre-journal collection attempt, invalidated by removal of its account or conversation. */
+internal class CollectionAdmission(
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+/** Tracks temporary admission permits under the registry lock so deletion cannot race a new journal write. */
+internal class CollectionAdmissionFence(
+    private val lock: Any,
+) {
+    private val preparing = mutableSetOf<CollectionAdmission>()
+
+    /** Captures the destination before staging begins. */
+    fun begin(
+        accountRef: String,
+        groupIdHex: String,
+    ): CollectionAdmission = synchronized(lock) { CollectionAdmission(accountRef, groupIdHex).also(preparing::add) }
+
+    /** Consumes exactly the attempt named by the operation, if its destination still owns it. */
+    fun accept(
+        admission: CollectionAdmission,
+        operation: AttachmentCollectionOperation,
+    ): Boolean =
+        synchronized(lock) {
+            admission.accountRef == operation.accountRef &&
+                admission.groupIdHex == operation.groupIdHex &&
+                preparing.remove(admission)
+        }
+
+    /** Releases an absent, aborted, or already-consumed staging attempt. */
+    fun release(admission: CollectionAdmission) {
+        synchronized(lock) { preparing.remove(admission) }
+    }
+
+    /** Invalidates staged work for one removed chat, or every chat when the account leaves. */
+    fun invalidate(
+        accountRef: String,
+        groupIdHex: String? = null,
+    ) {
+        synchronized(lock) {
+            preparing.removeAll { it.accountRef == accountRef && (groupIdHex == null || it.groupIdHex == groupIdHex) }
         }
     }
 }
@@ -200,6 +318,8 @@ internal val WhiteNoiseAppState.attachmentCollections: AttachmentCollectionRegis
     get() =
         synchronized(registries) {
             registries.getOrPut(this) {
-                AttachmentCollectionRegistry(AttachmentCollectionJournal(appContext.noBackupFilesDir))
+                val sources = CollectionDraftSourceFiles(appContext.cacheDir)
+                val journal = AttachmentCollectionJournal(appContext.noBackupFilesDir, draftSources = sources)
+                AttachmentCollectionRegistry(journal)
             }
         }

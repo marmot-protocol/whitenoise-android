@@ -115,6 +115,14 @@
           "MED-031",
           "MED-056"
         ]
+      },
+      {
+        "surface": "An app-owned restored PDF can open in the in-app reader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "composerDocumentReaderTarget(context, item.uri, document)",
+        "test_ids": [
+          "MED-067"
+        ]
       }
     ]
   },

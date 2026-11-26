@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+/** The component that knows which native draft attachments, if any, the send owns. */
+internal enum class RetainedDraftHandling {
+    LEGACY,
+    COMPOSER_SELECTION,
+    COLLECTION_CHUNK,
+}
+
 /**
  * Compressed bytes + metadata retained for an in-flight/failed media send.
  * The whole album is one unit: all attachments succeed/fail together, retry
@@ -25,6 +32,24 @@ internal class RetainedMediaUpload(
     val replyVersion: Long = 0L,
 ) {
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null
+    var draftHandling: RetainedDraftHandling = RetainedDraftHandling.LEGACY
+
+    /** A composer selection or collection chunk carries its own caption and uses exact native IDs for cleanup. */
+    val admitsPreparedMedia: Boolean
+        get() = draftHandling != RetainedDraftHandling.LEGACY
+
+    /** Prepared sends and captured replies defer admission until their references are available. */
+    val uploadsBeforeAdmission: Boolean
+        get() = admitsPreparedMedia || replyRevision != null
+
+    // The draft a send of stored draft files may consume on admission: the one it uploaded from, while that draft
+    // said exactly what it sends.
+    var draftUploadRevision: MessageDraftRevisionFfi? = null
+    var draftSendClearToken: DraftSendClearToken? = null
+
+    // Private copies of this send's stored draft files, by draft id, taken once an upload from the draft failed.
+    private var draftCopies: Map<String, StagedUploadSource> = emptyMap()
+    private var stagedSourcesReleased = false
     var localAcceptance: SendSummaryFfi? = null
     var recoveredWithoutUpload: Boolean = false
     var acceptedPending: Boolean = false
@@ -39,7 +64,7 @@ internal class RetainedMediaUpload(
     private val singleFileBytes: Long? =
         attachments
             .singleOrNull()
-            ?.takeIf { it.sourceFile != null }
+            ?.takeIf { it.isFileBacked }
             ?.byteCount
             ?.takeIf { it > 0L }
 
@@ -78,6 +103,41 @@ internal class RetainedMediaUpload(
         transferCancel?.invoke()
     }
 
+    /** Forgets the uploaded references when MDK refused them for a stale epoch (mdk#2891), so a retry uploads again. */
+    fun forgetUploadAfter(failure: Throwable) {
+        if (isStaleMediaReferenceEpoch(failure)) uploadedReferences = null
+    }
+
+    /** Whether the user's Cancel is waiting to be settled, without consuming it. */
+    val isTransferCancelRequested: Boolean
+        get() = transferCancelRequested
+
+    /** Whether this send owns a private copy of every stored draft file it carries, so retries need no draft. */
+    val ownsDraftCopies: Boolean
+        get() = isDraftStored && attachments.all { it.draftFile == null || it.draftFile.attachmentId in draftCopies }
+
+    /**
+     * Takes ownership of [copies], private copies of this send's stored draft files by draft id, released with the
+     * send's other staged files. Copies arriving after those were released, or while it already owns some, are closed.
+     */
+    fun adoptDraftCopies(
+        copies: Map<String, StagedUploadSource>,
+        closeStaged: (StagedUploadSource) -> Unit = StagedUploadSource::closeQuietly,
+    ) {
+        if (stagedSourcesReleased || draftCopies.isNotEmpty()) {
+            copies.values.forEach(closeStaged)
+        } else {
+            draftCopies = copies
+        }
+    }
+
+    /** The send's attachments, each stored draft file replaced by the private copy this send owns of it. */
+    fun ownedUploadAttachments(): List<PendingAttachment> =
+        attachments.map { attachment ->
+            val copy = attachment.draftFile?.let { draftCopies[it.attachmentId] }
+            if (copy == null) attachment else attachment.copy(sourceFile = copy, draftFile = null)
+        }
+
     /** Whether the user cancelled this send; reading it clears the request. */
     fun consumeTransferCancelRequest(): Boolean {
         val requested = transferCancelRequested
@@ -90,7 +150,11 @@ internal class RetainedMediaUpload(
      * publish-only retry never reads them again, so they need not wait for the whole send to settle.
      */
     fun releaseStagedSources(closeStaged: (StagedUploadSource) -> Unit) {
+        stagedSourcesReleased = true
         attachments.forEach { attachment -> attachment.sourceFile?.let(closeStaged) }
+        val copies = draftCopies.values
+        draftCopies = emptyMap()
+        copies.forEach(closeStaged)
     }
 
     /** Android intake resources share the queue's existing removal/discard/eviction lifetime. */
