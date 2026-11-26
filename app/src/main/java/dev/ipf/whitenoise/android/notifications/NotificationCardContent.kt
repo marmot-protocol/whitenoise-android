@@ -245,7 +245,6 @@ internal class NotificationCardContent(
      */
     fun messagingStyle(
         content: LocalNotificationContent,
-        conversationTitleOverride: String?,
         historyCap: Int,
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
@@ -286,10 +285,8 @@ internal class NotificationCardContent(
                 )
             }
         style.isGroupConversation = content.isGroupConversation
-        // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
-        // people" for unnamed groups) over the often-empty payload group name.
         if (content.isGroupConversation) {
-            style.conversationTitle = conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle
+            style.conversationTitle = content.conversationTitle
         }
         newMessages.forEach(style::addMessage)
         return style

@@ -153,24 +153,29 @@ class NotificationFirstPostIntegrationTest {
                     notificationUsersHaveDisplayNames = false,
                     localDisplayName = authored,
                     notificationFirstPostTimingObserver = events::add,
+                    emitStartupNotification = false,
                 )
             try {
                 fixture.bootstrap()
+                fixture.emitNotification(fixture.update.copy(groupName = "Work :office_parrot:"))
                 fixture.awaitNotificationPosted(
                     advanceMainClock = { events.any { it.stage == NotificationFirstPostTimingStage.ContentComplete } },
                 )
                 delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
-                val names =
-                    FirstPostRecordingNotificationManager.posts.map { notification ->
-                        NotificationCompat.MessagingStyle
-                            .extractMessagingStyleFromNotification(notification)
-                            ?.messages
-                            ?.last()
-                            ?.person
-                            ?.name
+                val styles =
+                    FirstPostRecordingNotificationManager.posts.mapNotNull { notification ->
+                        NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
                     }
-                assertEquals(listOf(readable), names)
+                val published = styles.single()
+                assertEquals(
+                    readable,
+                    published.messages
+                        .single()
+                        .person
+                        ?.name,
+                )
+                assertEquals("Work office parrot", published.conversationTitle)
             } finally {
                 fixture.close()
             }

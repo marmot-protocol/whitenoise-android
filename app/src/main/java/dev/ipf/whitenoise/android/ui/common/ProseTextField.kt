@@ -56,6 +56,7 @@ internal fun ProseTextField(
     val emojiAnchor = rememberEmojiSheetFieldAnchor()
     val artwork = rememberTextFieldEmojiArtwork(state, enabled = true)
     val layout = remember { TextLayoutHolder() }
+    val spokenValue = emojiEditableText(state, enabled, readOnly = false, layout = layout)
     val scroll = rememberScrollState()
     val interactions = remember { MutableInteractionSource() }
     val focused by interactions.collectIsFocusedAsState()
@@ -119,7 +120,7 @@ internal fun ProseTextField(
                         .then(cutout)
                         .textFieldErrorSemantics(errorMessage)
                         .defaultMinSize(OutlinedTextFieldDefaults.MinWidth, OutlinedTextFieldDefaults.MinHeight)
-                        .then(emojiEditableText(state, enabled)),
+                        .then(spokenValue),
                 enabled = enabled,
                 textStyle = style.merge(TextStyle(color = textColor)),
                 cursorBrush = SolidColor(if (isError) colors.errorCursorColor else colors.cursorColor),

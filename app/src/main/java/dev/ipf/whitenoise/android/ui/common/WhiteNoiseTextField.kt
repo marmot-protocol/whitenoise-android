@@ -109,10 +109,10 @@ internal fun WhiteNoiseTextField(
     val emojiAnchor = rememberEmojiSheetFieldAnchor()
     val useEmojiArtwork = emojiArtwork && outputTransformation == null
     val artwork = rememberTextFieldEmojiArtwork(state, useEmojiArtwork)
-    val spokenValue = if (useEmojiArtwork) emojiEditableText(state, enabled) else Modifier
     val fieldInput = artwork.inputWith(inputTransformation)
     val scrollState = rememberScrollState()
     val textLayout = remember { TextLayoutHolder() }
+    val spokenValue = if (useEmojiArtwork) emojiEditableText(state, enabled, readOnly, textLayout) else Modifier
 
     CompositionLocalProvider(
         LocalTextSelectionColors provides colors.textSelectionColors,

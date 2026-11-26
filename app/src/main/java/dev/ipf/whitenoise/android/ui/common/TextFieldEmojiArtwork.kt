@@ -18,6 +18,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -31,18 +32,25 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.copyText
+import androidx.compose.ui.semantics.cutText
 import androidx.compose.ui.semantics.editableText
+import androidx.compose.ui.semantics.getTextLayoutResult
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setSelection
 import androidx.compose.ui.semantics.textSelectionRange
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.em
@@ -52,6 +60,8 @@ import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerEmojiDeletion
 import dev.ipf.whitenoise.android.ui.rememberEmojiArtPainter
 import dev.ipf.whitenoise.android.ui.withSpokenEmojiNames
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 private val shortcodeSlotStyle by lazy {
     // A monospace colon provides the advance for the artwork. Scale it to one em.
@@ -83,7 +93,10 @@ private val clipboardIsolates =
 private fun drawableShortcodes(
     text: String,
     custom: CustomEmojiSet,
-): List<String> = EmojiShortcodes.presentationShortcodes(text).filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
+): List<String> =
+    EmojiShortcodes
+        .presentationShortcodes(text)
+        .filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
 
 /**
  * Compose copies the visual selection. Strip its formatting isolates on the way to the platform clipboard.
@@ -138,7 +151,8 @@ private class TextFieldEmojiOutput(
     override fun TextFieldBuffer.transformOutput() {
         val source = asCharSequence().toString()
         for (match in authoredIsolates.findAll(source).toList().asReversed()) {
-            replace(match.range.first, match.range.last + 1, match.value + WORD_JOINER.repeat(match.value.length - 1))
+            val end = match.range.last + 1
+            replace(end, end, WORD_JOINER.repeat(match.value.length - 1))
         }
         val ranges =
             EmojiShortcodes
@@ -236,16 +250,27 @@ internal class TextFieldEmojiArtwork(
     }
 }
 
+/** Accessibility consumes the authored string and its line/character offsets together. */
 @Composable
 internal fun emojiEditableText(
     state: TextFieldState,
     enabled: Boolean,
+    readOnly: Boolean,
+    layout: TextLayoutHolder,
 ): Modifier {
     val custom = LocalCustomEmoji.current
     val resources = LocalContext.current.resources
+    val measurer = rememberTextMeasurer(cacheSize = 2)
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     return Modifier.semantics {
-        editableText = AnnotatedString(state.text.toString()).withSpokenEmojiNames(custom, resources)
+        val authored = AnnotatedString(state.text.toString())
+        editableText = authored.withSpokenEmojiNames(custom, resources)
         textSelectionRange = state.selection
+        getTextLayoutResult { results ->
+            val current = layout.result?.invoke() ?: return@getTextLayoutResult false
+            results.add(measurer.authoredLayout(current, authored, custom))
+        }
         setSelection { start, end, _ ->
             val offsets = 0..state.text.length
             if (!enabled || start !in offsets || end !in offsets) {
@@ -255,7 +280,55 @@ internal fun emojiEditableText(
                 true
             }
         }
+        if (enabled) {
+            copyText { copyAuthoredSelection(state, clipboard, scope, cut = false) }
+            if (!readOnly) cutText { copyAuthoredSelection(state, clipboard, scope, cut = true) }
+        }
     }
+}
+
+private fun TextMeasurer.authoredLayout(
+    current: TextLayoutResult,
+    authored: AnnotatedString,
+    custom: CustomEmojiSet,
+): TextLayoutResult {
+    val input = current.layoutInput
+    if (input.text.text == authored.text) return current
+    val placeholder = Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)
+    val placeholders =
+        EmojiShortcodes
+            .presentationRanges(authored.text)
+            .filter { EmojiShortcodes.art(it.item, custom, emptyMap()) != null }
+            .map { AnnotatedString.Range(placeholder, it.start, it.end) }
+    return measure(
+        text = authored,
+        style = input.style,
+        overflow = input.overflow,
+        softWrap = input.softWrap,
+        maxLines = input.maxLines,
+        placeholders = placeholders,
+        constraints = input.constraints,
+        layoutDirection = input.layoutDirection,
+        density = input.density,
+        fontFamilyResolver = input.fontFamilyResolver,
+    )
+}
+
+private fun copyAuthoredSelection(
+    state: TextFieldState,
+    clipboard: Clipboard,
+    scope: CoroutineScope,
+    cut: Boolean,
+): Boolean {
+    val selected = state.selection
+    if (selected.collapsed) return false
+    val text = state.text.subSequence(selected.min, selected.max)
+    state.edit {
+        if (cut) replace(selected.min, selected.max, "")
+        selection = TextRange(if (cut) selected.min else selected.max)
+    }
+    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("plain text", text))) }
+    return true
 }
 
 /** The field's latest text layout getter, read in the draw phase. */

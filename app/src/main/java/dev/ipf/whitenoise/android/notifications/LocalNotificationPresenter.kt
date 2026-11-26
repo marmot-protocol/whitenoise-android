@@ -737,7 +737,7 @@ class LocalNotificationPresenter(
                                 builder.setConversationIdentityImage(
                                     notificationContent.identityImage(
                                         seed = messagingShortcutId ?: notificationContent.notificationTag,
-                                        titleOverride = conversationTitleOverride,
+                                        titleOverride = null,
                                         conversationAvatar = resolvedConversationAvatarBitmap,
                                         senderAvatar = resolvedSenderAvatarBitmap,
                                         contact = identityContact,
@@ -777,7 +777,6 @@ class LocalNotificationPresenter(
                             messagingPost =
                                 MessagingPostContext(
                                     sender = sender,
-                                    conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
@@ -897,7 +896,6 @@ class LocalNotificationPresenter(
                                         builder.setStyle(
                                             cardContent.messagingStyle(
                                                 notificationContent,
-                                                messaging.conversationTitleOverride,
                                                 decision.historyCap,
                                                 carried,
                                                 messaging.sender,
@@ -966,7 +964,6 @@ class LocalNotificationPresenter(
                                                 builder.setStyle(
                                                     cardContent.messagingStyle(
                                                         notificationContent,
-                                                        messaging.conversationTitleOverride,
                                                         decision.historyCap,
                                                         carriedHistory = null,
                                                         sender = messaging.sender,
@@ -1396,7 +1393,6 @@ class LocalNotificationPresenter(
 
 internal data class MessagingPostContext(
     val sender: Person,
-    val conversationTitleOverride: String?,
     val shortcutId: String?,
     val conversationAvatarUrl: String?,
     val conversationAvatarBitmap: Bitmap?,

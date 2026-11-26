@@ -62,8 +62,9 @@ class CustomEmojiParityScreenshotTest {
     /** Large-font RTL keeps the artwork the size of the surrounding text. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
-    fun foldersFieldAndMonogramsLargeRtl() =
+    fun foldersFieldAndMonogramsLargeRtl() {
         captureSurfaces("custom_emoji_parity_large_rtl", dark = false, largeRtl = true)
+    }
 
     /** Folder settings rows draw the artwork in names and descriptions. */
     @Test

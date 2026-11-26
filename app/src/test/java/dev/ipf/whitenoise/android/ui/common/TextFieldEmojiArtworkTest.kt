@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.placeCursorAtEnd
@@ -96,7 +97,11 @@ class TextFieldEmojiArtworkTest {
         field.performClick()
 
         composeRule.runOnIdle { state.edit { selection = TextRange(5, length) } }
-        field.performSemanticsAction(SemanticsActions.CopyText)
+        field.performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.C)
+            keyUp(Key.CtrlLeft)
+        }
         composeRule.runOnIdle {
             assertEquals(
                 ":party:",
@@ -108,7 +113,11 @@ class TextFieldEmojiArtworkTest {
         }
 
         composeRule.runOnIdle { state.edit { selection = TextRange(5, length) } }
-        field.performSemanticsAction(SemanticsActions.CutText)
+        field.performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.X)
+            keyUp(Key.CtrlLeft)
+        }
         composeRule.runOnIdle {
             assertEquals(
                 ":party:",
@@ -135,14 +144,26 @@ class TextFieldEmojiArtworkTest {
     @Test
     fun customAndUnicodeEmojiHaveTheSamePositionInBidirectionalText() {
         val state = TextFieldState("אב A :party: אב")
-        setField(state, LayoutDirection.Rtl)
-
-        val field = composeRule.onNodeWithTag(FIELD)
+        val actualLayout = AtomicReference<TextLayoutResult>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(
+                    LocalCustomEmoji provides localEmoji(),
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                ) {
+                    val artwork = rememberTextFieldEmojiArtwork(state, enabled = true)
+                    BasicTextField(
+                        state = state,
+                        outputTransformation = artwork.output,
+                        lineLimits = TextFieldLineLimits.SingleLine,
+                        onTextLayout = { result -> actualLayout.set(result()) },
+                    )
+                }
+            }
+        }
 
         fun isLeftOfEnglishLetter(emoji: String): Boolean {
-            val layouts = mutableListOf<TextLayoutResult>()
-            field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
-            val layout = layouts.single()
+            val layout = requireNotNull(actualLayout.get())
             val text = layout.layoutInput.text.text
             val emojiX = layout.getBoundingBox(text.indexOf(emoji)).center.x
             val englishX = layout.getBoundingBox(text.indexOf('A')).center.x
@@ -156,16 +177,24 @@ class TextFieldEmojiArtworkTest {
 
     @Test
     fun accessibilitySelectionUsesCanonicalOffsets() {
-        val state = TextFieldState("Work :party: there")
+        val authored = "Work :party: there"
+        val state = TextFieldState(authored)
         setField(state)
         val field = composeRule.onNodeWithTag(FIELD)
         field.performClick()
+        val layouts = mutableListOf<TextLayoutResult>()
+        field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> assertTrue(action(layouts)) }
+        val layout = layouts.single()
+        assertEquals(authored, layout.layoutInput.text.text)
+        assertTrue(layout.placeholderRects.single() != null)
+        val lineEnd = layout.getLineEnd(layout.lineCount - 1)
         field.performSemanticsAction(SemanticsActions.SetSelection) { action ->
-            assertTrue(action(5, 12, false))
+            assertTrue(action(lineEnd, lineEnd, true))
         }
 
-        composeRule.runOnIdle { assertEquals(TextRange(5, 12), state.selection) }
-        assertEquals(TextRange(5, 12), field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
+        val caret = TextRange(authored.length)
+        composeRule.runOnIdle { assertEquals(caret, state.selection) }
+        assertEquals(caret, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
     }
 
     @Test
@@ -187,6 +216,29 @@ class TextFieldEmojiArtworkTest {
                     ?.text
                     ?.toString(),
             )
+        }
+    }
+
+    @Test
+    fun accessibilityCutKeepsOnlyTheSelectedAuthoredControl() {
+        val authored = "A\u2066\u2060B\u2069 :party:"
+        val state = TextFieldState(authored)
+        setField(state)
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        val field = composeRule.onNodeWithTag(FIELD)
+        field.performClick()
+        field.performSemanticsAction(SemanticsActions.SetSelection) { action -> assertTrue(action(1, 2, true)) }
+        field.performSemanticsAction(SemanticsActions.CutText) { action -> assertTrue(action()) }
+
+        composeRule.runOnIdle {
+            val copied =
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString()
+            assertEquals("\u2066", copied)
+            assertEquals(authored.removeRange(1, 2), state.text.toString())
         }
     }
 
