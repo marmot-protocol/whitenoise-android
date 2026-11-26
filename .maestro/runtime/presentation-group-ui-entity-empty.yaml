@@ -5,7 +5,7 @@ name: presentation-group-ui-entity-empty
 - assertVisible:
     text: Fixture entities
 - assertVisible:
-    text: No results
+    text: No matches
 - back
 - assertVisible:
     id: presentation.complete

@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Authored emoji label: NewMessagePresentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "NewMessageActionGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
         "anchor": "fun NewMessageActionGroup(",
@@ -254,17 +246,6 @@
         "surface": "setting:user_search_searching",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
         "anchor": "R.string.user_search_searching",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:user_search_you_follow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
-        "anchor": "R.string.user_search_you_follow",
         "test_ids": [
           "NCH-001",
           "NCH-002",

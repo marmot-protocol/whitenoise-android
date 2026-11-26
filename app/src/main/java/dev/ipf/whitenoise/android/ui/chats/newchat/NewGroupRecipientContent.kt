@@ -78,12 +78,14 @@ internal fun NewGroupRecipientContent(
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
                 item {
-                    NewGroupRecipientSearchField(
-                        query,
-                        actions.pasteRejected,
-                        actions.scan,
-                        isValidNpub,
-                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
+                    RecipientSearchField(
+                        state = query,
+                        placeholder = stringResource(R.string.search_people_hint),
+                        onPasteRejected = actions.pasteRejected,
+                        isValidNpub = isValidNpub,
+                        onScanQr = actions.scan,
+                        nativeDestination = "new-group-search",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
                     )
                 }
                 if (selected.isNotEmpty()) {

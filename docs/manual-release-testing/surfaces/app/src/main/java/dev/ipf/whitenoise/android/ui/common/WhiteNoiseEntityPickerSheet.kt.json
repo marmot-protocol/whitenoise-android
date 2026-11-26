@@ -24,18 +24,6 @@
         ]
       },
       {
-        "surface": "WhiteNoiseCompactSearchField",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
-        "anchor": "fun WhiteNoiseCompactSearchField(",
-        "test_ids": [
-          "FIND-001",
-          "FIND-004",
-          "FLD-001",
-          "FLD-002",
-          "SET-009"
-        ]
-      },
-      {
         "surface": "WhiteNoiseEntityPickerSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
         "anchor": "fun WhiteNoiseEntityPickerSheet(",
@@ -49,16 +37,6 @@
       }
     ],
     "settings_controls": [
-      {
-        "surface": "string:clear_search",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
-        "anchor": "R.string.clear_search",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002"
-        ]
-      },
       {
         "surface": "string:done",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
@@ -80,9 +58,9 @@
         ]
       },
       {
-        "surface": "string:no_results",
+        "surface": "string:no_matches",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
-        "anchor": "R.string.no_results",
+        "anchor": "R.string.no_matches",
         "test_ids": [
           "SET-009",
           "FLD-001",
