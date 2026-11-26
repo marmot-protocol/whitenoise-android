@@ -63,6 +63,37 @@ class StickerBrowserRetryTest {
         composeRule.onNodeWithText(PACK_TITLE).assertExists()
     }
 
+    /** While the first relay sync is still running, a failed read offers Try again, which shows the packs at once. */
+    @Test
+    fun loadFailedRetryWorksBeforeTheFirstRelaySyncReturns() {
+        var readFails = true
+        val library =
+            StickerLibrary(
+                packs = { installedOnly, _ ->
+                    check(installedOnly || !readFails) { "store read failed" }
+                    if (installedOnly) emptyList() else listOf(pack())
+                },
+                syncPacks = { awaitCancellation() },
+                fetchPack = { error("offline") },
+                installPack = { error("unused") },
+                uninstallPack = { error("unused") },
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column {
+                    StickerBrowserPage(library, { _, _, _ -> }, onOpen = {}, onBack = {}, onClose = {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.sticker_packs_load_failed)).assertExists()
+
+        readFails = false
+        composeRule.onNodeWithText(app.getString(R.string.sticker_packs_try_again)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(PACK_TITLE).assertExists()
+    }
+
     private companion object {
         const val PACK_TITLE = "Waving marmots"
         val COORDINATE = "30031:${"cd".repeat(32)}:wave"

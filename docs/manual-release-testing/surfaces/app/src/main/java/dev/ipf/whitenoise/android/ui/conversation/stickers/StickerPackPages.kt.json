@@ -254,7 +254,7 @@
       {
         "surface": "Load-failed retry re-reads the store without a relay sync",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
-        "anchor": "onReload = discovery::retry",
+        "anchor": "onReload = { discoveryReads++ }",
         "test_ids": [
           "MSG-046"
         ]

@@ -84,10 +84,10 @@ class StickerLibrary(
     private val syncMutex = Mutex()
     private var synced = false
 
-    /** Advances on every install or uninstall, so a read that started before it can't overwrite its effect. */
-    private var membershipGeneration = 0L
-
-    /** Numbers installed reads as they start; [appliedInstalledRead] is the newest one whose outcome was applied. */
+    /**
+     * Numbers installed reads as they start; [appliedInstalledRead] is the newest outcome applied. An install or
+     * uninstall takes a number too, so a read that started before it can't overwrite its effect.
+     */
     private var installedReadSequence = 0L
     private var appliedInstalledRead = 0L
 
@@ -107,14 +107,10 @@ class StickerLibrary(
      */
     @Suppress("TooGenericExceptionCaught")
     suspend fun reloadInstalled() {
-        val generation = membershipGeneration
         val sequence = ++installedReadSequence
 
         /** Whether this read is still the newest outcome to apply; claims the slot when it is. */
-        fun claim(): Boolean =
-            (generation == membershipGeneration && sequence > appliedInstalledRead).also {
-                if (it) appliedInstalledRead = sequence
-            }
+        fun claim(): Boolean = (sequence > appliedInstalledRead).also { if (it) appliedInstalledRead = sequence }
         try {
             val read = packs(true, null)
             if (claim()) {
@@ -158,7 +154,7 @@ class StickerLibrary(
      */
     suspend fun install(pack: StickerPackFfi): StickerPackFfi {
         val added = installPack(openedFrom[pack.coordinate] ?: pack.coordinate)
-        membershipGeneration++
+        appliedInstalledRead = ++installedReadSequence
         installed = installed.filterNot { it.coordinate == added.coordinate } + added
         reloadInstalled()
         return added
@@ -170,7 +166,7 @@ class StickerLibrary(
      */
     suspend fun uninstall(pack: StickerPackFfi) {
         uninstallPack(pack.coordinate)
-        membershipGeneration++
+        appliedInstalledRead = ++installedReadSequence
         installed = installed.filterNot { it.coordinate == pack.coordinate }
         reloadInstalled()
     }

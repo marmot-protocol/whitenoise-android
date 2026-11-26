@@ -319,9 +319,11 @@ class StickersTest {
             runCurrent()
             val newer = async { library.reloadInstalled() }
             runCurrent()
+            // Cancelled first, the newer read must neither block nor claim the slot the older read applies to.
+            newer.cancel()
+            runCurrent()
             olderRead.complete(Unit)
             older.await()
-            newer.cancel()
             assertTrue(library.hasLoadedInstalled)
             assertTrue(library.isInstalled(coordinate("a")))
         }

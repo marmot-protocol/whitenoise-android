@@ -75,15 +75,6 @@ internal class DiscoveryResults {
         private set
     private var search: String? = null
 
-    /** Advances on a load-failed retry, so the browser re-reads the store without waiting on a relay sync first. */
-    var retries by mutableIntStateOf(0)
-        private set
-
-    /** Asks for another read of the current query. */
-    fun retry() {
-        retries++
-    }
-
     /**
      * Reads [query]; a failed read keeps this query's last results, minus packs installed since, but never shows
      * another query's.
@@ -145,7 +136,8 @@ internal fun StickerBrowserPage(
     var syncing by remember { mutableStateOf(true) }
     var syncFailed by remember { mutableStateOf(false) }
     var refreshRequests by remember { mutableIntStateOf(0) }
-    var syncGeneration by remember { mutableIntStateOf(0) }
+    // Advances when a relay sync settles and when a failed read is retried; each advance re-reads the store.
+    var discoveryReads by remember { mutableIntStateOf(0) }
     val discovery = remember { DiscoveryResults() }
     val whiteNoise = rememberWhiteNoisePacks(library, refreshRequests)
     val discoverable = discovery.packs.filterNot { pack -> whiteNoise.any { it.coordinate == pack.coordinate } }
@@ -153,9 +145,9 @@ internal fun StickerBrowserPage(
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
         syncing = false
-        syncGeneration++
+        discoveryReads++
     }
-    LaunchedEffect(search, library.installed, syncGeneration, discovery.retries) {
+    LaunchedEffect(search, library.installed, discoveryReads) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
         discovery.read(library, search)
     }
@@ -194,7 +186,7 @@ internal fun StickerBrowserPage(
             packs = discoverable,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
-            onReload = discovery::retry,
+            onReload = { discoveryReads++ },
         )
         item { StickerDisclosure(stringResource(R.string.sticker_packs_public_footer)) }
     }
