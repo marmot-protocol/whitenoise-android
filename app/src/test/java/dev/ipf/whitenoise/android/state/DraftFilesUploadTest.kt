@@ -362,19 +362,8 @@ class StoredDraftAcceptanceTest {
             val replacement = old.copy(id = "picked-again")
             val updatedDraft = content("same caption", old, replacement).copy(replyToMessageIdHex = "new-reply")
             val engine = DraftUploadEngine(updatedDraft)
-            val runtime = AppMarmotRuntime("test", engine.marmot)
-            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            val app =
-                WhiteNoiseAppState(
-                    context = context,
-                    draftStore = DraftStore.forContext(context),
-                    accountIdHexResolver = { null },
-                    accounts = emptyList(),
-                    activeAccountRef = "acct",
-                    initialMarmotRuntime = runtime,
-                    marmotRuntimeFactory = { runtime },
-                )
-            val journal = AttachmentCollectionJournal(context.noBackupFilesDir)
+            val app = acceptanceAppState(engine)
+            val journal = AttachmentCollectionJournal(app.appContext.noBackupFilesDir)
             val item =
                 CollectionItem(
                     "pick",
@@ -428,18 +417,7 @@ class StoredDraftAcceptanceTest {
                     fileBacked = true,
                 )
             val engine = DraftUploadEngine(content("caption", attachment))
-            val runtime = AppMarmotRuntime("test", engine.marmot)
-            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            val app =
-                WhiteNoiseAppState(
-                    context = context,
-                    draftStore = DraftStore.forContext(context),
-                    accountIdHexResolver = { null },
-                    accounts = emptyList(),
-                    activeAccountRef = "acct",
-                    initialMarmotRuntime = runtime,
-                    marmotRuntimeFactory = { runtime },
-                )
+            val app = acceptanceAppState(engine)
             try {
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val pick =
@@ -461,6 +439,21 @@ class StoredDraftAcceptanceTest {
                 app.mutationsScope.cancel()
             }
         }
+
+    /** Provides the test engine through the real app state and its coordinated draft shelf. */
+    private fun acceptanceAppState(engine: DraftUploadEngine): WhiteNoiseAppState {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val runtime = AppMarmotRuntime("test", engine.marmot)
+        return WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore.forContext(context),
+            accountIdHexResolver = { null },
+            accounts = emptyList(),
+            activeAccountRef = "acct",
+            initialMarmotRuntime = runtime,
+            marmotRuntimeFactory = { runtime },
+        )
+    }
 }
 
 /** Draft content holding [attachments] under [text]. */

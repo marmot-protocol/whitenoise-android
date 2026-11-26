@@ -394,7 +394,7 @@ internal class ConversationAttachmentReader(
      * Reads visual picks in order. Without [fileBacked], every pick shares the in-memory album budget
      * exactly as before. With it, a video that does not fit the remaining [inMemoryBytesBudget] is
      * staged to a private file, and every accepted item is charged against the message's file budget.
-     * A named [pick] is one picked file and decodes in its draft's worker, so it reads at most one URI.
+     * A named [pick] is one file and decodes in its draft's worker. [ownedMime] comes from a journaled copy.
      */
     suspend fun readPickedImages(
         uris: List<android.net.Uri>,
@@ -403,7 +403,7 @@ internal class ConversationAttachmentReader(
         pick: String? = null,
         ownedMime: String? = null,
     ): VisualReadOutcome {
-        require((pick == null && ownedMime == null) || uris.size <= 1) { "One pick names one picked file" }
+        require(pick == null || uris.size <= 1) { "One pick names one picked file" }
         // A file-backed pick copies up to 512 MiB, which belongs on the IO pool rather than a CPU worker.
         return withContext(if (fileBacked == null) Dispatchers.Default else Dispatchers.IO) {
             val checkCancellation = { ensureActive() }
