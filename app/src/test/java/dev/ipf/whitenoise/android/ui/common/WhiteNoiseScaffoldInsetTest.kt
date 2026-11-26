@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import android.view.View
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -13,12 +14,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
@@ -26,8 +31,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,6 +57,7 @@ class WhiteNoiseScaffoldInsetTest {
 
     private lateinit var view: View
     private val notice = mutableStateOf<TransientNotice?>(null)
+    private var hits = 0
 
     /** Without a top bar, the content starts under the status bar exactly as it does in a plain material scaffold. */
     @Test
@@ -114,6 +122,40 @@ class WhiteNoiseScaffoldInsetTest {
         assertEquals(banner.bottom.value, contentBounds().top.value, TOLERANCE)
     }
 
+    /** A confirmation neither shifts the next hit target nor intercepts a physical tap through the bubble. */
+    @Test
+    fun confirmationOverlaysTheBodyWithoutMovingOrBlockingTheNextTap() {
+        render(topBar = true, onContentClick = { hits++ })
+        val before = contentBounds()
+        composeRule.runOnIdle {
+            notice.value =
+                TransientNotice(
+                    id = 1L,
+                    title = AppText.Plain("Admin added"),
+                    kind = TransientNoticeKind.Confirmation,
+                )
+        }
+        val bubble = bannerBounds()
+        assertEquals(before, contentBounds())
+        assertTrue(bubble.top >= before.top)
+        assertTrue(bubble.right - bubble.left < before.right - before.left)
+        val content = composeRule.onNodeWithTag(CONTENT_TAG)
+        content.performTouchInput { click(Offset(center.x, 24.dp.toPx())) }
+        composeRule.runOnIdle {
+            assertEquals(1, hits)
+            notice.value = notice.value?.copy(id = 2L, title = AppText.Plain("Invitation sent"))
+        }
+        composeRule.onNodeWithText("Invitation sent").assertIsDisplayed()
+        composeRule.onNodeWithText("Admin added").assertDoesNotExist()
+        assertEquals(before, contentBounds())
+        content.performTouchInput { down(Offset(center.x, 24.dp.toPx())) }
+        composeRule.runOnIdle { notice.value = null }
+        composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertDoesNotExist()
+        assertEquals(before, contentBounds())
+        content.performTouchInput { up() }
+        composeRule.runOnIdle { assertEquals(2, hits) }
+    }
+
     /** Publishes an app-global confirmation through a host, as the app root does. */
     private fun showNotice() {
         composeRule.runOnUiThread { notice.value = TransientNotice(id = 1L, title = AppText.Plain(NOTICE_TITLE)) }
@@ -152,6 +194,7 @@ class WhiteNoiseScaffoldInsetTest {
         topBar: Boolean,
         slot: Boolean = true,
         statusBarConsumedAbove: Boolean = false,
+        onContentClick: (() -> Unit)? = null,
     ) {
         val host = TopNoticeHost(SnackbarHostState(), notice = { notice.value })
         composeRule.setContent {
@@ -170,7 +213,14 @@ class WhiteNoiseScaffoldInsetTest {
                                     .fillMaxSize()
                                     .padding(padding)
                                     .consumeWindowInsets(padding)
-                                    .testTag(CONTENT_TAG),
+                                    .testTag(CONTENT_TAG)
+                                    .then(
+                                        if (onContentClick != null) {
+                                            Modifier.clickable(onClick = onContentClick)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
                             )
                         }
                     }

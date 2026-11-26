@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Authored emoji label: NewMessagePresentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "NewMessageActionGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
         "anchor": "fun NewMessageActionGroup(",
@@ -20,7 +12,9 @@
           "NCH-002",
           "ACC-003",
           "ACC-017",
-          "NCH-007"
+          "NCH-007",
+          "NAV-011",
+          "NCH-008"
         ]
       },
       {
@@ -260,17 +254,6 @@
         ]
       },
       {
-        "surface": "setting:user_search_you_follow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
-        "anchor": "R.string.user_search_you_follow",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:new_message_talk_to_agent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
         "anchor": "R.string.new_message_talk_to_agent",
@@ -289,6 +272,14 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "Search results and feedback have priority while typing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "if (query.isBlank())",
+        "test_ids": [
+          "NCH-001"
         ]
       }
     ]

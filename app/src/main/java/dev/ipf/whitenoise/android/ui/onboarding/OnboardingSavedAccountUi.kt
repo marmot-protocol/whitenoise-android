@@ -28,13 +28,15 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet as ModalBottomSheet
 
 data class OnboardingSavedAccountUi(
     val label: String,
@@ -45,6 +47,7 @@ data class OnboardingSavedAccountUi(
     val recoveryRequired: Boolean = false,
     /** Another of the account's devices unlinked this one, so it can only be removed here and signed in anew. */
     val unlinked: Boolean = false,
+    val npub: String = "",
 )
 
 internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<OnboardingSavedAccountUi> =
@@ -61,6 +64,7 @@ internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<Onboard
                 avatarUrl = appState.avatarUrl(account.accountIdHex),
                 recoveryRequired = appState.onboardingRecoveryRequired(account.label),
                 unlinked = account.unlinked,
+                npub = appState.npubForDisplay(account.accountIdHex),
             )
         }
 
@@ -114,7 +118,7 @@ internal fun OnboardingSavedAccountActions(
     val currentRecoveryAccount by rememberUpdatedState(recoveryAccount)
     val currentOnRecover by rememberUpdatedState(onRecover)
     if (recoveryAccount != null && recoveryEnabled) {
-        AnimatedAlertDialog(
+        WhiteNoiseAlertDialog(
             onDismissRequest = { recoveryAccountLabel = null },
             ownerKey = recoveryAccount,
             title = { Text(stringResource(savedAccountConsentTitle(recoveryAccount))) },
@@ -151,16 +155,28 @@ internal fun RetainedProfilesSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
+    WhiteNoiseModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
         WhiteNoiseSheetHeader(
             stringResource(R.string.onboarding_choose_profile),
             onClose = { terminal.close(onDismiss) },
         )
         WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
             items(accounts, key = OnboardingSavedAccountUi::label) { account ->
+                val titleIsKey = abbreviatesPublicKey(account.displayName, account.npub)
                 ListItem(
-                    headlineContent = { EmojiLabel(account.displayName) },
-                    supportingContent = { Text(account.shortIdentity) },
+                    headlineContent = {
+                        if (titleIsKey) {
+                            PublicKeyCopyText(account.displayName, account.npub, enabled = enabled)
+                        } else {
+                            EmojiLabel(account.displayName)
+                        }
+                    },
+                    supportingContent =
+                        if (titleIsKey) {
+                            null
+                        } else {
+                            { PublicKeyCopyText(account.shortIdentity, account.npub, enabled = enabled) }
+                        },
                     leadingContent = {
                         Avatar(
                             title = account.displayName,

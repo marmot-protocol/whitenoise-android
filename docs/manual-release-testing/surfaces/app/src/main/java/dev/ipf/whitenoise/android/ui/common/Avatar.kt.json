@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
         "anchor": "fun Avatar(",
         "test_ids": [
+          "AXY-001",
           "PRO-008"
         ]
       },
@@ -18,7 +19,8 @@
         "test_ids": [
           "AXY-001",
           "INT-011",
-          "PRO-006"
+          "PRO-006",
+          "PRO-012"
         ]
       },
       {
@@ -36,7 +38,8 @@
         "anchor": "fun PersonAvatar(",
         "test_ids": [
           "MED-031",
-          "PRO-006"
+          "PRO-006",
+          "PRO-012"
         ]
       },
       {
@@ -45,6 +48,15 @@
         "anchor": "fun AvatarAnimationLayers(",
         "test_ids": [
           "GRP-035"
+        ]
+      },
+      {
+        "surface": "AvatarCircle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun AvatarCircle(",
+        "test_ids": [
+          "AXY-001",
+          "PRO-012"
         ]
       }
     ]

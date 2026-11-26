@@ -5,7 +5,6 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -58,7 +54,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -71,7 +66,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountDevicesActivationFfi
@@ -114,16 +108,16 @@ import dev.ipf.whitenoise.android.state.transferAdmin
 import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
-import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.ErrorCallout
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
@@ -131,8 +125,10 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
@@ -162,7 +158,6 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -398,7 +393,7 @@ internal fun GroupDetailsScreen(
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
             }
-        val clipboard = LocalClipboardManager.current
+        val clipboard = rememberClipboardCopier()
         val readOnlyInvite = controller.group.pendingConfirmation
         val isDm = controller.isDm
         val groupTerminal = controller.group.disbanding || controller.group.disbanded
@@ -710,7 +705,6 @@ internal fun GroupDetailsScreen(
             abandonment.open(
                 GroupAbandonmentTarget(
                     accountRef = account,
-                    accountName = abandonmentAccountName(appState, account),
                     groupIdHex = controller.group.groupIdHex,
                     conversationTitle = conversationTitle,
                     isDm = isDm,
@@ -1265,8 +1259,7 @@ internal fun GroupDetailsScreen(
 
         abandonment.target?.let { target ->
             GroupAbandonmentReviewDialog(
-                // The acting account's name resolves while the review shows, as the group-action identity does.
-                targets = listOf(target.copy(accountName = abandonmentAccountName(appState, target.accountRef))),
+                targets = listOf(target),
                 status =
                     when {
                         activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
@@ -1290,9 +1283,9 @@ internal fun GroupDetailsScreen(
                     }
                 },
                 onDismiss = abandonment::dismiss,
+                appState = appState,
                 // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
                 error = controller.lastMutationError.takeIf { abandonment.attempted },
-                identity = ownIdentity,
                 confirmEnabled = mutationOwnerCurrent,
             )
         }
@@ -1325,7 +1318,7 @@ internal fun GroupDetailsScreen(
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {
                 // Keep the member header, identities, pending invitations and the
-                // full-roster action in one contiguous primary section. ContactRow
+                // full-roster action in one contiguous primary section. PersonRow
                 // already provides Material touch heights and internal padding.
                 Column(Modifier.testTag("chat_info.members")) {
                     if (!rosterReady) {
@@ -1494,7 +1487,7 @@ internal fun GroupDetailsScreen(
                                 // The title actually shown decides: a member titled by their own key copies it (#3565).
                                 val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
                                 val profileLaunch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         appState.presentProfile(profileNpub, origin = origin)
                                     }
                                 ChatInfoMemberCard(
@@ -1505,13 +1498,15 @@ internal fun GroupDetailsScreen(
                                     nativeKey = member.memberIdHex,
                                     modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
                                 ) {
-                                    ContactRow(
+                                    PersonRow(
+                                        segmented = false,
                                         title = memberTitle,
                                         subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
                                         publicKey = profileNpub.takeIf { titleIsKey },
                                         publicKeyInTitle = true,
                                         avatarSeed = member.memberIdHex,
                                         avatarUrl = controller.memberAvatarUrl(member),
+                                        followedAccount = member.memberIdHex,
                                         modifier =
                                             if (index == 0) {
                                                 profileLaunch.first.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
@@ -1577,7 +1572,7 @@ internal fun GroupDetailsScreen(
                                     if (inviteNpub.isBlank()) {
                                         {}
                                     } else {
-                                        { clipboard.setText(AnnotatedString(inviteNpub)) }
+                                        { clipboard.copy(inviteNpub) }
                                     },
                             )
                         }
@@ -1640,6 +1635,7 @@ internal fun GroupDetailsScreen(
                                             picture = encryptedGroupAvatar,
                                             groupAnimation = groupAvatar.groupAnimation,
                                             pictureDomain = groupAvatar.pictureDomain,
+                                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                                         )
                                     }
                                     Text(
@@ -1713,6 +1709,7 @@ internal fun GroupDetailsScreen(
                             groupAnimation = groupAvatar.groupAnimation,
                             archived = controller.presentedArchived,
                             readLocalBytes = groupAvatar.readOriginalBytes,
+                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                             // A group's URL picture decodes single-use, a direct chat's peer picture
                             // in the public profiles.
                             pictureDomain = groupAvatar.pictureDomain,
@@ -1753,7 +1750,7 @@ internal fun GroupDetailsScreen(
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
                             row("start_group") { rowContext ->
                                 val launch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         val candidate =
                                             RecipientSearch.Candidate(
                                                 dmPeerAccountIdHex,
@@ -1938,8 +1935,7 @@ internal fun GroupDetailsScreen(
                                     subtitle = stringResource(R.string.copy_chat_link_subtitle),
                                     explanation = stringResource(R.string.explanation_chat_info_copy_chat_link),
                                     onClick = {
-                                        clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
-                                        appState.present(R.string.copied)
+                                        clipboard.copy(ChatLink.uri(controller.group.groupIdHex))
                                     },
                                     leading = { SettingsLeadingIcon(R.drawable.ic_link) },
                                 )
@@ -2093,7 +2089,6 @@ internal fun GroupDetailsScreen(
                                                     R.drawable.ic_archive
                                                 },
                                             inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                                            destructive = false,
                                         )
                                     },
                                 )
@@ -2275,7 +2270,6 @@ internal fun GroupDetailsScreen(
                                                     icon = R.drawable.ic_admin_panel_settings,
                                                     inProgress =
                                                         activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                                                    destructive = false,
                                                 )
                                             },
                                         )
@@ -2435,35 +2429,12 @@ private fun GroupMutationErrorBanner(
     error: ErrorPresentation,
     onDismiss: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    val message = error.message.resolve(context)
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(R.drawable.ic_error), contentDescription = null)
-            SelectionContainer(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.latest_group_error, message),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
-                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = stringResource(R.string.copy))
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
-            }
-        }
-    }
+    ErrorCallout(
+        message = stringResource(R.string.latest_group_error, error.message.resolve(context)),
+        report = error.report,
+        onDismiss = onDismiss,
+    )
 }
 
 private sealed class DetailsConfirm {

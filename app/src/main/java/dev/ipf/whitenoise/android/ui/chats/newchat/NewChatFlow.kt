@@ -1,22 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,14 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
@@ -68,13 +49,13 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.account.startingAccount
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectScreen
-import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
     Creating,
@@ -133,6 +114,7 @@ internal fun startChatErrorUiState(
         diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
         invitation = invitation,
+        missingInbox = error is MarmotKitException.MissingMemberInboxRoute,
         title = AppText.Resource(R.string.toast_couldnt_start_chat),
     )
 }
@@ -369,7 +351,7 @@ private fun NewMessageAccountScreen(
         if (creatingHex != null || !session.isCurrent()) scannerSession = null
     }
     LaunchedEffect(query) { startChatError = null }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val context = LocalContext.current
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
@@ -664,18 +646,18 @@ private fun NewMessageAccountScreen(
             matches
         }
     val people =
-        displayedCandidates.map { candidate ->
+        displayedCandidates.map { person ->
             NewMessagePerson(
-                candidate = candidate,
+                candidate = person.copy(npub = appState.npubForDisplay(person.accountIdHex).ifBlank(person::npub)),
                 subtitle =
                     if (addressQuery && resolution.resolvedHex == null) {
                         stringResource(R.string.user_search_address_result)
                     } else {
-                        appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+                        appState.shortNpub(person.accountIdHex).takeIf { it.isNotBlank() }
                     },
                 avatarUrl =
-                    appState.contactAvatarSource(candidate.accountIdHex)
-                        ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+                    appState.contactAvatarSource(person.accountIdHex)
+                        ?: ProfileSanitizer.protocolImageUrl(person.searchProfile?.picture),
             )
         }
 
@@ -768,79 +750,8 @@ private fun NewMessageAccountScreen(
                         }
                     },
                     profile = ::presentPerson,
-                    copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
+                    copyError = { if (canInteract()) clipboard.copy(it) },
                 ),
         )
-    }
-}
-
-/** Resolves plain or resource text for display. */
-@Composable
-private fun AppText.resolveForCompose(): String =
-    when (this) {
-        is AppText.Plain -> value
-        is AppText.Resource ->
-            if (args.isEmpty()) {
-                stringResource(resId)
-            } else {
-                stringResource(resId, *args.toTypedArray())
-            }
-    }
-
-/** Keeps native failure details and canonical retry identity actionable at large text sizes. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-@Suppress("FunctionNaming") // Compose naming follows the framework convention.
-internal fun StartChatErrorCard(
-    error: StartChatErrorUiState,
-    onRetry: () -> Unit,
-    onInvite: () -> Unit,
-    onCopy: (String) -> Unit,
-) {
-    val title =
-        if (error.retryGroupIdHex != null) {
-            stringResource(R.string.new_message_chat_created)
-        } else {
-            error.title.resolveForCompose()
-        }
-    val detail = error.detail.resolveForCompose()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Text(
-            detail,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
-            if (error.invitation) {
-                Button(onClick = onInvite) {
-                    val shareIcon = painterResource(R.drawable.ic_share)
-                    Icon(shareIcon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.share))
-                }
-            }
-            TextButton(onClick = onRetry) {
-                Text(
-                    stringResource(
-                        if (error.retryGroupIdHex != null) R.string.new_message_open_chat else R.string.retry,
-                    ),
-                )
-            }
-            if (error.copyable) {
-                TextButton(onClick = { onCopy(requireNotNull(error.diagnosticReport)) }) {
-                    Text(stringResource(R.string.copy))
-                }
-            }
-        }
     }
 }

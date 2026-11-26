@@ -52,8 +52,8 @@ import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.performAttachmentUserAction
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import kotlinx.coroutines.flow.first
 
 internal fun Modifier.fileBubbleWidth(): Modifier = fillMaxWidth()
@@ -401,11 +401,11 @@ internal fun MediaFileBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .onGloballyPositioned { activationBounds[0] = it.settingsMorphBounds(view) }
+                .onGloballyPositioned { activationBounds[0] = it.motionBoundsOnScreen(view) }
                 .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
@@ -621,7 +621,7 @@ internal fun PendingFilePill(
     val progressDescription = progress?.let { uploadProgressDescription(it) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier =
             Modifier
                 .fileBubbleWidth()

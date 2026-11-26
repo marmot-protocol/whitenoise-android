@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.Nip46ErrorFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RemoteSignerAccountStatus
 import dev.ipf.whitenoise.android.state.RemoteSignerHealth
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
@@ -38,7 +39,7 @@ import org.robolectric.annotation.GraphicsMode
 class RemoteSignerScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Sign In gains only the quiet link under the key field. */
+    /** Sign in gains only the full-width outlined remote-signer button under the key field. */
     @Test fun signInEntryAmoled() {
         capture("remote_signer_sign_in_entry_amoled") {
             SignInContent(
@@ -62,6 +63,13 @@ class RemoteSignerScreenshotTest {
     @Test fun linkLight() =
         captureFlow("remote_signer_link_light", dark = false) {
             choose(RemoteSignerMethod.BunkerLink)
+        }
+
+    /** The scanner follows the input when an inline error wraps at 200% text in RTL. */
+    @Test fun linkErrorAmoledRtlLargeText() =
+        captureFlow("remote_signer_link_error_amoled_rtl_200", rtl = true, scale = 2f) {
+            choose(RemoteSignerMethod.BunkerLink)
+            linkErrorRes = R.string.remote_signer_error_invalid_link
         }
 
     /** Grouped permission review before pairing. */

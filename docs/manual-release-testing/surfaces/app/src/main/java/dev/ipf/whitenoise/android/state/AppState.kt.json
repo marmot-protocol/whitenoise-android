@@ -84,15 +84,6 @@
     ],
     "source_coverage": [
       {
-        "surface": "Prepared attachment speech account-switch ownership",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun speakAloudPrepared(",
-        "test_ids": [
-          "MED-010",
-          "NAV-006"
-        ]
-      },
-      {
         "surface": "Queued share source retention",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "fun untrackInFlightMediaUpload(",
@@ -205,7 +196,8 @@
         "anchor": "internal suspend fun sendDictationTranscriptIfOriginUnchanged(",
         "test_ids": [
           "DIC-002",
-          "DIC-010"
+          "DIC-010",
+          "DIC-018"
         ]
       },
       {
@@ -313,6 +305,16 @@
         "anchor": "internal fun auditDiagnosticsSettings(",
         "test_ids": [
           "SEC-018"
+        ]
+      },
+      {
+        "surface": "R.string.toast_amber_sign_in_cancelled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_amber_sign_in_cancelled",
+        "test_ids": [
+          "PRO-001",
+          "NAV-007",
+          "ONB-020"
         ]
       }
     ]

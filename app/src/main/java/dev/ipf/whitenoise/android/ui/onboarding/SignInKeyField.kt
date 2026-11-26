@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -39,8 +37,8 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureInputCenter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -81,12 +79,8 @@ internal fun SignInKeyField(
             scannerSession = null
         }
     }
-    var scanError by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(busy) {
-        if (busy) {
-            scannerSession = null
-            scanError = null
-        }
+        if (busy) scannerSession = null
     }
     val context = LocalContext.current
     val clipboard = remember(context) { ContextCompat.getSystemService(context, ClipboardManager::class.java) }
@@ -101,13 +95,16 @@ internal fun SignInKeyField(
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         WhiteNoiseSecureTextField(
             state = key,
             enabled = !busy,
             textObfuscationMode = TextObfuscationMode.Hidden,
-            modifier = Modifier.weight(1f).testTag("onboarding.sign_in.private_key"),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .alignBy(WhiteNoiseSecureInputCenter)
+                    .testTag("onboarding.sign_in.private_key"),
             label = { Text(stringResource(R.string.private_key)) },
             placeholder = { Text(stringResource(R.string.onboarding_enter_private_key)) },
             errorMessage = errorRes?.let { stringResource(it) },
@@ -144,6 +141,7 @@ internal fun SignInKeyField(
                     imeAction = ImeAction.Done,
                 ),
             onKeyboardAction = { if (!busy && key.text.isNotBlank()) onSubmit() },
+            containerModifier = Modifier.testTag("onboarding.sign_in.private_key_container"),
         )
         FilledTonalIconButton(
             onClick = {
@@ -151,7 +149,11 @@ internal fun SignInKeyField(
             },
             enabled = !busy,
             shape = MaterialTheme.shapes.extraLarge,
-            modifier = Modifier.size(WhiteNoiseButtonDefaults.TaskHeight).testTag("onboarding.sign_in.scan"),
+            modifier =
+                Modifier
+                    .alignBy { it.measuredHeight / 2 }
+                    .size(WhiteNoiseButtonDefaults.TaskHeight)
+                    .testTag("onboarding.sign_in.scan"),
         ) {
             Icon(painterResource(R.drawable.ic_qr_code_scanner), stringResource(R.string.scan_qr_code))
         }
@@ -173,23 +175,14 @@ internal fun SignInKeyField(
                                 R.string.sign_in_error_public_key
                             else -> null
                         }
+                    // A rejected scan reports through the field's supporting text, like a rejected paste.
                     if (error != null) {
-                        scanError = error
                         onErrorChange(error)
                     } else if (scanned != null) {
                         replaceKey(scanned)
                     }
                 }
             },
-        )
-    }
-    scanError?.let { message ->
-        WhiteNoiseAlertDialog(
-            modifier = Modifier.testTag("onboarding.sign_in.scan_error"),
-            onDismissRequest = { scanError = null },
-            title = { Text(stringResource(R.string.scan_qr_code)) },
-            text = { Text(stringResource(message)) },
-            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) } },
         )
     }
 }

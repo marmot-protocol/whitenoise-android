@@ -32,7 +32,6 @@
     <ID>CyclomaticComplexMethod:ConversationControllerMedia.kt:internal suspend fun ConversationController.performMediaUpload</ID>
     <ID>CyclomaticComplexMethod:ConversationControllerProjection.kt:internal fun ConversationController.upsertProjectedRecord: AppMessageRecordFfi</ID>
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ConversationScreen</ID>
-    <ID>CyclomaticComplexMethod:ConversationStreamPresentation.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
     <ID>CyclomaticComplexMethod:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
@@ -165,9 +164,7 @@
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun FileLibraryRow</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun SharedMediaSection</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun VoiceLibraryRow</ID>
-    <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun EmptyPlaceholder</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun FileLibraryTab</ID>
-    <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun MediaTileGrid</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun SenderAvatar</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun VoiceLibraryTab</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun UrlLibraryRow</ID>
@@ -204,7 +201,6 @@
     <ID>FunctionNaming:Snackbar.kt:@Composable fun WhiteNoiseSnackbarHost</ID>
     <ID>FunctionNaming:StickyFormActionBar.kt:@Composable internal fun StickyFormActionBar</ID>
     <ID>FunctionNaming:StreamDebug.kt:@Composable internal fun MessageDebugRow</ID>
-    <ID>FunctionNaming:StreamDebug.kt:@Composable internal fun StreamDebugEventRow</ID>
     <ID>FunctionNaming:Theme.kt:@Composable fun WhiteNoiseTheme</ID>
     <ID>FunctionNaming:TtsTrustWarning.kt:@Composable fun TtsTrustWarningDialog</ID>
     <ID>FunctionNaming:UserShare.kt:@Composable internal fun UserMessageBubble</ID>
@@ -223,8 +219,6 @@
     <ID>LargeClass:MediaPipeline.kt:MediaPipeline</ID>
     <ID>LargeClass:NotificationTargetTest.kt:NotificationTargetTest</ID>
     <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
-    <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_reanchorsAfterOptimisticPromptOverride</ID>
-    <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_sortsFinalAfterLinkedPromptOnReload</ID>
     <ID>LongMethod:AmberActivityCoordinatorTest.kt:AmberActivityCoordinatorTest$@Test fun staleNip55RejectionAfterTimeoutDoesNotSatisfyNextRequest</ID>
     <ID>LongMethod:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$suspend fun downloadVerifiedApk: Result&lt;Unit&gt;</ID>
     <ID>LongMethod:AppStateNotificationReply.kt:internal suspend fun WhiteNoiseAppState.sendNotificationReply: NotificationReplySendOutcome</ID>
@@ -243,12 +237,10 @@
     <ID>LongMethod:ContactPreviewScreen.kt:@Composable internal fun ContactPreviewScreen</ID>
     <ID>LongMethod:ConversationController.kt:ConversationController$internal suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>LongMethod:ConversationController.kt:ConversationController$suspend fun send</ID>
-    <ID>LongMethod:ConversationControllerAgentStream.kt:internal suspend fun ConversationController.watchAgentTextStream</ID>
     <ID>LongMethod:ConversationControllerMedia.kt:internal suspend fun ConversationController.performMediaUpload</ID>
     <ID>LongMethod:ConversationControllerProjection.kt:internal fun ConversationController.publishTimelineFromIndexesInternal</ID>
     <ID>LongMethod:ConversationControllerProjection.kt:internal fun ConversationController.upsertProjectedRecord: AppMessageRecordFfi</ID>
     <ID>LongMethod:ConversationControllerSubscriptions.kt:private suspend fun ConversationController.runConversationSubscriptionIteration: Pair&lt;Boolean, Boolean&gt;</ID>
-    <ID>LongMethod:ConversationControllerTimelinePage.kt:internal fun ConversationController.applyTimelineChanges: List&lt;String&gt;</ID>
     <ID>LongMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ConversationScreen</ID>
     <ID>LongMethod:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$@Test fun documentEncodesTimelineMetadataInChronologicalOrder</ID>
     <ID>LongMethod:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
@@ -292,7 +284,6 @@
     <ID>LongMethod:ProfileSheet.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ProfileSheet</ID>
     <ID>LongMethod:QrScannerSheet.kt:@androidx.annotation.OptIn(ExperimentalGetImage::class) private fun bindQrScannerCamera</ID>
     <ID>LongMethod:SourceBlockTestHelpers.kt:internal fun String.kotlinBlockFrom: String</ID>
-    <ID>LongMethod:StreamDebug.kt:@Composable internal fun StreamDebugEventRow</ID>
     <ID>LongMethod:Thumbhash.kt:Thumbhash$internal fun decodeRgba: DecodedRgba?</ID>
     <ID>LongMethod:Thumbhash.kt:Thumbhash$internal fun encodeFromRgba: ByteArray?</ID>
     <ID>LongMethod:TtsEngineResolver.kt:TtsEngineResolver$suspend fun resolve: TtsResolutionResult</ID>
@@ -307,8 +298,6 @@
     <ID>LoopWithTooManyJumpStatements:ChatsController.kt:ChatsController$while</ID>
     <ID>LoopWithTooManyJumpStatements:ChatsController.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ConversationController.kt:ConversationController$while</ID>
-    <ID>LoopWithTooManyJumpStatements:ConversationControllerAgentStream.kt:while</ID>
-    <ID>LoopWithTooManyJumpStatements:ConversationStreamPresentation.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ConversationTranscriptExport.kt:ConversationTranscriptExport$while</ID>
     <ID>LoopWithTooManyJumpStatements:DisappearingMessageSweep.kt:DisappearingMessageSweep$for</ID>
     <ID>LoopWithTooManyJumpStatements:DiskByteCache.kt:DiskByteCache$for</ID>
@@ -373,7 +362,6 @@
     <ID>MagicNumber:ChatsControllerMemberSnapshots.kt:8</ID>
     <ID>MagicNumber:ComposerBar.kt:900L</ID>
     <ID>MagicNumber:ConversationCardPostSynchronizer.kt:ConversationCardPostSynchronizer$31</ID>
-    <ID>MagicNumber:ConversationControllerAgentStream.kt:1000L</ID>
     <ID>MagicNumber:ConversationControllerProjection.kt:8</ID>
     <ID>MagicNumber:ConversationControllerTimelinePage.kt:120u</ID>
     <ID>MagicNumber:ConversationNotificationSettings.kt:32</ID>
@@ -381,8 +369,6 @@
     <ID>MagicNumber:ConversationRows.kt:1000L</ID>
     <ID>MagicNumber:ConversationRows.kt:6L</ID>
     <ID>MagicNumber:ConversationScreen.kt:99</ID>
-    <ID>MagicNumber:ConversationStreamPresentation.kt:1200uL</ID>
-    <ID>MagicNumber:ConversationStreamPresentation.kt:9uL</ID>
     <ID>MagicNumber:ConversationUnreadProjection.kt:1009uL</ID>
     <ID>MagicNumber:ConversationUnreadProjection.kt:1210uL</ID>
     <ID>MagicNumber:ConversationUnreadProjection.kt:9uL</ID>
@@ -515,8 +501,6 @@
     <ID>MagicNumber:StreamDebug.kt:0xFF7B1FA2</ID>
     <ID>MagicNumber:StreamDebug.kt:0xFFB28900</ID>
     <ID>MagicNumber:StreamDebug.kt:0xFFC62828</ID>
-    <ID>MagicNumber:StreamDebug.kt:0xFFEF6C00</ID>
-    <ID>MagicNumber:StreamDebug.kt:16</ID>
     <ID>MagicNumber:StreamDebug.kt:8</ID>
     <ID>MagicNumber:Thumbhash.kt:Thumbhash$0.5</ID>
     <ID>MagicNumber:Thumbhash.kt:Thumbhash$0xFF</ID>
@@ -668,7 +652,6 @@
     <ID>MaxLineLength:DiagnosticFormatter.kt:DiagnosticFormatter$private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&amp;]+)")</ID>
     <ID>MaxLineLength:DiagnosticFormatterTest.kt:DiagnosticFormatterTest$assertTrue(described.startsWith("[alice] error: failed [redacted] token=[redacted] https://[redacted]@example.test"))</ID>
     <ID>MaxLineLength:DiagnosticsScreen.kt:appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }</ID>
-    <ID>MaxLineLength:DiskByteCache.kt:DiskByteCache$private fun Throwable.isAuthenticationFailure: Boolean</ID>
     <ID>MaxLineLength:DiskByteCache.kt:DiskByteCache$val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)</ID>
     <ID>MaxLineLength:DiskByteCacheTest.kt:DiskByteCacheTest$assertEquals("AES-GCM envelope stores a 6-byte header, metadata auth, and payload IV/tag", payload.size + 62, stored.size)</ID>
     <ID>MaxLineLength:DiskByteCacheTest.kt:DiskByteCacheTest$assertTrue("a `.enc` must remain on disk after replace", dir.listFiles()?.any { it.name.endsWith(".enc") } ?: false)</ID>
@@ -899,7 +882,6 @@
     <ID>MaxLineLength:ZapstoreReleaseClient.kt:ZapstoreReleaseClient$private suspend fun fetchAppReleaseEvents: List&lt;NostrEvent&gt;</ID>
     <ID>MayBeConstant:ChatsController.kt:private val SEARCH_PER_CHAT_LIMIT = 5u</ID>
     <ID>MayBeConstant:ConversationTranscriptExport.kt:ConversationTranscriptExport$val PageLimit: UInt = 200u</ID>
-    <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindAgentStreamStart = 1200uL</ID>
     <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindChat = 9uL</ID>
     <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindDelete = 5uL</ID>
     <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindEdit = 1009uL</ID>
@@ -965,7 +947,6 @@
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
     <ID>ReturnCount:ConversationNotificationLifecycle.kt:internal fun conversationOpenDismissalTarget: ConversationNotificationTarget?</ID>
-    <ID>ReturnCount:ConversationStreamPresentation.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>
     <ID>ReturnCount:ConversationTimelineOrdering.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
     <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun firstUnreadReceivedIndex: Int</ID>
     <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
@@ -1095,7 +1076,6 @@
     <ID>ReturnCount:ReplyNavigation.kt:ReplyNavigation$suspend fun loadScrollNavigationTarget: String?</ID>
     <ID>ReturnCount:SafeHttpsGet.kt:SafeHttpsGet$private fun pinnedConnection: HttpsURLConnection?</ID>
     <ID>ReturnCount:SafeHttpsGet.kt:SafeHttpsGet$private fun readBounded: ByteArray?</ID>
-    <ID>ReturnCount:StreamDebugEvent.kt:StreamDebugEventFormatter$fun textSummary: String</ID>
     <ID>ReturnCount:Thumbhash.kt:Thumbhash$fun decodeToBitmap: Bitmap?</ID>
     <ID>ReturnCount:Thumbhash.kt:Thumbhash$internal fun decodeRgba: DecodedRgba?</ID>
     <ID>ReturnCount:Thumbhash.kt:Thumbhash$internal fun encodeFromRgba: ByteArray?</ID>

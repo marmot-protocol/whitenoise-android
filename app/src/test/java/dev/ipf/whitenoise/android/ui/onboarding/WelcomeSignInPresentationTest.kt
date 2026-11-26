@@ -8,23 +8,34 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerHost
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.FakeRemoteSignerSession
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerLinkField
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPairing
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -41,6 +52,47 @@ import org.robolectric.annotation.Config
 class WelcomeSignInPresentationTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** The scanner tracks the input surface center when help and error text wrap. */
+    @Test fun scanButtonStaysCenteredOnTheInputSurface() {
+        val error = mutableStateOf<Int?>(null)
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                SignInKeyField(TextFieldState(), false, error.value, {}, {}, {})
+            }
+        }
+        assertScannerAligned("onboarding.sign_in.private_key_container", "onboarding.sign_in.scan")
+        composeRule.runOnIdle { error.value = R.string.sign_in_error_public_key }
+        assertScannerAligned("onboarding.sign_in.private_key_container", "onboarding.sign_in.scan")
+    }
+
+    /** The bunker link shares input alignment with private-key sign-in at large text in RTL. */
+    @Test fun bunkerLinkScanButtonTracksTheInputSurface() {
+        val pairing =
+            RemoteSignerPairing(
+                FakeRemoteSignerHost(FakeRemoteSignerSession()),
+                CoroutineScope(Dispatchers.Unconfined),
+                sessionDispatcher = Dispatchers.Unconfined,
+            )
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(fontScale = 2f) { RemoteSignerLinkField(pairing) }
+            }
+        }
+        assertScannerAligned("remote_signer.link.container", "remote_signer.link.scan")
+        composeRule.runOnIdle { pairing.linkErrorRes = R.string.remote_signer_error_invalid_link }
+        assertScannerAligned("remote_signer.link.container", "remote_signer.link.scan")
+    }
+
+    /** Compares the actual secure input container with the sibling QR button. */
+    private fun assertScannerAligned(
+        fieldTag: String,
+        scanTag: String,
+    ) {
+        val field = composeRule.onNodeWithTag(fieldTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val scan = composeRule.onNodeWithTag(scanTag).fetchSemanticsNode().boundsInRoot
+        assertEquals(field.center.y, scan.center.y, 0.5f)
+    }
 
     /** The native Amber capability moves to Sign In and never appears as an unsolicited Welcome action. */
     @Test fun amberLivesOnSignInAndNeedsItsOwnTap() {
@@ -279,6 +331,31 @@ class WelcomeSignInPresentationTest {
 
     /** A public QR is rejected immediately and cannot replace an already entered private key. */
     @Test fun qrPublicKeyDoesNotReplaceSecret() = scannerResult("npub1" + "q".repeat(58), false, SECRET)
+
+    /** A rejected scan shows its error as the key field's supporting text and opens no dialog. */
+    @Test fun qrRejectionUsesFieldSupportingTextWithoutDialog() {
+        val key = TextFieldState(SECRET)
+        val error = mutableStateOf<Int?>(null)
+        var deliver: ((String) -> Unit)? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SignInKeyField(
+                    key,
+                    false,
+                    error.value,
+                    {},
+                    { error.value = it },
+                    {},
+                    scannerContent = { _, scan -> deliver = scan },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("onboarding.sign_in.scan").performClick()
+        composeRule.runOnIdle { checkNotNull(deliver)("npub1" + "q".repeat(58)) }
+        composeRule.onNodeWithText(context.getString(R.string.sign_in_error_public_key)).assertIsDisplayed()
+        composeRule.onAllNodes(isDialog()).assertCountEquals(0)
+        composeRule.runOnIdle { assertEquals(SECRET, key.text.toString()) }
+    }
 
     /** A late camera callback cannot edit credentials once import or an external signer owns the form. */
     @Test fun qrReturnDuringBusyOperationIsIgnored() = scannerResult("nsec1" + "p".repeat(58), true, SECRET)

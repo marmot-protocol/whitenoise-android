@@ -4,17 +4,10 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,12 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadMatrix
@@ -37,11 +27,9 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
-import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogToggleRow
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
@@ -165,7 +153,6 @@ internal fun DataUsageScreen(
                     }
                 }
             }
-            item(key = "search.DataUsage.3") { SettingsExplainer(stringResource(R.string.download_rules_help)) }
             item(key = "search.DataUsage.4") { SettingsSection(stringResource(R.string.download_queue)) }
             item(key = "search.DataUsage.5") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.queue")) {
@@ -201,15 +188,14 @@ internal fun DataUsageScreen(
                             title = stringResource(R.string.download_quality),
                             onClick = { qualityPicker = true },
                             value = qualityLabels.getValue(appState.mediaQuality),
-                            explanation = stringResource(R.string.explanation_privacy_data_quality),
+                            explanation =
+                                stringResource(R.string.explanation_privacy_data_quality) + "\n\n" +
+                                    stringResource(R.string.media_quality_footer) + "\n\n" +
+                                    stringResource(R.string.download_quality_help),
                             leading = { SettingsLeadingIcon(R.drawable.ic_high_quality) },
                         )
                     }
                 }
-            }
-            item(key = "search.DataUsage.8") {
-                SettingsExplainer(stringResource(R.string.download_quality_help))
-                SettingsExplainer(stringResource(R.string.media_quality_footer))
             }
             item(key = "search.DataUsage.9") {
                 SettingsGroup {
@@ -324,7 +310,7 @@ internal fun DownloadNetworkOptions(
     }
 }
 
-/** A dialog switch row: the whole row toggles and carries the switch semantics. */
+/** A dialog switch row on the shared [WhiteNoiseDialogToggleRow]: the whole row toggles and carries the switch role. */
 @Composable
 internal fun DownloadSwitch(
     title: String,
@@ -334,25 +320,14 @@ internal fun DownloadSwitch(
     explanation: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .whiteNoiseDialogSelection(checked && enabled)
-            .explainOnLongPress(explanation?.let { Explanation(title, it) })
-            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
-            .testTag(tag)
-            .heightIn(min = DownloadSwitchMinHeight)
-            .padding(horizontal = WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        Text(
-            title,
-            Modifier.weight(1f),
-            color = LocalContentColor.current.let { if (enabled) it else it.copy(alpha = DISABLED_ALPHA) },
-        )
-        Switch(checked, onCheckedChange = null, enabled = enabled)
-    }
+    WhiteNoiseDialogToggleRow(
+        title = title,
+        checked = checked,
+        onCheckedChange = onChange,
+        modifier = Modifier.testTag(tag),
+        enabled = enabled,
+        explanation = explanation,
+    )
 }
 
 /** Every cell back to the shipped default; unchanged cells are not rewritten. */
@@ -383,6 +358,3 @@ internal val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Video -> R.string.download_videos
             MediaAutoDownloadType.Document -> R.string.download_files
         }
-
-private val DownloadSwitchMinHeight = 48.dp
-private const val DISABLED_ALPHA = 0.38f

@@ -101,7 +101,9 @@ internal fun LazyListScope.storageFreeUpItems(
                     onClick = { onOpenList(LARGEST_ATTACHMENTS_LIST) },
                     enabled = ready && hasAttachments,
                     modifier = Modifier.testTag("storage.largest"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_largest),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_largest) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = { SettingsLeadingIcon(R.drawable.ic_sort) },
                 )
             }
@@ -113,25 +115,24 @@ internal fun LazyListScope.storageFreeUpItems(
                     enabled = ready && hasAttachments,
                     busy = state.action is StorageAction.RemoveOlder,
                     modifier = Modifier.testTag("storage.remove_older"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_remove_older),
+                    explanation =
+                        stringResource(R.string.explanation_privacy_storage_remove_older) + "\n\n" +
+                            stringResource(R.string.storage_removal_help),
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
             row("cache") { context ->
+                // The size leads the subtitle rather than sitting at the end, so the title keeps the row's width at
+                // large text sizes, and it is left out until the figures arrive instead of reading as zero.
+                val cacheBytes = usage?.clearableCacheBytes?.let { storageBytes(it) }
+                val help = stringResource(R.string.storage_clear_cache_subtitle)
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.storage_clear_cache),
-                    subtitle = stringResource(R.string.storage_clear_cache_subtitle),
+                    subtitle = cacheBytes?.let { storageSizeDetail(it, help) } ?: help,
                     onClick = { dialogs.clearCache.value = true },
                     enabled = ready && (usage?.clearableCacheBytes ?: 0) > 0,
                     busy = state.action == StorageAction.ClearCaches,
-                    trailing = {
-                        Text(
-                            storageBytes(usage?.clearableCacheBytes ?: 0),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
                     modifier = Modifier.testTag("storage.clear_cache"),
                     explanation = stringResource(R.string.explanation_privacy_storage_clear_cache),
                     leading = { SettingsLeadingIcon(R.drawable.ic_cleaning_services) },
@@ -139,7 +140,6 @@ internal fun LazyListScope.storageFreeUpItems(
             }
         }
     }
-    item(key = "search.ManageStorage.4") { SettingsExplainer(stringResource(R.string.storage_removal_help)) }
 }
 
 /** The account's Keep media window and what changing it does. */
@@ -147,7 +147,7 @@ internal fun LazyListScope.storageKeepMediaItems(
     state: ManageStorageUiState,
     dialogs: StorageDialogs,
 ) {
-    item(key = "search.ManageStorage.5") { SettingsSection(stringResource(R.string.storage_keep_media)) }
+    item(key = "search.ManageStorage.5") { SettingsSection(stringResource(R.string.storage_automatic_cleanup)) }
     item(key = "search.ManageStorage.6") {
         SettingsGroup(modifier = Modifier.testTag("storage.keep_media")) {
             row("keep") { context ->
@@ -167,7 +167,6 @@ internal fun LazyListScope.storageKeepMediaItems(
             }
         }
     }
-    item(key = "search.ManageStorage.7") { SettingsExplainer(stringResource(R.string.storage_keep_media_help)) }
 }
 
 /** What the Keep media row shows before its window is known. */
@@ -183,7 +182,12 @@ internal fun LazyListScope.storageChatItems(
     state: ManageStorageUiState,
     actions: ManageStorageActions,
 ) {
-    item(key = "search.ManageStorage.8") { SettingsSection(stringResource(R.string.storage_chats)) }
+    item(key = "search.ManageStorage.8") {
+        SettingsSection(
+            title = stringResource(R.string.storage_chats),
+            explanation = stringResource(R.string.storage_chats_help),
+        )
+    }
     if (state.chats.isNotEmpty()) {
         item(key = "storage.chats") {
             SettingsGroup(modifier = Modifier.testTag("storage.chats")) {
@@ -210,7 +214,7 @@ internal fun LazyListScope.storageChatItems(
                 LaunchedEffect(state.chats.size) { actions.onLoadMoreChats() }
                 StorageLoadingRow()
             }
-            else -> SettingsExplainer(stringResource(R.string.storage_chats_help))
+            else -> Unit
         }
     }
 }

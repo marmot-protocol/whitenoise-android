@@ -10,8 +10,9 @@ name: Android CI
 # separate workflow (see issue #247). Merge groups and full-matrix pull requests also
 # build both shipping R8 variants, unsigned, and fail on their post-R8 DEX method budgets.
 #
-# Activated queue mode uses compile/style/security PR prechecks and full
-# integration suites. Unset/unknown modes preserve prior PR validation.
+# Activated queue mode uses compile/style/security PR prechecks, which also verify
+# the Zapstore screenshot goldens, and full integration suites. Unset/unknown modes
+# preserve prior PR validation.
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
 # nightly and dispatch run stays full (docs/ci-request-policy.md), and so does every
 # master push except one of a commit its merge group already validated, which reuses that
@@ -246,7 +247,7 @@ jobs:
       - name: Test PR GitHub scripts
         run: >-
           node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
-          .github/scripts/check-invariant-gate.test.js
+          .github/scripts/check-invariant-gate.test.js .github/scripts/report-pr-merge-order.test.js
 
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py
@@ -354,11 +355,11 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: '1.24.11'
           cache: false
@@ -405,7 +406,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -757,7 +758,7 @@ jobs:
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -837,7 +838,8 @@ jobs:
           retention-days: 14
   # Prechecks compile every test source set here. Full runs compile main and unit-test
   # sources once per flavor and hand the new build-cache entries to the four unit shards,
-  # which would otherwise each repeat the same 5-7 minute compilation.
+  # which would otherwise each repeat the same 5-7 minute compilation. Prechecks hand
+  # Zapstore's entries to its screenshot shards the same way.
   compile-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
@@ -862,7 +864,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -913,7 +915,7 @@ jobs:
 
       # Only entries written by this compilation; the shards already restore the master cache.
       - name: Package new build-cache entries
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         shell: bash
         run: |
           cd ~/.gradle/caches/build-cache-1
@@ -922,7 +924,7 @@ jobs:
           tar -tf "$RUNNER_TEMP/unit-compile-cache.tar" | wc -l
 
       - name: Share compiled outputs with the unit shards
-        if: success() && needs.changes.outputs.precheck != 'true'
+        if: success() && (needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: unit-compile-cache-${{ matrix.flavor }}
@@ -1003,7 +1005,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1088,10 +1090,12 @@ jobs:
   # top-level name hashes to its index (see ciTestShard in build.gradle.kts) and takes
   # its compiled sources from compile-tests' build-cache entries, so it runs about a
   # quarter of the suite without recompiling. The coverage job below merges every
-  # shard's screenshot summary and Kover binary report.
+  # shard's screenshot summary and Kover binary report. PR prechecks run only the tests
+  # that own committed goldens (config/screenshot-baseline-owners.txt), so a screenshot
+  # mismatch fails the PR instead of the merge group; coverage stays at integration.
   tests:
     needs: [changes, compile-tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -1126,7 +1130,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1179,21 +1183,27 @@ jobs:
 
       # Shard 0 also compiles androidTest sources on full runs and, for Zapstore, writes
       # the Kover artifact that names the class directories the coverage job needs.
+      # Prechecks select only the registered golden owners and skip Kover.
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
         env:
           CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
+          CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
         run: |
           extra_tasks=()
+          test_filters=()
           if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "$CI_FULL_MATRIX" == true ]]; then
             extra_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
           fi
-          if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
+          if [[ "$CI_PRECHECK" == true ]]; then
+            mapfile -t test_filters < <(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)
+            (( ${#test_filters[@]} > 0 )) || { echo "The screenshot owner registry selected no tests" >&2; exit 1; }
+          elif [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
             extra_tasks+=(:app:koverGenerateArtifactDevZapstoreDebug)
           fi
           python3 scripts/run_unit_tests_with_diagnostics.py -- \
-            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
+            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest "${test_filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
 
       # Upload before later gates: a timed-out child must not lose its actual PNGs.
@@ -1233,7 +1243,7 @@ jobs:
           retention-days: 7
 
       - name: Upload shard coverage data
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-binary-Zapstore-${{ matrix.shard }}
@@ -1242,11 +1252,11 @@ jobs:
           retention-days: 3
 
       - name: Pack Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         run: python3 scripts/kover_class_outputs.py pack app/build/kover/devZapstoreDebug.artifact build/kover-classes.tar
 
       - name: Upload Kover class directories
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && needs.changes.outputs.precheck != 'true' && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kover-classes-Zapstore
@@ -1298,9 +1308,11 @@ jobs:
   # Merge the unit-test shards: every committed golden must be compared by some shard,
   # and Zapstore coverage gates read all shards' binary reports. Kover runs against the
   # class directories shard 0 compiled, so this job neither recompiles nor reruns tests.
+  # Drafts and PR prechecks run only the golden check; in a precheck it catches a
+  # golden whose capturing test is missing from the owner registry.
   coverage:
     needs: [changes, tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Screenshot ownership and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1329,28 +1341,28 @@ jobs:
           done
 
       - name: Configure MarmotKit cache directory
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         shell: bash
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
 
       # Report tasks only; the shards own the cache entries.
       - name: Set up Gradle
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         shell: bash
         run: |
           sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
@@ -1358,21 +1370,21 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Download shard coverage data
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: kover-binary-Zapstore-*
           path: build/kover-shards
 
       - name: Download Kover class directories
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: kover-classes-Zapstore
@@ -1380,7 +1392,7 @@ jobs:
 
       # Name each shard's report uniquely in one directory and require all four.
       - name: Restore shard coverage inputs
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: |
           mkdir -p build/kover-shard-reports
           for shard in 0 1 2 3; do
@@ -1395,7 +1407,7 @@ jobs:
       # unsigned-release guard (no signing in CI). Compilation and tests are excluded:
       # the restored classes and shard reports are the inputs.
       - name: Coverage gate and report (Kover)
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: >-
           ./gradlew :app:koverVerifyDevZapstoreDebug :app:koverXmlReportDevZapstoreDebug
           :app:koverHtmlReportDevZapstoreDebug
@@ -1408,7 +1420,7 @@ jobs:
       # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
       # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
       - name: Runtime listener and viewport restoration coverage floors
-        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: |
           python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
           python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
@@ -1453,7 +1465,7 @@ jobs:
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
@@ -1691,7 +1703,7 @@ jobs:
                 elif .key == "compose-compiler" then .value.result == (if $campaigns == "false" then "skipped" else "success" end)
                 elif .key == "static-analysis" then .value.result == (if $lint == "true" then "success" else "skipped" end)
                 else .value.result == "skipped" end)
-              elif $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              elif $precheck and (.key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)

@@ -9,9 +9,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -40,11 +39,15 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /** Keeps a reactor-sheet filter while its emoji remains present in the live participant list. */
@@ -118,6 +121,7 @@ internal fun ReactionDetailsSheet(
 }
 
 /** Renders complete reactor snapshots, preserving filters during refresh and offering Retry after failed reads. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
 internal fun ReactionDetailsContent(
@@ -139,14 +143,15 @@ internal fun ReactionDetailsContent(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = amoledSheetContainerColor(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        // Same shape and insets as WhiteNoiseModalBottomSheet; the popup keeps its own non-focus-stealing window.
+        shape = BottomSheetDefaults.ExpandedShape,
     ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSheetInset),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ReactionDetailsReadStatus(readState.loading, readState.failed, readState.hasSnapshot, readState.onRetry)
@@ -227,13 +232,13 @@ private fun ReactionFilterChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
+        WhiteNoiseFilterChip(
             selected = selectedEmoji == null,
             onClick = { onSelectedEmoji(null) },
             label = { Text("${stringResource(R.string.reaction_filter_all)} · $participantCount") },
         )
         emojiCounts.forEach { (emoji, count) ->
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = selectedEmoji == emoji,
                 onClick = { onSelectedEmoji(emoji) },
                 label = {
@@ -262,20 +267,37 @@ private fun ReactionParticipantRow(
         appState.shortNpub(participant.sender).ifBlank {
             IdentityFormatter.short(participant.sender, prefix = 10, suffix = 8)
         }
+    val npub = appState.npubForDisplay(participant.sender)
     val displayName = appState.displayName(participant.sender).ifBlank { shortIdentity }
     val headline: @Composable () -> Unit = {
-        EmojiLabel(
-            text = if (mine) stringResource(R.string.you) else displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (!mine && abbreviatesPublicKey(displayName, npub)) {
+            PublicKeyCopyText(displayName, npub, style = MaterialTheme.typography.bodyLarge, keyboardFocusable = true)
+        } else {
+            EmojiLabel(
+                text = if (mine) stringResource(R.string.you) else displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
     val removeHint = stringResource(R.string.reaction_tap_to_remove)
     val subtitle = if (mine) removeHint.takeIf { onRemove != null } else shortIdentity.takeUnless { it == displayName }
     val supporting: (@Composable () -> Unit)? =
         subtitle?.let { text ->
-            { ReactionParticipantSupportingText(text) }
+            {
+                if (!mine && abbreviatesPublicKey(text, npub)) {
+                    PublicKeyCopyText(
+                        text,
+                        npub,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        keyboardFocusable = true,
+                    )
+                } else {
+                    ReactionParticipantSupportingText(text)
+                }
+            }
         }
     val leading: @Composable () -> Unit = {
         PersonAvatar(
@@ -283,6 +305,7 @@ private fun ReactionParticipantRow(
             seed = participant.sender,
             size = 48.dp,
             pictureUrl = appState.contactAvatarSource(participant.sender),
+            followedAccount = participant.sender,
         )
     }
     val trailing: @Composable () -> Unit = {

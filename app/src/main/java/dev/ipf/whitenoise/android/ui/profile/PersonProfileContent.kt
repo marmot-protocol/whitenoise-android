@@ -8,7 +8,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -38,7 +39,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,10 +48,12 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.IdentityHeader
+import dev.ipf.whitenoise.android.ui.common.IdentityName
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
-import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
@@ -69,7 +71,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
  * [fromGroup] marks a profile opened from inside a group: the relationship rows then carry the Profile Actions
  * heading that separates them from the group-scoped moderation block supplied through [adminActions].
  */
-
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun PersonProfileContent(
@@ -300,10 +301,7 @@ internal fun PersonProfileContent(
     }
 }
 
-/**
- * Prototype hero uses a 32% avatar bounded to 104–152 dp, with public identity values below the optional about
- * card.
- */
+/** The shared identity header, with the optional banner above the avatar and the about card and addresses below. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun PersonProfileIdentity(
@@ -314,41 +312,34 @@ private fun PersonProfileIdentity(
     onBanner: () -> Unit,
     onCopyLightning: () -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val avatarSize = (maxWidth * 0.32f).coerceIn(104.dp, 152.dp)
-        // The banner is inset from the hero's full width, so its bounded decode
-        // is derived from the box it actually fills (#2762).
-        val bannerWidthPx = profileBannerTargetWidthPx(maxWidth - WhiteNoiseSpacing.CompactScreenMargin * 2)
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    IdentityHeader(
+        top = { contentWidth ->
             person.bannerUrl?.let { url ->
-                val banner = rememberProfileBannerLoadState(url, bannerWidthPx)
+                // The banner fills the header's content width, so its bounded decode is derived from it (#2762).
+                val banner = rememberProfileBannerLoadState(url, profileBannerTargetWidthPx(contentWidth))
                 if (banner.visible) {
-                    Box(
-                        Modifier
-                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                            .padding(bottom = WhiteNoiseSpacing.FormField),
+                    Surface(
+                        onClick = onBanner,
+                        enabled = banner.image != null,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(2f).testTag(PROFILE_BANNER_TAG),
                     ) {
-                        Surface(
-                            onClick = onBanner,
-                            enabled = banner.image != null,
-                            shape = MaterialTheme.shapes.large,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(2f).testTag(PROFILE_BANNER_TAG),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                banner.image?.let {
-                                    Image(
-                                        it,
-                                        stringResource(R.string.profile_banner),
-                                        Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                    )
-                                }
-                                    ?: CircularProgressIndicator(Modifier.testTag(PROFILE_BANNER_LOADING_TAG))
+                        Box(contentAlignment = Alignment.Center) {
+                            banner.image?.let {
+                                Image(
+                                    it,
+                                    stringResource(R.string.profile_banner),
+                                    Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                )
                             }
+                                ?: CircularProgressIndicator(Modifier.testTag(PROFILE_BANNER_LOADING_TAG))
                         }
                     }
                 }
             }
+        },
+        avatar = { avatarSize ->
             Box(
                 Modifier.size(avatarSize).testTag("person_profile.avatar").clickable(
                     enabled = person.avatarClickable,
@@ -363,77 +354,71 @@ private fun PersonProfileIdentity(
                     avatarSize,
                     pictureUrl = person.pictureUrl,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = person.seed.takeUnless { person.self },
                 )
             }
-            val keyShown = person.publicKey.isNotBlank()
-            PersonProfileNames(person, keyShown)
-            person.about?.let { about ->
-                Surface(
-                    Modifier
-                        .padding(top = WhiteNoiseSpacing.FormField)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .testTag("person_profile.about"),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    EmojiLabel(
-                        about,
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-                Spacer(Modifier.height(WhiteNoiseSpacing.Related))
-            }
-            person.nip05?.let { address ->
-                Row(
-                    Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        address,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.MiddleEllipsis,
-                    )
-                    if (person.nip05Verified) {
-                        Icon(
-                            painterResource(R.drawable.ic_verified_filled),
-                            stringResource(R.string.profile_nip05_verified),
-                            Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            person.lightningAddress?.let { address ->
-                Text(
-                    stringResource(R.string.person_lightning_display, address),
-                    Modifier
-                        .padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related)
-                        .clickable(
-                            role = Role.Button,
-                            onClickLabel = stringResource(R.string.copy),
-                            onClick = onCopyLightning,
-                        ).testTag("person_profile.lightning"),
+        },
+    ) {
+        val keyShown = person.publicKey.isNotBlank()
+        PersonProfileNames(person, keyShown)
+        person.about?.let { about ->
+            Surface(
+                Modifier.fillMaxWidth().testTag("person_profile.about"),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                EmojiLabel(
+                    about,
+                    Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
                     textAlign = TextAlign.Center,
                 )
             }
-            if (keyShown) {
-                // One complete, copyable key replaces the old short capsule plus inert full block (#3321, #3565).
-                CopyableFullPublicKey(
-                    npub = person.publicKey,
-                    copied = copied,
-                    onCopy = onCopy,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related),
-                    targetTestTag = "person_profile.copy_public_key",
-                    textTestTag = "person_profile.full_public_key",
+        }
+        person.nip05?.let { address ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related / 2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    address,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.MiddleEllipsis,
                 )
+                if (person.nip05Verified) {
+                    Icon(
+                        painterResource(R.drawable.ic_verified_filled),
+                        stringResource(R.string.profile_nip05_verified),
+                        Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
+        }
+        person.lightningAddress?.let { address ->
+            Text(
+                stringResource(R.string.person_lightning_display, address),
+                Modifier
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = stringResource(R.string.copy),
+                        onClick = onCopyLightning,
+                    ).testTag("person_profile.lightning"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (keyShown) {
+            // One key: short until tapped, then copied and expanded in full (#3321, #3565).
+            CopyablePublicKey(
+                npub = person.publicKey,
+                copied = copied,
+                onCopy = onCopy,
+                targetTestTag = "person_profile.copy_public_key",
+                textTestTag = "person_profile.full_public_key",
+            )
         }
     }
 }
@@ -462,20 +447,11 @@ private fun PersonProfileNames(
                 },
         )
     } else {
-        EmojiLabel(
-            person.title,
-            Modifier
-                .padding(start = 16.dp, end = 16.dp, top = WhiteNoiseSpacing.FormField)
-                .testTag("person_profile.name"),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
+        IdentityName(person.title, Modifier.testTag("person_profile.name"), maxLines = Int.MAX_VALUE)
     }
     if (person.title != person.publishedName && !(person.publishedNameIsPublicKey && keyShown)) {
         EmojiLabel(
             person.publishedName,
-            Modifier.padding(horizontal = 16.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
@@ -493,7 +469,10 @@ internal fun PersonProfileBottomAction(
     modifier: Modifier = Modifier,
     groupAction: Boolean = false,
 ) {
-    val scrolled = (LocalWhiteNoiseHeaderScroll.current?.state?.overlappedFraction ?: 0f) > 0f
+    val headerScrollState = LocalWhiteNoiseHeaderScroll.current?.state
+    val scrolled by remember(headerScrollState) {
+        derivedStateOf { (headerScrollState?.overlappedFraction ?: 0f) > 0f }
+    }
     val color by animateColorAsState(
         if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         label = "PersonProfileBottomAction",

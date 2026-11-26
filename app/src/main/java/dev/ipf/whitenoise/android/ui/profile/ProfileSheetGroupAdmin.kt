@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -176,15 +175,7 @@ private fun ProfileSheetAdminActionRow(
             if (inProgress) {
                 CircularProgressIndicator(Modifier.size(ProfileAdminGlyphSize))
             } else {
-                SettingsLeadingIcon(
-                    icon,
-                    tint =
-                        if (destructive) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
+                SettingsLeadingIcon(icon)
             }
         },
     )

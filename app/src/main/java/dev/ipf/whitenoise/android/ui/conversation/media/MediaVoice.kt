@@ -84,8 +84,8 @@ import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceSendingIndicator
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMediaTileShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
-import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -286,6 +286,7 @@ internal fun MediaVoiceBubble(
     onLongPress: () -> Unit = {},
     audioTranscription: AudioTranscriptionToggleState? = null,
     sending: Boolean = false,
+    completedTranscriptInFooter: Boolean = false,
 ) {
     val playbackTitleCopy =
         dev.ipf.whitenoise.android.ui.common
@@ -591,7 +592,7 @@ internal fun MediaVoiceBubble(
         )
         if (!mine && audioTranscription != null) {
             key(localFile) {
-                ReceivedAudioTranscription(localFile, pillKey, audioTranscription)
+                ReceivedAudioTranscription(localFile, pillKey, audioTranscription, completedTranscriptInFooter)
             }
         }
     }
@@ -656,7 +657,7 @@ internal fun VoiceAttachmentContent(
     Surface(
         color = container,
         contentColor = content,
-        shape = ConversationRichContentShape,
+        shape = ConversationMediaTileShape,
         modifier = modifier.width(ConversationMessageMetrics.RichContentCanvasWidth),
     ) {
         Row(

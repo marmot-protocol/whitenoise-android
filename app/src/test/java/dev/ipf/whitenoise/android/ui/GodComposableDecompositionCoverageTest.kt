@@ -77,6 +77,32 @@ class GodComposableDecompositionCoverageTest {
         )
     }
 
+    /**
+     * A queued Select text keeps the holder it was built with. When a pending send confirms, the record id replaces
+     * the text layouts and so the holder; the old holder must keep its own inputs, never the confirmed message's.
+     */
+    @Test
+    fun messageBubbleTextSelectionKeepsInputsPerHolder() {
+        val bubbleBody =
+            source("conversation/messages/MessageBubble.kt").readText().functionBody("MessageBubble")
+        val remembered =
+            source("conversation/messages/MessageBubbleTextSelection.kt")
+                .readText()
+                .functionBody("rememberMessageBubbleTextSelection")
+
+        assertTrue(
+            "MessageBubble must use the text selection holder",
+            "rememberMessageBubbleTextSelection(" in bubbleBody,
+        )
+        assertTrue(
+            "inputs must be remembered on the holder's key, never shared across holders",
+            remembered.contains("remember(textLayouts) { mutableStateOf(inputs) }") &&
+                remembered.contains("latest.value = inputs") &&
+                remembered.contains("remember(textLayouts) {\n        MessageBubbleTextSelection(") &&
+                !remembered.contains("rememberUpdatedState"),
+        )
+    }
+
     @Test
     fun messageBubbleUiBlocksLiveInNamedRestartScopes() {
         val bubbleSource = source("conversation/messages/MessageBubble.kt").motionOwnerSource()
@@ -95,6 +121,31 @@ class GodComposableDecompositionCoverageTest {
         assertFalse(
             "body/footer UI must not remain an inline composable lambda",
             "val bodyFooterAndRetry:" in bubbleBody,
+        )
+    }
+
+    /**
+     * A menu action queued behind the exit animation keeps the holder it was built with. When a pending send
+     * confirms, the record id replaces the poll owner and so the holder; the old holder must keep its own inputs,
+     * never the confirmed message's.
+     */
+    @Test
+    fun messageBubbleActionsKeepInputsPerHolder() {
+        val bubbleBody =
+            source("conversation/messages/MessageBubble.kt").readText().functionBody("MessageBubble")
+        val remembered =
+            source("conversation/messages/MessageBubbleActions.kt")
+                .readText()
+                .functionBody("rememberMessageBubbleActions")
+        val keys = "remember(appState, controller, surfaces, pollOwner)"
+
+        assertTrue("MessageBubble must use the actions holder", "rememberMessageBubbleActions(" in bubbleBody)
+        assertTrue(
+            "inputs must be remembered on the holder's keys, never shared across holders",
+            remembered.contains("$keys { mutableStateOf(inputs) }") &&
+                remembered.contains("latest.value = inputs") &&
+                remembered.contains("$keys {\n        MessageBubbleActions(") &&
+                !remembered.contains("rememberUpdatedState"),
         )
     }
 

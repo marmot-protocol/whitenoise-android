@@ -13,4 +13,16 @@
     <string name="shared_content_partial">尚未加载匹配的附件</string>
     <string name="shared_content_page_failed">无法加载共享内容，请重试。</string>
     <string name="shared_content_history_end">已到本地附件历史末尾</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="other">已选择 %1$d 张照片</item>
+    </plurals>
+    <string name="shared_media_select_photo">选择照片</string>
+    <string name="shared_media_cancel_selection">取消选择</string>
+    <string name="shared_media_share_selected_photos">分享所选照片</string>
+    <string name="shared_media_photo_from">来自 %1$s 的照片</string>
+    <string name="shared_media_video_not_selectable">视频，无法选择</string>
+    <string name="shared_media_share_photos_failed">无法分享照片</string>
+    <string name="shared_media_share_photos_unavailable">部分所选照片已不可用，因此未分享任何内容。这些照片已取消选择。请重试。</string>
+    <string name="shared_media_share_photos_too_large">这些照片太大，无法一次分享。请少选一些后重试。</string>
+    <string name="shared_media_jump_to_date">跳转到日期</string>
 </resources>

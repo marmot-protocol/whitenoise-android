@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageAction.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageAction.kt",
+        "surface": "Focused message action carries an explanation",
+        "anchor": "val explanation: Explanation? = null",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageAction.kt",
+        "surface": "Actions off the first level wait behind More actions",
+        "anchor": "val firstLevel: Boolean = true",
+        "test_ids": [
+          "MSG-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

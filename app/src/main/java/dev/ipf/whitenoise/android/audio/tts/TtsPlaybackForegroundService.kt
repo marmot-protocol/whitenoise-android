@@ -116,15 +116,18 @@ class TtsPlaybackForegroundService : Service() {
     private var playbackOwner: TtsPlaybackSessionHost? = null
     private var playbackSessionId: Long? = null
     private var observedController: TtsController? = null
+    private var latestStartId: Int = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** Promotes the service before any early stop and threads [startId] into teardown. */
     @Suppress("ReturnCount")
     override fun onStartCommand(
         intent: Intent?,
         flags: Int,
         startId: Int,
     ): Int {
+        latestStartId = startId
         val host = hostResolver(this)
         val model =
             host
@@ -138,14 +141,13 @@ class TtsPlaybackForegroundService : Service() {
         // when the host is unavailable or the session ended during startup.
         startForeground(NOTIFICATION_ID, buildNotification(model))
         if (host == null) {
-            stopSelf()
+            stopForegroundIfStopped(startId)
             return START_NOT_STICKY
         }
         if (intent?.action == null && !model.isActive) {
             // Started for a session that already ended before the service came
-            // up — do not park a stale notification. Stopping the service also
-            // removes the foreground notification.
-            stopSelf()
+            // up — do not park a stale notification.
+            stopForegroundIfStopped(startId)
             return START_NOT_STICKY
         }
         if (model.isActive) {
@@ -227,6 +229,7 @@ class TtsPlaybackForegroundService : Service() {
             }
     }
 
+    /** Mirrors active playback state to the foreground notification and stops on terminal state. */
     private fun observe(host: TtsPlaybackSessionHost) {
         if (observeJob?.isActive == true && observedController === host.controller) return
         observeJob?.cancel()
@@ -249,8 +252,7 @@ class TtsPlaybackForegroundService : Service() {
                             // the queue is already cleared, so tear everything
                             // down exactly once and unsubscribe. A replacement
                             // session must enter through a new service start.
-                            stopForeground(STOP_FOREGROUND_REMOVE)
-                            stopSelf()
+                            stopForegroundIfStopped(latestStartId)
                         }
                         model.isActive
                     }.collect { model ->
@@ -258,6 +260,13 @@ class TtsPlaybackForegroundService : Service() {
                         startForeground(NOTIFICATION_ID, buildNotification(model))
                     }
             }
+    }
+
+    /** Removes the foreground notification only when [startId] actually stops the service. */
+    private fun stopForegroundIfStopped(startId: Int) {
+        if (stopSelfResult(startId)) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        }
     }
 
     private fun publishPlaybackState(model: TtsPlaybackSessionModel) {

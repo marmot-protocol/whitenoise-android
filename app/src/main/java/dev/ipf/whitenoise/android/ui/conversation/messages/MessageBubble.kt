@@ -50,7 +50,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -62,14 +61,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
@@ -78,9 +75,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
@@ -107,13 +102,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.dismissReports
 import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
-import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.teamReportingAvailable
-import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
@@ -127,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
@@ -142,12 +136,14 @@ import dev.ipf.whitenoise.android.ui.conversation.PollMessageContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
-import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceTranscription
+import dev.ipf.whitenoise.android.ui.conversation.media.animateTranscriptFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberReceivedAudioTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
@@ -471,7 +467,7 @@ internal fun MessageBubble(
             replySwipe.cancel()
         }
     }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val messageTextCopy = rememberMessageTextCopy()
@@ -497,19 +493,23 @@ internal fun MessageBubble(
         }
     }
 
-    /** Registers the plain-text leaf for selection once both its layout and its position are known. */
-    fun reportPlainTextLayoutIfReady() {
-        val layoutResult = textLayouts.plainTextLayoutTracker.layoutResult ?: return
-        val coordinates = textLayouts.plainTextLayoutTracker.coordinates ?: return
-        textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
-    }
+    val textSelection =
+        rememberMessageBubbleTextSelection(
+            textLayouts = textLayouts,
+            inputs =
+                MessageBubbleTextSelection.Inputs(
+                    deleted = deleted,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                ),
+        )
 
     val composerSendMotion = LocalComposerSendMotion.current
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
             composerSendMotion?.destinationText(item.presentationId, coordinates)
             textLayouts.plainTextLayoutTracker.coordinates = coordinates
-            reportPlainTextLayoutIfReady()
+            textSelection.reportPlainTextLayoutIfReady()
         }
     val textSelectionBoundsModifier =
         if (textSelectionMode) {
@@ -555,16 +555,8 @@ internal fun MessageBubble(
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
-    // A received voice message's side transcribe disc drives every recording in this bubble.
-    val audioTranscription =
-        if (mine) {
-            null
-        } else {
-            remember(record.messageIdHex) {
-                dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState(record.messageIdHex)
-            }
-        }
+    val audioTranscription = rememberReceivedAudioTranscription(record.messageIdHex, mine)
+    val voiceTranscription = LocalVoiceTranscription.current
     val translationSource =
         dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
             messageId = record.messageIdHex,
@@ -921,357 +913,52 @@ internal fun MessageBubble(
         }
     }
 
-    /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
-    fun beginReply() {
-        if (deleted || actionsReadOnly) return
-        val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
-        controller.replyingTo = target
-        onActionMenuOpenChange(false)
-    }
-
-    /** Closes the action menu and shows Info, unless the message is already deleted. */
-    fun openInfoSheet() {
-        surfaces.infoOrigin = null
-        if (deleted) return
-        onActionMenuOpenChange(false)
-        surfaces.infoSheetOpen = true
-    }
-
-    /** Closes the action menu and asks which delete scope to use, when any scope is offered. */
-    fun requestDelete() {
-        if (!deleteCapability.canDeleteAtAll) return
-        onActionMenuOpenChange(false)
-        surfaces.deleteDialogOpen = true
-    }
-
-    /** Hides the message on this device only, closing the dialog once the controller confirms the removal. */
-    fun performDeleteForMe() {
-        if (surfaces.deleteInFlight) return
-        surfaces.deleteInFlight = true
-        appState.launchMutation {
-            try {
-                val removed = controller.hideMessageForMe(record.messageIdHex)
-                if (removed) surfaces.deleteDialogOpen = false
-            } finally {
-                surfaces.deleteInFlight = false
-            }
-        }
-    }
-
-    /** Deletes the message for every member, keeping the dialog open until the outcome is known. */
-    fun performDeleteForEveryone() {
-        // The in-flight flag is the repeated-tap guard on top of the
-        // controller's own idempotency (a second deleteMessage on an already
-        // tombstoned id is a no-op).
-        if (surfaces.deleteInFlight) return
-        surfaces.deleteInFlight = true
-        // launchMutation so the MLS commit + Nostr publish survive navigating
-        // away from the conversation. The dialog stays open with its options
-        // disabled until the outcome is known, and stays open on failure so
-        // the error toast never explains a surface that silently vanished;
-        // the optimistic tombstone rollback restores the bubble either way.
-        appState.launchMutation {
-            try {
-                val removed = controller.deleteMessage(record, optimisticKeyOverride = item.id)
-                if (removed) surfaces.deleteDialogOpen = false
-            } finally {
-                // Cancellation must not leave the flag stuck true, which would
-                // disable deletion for this bubble's remember scope.
-                surfaces.deleteInFlight = false
-            }
-        }
-    }
-
-    fun reactWithEmoji(emoji: String) {
-        // Chokepoint guard: never react to a deleted message, whatever path
-        // (menu, emoji picker) called in — even if that surface was open when
-        // the delete landed.
-        if (deleted || actionsReadOnly) return
-        // Route via launchMutation: same survives-navigation rationale as delete/send.
-        val reactionOrigin = localReactionMotion.takeOrigin(emoji)
-        appState.launchMutation {
-            val target =
-                if (isPollRecord) {
-                    currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
-                } else {
-                    record
-                }
-            controller.toggleReaction(emoji, target, onLocalIntent = { added ->
-                localReactionMotion.accept(emoji, added, reactionOrigin)
-            }) {
-                !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
-            }
-        }
-    }
-
-    /** Copies the whole message as plain text, a poll as its question and options from the current row. */
-    fun copyMessageText() {
-        if (deleted) return
-        // Polls use the current question/options; ordinary messages copy the visible rendition.
-        val text =
-            if (isPollRecord) {
-                currentPollCopyText(controller, pollOwner, messageTextCopy)
-            } else {
-                visibleTranslation ?: displayedBody
-            }
-        text?.let { clipboard.setText(AnnotatedString(it)) }
-        onActionMenuOpenChange(false)
-    }
-
-    /** Captures display names and the conversation size alongside the rendered speech projection. */
-    suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
-        projectTtsSpeakableEntry(
-            message = entryRecord,
-            editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
-            senderDisplayName = appState.displayName(entryRecord.sender),
-            conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
-            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            mentionDisplayName = appState::mentionSpeechName,
+    val messageActions =
+        rememberMessageBubbleActions(
+            appState = appState,
+            controller = controller,
+            surfaces = surfaces,
+            pollOwner = pollOwner,
+            inputs =
+                MessageBubbleActions.Inputs(
+                    item = item,
+                    isPollRecord = isPollRecord,
+                    deleted = deleted,
+                    actionsReadOnly = actionsReadOnly,
+                    deleteCapability = deleteCapability,
+                    forwardPayload = forwardPayload,
+                    visibleTranslation = visibleTranslation,
+                    displayedBody = displayedBody,
+                    messageTextCopy = messageTextCopy,
+                    localReactionMotion = localReactionMotion,
+                    clipboard = clipboard,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onForwardMenuHandoff = onForwardMenuHandoff,
+                ),
         )
 
-    // Speak aloud reads from this message onward: catch-up listening is the
-    // point of the action, and Stop on the transport bar is one tap. The
-    // session takes auto-read ownership so messages arriving while it speaks
-    // continue the read. Falls back to just this bubble when its record has
-    // left the loaded timeline. When text is selected or the action menu was
-    // opened from a text selection, start at the containing visible sentence.
-    // A text press retains its rendered hit; genuine gutter/edge presses retain
-    // the deterministic message-top fallback without guessing a nearby glyph.
-
-    suspend fun speakFromHereEntries(literalCode: Boolean): List<TtsSpeakableEntry> =
-        ttsSpeakFromHereCandidates(timeline = controller.timeline, selected = record)
-            .mapNotNull { entryRecord -> ttsEntry(entryRecord) }
-            .mapIndexed { index, entry ->
-                if (index == 0 && literalCode) {
-                    entry.copy(speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode)
-                } else {
-                    entry
-                }
-            }
-
-    /** Starts from the selected sentence and preserves a specific start-gate explanation. */
-    fun startSpeakAloud(
-        startRenderedHit: RenderedTextHit? = null,
-        fallbackVisibleText: String? = null,
-        fallbackVisibleOffset: Int? = null,
-        literalCode: Boolean = false,
-        press: TtsLongPressStart? = null,
-    ) {
-        if (deleted) return
-        val owner = press ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
-        val canCommit = captureTtsLongPressGuard(owner, record, controller, appState)
-        if (!canCommit()) return
-        val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
-        val locale = java.util.Locale.getDefault()
-        appState.launchMutation {
-            val entries = speakFromHereEntries(literalCode)
-            if (!canCommit() || !projectionStillCurrent()) {
-                return@launchMutation
-            }
-            if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
-                appState.present(R.string.tts_bar_error)
-                return@launchMutation
-            }
-            val fallbackSentenceIndex =
-                if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
-                    0
-                } else {
-                    speakableSentenceIndexAtVisibleOffset(
-                        visibleText = fallbackVisibleText,
-                        speakableText = entries.first().text,
-                        visibleOffset = fallbackVisibleOffset,
-                        locale = locale,
-                    )
-                }
-            if (!appState.confirmTtsPlaybackTrust(canCommit)) return@launchMutation
-            val started =
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    locale,
-                    startSentenceIndex = fallbackSentenceIndex,
-                    startRenderedHit =
-                        startRenderedHit?.let {
-                            preparedHitFromRenderedHit(entries.first(), it)
-                        },
-                    backgroundPreparation = true,
-                    canCommit = canCommit,
-                )
-            if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
-        }
-    }
-
-    /** Starts read-aloud at the selected sentence, or at the long-pressed text when nothing is selected. */
-    fun speakFromHere() {
-        val layouts = textLayouts.selectableTextLayouts.snapshot()
-        val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
-        if (!selectionActive) {
-            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)
-            return
-        }
-        val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
-        val visibleOffset =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                visibleOffsetFromSelection(
-                    layouts = layouts,
-                    selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
-                )
-            }
-        val renderedHit =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                renderedTextHitFromSelection(
-                    layouts = layouts,
-                    selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
-                )
-            }
-        startSpeakAloud(
-            startRenderedHit = renderedHit,
-            fallbackVisibleText = visibleText,
-            fallbackVisibleOffset = visibleOffset,
+    val readAloud =
+        rememberMessageBubbleReadAloud(
+            appState = appState,
+            controller = controller,
+            inputs =
+                MessageBubbleReadAloud.Inputs(
+                    record = record,
+                    deleted = deleted,
+                    selectionMode = selectionMode,
+                    textSelectionMode = textSelectionMode,
+                    canSpeakAloud = canSpeakAloud,
+                    displayedBody = displayedBody,
+                    ttsSpeakableSource = ttsSpeakableSource,
+                    speakableProjection = speakableProjection,
+                    ttsProjectionResolver = ttsProjectionResolver,
+                    textLayouts = textLayouts,
+                    pressState = pressState,
+                    messageTextSelectionState = messageTextSelectionState,
+                    ttsLinkTapCoordinator = ttsLinkTapCoordinator,
+                    onTtsSentenceSeek = onTtsSentenceSeek,
+                ),
         )
-    }
-
-    fun seekActiveSentence(sentenceIndex: Int) {
-        when (
-            appState.ttsController.seekToSentence(
-                record.messageIdHex,
-                sentenceIndex,
-                speakableProjection?.projectionId,
-            )
-        ) {
-            TtsSeekResult.Repositioned,
-            TtsSeekResult.RepositionedAcrossMessages,
-            -> {
-                appState.ttsHistorySession.cancelPendingSeek()
-                ttsLinkTapCoordinator.cancelPendingActivation()
-                onTtsSentenceSeek(appState.ttsController.state.value)
-                return
-            }
-
-            TtsSeekResult.MessageNotInWindow -> {
-                if (appState.ttsHistorySession.requestSentenceSeek(
-                        record.messageIdHex,
-                        record.recordedAt,
-                        sentenceIndex,
-                        speakableProjection?.projectionId.orEmpty(),
-                    )
-                ) {
-                    ttsLinkTapCoordinator.cancelPendingActivation()
-                }
-            }
-            TtsSeekResult.SentenceOutOfRange,
-            TtsSeekResult.SessionInactive,
-            -> Unit
-        }
-    }
-
-    /** Seeks read-aloud to a tapped sentence through the history session when this message is not projected. */
-    fun seekRenderedSentenceOutsideCurrentProjection(
-        hit: RenderedTextHit,
-        allowOmittedLinkNeighbor: Boolean,
-    ) {
-        val account = controller.boundAccountRef
-        val owner =
-            appState.ttsHistorySession.conversationSource.value?.takeIf {
-                it.accountRef == account && it.groupIdHex == controller.group.groupIdHex
-            } ?: return
-        val runtimeGeneration = appState.runtimeGeneration
-        val expectedText = ttsSpeakableSource?.text
-        val canCommit = {
-            val live = controller.timeline.firstOrNull { it.record.messageIdHex == record.messageIdHex }
-            val source =
-                dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource(
-                    live?.record ?: record,
-                    controller.editsByTarget[record.messageIdHex]?.latestText,
-                )
-            val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == runtimeGeneration
-            val unavailable =
-                record.messageIdHex in controller.deletedMessageIds ||
-                    live?.projected?.deleted == true ||
-                    live?.projected?.invalidationStatus != null
-            sameOwner && !unavailable && source?.text == expectedText
-        }
-        if (!canCommit()) return
-        val accepted =
-            appState.ttsHistorySession.requestRenderedSentenceSeek(
-                record.messageIdHex,
-                record.recordedAt,
-                expectedSource = owner,
-                resolveTarget = {
-                    if (!canCommit()) return@requestRenderedSentenceSeek null
-                    val entry = ttsEntry(record) ?: return@requestRenderedSentenceSeek null
-                    val projection = entry.speakableProjection()
-                    dev.ipf.whitenoise.android.audio.tts.TtsRenderedSeekRequest(
-                        entry = entry,
-                        sentenceIndex = { prepared ->
-                            TtsHighlightProjectionResolver(projection, prepared)
-                                .sentenceIndexAtRenderedOffset(hit, allowOmittedLinkNeighbor)
-                        },
-                        canCommit = canCommit,
-                    )
-                },
-                onCommitted = { onTtsSentenceSeek(appState.ttsController.state.value) },
-            )
-        if (accepted) ttsLinkTapCoordinator.cancelPendingActivation()
-    }
-
-    /** Whether this conversation's read-aloud session is speaking, paused or preparing right now. */
-    fun ownsActiveReadAloud(): Boolean {
-        val activeState = appState.ttsController.state.value
-        val active =
-            activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing
-        return active && appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-    }
-
-    /** Seeks owned read-aloud to the double-tapped sentence, or starts reading there unless the tap hit a link. */
-    @Suppress("ComplexCondition", "ReturnCount")
-    fun seekSpeakAloudAt(pressInWindow: Offset) {
-        if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
-        val layouts = textLayouts.selectableTextLayouts.snapshot()
-        if (ownsActiveReadAloud()) {
-            val hit = renderedTextHitAtWindowPosition(layouts, pressInWindow)
-            val sentenceIndex =
-                hit?.let {
-                    ttsProjectionResolver?.sentenceIndexAtRenderedOffset(
-                        it,
-                        // Retain the established link double-tap coordination during playback.
-                        allowOmittedLinkNeighbor =
-                            markdownHasLinkAnnotationAt(
-                                textLayouts.markdownLinkLayouts.values,
-                                pressInWindow,
-                            ),
-                    )
-                }
-            if (sentenceIndex != null) {
-                seekActiveSentence(sentenceIndex)
-            } else if (ttsProjectionResolver == null && hit != null && !record.contentTokens.truncated) {
-                seekRenderedSentenceOutsideCurrentProjection(
-                    hit,
-                    markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow),
-                )
-            }
-            // An owned session must never be replaced merely because a hit is
-            // ambiguous, outside the queue window, or denied audio focus. A
-            // pending link remains armed and opens after its tap window.
-            return
-        }
-        // Outside playback, links retain their immediate activation and do
-        // not become a read-aloud gesture target.
-        if (markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow)) return
-        val renderedHit =
-            if (record.contentTokens.truncated) {
-                null
-            } else {
-                renderedTextHitAtWindowPosition(layouts, pressInWindow)
-            } ?: return
-        startSpeakAloud(renderedHit)
-    }
 
     val sentenceActionsEnabled =
         !deleted &&
@@ -1318,32 +1005,6 @@ internal fun MessageBubble(
                 )
             }
         }
-
-    /** Copies a link destination to the clipboard and closes the action menu. */
-    fun copyMarkdownLink(url: String) {
-        if (deleted) return
-        clipboard.setText(AnnotatedString(url))
-        onActionMenuOpenChange(false)
-    }
-
-    /** Enters text selection for this message with a cleared layout registry, closing the action menu. */
-    fun beginTextSelection() {
-        if (deleted) return
-        textLayouts.selectableTextLayouts.clear()
-        textLayouts.textSelectionSeeded = false
-        onActionMenuOpenChange(false)
-        onTextSelectionModeChange(true)
-    }
-
-    /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
-    fun beginForward() {
-        surfaces.forwardOrigin = null
-        if (deleted || actionsReadOnly || forwardPayload == null) return
-        // Keep the dimmed menu below the picker until its window is dismissed.
-        onForwardMenuHandoff()
-        surfaces.forwardSnapshot = forwardPayload
-        surfaces.forwardSheetOpen = true
-    }
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
     val bubbleMedia = rememberBubbleMedia(messageAttachments, pendingAttachmentsForRecord)
@@ -1411,26 +1072,6 @@ internal fun MessageBubble(
             !deleted &&
             record.sticker == null
 
-    /** Opens this message in the edit composer; reply and edit modes are mutually exclusive in the composer banner. */
-    fun beginEdit() {
-        if (deleted || actionsReadOnly) return
-        onActionMenuOpenChange(false)
-        controller.replyingTo = null
-        controller.beginMessageEdit(record.messageIdHex)
-    }
-
-    /**
-     * Whether a press lands on this bubble's rendered text rather than a link, the row's empty width or its
-     * chrome, so a double tap there may edit without stealing a link's own activation.
-     */
-    fun ordinaryTextHitAt(pressInWindow: Offset): Boolean =
-        !markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow) &&
-            renderedTextHitAtWindowPosition(
-                textLayouts.selectableTextLayouts.snapshot(),
-                pressInWindow,
-                requireTextLineHit = true,
-            ) != null
-
     /**
      * Double-tapping the ordinary text of your own editable message opens it for editing (#3388). While this
      * conversation's read-aloud session is active the same gesture keeps seeking there, and other messages seek or
@@ -1440,9 +1081,11 @@ internal fun MessageBubble(
         val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
         when {
             pressInWindow == null -> Unit
-            canEditMessage && !ownsActiveReadAloud() ->
-                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) beginEdit()
-            else -> seekSpeakAloudAt(pressInWindow)
+            canEditMessage && !readAloud.ownsActiveReadAloud() ->
+                if (recentPressesOnLink.none { it } && textSelection.ordinaryTextHitAt(pressInWindow)) {
+                    messageActions.beginEdit()
+                }
+            else -> readAloud.seekSpeakAloudAt(pressInWindow)
         }
     }
 
@@ -1462,7 +1105,7 @@ internal fun MessageBubble(
         when (action) {
             TtsQuickTransportAction.Pause -> appState.ttsController.pause()
             TtsQuickTransportAction.Resume -> appState.ttsController.resume()
-            TtsQuickTransportAction.StartReadingMessage -> startSpeakAloud()
+            TtsQuickTransportAction.StartReadingMessage -> readAloud.startSpeakAloud()
             TtsQuickTransportAction.Ignore -> Unit
         }
     }
@@ -1518,8 +1161,8 @@ internal fun MessageBubble(
             if (!gestureCurrent || !ownerCurrent) return
             if (!targetCurrent || replySwipeUnavailable) return
             when (if (direction < 0) leftSwipe else rightSwipe) {
-                SwipeAction.Reply -> beginReply()
-                SwipeAction.Forward -> beginForward()
+                SwipeAction.Reply -> messageActions.beginReply()
+                SwipeAction.Forward -> messageActions.beginForward()
                 SwipeAction.React -> {
                     onActionMenuOpenChange(false)
                     surfaces.emojiPickerOpen = true
@@ -1578,7 +1221,11 @@ internal fun MessageBubble(
                 MessageRowAction(stringResource(R.string.discard_failed_message), discardableSend) {
                     appState.launchMutation { controller.discardFailedSend(item) }
                 },
-                MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
+                MessageRowAction(
+                    stringResource(R.string.reply),
+                    !deleted && !actionsReadOnly,
+                    messageActions::beginReply,
+                ),
                 MessageRowAction(stringResource(R.string.message_react), !deleted && !actionsReadOnly) {
                     onActionMenuOpenChange(false)
                     surfaces.emojiPickerOpen = true
@@ -1586,15 +1233,19 @@ internal fun MessageBubble(
                 MessageRowAction(
                     stringResource(R.string.copy),
                     messageBubbleCanCopyText(item, deleted, persistedFailure, displayedBody, messageTextCopy),
-                    ::copyMessageText,
+                    messageActions::copyMessageText,
                 ),
                 MessageRowAction(
                     stringResource(R.string.forward),
                     !deleted && !actionsReadOnly && forwardPayload != null,
-                    ::beginForward,
+                    messageActions::beginForward,
                 ),
-                MessageRowAction(stringResource(R.string.delete), deleteCapability.canDeleteAtAll, ::requestDelete),
-                MessageRowAction(stringResource(R.string.info), !deleted, ::openInfoSheet),
+                MessageRowAction(
+                    stringResource(R.string.delete),
+                    deleteCapability.canDeleteAtAll,
+                    messageActions::requestDelete,
+                ),
+                MessageRowAction(stringResource(R.string.info), !deleted, messageActions::openInfoSheet),
                 MessageRowAction(stringResource(R.string.go_to_message), replyPreview != null) {
                     onReplyPreviewClick(item)
                 },
@@ -1723,7 +1374,7 @@ internal fun MessageBubble(
                                 pressState.initiatingMenuHoldActive = false
                                 val linkDestination = textLayouts.pendingLongPressLinkDestination[0]
                                 textLayouts.pendingLongPressLinkDestination[0] = null
-                                if (linkDestination != null) copyMarkdownLink(linkDestination)
+                                if (linkDestination != null) messageActions.copyMarkdownLink(linkDestination)
                             },
                             onDragStart = { position ->
                                 pressState.initiatingMenuHoldActive = false
@@ -2153,15 +1804,8 @@ internal fun MessageBubble(
                                 !hasMedia &&
                                 visibleTranslation == null,
                     ) { EmojiShortcodes.art(it, customEmoji, receivedEmoji.art) }
-                // Detached media keeps its own rounded Surface. When a caption
-                // is attached, each child delegates its corners and border to
-                // the shared frame so the result is one continuous message card.
-                // Download gating, footer overlays, viewers, and retry behavior
-                // remain owned by the media children.
-                // Long-press on any media tile opens the action menu (not the
-                // viewer); anchored to the bubble top like the accessibility
-                // long-click path. Hoisted so every media call site shares one
-                // definition.
+                // Captions share a frame with their media. Long presses open the
+                // message menu, anchored to the bubble as in the accessibility action.
                 val onMediaLongPress =
                     remember(
                         textSelectionMode,
@@ -2186,7 +1830,7 @@ internal fun MessageBubble(
                 //   fallbacks stay hidden because the attachment is already
                 //   visible in the same bubble.
                 // - Non-media: render displayedBody (covers reactions,
-                //   deletions, agent streams, plain text).
+                //   deletions, plain text).
                 val bodyTextToRender: String? =
                     visibleTranslation ?: messageBodyTextToRender(
                         displayedBody = displayedBody,
@@ -2245,6 +1889,15 @@ internal fun MessageBubble(
                     }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
+                val footerVoice =
+                    bubbleMedia.transcriptFooterVoice(
+                        showReceivedVoice = !mine && !deleted,
+                        footerAvailable = !bodyOrWarningInsideBubble && !fileFooterInCard && remoteGiphyMedia == null,
+                    )
+                val completedTranscript =
+                    footerVoice?.let {
+                        audioTranscription?.completedText(voiceTranscription, it.index, it.value.sourceEpoch)
+                    }
                 val soleCaptionedVisual =
                     if (bubbleMedia.hasConfirmedMedia) {
                         bubbleMedia.visuals.singleOrNull()?.value.takeIf {
@@ -2419,7 +2072,7 @@ internal fun MessageBubble(
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
                     composerSendMotion?.destinationLayout(item.presentationId, it)
                     textLayouts.plainTextLayoutTracker.layoutResult = it
-                    reportPlainTextLayoutIfReady()
+                    textSelection.reportPlainTextLayoutIfReady()
                 }
 
                 /** Wraps the message text in a selection container while text selection mode is active. */
@@ -2436,7 +2089,7 @@ internal fun MessageBubble(
                                         label = speakAloudLabel,
                                         systemReadAloudKeyIds = systemReadAloudKeyIds,
                                         onSpeak = {
-                                            speakFromHere()
+                                            readAloud.speakFromHere()
                                             onTextSelectionModeChange(false)
                                         },
                                     ),
@@ -2659,7 +2312,7 @@ internal fun MessageBubble(
                                     customBubbleColorActive = customBubbleColorActive,
                                     selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    onCopyMarkdownLink = messageActions::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
@@ -2697,6 +2350,7 @@ internal fun MessageBubble(
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
+                                contentModifier = Modifier.animateTranscriptFooter(footerVoice != null),
                                 media = {
                                     LookaheadScope {
                                         Column(
@@ -2729,14 +2383,12 @@ internal fun MessageBubble(
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
                                                 audioTranscription = audioTranscription,
+                                                transcriptFooterAttachment = footerVoice?.index,
                                             )
                                         }
                                     }
                                 },
                             ) {
-                                // No caption: the footer (time/status) for audio,
-                                // file, or multi-visual media still needs a home —
-                                // and so does the failed-send retry row.
                                 BubbleBodyFooterAndRetry(
                                     item = item,
                                     record = record,
@@ -2751,7 +2403,7 @@ internal fun MessageBubble(
                                     customBubbleColorActive = customBubbleColorActive,
                                     selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    onCopyMarkdownLink = messageActions::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
                                     onPlainTextLayout = onPlainTextLayout,
@@ -2775,6 +2427,7 @@ internal fun MessageBubble(
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
+                                    completedTranscript = completedTranscript,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
                                     onExpand = expandBody,
@@ -2833,7 +2486,7 @@ internal fun MessageBubble(
                             customBubbleColorActive = customBubbleColorActive,
                             selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                             markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
-                            onCopyMarkdownLink = ::copyMarkdownLink,
+                            onCopyMarkdownLink = messageActions::copyMarkdownLink,
                             deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                             plainTextSelectionModifier = plainTextSelectionModifier,
                             onPlainTextLayout = onPlainTextLayout,
@@ -2936,6 +2589,7 @@ internal fun MessageBubble(
                             translationNoticeOpen = true
                         }
                     },
+                    onTranscribe = audioTranscription?.takeUnless { deleted }?.menuAction(voiceTranscription),
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = !deleted && speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
@@ -2956,7 +2610,7 @@ internal fun MessageBubble(
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onEmojiUsed(emoji)
-                            reactWithEmoji(emoji)
+                            messageActions.reactWithEmoji(emoji)
                         }
                     },
                     onKeepOnScreen = {
@@ -2969,41 +2623,41 @@ internal fun MessageBubble(
                             surfaces.emojiPickerOpen = true
                         }
                     },
-                    onReply = ::beginReply,
-                    onEdit = ::beginEdit,
-                    onCopyText = ::copyMessageText,
+                    onReply = messageActions::beginReply,
+                    onEdit = messageActions::beginEdit,
+                    onCopyText = messageActions::copyMessageText,
                     onSpeak = {
-                        speakFromHere()
+                        readAloud.speakFromHere()
                         onActionMenuOpenChange(false)
                     },
                     onSpeakCodeLiterally = {
-                        startSpeakAloud(literalCode = true)
+                        readAloud.startSpeakAloud(literalCode = true)
                         onActionMenuOpenChange(false)
                     },
                     onShare = ::shareMessage,
                     onSave = ::saveAttachments,
-                    onSelectText = ::beginTextSelection,
-                    onForward = ::beginForward,
+                    onSelectText = textSelection::beginTextSelection,
+                    onForward = messageActions::beginForward,
                     onSelect = {
                         if (batchSelectable && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onToggleSelection()
                         }
                     },
-                    onInfo = ::openInfoSheet,
+                    onInfo = messageActions::openInfoSheet,
                     onInfoAt = { origin ->
-                        openInfoSheet()
+                        messageActions.openInfoSheet()
                         surfaces.infoOrigin = origin
                     },
                     onForwardAt = { origin ->
-                        beginForward()
+                        messageActions.beginForward()
                         surfaces.forwardOrigin = origin
                     },
                     onReport = {
                         onActionMenuOpenChange(false)
                         surfaces.reportSheetOpen = true
                     },
-                    onDelete = ::requestDelete,
+                    onDelete = messageActions::requestDelete,
                     mine = mine,
                     selectedReactionEmojis = reactionTallies.filter { it.mine }.mapTo(mutableSetOf()) { it.emoji },
                     previewDescription =
@@ -3091,7 +2745,8 @@ internal fun MessageBubble(
                             } else {
                                 null
                             }
-                        if (visiblePoll != null || (hasMedia && !bodyOrWarningInsideBubble)) {
+                        val mediaOnly = hasMedia && !bodyOrWarningInsideBubble && completedTranscript == null
+                        if (visiblePoll != null || mediaOnly) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
@@ -3142,6 +2797,7 @@ internal fun MessageBubble(
                                 mine = mine,
                                 text =
                                     bodyTextToRender
+                                        ?: completedTranscript
                                         ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
                                 document = displayedMarkdownDocument,
                                 time = rememberedMessageBubbleTime(record.recordedAt),
@@ -3225,7 +2881,7 @@ internal fun MessageBubble(
                             onEmojiPicked = { emoji ->
                                 surfaces.emojiPickerOpen = false
                                 if (pickingSlot == null) {
-                                    reactWithEmoji(emoji)
+                                    messageActions.reactWithEmoji(emoji)
                                 } else {
                                     surfaces.pickConfigureReaction(pickingSlot, emoji)
                                     surfaces.configureReactionSlot = null
@@ -3308,7 +2964,7 @@ internal fun MessageBubble(
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
                         onDismissRequest = { surfaces.infoSheetOpen = false },
                         onCopy = { value ->
-                            clipboard.setText(AnnotatedString(value))
+                            clipboard.copy(value)
                         },
                     )
                 }
@@ -3332,8 +2988,8 @@ internal fun MessageBubble(
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         deleteInFlight = surfaces.deleteInFlight,
-                        onDeleteForEveryone = ::performDeleteForEveryone,
-                        onDeleteForMe = ::performDeleteForMe,
+                        onDeleteForEveryone = messageActions::performDeleteForEveryone,
+                        onDeleteForMe = messageActions::performDeleteForMe,
                         onDismissRequest = { surfaces.deleteDialogOpen = false },
                     )
                 }
@@ -3356,7 +3012,7 @@ internal fun MessageBubble(
                         item = item,
                         controller = controller,
                         appState = appState,
-                        onRemoveOwnReaction = if (actionsReadOnly || deleted) null else ::reactWithEmoji,
+                        onRemoveOwnReaction = if (actionsReadOnly || deleted) null else messageActions::reactWithEmoji,
                         onDismissRequest = { surfaces.reactionSheetOpen = false },
                     )
                 }

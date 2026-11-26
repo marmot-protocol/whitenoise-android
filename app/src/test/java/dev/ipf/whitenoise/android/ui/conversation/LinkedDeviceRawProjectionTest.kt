@@ -6,15 +6,10 @@ import dev.ipf.marmotkit.ConversationReactionsFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.notifications.notificationUpdate
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
-import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.lookupMessageRecord
 import dev.ipf.whitenoise.android.state.notificationMessageRecord
-import dev.ipf.whitenoise.android.state.timelineMessageFromProjection
-import dev.ipf.whitenoise.android.state.timelineRecord
-import dev.ipf.whitenoise.android.state.updateStreamPreview
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -38,30 +33,6 @@ class LinkedDeviceRawProjectionTest : PollMessageTestFixtures() {
     @Before fun bindRoster() = runTest { pollController.retryMembers() }
 
     @After fun clearController() = pollController.onCleared()
-
-    /** Chunk replacement and an early synthetic preview both keep the actual sender’s received provenance. */
-    @Test
-    fun streamedRowsKeepSiblingAndPeerDistinct() {
-        val mine = requireNotNull(pollController.boundAccountIdHex)
-        for ((stream, author) in listOf("sibling" to mine, "peer" to "other")) {
-            val record =
-                timelineRecord(stream, 1uL).copy(
-                    sender = author,
-                    groupIdHex = pollController.group.groupIdHex,
-                    kind = 1200uL,
-                    tags = listOf(MessageProjector.streamTag(stream)),
-                )
-            pollController.timelineRecords[stream] = record
-            pollController.updateStreamPreview(stream, "first", MessageStatus.Streaming)
-            val first = pollController.timeline.single { it.id == "stream:$stream" }
-            assertEquals(author == mine, first.fromOtherOwnDevice)
-            retain(pollController.timelineMessageFromProjection(record))
-            pollController.updateStreamPreview(stream, "second", MessageStatus.Streaming)
-            val second = pollController.timeline.single { it.id == "stream:$stream" }
-            assertEquals("second", second.record.plaintext)
-            assertEquals(author == mine, second.fromOtherOwnDevice)
-        }
-    }
 
     /** The same invalidated raw event cannot supply either notification artwork/content or a reaction deep link. */
     @Test

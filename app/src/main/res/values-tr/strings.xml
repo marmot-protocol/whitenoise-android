@@ -85,7 +85,7 @@
     <string name="refresh">Yenile</string>
     <string name="retry">Tekrar dene</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
-    <string name="sign_in">Giriş Yap</string>
+    <string name="sign_in">Giriş yap</string>
     <string name="sign_in_secret_key_help">Bu cihazda mevcut bir kimliği kullanmak için Nostr gizli anahtarınızı girin.</string>
     <string name="nostr_nsec">Özel anahtarınızı girin</string>
     <string name="back">Geri dön</string>
@@ -105,6 +105,9 @@
         <item quantity="other">%1$d aktif filtre</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Tümünü temizle</string>
+    <string name="chat_list_search_recent">Son açılanlar</string>
+    <string name="chat_list_search_recent_clear">Temizle</string>
+    <string name="chat_list_search_recent_remove">Son açılanlardan kaldır</string>
     <string name="chat_list_search_filter_chat">Sohbetler</string>
     <string name="chat_list_search_filter_sender">Gönderenler</string>
     <string name="chat_list_search_filter_date">Tarih</string>
@@ -167,20 +170,19 @@
     <string name="leave_and_delete_message">Bu gruptan ayrılıp geçmişini bu cihazdan silmek istiyor musunuz?</string>
     <string name="toast_left_chat_delete_failed">Gruptan ayrıldınız. Yerel silme başarısız.</string>
     <string name="group_reset_action">Sıfırla ve yeni davet bekle</string>
-    <string name="group_reset_dialog_title">Bu grup bu cihazda sıfırlansın mı?</string>
-    <string name="group_reset_dialog_message">White Noise bu grubun geçmişini ve şifreleme durumunu yalnızca bu cihazda siler. Gruba hiçbir şey gönderilmez. Yalnızca bir yönetici bu sıfırlamadan sonra oluşturulmuş yeni bir davet gönderdiğinde yeniden katılırsınız.</string>
+    <string name="group_reset_dialog_title">Bu grup sıfırlansın mı?</string>
+    <string name="group_reset_dialog_message">Grubun geçmişi ve şifreleme durumu bu cihazda silinir. Hiçbir şey gönderilmez. Yeniden katılmak için bir yöneticinin sıfırlamadan sonra oluşturduğu yeni bir davet gerekir.</string>
     <string name="group_reset_confirm">Sıfırla</string>
     <string name="toast_group_reset_done">Grup sıfırlandı. Yeni bir davet geldiğinde yeniden görünecek.</string>
     <string name="toast_group_reset_already_waiting">Bu grup zaten yeni bir davet bekliyor.</string>
     <string name="toast_couldnt_reset_group">Grup sıfırlanamadı. Tekrar deneyin.</string>
-    <string name="chat_abandon_dialog_title">Bu sohbet bu cihazdan silinsin mi?</string>
-    <string name="chat_abandon_dialog_message">Burada siler ve yeni mesajları durdurur. Hiçbir şey gönderilmez.</string>
+    <string name="chat_abandon_dialog_title">Bu sohbet silinsin mi?</string>
+    <string name="chat_abandon_dialog_message">Sohbet bu cihazdan silinir ve yeni mesajlar alınmaz. Hiçbir şey gönderilmez.</string>
     <string name="chat_abandon_confirm">Bırak</string>
     <string name="abandon_identity_chat">Sohbet: %1$s</string>
     <string name="abandon_identity_group">Grup: %1$s</string>
-    <string name="abandon_identity_account">Hesabınız: %1$s</string>
     <string name="chats_abandon_action">Sohbetleri bu cihazda bırak</string>
-    <string name="chats_abandon_dialog_title">Seçili sohbetler bu cihazda bırakılsın mı?</string>
+    <string name="chats_abandon_dialog_title">Bu cihazdaki sohbetlerden vazgeçilsin mi?</string>
     <string name="toast_chat_already_abandoned">Bu sohbet bu cihazdan zaten silindi.</string>
     <string name="leave_blocked_abandon_hint_dm">Ayrılma tamamlanmadı. Bunun yerine bu sohbeti bu cihazdan silebilirsiniz. Diğer kişiye hiçbir şey gönderilmez.</string>
     <string name="leave_blocked_abandon_hint_group">Ayrılma tamamlanmadı. Bunun yerine bu grubu bu cihazda sıfırlayabilirsiniz. Gruba hiçbir şey gönderilmez.</string>
@@ -436,8 +438,6 @@
     <string name="message_actions">Mesaj eylemleri</string>
     <string name="message_reply_quote_description">Yanıtlanan: %1$s, %2$s</string>
     <string name="message_deleted_preview">Mesaj silindi</string>
-    <string name="agent_stream_started">Ajan akışı başlatıldı</string>
-    <string name="stream_finished">Akış bitti</string>
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
@@ -451,8 +451,6 @@
     <string name="giphy_preview_loading">Önizleme yükleniyor</string>
     <string name="giphy_preview_unavailable">Önizleme kullanılamıyor</string>
     <string name="giphy_send_result">GIF gönder: %1$s</string>
-    <string name="waiting_for_stream">Akış bekleniyor...</string>
-    <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>
     <string name="select_text">Metin seç</string>
     <string name="open_emoji_picker">Emoji seçiciyi aç</string>
@@ -666,7 +664,7 @@
     <string name="link_confirm_title">Harici bağlantıyı aç?</string>
     <string name="link_confirm_open">Aç</string>
     <string name="camera_access_required">QR kodlarını taramak için cihaz ayarlarınızda kamera erişimini etkinleştirin.</string>
-    <string name="allow_camera">Kameraya İzin Ver</string>
+    <string name="allow_camera">Kameraya izin ver</string>
     <string name="camera_lifecycle_unavailable">Tarayıcıda bir hata oluştu. Lütfen tekrar deneyin.</string>
     <string name="camera_unavailable">Tarayıcıda bir hata oluştu. Lütfen tekrar deneyin.</string>
     <string name="preview">Önizleme</string>
@@ -1034,7 +1032,7 @@
     <string name="notification_background_on">Arka plan bağlantısı açık.</string>
     <string name="notification_background_off">Arka plan bağlantısı kapalı.</string>
     <string name="notification_categories_detail">Android ses, titreşim ve önemi kategori başına ayarlar.</string>
-    <string name="chat_with_support">Destek ile sohbet</string>
+    <string name="chat_with_support">White Noise ekibiyle konuş</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Açık</string>
@@ -1112,7 +1110,6 @@
     <string name="message_status_sent">Gönderildi</string>
     <string name="message_status_received">Alındı</string>
     <string name="message_status_failed">Başarısız</string>
-    <string name="message_status_streaming">Aktarılıyor</string>
     <string name="toast_notification_account_unavailable">Bu hesap artık kullanılamıyor</string>
     <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_draft_save_failed">Taslak kaydedilemedi.</string>
@@ -1520,9 +1517,18 @@
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_90_days">3 ay</string>
     <string name="disappearing_custom">Özel süre</string>
-    <string name="disappearing_days_format">%1$d gün</string>
-    <string name="disappearing_hours_format">%1$d saat</string>
-    <string name="disappearing_minutes_format">%1$d dakika</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d saat</item>
+        <item quantity="other">%d saat</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d dakika</item>
+        <item quantity="other">%d dakika</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Dakika</string>
     <string name="disappearing_unit_hours">Saat</string>
     <string name="disappearing_unit_days">Gün</string>
@@ -1563,7 +1569,10 @@
     <string name="disappearing_5_minutes">5 dakika</string>
     <string name="disappearing_30_seconds">30 saniye</string>
     <string name="disappearing_explainer">Okunmamış gelen mesajların süresi, onları okuduğunuzda başlar. Diğer yeni mesajlar seçtiğiniz süre sonunda herkes için kalıcı olarak silinir.</string>
-    <string name="disappearing_seconds_format">%1$d saniye</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d saniye</item>
+        <item quantity="other">%d saniye</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Saniye</string>
     <string name="disappearing_set">Ayarla</string>
     <string name="disappearing_custom_decrease">Kısalt</string>
@@ -1608,20 +1617,20 @@
     <string name="collapse_long_messages_subtitle">Bu sohbetteki uzun mesajların önizlemesini gösterir.</string>
     <string name="search_members">Üye ara</string>
     <string name="recent_chats">Son sohbetler</string>
-    <string name="onboarding_login">Giriş Yap</string>
+    <string name="onboarding_login">Giriş yap</string>
     <string name="onboarding_login_with_amber">Amber ile giriş yap</string>
     <string name="onboarding_continue_as">%1$s olarak devam et</string>
     <string name="onboarding_offline_setup_message">İnternet bağlantısı yok. Wi-Fi, mobil veri veya başka bir ağ üzerinden bağlanıp tekrar deneyin.</string>
     <string name="toast_couldnt_login_amber">Amber ile giriş yapılamadı</string>
     <string name="amber_identity_already_added">Bu hesap White Noise uygulamasına zaten eklenmiş. Hesap değiştiriciden seçin.</string>
     <string name="toast_amber_sign_in_cancelled">Amber girişi iptal edildi</string>
-    <string name="onboarding_sign_up">Kayıt Ol</string>
+    <string name="onboarding_sign_up">Kayıt ol</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
-    <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş Yap\'a dokunun.</string>
-    <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş yap\'a dokunun.</string>
     <string name="sign_in_error_setup_unexpected_state">Beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Hiçbir şey değiştirilmedi.</string>
     <string name="sign_in_error_setup_recovery_declined">Kurtarma iptal edildi. Hiçbir şey değiştirilmedi.</string>
-    <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş yap\'a dokunun.</string>
     <string name="sign_in_error_setup_recovery_unexpected_state">Kurtarmadan sonra beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Kurtarmanın bir kısmı zaten uygulanmış olabilir.</string>
     <string name="sign_in_recovery_title">Bu hesap kurtarılsın mı?</string>
     <string name="sign_in_recovery_message">Kurulum tamamlanmadı. Kurtarma işlemi bunu temizler ve yeniden oturum açmayı dener. Daha önce yayımlanmış davet anahtarları rölelerde kalabilir.</string>
@@ -2124,8 +2133,8 @@
     <string name="setup_action_retry">Yeniden dene</string>
     <string name="setup_action_continue_without">Şimdi değil</string>
     <string name="setup_action_use_recommended_relays">Aktarıcı kurulumunu düzelt</string>
-    <string name="setup_action_edit_relays">Aktarıcıları incele</string>
-    <string name="setup_action_remove_unusable_relays">Kullanılamayan aktarıcıları kaldır</string>
+    <string name="setup_action_edit_relays">Röleleri incele</string>
+    <string name="setup_action_remove_unusable_relays">Kullanılamayan röleleri kaldır</string>
     <string name="setup_action_edit_profile">Profili düzenle</string>
     <string name="setup_action_edit_follows">Takipleri düzenle</string>
     <string name="setup_action_approve_repair">Değişiklikleri kaydet</string>
@@ -2141,6 +2150,7 @@
     <string name="setup_finding_retired_relay">Bu röle kullanımdan kaldırılmış.</string>
     <string name="setup_finding_unsafe_relay">Bu röle adresini kullanmak güvenli değil.</string>
     <string name="setup_finding_unreachable">Bu röleye ulaşılamadı.</string>
+    <string name="setup_relay_timeout_title">Bir röle zamanında yanıt vermedi</string>
     <string name="setup_finding_timed_out">Bu kontrol zaman aşımına uğradı.</string>
     <string name="setup_finding_authentication_required">Bu röle kimlik doğrulaması gerektiriyor.</string>
     <string name="setup_finding_payment_required">Bu röle ödeme gerektiriyor.</string>
@@ -2158,6 +2168,26 @@
     <string name="setup_details">Ayrıntılar</string>
     <string name="setup_hide_details">Ayrıntıları gizle</string>
     <string name="setup_opening_chats">Sohbetleriniz açılıyor…</string>
+    <string name="setup_purpose_relays">Diğer Nostr uygulamaları profilinizi ve gönderilerinizi bu röleler aracılığıyla bulur.</string>
+    <string name="setup_purpose_inbox_relays">Gelen kutusu röleleri, insanların size sohbet davetleri gönderdiği yerdir.</string>
+    <string name="setup_purpose_key_package">Mesajlaşma anahtarları, başkalarının sizinle şifreli sohbet başlatmasını sağlar.</string>
+    <string name="setup_problem_check_incomplete">Bazı röleler yanıt vermedi, bu yüzden bu kontrol tamamlanamadı.</string>
+    <string name="setup_problem_no_usable_route">Bu listedeki röleler kullanılamadı.</string>
+    <string name="setup_problem_check_failed">Bu kontrol tamamlanamadı.</string>
+    <string name="setup_problem_unusable">Bu hesabın listesi bu haliyle kullanılamaz.</string>
+    <string name="setup_problem_save_refused">Son röle kontrolü tamamlanamadı. Değişiklikleriniz kaydedilmedi ve yayımlanmadı.</string>
+    <string name="setup_problem_save_not_published">Değişiklikleriniz kaydedilmedi ve yayımlanmadı.</string>
+    <string name="setup_problem_save_record_changed">Röle listesi değiştiği için değişiklikleriniz kaydedilmedi. Hiçbir şey yayımlanmadı.</string>
+    <string name="setup_problem_publication_failed">Değişikliğin yayımlanması tamamlanamadı.</string>
+    <string name="setup_problem_keys_failed">Mesajlaşma anahtarlarınız yayımlanamadı.</string>
+    <string name="setup_next_retry">Yeniden deneyin.</string>
+    <string name="setup_next_retry_then_review">Yeniden deneyin. İşe yaramazsa önerilen değişiklikleri inceleyin.</string>
+    <string name="setup_next_retry_then_edit">Yeniden deneyin. İşe yaramazsa rölelerinizi düzenleyin.</string>
+    <string name="setup_next_review">Önerilen değişiklikleri inceleyin. Siz kaydedene kadar hiçbir şey yayımlanmaz.</string>
+    <string name="setup_next_edit">Rölelerinizi düzenleyin. Siz kaydedene kadar hiçbir şey yayımlanmaz.</string>
+    <string name="setup_next_remove">Hizmet dışı röleyi kaldırın. Siz kaydedene kadar hiçbir şey yayımlanmaz.</string>
+    <string name="setup_next_remove_unusable">Kullanılamayan röleleri kaldırın. Siz kaydedene kadar hiçbir şey yayımlanmaz.</string>
+    <string name="setup_passed_warning">Kurulum devam etti, ancak bu rölelerde bir sorun oluştu.</string>
     <string name="unnamed_group">Adsız grup</string>
     <string name="conversation_unavailable">Sohbet kullanılamıyor</string>
     <string name="onboarding_recover_setup_title">Oturum açma kurulumu kurtarılsın mı?</string>
@@ -2244,7 +2274,7 @@
     <string name="app_unlock_checking">Uygulama koruması kontrol ediliyor…</string>
     <string name="support_contact_title">White Noise Destek</string>
     <string name="support_contact_subtitle">Sorular, sorunlar ve öneriler</string>
-    <string name="support_contact_explainer">Soru sorun, sorun bildirin veya öneride bulunun.</string>
+    <string name="support_contact_explainer">White Noise’u geliştiren ekibe soru sor, sorun bildir veya geri bildirim gönder.</string>
     <string name="support_relays_attention">Profil aktarıcıları dikkat gerektiriyor</string>
     <string name="support_open_relays">Aktarıcıları Aç</string>
     <string name="support_relays_review">Bu profilin alıcı aktarıcı listesini inceleyin.</string>
@@ -2268,8 +2298,8 @@
     <string name="signup_profile_incomplete_title">Profil değişiklikleri tamamlanmadı</string>
     <string name="signup_leave_profile_detail">Kimliğiniz korunacak. Bu profil değişiklikleri eksik olabilir; profilinizi daha sonra düzenleyebilirsiniz.</string>
     <string name="signup_continue_without_profile">Bu değişiklikler olmadan devam et</string>
-    <string name="qr_camera_access_needed">Kamera Erişimi Gerekiyor</string>
-    <string name="qr_private_key_permission_detail">Özel Anahtar QR kodunu taramak için kamera erişimine izin verin.</string>
+    <string name="qr_camera_access_needed">Kamera erişimi gerekiyor</string>
+    <string name="qr_private_key_permission_detail">Özel anahtar QR kodunu taramak için kamera erişimine izin verin.</string>
     <string name="qr_turn_flashlight_on">El fenerini aç</string>
     <string name="qr_turn_flashlight_off">El fenerini kapat</string>
     <string name="startup_loading_message">White Noise başlatılıyor…</string>
@@ -2305,6 +2335,12 @@
     <string name="new_message_no_results_detail">Yazımı kontrol edin veya farklı bir arama yapmayı deneyin.</string>
     <string name="new_message_chat_created">Sohbet oluşturuldu</string>
     <string name="new_message_open_chat">Sohbeti aç</string>
+    <string name="group_setup_customize">Grubu özelleştir</string>
+    <string name="group_setup_hide_customization">Özelleştirme seçeneklerini gizle</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d üye seçildi</item>
+        <item quantity="other">%d üye seçildi</item>
+    </plurals>
     <string name="group_setup_title">Grubu Kur</string>
     <string name="group_create_action">Grup Oluştur</string>
     <string name="group_add_photo">Fotoğraf Ekle</string>
@@ -2445,6 +2481,8 @@
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_incompatible_key_package">Bu kişinin sohbet anahtarı uyumlu değil. White Noise’u güncelleyip açmasını isteyin, ardından tekrar deneyin.</string>
     <string name="error_incompatible_key_package_for">%1$s adlı kişinin sohbet anahtarı uyumlu değil. White Noise’u güncelleyip açmasını isteyin, ardından tekrar deneyin.</string>
+    <string name="new_message_copy_inbox_instructions">Talimatları kopyala</string>
+    <string name="new_message_inbox_instructions">White Noise’ta seninle sohbet başlatamadım. White Noise ayarlarında gelen kutusu rölelerini kontrol edip ne zaman tekrar deneyebileceğimi söyler misin?</string>
     <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_invite_welcome_too_large">Bu davet, bir alıcının gelen kutusu röleleri için çok büyük. Daha büyük mesajları kabul eden bir gelen kutusu rölesi eklemesini isteyin.</string>

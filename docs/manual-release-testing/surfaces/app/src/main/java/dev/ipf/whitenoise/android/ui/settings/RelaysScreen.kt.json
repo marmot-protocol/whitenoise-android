@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Authored emoji prompt: RelaysScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "RelayDetailsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
         "anchor": "fun RelayDetailsScreen(",
@@ -56,16 +48,6 @@
         "surface": "string:add_relay",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
         "anchor": "R.string.add_relay",
-        "test_ids": [
-          "SYS-001",
-          "SYS-002",
-          "SYS-003"
-        ]
-      },
-      {
-        "surface": "string:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
-        "anchor": "R.string.cancel",
         "test_ids": [
           "SYS-001",
           "SYS-002",

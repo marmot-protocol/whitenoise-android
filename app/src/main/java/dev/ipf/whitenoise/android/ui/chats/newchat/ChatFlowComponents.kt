@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -21,8 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -41,15 +35,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
-import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
@@ -59,7 +48,6 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /** The new-chat flows' search field. */
 @Composable
@@ -72,20 +60,21 @@ internal fun FlowSearchField(
     onScanQr: (() -> Unit)? = null,
     clipboardInput: ((String?) -> String?)? = null,
 ) {
-    val shape = RoundedCornerShape(28.dp)
-    TextField(
+    WhiteNoiseCompactSearchField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-        trailingIcon = {
+        placeholder = placeholder,
+        outlined = true,
+        keyboardOptions = RecipientSearchKeyboardOptions,
+        clearDescription = stringResource(R.string.clear),
+        emptyTrailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PublicIdentifierFieldTrailingAction(
                     value = value,
                     clipboardInput = clipboardInput,
                     onValueChange = onValueChange,
                 )
-                if (value.isEmpty() && onScanQr != null) {
+                if (onScanQr != null) {
                     IconButton(onClick = onScanQr) {
                         Icon(
                             painterResource(R.drawable.ic_qr_code_scanner),
@@ -95,151 +84,11 @@ internal fun FlowSearchField(
                 }
             }
         },
-        singleLine = true,
-        shape = shape,
-        colors =
-            TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
-        keyboardOptions =
-            KeyboardOptions(
-                capitalization = KeyboardCapitalization.None,
-                autoCorrectEnabled = false,
-                imeAction = ImeAction.Search,
-            ),
         modifier =
             modifier
                 .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
-                .fillMaxWidth()
-                .amoledSurfaceBorder(shape),
+                .fillMaxWidth(),
     )
-}
-
-/**
- * Renders a reusable person row while keeping relationship and selection states independent.
- *
- * [isFollowed] adds the followed-person avatar badge and exports the localized `You follow`
- * state once from the row. [selectionState] remains separate so multi-select pickers can expose
- * selected and followed at the same time without making the badge look like a selection control.
- * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
- * [avatarDomain] is the worker domain that decodes [avatarUrl], single-use unless the caller names one: a person
- * row passes [dev.ipf.whitenoise.android.core.AvatarImageLoader.publicProfiles], a group row its presentation's.
- * [publicKey] is the person's complete canonical npub: when the subtitle, or with [publicKeyInTitle] the nameless
- * title, displays that key, its own text copies the whole value while the row keeps its action (#3565).
- * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying,
- * and then the key takes its own keyboard focus, since the disabled row cannot.
- */
-@Composable
-@Suppress("FunctionNaming", "LongMethod")
-internal fun ContactRow(
-    title: String,
-    subtitle: String?,
-    avatarSeed: String,
-    avatarUrl: String?,
-    avatarImage: ImageBitmap? = null,
-    avatarAnimationKey: String? = null,
-    isFollowed: Boolean = false,
-    selectionState: Boolean? = null,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null,
-    publicKey: String? = null,
-    publicKeyInTitle: Boolean = false,
-    publicKeyCopyEnabled: Boolean = enabled,
-    trailing: (@Composable () -> Unit)? = null,
-    titleMaxLines: Int = 1,
-    groupAnimation: GroupAvatarAnimation? = null,
-    secondaryContent: (@Composable () -> Unit)? = null,
-    avatarDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
-        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
-) {
-    val followedStateDescription =
-        if (isFollowed) {
-            stringResource(R.string.user_search_you_follow)
-        } else {
-            null
-        }
-    val rowRole = if (selectionState == null) Role.Button else Role.Checkbox
-    // The key takes its own focus stop only when the row offers none, so a selectable row keeps one stop.
-    val keyFocusable = publicKeyCopyEnabled && (onClick == null || !enabled)
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .let {
-                    if (onClick != null && onLongClick != null) {
-                        it.combinedClickable(
-                            enabled = enabled,
-                            role = rowRole,
-                            onLongClick = onLongClick,
-                            onClick = onClick,
-                        )
-                    } else if (onClick != null) {
-                        it.clickable(
-                            enabled = enabled,
-                            role = rowRole,
-                            onClick = onClick,
-                        )
-                    } else {
-                        it
-                    }
-                }.recipientRelationshipSemantics(followedStateDescription, selectionState)
-                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
-    ) {
-        Box(modifier = Modifier.size(48.dp)) {
-            Avatar(
-                title = title,
-                seed = avatarSeed,
-                size = 48.dp,
-                pictureUrl = avatarUrl?.takeIf { avatarImage == null },
-                picture = avatarImage,
-                animationKey = avatarAnimationKey,
-                groupAnimation = groupAnimation,
-                pictureDomain = avatarDomain,
-            )
-            if (isFollowed) {
-                FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))
-            }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            if (publicKey != null && publicKeyInTitle) {
-                PublicKeyCopyText(
-                    title,
-                    publicKey,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = titleMaxLines,
-                    enabled = publicKeyCopyEnabled,
-                    keyboardFocusable = keyFocusable,
-                )
-            } else {
-                EmojiLabel(
-                    title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = titleMaxLines,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (subtitle != null) {
-                ContactRowSubtitle(
-                    subtitle,
-                    stateOnly = followedStateDescription != null && subtitle == followedStateDescription,
-                    publicKey = publicKey?.takeUnless { publicKeyInTitle },
-                    enabled = publicKeyCopyEnabled,
-                    keyboardFocusable = keyFocusable,
-                )
-            }
-            secondaryContent?.invoke()
-        }
-        trailing?.invoke()
-    }
 }
 
 @Composable
@@ -279,22 +128,6 @@ internal fun ResolvingContactRow(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-internal fun SectionHeader(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(start = Dimens.spaceLg, end = Dimens.spaceLg, top = Dimens.spaceLg, bottom = Dimens.spaceSm),
-    )
 }
 
 /**
@@ -471,7 +304,6 @@ internal fun FlowQuickActionRow(
     modifier: Modifier = Modifier,
     iconContentDescription: String? = null,
     enabled: Boolean = true,
-    penFlightIndex: Int? = null,
 ) {
     Row(
         modifier =
@@ -486,7 +318,6 @@ internal fun FlowQuickActionRow(
         Box(
             modifier =
                 Modifier
-                    .then(penFlightIndex?.let { Modifier.penFlightBubble(it) } ?: Modifier)
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -497,7 +328,6 @@ internal fun FlowQuickActionRow(
         Text(
             title,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = penFlightIndex?.let { Modifier.penFlightLabel(it) } ?: Modifier,
         )
     }
 }
@@ -519,25 +349,21 @@ internal fun NewMessageQuickActions(
         title = stringResource(R.string.new_group),
         onClick = onNewGroup,
         modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
-        penFlightIndex = 0,
     )
     FlowQuickActionRow(
         icon = ImageVector.vectorResource(R.drawable.ic_share),
         title = stringResource(R.string.invite_friends),
         onClick = onInviteFriends,
-        penFlightIndex = 1,
     )
     FlowQuickActionRow(
         icon = ImageVector.vectorResource(R.drawable.ic_qr_code_scanner),
         title = stringResource(R.string.scan_qr_code),
         onClick = onScanQr,
-        penFlightIndex = 2,
     )
     FlowQuickActionRow(
         icon = ImageVector.vectorResource(R.drawable.ic_settings_qr_code_2),
         title = showMyQrLabel,
         onClick = onShowMyQr,
         enabled = showMyQrEnabled,
-        penFlightIndex = 3,
     )
 }

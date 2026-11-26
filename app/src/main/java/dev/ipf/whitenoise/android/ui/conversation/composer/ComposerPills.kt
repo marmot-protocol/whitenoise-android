@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -86,6 +87,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -116,18 +118,13 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -149,8 +146,12 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
-import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleThickness
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleWidth
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationSettingsMotion
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsGrip
+import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsOutline
 import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
@@ -161,7 +162,7 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -182,8 +183,6 @@ private val ComposerOutlineThickness = 1.dp
 
 // The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
 // reads as chrome rather than content.
-private val ComposerResizeHandleWidth = 32.dp
-private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 48.dp
 
 /** Interpolates one layout-space distance without allocating an animation object. */
@@ -325,6 +324,8 @@ internal fun ComposerPill(
     hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
+    // Shortcodes whose artwork is ready; the owner passes the same set to its edit repair.
+    emojiPainters: Map<String, Painter> = rememberComposerEmojiPainters(textFieldValue.text),
     // Mention chips share the send button's colours: the exact account accent with readable content.
     // Required so a caller cannot silently fall back to the default accent.
     actionColors: AccountActionColors,
@@ -358,6 +359,7 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    accessoryTopInset: Dp = ComposerResizeStripHeight,
     sendingIdentity: (@Composable (Modifier) -> Unit)? = null,
     toolbar: ComposerToolbarBindings? = null,
     toolbarHeightLimit: Dp = ComposerToolbarMaximumHeight,
@@ -465,91 +467,16 @@ internal fun ComposerPill(
                 }
             }
         }
-    // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
-    // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
-    // while keeping the backing TextFieldValue canonical for send/markdown.
-    // A filled chip with black-or-white content reads on any accent, including ones that vanish as text.
-    val chipColor = actionColors.container
-    val chipContentColor = actionColors.content
-    val mentionCandidateLookup =
-        remember(highlightMentionChips, mentionCandidates) {
-            if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
-        }
-    val mentionComposition = textFieldValue.composition
+    val emojiCodes = emojiPainters.keys.toSet()
+    val emojiRanges = remember(textFieldValue, emojiCodes) { activeComposerEmojiRanges(textFieldValue, emojiCodes) }
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor, chipContentColor, mentionCandidateLookup, mentionComposition) {
-            if (!highlightMentionChips) {
-                VisualTransformation.None
-            } else {
-                VisualTransformation { text ->
-                    // #607: the chip renderer must never crash the composer. The
-                    // primary fix (MentionComposer.repairChipDeletion in
-                    // onValueChange) makes a partial `@npub1…` chip state
-                    // impossible, but degrade gracefully — fall back to the
-                    // untransformed text — if any unforeseen malformed input
-                    // state still drives buildAnnotatedString / the offset
-                    // mapping out of bounds, rather than letting it throw.
-                    runCatching {
-                        val visual = MentionComposer.editingVisualText(text.text, mentionCandidateLookup)
-                        // Legacy BasicTextField reports the IME's composing-character
-                        // bounds through CursorAnchorInfo. A shortened mention label can
-                        // map both ends of a non-empty composing range inside the stored
-                        // `@npub...` to the same visible offset; Compose then forwards an
-                        // empty range to fillBoundingBoxes and crashes. Keep the canonical
-                        // text and identity mapping only for that transient composition.
-                        // Friendly mention labels return as soon as the IME commits it.
-                        val compositionCollapses =
-                            mentionComposition?.takeUnless { it.collapsed }?.let { composition ->
-                                visual.originalToTransformed(composition.min) >=
-                                    visual.originalToTransformed(composition.max)
-                            } == true
-                        if (compositionCollapses) {
-                            return@runCatching TransformedText(text, OffsetMapping.Identity)
-                        }
-                        val visualLength = visual.text.length
-                        val styled =
-                            buildAnnotatedString {
-                                append(visual.text)
-                                visual.ranges.forEach { range ->
-                                    // Clamp span bounds into the transformed text
-                                    // so a stale/oversized range can't trip
-                                    // addStyle's range check.
-                                    val spanStart = range.transformed.first.coerceIn(0, visualLength)
-                                    val spanEnd = (range.transformed.last + 1).coerceIn(spanStart, visualLength)
-                                    if (spanEnd > spanStart) {
-                                        addStyle(
-                                            SpanStyle(
-                                                color = chipContentColor,
-                                                fontWeight = FontWeight.Medium,
-                                                background = chipColor,
-                                            ),
-                                            spanStart,
-                                            spanEnd,
-                                        )
-                                    }
-                                }
-                            }
-                        val offsetMapping =
-                            object : OffsetMapping {
-                                /** Maps the source caret into the bounded mention-chip text. */
-                                override fun originalToTransformed(offset: Int): Int =
-                                    visual
-                                        .originalToTransformed(offset)
-                                        .coerceIn(0, visualLength)
-
-                                /** Maps chip selections into the current source draft bounds. */
-                                override fun transformedToOriginal(offset: Int): Int =
-                                    visual
-                                        .transformedToOriginal(offset)
-                                        .coerceIn(0, text.text.length)
-                            }
-                        TransformedText(styled, offsetMapping)
-                    }.getOrElse {
-                        TransformedText(text, OffsetMapping.Identity)
-                    }
-                }
-            }
-        }
+        rememberComposerVisualTransformation(
+            highlightMentionChips,
+            mentionCandidates,
+            actionColors,
+            textFieldValue.composition,
+            emojiRanges,
+        )
     val transformedText =
         remember(textFieldValue.text, mentionVisualTransformation) {
             mentionVisualTransformation.filter(AnnotatedString(textFieldValue.text))
@@ -1345,6 +1272,7 @@ internal fun ComposerPill(
     ) {
         val sourceFill = MaterialTheme.colorScheme.surfaceContainerHigh
         val sourceBorder = MaterialTheme.colorScheme.outlineVariant
+        val sourceShape = RoundedCornerShape(Radii.xl)
         SideEffect {
             sendMotion?.sourceFill = sourceFill
             sendMotion?.sourceBorder = sourceBorder
@@ -1355,27 +1283,29 @@ internal fun ComposerPill(
         val morphing = LocalComposerFabHandoff.current?.active == true
         val nativePreview =
             if (toolbarPreview) {
+                val settingsMotion = LocalConversationSettingsMotion.current
+                val reportPreview = remember(settingsMotion) { settingsMotion?.let { it::reportComposerPreview } }
                 dev.ipf.whitenoise.android.ui.settings
                     .rememberSettingsNativeSurface(
                         destination = "composer.editor",
                         surface = "composer.editor.preview",
                         fill = sourceFill,
-                        shape = RoundedCornerShape(24.dp),
+                        shape = sourceShape,
                         strokeColor = sourceBorder,
+                        onMeasured = reportPreview,
                     ).first
             } else {
-                // Composer settings open from this outline and fold back into it.
-                Modifier.settingsMorphAnchorOutline(
-                    ConversationMorphAnchor.Composer,
-                    RoundedCornerShape(24.dp),
+                Modifier.conversationSettingsOutline(
+                    sourceShape,
+                    sourceFill,
                     sourceBorder,
                     ComposerOutlineThickness,
+                    hasGrip = inputContentVisible,
                 )
             }
         Surface(
             color = if (morphing) Color.Transparent else sourceFill,
-            // Custom clipping owns motion; settled chrome remains the original Material surface.
-            shape = if (morphing) RectangleShape else RoundedCornerShape(24.dp),
+            shape = if (morphing) RectangleShape else sourceShape,
             border = if (morphing) null else BorderStroke(ComposerOutlineThickness, sourceBorder),
             modifier =
                 Modifier
@@ -1432,14 +1362,12 @@ internal fun ComposerPill(
                 }
                 Column(modifier = Modifier.then(expandedHeightModifier)) {
                     if (accessoryContent != null) {
-                        Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
                         Box(
                             Modifier
+                                .onSizeChanged { onAccessoryHeightChanged(with(density) { it.height.toDp() }) }
+                                .padding(top = accessoryTopInset)
                                 .boundedComposerAccessory()
-                                .onSizeChanged { size ->
-                                    // Accessories insert 12dp beyond the ordinary editor padding in either layout.
-                                    onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
-                                }.fadingVerticalScroll(rememberScrollState()),
+                                .fadingVerticalScroll(rememberScrollState()),
                         ) {
                             accessoryContent()
                         }
@@ -1737,7 +1665,7 @@ internal fun ComposerPill(
                                                 } else {
                                                     false
                                                 }
-                                            },
+                                            }.composerEmojiArtwork(emojiPainters) { textLayoutSnapshot?.result },
                                     textStyle = composerTextStyle,
                                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                     visualTransformation = mentionVisualTransformation,
@@ -2109,14 +2037,6 @@ internal fun ComposerPill(
     }
 }
 
-/** Keeps accessory overflow scrollable while reserving at least half the finite viewport for input. */
-private fun Modifier.boundedComposerAccessory(): Modifier =
-    layout { measurable, constraints ->
-        val limit = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
-        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = limit))
-        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-    }
-
 /** The grip marks the parent-owned drag region without intercepting child controls. */
 @Composable
 @Suppress("FunctionNaming")
@@ -2135,6 +2055,7 @@ private fun ComposerResizeGestureStrip(modifier: Modifier = Modifier) {
                 .offset(y = (ComposerOutlineThickness - ComposerResizeHandleThickness) / 2)
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
                 .composerFabGrip()
+                .conversationSettingsGrip()
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outlineVariant)
                 .testTag(COMPOSER_RESIZE_HANDLE_TAG),

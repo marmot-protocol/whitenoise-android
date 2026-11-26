@@ -13,4 +13,16 @@
     <string name="shared_content_partial">尚未載入相符的附件</string>
     <string name="shared_content_page_failed">無法載入共享內容，請重試。</string>
     <string name="shared_content_history_end">已到本機附件記錄結尾</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="other">已選取 %1$d 張相片</item>
+    </plurals>
+    <string name="shared_media_select_photo">選取相片</string>
+    <string name="shared_media_cancel_selection">取消選取</string>
+    <string name="shared_media_share_selected_photos">分享所選相片</string>
+    <string name="shared_media_photo_from">來自 %1$s 的相片</string>
+    <string name="shared_media_video_not_selectable">影片，無法選取</string>
+    <string name="shared_media_share_photos_failed">無法分享相片</string>
+    <string name="shared_media_share_photos_unavailable">部分所選相片已無法使用，因此未分享任何內容。這些相片已取消選取。請再試一次。</string>
+    <string name="shared_media_share_photos_too_large">這些相片太大，無法一次分享。請少選一些後再試一次。</string>
+    <string name="shared_media_jump_to_date">跳至日期</string>
 </resources>

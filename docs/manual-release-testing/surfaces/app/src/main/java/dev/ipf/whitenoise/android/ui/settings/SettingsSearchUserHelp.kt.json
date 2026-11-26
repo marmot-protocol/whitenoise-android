@@ -1,0 +1,24 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "R.string.learn_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
+        "anchor": "R.string.learn_white_noise",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-071"
+        ]
+      }
+    ]
+  }
+}

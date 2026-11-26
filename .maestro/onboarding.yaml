@@ -14,13 +14,13 @@ name: Welcome, sign in, and return
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - assertVisible: "Private key"
-- assertNotVisible: "Sign Up"
+- assertNotVisible: "Sign up"
 - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - assertNotVisible: "Private key"
 - takeScreenshot: welcome-returned

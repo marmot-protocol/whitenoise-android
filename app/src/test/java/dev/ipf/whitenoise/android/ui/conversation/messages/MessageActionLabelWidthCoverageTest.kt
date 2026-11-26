@@ -46,8 +46,9 @@ class MessageActionLabelWidthCoverageTest {
     fun normalScaleKeepsEveryLabelOnOneLineInTwoColumns() {
         render(fontScale = 1f)
 
-        assertEquals("Keep on screen pairs with Edit", cell("Keep on screen").top, cell("Edit").top, 0.5f)
-        assertTrue("Keep on screen gets the wider column", cell("Keep on screen").width > cell("Edit").width)
+        assertEquals("Keep on screen pairs with Save", cell("Keep on screen").top, cell("Save").top, 0.5f)
+        assertTrue("Keep on screen gets the second column", cell("Keep on screen").left > cell("Save").left)
+        assertEquals("which is as wide as its widest label", cell("Edit").width, cell("Keep on screen").width, 0.5f)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped", 1, labelLines(it)) }
     }
 
@@ -57,13 +58,15 @@ class MessageActionLabelWidthCoverageTest {
         render(fontScale = 1f)
 
         val cells = MAXIMUM_LABELS.map(::cell)
+        // The tagged stack bounds are already inside its 16dp padding.
         val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val gridWidth = cells.maxOf { it.right } - cells.minOf { it.left }
-        val stackContentWidth = stack.width - with(composeRule.density) { 32.dp.toPx() }
-        assertTrue(
-            "the grid $gridWidth must stay narrower than the stack $stackContentWidth",
-            gridWidth < stackContentWidth,
-        )
+        assertTrue("the grid $gridWidth must stay narrower than the stack ${stack.width}", gridWidth < stack.width)
+        // Fewer actions is an ordinary last cell in the next free slot; starting a row, it may run past its
+        // column but never past the grid.
+        val fewer = cell("Fewer actions")
+        assertEquals("Fewer actions keeps its column's start", cell("Reply").left, fewer.left, 0.5f)
+        assertTrue("and stays inside the grid", fewer.right <= cells.maxOf { it.right } + 0.5f)
     }
 
     /** A larger text scale first uses spare width: every label still fits one line at 130%. */
@@ -110,7 +113,7 @@ class MessageActionLabelWidthCoverageTest {
 
         val columnWidth = with(composeRule.density) { (560.dp - 32.dp).toPx() }
         val cells = MAXIMUM_LABELS.map(::cell)
-        assertEquals("two columns at 300% on a wide window", cell("Keep on screen").top, cell("Edit").top, 0.5f)
+        assertEquals("two columns at 300% on a wide window", cell("Keep on screen").top, cell("Save").top, 0.5f)
         assertTrue("the panel outgrows the column", cells.maxOf { it.right } - cells.minOf { it.left } > columnWidth)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped on a wide window", 1, labelLines(it)) }
         val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).boundsInRoot()
@@ -144,7 +147,7 @@ class MessageActionLabelWidthCoverageTest {
     fun rightToLeftMirrorsTheLabelSizedColumns() {
         render(fontScale = 1f, layoutDirection = LayoutDirection.Rtl)
 
-        assertTrue("the first action sits on the right", cell("Keep on screen").left > cell("Edit").left)
+        assertTrue("the first action sits on the right", cell("Reply").left > cell("Edit").left)
         MAXIMUM_LABELS.forEach { assertEquals("$it wrapped in RTL", 1, labelLines(it)) }
     }
 
@@ -231,7 +234,8 @@ class MessageActionLabelWidthCoverageTest {
                 }
             }
         }
-        composeRule.waitForIdle()
+        // Measure the full action set, whose longest labels wait behind More actions (#4077).
+        composeRule.messageAction("Select text")
     }
 
     private companion object {

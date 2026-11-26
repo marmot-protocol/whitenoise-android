@@ -9,7 +9,6 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -260,14 +259,6 @@ class WindowApplyPreparationTest {
                             } else {
                                 null
                             },
-                        kind = if (index % 23 == 0) 1200uL else record.kind,
-                        tags =
-                            if (index % 23 == 0) {
-                                listOf(MessageProjector.streamTag("stream-$index"))
-                            } else {
-                                record.tags
-                            },
-                        agentTextStreamJson = if (index % 23 == 0) "{\"status\":\"started\"}" else null,
                     )
                 }
             val snapshot =
@@ -313,7 +304,6 @@ class WindowApplyPreparationTest {
                 assertTrue(prepared.rows.any { it.record.edit != null })
                 assertTrue(prepared.rows.any { it.record.deleted })
                 assertTrue(prepared.rows.any { it.record.clientToken != null })
-                assertTrue(prepared.rows.any { it.record.agentTextStreamJson != null })
                 assertEquals(replacement.map { it.messageIdHex }, prepared.rows.map { it.actionRecord.messageIdHex })
             } finally {
                 dispatcher.close()
@@ -336,7 +326,8 @@ class WindowApplyPreparationTest {
             kind = 9uL,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            replyToMessageIdHex = null,
+            thread = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,

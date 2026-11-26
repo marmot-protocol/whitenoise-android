@@ -1,10 +1,40 @@
-# Serial Android merge queue
+# Android merge queue
 
-A serial GitHub merge queue tests the reviewed PR against the current `master`
-while preserving the source heads of remaining PRs. Up to five reviewed
-PRs can queue: one active front and four waiting entries. One candidate is built
-and merged at a time. After a merge, the next front needs fresh qualification
-against its new base and integration commit while keeping its source head.
+The GitHub merge queue on `master` builds up to three entries at once and merges
+one at a time (squash, `ALLGREEN`, minimum one entry, no grouping wait, 120-minute
+check timeout). Each entry is tested on top of `master` and every entry ahead of
+it, so it is the combination that must pass. When an entry fails or no longer
+merges cleanly, it leaves the queue and the entries behind it rebuild without
+it. Its author rebases, fixes and requeues it.
+
+Most queue failures come from PRs that passed alone but clash with what lands
+ahead of them: textual conflicts, screenshot baselines made stale by a shared
+UI change, and the source file size ratchet. Before queueing, rebase onto the
+current `master`, re-record affected screenshots and check the combination with
+the entries already queued. Queue overlapping UI series one PR at a time.
+
+## Planning overlapping PRs
+
+The advisory `PR merge order` workflow checks a pull request when it opens,
+gets new commits, changes base or review state, including drafts. It compares
+changed paths across open PRs targeting `master` and tries cumulative squash
+merges from a pinned base. Open **Actions** and select the **PR merge order** run
+named for the PR number. Its summary shows the longest clean order it found and
+the conflict paths for any PR that should wait. When several orders can land the
+same number of PRs, it prefers ready PRs, then lower PR numbers.
+
+The scan includes up to 100 open PRs. Each plan includes the triggering PR and
+up to four direct overlaps, with shared app code and Roborazzi baselines taking
+priority. The summary lists any coverage limits. While the workflow runs, a
+change to the selected candidates triggers one new simulation on the same base.
+Unrelated PR changes do not invalidate the plan. After a preceding PR lands
+or a peer branch moves, rerun `PR merge order` from the Actions tab on
+`master` with the relevant PR number to refresh the plan.
+
+Use the recommendation to agree on the landing order before queueing. If a PR
+should wait, update it from `master` after the recommended series lands.
+The workflow checks Git conflicts. Queue CI validates combined behavior,
+screenshot baselines and the source file size limits.
 
 ## CI contract
 
@@ -29,6 +59,10 @@ The existing required aggregate check remains
 `Compile, test, ktlint, detekt, Android lint`.
 
 ## Authorization contract
+
+The serial authorization below is not active. The live ruleset requires only
+the Android aggregate check, and the policy's serial configuration (one entry
+built at a time) no longer matches the queue. The text records the design.
 
 `scripts/whitenoise_android_serial_queue.py` is the pure policy used by the
 external watchdog. It computes the next action; the adapter supplies

@@ -23,7 +23,6 @@ class CompareTimelineMessagesTest {
         recordedAt: ULong,
         order: ULong,
         authoritativeOrder: ULong? = null,
-        displayAfterMessageIdHex: String? = null,
     ) = TimelineMessage(
         id = id,
         record =
@@ -52,7 +51,6 @@ class CompareTimelineMessagesTest {
         status = MessageStatus.Received,
         timelineOrder = order,
         authoritativeOrder = authoritativeOrder,
-        displayAfterMessageIdHex = displayAfterMessageIdHex,
     )
 
     /** A total fallback comparator produces the same result for every input permutation. */
@@ -115,32 +113,6 @@ class CompareTimelineMessagesTest {
         assertEquals(
             listOf("mdk-first", "mdk-second", "overlay"),
             orderTimelineMessagesForDisplay(listOf(overlay, mdkSecond, mdkFirst)).map { it.id },
-        )
-    }
-
-    /** Durable stream children stay under their prompt instead of crossing an MDK-ranked event. */
-    @Test
-    fun displayOrderAnchorsDurableStreamChainBelowAuthoritativePrompt() {
-        val membership = msg("membership", recordedAt = 200uL, order = 0uL, authoritativeOrder = 0uL)
-        val prompt = msg("prompt", recordedAt = 100uL, order = 0uL, authoritativeOrder = 1uL)
-        val start =
-            msg(
-                "start",
-                recordedAt = 100uL,
-                order = 1uL,
-                displayAfterMessageIdHex = "prompt",
-            )
-        val final =
-            msg(
-                "final",
-                recordedAt = 100uL,
-                order = 2uL,
-                displayAfterMessageIdHex = "start",
-            )
-
-        assertEquals(
-            listOf("membership", "prompt", "start", "final"),
-            orderTimelineMessagesForDisplay(listOf(final, prompt, membership, start)).map { it.id },
         )
     }
 }

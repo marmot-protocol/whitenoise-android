@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 internal const val CONVERSATION_TOP_BAR_TAG = "conversation-top-bar"
 
@@ -268,7 +269,7 @@ internal fun ConversationTopBar(
                                     Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(Radii.md))
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(
                                             Explanation(
@@ -302,6 +303,7 @@ internal fun ConversationTopBar(
                                         durableAvatarIsPersonPicture =
                                             selectedAssetIsPersonPicture ||
                                                 avatarSource?.avatarSource?.isPeerSourced() == true,
+                                        followedAccount = presentedAvatarAccount?.takeIf { controller.isDm },
                                     )
                                 }
                                 Column(
@@ -456,7 +458,7 @@ private fun HeaderTimerBadge(
             Modifier
         } else {
             Modifier
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(Radii.sm))
                 .clickable(
                     onClickLabel = stringResource(R.string.conversation_header_timer_change),
                     role = Role.Button,

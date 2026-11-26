@@ -31,6 +31,14 @@
         ]
       },
       {
+        "surface": "string:storage_automatic_cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_automatic_cleanup",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
         "surface": "string:storage_calculating",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
         "anchor": "R.string.storage_calculating",
@@ -112,14 +120,6 @@
         ]
       },
       {
-        "surface": "string:storage_keep_media_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
-        "anchor": "R.string.storage_keep_media_help",
-        "test_ids": [
-          "SET-047"
-        ]
-      },
-      {
         "surface": "string:storage_largest_attachments",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
         "anchor": "R.string.storage_largest_attachments",
@@ -193,14 +193,6 @@
         ]
       },
       {
-        "surface": "string:storage_removal_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
-        "anchor": "R.string.storage_removal_help",
-        "test_ids": [
-          "SET-050"
-        ]
-      },
-      {
         "surface": "string:storage_remove_older",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
         "anchor": "R.string.storage_remove_older",
@@ -254,6 +246,14 @@
         "surface": "R.string.explanation_privacy_storage_remove_older",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
         "anchor": "R.string.explanation_privacy_storage_remove_older",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.storage_removal_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_removal_help",
         "test_ids": [
           "SET-055"
         ]

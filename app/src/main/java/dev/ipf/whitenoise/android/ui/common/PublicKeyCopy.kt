@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import android.os.Build
-import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -12,11 +12,13 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -24,13 +26,10 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
@@ -49,6 +48,8 @@ private const val BECH32_POLYMOD_MASK = 0x1ffffff
 private const val BECH32_ACCUMULATOR_MASK = 0xfff
 private const val BYTE_MASK = 0xff
 private val BECH32_GENERATORS = intArrayOf(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+private const val PUBLIC_KEY_REVEAL_START_ALPHA = 0.65f
+private const val PUBLIC_KEY_REVEAL_DURATION_MILLIS = 160
 private const val MIN_ABBREVIATION_HEAD = 8
 private const val MIN_ABBREVIATION_TAIL = 4
 private val ELLIPSIS_PATTERN = Regex("…|\\.\\.\\.")
@@ -134,14 +135,31 @@ internal fun abbreviatesPublicKey(
     return npub.isNotBlank() && value.isNotEmpty() && (value == npub || abbreviation)
 }
 
+/** Reflow immediately, then fade in the grouped text without animating parent layout constraints. */
+@Composable
+internal fun Modifier.animatePublicKeyExpansion(expanded: Boolean): Modifier {
+    val opacity = remember { Animatable(1f) }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            opacity.snapTo(PUBLIC_KEY_REVEAL_START_ALPHA)
+            opacity.animateTo(1f, tween(durationMillis = PUBLIC_KEY_REVEAL_DURATION_MILLIS))
+        } else {
+            opacity.snapTo(1f)
+        }
+    }
+    return graphicsLayer { alpha = opacity.value }
+}
+
 /**
- * A compact public-key [label] whose own text copies the complete canonical [npub] (#3565). The tap belongs to the
- * label alone, so a surrounding row keeps its navigation, selection or account-switch action, and a long press is
- * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
- * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
- * [enabled], it is plain text. With [keyboardFocusable] — for a row with no action of its own, or a disabled one —
- * the label becomes its own focus stop with the theme's focus highlight, Enter, D-pad centre or Space copies the key,
- * and its widened touch margin still copies, since no row action owns that margin.
+ * A compact public-key [label] that copies the complete canonical [npub]. The label never grows into the full key:
+ * it sits in list rows, chips, menus and dialogs that have no room for a grouped key, so a caller with full content
+ * width reveals the whole key in its own layout through [onExpand]. The tap belongs to the label, so a surrounding
+ * row keeps navigation, selection or account switching, and a long press is left to the row. The label adds no
+ * semantics boundary: its short text stays in the row's spoken label, and the row gains a Copy public key action
+ * whose label carries the full key. Without a canonical [npub], or while not [enabled], it is plain text. With
+ * [keyboardFocusable] — for a row with no action of its own, or a disabled one — the label becomes its own focus stop
+ * with the theme's focus highlight, Enter, D-pad centre or Space copies the key, and its widened touch margin still
+ * copies, since no row action owns that margin.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -154,8 +172,13 @@ internal fun PublicKeyCopyText(
     maxLines: Int = 1,
     enabled: Boolean = true,
     keyboardFocusable: Boolean = false,
+    onExpand: (() -> Unit)? = null,
 ) {
     val copy = rememberPublicKeyCopy(npub)
+    val copyAndExpand: () -> Unit = {
+        copy()
+        onExpand?.invoke()
+    }
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
     val focusInteractions = remember { MutableInteractionSource() }
     Text(
@@ -163,12 +186,13 @@ internal fun PublicKeyCopyText(
         modifier =
             if (enabled && isCanonicalNpub(npub)) {
                 modifier
-                    .pointerInput(npub, keyboardFocusable) { copyOnShortTap(copy, keepTouchMargin = keyboardFocusable) }
-                    .then(
+                    .pointerInput(npub, keyboardFocusable) {
+                        copyOnShortTap(copyAndExpand, keepTouchMargin = keyboardFocusable)
+                    }.then(
                         if (keyboardFocusable) {
                             Modifier
                                 .indication(focusInteractions, ripple())
-                                .copyOnKeyActivation(copy, focusInteractions)
+                                .copyOnKeyActivation(copyAndExpand, focusInteractions)
                         } else {
                             Modifier
                         },
@@ -176,7 +200,7 @@ internal fun PublicKeyCopyText(
                         customActions =
                             listOf(
                                 CustomAccessibilityAction(copyLabel) {
-                                    copy()
+                                    copyAndExpand()
                                     true
                                 },
                             )
@@ -235,20 +259,11 @@ private suspend fun PointerInputScope.copyOnShortTap(
 }
 
 /**
- * Copies [npub] to the clipboard. Android 13 and later confirm clipboard writes themselves; older supported releases
- * get the app's localized Copied toast, as other compact copy sites do.
+ * Copies the latest [npub] through the shared clipboard copier.
  */
 @Composable
 private fun rememberPublicKeyCopy(npub: String): () -> Unit {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
+    val copier = rememberClipboardCopier()
     val current by rememberUpdatedState(npub)
-    return remember(clipboard, context) {
-        {
-            clipboard.setText(AnnotatedString(current))
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+    return remember(copier) { { copier.copy(current) } }
 }

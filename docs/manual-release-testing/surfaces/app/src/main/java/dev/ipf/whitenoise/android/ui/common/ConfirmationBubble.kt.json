@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmationBubble.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AnchoredConfirmationBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmationBubble.kt",
+        "anchor": "fun AnchoredConfirmationBubble(",
+        "test_ids": [
+          "CON-034",
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "ConfirmationBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmationBubble.kt",
+        "anchor": "fun ConfirmationBubble(",
+        "test_ids": [
+          "CON-034",
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "BubbleNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmationBubble.kt",
+        "anchor": "fun BubbleNotice(",
+        "test_ids": [
+          "CON-034",
+          "AXY-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

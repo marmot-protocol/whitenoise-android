@@ -24,13 +24,59 @@
         ]
       },
       {
-        "surface": "string:back",
+        "surface": "Shared top bar: contact picker",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
-        "anchor": "R.string.back",
+        "anchor": "WhiteNoiseTopBar(",
         "test_ids": [
           "NCH-001",
           "NCH-003",
           "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:recipient_search_empty_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.recipient_search_empty_hint",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:user_search_searching",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_searching",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:user_search_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_failed",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:user_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_incomplete",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
         ]
       }
     ],
@@ -44,6 +90,30 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "Contact picker Back disabled while busy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "navigationEnabled = !busy",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "Contact picker list position drives the bar tint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": ".trackWhiteNoiseHeader(listState)",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "Share user picker leads with Close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "navigation: WhiteNoiseTopBarNavigation",
+        "test_ids": [
+          "MED-013"
         ]
       }
     ]

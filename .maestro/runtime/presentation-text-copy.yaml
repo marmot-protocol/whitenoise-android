@@ -5,6 +5,6 @@ name: presentation-text-copy
 - assertVisible: Maestro document first line.*
 - assertVisible: Copy text
 - tapOn: Copy text
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

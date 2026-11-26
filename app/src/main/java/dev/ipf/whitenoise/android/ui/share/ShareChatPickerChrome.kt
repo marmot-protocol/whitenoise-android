@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,15 +30,9 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-
-/** Emits the picker's dismiss action through a close control with a localized accessibility label. */
-@Composable
-internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
-    }
-}
 
 /**
  * Summarizes the pending share without changing its payload. [compact] limits
@@ -55,7 +48,7 @@ internal fun ShareChatPickerPreview(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
@@ -111,7 +104,7 @@ internal fun ChatPickerSendingAccountRow(
         onClick = { if (multipleAccounts) onOpenSelector() },
         enabled = multipleAccounts,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         border = amoledSurfaceBorderStroke(),
         modifier = modifier.testTag(testTag),
     ) {
@@ -175,13 +168,11 @@ internal fun ShareChatPickerAccountIdentity(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            PublicKeyCopyText(
                 appState.shortNpub(account.accountIdHex),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
+                appState.npubForDisplay(account.accountIdHex),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -36,24 +37,27 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.loadAccountRelayLists
-import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
-import dev.ipf.whitenoise.android.ui.chats.newchat.newMessagePenOrigin
+import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPenDialogMotion
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
+import dev.ipf.whitenoise.android.ui.keyboard.KeyboardShortcut
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingControlShown
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.settings.settingsPenSource
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -66,14 +70,23 @@ internal fun chatsFabNeedsRelays(lists: AccountRelayListsFfi?): Boolean {
     return relayState == SupportRelayState.Missing
 }
 
-/** Plain prototype FAB keeps actual native configuration and the existing New Message/Relays owners. */
+internal data class NewMessageFlowLaunch(
+    val origin: Rect?,
+    val pen: MeasuredPenDialogMotion? = null,
+)
+
+/**
+ * The FAB opens New Message or receiving-relay recovery using their existing owners. Ctrl+N takes the same New
+ * Message path while the FAB offers it.
+ */
 @Suppress("FunctionNaming", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun ChatsNewMessageFab(
     appState: WhiteNoiseAppState,
     onNewMessage: () -> Unit,
     loadRelays: suspend (String) -> AccountRelayListsFfi? = appState::loadAccountRelayLists,
-    onNewMessageOrigin: (Rect?) -> Unit = {},
+    onNewMessageOrigin: (MeasuredPenDialogMotion?) -> Unit = {},
+    hidePen: () -> Boolean = { false },
 ) {
     val account = appState.activeAccountRef
     val runtime = appState.runtimeGeneration
@@ -88,6 +101,7 @@ internal fun ChatsNewMessageFab(
         return active && sameOwner && available
     }
     var missing by remember(appState, account, runtime) { mutableStateOf(false) }
+    var relaysChecked by remember(appState, account, runtime) { mutableStateOf(false) }
     var relayOpening by remember(appState, account, runtime) { mutableStateOf<Any?>(null) }
     var refresh by remember(appState, account, runtime) { mutableIntStateOf(0) }
     LaunchedEffect(appState, account, runtime, refresh) {
@@ -100,22 +114,45 @@ internal fun ChatsNewMessageFab(
             } catch (_: Exception) {
                 null
             }
-        if (current()) missing = chatsFabNeedsRelays(result)
+        if (current()) {
+            missing = chatsFabNeedsRelays(result)
+            relaysChecked = true
+        }
     }
     var relayOrigin by remember(appState, account, runtime) { mutableStateOf<Rect?>(null) }
     var fabBounds by remember { mutableStateOf<Rect?>(null) }
-    val penFlight = LocalNewMessagePenFlight.current
-    val motionAllowed = rememberSystemAnimationsEnabled()
-    ChatsNewMessageFabContent(missing, onBounds = {
-        fabBounds = it
-    }, onClick = {
+    val scheme = MaterialTheme.colorScheme
+    val penSurface =
+        with(LocalDensity.current) {
+            ControlMorphSurface(scheme.surfaceContainerHigh, scheme.outlineVariant, 16.dp.toPx(), 1.dp.toPx(), 1f)
+        }
+    // Ctrl+N takes the button's own path, only while the button is shown and its relay check found New Message
+    // usable, so a key cannot skip the Check relays state. A shown button is waiting during its check (#4005).
+    val shown = LocalFloatingControlShown.current && current()
+    KeyboardShortcut(
+        HardwareShortcutCommand.NewMessage,
+        available = shown && relaysChecked && !missing,
+        waiting = shown && !relaysChecked,
+    ) {
+        // Rechecked when the key arrives, as a tap is, since the owner can change before the next composition.
+        if (current() && relaysChecked && !missing) {
+            onNewMessageOrigin(null)
+            onNewMessage()
+        }
+    }
+    ChatsNewMessageFabContent(missing, onBounds = { fabBounds = it }, hidePen = hidePen, onClick = {
         if (current()) {
             if (missing) {
                 relayOrigin = fabBounds
                 relayOpening = Any()
             } else {
-                penFlight?.launchFromPen(motionAllowed)
-                onNewMessageOrigin(fabBounds)
+                onNewMessageOrigin(
+                    fabBounds?.let { bounds ->
+                        MeasuredPenDialogMotion(SurfaceMorphSource(bounds, penSurface)) {
+                            current() && !missing && fabBounds == bounds
+                        }
+                    },
+                )
                 onNewMessage()
             }
         }
@@ -147,8 +184,6 @@ internal fun ChatsNewMessageFab(
     }
 }
 
-internal object ChatsPenMorphAnchor : dev.ipf.whitenoise.android.ui.settings.SettingsMorphAnchor
-
 /**
  * Composer-colored edit/warning button, with adaptive pane placement and matching composer chrome.
  */
@@ -157,6 +192,7 @@ internal object ChatsPenMorphAnchor : dev.ipf.whitenoise.android.ui.settings.Set
 internal fun ChatsNewMessageFabContent(
     missingRelays: Boolean,
     onBounds: (Rect) -> Unit = {},
+    hidePen: () -> Boolean = { false },
     onClick: () -> Unit,
 ) {
     if (!LocalControlHandoffEndpointCurrent.current) {
@@ -166,8 +202,9 @@ internal fun ChatsNewMessageFabContent(
     // Keep the compact home pen on its bottom action baseline under current insets.
     // The measured handoff retains the source rectangle for the morph.
     val view = LocalView.current
-    val outline =
-        if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val penFill = MaterialTheme.colorScheme.surfaceContainerHigh
+    val outline = if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, outlineVariant)
     val finishControlMorph = LocalFinishControlMorph.current
     val morphing = !missingRelays && LocalComposerFabHandoff.current?.active == true
     BoxWithConstraints {
@@ -177,18 +214,9 @@ internal fun ChatsNewMessageFabContent(
                 .padding(end = paneInset)
                 .offset(y = if (missingRelays) 0.dp else 16.dp - ComposerOuterVerticalPadding)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
-                .newMessagePenOrigin()
-                .then(
-                    if (!missingRelays) {
-                        Modifier.settingsMorphAnchorOutline(
-                            ChatsPenMorphAnchor,
-                            FloatingActionButtonDefaults.shape,
-                            MaterialTheme.colorScheme.outlineVariant,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ).onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
+                .onGloballyPositioned { onBounds(it.motionBoundsOnScreen(view)) }
+                .settingsPenSource(!missingRelays, 16.dp, penFill, outlineVariant)
+                .drawWithContent { if (missingRelays || !hidePen()) drawContent() }
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)

@@ -50,7 +50,7 @@ class ConversationDiscardFailedSendTest {
                     calls += Triple(account, group, message)
                     result(DiscardFailedSendOutcomeFfi.DISCARDED, listOf("AB12"))
                 }
-            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            controller.testApplyLiveTimelineChanges(
                 listOf(TimelineMessageChangeFfi.Remove(FAILED, TimelineRemoveReasonFfi.CLEARED)),
             )
 

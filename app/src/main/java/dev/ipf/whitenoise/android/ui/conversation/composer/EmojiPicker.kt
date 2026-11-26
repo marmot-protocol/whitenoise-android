@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,9 +25,9 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldAnchor
 import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldGap
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.emojiSheetHeightBelowField
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal enum class EmojiPickerPurpose {
     USE,
@@ -68,10 +67,9 @@ internal fun EmojiPickerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { terminal.close(onDismissRequest) },
         sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
     ) {
         // The sheet's own window view: an anchored field is placed by screen position, wherever its window is.
         val sheetView = LocalView.current

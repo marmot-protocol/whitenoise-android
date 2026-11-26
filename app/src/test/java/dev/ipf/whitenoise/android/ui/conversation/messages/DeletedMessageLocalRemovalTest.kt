@@ -177,7 +177,7 @@ class DeletedMessageLocalRemovalTest {
     fun remoteDeletionClosesAnAlreadyOpenMessageInfoSheet() {
         val surface = renderLive()
         liveMessage().performTouchInput { longClick() }
-        composeRule.onNodeWithText(string(R.string.info), substring = false).performClick()
+        composeRule.messageAction(string(R.string.info)).performClick()
         composeRule.onNodeWithText(string(R.string.message_info_message_id), substring = false).assertIsDisplayed()
 
         surface.markDeleted()
@@ -654,7 +654,7 @@ class DeletedMessageLocalRemovalTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,

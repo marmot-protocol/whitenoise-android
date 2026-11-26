@@ -1,0 +1,70 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MediaTileGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "fun MediaTileGrid(",
+        "test_ids": [
+          "INT-001",
+          "MED-063",
+          "GRP-046"
+        ]
+      },
+      {
+        "surface": "BoxScope.SharedMediaGridTile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "fun BoxScope.SharedMediaGridTile(",
+        "test_ids": [
+          "GRP-018",
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "SharedMediaTileCaption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "fun SharedMediaTileCaption(",
+        "test_ids": [
+          "INT-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_tab_videos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "R.string.shared_media_tab_videos",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:shared_media_photo_from",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "R.string.shared_media_photo_from",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_video_not_selectable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+        "anchor": "R.string.shared_media_video_not_selectable",
+        "test_ids": [
+          "MED-063"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

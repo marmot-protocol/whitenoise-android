@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Conheça o White Noise</string>
+    <string name="learn_find_title">Encontre alguém</string>
+    <string name="learn_find_body">Abra uma nova conversa e cole o link do perfil ou escaneie o código QR. Se a busca pelo nome não der resultados, peça o link do perfil.</string>
+    <string name="learn_share_title">Compartilhe seu perfil</string>
+    <string name="learn_share_body">Abra Compartilhar e conectar para mostrar seu código QR ou enviar o link do seu perfil. Mantenha sua chave privada em segredo.</string>
+    <string name="learn_actions_title">Responda ou reaja</string>
+    <string name="learn_actions_body">Deslize a mensagem em direção ao centro da conversa para responder. Toque e segure para ver mais ações, incluindo reações.</string>
+    <string name="learn_example_question">Vemo-nos amanhã?</string>
+    <string name="learn_example_message">Até amanhã!</string>
+    <string name="learn_show_actions">Mostrar ações da mensagem</string>
+    <string name="learn_open_share">Abrir Compartilhar e conectar</string>
+    <string name="learn_group_title">Crie um grupo privado</string>
+    <string name="learn_group_body">Reúna as pessoas certas em uma conversa. Crie um grupo em Nova conversa e escolha quem convidar. Suas mensagens têm criptografia de ponta a ponta.</string>
+    <string name="learn_demo_label">Chat de prática · Nada é enviado</string>
+    <string name="learn_demo_sender">Contato de demonstração</string>
+    <string name="learn_marmot_title">Converse entre apps</string>
+    <string name="learn_marmot_body">Seus amigos podem entrar na conversa por outro app compatível. O White Noise usa Marmot, um protocolo aberto que permite que equipes diferentes criem apps que funcionam juntos.</string>
+    <string name="learn_marmot_link">Explorar apps Marmot</string>
+    <string name="learn_marmot_link_failed">Não foi possível abrir o diretório. Acesse marmot.build/apps.html no navegador.</string>
+</resources>

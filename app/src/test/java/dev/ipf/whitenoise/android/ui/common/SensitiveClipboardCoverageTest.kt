@@ -48,8 +48,26 @@ class SensitiveClipboardCoverageTest {
         val screen = appModuleSource(ACCOUNT_KEYS)
         assertTrue("copySensitiveToClipboard(context, privateKeyLabel, " in screen)
         assertTrue("copySensitiveToClipboard(context, encryptedBackupLabel, " in screen)
-        assertTrue("copyToClipboard(context, publicKeyLabel, " in screen)
-        assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PROFILE_KEY_CLIPBOARD).functionBody("copyToClipboard"))
+        assertTrue("copier.copy(npub, publicKeyLabel)" in screen)
+        assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PUBLIC_COPY).functionBody("copyToClipboard"))
+    }
+
+    /**
+     * Regression guard for #4151. The clipboard edge is confined to the public and sensitive writers
+     * and the Compose adapter that passes native selection clips to [ClipboardCopier].
+     */
+    @Test
+    fun onlyAllowlistedFilesWriteTheClipboardDirectly() {
+        val root = appModuleFile("src/main/java")
+        val direct = Regex("""LocalClipboardManager|setClipEntry|setPrimaryClip|\bLocalClipboard\b""")
+        val writers =
+            root
+                .walkTopDown()
+                .filter { it.extension == "kt" && direct.containsMatchIn(it.motionOwnerSource()) }
+                .map { it.relativeTo(root).invariantSeparatorsPath.removePrefix("dev/ipf/whitenoise/android/ui/") }
+                .sorted()
+                .toList()
+        assertEquals(DIRECT_WRITERS, writers)
     }
 
     /** Pairs each block-bodied function name with its body; expression bodies cannot hold two statements. */
@@ -67,8 +85,15 @@ class SensitiveClipboardCoverageTest {
     private companion object {
         val FUNCTION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?(\w+)\s*\(""")
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
-        const val PROFILE_KEY_CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyClipboard.kt"
+        const val PUBLIC_COPY = "src/main/java/dev/ipf/whitenoise/android/ui/common/ClipboardCopier.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
+        val DIRECT_WRITERS =
+            listOf(
+                "common/Clipboard.kt",
+                "common/ClipboardCopier.kt",
+                "conversation/messages/MessageBubble.kt",
+                "conversation/messages/MessageTextSelection.kt",
+            )
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }
 }

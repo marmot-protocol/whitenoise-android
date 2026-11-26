@@ -12,18 +12,20 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogProperties
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
 import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Opt-in page presentation; thumbnail viewers keep their existing gesture owner. No page is captured. */
 @Composable
@@ -37,6 +39,8 @@ internal fun MeasuredPlaybackDialog(
     onDismissStart: () -> Unit = {},
     dismissEnabled: () -> Boolean = { true },
     sourceContour: SettingsContour? = null,
+    penMotion: MeasuredPenDialogMotion? = null,
+    noticeScope: ConversationNoticeDestination? = LocalTopNoticeScope.current,
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
     val contourMorph =
@@ -53,11 +57,13 @@ internal fun MeasuredPlaybackDialog(
             ownerKey = ownerKey,
             onDismissStart = onDismissStart,
             dismissEnabled = dismissEnabled,
+            presentationReady = penMotion == null || !host.isEmpty,
         )
     if (!surface.visible) return
     PlaybackDialog(
         onDismissRequest = surface.dismiss,
         properties = properties,
+        noticeScope = noticeScope,
         onSourceDismiss = onSourceDismiss,
         onSourceExit =
             onSourceDismiss?.let { dismiss ->
@@ -79,6 +85,7 @@ internal fun MeasuredPlaybackDialog(
                 nativeBody,
                 sourceContour.takeIf { geometryValid },
                 contourMorph,
+                penMotion,
             ) { next ->
                 // Once established, a moved/resized window retires the old launch rectangle.
                 if (measuredOriginRetired(origin, host, next)) geometryValid = false
@@ -88,6 +95,7 @@ internal fun MeasuredPlaybackDialog(
     ) {
         CompositionLocalProvider(
             LocalNativePageBody provides nativeBody,
+            LocalMeasuredPenDialog provides penMotion,
             LocalSettingsCardMorph provides (contourMorph ?: LocalSettingsCardMorph.current),
         ) { content(surface) }
     }
@@ -103,12 +111,21 @@ private fun measuredDialogPageModifier(
     nativeBody: NativePageBody,
     sourceContour: SettingsContour?,
     contourMorph: SettingsCardMorph?,
+    penMotion: MeasuredPenDialogMotion?,
     onHost: (Rect) -> Unit,
 ): Modifier {
     val view = LocalView.current
     val background = androidx.compose.material3.MaterialTheme.colorScheme.background
-    return Modifier
-        .onGloballyPositioned { onHost(it.settingsMorphBounds(view)) }
+    val placement = Modifier.onGloballyPositioned { onHost(it.motionBoundsOnScreen(view)) }
+    if (penMotion != null) {
+        val penHost = host.takeIf { measuredOriginUsable(origin, host) }
+        return placement.measuredPenOutline(penMotion, penHost, surface).then(
+            dev.ipf.whitenoise.android.ui.common.fullScreenSurfaceMotion(surface) {
+                penHost?.let(penMotion::bubble) == null
+            },
+        )
+    }
+    return placement
         .drawWithContent {
             if (sourceContour != null && contourMorph?.page != null && !host.isEmpty) {
                 with(contourMorph.page) { drawExternal(sourceContour, host, surface.presence.value, background) }

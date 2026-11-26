@@ -43,13 +43,14 @@ import dev.ipf.whitenoise.android.ui.account.AccountSelectorAccountState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorState
 import dev.ipf.whitenoise.android.ui.account.ProfileSwitcherSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.CandidateKeyPlacement
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.candidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
-import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
+import dev.ipf.whitenoise.android.ui.settings.publicKeyShortForm
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -90,7 +91,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -124,7 +125,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -146,7 +147,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun aKeyWithoutARowActionKeepsItsTouchMargin() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Member",
                     subtitle = SHORT_KEY,
                     avatarSeed = "member",
@@ -204,7 +205,7 @@ class PublicKeyCopyPresentationCoverageTest {
             Themed {
                 Column {
                     listOf(ROW to FIRST_KEY, SECOND_ROW to SECOND_KEY).forEach { (tag, key) ->
-                        ContactRow(
+                        PersonRow(
                             title = SHORT_KEY,
                             subtitle = "Member",
                             avatarSeed = tag,
@@ -234,7 +235,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var longPresses = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -264,7 +265,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Alice",
                     subtitle = SHORT_KEY,
                     avatarSeed = "alice",
@@ -292,7 +293,7 @@ class PublicKeyCopyPresentationCoverageTest {
         var rowTaps = 0
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Already in this group",
                     avatarSeed = "member",
@@ -329,7 +330,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun aKeyboardFocusedKeyIsVisiblyHighlighted() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Already in this group",
                     avatarSeed = "member",
@@ -356,7 +357,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun anEnabledRowKeepsTheKeyOutOfKeyboardFocus() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = SHORT_KEY,
                     subtitle = "Member",
                     avatarSeed = "member",
@@ -381,7 +382,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun anActionlessRowLetsTheKeyboardCopyItsKey() {
         composeRule.setContent {
             Themed {
-                ContactRow(
+                PersonRow(
                     title = "Member",
                     subtitle = SHORT_KEY,
                     avatarSeed = "member",
@@ -429,13 +430,13 @@ class PublicKeyCopyPresentationCoverageTest {
         assertEquals(1, opens)
     }
 
-    /** The profile's full key block groups every character inside one copy button at least 48 dp tall. */
+    /** The profile key starts short, and one tap copies it and expands every grouped character inside the button. */
     @Test
-    fun fullKeyBlockGroupsTheWholeKeyInsideOneCopyButton() {
+    fun profileKeyExpandsTheWholeKeyInsideOneCopyButtonOnCopy() {
         var copies = 0
         composeRule.setContent {
             Themed {
-                CopyableFullPublicKey(
+                CopyablePublicKey(
                     npub = FIRST_KEY,
                     copied = false,
                     onCopy = { copies += 1 },
@@ -446,6 +447,13 @@ class PublicKeyCopyPresentationCoverageTest {
             }
         }
 
+        assertEquals(
+            publicKeyShortForm(FIRST_KEY),
+            composeRule.onNodeWithTag(KEY_TEXT, true).fetchSemanticsNode().spoken(),
+        )
+        assertEquals(FIRST_KEY, composeRule.onNodeWithTag(ROW).fetchSemanticsNode().spoken())
+        composeRule.onNodeWithTag(ROW).performClick()
+        assertEquals(1, copies)
         val target = composeRule.onNodeWithTag(ROW).getUnclippedBoundsInRoot()
         val text = composeRule.onNodeWithTag(KEY_TEXT, true).getUnclippedBoundsInRoot()
         assertTrue("target shorter than 48 dp", target.bottom - target.top >= 48.dp)
@@ -455,8 +463,6 @@ class PublicKeyCopyPresentationCoverageTest {
             composeRule.onNodeWithTag(KEY_TEXT, true).fetchSemanticsNode().spoken(),
         )
         assertEquals(FIRST_KEY, composeRule.onNodeWithTag(ROW).fetchSemanticsNode().spoken())
-        composeRule.onNodeWithTag(ROW).performClick()
-        assertEquals(1, copies)
     }
 
     /** An unresolved reference is shown but never offered for copy. */
@@ -464,7 +470,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun fullKeyBlockNeverCopiesAnUnresolvedReference() {
         var copies = 0
         composeRule.setContent {
-            Themed { CopyableFullPublicKey(UNRESOLVED, false, { copies += 1 }, targetTestTag = ROW) }
+            Themed { CopyablePublicKey(UNRESOLVED, false, { copies += 1 }, targetTestTag = ROW) }
         }
 
         val node = composeRule.onNodeWithTag(ROW).fetchSemanticsNode()
@@ -573,7 +579,7 @@ class PublicKeyCopyPresentationCoverageTest {
 
     /** The unmerged key text inside the node tagged [tag]. */
     private fun keyText(tag: String): SemanticsNodeInteraction =
-        composeRule.onNode(hasText("npub1qqqq", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
+        composeRule.onNode(hasText("npub1", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
 
     /** The Copy public key custom action merged into the row tagged [tag]. */
     private fun copyAction(
@@ -646,7 +652,8 @@ class PublicKeyCopyPresentationCoverageTest {
         /** Each classified route and the call that hands the shared presentation its canonical key. */
         val CALL_SITES =
             listOf(
-                "ui/profile/PersonProfileContent.kt" to """CopyableFullPublicKey\(\s*npub = person\.publicKey,""",
+                "ui/profile/PersonProfileContent.kt" to """CopyablePublicKey\(\s*npub = person\.publicKey,""",
+                "ui/group/GroupDetailsHeader.kt" to """CopyablePublicKey\(\s*npub = copyValue,""",
                 "ui/search/GlobalPersonRow.kt" to """PublicKeyCopyText\(\s*IdentityFormatter\.short\(npub""",
                 "ui/account/ProfileSwitcherSheet.kt" to
                     """PublicKeyCopyText\(\s*shortNpub\(account\.accountIdHex\),\s*npub\(account\.accountIdHex\)""",

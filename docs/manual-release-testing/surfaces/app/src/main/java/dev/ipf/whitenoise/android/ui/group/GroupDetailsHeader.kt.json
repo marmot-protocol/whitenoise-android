@@ -46,33 +46,9 @@
         ]
       },
       {
-        "surface": "string:copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:copy_public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.copy_public_key",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:edit_group_name_and_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
         "anchor": "R.string.edit_group_name_and_description",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.not_copied",
         "test_ids": [
           "GRP-001"
         ]
@@ -87,33 +63,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "R.string.copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
-        ]
-      },
-      {
-        "surface": "R.string.copy_public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.copy_public_key",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
-        ]
-      },
-      {
-        "surface": "R.string.not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
-        "anchor": "R.string.not_copied",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
-        ]
-      },
       {
         "surface": "R.string.explanation_chat_info_copy_peer_public_key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",

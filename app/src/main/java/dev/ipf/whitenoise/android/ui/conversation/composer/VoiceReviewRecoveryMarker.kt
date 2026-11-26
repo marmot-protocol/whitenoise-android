@@ -13,7 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import java.security.MessageDigest
 
 /** Only an opaque account/chat binding and presence bit survive recreation; no file, audio, key, or duration does. */
@@ -83,7 +83,7 @@ internal fun VoiceReviewUnavailableNotice(
     onRecordAgain: () -> Boolean,
 ) {
     var attempt by remember { mutableIntStateOf(0) }
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         ownerKey = attempt,
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.voice_review_unavailable_title)) },

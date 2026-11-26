@@ -15,7 +15,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,7 +32,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -46,11 +44,14 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.filter
 
 internal enum class GroupMemberMenuAction {
@@ -124,20 +125,18 @@ internal fun TransferAdminSheet(
             }
         }
 
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         sheetState = sheetState,
         onDismissRequest = { terminal.close(onDismiss) },
-        containerColor = amoledSheetContainerColor(),
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.transfer_admin))
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.transfer_admin),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
             Text(
                 stringResource(R.string.transfer_admin_picker_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
@@ -192,6 +191,7 @@ internal fun TransferAdminSheet(
                                     size = 40.dp,
                                     pictureUrl = controller.memberAvatarUrl(member),
                                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                                    followedAccount = member.memberIdHex,
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column(
@@ -256,21 +256,19 @@ internal fun SoleAdminDeletePicker(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal =
         rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         sheetState = sheetState,
         onDismissRequest = { terminal.close(onDismiss) },
-        containerColor = amoledSheetContainerColor(),
         modifier = soleAdminEmptyPickerTag(candidates.isEmpty()),
     ) {
+        WhiteNoiseSheetHeader(stringResource(R.string.transfer_admin))
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.transfer_admin),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
             Text(
                 stringResource(R.string.transfer_admin_picker_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
@@ -280,6 +278,9 @@ internal fun SoleAdminDeletePicker(
                 Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
             ) {
                 GroupMemberIdentityRows(candidates) { _, member ->
+                    val title = appState.displayName(member.memberIdHex)
+                    val npub = appState.npubForDisplay(member.memberIdHex)
+                    val titleIsKey = abbreviatesPublicKey(title, npub)
                     Row(
                         modifier =
                             Modifier
@@ -293,22 +294,21 @@ internal fun SoleAdminDeletePicker(
                             seed = member.memberIdHex,
                             size = 40.dp,
                             pictureUrl = appState.contactAvatarSource(member.memberIdHex),
+                            followedAccount = member.memberIdHex,
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            EmojiLabel(
-                                appState.displayName(member.memberIdHex),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                appState.shortNpub(member.memberIdHex),
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (titleIsKey) {
+                                PublicKeyCopyText(title, npub)
+                            } else {
+                                EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                PublicKeyCopyText(
+                                    appState.shortNpub(member.memberIdHex),
+                                    npub,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

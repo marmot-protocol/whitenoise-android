@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
 import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
@@ -50,6 +52,7 @@ import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.performUnreadFilterAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -337,21 +340,29 @@ internal class ReturnFixture(
     private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
     private val unreadTarget: Boolean = false,
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+    rowCount: Int = 6,
     customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
+    /** When given, opening any chat other than [target] waits for this signal before its timeline opens. */
+    otherChatTimelineGate: CompletableDeferred<Unit>? = null,
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
     val avatarRequests = AtomicInteger()
     val rows =
-        (0..5).map { index ->
+        (0 until rowCount).map { index ->
+            val groupId =
+                if (index == rowCount - 1) {
+                    ConversationTimelineTestIds.GROUP_ID
+                } else {
+                    "%02x".format(index + 10).repeat(16)
+                }
             customizeRow(
                 index,
                 notificationChatListRow().copy(
-                    groupIdHex =
-                        if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
+                    groupIdHex = groupId,
                     title = "Return chat $index",
                     groupName = "Return chat $index",
-                    activitySortAt = (10 - index).toULong(),
+                    activitySortAt = (rowCount + 4 - index).toULong(),
                     unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
                     hasUnread = unreadTarget && index == 5,
                 ),
@@ -366,7 +377,7 @@ internal class ReturnFixture(
         )
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
-            timelines.subscriptions,
+            otherChatTimelineGate?.let(timelines.subscriptions::holdingOtherChats) ?: timelines.subscriptions,
             additionalAccounts = additionalAccounts,
         ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
@@ -484,7 +495,13 @@ internal class ReturnWindow(
                 snapshot.rows.map { presented ->
                     val row = presented.row
                     val asset = avatarAssetForRow(row)
-                    val source = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource
+                    val direct = row.conversationKind == ChatConversationKindFfi.DIRECT
+                    val source =
+                        when {
+                            direct -> PresentationSourceFfi.PEER_PROFILE
+                            asset == null -> PresentationSourceFfi.GROUP
+                            else -> presented.presentation.avatarSource
+                        }
                     val avatar =
                         when {
                             asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
@@ -494,12 +511,14 @@ internal class ReturnWindow(
                                 SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
                             else -> return@map presented
                         }
+                    val peerId = if (direct) ConversationTimelineTestIds.SENDER_ID else presented.presentation.peerId
                     presented.copy(
                         avatarAsset = asset,
                         presentation =
                             presented.presentation.copy(
                                 avatar = avatar,
                                 avatarSource = source,
+                                peerId = peerId,
                             ),
                     )
                 },
@@ -518,7 +537,7 @@ internal class ReturnWindow(
     /** Holds the live stream until its owner cancels it. */
     override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
-    /** This six-row account has no next or previous page. */
+    /** This synthetic account has no next or previous page. */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,
@@ -553,3 +572,13 @@ private class ReturnGroups(
     /** Receives are owned and cancelled by the production controller. */
     override fun close() = Unit
 }
+
+/** Opens [ConversationTimelineTestIds.GROUP_ID] at once, while every other chat's timeline waits for [gate]. */
+private fun ConversationLiveSubscriptions.holdingOtherChats(gate: CompletableDeferred<Unit>) =
+    ConversationLiveSubscriptions(
+        openTimeline = { account, groupIdHex, limit ->
+            if (!groupIdHex.equals(ConversationTimelineTestIds.GROUP_ID, ignoreCase = true)) gate.await()
+            openTimeline(account, groupIdHex, limit)
+        },
+        openGroupState = openGroupState,
+    )

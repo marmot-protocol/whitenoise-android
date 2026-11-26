@@ -10,6 +10,8 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecents
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentsOwner
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
@@ -55,6 +57,7 @@ internal data class MainShellGlobalSearchStateHolder(
     val conversationReturn: ConversationSearchReturn?,
     val beginConversationSearch: (String, GlobalSearchState, String?) -> Boolean,
     val finishConversationSearch: () -> ConversationSearchReturn?,
+    val recents: GlobalSearchRecents,
 )
 
 /**
@@ -66,6 +69,7 @@ internal data class MainShellGlobalSearchStateHolder(
 internal fun rememberMainShellGlobalSearchState(
     accountRef: String?,
     runtimeGeneration: Int,
+    recentsOwner: GlobalSearchRecentsOwner = remember { GlobalSearchRecentsOwner() },
 ): MainShellGlobalSearchStateHolder {
     var globalSearchState by rememberSaveable(stateSaver = GlobalSearchStateSaver) {
         mutableStateOf(GlobalSearchState())
@@ -77,6 +81,9 @@ internal fun rememberMainShellGlobalSearchState(
     val scopedGlobalSearchState =
         GlobalSearchTransitions.reconcileAccountScope(globalSearchState, globalSearchAccountScope)
     val viewport = key(globalSearchAccountScope) { rememberGlobalSearchViewport() }
+    // In memory only, and out of the saveable codec: a new account or process starts with no recents (#4004).
+    val recents =
+        remember(globalSearchAccountScope, recentsOwner) { recentsOwner.obtain(globalSearchAccountScope.encodeToken()) }
     var conversationReturn by key(globalSearchAccountScope) {
         rememberSaveable(stateSaver = ConversationSearchReturnSaver) { mutableStateOf<ConversationSearchReturn?>(null) }
     }
@@ -93,6 +100,7 @@ internal fun rememberMainShellGlobalSearchState(
     return MainShellGlobalSearchStateHolder(
         scopedState = scopedGlobalSearchState,
         viewport = viewport,
+        recents = recents,
         conversationReturn = ownedReturn,
         beginConversationSearch = { groupId, request, folderId ->
             if (request.accountScopeToken == globalSearchAccountScope.encodeToken()) {

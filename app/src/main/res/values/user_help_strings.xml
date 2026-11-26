@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Learn White Noise</string>
+    <string name="learn_find_title">Find someone</string>
+    <string name="learn_find_body">Have a friend’s link or QR code? Open New Chat and paste the link or scan the code to find them. If a name search comes up empty, ask them to share their profile.</string>
+    <string name="learn_share_title">Share your profile</string>
+    <string name="learn_share_body">Give someone your public profile link or show them your QR code so they can find you on White Noise. Keep your private sign-in key to yourself.</string>
+    <string name="learn_actions_title">Reply or react</string>
+    <string name="learn_actions_body">Swipe a message toward the middle of the chat to reply. Touch and hold it for more actions, including reactions.</string>
+    <string name="learn_example_question">See you tomorrow?</string>
+    <string name="learn_example_message">See you tomorrow!</string>
+    <string name="learn_show_actions">Show message actions</string>
+    <string name="learn_open_share">Open Share &amp; connect</string>
+    <string name="learn_group_title">Make a private group</string>
+    <string name="learn_group_body">Bring the right people into one conversation. Start a group from New Chat and choose who to invite. Your messages are end-to-end encrypted.</string>
+    <string name="learn_demo_label">Practice chat · nothing is sent</string>
+    <string name="learn_demo_sender">Demo contact</string>
+    <string name="learn_marmot_title">Chat across apps</string>
+    <string name="learn_marmot_body">Your friends can join the conversation from another compatible app. White Noise uses Marmot, an open protocol that lets different teams build apps that work together.</string>
+    <string name="learn_marmot_link">Explore Marmot apps</string>
+    <string name="learn_marmot_link_failed">Couldn’t open the app directory. Visit marmot.build/apps.html in your browser.</string>
+</resources>

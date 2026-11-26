@@ -992,7 +992,7 @@ private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
 ) {
-    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    controller.testApplyLiveTimelineChanges(
         listOf(
             TimelineMessageChangeFfi.Upsert(
                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -1075,7 +1075,7 @@ private fun projectedMediaMessage(
     replyPreview = null,
     mediaJson = null,
     media = MessageAttachments.acceptedOutcomes(listOf(reference)),
-    agentTextStreamJson = null,
+    thread = null,
     poll = null,
     groupSystem = null,
     hasReports = false,

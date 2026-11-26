@@ -65,7 +65,7 @@ internal fun AccountScreen(
 }
 
 /**
- * The Account hub's connected group; the Profile row carries the live readiness summary. The Linked devices row is
+ * The Account hub's connected group; the Profile row carries the live readiness summary. The Devices row is
  * present only when [onOpenLinkedDevices] is given.
  */
 @Suppress("FunctionNaming", "LongMethod")
@@ -119,7 +119,7 @@ internal fun AccountHubGroup(
                     explanation = stringResource(R.string.explanation_linked_devices_hub),
                     onClick = onOpenLinkedDevices,
                     modifier = Modifier.testTag("settings.account.linked_devices"),
-                    leading = { SettingsLeadingIcon(R.drawable.ic_device) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_devices) },
                 )
             }
         }
@@ -311,8 +311,8 @@ internal fun VoiceLanguageScreen(
     }
 }
 
-/** Help & support hub: guides, the support chat, donations and the developer tools. */
-@Suppress("FunctionNaming")
+/** Help & support hub: first-run help, the support chat, donations and the developer tools. */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun HelpSupportScreen(
     appState: WhiteNoiseAppState,
@@ -327,6 +327,15 @@ internal fun HelpSupportScreen(
                     destination = SettingsDetail.HelpSupport,
                     surface = "help-support-controls",
                 ) {
+                    row("learn_white_noise") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.learn_white_noise),
+                            routeKey = SettingsDetail.LearnWhiteNoise,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
+                            onClick = { onOpenDetail(SettingsDetail.LearnWhiteNoise) },
+                        )
+                    }
                     row("help") { context ->
                         SettingsLink(
                             context = context,

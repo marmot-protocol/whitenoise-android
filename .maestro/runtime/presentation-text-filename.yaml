@@ -8,6 +8,6 @@ name: presentation-text-filename
 - assertVisible: Maestro complete filename.txt
 - tapOn: Copy
 - assertNotVisible: File name
-- tapOn: Back
+- tapOn: Close
 - assertVisible:
     id: presentation.complete

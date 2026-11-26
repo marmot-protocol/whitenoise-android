@@ -10,14 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -29,17 +25,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.share.QrShareCardRenderer
 import dev.ipf.whitenoise.android.share.QrShareCardSpec
@@ -50,17 +43,21 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
-import dev.ipf.whitenoise.android.ui.settings.FullPublicKey
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 
 internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
 
@@ -78,7 +75,7 @@ internal fun ProfileQrSheet(
     showScan: Boolean = true,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberClipboardCopier()
     val npub = appState.npubForDisplay(accountIdHex)
     val link = remember(npub) { ProfileLink.parse(npub) }
     var copied by remember { mutableStateOf(false) }
@@ -127,16 +124,10 @@ internal fun ProfileQrSheet(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = ::dismissSheet,
         sheetState = sheetState,
-        sheetGesturesEnabled = sheetActive,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = sheetActive,
-                shouldDismissOnClickOutside = sheetActive,
-            ),
-        containerColor = amoledSheetContainerColor(),
+        interactionEnabled = sheetActive,
     ) {
         Column(
             Modifier
@@ -144,7 +135,7 @@ internal fun ProfileQrSheet(
                 .fadingVerticalScroll(
                     state = contentScrollState,
                     enabled = contentScrollState.maxValue > 0,
-                ).padding(24.dp),
+                ).padding(WhiteNoiseSheetInset),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -161,36 +152,22 @@ internal fun ProfileQrSheet(
                 fontWeight = FontWeight.SemiBold,
             )
             if (npub.isNotBlank()) {
-                Button(
-                    onClick = {
-                        clipboard.setText(AnnotatedString(npub))
-                        copied = true
-                    },
-                ) {
-                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (copied) {
-                            stringResource(
-                                R.string.copied,
-                            )
-                        } else {
-                            IdentityFormatter.short(npub, prefix = 16, suffix = 14)
-                        },
-                    )
-                }
-                // The button abbreviates; the whole key stays readable beside the code (#3321).
-                FullPublicKey(
+                // One key: short until tapped, then copied and expanded in full for comparison (#3321).
+                CopyablePublicKey(
                     npub = npub,
-                    testTag = "profile_qr.full_public_key",
-                    label = stringResource(R.string.public_key),
+                    copied = copied,
+                    onCopy = {
+                        if (clipboard.copy(npub)) copied = true
+                    },
+                    targetTestTag = "profile_qr.copy_public_key",
+                    textTestTag = "profile_qr.full_public_key",
                 )
             }
             link?.let { QrCodeImage(content = it.qrUri) }
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
-                    OutlinedButton(
+                    WhiteNoiseOutlinedButton(
                         onClick = { shareMenuExpanded = true },
                         enabled = npub.isNotBlank() && !pictureShareInProgress,
                         modifier = Modifier.fillMaxWidth(),
@@ -264,7 +241,7 @@ internal fun ProfileQrSheet(
                     )
                 }
                 if (showScan) {
-                    Button(
+                    WhiteNoiseButton(
                         onClick = {
                             scanError = null
                             showScanner = true

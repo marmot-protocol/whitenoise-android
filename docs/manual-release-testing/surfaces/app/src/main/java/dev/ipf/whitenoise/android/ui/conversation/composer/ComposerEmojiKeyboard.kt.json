@@ -10,57 +10,6 @@
         "test_ids": [
           "CON-010"
         ]
-      },
-      {
-        "surface": "ComposerEmojiRail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "fun ComposerEmojiRail(",
-        "test_ids": [
-          "CON-010",
-          "SET-051"
-        ]
-      },
-      {
-        "surface": "ComposerEmojiRailToggle",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "fun ComposerEmojiRailToggle(",
-        "test_ids": [
-          "CON-010"
-        ]
-      }
-    ],
-    "settings_controls": [
-      {
-        "surface": "string:emoji_backspace",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "R.string.emoji_backspace",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
-        "surface": "string:emoji_search_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "R.string.emoji_search_hint",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
-        "surface": "string:emoji_sets_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "R.string.emoji_sets_title",
-        "test_ids": [
-          "SET-051"
-        ]
-      },
-      {
-        "surface": "string:custom_emoji",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "R.string.custom_emoji",
-        "test_ids": [
-          "SET-051"
-        ]
       }
     ]
   },

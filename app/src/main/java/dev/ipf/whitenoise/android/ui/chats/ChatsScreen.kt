@@ -6,21 +6,14 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -30,12 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,7 +36,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,19 +50,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
@@ -90,16 +71,15 @@ import dev.ipf.whitenoise.android.core.unreadNeedsMembers
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatFolderPreferences
-import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatListPinMoveResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
@@ -119,26 +99,18 @@ import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.state.setConversationMuted
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePenFlight
-import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
-import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
-import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
-import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -147,10 +119,8 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
-import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
-import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -158,7 +128,6 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
@@ -222,6 +191,7 @@ internal fun ChatsScreen(
     globalSearchState: GlobalSearchState = GlobalSearchState(),
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
     searchViewport: GlobalSearchViewport? = null,
+    searchRecents: GlobalSearchRecents? = null,
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
@@ -240,6 +210,7 @@ internal fun ChatsScreen(
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -270,9 +241,11 @@ internal fun ChatsScreen(
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     // #2925: a Select all bound to MDK's complete view; null for loaded-window selections.
-    var completeSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
-        mutableStateOf<ChatListCompleteSelection?>(null)
-    }
+    val completeSelectionState =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<ChatListCompleteSelection?>(null)
+        }
+    var completeSelection by completeSelectionState
     var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatDeparture?>(null)
     }
@@ -365,7 +338,10 @@ internal fun ChatsScreen(
                             directBatchResult = null
                             pendingStateBatch = null
                         } else if (previous == null) {
-                            appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                            appState.presentTransient(
+                                resources.getString(R.string.toast_couldnt_update_chat),
+                                kind = TransientNoticeKind.Information,
+                            )
                         }
                     } else {
                         directBatchResult = null
@@ -608,7 +584,7 @@ internal fun ChatsScreen(
         remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
             mutableStateOf<PendingLocalChatDelete?>(null)
         }
-    val searchFocusRequester = remember { FocusRequester() }
+    val searchFocusRequester = rememberGlobalSearchShortcut(searchOpen, selectionMode, onGlobalSearchStateChange)
     val scope = rememberCoroutineScope()
 
     /** Preserves the legacy direct-switch behavior for isolated screen owners. */
@@ -931,7 +907,7 @@ internal fun ChatsScreen(
                 val hex = appState.accountIdHex(id.npub)
                 identifierResolution =
                     if (hex != null) {
-                        IdentifierResolution.Resolved(id.npub)
+                        IdentifierResolution.Resolved(id.npub, hex)
                     } else {
                         IdentifierResolution.Failed(R.string.chat_list_search_invalid_npub)
                     }
@@ -945,8 +921,8 @@ internal fun ChatsScreen(
                 val hex = Nip05Resolver.resolve(id.identifier)
                 val npub = presentableIdentifierNpub(hex, appState::npubForDisplay)
                 identifierResolution =
-                    if (npub != null) {
-                        IdentifierResolution.Resolved(npub)
+                    if (npub != null && hex != null) {
+                        IdentifierResolution.Resolved(npub, hex)
                     } else {
                         IdentifierResolution.Failed(
                             R.string.chat_list_search_nip05_not_found,
@@ -988,7 +964,8 @@ internal fun ChatsScreen(
             }
         }
     }
-    var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
+    val programmaticViewportGenerationState = remember(chatListState) { mutableLongStateOf(0L) }
+    var programmaticViewportGeneration by programmaticViewportGenerationState
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
     val completeSearchSections =
         rememberCompleteChatSearchSections(
@@ -1107,8 +1084,7 @@ internal fun ChatsScreen(
             !searchActive &&
             (selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT) ==
             dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT
-    var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
-    var pendingHeadDemotion by
+    val pendingHeadDemotionState =
         remember(
             controller,
             appState.activeAccountRef,
@@ -1121,6 +1097,7 @@ internal fun ChatsScreen(
         ) {
             mutableStateOf<ChatListHeadDemotion?>(null)
         }
+    var pendingHeadDemotion by pendingHeadDemotionState
     val pendingHeadDemotionTarget =
         pendingHeadDemotion?.viewportAnchor?.let { anchor ->
             visibleItems.firstOrNull { it.id == anchor.chatId }
@@ -1156,8 +1133,9 @@ internal fun ChatsScreen(
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
-    val penFlight = remember { NewMessagePenFlight() }
-    var newChatFlowOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var newChatFlowLaunch by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<NewMessageFlowLaunch?>(null)
+    }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1180,6 +1158,11 @@ internal fun ChatsScreen(
                     return
                 }
         openGroupFromVisibleList(item, messageIdHex, false)
+    }
+
+    /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
+    fun recordSearchOpen(entry: GlobalSearchRecent) {
+        searchRecents?.record(globalSearchState.accountScopeToken, entry)
     }
 
     /** Presents a profile from the visible list, remembering the list head for the return scroll. */
@@ -1273,159 +1256,28 @@ internal fun ChatsScreen(
         onDispose { actionScope.set(false) }
     }
 
-    fun archiveChats(
-        items: List<ChatListItem>,
-        archive: Boolean,
-    ) {
-        if (items.isEmpty()) return
-        val owner = controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val succeeded =
-                controller.setArchivedForOwner(
-                    groupIds = items.map { it.group.groupIdHex },
-                    archived = archive,
-                    notify = false,
-                    owner = owner,
-                )
-            if (succeeded > 0 && controller.chatListActionIsCurrent(owner)) {
-                val pluralRes =
-                    if (archive) {
-                        R.plurals.toast_chat_list_chats_archived
-                    } else {
-                        R.plurals.toast_chat_list_chats_restored
-                    }
-                appState.presentTransient(context.resources.getQuantityString(pluralRes, succeeded, succeeded))
-            }
-        }
-    }
-
-    fun openFolderPicker(items: List<ChatListItem>) {
-        folderHandoff.pickerChatIds =
-            items
-                .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
-                .takeIf { it.isNotEmpty() }
-    }
-
-    fun markChatRead(
-        item: ChatListItem,
-        unread: Boolean,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed =
-                if (unread) current?.actions?.canMarkUnread != false else current?.actions?.canMarkRead != false
-            if (current != null && allowed) {
-                if (unread) controller.markUnread(current, owner) else controller.markAllRead(current, owner)
-            }
-        }
-    }
-
-    fun toggleChatMute(
-        item: ChatListItem,
-        muted: Boolean,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed = if (muted) current?.actions?.canUnmute != false else current?.actions?.canMute != false
-            if (current != null && allowed && controller.chatListActionIsCurrent(owner)) {
-                appState.setConversationMuted(
-                    current.group.groupIdHex,
-                    !muted,
-                    onCommitted = { controller.refreshChatListActionProjection(owner) },
-                    isCurrent = { controller.chatListActionIsCurrent(owner) },
-                    completionIsCurrent = { controller.chatListActionSessionIsCurrent(owner) },
-                )
-            }
-        }
-    }
-
-    fun toggleChatPin(
-        item: ChatListItem,
-        resolvedOwner: ChatListActionOwner? = null,
-    ) {
-        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
-        if (item.group.archived) return
-        val nextPinned = !item.pinned()
-        val headDemotion =
-            if (!nextPinned && ordinaryActiveList && visibleItems.firstOrNull()?.id == item.id) {
-                nextHeadDemotionTransactionId += 1L
-                ChatListHeadDemotion(
-                    chatId = item.id,
-                    transactionId = nextHeadDemotionTransactionId,
-                    viewportAnchor = chatListState.chatListViewportAnchor(visibleChatIds),
+    val chatListActions =
+        rememberChatListActions(
+            appState = appState,
+            controller = controller,
+            actionScope = actionScope,
+            batchScope = batchScope,
+            pinFollow = pinFollow,
+            folderHandoff = folderHandoff,
+            pendingHeadDemotion = pendingHeadDemotionState,
+            inputs =
+                ChatListActions.Inputs(
+                    context = context,
+                    resources = resources,
+                    ordinaryActiveList = ordinaryActiveList,
+                    visibleItems = visibleItems,
+                    visibleChatIds = visibleChatIds,
+                    chatListState = chatListState,
                     viewportGeneration = viewportGeneration,
-                )
-            } else {
-                null
-            }
-        if (headDemotion != null) {
-            pendingHeadDemotion = headDemotion
-        } else if (nextPinned && pendingHeadDemotion?.chatId == item.id) {
-            pendingHeadDemotion = null
-        }
-        // Captured at the gesture: a pin that commits after a folder/query/account change follows nothing.
-        val followScope = pinFollow.currentScope.takeIf { nextPinned }
-        clearSelection()
-        appState.launchMutation {
-            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
-            val allowed = if (nextPinned) current?.actions?.canPin != false else current?.actions?.canUnpin != false
-            val eligible = current != null && !current.group.archived && allowed
-            val succeeded = eligible && current != null && controller.setPinned(current, nextPinned, owner)
-            if (!succeeded && pendingHeadDemotion == headDemotion) {
-                pendingHeadDemotion = null
-            }
-            if (succeeded && nextPinned && controller.chatListActionSessionIsCurrent(owner)) {
-                pinFollow.issue(followScope, setOf(item.id))
-            }
-        }
-    }
-
-    /**
-     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
-     * user when the order did not change. Selection and single-row moves share this path (#3709).
-     */
-    fun movePinnedChats(
-        ids: Set<String>,
-        delta: Int,
-        fromSelection: Boolean = true,
-    ) {
-        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
-        appState.launchMutation {
-            val result =
-                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-            // The unchanged notice describes a selection; a single row already at the end just stays put.
-            val quiet =
-                result == ChatListPinMoveResult.MOVED ||
-                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
-            if (controller.chatListActionIsCurrent(owner) && !quiet) {
-                val message =
-                    when (result) {
-                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
-                        else -> R.string.chat_batch_order_failed
-                    }
-                appState.presentTransient(resources.getString(message))
-            }
-        }
-    }
-
-    /** Moves one pinned row from its long-press menu through the complete-order path. */
-    fun movePinnedChat(
-        item: ChatListItem,
-        delta: Int,
-    ) {
-        if (pinnedIndex(item) == null) return
-        clearSelection()
-        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
-    }
+                    pinnedIndex = ::pinnedIndex,
+                    clearSelection = ::clearSelection,
+                ),
+        )
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
@@ -1447,8 +1299,7 @@ internal fun ChatsScreen(
         rememberSearchBodyAnchorRestoration(
             datasetKey = chatListDatasetKey,
             sameDataset = searchViewport?.resetState(showArchived)?.appliedDatasetKey == chatListDatasetKey,
-            firstVisibleIndex = chatListState.firstVisibleItemIndex,
-            firstVisibleOffset = chatListState.firstVisibleItemScrollOffset,
+            listState = chatListState,
             loading = messageResultsPending,
         )
     ChatListSearchTopResetEffect(
@@ -1470,99 +1321,28 @@ internal fun ChatsScreen(
     )
     GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
-    val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
-    var chatListWindowTop by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var chatListHeightPx by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableFloatStateOf(0f) }
-    var dragAnchorChatId by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    var dragPointerWindowY by
-        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
-
-    @Suppress("ReturnCount") // Guard clauses keep invalid live-list gesture state explicit.
-    fun updateChatDragSelection(pointerWindowY: Float): Boolean {
-        val anchorId = dragAnchorChatId ?: return false
-        val pointerY = pointerWindowY - chatListWindowTop
-        val endpointId =
-            dragSelectionEndpoint(
-                chatListState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
-                    val id = visible.key as? String
-                    id
-                        ?.takeIf(visibleChatIds::contains)
-                        ?.let {
-                            DragSelectionVisibleItem(
-                                key = it,
-                                start = visible.offset.toFloat(),
-                                end = (visible.offset + visible.size).toFloat(),
-                            )
-                        }
-                },
-                pointerY,
-            ) ?: return false
-        if (endpointId == anchorId && selectedChatIds.isEmpty()) return false
-        completeSelection = null
-        val next =
-            anchoredDragSelection(
-                orderedIds = orderedVisibleChatIds,
-                eligibleIds = visibleChatIds,
-                anchorId = anchorId,
-                endpointId = endpointId,
-            )
-        selectedChatIds.clear()
-        selectedChatIds.addAll(next)
-        return true
-    }
-
-    fun finishChatDrag(clearSelection: Boolean) {
-        dragAnchorChatId = null
-        dragPointerWindowY = null
-        if (clearSelection) {
-            completeSelection = null
-            selectedChatIds.clear()
+    val chatDragSelection =
+        rememberChatListDragSelection(
+            accountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            selectedChatIds = selectedChatIds,
+            completeSelection = completeSelectionState,
+        )
+    // Row drag callbacks and drag effects keep their composition's values; remembered so unchanged ones keep identity.
+    val chatDragInputs =
+        remember(chatListState, visibleChatIds, orderedVisibleChatIds) {
+            ChatListDragSelection.Inputs(chatListState, visibleChatIds, orderedVisibleChatIds)
         }
-    }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
-        finishChatDrag(clearSelection = true)
+        chatDragSelection.finishChatDrag(clearSelection = true)
         actionSheetChatId = null
     }
-    LaunchedEffect(chatListDatasetKey) {
-        if (dragAnchorChatId != null) finishChatDrag(clearSelection = true)
-    }
-    LaunchedEffect(visibleChatIds) {
-        val anchorId = dragAnchorChatId ?: return@LaunchedEffect
-        if (anchorId !in visibleChatIds) finishChatDrag(clearSelection = true)
-    }
-
-    LaunchedEffect(dragAnchorChatId, chatListState) {
-        var autoScrollActive = false
-        while (dragAnchorChatId != null) {
-            withFrameNanos { }
-            val pointerWindowY = dragPointerWindowY ?: continue
-            val pointerY = pointerWindowY - chatListWindowTop
-            val scrollDelta =
-                dragSelectionAutoScrollDelta(
-                    pointerY = pointerY,
-                    viewportStart = 0f,
-                    viewportEnd = chatListHeightPx,
-                    edgeThreshold = dragEdgeThresholdPx,
-                    maxStep = dragMaxScrollStepPx,
-                )
-            if (scrollDelta != 0f) {
-                if (chatListAutoScrollSessionStarts(autoScrollActive, scrollDelta)) {
-                    programmaticViewportGeneration += 1L
-                }
-                autoScrollActive = true
-                chatListState.scrollBy(scrollDelta)
-                updateChatDragSelection(pointerWindowY)
-            } else {
-                autoScrollActive = false
-            }
-        }
-    }
+    chatDragSelection.chatDragSelectionEffects(
+        datasetKey = chatListDatasetKey,
+        inputs = chatDragInputs,
+        programmaticViewportGenerationState = programmaticViewportGenerationState,
+    )
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
@@ -1658,19 +1438,15 @@ internal fun ChatsScreen(
             }
         }
     }
-    // Keep a new chat-list head flush at the top when live activity reorders
-    // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
-    // previous head by key, leaving the promoted row above or clipped by the
-    // viewport.
-    //
-    // Two paths, both via [ChatListHeadSnap]:
-    //   - Return from a conversation: if the head changed while the list was
-    //     off-screen, snap regardless of the restored scroll index (#1313).
-    //   - Active on-list reader: animate the one-row correction only from the
-    //     true top so both keyed rows move together; never yank a deeper reader
-    //     or interrupt active scrolling (#541 / #1651).
-    // Keyed on `showArchived` so the tracked head resets alongside
-    // `chatListState` on a view swap.
+    val resumeBaseline = rememberChatListResumeBaseline()
+    // Keep a new chat-list head flush at the top when live activity reorders keyed items (issues #541 / #1313 /
+    // #1651). LazyColumn otherwise pins the previous head by key, leaving the promoted row above or clipped by the
+    // viewport. Two paths, both via [ChatListHeadSnap] (background returns: ChatListResumeBaseline):
+    //   - Return from a conversation: if the head changed while the list was off-screen, snap regardless of the
+    //     restored scroll index (#1313).
+    //   - Active on-list reader: animate the one-row correction only from the true top so both keyed rows move
+    //     together; never yank a deeper reader or interrupt active scrolling (#541 / #1651).
+    // Keyed on `showArchived` so the tracked head resets alongside `chatListState` on a view swap.
     val activeHeadId = visibleItems.firstOrNull()?.id.takeIf { ordinaryActiveList }
     val activeReturnHead = chatListReturnHead(visibleItems).takeIf { ordinaryActiveList }
     LaunchedEffect(conversationReturnHead, activeReturnHead, ordinaryActiveList) {
@@ -1713,6 +1489,7 @@ internal fun ChatsScreen(
             if (inProgress && !headScrollCorrectionInProgress) programmaticViewportGeneration += 1L
             headScrollCorrectionInProgress = inProgress
         },
+        resumeBaseline = resumeBaseline,
     )
     val headReorderInProgress =
         rememberChatListHeadReorderGate(
@@ -1720,6 +1497,7 @@ internal fun ChatsScreen(
             datasetKey = chatListDatasetKey,
             isActiveList = ordinaryActiveList,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
+            resumeBaseline = resumeBaseline,
         )
     SideEffect { pinFollow.currentScope = ChatPinFollowScope(chatListDatasetKey, userGestureGeneration) }
     val unpinnedVisibleIds =
@@ -1760,6 +1538,7 @@ internal fun ChatsScreen(
             pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
             datasetKey = chatListDatasetKey,
             headPromotionEligible = headPromotionMotionEligible,
+            resumeBaseline = resumeBaseline,
         )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
@@ -1767,6 +1546,7 @@ internal fun ChatsScreen(
             pinnedBoundaryIndex = pinnedBoundary.takeUnless { searchActive },
             leadingItemCount = leadingChatListItemCount.takeUnless { searchActive } ?: 0,
             placementDurationMillis = rowPlacementDurationMillis,
+            resumeEpoch = resumeBaseline.epoch,
         )
     val chatListInteractionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     val archivedUnreadCount =
@@ -1839,7 +1619,8 @@ internal fun ChatsScreen(
                     .takeIf { showPlaybackTransport },
         ) {
             dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog(
-                origin = newChatFlowOrigin,
+                origin = newChatFlowLaunch?.origin,
+                penMotion = newChatFlowLaunch?.pen,
                 ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
                 properties =
                     androidx.compose.ui.window.DialogProperties(
@@ -1848,25 +1629,25 @@ internal fun ChatsScreen(
                     ),
                 onDismissRequest = {
                     showNewChatFlow = false
+                    newChatFlowLaunch = null
                     onGroupCreateFlowSuperseded()
                 },
             ) {
-                LaunchedEffect(penFlight.origin) { penFlight.fly() }
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    NewChatFlowHost(
-                        appState = appState,
-                        onOpenConversation = { item, justCreated ->
-                            showNewChatFlow = false
-                            onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                        },
-                        onClose = dismiss,
-                        onGroupCreateSubmitted = onGroupCreateSubmitted,
-                        onGroupCreateCompletedOpen = { item, requestToken ->
-                            showNewChatFlow = false
-                            onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                        },
-                    )
-                }
+                NewChatFlowHost(
+                    appState = appState,
+                    onOpenConversation = { item, justCreated ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                    },
+                    onClose = dismiss,
+                    onGroupCreateSubmitted = onGroupCreateSubmitted,
+                    onGroupCreateCompletedOpen = { item, requestToken ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                    },
+                )
             }
         }
     }
@@ -2025,7 +1806,7 @@ internal fun ChatsScreen(
                 val swipeEnabled =
                     chatListInteractionsEnabled &&
                         !selectionMode &&
-                        dragAnchorChatId == null &&
+                        chatDragSelection.dragAnchorChatId == null &&
                         actionSheetChatId == null
                 val latestSwipeAdmission by rememberUpdatedState<() -> Boolean> {
                     val visible = rowId in visibleChatIds && item.group.groupIdHex !in leavingAndDeleting
@@ -2047,6 +1828,8 @@ internal fun ChatsScreen(
                                 actionScope.get() && latestSwipeAdmission()
                             }
                         if (owner != null && menuActionsCurrent()) {
+                            // The action below keeps this commit's list values across the native row lookup, as before.
+                            val commitInputs = chatListActions.currentInputs()
                             appState.launchMutation {
                                 val current = controller.resolveChatListActionItem(item.group.groupIdHex, owner)
                                 val gestureCurrent =
@@ -2063,13 +1846,21 @@ internal fun ChatsScreen(
                                     val markUnread = !current.effectiveHasUnread(appState.activeAccount?.accountIdHex)
                                     when (action) {
                                         SwipeAction.ReadUnread ->
-                                            markChatRead(
+                                            chatListActions.markChatRead(
                                                 current,
                                                 unread = markUnread,
                                                 resolvedOwner = owner,
+                                                inputs = commitInputs,
                                             )
-                                        SwipeAction.MuteUnmute -> toggleChatMute(current, current.engineMuted(), owner)
-                                        SwipeAction.PinUnpin -> toggleChatPin(current, owner)
+                                        SwipeAction.MuteUnmute ->
+                                            chatListActions.toggleChatMute(
+                                                current,
+                                                current.engineMuted(),
+                                                owner,
+                                                commitInputs,
+                                            )
+                                        SwipeAction.PinUnpin ->
+                                            chatListActions.toggleChatPin(current, owner, commitInputs)
                                         else -> Unit
                                     }
                                 }
@@ -2098,6 +1889,7 @@ internal fun ChatsScreen(
                         },
                         onOpen = {
                             if (menuActionsCurrent()) {
+                                if (searchActive) recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
                                 searchViewport?.selection?.selected = GlobalSearchSelectedResult()
                                 openGroupFromVisibleList(item, null, false)
                             }
@@ -2116,21 +1908,20 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                dragAnchorChatId = rowId
-                                dragPointerWindowY = pointerWindowY
+                                chatDragSelection.startChatDrag(rowId, pointerWindowY)
                             }
                         },
                         onDragSelection = { pointerWindowY ->
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                dragPointerWindowY = pointerWindowY
-                                updateChatDragSelection(pointerWindowY)
+                                chatDragSelection.moveChatDragPointer(pointerWindowY)
+                                chatDragSelection.updateChatDragSelection(pointerWindowY, chatDragInputs)
                             } else {
                                 false
                             }
                         },
                         onDragSelectionEnd = {
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                                finishChatDrag(clearSelection = false)
+                                chatDragSelection.finishChatDrag(clearSelection = false)
                             }
                             heldMenuToken[1] = null
                         },
@@ -2138,11 +1929,11 @@ internal fun ChatsScreen(
                             if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
                                 actionSheetChatId = null
                                 actionMenuOwner.dismiss(heldMenuToken[1])
-                                finishChatDrag(clearSelection = true)
+                                chatDragSelection.finishChatDrag(clearSelection = true)
                             }
                             heldMenuToken[1] = null
                         },
-                        rangeDragActive = dragAnchorChatId == rowId,
+                        rangeDragActive = chatDragSelection.dragAnchorChatId == rowId,
                         onToggleSelection = {
                             if (menuActionsCurrent()) {
                                 // A row choice made while Select all resolves supersedes that pending read.
@@ -2169,9 +1960,9 @@ internal fun ChatsScreen(
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
                             // Pins below the loaded window still count; a move at the true end leaves the row in place.
                             showMovePinnedDown = pinnedIndex != null,
-                            onMarkRead = { markChatRead(item, unread = false) },
-                            onMarkUnread = { markChatRead(item, unread = true) },
-                            onAddToFolder = { openFolderPicker(listOf(item)) },
+                            onMarkRead = { chatListActions.markChatRead(item, unread = false) },
+                            onMarkUnread = { chatListActions.markChatRead(item, unread = true) },
+                            onAddToFolder = { chatListActions.openFolderPicker(listOf(item)) },
                             onExcludeFromFolder =
                                 selectedFolder?.let { folder ->
                                     {
@@ -2185,10 +1976,12 @@ internal fun ChatsScreen(
                                         }
                                     }
                                 },
-                            onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
-                            onMuteToggle = { toggleChatMute(item, muted) },
-                            onPinToggle = { toggleChatPin(item) },
-                            onMovePinned = { delta -> movePinnedChat(item, delta) },
+                            onArchiveToggle = {
+                                chatListActions.archiveChats(listOf(item), archive = !item.group.archived)
+                            },
+                            onMuteToggle = { chatListActions.toggleChatMute(item, muted) },
+                            onPinToggle = { chatListActions.toggleChatPin(item) },
+                            onMovePinned = { delta -> chatListActions.movePinnedChat(item, delta) },
                             onSelect = {
                                 clearSelection()
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
@@ -2479,11 +2272,11 @@ internal fun ChatsScreen(
                             }
                         },
                         onAddToFolder = {
-                            openFolderPicker(selectedVisibleItems)
+                            chatListActions.openFolderPicker(selectedVisibleItems)
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
+                        onMovePinned = { delta -> chatListActions.movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.
@@ -2507,6 +2300,7 @@ internal fun ChatsScreen(
                                         if (controller.chatListActionIsCurrent(owner)) {
                                             appState.presentTransient(
                                                 resources.getString(R.string.toast_chat_list_select_all_loaded_only),
+                                                kind = TransientNoticeKind.Information,
                                             )
                                         }
                                     }
@@ -2535,13 +2329,14 @@ internal fun ChatsScreen(
                 visible = !searchOpen && !selectionMode,
                 motionEnabled = rememberSystemAnimationsEnabled(),
             ) {
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    ChatsNewMessageFab(
-                        appState,
-                        openNewMessageFlow,
-                        onNewMessageOrigin = { newChatFlowOrigin = it },
-                    )
-                }
+                ChatsNewMessageFab(
+                    appState,
+                    openNewMessageFlow,
+                    onNewMessageOrigin = { pen ->
+                        newChatFlowLaunch = pen?.let { NewMessageFlowLaunch(it.origin, it) }
+                    },
+                    hidePen = { showNewChatFlow && newChatFlowLaunch?.pen?.drawsSource?.invoke() == true },
+                )
             }
         },
     ) { padding ->
@@ -2614,11 +2409,22 @@ internal fun ChatsScreen(
                 accountRef = controller.boundAccountRef,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
+                    recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
                     openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
+                    recordSearchOpen(GlobalSearchRecent.Profile(npub))
                     presentProfileFromVisibleList(npub)
                 },
+            )
+            GlobalSearchRecentStrip(
+                recents = searchRecents,
+                scopeToken = globalSearchState.accountScopeToken,
+                visible = globalSearchRecentsVisible(globalSearchState) && !selectionMode,
+                controller = controller,
+                appState = appState,
+                onOpenChat = { chat -> openGroupFromVisibleList(chat, null, false) },
+                onOpenProfile = ::presentProfileFromVisibleList,
             )
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
@@ -2683,16 +2489,14 @@ internal fun ChatsScreen(
                                     preservePendingAnchor = preservePendingSearchAnchor,
                                 )
                         if (keepChatListMounted) {
-                            PreparedVisibleGroupAvatarContent(
+                            PreparedChatListAvatarContent(
                                 appState,
                                 visibleItems,
                                 chatListState,
                                 ::visibleRowId,
-                                { it.selectedAvatarAsset },
                                 accountRef = controller.boundAccountRef,
                                 surfaceIdentity = controller,
                                 retainedPreparation = retainedAvatarPreparation,
-                                compatibilityId = { it.group.groupIdHex },
                             ) {
                                 LazyColumn(
                                     modifier =
@@ -2704,10 +2508,7 @@ internal fun ChatsScreen(
                                             .chatListEdgeFade(chatListState, motion = edgeFadeMotion)
                                             .then(folderArrival)
                                             .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                            .onGloballyPositioned { coordinates ->
-                                                chatListWindowTop = coordinates.positionInWindow().y
-                                                chatListHeightPx = coordinates.size.height.toFloat()
-                                            },
+                                            .onGloballyPositioned(chatDragSelection::updateListBounds),
                                     state = chatListState,
                                 ) {
                                     controller.error
@@ -2728,9 +2529,9 @@ internal fun ChatsScreen(
                                                 key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
                                                 contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
                                             ) {
-                                                ChatListSearchSectionHeader(
-                                                    title = stringResource(R.string.chat_list_filter_groups),
-                                                    testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                SectionHeader(
+                                                    text = stringResource(R.string.chat_list_filter_groups),
+                                                    modifier = Modifier.testTag(CHAT_LIST_SEARCH_GROUPS_HEADER_TAG),
                                                 )
                                             }
                                         }
@@ -2811,7 +2612,18 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
+                                EmptyChats(
+                                    appState,
+                                    onCreate = openNewMessageFlow,
+                                    onFirstRunHelp =
+                                        onFirstRunHelp.takeIf {
+                                            controller.error == null &&
+                                                controller.archivedItems.isEmpty() &&
+                                                selectedFolderId == null &&
+                                                !searchOpen &&
+                                                !searchActive
+                                        },
+                                ) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2987,183 +2799,6 @@ internal fun ChatsScreen(
     }
 }
 
-/**
- * Resolution state for a chat-list search query that parsed as a Nostr
- * identifier (npub / NIP-05) — issue #344. An npub resolves synchronously to
- * its key; a NIP-05 address has to be looked up over the network, so it passes
- * through [Resolving] before landing on [Resolved] or [Failed]. [None] is the
- * ordinary plain-text-query case where the chat list filters as before.
- */
-private sealed interface IdentifierResolution {
-    data object None : IdentifierResolution
-
-    data object Resolving : IdentifierResolution
-
-    /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
-    data class Resolved(
-        val npub: String,
-    ) : IdentifierResolution
-
-    /** Resolution failed; [messageRes] is the inline error to show. */
-    data class Failed(
-        @StringRes val messageRes: Int,
-        val arg: String? = null,
-    ) : IdentifierResolution
-}
-
-internal fun presentableIdentifierNpub(
-    resolvedAccountIdHex: String?,
-    npubForDisplay: (String) -> String,
-): String? =
-    resolvedAccountIdHex
-        ?.let(npubForDisplay)
-        ?.takeIf { it.startsWith("npub1") }
-
-/**
- * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
- * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight; once
- * resolved, either the existing 1:1 chat row (when the active account already
- * has a DM with the resolved key — tapping opens that conversation directly,
- * issue #344 step 2) or an "open profile" row (no existing chat — tapping
- * routes into the shared profile sheet, which surfaces the Start-chat
- * affordance, step 3); or an inline error on failure. Plain-text queries never
- * reach here — they keep filtering the list as before.
- */
-@Composable
-private fun ChatListIdentifierResult(
-    resolution: IdentifierResolution,
-    appState: WhiteNoiseAppState,
-    accountRef: String?,
-    existingDirectChat: (String) -> ChatListItem?,
-    onOpenChat: (ChatListItem) -> Unit,
-    onOpenProfile: (String) -> Unit,
-) {
-    when (resolution) {
-        IdentifierResolution.None -> Unit
-        IdentifierResolution.Resolving ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(
-                    stringResource(R.string.chat_list_search_resolving),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        is IdentifierResolution.Resolved -> {
-            // Surface the existing 1:1 chat as the top result so a single tap
-            // opens the conversation (issue #344 step 2). existingDirectChat
-            // reads snapshot-backed projected items, so this recomposes if the
-            // chat list lands the DM after the npub already resolved. Only when
-            // there is no existing DM do we fall back to the profile preview /
-            // Start-chat path (step 3).
-            val existing = existingDirectChat(resolution.npub)
-            if (existing != null) {
-                ChatRow(
-                    item = existing,
-                    appState = appState,
-                    accountRef = accountRef,
-                    onClick = { onOpenChat(existing) },
-                    onOpenProfile = onOpenProfile,
-                )
-            } else {
-                dev.ipf.whitenoise.android.ui.search.GlobalPersonRow(
-                    npub = resolution.npub,
-                    onOpen = onOpenProfile,
-                )
-            }
-        }
-        is IdentifierResolution.Failed ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_error),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    resolution.arg
-                        ?.let { stringResource(resolution.messageRes, it) }
-                        ?: stringResource(resolution.messageRes),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-    }
-}
-
-/**
- * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
- * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
- * it never overlaps either of them.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopControl(
-    visible: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier) {
-        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-        FloatingControlVisibility(
-            visible = visible,
-            motionEnabled = rememberSystemAnimationsEnabled(),
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-        ) {
-            ChatListJumpToTopButton(onClick = onClick)
-        }
-    }
-}
-
-/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-    Box(
-        modifier =
-            modifier
-                .size(42.dp)
-                .semantics { contentDescription = scrollToTopLabel }
-                .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_edge),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
-// 19 + 42 / 2 == 16 + 48 / 2.
-internal val JUMP_TO_TOP_END_INSET = 19.dp
-
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back
 // to HIDE — the 3–4 dead band gives hysteresis so a quick scroll wiggle near
@@ -3177,14 +2812,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
-
-private const val CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE = "search-section-header"
-
-internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_KEY = "chat-list-search-groups-header"
-internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY = "chat-list-search-messages-header"
-internal const val CHAT_LIST_SEARCH_GROUPS_HEADER_TAG = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY
-internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY
-
-// Debounce before global message results read their first MDK page (#1944). Sits inside the existing
-// 250–300 ms chat-list input debounce band so a fast typist doesn't trigger a query per keystroke.
-internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L

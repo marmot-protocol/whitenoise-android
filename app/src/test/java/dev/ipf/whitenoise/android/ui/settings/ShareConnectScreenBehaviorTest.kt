@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -14,11 +15,13 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.whitenoise.android.R
@@ -76,25 +79,33 @@ class ShareConnectScreenBehaviorTest {
     @Test
     fun keyCapsuleCopiesAndAnnouncesTheCopiedState() {
         mount(copied = false)
-        composeRule.onNodeWithContentDescription("Copy public key").assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithTag("share_connect.copy_public_key")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not copied"))
+            .performClick()
         composeRule.runOnIdle { assertEquals(1, copyCount) }
     }
 
-    /** While copied, the capsule announces the copied state instead of the copy action. */
+    /** While copied, the capsule announces its copied state. */
     @Test
     fun copiedCapsuleShowsTheCopiedDescription() {
         mount(copied = true)
-        composeRule.onNodeWithContentDescription("Copied").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("share_connect.copy_public_key")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Copied"))
     }
 
-    /** The pinned Scan QR Code button opens the scanner, and an invalid scan shows the error under the caption. */
+    /** The scanner entry and invalid-scan warning are both visible without scrolling. */
     @Test
     fun scanButtonOpensTheScannerAndInvalidScansExplain() {
         mount(scanInvalid = true)
-        composeRule.onNodeWithText("Scan QR Code").performClick()
+        composeRule.onNodeWithText("Scan QR Code").assertIsDisplayed().performClick()
         composeRule
             .onNode(hasText("That QR code doesn’t contain a White Noise profile."))
-            .performScrollTo()
             .assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(1, scannerCount) }
     }
@@ -108,15 +119,20 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithText("Scan to connect.").performScrollTo().assertIsDisplayed()
     }
 
-    /** The whole public key shows below the capsule for comparison, read as its contiguous value (#3321). */
+    /** The screen shows one key: short until tapped, then copied and expanded in groups of five (#3321). */
     @Test
-    fun theWholePublicKeyShowsBelowTheCapsule() {
+    fun tappingTheShortKeyCopiesAndExpandsTheWholeKey() {
         mount()
+        val npub = shareConnectFixture.npub
+        val text = composeRule.onNodeWithTag("share_connect.full_public_key", useUnmergedTree = true)
+        text.performScrollTo().assertIsDisplayed().assertTextEquals(publicKeyShortForm(npub))
         composeRule
-            .onNodeWithTag("share_connect.full_public_key", useUnmergedTree = true)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertTextEquals(shareConnectFixture.npub)
+            .onNodeWithTag("share_connect.copy_public_key")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(npub))))
+            .performClick()
+        composeRule.runOnIdle { assertEquals(1, copyCount) }
+        text.assertTextEquals(publicKeyDisplayGroups(npub).joinToString(" "))
+        composeRule.onAllNodesWithText(npub, substring = true).assertCountEquals(1)
     }
 
     /** Save to Gallery is the Share menu's last entry, and the toolbar carries no separate save action. */
@@ -248,7 +264,7 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithTag(SAVE_ENTRY).assertIsDisplayed()
     }
 
-    /** The capsule retains its existing explicit-copy action under a reveal wrapper. */
+    /** The key retains its explicit-copy action under a reveal wrapper. */
     @Test
     fun copySearchRevealDoesNotCopyUntilExplicitTap() {
         searchTarget = "ShareConnect.copy_public_key"
@@ -318,11 +334,11 @@ class ShareConnectScreenBehaviorTest {
     }
 }
 
-/** Alice with a verified-looking address; the key is a syntactically plausible npub of the right length. */
+/** Alice with a verified-looking address and a complete, checksum-valid npub, so her key can be copied. */
 internal val shareConnectFixture =
     ShareConnectProfile(
         name = "Alice",
-        npub = "npub1" + "q".repeat(58),
+        npub = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t",
         seed = "alice-account-id",
         pictureUrl = null,
         nostrAddress = "alice@example.com",

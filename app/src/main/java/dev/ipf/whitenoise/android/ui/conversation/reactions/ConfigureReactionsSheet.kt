@@ -18,7 +18,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,14 +39,15 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private val ConfigureReactionsMaximumWidth = 560.dp
 private val ReactionSlotSize = 56.dp
@@ -71,12 +71,10 @@ internal fun ConfigureReactionsSheet(
     onApply: (List<String>) -> Unit,
     onPickSlot: (Int, List<String>) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var draft by remember(current) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(current)) }
-    ModalBottomSheet(sheetState = sheetState, onDismissRequest = {
-        terminal.close(onDismiss)
-    }, containerColor = amoledSheetContainerColor()) {
+    WhiteNoiseModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
         WhiteNoiseSheetHeader(stringResource(R.string.configure_reactions))
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -85,8 +83,8 @@ internal fun ConfigureReactionsSheet(
                         .fillMaxWidth()
                         .widthIn(max = ConfigureReactionsMaximumWidth)
                         .fadingVerticalScroll(rememberScrollState())
-                        .padding(horizontal = WhiteNoiseSpacing.Section)
-                        .padding(bottom = WhiteNoiseSpacing.Section),
+                        .padding(horizontal = WhiteNoiseSheetInset)
+                        .padding(bottom = WhiteNoiseSheetInset),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
             ) {
                 Text(

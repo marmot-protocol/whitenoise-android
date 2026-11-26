@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 
 /** A remounted deep result viewport must not measure a shorter list before its anchor returns. */
 internal fun preserveSearchBodyAnchor(
@@ -14,18 +16,28 @@ internal fun preserveSearchBodyAnchor(
     firstVisibleOffset: Int,
 ): Boolean = sameDataset && (firstVisibleIndex > 0 || firstVisibleOffset > 0)
 
-/** One restored viewport waits for its first message-results load; retries keep already visible names usable. */
+/**
+ * One restored viewport waits for its first message-results load; retries keep already visible names usable.
+ * Snapshots [listState] without read observation so per-pixel scrolling never recomposes the caller.
+ */
 @Composable
 internal fun rememberSearchBodyAnchorRestoration(
     datasetKey: ChatListDatasetKey,
     sameDataset: Boolean,
-    firstVisibleIndex: Int,
-    firstVisibleOffset: Int,
+    listState: LazyListState,
     loading: Boolean,
 ): Boolean {
     val restoration =
         remember(datasetKey) {
-            SearchBodyAnchorRestoration(preserveSearchBodyAnchor(sameDataset, firstVisibleIndex, firstVisibleOffset))
+            val initiallyPending =
+                Snapshot.withoutReadObservation {
+                    preserveSearchBodyAnchor(
+                        sameDataset = sameDataset,
+                        firstVisibleIndex = listState.firstVisibleItemIndex,
+                        firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                    )
+                }
+            SearchBodyAnchorRestoration(initiallyPending)
         }
     SideEffect { restoration.observeLoading(loading) }
     return restoration.pending

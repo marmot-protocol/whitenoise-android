@@ -36,16 +36,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "setting:toast_chat_created",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
-        "anchor": "R.string.toast_chat_created",
-        "test_ids": [
-          "NCH-002",
-          "ACC-017",
-          "SET-028"
-        ]
-      },
-      {
         "surface": "setting:group_avatar_url",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
         "anchor": "R.string.group_avatar_url",
@@ -71,14 +61,6 @@
           "NCH-002",
           "ACC-017"
         ]
-      },
-      {
-        "surface": "setting:toast_some_members_not_added",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
-        "anchor": "R.string.toast_some_members_not_added",
-        "test_ids": [
-          "NCH-002"
-        ]
       }
     ],
     "source_coverage": [
@@ -96,6 +78,14 @@
         "anchor": "R.string.avatar_preparation_interrupted",
         "test_ids": [
           "STB-001"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "surface": "Conversation open from the native committed chat row",
+        "anchor": "loadCreatedGroupForOwner(",
+        "test_ids": [
+          "NCH-002"
         ]
       }
     ]

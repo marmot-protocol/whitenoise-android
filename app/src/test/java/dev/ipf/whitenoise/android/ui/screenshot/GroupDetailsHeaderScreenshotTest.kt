@@ -144,6 +144,11 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule.onNodeWithTag("chat_info.copy_public_key").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_copy_header_dark.png")
         composeRule.onNodeWithTag("chat_info.copy_public_key").performClick()
+        val expandedKey = composeRule.onNodeWithTag("chat_info.full_public_key", useUnmergedTree = true)
+        val layout = mutableListOf<TextLayoutResult>()
+        expandedKey.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layout) }
+        assertTrue("The full key should fit within three lines", layout.single().lineCount <= 3)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_expanded_key_dark.png")
         val clipboard =
             ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         assertEquals(

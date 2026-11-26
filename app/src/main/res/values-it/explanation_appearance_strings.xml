@@ -58,6 +58,6 @@
     <string name="explanation_appearance_action_color_save">Salva questo colore di azione per il profilo attivo e il tema attuale su questo dispositivo. Disponibile quando il colore è valido e diverso da quello salvato.</string>
     <string name="explanation_appearance_action_color_reset">Rimuove il tuo colore di azione personalizzato per il tema attuale e torna a quello predefinito. Vale per il profilo attivo su questo dispositivo.</string>
     <string name="explanation_appearance_bubble_colors_save">Salva i colori dei fumetti scelti. Valgono per il profilo attivo su questo dispositivo, oppure solo per questa chat se hai aperto la schermata da una chat.</string>
-    <string name="explanation_appearance_bubble_colors_menu">Apre un menu con un\'azione di ripristino che elimina qui i tuoi colori dei fumetti personalizzati e torna ai colori predefiniti.</string>
+    <string name="explanation_appearance_bubble_colors_reset">Elimina qui i tuoi colori dei fumetti personalizzati e torna ai colori predefiniti, o ai tuoi colori globali in una chat. Nulla cambia finché non salvi.</string>
     <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text trascrive su questo dispositivo. Usa il pulsante accanto al messaggio per nascondere la trascrizione.</string>
 </resources>

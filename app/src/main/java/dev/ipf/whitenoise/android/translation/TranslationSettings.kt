@@ -5,14 +5,12 @@ package dev.ipf.whitenoise.android.translation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -30,9 +27,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.DialogToggleControl
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogToggleRow
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.settings.SettingsSearchRowReveal
+import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
+import dev.ipf.whitenoise.android.ui.settings.SettingsLink
+import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * The one source of picker entries: detection plus catalog sources, or catalog targets only. Empty or
@@ -55,18 +60,25 @@ internal fun rememberTranslationLanguageChoices(allowDetection: Boolean): Transl
     }
 }
 
-/** Language choices are not a claim that the corresponding pack is installed. */
+/**
+ * A target-language choice that opens the searchable language sheet. [trigger] draws the control that opens it from
+ * the selected language's label, so a settings list can use its link row while a dialog keeps the default text
+ * button. Language choices are not a claim that the corresponding pack is installed.
+ */
 @Composable
 internal fun TranslationLanguagePicker(
     title: String,
     selected: String,
     onSelected: (String) -> Unit,
     allowDetection: Boolean = false,
+    trigger: @Composable (label: String, open: () -> Unit) -> Unit = { label, open ->
+        TextButton(onClick = open) { Text("$title: $label") }
+    },
 ) {
     var expanded by remember { mutableStateOf(false) }
     val choices = rememberTranslationLanguageChoices(allowDetection)
     Box {
-        TextButton(onClick = { expanded = true }) { Text("$title: ${choices.label(selected)}") }
+        trigger(choices.label(selected)) { expanded = true }
         if (expanded) {
             TranslationLanguagePickerSheet(
                 title = title,
@@ -82,34 +94,55 @@ internal fun TranslationLanguagePicker(
     }
 }
 
-/** Global automatic translation: the switch, its target with recovery for an unusable one, and the engine. */
+/**
+ * Global automatic translation as settings rows: the engine and provider explainers, then one group with the
+ * automatic switch and a target-language link whose value names the current target. The link is the
+ * [TranslationLanguagePicker]'s trigger, so it opens the same language sheet as the chat dialog; recovery for an
+ * unusable target and the engine action follow the group.
+ */
 @Composable
 internal fun TranslationGlobalSettingsContent(preferences: TranslationPreferences) {
     val revision by preferences.changes.collectAsState()
     val choice = remember(revision) { preferences.global() }
     val context = LocalContext.current
-    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.translation_engine_managed))
-        Text(stringResource(R.string.translation_privacy_warning))
-        SettingsSearchRowReveal("automatic") {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.translation_automatic), Modifier.weight(1f))
-                Switch(
+    val targetTitle = stringResource(R.string.translation_target_language)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+        SettingsExplainer(stringResource(R.string.translation_engine_managed))
+        SettingsExplainer(stringResource(R.string.translation_privacy_warning))
+        SettingsGroup {
+            row("automatic") { rowContext ->
+                SettingsSwitch(
+                    context = rowContext,
+                    title = stringResource(R.string.translation_automatic),
                     checked = choice.enabled,
                     onCheckedChange = { preferences.setGlobal(it, choice.target) },
                     modifier = Modifier.testTag("translation.automatic"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_translate) },
                 )
             }
+            row("target") { rowContext ->
+                TranslationLanguagePicker(
+                    title = targetTitle,
+                    selected = choice.target.orEmpty(),
+                    onSelected = { preferences.setGlobal(choice.enabled, it) },
+                ) { label, open ->
+                    SettingsLink(
+                        context = rowContext,
+                        title = targetTitle,
+                        value = label,
+                        onClick = open,
+                        modifier = Modifier.testTag("translation.target"),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_language) },
+                    )
+                }
+            }
         }
-        SettingsSearchRowReveal("target") {
-            TranslationLanguagePicker(
-                stringResource(R.string.translation_target_language),
-                choice.target.orEmpty(),
-                { preferences.setGlobal(choice.enabled, it) },
-            )
+        if (choice.target == null) {
+            TranslationTargetRecovery(Modifier.padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset))
         }
-        if (choice.target == null) TranslationTargetRecovery()
-        OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })
+        Box(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+            OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })
+        }
     }
 }
 
@@ -130,7 +163,7 @@ internal fun TranslationChatSettingsDialog(
     val currentOverride = remember(revision) { preferences.override(account, group) }
     val effectiveTarget = remember(revision) { preferences.effective(account, group).target }
     val context = LocalContext.current
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.translation_automatic)) },
         text = {
@@ -150,22 +183,28 @@ internal fun TranslationChatSettingsDialog(
     )
 }
 
-/** Inherit, On and Off for one chat; changing the mode never touches the chat's target language. */
+/**
+ * Inherit, On and Off for one chat as one group of the shared dialog radio rows, stacked flush as in a choice
+ * dialog; changing the mode never touches the chat's target language.
+ */
 @Composable
 private fun TranslationOverrideOptions(
     selected: TranslationOverride,
     onSelected: (TranslationOverride) -> Unit,
 ) {
-    TranslationOverride.entries.forEach { option ->
-        val label =
-            when (option) {
-                TranslationOverride.INHERIT -> R.string.translation_inherit
-                TranslationOverride.ON -> R.string.translation_on
-                TranslationOverride.OFF -> R.string.translation_off
-            }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected == option, onClick = { onSelected(option) })
-            TextButton(onClick = { onSelected(option) }) { Text(stringResource(label)) }
+    Column(Modifier.fillMaxWidth().selectableGroup()) {
+        TranslationOverride.entries.forEach { option ->
+            val label =
+                when (option) {
+                    TranslationOverride.INHERIT -> R.string.translation_inherit
+                    TranslationOverride.ON -> R.string.translation_on
+                    TranslationOverride.OFF -> R.string.translation_off
+                }
+            WhiteNoiseDialogChoiceRow(
+                title = stringResource(label),
+                selected = selected == option,
+                onClick = { onSelected(option) },
+            )
         }
     }
 }
@@ -174,7 +213,8 @@ private fun TranslationOverrideOptions(
  * The chat target: inherited, a catalog override, or a saved code that needs a new choice. Leaving inherit
  * starts from a usable global target, and otherwise saves nothing until a language is chosen. A change to the
  * saved target, from this dialog or elsewhere, reloads it so the checkbox and picker match storage, while an
- * unrelated preference change, such as the chat's mode, keeps a choice that is still pending.
+ * unrelated preference change, such as the chat's mode, keeps a choice that is still pending. The inherit choice is
+ * the shared dialog check row.
  */
 @Composable
 private fun TranslationChatTargetControls(
@@ -185,14 +225,16 @@ private fun TranslationChatTargetControls(
     val revision by preferences.changes.collectAsState()
     val savedTarget = remember(revision, account, group) { preferences.targetOverride(account, group) }
     var targetOverride by remember(account, group, savedTarget) { mutableStateOf(savedTarget) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(targetOverride == null, onCheckedChange = { inherit ->
+    WhiteNoiseDialogToggleRow(
+        title = stringResource(R.string.translation_inherit_language),
+        checked = targetOverride == null,
+        onCheckedChange = { inherit ->
             val start = if (inherit) null else preferences.global().target
             targetOverride = if (inherit) null else start.orEmpty()
             if (inherit || start != null) preferences.setTargetOverride(account, group, start)
-        })
-        Text(stringResource(R.string.translation_inherit_language))
-    }
+        },
+        control = DialogToggleControl.Checkbox,
+    )
     targetOverride?.let { target ->
         TranslationLanguagePicker(stringResource(R.string.translation_target_language), target, {
             targetOverride = it
@@ -201,12 +243,15 @@ private fun TranslationChatTargetControls(
     }
 }
 
-/** Explicit recovery for a saved target outside the catalog, shown instead of a silent substitute. */
+/**
+ * Explicit recovery for a saved target outside the catalog, shown instead of a silent substitute. [modifier] puts it
+ * on the caller's content line.
+ */
 @Composable
-private fun TranslationTargetRecovery() {
+private fun TranslationTargetRecovery(modifier: Modifier = Modifier) {
     Text(
         stringResource(R.string.translation_unsupported_target),
-        modifier = Modifier.testTag("translation.target_recovery"),
+        modifier = modifier.testTag("translation.target_recovery"),
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodyMedium,
     )

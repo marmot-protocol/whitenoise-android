@@ -20,7 +20,7 @@
     "children": [
       {
         "attributes": {
-          "text": "Allow Camera",
+          "text": "Allow camera",
           "ignoreBoundsFiltering": "false",
           "clickable": "false",
           "bounds": "[115,397][205,417]",

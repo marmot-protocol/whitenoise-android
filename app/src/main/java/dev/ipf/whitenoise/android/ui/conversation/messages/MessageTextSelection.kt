@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
+import dev.ipf.whitenoise.android.ui.common.ClipboardCopier
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import kotlin.math.max
 import kotlin.math.min
 
@@ -320,21 +322,22 @@ private fun squaredDistanceToRect(
 @Composable
 internal fun rememberExitOnCopyClipboard(onCopyCompleted: () -> Unit): Clipboard {
     val delegate = LocalClipboard.current
+    val copier = rememberClipboardCopier()
     val latestOnCopyCompleted by rememberUpdatedState(onCopyCompleted)
-    return remember(delegate) {
-        ExitOnCopyClipboard(delegate) { latestOnCopyCompleted() }
+    return remember(delegate, copier) {
+        ExitOnCopyClipboard(delegate, copier) { latestOnCopyCompleted() }
     }
 }
 
 internal class ExitOnCopyClipboard(
     private val delegate: Clipboard,
+    private val copier: ClipboardCopier,
     private val onCopyCompleted: () -> Unit,
 ) : Clipboard {
     override suspend fun getClipEntry(): ClipEntry? = delegate.getClipEntry()
 
     override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-        delegate.setClipEntry(clipEntry)
-        onCopyCompleted()
+        if (copier.copySelection(delegate, clipEntry)) onCopyCompleted()
     }
 
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")

@@ -41,6 +41,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
         "anchor": "fun GroupReviewCopyRow(",
         "test_ids": [
+          "GRP-005",
           "GRP-030",
           "GRP-034"
         ]
@@ -50,6 +51,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
         "anchor": "fun GroupReviewPersonText(",
         "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewKeyText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewKeyText(",
+        "test_ids": [
+          "GRP-005",
+          "GRP-030",
           "GRP-034"
         ]
       }

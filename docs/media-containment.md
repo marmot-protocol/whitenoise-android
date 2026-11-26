@@ -84,7 +84,7 @@ Inline eligibility requires a visible row, a resumed lifecycle, focused window, 
 
 A startup timeout retains animation admission even before OPEN: an unconnected Android instance may still be starting. This favours the one-worker resource bound over automatic recovery from an unconfirmed startup. If Android never reports a connection or worker death, the animation lane can remain unavailable until app-process restart; the still-image lane remains independent.
 
-Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness.
+Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Playback frames are converted no larger than the display's longest side (at least 1280 pixels). Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness.
 
 An accepted playback or transcription binding that never connects retains its lane,
 even though OPEN was never sent. A binding exception also leaves creation uncertain.
@@ -99,7 +99,7 @@ until app-process restart; resetting an account or waiting out a deadline does
 not clear that hold. A definitive false bind or a failure before binding has no
 possible worker and follows the existing no-worker cleanup path.
 
-Referenced Nostr-event networking retains its existing ExoPlayer owner and explicit loading policy; it remains outside local attachment containment.
+Referenced Nostr-event video no longer streams into an app-process extractor. Play downloads the one public HTTPS resource through the validated media client into a private per-player directory under `cache/nostr_video`, refusing a declared or streamed size over the decoder input limit, then plays that file through the same isolated player as local attachments. Playlists are never expanded: HLS links and typed HLS variants are not offered for in-app playback and stay ordinary links. The download refuses to fill the app's disk reserve. Dismissal releases the player and deletes its directory; startup deletes directories left by earlier processes, and the session wipe covers the folder. No production source constructs ExoPlayer; `AttachmentMediaContainmentCoverageTest` scans every Kotlin and Java file in the main source set for platform audio, video and image parsers, ExoPlayer and Media3 extractors outside the isolated workers.
 
 ## Native audio/video policy
 

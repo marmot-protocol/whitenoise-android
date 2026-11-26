@@ -40,10 +40,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.CameraRecordRed
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /** The camera's controls over a black preview: white chrome, as a phone camera shows it in every theme. */
 private val CameraChrome = Color.White
-private val CameraRecordRed = Color(0xFFE53935)
 private val CameraScrim = Color.Black.copy(alpha = 0.5f)
 private val CameraChipScrim = Color.Black.copy(alpha = 0.4f)
 private val CameraButtonSize = 48.dp
@@ -158,7 +159,7 @@ private fun NoSoundNotice() {
         modifier =
             Modifier
                 .padding(horizontal = 24.dp, vertical = 8.dp)
-                .background(CameraScrim, RoundedCornerShape(12.dp))
+                .background(CameraScrim, RoundedCornerShape(Radii.md))
                 .padding(horizontal = 12.dp, vertical = 6.dp)
                 .testTag("camera.noSound"),
     )
@@ -225,7 +226,7 @@ private fun ShutterButton(
                 .testTag("camera.shutter"),
     ) {
         when {
-            state.recording -> Box(Modifier.size(28.dp).background(CameraRecordRed, RoundedCornerShape(6.dp)))
+            state.recording -> Box(Modifier.size(28.dp).background(CameraRecordRed, RoundedCornerShape(Radii.sm)))
             state.mode == CameraMode.Video -> Box(Modifier.size(58.dp).background(CameraRecordRed, CircleShape))
             else -> Box(Modifier.size(58.dp).background(CameraChrome, CircleShape))
         }

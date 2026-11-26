@@ -165,6 +165,16 @@
           "ONB-028"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Bunker-link QR button aligns to the secure field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairingContent.kt",
+        "anchor": "alignBy(WhiteNoiseSecureInputCenter)",
+        "test_ids": [
+          "ONB-027"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

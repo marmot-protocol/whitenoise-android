@@ -2,8 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,7 +14,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountWipeCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.removeUnlinkedAccountForOutcome
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.runAccountWipeMutation
 
 internal const val UNLINKED_PROFILE_REMOVAL_TAG = "unlinked_profile.removal"
@@ -116,16 +114,15 @@ internal fun UnlinkedProfileRemovalDialog(
 ) {
     val detail = if (signingIn) R.string.unlinked_remove_sign_in_detail else R.string.unlinked_account_remove_detail
     val action = if (signingIn) R.string.unlinked_remove_sign_in else R.string.unlinked_account_remove_confirm
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onCancel,
+    ConfirmDialog(
         modifier = Modifier.testTag(UNLINKED_PROFILE_REMOVAL_TAG),
-        title = { Text(stringResource(R.string.device_unlinked_title)) },
-        text = { Text(stringResource(detail)) },
-        confirmButton = {
-            TextButton(onClick = onRemove, modifier = Modifier.testTag(UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG)) {
-                Text(stringResource(action))
-            }
-        },
-        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
+        title = stringResource(R.string.device_unlinked_title),
+        message = stringResource(detail),
+        confirmLabel = stringResource(action),
+        onConfirm = onRemove,
+        onDismiss = onCancel,
+        // Removing the profile deletes its chats and data from this device.
+        destructive = true,
+        confirmTag = UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG,
     )
 }

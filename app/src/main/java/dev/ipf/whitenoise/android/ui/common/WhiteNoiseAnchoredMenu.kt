@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlin.math.roundToInt
 
@@ -48,6 +49,8 @@ internal fun WhiteNoiseAnchoredMenu(
     touchX: Float? = null,
 ) {
     BackHandler(enabled = expanded && !focusable, onBack = onDismissRequest)
+    // A nonfocusable menu leaves keys with the activity, so its shortcuts wait for the menu.
+    if (expanded) HardwareShortcutBlocker()
     val rowPosition = MenuDefaults.rememberDropdownMenuPopupPositionProvider(MenuAnchorPosition.Below)
     val position =
         remember(rowPosition, touchX) {

@@ -39,9 +39,9 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-private val GlobalSearchResultAvatarSize = 40.dp
 private val GlobalSearchResultMinHeight = 72.dp
 private val GlobalSearchResultAttachmentIconSize = 16.dp
 private const val GLOBAL_SEARCH_RESULT_SNIPPET_LINES = 2
@@ -98,7 +98,13 @@ internal fun GlobalSearchResultRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
-        PersonAvatar(presentation.senderLabel, result.senderIdHex, GlobalSearchResultAvatarSize, presentation.avatarUrl)
+        PersonAvatar(
+            presentation.senderLabel,
+            result.senderIdHex,
+            WhiteNoiseSizes.AvatarCompact,
+            presentation.avatarUrl,
+            followedAccount = result.senderIdHex,
+        )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             GlobalSearchResultOrigin(presentation)
             Text(

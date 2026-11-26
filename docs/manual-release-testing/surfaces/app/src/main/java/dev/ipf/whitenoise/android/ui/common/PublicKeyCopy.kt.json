@@ -8,7 +8,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
         "anchor": "internal fun PublicKeyCopyText(",
         "test_ids": [
-          "ACC-002"
+          "ACC-002",
+          "GRP-005",
+          "NCH-010"
         ]
       },
       {
@@ -18,17 +20,19 @@
         "test_ids": [
           "ACC-002"
         ]
+      },
+      {
+        "surface": "Modifier.animatePublicKeyExpansion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+        "anchor": "fun Modifier.animatePublicKeyExpansion(",
+        "test_ids": [
+          "ACC-002",
+          "GRP-001",
+          "GRP-005"
+        ]
       }
     ],
     "settings_controls": [
-      {
-        "surface": "R.string.copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "ACC-002"
-        ]
-      },
       {
         "surface": "R.string.public_key_copy_action_with_value",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",

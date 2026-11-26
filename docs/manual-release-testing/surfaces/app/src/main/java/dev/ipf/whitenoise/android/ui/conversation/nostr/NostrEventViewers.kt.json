@@ -65,26 +65,25 @@
         ]
       },
       {
-        "surface": "NostrVideoPlaybackFailure",
+        "surface": "Shared viewer chrome: Nostr reader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
-        "anchor": "fun NostrVideoPlaybackFailure(",
+        "anchor": "AttachmentViewerChrome(",
         "test_ids": [
           "RDR-001"
         ]
       },
       {
-        "surface": "NostrVideoPlayerDialog",
+        "surface": "Nostr reader copy reference",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
-        "anchor": "fun NostrVideoPlayerDialog(",
+        "anchor": "R.string.nostr_event_copy",
         "test_ids": [
-          "RDR-001",
-          "MED-028"
+          "RDR-001"
         ]
       },
       {
-        "surface": "NostrVideoPlayerSurface",
+        "surface": "Nostr reader open externally",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
-        "anchor": "fun NostrVideoPlayerSurface(",
+        "anchor": "R.string.nostr_event_open",
         "test_ids": [
           "RDR-001"
         ]
@@ -100,14 +99,6 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
-        ]
-      },
-      {
-        "surface": "Referenced Nostr video pauses when headphones disconnect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
-        "anchor": "setHandleAudioBecomingNoisy(true)",
-        "test_ids": [
-          "MED-047"
         ]
       },
       {

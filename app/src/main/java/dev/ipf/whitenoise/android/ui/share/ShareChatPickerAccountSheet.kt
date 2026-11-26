@@ -15,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -35,10 +34,17 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
+/** Lets a share target pick which signed-in account sends when more than one is available. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ShareChatPickerAccountSheet(
@@ -51,10 +57,9 @@ internal fun ShareChatPickerAccountSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal =
         rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         sheetState = sheetState,
         onDismissRequest = { terminal.close(onDismiss) },
-        containerColor = amoledSheetContainerColor(),
     ) {
         ShareChatPickerAccountSheetContent(
             appState = appState,
@@ -71,6 +76,7 @@ internal fun ShareChatPickerAccountSheet(
     }
 }
 
+/** Sheet body: a title and one selectable row per account. */
 @Composable
 internal fun ShareChatPickerAccountSheetContent(
     appState: WhiteNoiseAppState,
@@ -79,31 +85,26 @@ internal fun ShareChatPickerAccountSheetContent(
     onChooseAccount: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .testTag(SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG)
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            stringResource(R.string.share_choose_sending_account),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            stringResource(R.string.share_choose_sending_account_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-            items(accounts, key = AccountSummaryFfi::label) { account ->
-                ShareChatPickerAccountItem(
-                    appState = appState,
-                    account = account,
-                    selected = account.label == selectedAccountRef,
-                    onChooseAccount = onChooseAccount,
-                )
+    Column(modifier = modifier.fillMaxWidth().testTag(SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG)) {
+        WhiteNoiseSheetHeader(stringResource(R.string.share_choose_sending_account))
+        Column(
+            Modifier.padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            Text(
+                stringResource(R.string.share_choose_sending_account_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                items(accounts, key = AccountSummaryFfi::label) { account ->
+                    ShareChatPickerAccountItem(
+                        appState = appState,
+                        account = account,
+                        selected = account.label == selectedAccountRef,
+                        onChooseAccount = onChooseAccount,
+                    )
+                }
             }
         }
     }
@@ -118,11 +119,13 @@ private fun ShareChatPickerAccountItem(
     onChooseAccount: (String) -> Unit,
 ) {
     val accountTitle = appState.networkDisplayName(account.accountIdHex)
+    val npub = appState.npubForDisplay(account.accountIdHex)
+    val titleIsKey = abbreviatesPublicKey(accountTitle, npub)
     ListItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(Radii.md))
                 .clickable(role = Role.RadioButton) { onChooseAccount(account.label) }
                 .semantics { this.selected = selected },
         colors =
@@ -144,16 +147,24 @@ private fun ShareChatPickerAccountItem(
             )
         },
         headlineContent = {
-            Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (titleIsKey) {
+                PublicKeyCopyText(accountTitle, npub)
+            } else {
+                Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         },
-        supportingContent = {
-            Text(
-                appState.shortNpub(account.accountIdHex),
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
+        supportingContent =
+            if (titleIsKey) {
+                null
+            } else {
+                {
+                    PublicKeyCopyText(
+                        appState.shortNpub(account.accountIdHex),
+                        npub,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    )
+                }
+            },
         trailingContent = {
             if (selected) {
                 Icon(painterResource(R.drawable.ic_check), contentDescription = stringResource(R.string.selected))

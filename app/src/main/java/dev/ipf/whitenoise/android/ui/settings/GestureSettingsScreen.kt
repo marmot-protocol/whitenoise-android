@@ -20,10 +20,12 @@ import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
 import dev.ipf.whitenoise.android.state.SwipePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SpeechChoice
-import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+
+/** The swipe-action choice dialog, which Maestro and Compose tests find without depending on its row content. */
+internal const val GESTURE_PICKER_TAG = "gestures.picker"
 
 /** Settings owns Android gesture preferences; command eligibility stays with each current row. */
 @Composable
@@ -54,7 +56,12 @@ internal fun GestureSettingsContent(
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     SettingsScaffold(title = stringResource(R.string.gestures_title), onBack = onBack) {
         SettingsList {
-            item(key = "search.GestureSettings.1") { SettingsSection(stringResource(R.string.gestures_messages)) }
+            item(key = "search.GestureSettings.1") {
+                SettingsSection(
+                    title = stringResource(R.string.gestures_messages),
+                    explanation = stringResource(R.string.gestures_physical_hint),
+                )
+            }
             item(key = "search.GestureSettings.2") {
                 SettingsGroup(destination = SettingsDetail.Gestures, surface = "message-gestures") {
                     for (binding in listOf(SwipeBinding.MessageLeft, SwipeBinding.MessageRight)) {
@@ -82,7 +89,12 @@ internal fun GestureSettingsContent(
                     }
                 }
             }
-            item(key = "search.GestureSettings.3") { SettingsSection(stringResource(R.string.chats)) }
+            item(key = "search.GestureSettings.3") {
+                SettingsSection(
+                    title = stringResource(R.string.chats),
+                    explanation = stringResource(R.string.gestures_physical_hint),
+                )
+            }
             item(key = "search.GestureSettings.4") {
                 SettingsGroup {
                     for (binding in listOf(SwipeBinding.ChatLeft, SwipeBinding.ChatRight)) {
@@ -125,9 +137,6 @@ internal fun GestureSettingsContent(
                     }
                 }
             }
-            item(key = "search.GestureSettings.6") {
-                SettingsCallout(text = stringResource(R.string.gestures_physical_hint))
-            }
             item(key = "search.GestureSettings.7") {
                 SettingsGroup {
                     row("reset") { rowContext ->
@@ -145,20 +154,19 @@ internal fun GestureSettingsContent(
         }
     }
     picker?.let { binding ->
-        SpeechChoiceDialog(
+        val actions = SwipePreferences.choices(binding)
+        val titles = actions.associateWith { actionTitle(it) }
+        ChoiceDialog(
             title = bindingTitle(binding),
+            values = actions,
+            selected = state.choice(binding),
+            label = titles::getValue,
             onDismiss = { picker = null },
-            choices =
-                SwipePreferences.choices(binding).map { action ->
-                    SpeechChoice(
-                        title = actionTitle(action),
-                        selected = state.choice(binding) == action,
-                        onClick = {
-                            onChange(binding, action)
-                            picker = null
-                        },
-                    )
-                },
+            onSelect = { action ->
+                onChange(binding, action)
+                picker = null
+            },
+            modifier = Modifier.testTag(GESTURE_PICKER_TAG),
         )
     }
 }

@@ -135,9 +135,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.back",
+        "surface": "Shared viewer chrome: text reader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
-        "anchor": "R.string.back",
+        "anchor": "AttachmentViewerChrome(",
         "test_ids": [
           "MED-010",
           "MED-056"
@@ -206,6 +206,15 @@
           "SCR-002",
           "SCR-003",
           "SCR-004",
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.text_attachment_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.text_attachment_loading",
+        "test_ids": [
+          "MED-001",
           "MED-056"
         ]
       }

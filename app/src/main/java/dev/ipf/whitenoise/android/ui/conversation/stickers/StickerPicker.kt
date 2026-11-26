@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.StickerKey
 import dev.ipf.whitenoise.android.state.StickerLibrary
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 
@@ -74,7 +75,7 @@ internal fun StickerPickerPage(
     val packs = library.installed.filter { it.stickers.isNotEmpty() }
     var selectedCoordinate by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = packs.firstOrNull { it.coordinate == selectedCoordinate } ?: packs.firstOrNull()
-    StickerSheetTopBar(stringResource(R.string.stickers_title), onBack = null, onClose = onClose) {
+    WhiteNoiseSheetHeader(stringResource(R.string.stickers_title), onBack = null, onClose = onClose) {
         IconButton(onClick = onBrowse, modifier = Modifier.testTag("sticker.browse")) {
             Icon(painterResource(R.drawable.ic_add), stringResource(R.string.sticker_packs_title))
         }

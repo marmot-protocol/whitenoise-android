@@ -17,7 +17,7 @@ class ChatListBulkDeleteCoverageTest {
         val confirmBlock =
             source.requiredSection(
                 start = "pendingBulkDelete?.let { request ->",
-                end = "\n}\n\n/**\n * Resolution state for a chat-list search query",
+                end = "\n}\n\n// Chat-list jump-to-top FAB thresholds",
             )
 
         assertTrue(

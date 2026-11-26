@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayTimeout.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SetupRelayTimeoutHosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayTimeout.kt",
+        "anchor": "fun SetupRelayTimeoutHosts(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Focused timeout depends on native Retry being the visible primary action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayTimeout.kt",
+        "anchor": "fun AccountSetupState.focusesRelayTimeout(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ]
+  }
+}

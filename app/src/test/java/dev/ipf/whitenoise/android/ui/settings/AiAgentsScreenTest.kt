@@ -171,7 +171,10 @@ class AiAgentsScreenTest {
                 AiAgentsContent(
                     npub = npub.value,
                     onBack = {},
-                    onCopy = { label, value -> copies += label to value },
+                    onCopy = { label, value ->
+                        copies += label to value
+                        true
+                    },
                     onOpenDocs = { true },
                 )
             }
@@ -353,7 +356,10 @@ class AiAgentsScreenTest {
                 AiAgentsContent(
                     npub = npub,
                     onBack = { backCount++ },
-                    onCopy = { label, value -> copies += label to value },
+                    onCopy = { label, value ->
+                        copies += label to value
+                        true
+                    },
                     onOpenDocs = {
                         documentationHandOffs++
                         documentationOpens

@@ -9,14 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
@@ -56,13 +59,6 @@ private object ChoiceDialogDefaults {
     /** Supporting copy sits one form-field gap beneath the choices. */
     val SupportingTopSpacing = 16.dp
 
-    /**
-     * Material's BasicAlertDialog only bounds the surface to 280–560 dp, so filling content would reach
-     * both screen edges on a 360 dp phone. A 312 dp surface (264 dp of content inside the 24 dp dialog
-     * inset) keeps the customary 24 dp side margins.
-     */
-    val ContentMaxWidth = 264.dp
-
     /** AMOLED has no tonal surfaces, so the selected row uses a faint content-colour wash instead. */
     const val AmoledSelectionAlpha = 0.16f
 }
@@ -86,14 +82,13 @@ internal fun <T> ChoiceDialog(
     supportingText: String? = null,
     subtitle: (T) -> String? = { null },
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = modifier.exposePerformanceTestTags(),
+        modifier = modifier,
         title = { Text(title) },
         text = {
             Column(
                 Modifier
-                    .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
                     .fadingVerticalScroll(rememberScrollState()),
             ) {
@@ -125,8 +120,8 @@ internal fun <T> ChoiceDialog(
     )
 }
 
-/** Dialog-owned insets, a rounded selected fill, and one radio accessibility target per row. */
-@Suppress("FunctionNaming")
+/** Extends the shared choice row into the dialog content padding, leaving an 8 dp gutter. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun WhiteNoiseDialogChoiceRow(
     title: String,
@@ -140,35 +135,127 @@ internal fun WhiteNoiseDialogChoiceRow(
     highlightSelected: Boolean = true,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
+        WhiteNoiseChoiceRow(
+            title = title,
+            selected = selected,
+            onClick = onClick,
+            modifier = Modifier.requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2).then(modifier),
+            fontFamily = fontFamily,
+            subtitle = subtitle,
+            enabled = enabled,
+            accessibilityLabel = accessibilityLabel,
+            highlightSelected = highlightSelected,
+        )
+    }
+}
+
+/** A rounded choice with wrapping text and one radio accessibility target across the whole row. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun WhiteNoiseChoiceRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    fontFamily: FontFamily? = null,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    accessibilityLabel: String? = null,
+    highlightSelected: Boolean = true,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
+                .whiteNoiseDialogSelection(selected && enabled && highlightSelected)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .then(
+                    if (accessibilityLabel == null) {
+                        Modifier
+                    } else {
+                        Modifier.semantics(mergeDescendants = true) { contentDescription = accessibilityLabel }
+                    },
+                ).padding(horizontal = ChoiceDialogDefaults.RowOverhang),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            enabled = enabled,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = ChoiceDialogDefaults.RowOverhang)
+                .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
+        ) {
+            Text(
+                text = title,
+                color =
+                    if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = fontFamily,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+/** The decorative control a [WhiteNoiseDialogToggleRow] draws; the row itself carries the matching role. */
+internal enum class DialogToggleControl(
+    val role: Role,
+) {
+    Switch(Role.Switch),
+    Checkbox(Role.Checkbox),
+}
+
+/**
+ * The on/off counterpart of [WhiteNoiseDialogChoiceRow]: the same dialog-owned insets, minimum height, type and
+ * selected fill, a trailing switch or check box that stays decorative, and one toggle target for the whole row.
+ * [subtitleMaxLines] and [subtitleOverflow] let a row keep a long file name on one line; holding a row with
+ * [explanation] explains [title].
+ */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun WhiteNoiseDialogToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    control: DialogToggleControl = DialogToggleControl.Switch,
+    subtitle: String? = null,
+    subtitleMaxLines: Int = Int.MAX_VALUE,
+    subtitleOverflow: TextOverflow = TextOverflow.Clip,
+    enabled: Boolean = true,
+    explanation: String? = null,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
         Row(
             modifier =
                 Modifier
                     .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
                     .then(modifier)
                     .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
-                    .whiteNoiseDialogSelection(selected && enabled && highlightSelected)
-                    .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-                    .then(
-                        if (accessibilityLabel == null) {
-                            Modifier
-                        } else {
-                            Modifier.semantics(mergeDescendants = true) { contentDescription = accessibilityLabel }
-                        },
-                    ).padding(horizontal = ChoiceDialogDefaults.RowOverhang),
+                    .whiteNoiseDialogSelection(checked && enabled)
+                    .explainOnLongPress(explanation?.let { Explanation(title, it) })
+                    .toggleable(checked, enabled = enabled, role = control.role, onValueChange = onCheckedChange)
+                    .padding(horizontal = ChoiceDialogDefaults.RowOverhang),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ChoiceDialogDefaults.RowOverhang),
         ) {
-            RadioButton(
-                selected = selected,
-                onClick = null,
-                enabled = enabled,
-                modifier = Modifier.clearAndSetSemantics {},
-            )
-            Column(
-                Modifier
-                    .weight(1f)
-                    .padding(start = ChoiceDialogDefaults.RowOverhang)
-                    .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
-            ) {
+            Column(Modifier.weight(1f).padding(vertical = ChoiceDialogDefaults.RowTextPadding)) {
                 Text(
                     text = title,
                     color =
@@ -178,14 +265,24 @@ internal fun WhiteNoiseDialogChoiceRow(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = fontFamily,
                 )
                 if (subtitle != null) {
                     Text(
                         text = subtitle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
+                        maxLines = subtitleMaxLines,
+                        overflow = subtitleOverflow,
                     )
+                }
+            }
+            val silent = Modifier.clearAndSetSemantics {}
+            when (control) {
+                DialogToggleControl.Switch -> {
+                    Switch(checked, onCheckedChange = null, enabled = enabled, modifier = silent)
+                }
+                DialogToggleControl.Checkbox -> {
+                    Checkbox(checked, onCheckedChange = null, enabled = enabled, modifier = silent)
                 }
             }
         }
@@ -198,8 +295,8 @@ internal fun Modifier.whiteNoiseDialogSelection(selected: Boolean): Modifier =
     clip(MaterialTheme.shapes.large).background(if (selected) dialogSelectionColor() else Color.Transparent)
 
 /**
- * The selected choice fill. AlertDialog already sits on `surfaceContainerHigh`, so the tonal fill is one
- * step higher; the black AMOLED canvas has no tonal steps and uses a faint content wash instead.
+ * The selected choice fill. App dialogs and sheets sit on `surfaceContainerLow`, so the tonal fill is the highest
+ * container; the black AMOLED canvas has no tonal steps and uses a faint content wash instead.
  */
 @Composable
 private fun dialogSelectionColor(): Color =
@@ -254,6 +351,23 @@ internal fun WhiteNoiseAlertDialog(
     }
 }
 
+/** The dialog surface every White Noise dialog sits on, for content that lays out its own actions. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun WhiteNoiseDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = AlertDialogDefaults.shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
+        border = amoledOutlineBorder(),
+        content = content,
+    )
+}
+
 /** One option in a speech picker: its own label, selected state, availability reason and action. */
 internal data class SpeechChoice(
     val title: String,
@@ -275,14 +389,12 @@ internal fun SpeechChoiceDialog(
     choices: List<SpeechChoice>,
     onDismiss: () -> Unit,
 ) {
-    AnimatedAlertDialog(
+    WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.exposePerformanceTestTags(),
         title = { Text(title) },
         text = {
             Column(
                 Modifier
-                    .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
                     .heightIn(max = SpeechChoiceDialogMaxHeight)
                     .fadingVerticalScroll(rememberScrollState())

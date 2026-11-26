@@ -261,7 +261,7 @@ class FocusedMessageImeOverlayTest {
         }
     }
 
-    /** Mounts a full action menu at doubled text size with configurable preview and callbacks. */
+    /** Mounts the full action set at doubled text size with configurable preview and callbacks. */
     private fun showLongTextMenu(
         onDelete: () -> Unit,
         onDismiss: () -> Unit = {},
@@ -302,6 +302,9 @@ class FocusedMessageImeOverlayTest {
                 )
             }
         }
+        // Delete, the destructive canary these checks follow, waits behind More actions (#4077).
+        composeRule.onNodeWithText("More actions").performScrollTo().performClick()
+        composeRule.waitForIdle()
     }
 
     /** Renders the production text preview with a long excerpt, reply, and timestamp. */

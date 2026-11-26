@@ -263,20 +263,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
-      "calls": {
-        "fadingVerticalScroll": 1
-      },
-      "family": "common",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -291,7 +277,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -715,7 +701,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",
@@ -785,7 +771,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "conversation/messages",
       "policy": "ordinary",
@@ -925,10 +911,10 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
       "calls": {
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 1
       },
       "family": "group",
-      "policy": "Scroll the abandonment identities, consequences and failure, and the sole-admin gate's explanation, while Cancel and the destructive action stay reachable at large text sizes.",
+      "policy": "Scroll the abandonment identities, consequences and failure while Cancel, Copy and the destructive action stay reachable at large text sizes.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
@@ -1054,9 +1040,22 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
       "calls": {
-        "WhiteNoiseLazyVerticalGrid": 1,
         "WhiteNoiseLazyColumn": 1,
         "AnimatedDropdownMenu": 1
+      },
+      "family": "medialibrary",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
       },
       "family": "medialibrary",
       "policy": "ordinary",
@@ -1082,7 +1081,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingPinnedActionPage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -1125,20 +1124,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
-      "calls": {
-        "whiteNoiseVerticalScroll": 1
-      },
-      "family": "onboarding",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -2088,6 +2073,22 @@
         "fadingVerticalScroll": 1
       },
       "family": "common",
+      "policy": "Scroll the message and body slot (the sole-admin explanation and other confirmation bodies) while Cancel and the confirm action stay reachable at large text sizes.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "GRP-010",
+        "GRP-033"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
       "policy": "ordinary",
       "test_ids": [
         "SCR-001",
@@ -2099,7 +2100,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
       "calls": {
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 1
       },
       "family": "group",
       "policy": "ordinary",
@@ -2235,7 +2236,21 @@
         "SCR-003",
         "SCR-004"
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

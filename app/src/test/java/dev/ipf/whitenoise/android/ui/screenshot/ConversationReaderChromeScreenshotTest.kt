@@ -78,6 +78,11 @@ class ConversationReaderChromeScreenshotTest {
     /** Large RTL fallback history keeps full revision text, the Original row and a reachable native Back. */
     @Test fun historyDarkLargeRtl() = captureHistory("conversation_edit_history_dark_large_rtl", dark = true)
 
+    /** On AMOLED the shared top bar and its Back arrow stay on the black canvas above the revisions. */
+    @Test fun historyAmoled() {
+        captureHistory("conversation_edit_history_amoled", dark = true, amoled = true, largeRtl = false)
+    }
+
     /** The conversation entry reuses the shared filter action and removable chat preset. */
     @Test fun searchLight() = captureSearch("conversation_search_header_light", largeRtl = false)
 
@@ -114,12 +119,14 @@ class ConversationReaderChromeScreenshotTest {
     /**
      * Uses accepted native versions with exact timestamps, never a prototype history controller. With
      * [authoritative] the dialog loads MarmotKit's complete history, which differs from the window's edits
-     * and carries no original body.
+     * and carries no original body. [largeRtl] defaults to [dark], so the dark capture is also the large RTL one.
      */
     private fun captureHistory(
         name: String,
         dark: Boolean,
         authoritative: Boolean = false,
+        amoled: Boolean = false,
+        largeRtl: Boolean = dark,
     ) {
         var dismissed = 0
         val first = "First accepted revision"
@@ -132,9 +139,9 @@ class ConversationReaderChromeScreenshotTest {
             )
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalLayoutDirection provides if (dark) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, fontScale = if (dark) 2f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     EditHistoryDialog(
                         original = "Original message".takeUnless { authoritative },
                         originalTimestamp = 1_800_000_000uL,

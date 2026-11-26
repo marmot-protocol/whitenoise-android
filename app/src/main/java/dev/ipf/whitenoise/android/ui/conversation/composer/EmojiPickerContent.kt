@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -34,9 +33,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -49,7 +45,9 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.composerEmojiArtwork
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -57,7 +55,6 @@ import dev.ipf.whitenoise.android.ui.emojiSearchLayout
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
 import dev.ipf.whitenoise.android.ui.hides
 import dev.ipf.whitenoise.android.ui.installedSetSearchSections
-import dev.ipf.whitenoise.android.ui.libraryEmojiArtwork
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -378,18 +375,13 @@ internal fun EmojiSectionGrid(
 /** Header text of one emoji section. */
 @Composable
 private fun EmojiSectionHeader(category: EmojiPickerTab) {
-    Text(
+    SectionHeader(
         text = emojiPickerTabTitle(category),
         modifier =
             Modifier
-                .fillMaxWidth()
                 .heightIn(min = EmojiPickerSectionHeaderMinimumHeight)
-                .padding(top = WhiteNoiseSpacing.Related)
-                .semantics { heading() }
                 .testTag(emojiPickerHeaderTestTag(category)),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
+        contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related),
     )
 }
 
@@ -423,13 +415,7 @@ internal fun EmojiGlyph(
             baseStyle = baseStyle,
             densityFontScale = LocalDensity.current.fontScale,
         )
-    val customEmoji = LocalCustomEmoji.current
-    val art =
-        if (customEmoji.usesInstalledArtwork(emoji) || customEmoji.usesConversationArtwork(emoji)) {
-            libraryEmojiArtwork(emoji)
-        } else {
-            EmojiShortcodes.art(emoji, customEmoji, emptyMap())
-        }
+    val art = composerEmojiArtwork(emoji)
     if (art != null) {
         // Artwork takes the Unicode glyph's em box, so every emoji in a row reads at one size.
         val artSize = with(LocalDensity.current) { emojiGlyphArtworkSize(fontSize, size) }

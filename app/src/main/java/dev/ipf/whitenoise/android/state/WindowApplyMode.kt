@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -49,15 +48,8 @@ internal fun currentWindowApplySnapshot(
     heldOrder: Map<String, ULong> = emptyMap(),
 ) = WindowApplySnapshot(heldRecords.toList(), pendingProjectionIds.toSet(), heldOrder.toMap())
 
-/** Resolves the display index key off-main so commit validation never projects a record. */
-private fun preparedProjectedItemId(
-    messageIdHex: String,
-    actionRecord: AppMessageRecordFfi,
-): String {
-    val streamId =
-        MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-    return streamId?.let { "stream:$it" } ?: "msg:$messageIdHex"
-}
+/** The display index key of a projected row, `msg:<id>`. */
+private fun preparedProjectedItemId(messageIdHex: String): String = "msg:$messageIdHex"
 
 /** Pure result of interpreting a native window before the main-thread commit. */
 internal data class PreparedWindowRow(
@@ -161,12 +153,6 @@ internal suspend fun prepareWindowApplyOn(
         )
     }
 
-/** Excludes stream starts whose terminal row landed in the same window. */
-internal fun windowStreamIdsToLaunch(
-    streamIds: List<String>,
-    isRemoved: (String) -> Boolean,
-): List<String> = streamIds.filterNot(isRemoved)
-
 /**
  * Derives the immutable part of a window application.
  *
@@ -214,7 +200,7 @@ internal fun prepareWindowApply(
             PreparedWindowRow(
                 record = carried,
                 actionRecord = actionRecord,
-                projectedItemId = preparedProjectedItemId(record.messageIdHex, actionRecord),
+                projectedItemId = preparedProjectedItemId(record.messageIdHex),
                 needsProjection =
                     mode == WindowApplyMode.REPLACE ||
                         current == null ||
@@ -255,12 +241,7 @@ internal fun prepareWindowApply(
 internal fun ConversationController.refreshAuthoritativeOrder(page: TimelinePageFfi) {
     page.messages.forEach { record ->
         val id = record.messageIdHex
-        // Ordinary rows are keyed by message id, so look that up directly; only a durable stream
-        // row, keyed by its stream id, needs the scan.
-        val itemId =
-            "msg:$id".takeIf(timelineItemsById::containsKey)
-                ?: timelineItemsById.keys.firstOrNull { timelineItemHoldsMessage(it, id) }
-                ?: return@forEach
+        val itemId = "msg:$id"
         val item = timelineItemsById[itemId] ?: return@forEach
         val ordinal =
             authoritativeTimelineOrderByMessageId[id]
@@ -270,12 +251,6 @@ internal fun ConversationController.refreshAuthoritativeOrder(page: TimelinePage
         }
     }
 }
-
-/** Whether a projected item id stands for this message; durable stream rows carry a stream id instead. */
-private fun ConversationController.timelineItemHoldsMessage(
-    itemId: String,
-    messageIdHex: String,
-): Boolean = timelineItemsById[itemId]?.record?.messageIdHex == messageIdHex
 
 /**
  * How far the page's ordinals must move to line up with the rows the timeline already holds, or

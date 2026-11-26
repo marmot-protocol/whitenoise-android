@@ -14,12 +14,16 @@
         ]
       },
       {
-        "surface": "CopyableFullPublicKey",
+        "surface": "CopyablePublicKey",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
-        "anchor": "internal fun CopyableFullPublicKey(",
+        "anchor": "internal fun CopyablePublicKey(",
         "test_ids": [
           "ACC-001",
-          "ACC-002"
+          "ACC-002",
+          "ACC-019",
+          "GRP-001",
+          "NAV-004",
+          "SET-001"
         ]
       }
     ],
@@ -29,7 +33,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
         "anchor": "R.string.copy_public_key",
         "test_ids": [
-          "ACC-002"
+          "ACC-002",
+          "GRP-001",
+          "SYS-007"
         ]
       },
       {
@@ -37,7 +43,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
         "anchor": "R.string.copied",
         "test_ids": [
-          "ACC-002"
+          "ACC-002",
+          "GRP-001",
+          "SYS-007"
         ]
       },
       {
@@ -45,7 +53,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
         "anchor": "R.string.not_copied",
         "test_ids": [
-          "ACC-002"
+          "ACC-002",
+          "GRP-001",
+          "SYS-007"
         ]
       }
     ],

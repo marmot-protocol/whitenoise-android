@@ -1,0 +1,40 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListIdentifierResult",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
+        "anchor": "fun ChatListIdentifierResult(",
+        "test_ids": [
+          "CHL-001",
+          "FIND-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_list_search_resolving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
+        "anchor": "R.string.chat_list_search_resolving",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Followed frame on identifier preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
+        "anchor": "followedAccount = accountIdHex",
+        "test_ids": [
+          "FIND-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

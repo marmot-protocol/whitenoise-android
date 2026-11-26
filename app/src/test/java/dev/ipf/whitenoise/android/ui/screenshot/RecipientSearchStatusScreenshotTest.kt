@@ -26,11 +26,11 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.UserSearchUpdateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
-import dev.ipf.whitenoise.android.ui.chats.newchat.FOLLOWED_PERSON_BADGE_TEST_TAG
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientUserSearchState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.aggregateRecipientSearchUpdates
+import dev.ipf.whitenoise.android.ui.common.FOLLOWED_PERSON_BADGE_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -116,7 +116,7 @@ class RecipientSearchStatusScreenshotTest {
                     Surface {
                         Column(Modifier.width(360.dp).testTag(ROOT_TAG)) {
                             for (candidate in state.value.candidates) {
-                                ContactRow(
+                                PersonRow(
                                     title = candidate.displayName,
                                     subtitle =
                                         context.getString(
@@ -156,7 +156,7 @@ class RecipientSearchStatusScreenshotTest {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Surface(color = if (amoled) Color.Black else MaterialTheme.colorScheme.surface) {
                         Column(Modifier.width(width.dp).testTag(ROOT_TAG)) {
-                            ContactRow(
+                            PersonRow(
                                 title = "Ada Lovelace",
                                 subtitle = context.getString(R.string.user_search_you_follow),
                                 avatarSeed = "ada",
@@ -164,7 +164,7 @@ class RecipientSearchStatusScreenshotTest {
                                 avatarImage = avatarPicture,
                                 isFollowed = true,
                             )
-                            ContactRow(
+                            PersonRow(
                                 title = "Grace Hopper",
                                 subtitle = context.getString(R.string.user_search_you_follow),
                                 avatarSeed = "grace",
@@ -173,7 +173,7 @@ class RecipientSearchStatusScreenshotTest {
                                 selectionState = true,
                                 trailing = { SelectionIndicator(selected = true) },
                             )
-                            ContactRow(
+                            PersonRow(
                                 title = "Katherine Johnson",
                                 subtitle = context.getString(R.string.user_search_result),
                                 avatarSeed = "katherine",

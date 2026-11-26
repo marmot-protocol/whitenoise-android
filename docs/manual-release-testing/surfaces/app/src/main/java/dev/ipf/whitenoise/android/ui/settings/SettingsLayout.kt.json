@@ -25,7 +25,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
         "anchor": "fun SettingsExplainer(",
         "test_ids": [
-          "SET-002"
+          "SET-002",
+          "SET-072"
         ]
       },
       {
@@ -104,14 +105,6 @@
         "surface": "string:copy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
         "anchor": "R.string.copy",
-        "test_ids": [
-          "SET-019"
-        ]
-      },
-      {
-        "surface": "string:copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
-        "anchor": "R.string.copied",
         "test_ids": [
           "SET-019"
         ]

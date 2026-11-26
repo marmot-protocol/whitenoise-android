@@ -644,7 +644,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 id = peerPreview.messageIdHex,
                 recordedAt = peerPreview.timelineAt,
             ).copy(groupIdHex = DICTATION_GROUP, sender = peerPreview.sender, plaintext = peerPreview.plaintext)
-        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(
+        fixture.controller.testApplyLiveTimelineChanges(
             listOf(
                 TimelineMessageChangeFfi.Upsert(
                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,

@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,9 +25,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AppDivider
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -78,12 +74,7 @@ internal fun ProfileReadinessChecklist(readiness: ProfileReadiness) {
                     style = MaterialTheme.typography.titleSmall,
                 )
                 if (hasFields) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    DisclosureChevron(expanded, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (expanded && hasFields) {

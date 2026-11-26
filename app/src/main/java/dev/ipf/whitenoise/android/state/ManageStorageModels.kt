@@ -122,8 +122,9 @@ internal data class ChatStorageEntry(
 )
 
 /**
- * One retained attachment, as listed largest first. [receivedAtSeconds] is zero when unknown. The peer-supplied file
- * name is deliberately not carried, since this screen shows no file names.
+ * One retained attachment, as listed largest first. [receivedAtSeconds] is zero when unknown. [fileName] is the
+ * sender-supplied name from the published descriptor, empty when there is none; show it only through
+ * `storageDisplayName`, which strips anything that could spoof the row.
  */
 internal data class StoredAttachment(
     val groupIdHex: String,
@@ -133,6 +134,7 @@ internal data class StoredAttachment(
     val bytes: Long,
     val mediaType: String,
     val receivedAtSeconds: Long,
+    val fileName: String = "",
 ) {
     /** Stable identity within one account, used for list keys and selection. */
     val key: String get() = "$groupIdHex|$messageIdHex|$sourceMessageIdHex|$attachmentIndex"

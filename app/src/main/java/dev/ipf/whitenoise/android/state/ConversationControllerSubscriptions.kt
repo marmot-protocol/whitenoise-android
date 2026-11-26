@@ -109,17 +109,17 @@ private fun ConversationController.publishAuthoritativeEmptyInitialTimeline() {
 
 internal fun ConversationController.isAccountTeardownRequested(): Boolean = timelineSession.accountTeardownRequested
 
-// The initial page is a local read, but it crosses the FFI boundary — a
-// hung call would leave the chat-list tap permanently inert because
-// navigation cannot promote until the first page publishes. Bound it, and
-// convert exhaustion into the ordinary load failure whose surface already
-// promotes navigation and offers retry. Every subscription open, including
-// reconnects with a retained window, consumes its one-shot snapshot before
-// waiting for live updates.
+/**
+ * Applies the subscription's one-shot snapshot as the first page. The initial page is a local read, but it crosses
+ * the FFI boundary — a hung call would leave the chat-list tap permanently inert because navigation cannot promote
+ * until the first page publishes. Bound it, and convert exhaustion into the ordinary load failure whose surface
+ * already promotes navigation and offers retry. Every subscription open, including reconnects with a retained
+ * window, consumes its one-shot snapshot before waiting for live updates.
+ */
 private suspend fun ConversationController.publishInitialTimelineSnapshot(
     account: String,
     timelineStream: ConversationTimelineSubscriptionHandle,
-): List<String> {
+) {
     val snapshot = timelineSession.snapshot(timelineStream)
     windowPresentationTiming.begin(
         receivedAtElapsedMs = SystemClock.elapsedRealtime(),
@@ -129,27 +129,24 @@ private suspend fun ConversationController.publishInitialTimelineSnapshot(
         appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(
             count = snapshot?.messages?.size ?: 0,
         )
-    return if (snapshot == null) {
+    if (snapshot == null) {
         if (timelineRecords.isEmpty()) publishAuthoritativeEmptyInitialTimeline()
         publishRecoveryTimelineProjection(recoveryGeneration)
-        emptyList()
     } else {
         hasLoadedOlderPages = false
         protectedTimelineMessageIds.clear()
         // A reconnect's snapshot reads its cards first; a first page has its own hold.
         val warmedSnapshot = warmLaterPageEventCards(snapshot)
-        val streamIds =
-            appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
-                applyTimelinePage(
-                    warmedSnapshot,
-                    replaceWindow = true,
-                    updatePagination = true,
-                )
-            }
+        appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+            applyTimelinePage(
+                warmedSnapshot,
+                replaceWindow = true,
+                updatePagination = true,
+            )
+        }
         initializeReadState(account)
         publishRecoveryTimelineProjection(recoveryGeneration)
         publishReadyTimelineSubscription(timelineStream)
-        streamIds
     }
 }
 
@@ -189,7 +186,7 @@ private suspend fun ConversationController.runConversationSubscriptionIteration(
             timelineSession.openTimeline {
                 liveSubscriptions.openTimeline(account, group.groupIdHex, ConversationTimelinePageLimit)
             } ?: return true to false
-        val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
+        publishInitialTimelineSnapshot(account, timelineStream)
         timelineOpen.success()
         // Don't blanket-mark the absolute newest as read here — the UI
         // layer now drives mark-read as the user scrolls so partial-read
@@ -199,20 +196,9 @@ private suspend fun ConversationController.runConversationSubscriptionIteration(
         val initialMetadataReady = CompletableDeferred<Unit>()
 
         coroutineScope {
-            runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
-                startAttemptJobs = {
-                    // Snapshot-time agent streams are attempt-scoped: cancel them when
-                    // either live subscription ends, but do not join them before
-                    // reconnecting and closing the dropped live subscription handles.
-                    // Batch-time streams below remain timeline-pipeline children.
-                    snapshotStreamIds.forEach { streamId ->
-                        if (activeStreamIds.add(streamId)) {
-                            launch { watchAgentTextStream(account, streamId) }
-                        }
-                    }
-                },
+            runUntilFirstLiveSubscriptionEnds(
                 first = {
-                    runTimelineSubscriptionPipeline(account, timelineStream)
+                    runTimelineSubscriptionPipeline(timelineStream)
                     // Normal EOF must not cancel the initial roster before it can settle
                     // loading/disclosure. Failures still unwind the paired attempt immediately.
                     initialMetadataReady.await()
@@ -225,7 +211,7 @@ private suspend fun ConversationController.runConversationSubscriptionIteration(
                     // well after the retained conversation's first foreground frame (#3178).
                     val groupStream =
                         timelineSession.openGroup { liveSubscriptions.openGroupState(account, group.groupIdHex) }
-                            ?: return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
+                            ?: return@runUntilFirstLiveSubscriptionEnds
                     groupSubscription = groupStream
                     val groupSnapshot =
                         withContext(Dispatchers.IO) {

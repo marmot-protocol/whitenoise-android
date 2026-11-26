@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.audio.OFFLINE_SPEECH_TO_TEXT_PACKAGE
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -71,6 +72,13 @@ class SettingsScreenScreenshotTest {
     fun settingsScreenDefaultLight() {
         render(darkTheme = false)
         capture("settings_screen_default_light")
+    }
+
+    @Test
+    fun settingsProfileKeyExpandedAmoled() {
+        render(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag("settings.active_profile_public_key", useUnmergedTree = true).performClick()
+        capture("settings_screen_profile_key_expanded_amoled")
     }
 
     /** Captures the settings home on AMOLED: black groups with white connected outlines. */
@@ -134,13 +142,15 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_available_update_light")
     }
 
-    /**
-     * A global confirmation over Settings, under the app's top-notice host: it shows below the Settings bar, where
-     * the screen's own banner slot sits, and the list gives up the space (#3312).
-     */
+    /** Captures a global confirmation below the Settings bar with the list in its usual position. */
     @Test
     fun settingsScreenWithGlobalConfirmationDark() {
-        val notice = TransientNotice(id = 1L, title = AppText.Plain("Notifications enabled"))
+        val notice =
+            TransientNotice(
+                id = 1L,
+                title = AppText.Plain("Notifications enabled"),
+                kind = TransientNoticeKind.Confirmation,
+            )
         val noticeHost = TopNoticeHost(SnackbarHostState(), notice = { notice })
         composeRule.setContent {
             CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
@@ -405,6 +415,7 @@ class SettingsScreenScreenshotTest {
                     title = "Alice",
                     subtitle = SHORT_NPUB,
                     seed = "alice-account-id",
+                    npub = PROFILE_NPUB,
                     pictureUrl = null,
                 ),
             profileCount = profileCount,
@@ -465,6 +476,7 @@ class SettingsScreenScreenshotTest {
 
     private companion object {
         const val SETTINGS_WITH_CONFIRMATION_TAG = "settings-with-global-confirmation"
-        const val SHORT_NPUB = "npub1alice…9x2k"
+        const val SHORT_NPUB = "npub14242…rcaj"
+        const val PROFILE_NPUB = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
     }
 }

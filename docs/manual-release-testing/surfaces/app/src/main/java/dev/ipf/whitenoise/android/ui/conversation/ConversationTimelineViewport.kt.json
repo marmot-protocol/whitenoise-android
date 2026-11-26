@@ -15,6 +15,14 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
+        "surface": "Reply source visibility excludes decorative sender spacing",
+        "anchor": "fun LazyListLayoutInfo.isItemFullyVisible(",
+        "test_ids": [
+          "MSG-006"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
         "surface": "Native newest boundary for notification and mention clamp validation",
         "anchor": "get() = !listState.canScrollBackward",
         "test_ids": [

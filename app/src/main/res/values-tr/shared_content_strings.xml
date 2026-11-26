@@ -14,4 +14,17 @@
     <string name="shared_content_partial">Henüz eşleşen ek yüklenmedi</string>
     <string name="shared_content_page_failed">Paylaşılan içerik yüklenemedi. Tekrar deneyin.</string>
     <string name="shared_content_history_end">Yerel ek geçmişinin sonu</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d fotoğraf seçildi</item>
+        <item quantity="other">%1$d fotoğraf seçildi</item>
+    </plurals>
+    <string name="shared_media_select_photo">Fotoğrafı seç</string>
+    <string name="shared_media_cancel_selection">Seçimi iptal et</string>
+    <string name="shared_media_share_selected_photos">Seçilen fotoğrafları paylaş</string>
+    <string name="shared_media_photo_from">%1$s tarafından gönderilen fotoğraf</string>
+    <string name="shared_media_video_not_selectable">Video, seçilemez</string>
+    <string name="shared_media_share_photos_failed">Fotoğraflar paylaşılamadı</string>
+    <string name="shared_media_share_photos_unavailable">Seçilen bazı fotoğraflar artık kullanılamıyor, bu yüzden hiçbir şey paylaşılmadı. Seçimleri kaldırıldı. Tekrar deneyin.</string>
+    <string name="shared_media_share_photos_too_large">Bu fotoğraflar birlikte paylaşılamayacak kadar büyük. Daha azını seçip tekrar deneyin.</string>
+    <string name="shared_media_jump_to_date">Tarihe git</string>
 </resources>

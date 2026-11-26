@@ -43,7 +43,7 @@ class MediaViewerMessageActionsTest {
     @Test
     fun removedReadOnlyPendingFailedAndExpiredSourcesCannotEnterPicker() {
         assertNull(mediaViewerForwardPayload(page, item(), references, false, emptySet(), 100uL))
-        for (status in listOf(MessageStatus.Pending, MessageStatus.Failed, MessageStatus.Streaming)) {
+        for (status in listOf(MessageStatus.Pending, MessageStatus.Failed)) {
             assertNull(
                 mediaViewerForwardPayload(page, item().copy(status = status), references, true, emptySet(), 100uL),
             )

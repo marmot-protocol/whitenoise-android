@@ -32,6 +32,29 @@ class TransientNoticeOwnershipTest {
         assertNull(state.transientNotice)
     }
 
+    @Test
+    fun partialResultSurvivesLaterScopedAndGlobalConfirmationsUntilDismissed() {
+        val state = emptyAppState()
+        val account = requireNotNull(state.activeAccountRef)
+        val partial =
+            state.presentConversationTransient(
+                account,
+                "group",
+                AppText.Plain("Invited some members"),
+                detail = AppText.Plain("One member still needs an invite"),
+                kind = TransientNoticeKind.Partial,
+            )
+        val confirmation = state.presentConversationTransient(account, "group", R.string.toast_admin_added)
+        assertSame(confirmation, state.transientNotice)
+        assertSame(partial, state.currentPartialNotice())
+        state.presentTransient("Saved")
+        val global = state.transientNotice
+
+        state.clearTransientNotice(partial)
+        assertNull(state.currentPartialNotice())
+        assertSame(global, state.transientNotice)
+    }
+
     /** The newest live slot owns the app's banners, and leaving hands them back to the slot below (#3312). */
     @Test
     fun theNewestSlotOwnsTheBannersAndLeavingHandsThemBack() {

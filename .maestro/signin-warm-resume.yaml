@@ -14,9 +14,9 @@ name: signin-warm-resume
       visible: "Help Improve White Noise"
     commands:
       - back
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
-- tapOn: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
 - tapOn: "Private key"
 - inputText: "not-a-key"
 - hideKeyboard
@@ -34,6 +34,6 @@ name: signin-warm-resume
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."
 - tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- assertVisible: "Sign up"
+- assertVisible: "Sign in"
 - takeScreenshot: signin-warm-resume

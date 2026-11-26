@@ -107,6 +107,9 @@
         <item quantity="other">%1$d filtres actifs</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Tout effacer</string>
+    <string name="chat_list_search_recent">Récents</string>
+    <string name="chat_list_search_recent_clear">Effacer</string>
+    <string name="chat_list_search_recent_remove">Retirer des récents</string>
     <string name="chat_list_search_filter_chat">Discussions</string>
     <string name="chat_list_search_filter_sender">Expéditeurs</string>
     <string name="chat_list_search_filter_date">Période</string>
@@ -169,20 +172,19 @@
     <string name="leave_and_delete_message">Quitter ce groupe et supprimer son historique de cet appareil ?</string>
     <string name="toast_left_chat_delete_failed">Groupe quitté. Suppression locale impossible.</string>
     <string name="group_reset_action">Réinitialiser et attendre une nouvelle invitation</string>
-    <string name="group_reset_dialog_title">Réinitialiser ce groupe sur cet appareil ?</string>
-    <string name="group_reset_dialog_message">White Noise efface l’historique et l’état de chiffrement de ce groupe sur cet appareil uniquement. Rien n’est envoyé au groupe. Vous le rejoindrez seulement quand un admin enverra une nouvelle invitation créée après cette réinitialisation.</string>
+    <string name="group_reset_dialog_title">Réinitialiser ce groupe ?</string>
+    <string name="group_reset_dialog_message">Efface l’historique et l’état de chiffrement de ce groupe sur cet appareil. Rien n’est envoyé. Pour rejoindre le groupe, il faut une nouvelle invitation créée par un admin après la réinitialisation.</string>
     <string name="group_reset_confirm">Réinitialiser</string>
     <string name="toast_group_reset_done">Groupe réinitialisé. Il réapparaîtra à l’arrivée d’une nouvelle invitation.</string>
     <string name="toast_group_reset_already_waiting">Ce groupe attend déjà une nouvelle invitation.</string>
     <string name="toast_couldnt_reset_group">Impossible de réinitialiser le groupe. Réessayez.</string>
-    <string name="chat_abandon_dialog_title">Supprimer cette conversation de cet appareil ?</string>
-    <string name="chat_abandon_dialog_message">L’efface ici et arrête les nouveaux messages. Rien n’est envoyé.</string>
+    <string name="chat_abandon_dialog_title">Supprimer cette conversation ?</string>
+    <string name="chat_abandon_dialog_message">Efface cette conversation de cet appareil et arrête la réception des nouveaux messages. Rien n’est envoyé.</string>
     <string name="chat_abandon_confirm">Abandonner</string>
     <string name="abandon_identity_chat">Conversation : %1$s</string>
     <string name="abandon_identity_group">Groupe : %1$s</string>
-    <string name="abandon_identity_account">Votre compte : %1$s</string>
     <string name="chats_abandon_action">Abandonner les conversations sur cet appareil</string>
-    <string name="chats_abandon_dialog_title">Abandonner les conversations sélectionnées sur cet appareil ?</string>
+    <string name="chats_abandon_dialog_title">Abandonner les conversations sur cet appareil ?</string>
     <string name="toast_chat_already_abandoned">Cette conversation est déjà supprimée de cet appareil.</string>
     <string name="leave_blocked_abandon_hint_dm">Le départ n’a pas abouti. Vous pouvez plutôt supprimer cette conversation de cet appareil. Rien n’est envoyé à l’autre personne.</string>
     <string name="leave_blocked_abandon_hint_group">Le départ n’a pas abouti. Vous pouvez plutôt réinitialiser ce groupe sur cet appareil. Rien n’est envoyé au groupe.</string>
@@ -438,8 +440,6 @@
     <string name="message_actions">Actions du message</string>
     <string name="message_reply_quote_description">En réponse à %1$s : %2$s</string>
     <string name="message_deleted_preview">Message supprimé</string>
-    <string name="agent_stream_started">Flux de l’agent démarré</string>
-    <string name="stream_finished">Flux terminé</string>
     <string name="media_attachment">Pièce jointe multimédia</string>
     <string name="generic_message">Message</string>
     <string name="giphy_media_preview">GIF fourni par GIPHY</string>
@@ -453,8 +453,6 @@
     <string name="giphy_preview_loading">Chargement de l’aperçu</string>
     <string name="giphy_preview_unavailable">Aperçu indisponible</string>
     <string name="giphy_send_result">Envoyer le GIF : %1$s</string>
-    <string name="waiting_for_stream">En attente du flux...</string>
-    <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
     <string name="select_text">Sélectionner le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
@@ -1036,7 +1034,7 @@
     <string name="notification_background_on">La connexion en arrière-plan est activée.</string>
     <string name="notification_background_off">La connexion en arrière-plan est désactivée.</string>
     <string name="notification_categories_detail">Android définit son, vibration et importance par catégorie.</string>
-    <string name="chat_with_support">Discuter avec l\'assistance</string>
+    <string name="chat_with_support">Discutez avec l’équipe de White Noise</string>
     <string name="theme">Thème</string>
     <string name="theme_system">Système</string>
     <string name="theme_light">Clair</string>
@@ -1114,7 +1112,6 @@
     <string name="message_status_sent">Envoyé</string>
     <string name="message_status_received">Reçu</string>
     <string name="message_status_failed">Échec</string>
-    <string name="message_status_streaming">Diffusion</string>
     <string name="toast_notification_account_unavailable">Ce compte n\'est plus disponible</string>
     <string name="toast_reply_draft_restore_failed">Impossible de restaurer la réponse.</string>
     <string name="toast_draft_save_failed">Impossible d’enregistrer le brouillon.</string>
@@ -1535,9 +1532,18 @@
     <string name="disappearing_1_day">1 jour</string>
     <string name="disappearing_90_days">3 mois</string>
     <string name="disappearing_custom">Durée personnalisée</string>
-    <string name="disappearing_days_format">%1$d jours</string>
-    <string name="disappearing_hours_format">%1$d heures</string>
-    <string name="disappearing_minutes_format">%1$d minutes</string>
+    <plurals name="disappearing_days_count">
+        <item quantity="one">%d jour</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <plurals name="disappearing_hours_count">
+        <item quantity="one">%d heure</item>
+        <item quantity="other">%d heures</item>
+    </plurals>
+    <plurals name="disappearing_minutes_count">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
     <string name="disappearing_unit_minutes">Minutes</string>
     <string name="disappearing_unit_hours">Heures</string>
     <string name="disappearing_unit_days">Jours</string>
@@ -1578,7 +1584,10 @@
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 secondes</string>
     <string name="disappearing_explainer">Les messages reçus non lus démarrent leur délai lorsque vous les lisez. Les autres nouveaux messages sont définitivement supprimés pour tout le monde après la durée choisie.</string>
-    <string name="disappearing_seconds_format">%1$d secondes</string>
+    <plurals name="disappearing_seconds_count">
+        <item quantity="one">%d seconde</item>
+        <item quantity="other">%d secondes</item>
+    </plurals>
     <string name="disappearing_unit_seconds">Secondes</string>
     <string name="disappearing_set">Définir</string>
     <string name="disappearing_custom_decrease">Raccourcir</string>
@@ -2148,6 +2157,7 @@
     <string name="setup_finding_retired_relay">Ce relais a été retiré du service.</string>
     <string name="setup_finding_unsafe_relay">Cette adresse de relais ne peut pas être utilisée en toute sécurité.</string>
     <string name="setup_finding_unreachable">Ce relais n’a pas pu être joint.</string>
+    <string name="setup_relay_timeout_title">Un relais n’a pas répondu à temps</string>
     <string name="setup_finding_timed_out">Cette vérification a dépassé le délai prévu.</string>
     <string name="setup_finding_authentication_required">Ce relais exige une authentification.</string>
     <string name="setup_finding_payment_required">Ce relais exige un paiement.</string>
@@ -2165,6 +2175,26 @@
     <string name="setup_details">Détails</string>
     <string name="setup_hide_details">Masquer les détails</string>
     <string name="setup_opening_chats">Ouverture de vos discussions…</string>
+    <string name="setup_purpose_relays">Les autres apps Nostr utilisent ces relais pour trouver votre profil et vos publications.</string>
+    <string name="setup_purpose_inbox_relays">Vos relais de réception sont l’endroit où l’on vous envoie des invitations de discussion.</string>
+    <string name="setup_purpose_key_package">Les clés de messagerie permettent aux autres de démarrer des discussions chiffrées avec vous.</string>
+    <string name="setup_problem_check_incomplete">Certains relais n’ont pas répondu, la vérification n’a donc pas pu aboutir.</string>
+    <string name="setup_problem_no_usable_route">Les relais de cette liste n’ont pas pu être utilisés.</string>
+    <string name="setup_problem_check_failed">Cette vérification n’a pas pu aboutir.</string>
+    <string name="setup_problem_unusable">La liste de ce compte ne peut pas être utilisée en l’état.</string>
+    <string name="setup_problem_save_refused">La dernière vérification des relais n’a pas abouti. Vos modifications n’ont été ni enregistrées ni publiées.</string>
+    <string name="setup_problem_save_not_published">Vos modifications n’ont été ni enregistrées ni publiées.</string>
+    <string name="setup_problem_save_record_changed">Vos modifications n’ont pas été enregistrées car la liste de relais a changé. Rien n’a été publié.</string>
+    <string name="setup_problem_publication_failed">La publication de la modification n’a pas abouti.</string>
+    <string name="setup_problem_keys_failed">Vos clés de messagerie n’ont pas pu être publiées.</string>
+    <string name="setup_next_retry">Réessayez.</string>
+    <string name="setup_next_retry_then_review">Réessayez. Si cela ne suffit pas, examinez les modifications suggérées.</string>
+    <string name="setup_next_retry_then_edit">Réessayez. Si cela ne suffit pas, modifiez vos relais.</string>
+    <string name="setup_next_review">Examinez les modifications suggérées. Rien n’est publié tant que vous n’enregistrez pas.</string>
+    <string name="setup_next_edit">Modifiez vos relais. Rien n’est publié tant que vous n’enregistrez pas.</string>
+    <string name="setup_next_remove">Retirez le relais hors service. Rien n’est publié tant que vous n’enregistrez pas.</string>
+    <string name="setup_next_remove_unusable">Retirez les relais inutilisables. Rien n’est publié tant que vous n’enregistrez pas.</string>
+    <string name="setup_passed_warning">La configuration a continué, mais ces relais ont rencontré un problème.</string>
     <string name="unnamed_group">Groupe sans nom</string>
     <string name="conversation_unavailable">Conversation indisponible</string>
     <string name="onboarding_recover_setup_title">Récupérer la configuration de connexion ?</string>
@@ -2251,7 +2281,7 @@
     <string name="app_unlock_checking">Vérification de la protection de l’application…</string>
     <string name="support_contact_title">Assistance White Noise</string>
     <string name="support_contact_subtitle">Questions, problèmes et suggestions</string>
-    <string name="support_contact_explainer">Posez une question, signalez un problème ou faites une suggestion.</string>
+    <string name="support_contact_explainer">Posez une question, signalez un problème ou partagez vos retours avec les personnes qui développent White Noise.</string>
     <string name="support_relays_attention">Les relais du profil nécessitent votre attention</string>
     <string name="support_open_relays">Ouvrir les relais</string>
     <string name="support_relays_review">Vérifiez la liste des relais de réception de ce profil.</string>
@@ -2312,6 +2342,12 @@
     <string name="new_message_no_results_detail">Vérifiez l’orthographe ou essayez une autre recherche.</string>
     <string name="new_message_chat_created">Discussion créée</string>
     <string name="new_message_open_chat">Ouvrir la discussion</string>
+    <string name="group_setup_customize">Personnaliser le groupe</string>
+    <string name="group_setup_hide_customization">Masquer les options de personnalisation</string>
+    <plurals name="group_setup_selected_members">
+        <item quantity="one">%d membre sélectionné</item>
+        <item quantity="other">%d membres sélectionnés</item>
+    </plurals>
     <string name="group_setup_title">Configurer le groupe</string>
     <string name="group_create_action">Créer le groupe</string>
     <string name="group_add_photo">Ajouter une photo</string>
@@ -2452,6 +2488,8 @@
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_incompatible_key_package">La clé de discussion de cette personne est incompatible. Demandez-lui de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_incompatible_key_package_for">La clé de discussion de %1$s est incompatible. Demandez à cette personne de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
+    <string name="new_message_copy_inbox_instructions">Copier les instructions</string>
+    <string name="new_message_inbox_instructions">Je n’ai pas pu démarrer une discussion avec toi sur White Noise. Peux-tu vérifier tes relais de réception dans les paramètres de White Noise et me dire quand je peux réessayer ?</string>
     <string name="error_missing_member_inbox">Aucun relais de réception utilisable pour cette personne. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_missing_member_inbox_for">Aucun relais de réception utilisable pour %1$s. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_invite_welcome_too_large">Cette invitation est trop volumineuse pour les relais de réception d’un destinataire. Demandez-lui d’ajouter un relais de réception qui accepte des messages plus volumineux.</string>

@@ -140,6 +140,14 @@
         "test_ids": [
           "GRP-030"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "surface": "One canonical resolution per invite reference",
+        "anchor": "resolved.getOrPut(ref)",
+        "test_ids": [
+          "GRP-030"
+        ]
       }
     ]
   }

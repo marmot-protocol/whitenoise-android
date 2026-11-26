@@ -55,6 +55,7 @@ internal fun GroupMemberReviewRow(
                     GroupReviewAvatarSize,
                     pictureUrl = person.picture,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = member.accountIdHex,
                 )
                 Column(Modifier.weight(1f)) {
                     GroupReviewPersonText(person, memberRole, copyable = false)

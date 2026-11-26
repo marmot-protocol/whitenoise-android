@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,8 +21,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isJoiningChats
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
-import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
 @Suppress("FunctionNaming")
@@ -55,13 +56,20 @@ internal fun ChatListNoResults(
 internal fun EmptyChats(
     appState: WhiteNoiseAppState,
     onCreate: () -> Unit,
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
     val links = appState.deviceLinkRequests
     val snapshot = appState.activeAccountRef?.let { links.snapshots[it] }
     val progress = snapshot?.chatProgress?.firstOrNull { it.onNewDevice && it.isJoiningChats() }
     val awaiting = rememberAwaitingChatCount(appState.activeAccountRef?.let { links.linkedAwaitingCount[it] })
-    EmptyChats(onCreate, progress = progress, arriving = progress != null || awaiting, onCreateOrigin = onCreateOrigin)
+    EmptyChats(
+        onCreate,
+        progress = progress,
+        arriving = progress != null || awaiting,
+        onFirstRunHelp = onFirstRunHelp,
+        onCreateOrigin = onCreateOrigin,
+    )
 }
 
 /**
@@ -75,6 +83,7 @@ internal fun EmptyChats(
     onCreate: () -> Unit,
     progress: LinkChatProgressFfi? = null,
     arriving: Boolean = progress != null,
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
     val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
@@ -94,6 +103,14 @@ internal fun EmptyChats(
             progress?.let { Text(linkChatProgressText(it)) }
             Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
                 Text(stringResource(R.string.new_chat))
+            }
+            if (!arriving && onFirstRunHelp != null) {
+                TextButton(onClick = { onFirstRunHelp(false) }, modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text(stringResource(R.string.learn_white_noise))
+                }
+                TextButton(onClick = { onFirstRunHelp(true) }, modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text(stringResource(R.string.chat_with_support))
+                }
             }
         }
     }

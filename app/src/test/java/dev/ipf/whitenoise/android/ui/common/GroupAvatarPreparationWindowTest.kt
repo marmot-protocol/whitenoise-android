@@ -5,23 +5,24 @@ import org.junit.Test
 
 class GroupAvatarPreparationWindowTest {
     @Test
-    fun errorSearchHeadersAndPinnedBoundaryDoNotSkipVisibleRows() {
-        val rows = (0 until 30).map { "group-$it" }
-        val keys = listOf("load-error", "search-header", "pinned-boundary", "group-4", "group-5")
-        assertEquals(rows.subList(4, 20), visibleGroupAvatarWindow(rows, keys) { it })
+    fun visibleRowsComeBeforeNeighborsInBothDirections() {
+        val viewport = avatarViewport(40, listOf(20, 21, 22, 23))
+        assertEquals(listOf(20, 21, 22, 23), viewport.visible)
+        assertEquals(
+            listOf(20, 21, 22, 23, 24, 19, 25, 18, 26, 17, 27, 16, 28, 15, 29, 14),
+            viewport.nearby,
+        )
     }
 
     @Test
-    fun recentChatsHeaderDoesNotSkipTheFirstVisibleShareTarget() {
-        val rows = listOf("first", "second", "third")
-        assertEquals(rows, visibleGroupAvatarWindow(rows, listOf(0, "first", "second")) { it })
-        assertEquals(listOf("third"), visibleGroupAvatarWindow(rows, listOf("third")) { it })
+    fun preparationUsesTheRemainingDirectionAtEitherEnd() {
+        assertEquals((0..15).toList(), avatarViewport(40, listOf(0, 1)).nearby)
+        assertEquals(listOf(38, 39) + (37 downTo 24), avatarViewport(40, listOf(38, 39)).nearby)
     }
 
     @Test
     fun emptyLayoutPrimesOnlyTheInitialBoundedWindow() {
-        val rows = (0 until 30).map { "group-$it" }
-        assertEquals(rows.take(16), visibleGroupAvatarWindow(rows, emptyList()) { it })
-        assertEquals(emptyList<String>(), visibleGroupAvatarWindow(emptyList<String>(), listOf("header")) { it })
+        assertEquals((0..15).toList(), avatarViewport(30, emptyList()).nearby)
+        assertEquals(emptyList<Int>(), avatarViewport(0, emptyList()).nearby)
     }
 }

@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
@@ -51,6 +52,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Shows a PDF or HTML attachment under the shared viewer chrome. The reader body below the chrome keeps its black
+ * canvas, and a sanitized HTML page renders exactly as the policy wrote it.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // Optional exports keep both readers explicit.
 internal fun DocumentAttachmentViewer(
@@ -166,6 +171,11 @@ internal fun DocumentAttachmentViewer(
     }
 }
 
+/**
+ * Full-screen document frame: the themed shared viewer chrome with Close, the file name, Share and the More menu,
+ * then the reader body on its black canvas, with the HTML Rendered and Source tabs on top. Only the toolbar follows
+ * the theme (#4058), so the body keeps its white-on-black look.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun DocumentViewerFrame(
@@ -181,97 +191,99 @@ internal fun DocumentViewerFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var more by remember { mutableStateOf(false) }
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Color.White, onSurface = Color.White)) {
-        Column(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        painterResource(R.drawable.ic_close),
-                        stringResource(R.string.close),
-                        tint = Color.White,
-                    )
-                }
-
-                Text(
-                    name,
-                    modifier = Modifier.weight(1f),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    Column(Modifier.fillMaxSize().background(Color.Black)) {
+        AttachmentViewerChrome(
+            title = name,
+            onClose = onDismiss,
+            windowInsets = AttachmentViewerChromeDefaults.topInsets(),
+            actions = {
                 if (onShare != null) {
-                    IconButton(
-                        onClick = onShare,
-                        enabled = !shareBusy,
-                    ) { Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share), tint = Color.White) }
+                    IconButton(onClick = onShare, enabled = !shareBusy) {
+                        Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share))
+                    }
                 }
+            },
+            overflow =
                 if (onSave != null || onOpenExternal != null) {
-                    Box {
-                        IconButton(
-                            onClick = { more = true },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_more_vert),
-                                stringResource(R.string.more_options),
-                                tint = Color.White,
+                    {
+                        Box {
+                            IconButton(
+                                onClick = { more = true },
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_more_vert),
+                                    stringResource(R.string.more_options),
+                                )
+                            }
+
+                            WhiteNoiseDropdownMenu(
+                                expanded = more,
+                                onDismissRequest = { more = false },
+                                items =
+                                    listOfNotNull(
+                                        onSave?.let {
+                                            WhiteNoiseMenuItem(
+                                                label = stringResource(R.string.save),
+                                                icon = R.drawable.ic_download,
+                                                onClick = it,
+                                            )
+                                        },
+                                        onOpenExternal?.let {
+                                            WhiteNoiseMenuItem(
+                                                label = stringResource(R.string.text_attachment_open_external),
+                                                onClick = it,
+                                            )
+                                        },
+                                    ),
                             )
                         }
-
-                        WhiteNoiseDropdownMenu(
-                            expanded = more,
-                            onDismissRequest = { more = false },
-                            items =
-                                listOfNotNull(
-                                    onSave?.let {
-                                        WhiteNoiseMenuItem(
-                                            label = stringResource(R.string.save),
-                                            icon = R.drawable.ic_download,
-                                            onClick = it,
-                                        )
-                                    },
-                                    onOpenExternal?.let {
-                                        WhiteNoiseMenuItem(
-                                            label = stringResource(R.string.text_attachment_open_external),
-                                            onClick = it,
-                                        )
-                                    },
-                                ),
+                    }
+                } else {
+                    null
+                },
+        )
+        MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Color.White, onSurface = Color.White)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                    ),
+            ) {
+                if (kind == DocumentAttachmentKind.Html) {
+                    TabRow(
+                        selectedTabIndex = if (sourceTab) 1 else 0,
+                        containerColor = Color.Black,
+                        contentColor = Color.White,
+                    ) {
+                        Tab(
+                            selected = !sourceTab,
+                            onClick = {
+                                onSourceTab(false)
+                            },
+                            text = {
+                                Text(stringResource(R.string.document_rendered))
+                            },
+                        )
+                        Tab(
+                            selected = sourceTab,
+                            onClick = {
+                                onSourceTab(true)
+                            },
+                            text = {
+                                Text(stringResource(R.string.document_source))
+                            },
                         )
                     }
                 }
+                content()
             }
-            if (kind == DocumentAttachmentKind.Html) {
-                TabRow(
-                    selectedTabIndex = if (sourceTab) 1 else 0,
-                    containerColor = Color.Black,
-                    contentColor = Color.White,
-                ) {
-                    Tab(
-                        selected = !sourceTab,
-                        onClick = {
-                            onSourceTab(false)
-                        },
-                        text = {
-                            Text(stringResource(R.string.document_rendered))
-                        },
-                    )
-                    Tab(
-                        selected = sourceTab,
-                        onClick = {
-                            onSourceTab(true)
-                        },
-                        text = {
-                            Text(stringResource(R.string.document_source))
-                        },
-                    )
-                }
-            }
-            content()
         }
     }
 }
 
+/** The HTML source as selectable plain white text on the reader's black canvas. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun DocumentSource(
@@ -300,6 +312,7 @@ internal fun DocumentLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { CircularProgressIndicator() }
 }
 
+/** An inline failure message with Retry when the load can succeed again, and Open externally when offered. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun DocumentViewerError(
@@ -318,6 +331,7 @@ internal fun DocumentViewerError(
     }
 }
 
+/** Confirms a link opened from a document on the app dialog surface, like links everywhere else. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun DocumentLinkConfirmation(
@@ -325,8 +339,6 @@ internal fun DocumentLinkConfirmation(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Color.White)) {
-        dev.ipf.whitenoise.android.ui
-            .WebLinkConfirmation(url, onDismiss, onConfirm, Color.Black, Color.White, Color.White)
-    }
+    dev.ipf.whitenoise.android.ui
+        .WebLinkConfirmation(url, onDismiss, onConfirm)
 }
