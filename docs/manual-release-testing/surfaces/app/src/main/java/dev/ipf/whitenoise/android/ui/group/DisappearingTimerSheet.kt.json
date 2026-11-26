@@ -215,6 +215,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Timer choice spacing and scaled layout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
+        "anchor": "fun DisappearingChip(",
+        "test_ids": [
+          "GRP-001"
+        ]
       }
     ]
   },

@@ -17,7 +17,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 
@@ -54,6 +54,7 @@ internal fun GroupMemberMutationStatus(
     }
 }
 
+/** A member who was invited but has not joined; tapping copies their key. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun PendingGroupInviteRow(
@@ -63,7 +64,8 @@ internal fun PendingGroupInviteRow(
     avatarUrl: String?,
     onClick: () -> Unit,
 ) {
-    ContactRow(
+    PersonRow(
+        segmented = false,
         title = title,
         subtitle = subtitle,
         avatarSeed = avatarSeed,

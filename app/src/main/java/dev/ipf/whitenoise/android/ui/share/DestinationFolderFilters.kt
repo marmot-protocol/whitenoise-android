@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -112,7 +111,6 @@ internal fun DestinationFolderFilters(
     }
     if (!alwaysShow && rows.isEmpty() && selected.isEmpty()) return
     val title = stringResource(R.string.destination_filter_label)
-    val color = MaterialTheme.colorScheme.surfaceContainerHigh
     Row(
         modifier
             .fillMaxWidth()
@@ -126,7 +124,6 @@ internal fun DestinationFolderFilters(
             stringResource(R.string.destination_filter_all),
             state.folderId == null && !state.reviewingSelected,
             "destination.filter.all",
-            color,
             { state.selectFolder(null) },
             labelMaxWidth = 140.dp,
         )
@@ -141,7 +138,6 @@ internal fun DestinationFolderFilters(
                         stringResource(R.string.destination_filter_selected, selected.size),
                         state.reviewingSelected,
                         "destination.filter.selected",
-                        color,
                         {
                             state.reviewSelected()
                             onReviewSelected()
@@ -155,7 +151,6 @@ internal fun DestinationFolderFilters(
                     chatFolderDisplayName(folder),
                     state.folderId == folder.id,
                     "destination.filter.${folder.id}",
-                    color,
                     { state.selectFolder(folder.id) },
                     labelMaxWidth = 180.dp,
                 )
