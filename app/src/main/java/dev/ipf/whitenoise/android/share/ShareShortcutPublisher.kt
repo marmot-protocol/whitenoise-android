@@ -157,16 +157,18 @@ private fun rebuildRichShareShortcut(
     picture: Bitmap?,
     rank: Int,
     previewToken: NotificationPreviewToken,
-): ShortcutInfoCompat =
-    rebuildShortcut(
+): ShortcutInfoCompat {
+    val requestedTitle = context.emojiPlainText(target.title)
+    return rebuildShortcut(
         context = context,
         existing = existing,
-        title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString()),
+        title = preferredConversationShortcutTitle(requestedTitle, existing.longLabel?.toString()),
         avatarBitmap = picture,
         rank = rank,
         categories = existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY,
         extras = shareShortcutExtras(target.accountRef, existing.extras, previewToken),
     )
+}
 
 /**
  * Keeps a card-backed shortcut through a refresh. A shortcut held for a pending card is retained as the presenter

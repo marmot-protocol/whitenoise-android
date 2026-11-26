@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
 import dev.ipf.whitenoise.android.share.ShareInboundStager
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
@@ -2915,6 +2916,7 @@ class WhiteNoiseAppState private constructor(
         shareShortcutPublishJob =
             mutationsScope.launch {
                 runCatchingCancellable {
+                    appContext.prepareEmojiLabels(shareTitles.values)
                     withContext(Dispatchers.IO) {
                         shareShortcutPublisher.publish(
                             accountRef,
@@ -3038,6 +3040,7 @@ class WhiteNoiseAppState private constructor(
         val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
         if (available && canRefreshApprovedPin(account, runtime)) {
             val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+            appContext.prepareEmojiLabels(listOf(title))
             val presentation = pinnedConversationPresentation(account, item, title)
             withContext(Dispatchers.IO) {
                 val tokens = PinnedConversationTokens.create(appContext)
@@ -3084,6 +3087,7 @@ class WhiteNoiseAppState private constructor(
                 item.group.groupIdHex.lowercase(Locale.ROOT) to
                     pinnedConversationPresentation(accountRef, item, chatListItemDisplayTitle(item, this, titleCopy))
             }
+        appContext.prepareEmojiLabels(presentations.values.map { it.title })
         withContext(Dispatchers.IO) {
             shortcuts.refresh(accountRef, presentations) {
                 isActive &&
