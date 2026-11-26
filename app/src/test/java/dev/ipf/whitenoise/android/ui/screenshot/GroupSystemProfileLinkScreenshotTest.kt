@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -37,6 +39,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.GROUP_SYSTEM_ACTOR_LINK_TAG
 import dev.ipf.whitenoise.android.ui.conversation.GROUP_SYSTEM_SUBJECT_LINK_TAG
 import dev.ipf.whitenoise.android.ui.conversation.GroupSystemRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -50,9 +53,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The affected member's name in a member-added or member-removed row opens that member's profile (#2957).
- * Covers routing by authenticated id, stale-account taps, the untouched long-press and Wave actions, and the
- * linked rows' rendering across themes, RTL and large text.
+ * Names in member-added and member-removed rows open their profiles: the affected member (#2957) and, for
+ * additions, the member who added them (#4209). Covers routing by authenticated id and slot, stale-account
+ * taps, the untouched long-press and Wave actions, and the linked rows' rendering across themes, RTL and
+ * large text.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -68,47 +72,67 @@ class GroupSystemProfileLinkScreenshotTest {
     fun addedSubjectLinkOpensTheSubject() {
         val opened = renderSingle(event("member_added"))
 
-        composeRule.onNodeWithText("Alice added Bob").performFirstLinkClick()
+        composeRule.onNodeWithText("Alice added Bob").performFirstLinkClick(::isSubjectLink)
 
         assertEquals(listOf(SUBJECT_ID), opened)
     }
 
-    /** A removed member stays reachable from the removal row. */
+    /** Tapping the admin's name in the same row opens the admin (#4209). */
+    @Test
+    fun addedActorLinkOpensTheActor() {
+        val opened = renderSingle(event("member_added"))
+
+        composeRule.onNodeWithText("Alice added Bob").performFirstLinkClick(::isActorLink)
+
+        assertEquals(listOf(ACTOR_ID), opened)
+    }
+
+    /** A removed member stays reachable from the removal row, whose actor stays plain text. */
     @Test
     fun removedSubjectLinkOpensTheRemovedMember() {
         val opened = renderSingle(event("member_removed"))
+        val node = composeRule.onNodeWithText("Alice removed Bob")
 
-        composeRule.onNodeWithText("Alice removed Bob").performFirstLinkClick()
-
-        assertEquals(listOf(SUBJECT_ID), opened)
-    }
-
-    /** With the actor and subject sharing a name, only the subject's slot is a link and it opens the subject. */
-    @Test
-    fun identicalNamesLinkOnlyTheSubject() {
-        val opened = renderSingle(event("member_added", actorName = "Sam", subjectName = "Sam"))
-        val node = composeRule.onNodeWithText("Sam added Sam")
-        val text =
-            node
-                .fetchSemanticsNode()
-                .config
-                .getOrNull(SemanticsProperties.Text)
-                ?.single()
-        val links = requireNotNull(text).getLinkAnnotations(0, text.length)
-
-        assertEquals(1, links.size)
-        assertEquals(10, links.single().start)
-        assertEquals(GROUP_SYSTEM_SUBJECT_LINK_TAG, (links.single().item as LinkAnnotation.Clickable).tag)
+        assertEquals(listOf(GROUP_SYSTEM_SUBJECT_LINK_TAG), linkTags(node))
         node.performFirstLinkClick()
         assertEquals(listOf(SUBJECT_ID), opened)
     }
 
-    /** A row rendered for another account ignores the tap instead of opening a profile under the wrong account. */
+    /**
+     * With the actor and subject sharing a name, each slot is its own link — the separate link TalkBack
+     * offers for each — and each opens its own person.
+     */
+    @Test
+    fun identicalNamesLinkEachSlot() {
+        val opened = renderSingle(event("member_added", actorName = "Sam", subjectName = "Sam"))
+        val node = composeRule.onNodeWithText("Sam added Sam")
+        val links = linkRanges(node)
+
+        assertEquals(listOf(0 to 3, 10 to 13), links.map { it.start to it.end })
+        assertEquals(listOf(GROUP_SYSTEM_ACTOR_LINK_TAG, GROUP_SYSTEM_SUBJECT_LINK_TAG), linkTags(node))
+        node.performFirstLinkClick(::isActorLink)
+        node.performFirstLinkClick(::isSubjectLink)
+        assertEquals(listOf(ACTOR_ID, SUBJECT_ID), opened)
+    }
+
+    /** "You added Bob" leaves "You" as plain text and links only Bob. */
+    @Test
+    fun readerAsActorStaysPlain() {
+        renderSingle(event("member_added", actorId = ACCOUNT_ID))
+
+        assertEquals(listOf(GROUP_SYSTEM_SUBJECT_LINK_TAG), linkTags(composeRule.onNodeWithText("You added Bob")))
+    }
+
+    /** After switching accounts, taps on either name in a row rendered for the old account open nothing. */
     @Test
     fun staleAccountTapOpensNothing() {
-        val opened = renderSingle(event("member_added"), rowAccountRef = "another-account")
+        val appState = testAppState()
+        val opened = renderSingle(event("member_added"), appState = appState)
+        val node = composeRule.onNodeWithText("Alice added Bob")
 
-        composeRule.onNodeWithText("Alice added Bob").performFirstLinkClick()
+        composeRule.runOnIdle { appState.switchMediaSessionForTest("another-account") }
+        node.performFirstLinkClick(::isActorLink)
+        node.performFirstLinkClick(::isSubjectLink)
 
         assertEquals(emptyList<String>(), opened)
     }
@@ -177,6 +201,24 @@ class GroupSystemProfileLinkScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_system_profile_link_${theme.name.lowercase()}.png")
     }
 
+    /** The link annotations on [node]'s text, in order. */
+    private fun linkRanges(node: SemanticsNodeInteraction): List<AnnotatedString.Range<LinkAnnotation>> {
+        val text =
+            node
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(SemanticsProperties.Text)
+                ?.single()
+        return requireNotNull(text).getLinkAnnotations(0, text.length)
+    }
+
+    /** The tags of [node]'s links, in order. */
+    private fun linkTags(node: SemanticsNodeInteraction): List<String> = linkRanges(node).map { (it.item as LinkAnnotation.Clickable).tag }
+
+    private fun isActorLink(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag == GROUP_SYSTEM_ACTOR_LINK_TAG
+
+    private fun isSubjectLink(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag == GROUP_SYSTEM_SUBJECT_LINK_TAG
+
     /** One linked row whose taps are discarded, for the rendering baselines. */
     @Composable
     @Suppress("FunctionNaming")
@@ -190,11 +232,10 @@ class GroupSystemProfileLinkScreenshotTest {
     /** Renders one row with a profile callback and returns the list of accounts it opened. */
     private fun renderSingle(
         event: GroupSystemEventFfi,
-        rowAccountRef: String = ACCOUNT_REF,
+        appState: WhiteNoiseAppState = testAppState(),
         onDeleteForMe: (() -> Unit)? = null,
         onWave: (suspend (String, () -> Unit) -> Unit)? = null,
     ): List<String> {
-        val appState = testAppState()
         val opened = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -205,7 +246,7 @@ class GroupSystemProfileLinkScreenshotTest {
                         groupSystem = event,
                         onDeleteForMe = onDeleteForMe,
                         onWave = onWave,
-                        waveAccountRef = rowAccountRef,
+                        waveAccountRef = ACCOUNT_REF,
                         onOpenProfile = { opened += it },
                     )
                 }
