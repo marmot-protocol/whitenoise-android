@@ -73,12 +73,35 @@ class DetailsSurfacePolishScreenshotTest {
         )
 
     @Test
+    @Config(qualifiers = "ar-rSA-w360dp-h780dp-mdpi")
+    fun groupMemberLargeTextRtl() =
+        captureGroupDetails(
+            snapshot = "group_details_member_large_rtl_amoled.png",
+            group = group(admin = false),
+            members = groupMembers(),
+            darkTheme = true,
+            amoled = true,
+            fontScale = 2f,
+        )
+
+    @Test
     fun dmDark() =
         captureGroupDetails(
             snapshot = "dm_details_full_dark.png",
             group = dmGroup(),
             members = listOf(member(SELF_HEX, local = true), member(PEER_HEX)),
             darkTheme = true,
+        )
+
+    @Test
+    @Config(qualifiers = "ar-rSA-w360dp-h780dp-mdpi")
+    fun dmLargeTextRtl() =
+        captureGroupDetails(
+            snapshot = "dm_details_large_rtl_dark.png",
+            group = dmGroup(),
+            members = listOf(member(SELF_HEX, local = true), member(PEER_HEX)),
+            darkTheme = true,
+            fontScale = 2f,
         )
 
     @Test
@@ -181,8 +204,9 @@ class DetailsSurfacePolishScreenshotTest {
         members: List<AppGroupMemberRecordFfi>,
         darkTheme: Boolean,
         amoled: Boolean = false,
+        fontScale: Float = 1f,
     ) {
-        renderGroupDetails(group, members, darkTheme, amoled)
+        renderGroupDetails(group, members, darkTheme, amoled, fontScale = fontScale)
         assertUnavailableCallsAreAbsent()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
@@ -194,6 +218,7 @@ class DetailsSurfacePolishScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean = false,
         selfProfile: UserProfileMetadataFfi? = null,
+        fontScale: Float = 1f,
     ) {
         val appState = appState(profileHex = SELF_HEX.takeIf { selfProfile != null }, profile = selfProfile)
         if (selfProfile != null) {
@@ -208,7 +233,7 @@ class DetailsSurfacePolishScreenshotTest {
             )
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
                 GroupDetailsScreen(
                     appState = appState,
                     controller = controller,

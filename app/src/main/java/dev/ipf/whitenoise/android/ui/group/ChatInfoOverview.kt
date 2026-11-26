@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -80,6 +81,7 @@ internal fun QuickInfoAction(
         Text(
             text = label,
             modifier = Modifier.clearAndSetSemantics {},
+            color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelLarge,
         )
@@ -100,16 +102,28 @@ internal fun ChatInfoQuickActions(
     onOpenSearch: (() -> Unit)?,
 ) {
     val gap = WhiteNoiseSpacing.Related
+    val profileLabel = stringResource(R.string.about)
+    val addMembersLabel = stringResource(R.string.add_member)
+    val muteLabel = stringResource(muteControl.labelRes)
+    val disappearingLabel = stringResource(R.string.disappearing)
+    val searchLabel = stringResource(R.string.quick_action_search)
+    val labels =
+        listOfNotNull(
+            profileLabel.takeIf { onOpenProfile != null },
+            addMembersLabel.takeIf { onAddMembers != null },
+            muteLabel,
+            disappearingLabel,
+            searchLabel.takeIf { onOpenSearch != null },
+        )
     BoxWithConstraints(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = gap),
     ) {
-        val actions = 2 + listOf(onOpenProfile, onAddMembers, onOpenSearch).count { it != null }
-        val actionModifier = Modifier.width(quickActionWidth(maxWidth, gap, actions))
+        val actionModifier = Modifier.width(quickActionWidth(maxWidth, gap, labels))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             if (onOpenProfile != null) {
                 val profileLaunch = rememberMeasuredControlClick(onOpenProfile)
                 QuickInfoAction(
-                    label = stringResource(R.string.about),
+                    label = profileLabel,
                     icon = R.drawable.ic_person,
                     onClick = profileLaunch.second,
                     modifier = actionModifier,
@@ -118,7 +132,7 @@ internal fun ChatInfoQuickActions(
             }
             if (onAddMembers != null) {
                 QuickInfoAction(
-                    label = stringResource(R.string.add_member),
+                    label = addMembersLabel,
                     icon = R.drawable.ic_group_add,
                     onClick = onAddMembers,
                     enabled = addMembersEnabled,
@@ -127,7 +141,7 @@ internal fun ChatInfoQuickActions(
                 )
             }
             QuickInfoAction(
-                label = stringResource(muteControl.labelRes),
+                label = muteLabel,
                 icon = muteControl.iconRes,
                 enabled = !muteControl.pending,
                 explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
@@ -135,7 +149,7 @@ internal fun ChatInfoQuickActions(
                 modifier = actionModifier,
             )
             QuickInfoAction(
-                label = stringResource(R.string.disappearing),
+                label = disappearingLabel,
                 icon = R.drawable.ic_timer,
                 state = disappearingState,
                 enabled = disappearingEnabled,
@@ -145,7 +159,7 @@ internal fun ChatInfoQuickActions(
             )
             if (onOpenSearch != null) {
                 QuickInfoAction(
-                    label = stringResource(R.string.quick_action_search),
+                    label = searchLabel,
                     icon = R.drawable.ic_search,
                     onClick = onOpenSearch,
                     modifier = actionModifier,
@@ -155,20 +169,27 @@ internal fun ChatInfoQuickActions(
     }
 }
 
+/** Fits unbreakable caption runs and balances the actions across the rows that fit. */
 @Composable
 private fun quickActionWidth(
     availableWidth: Dp,
     gap: Dp,
-    actions: Int,
-): Dp =
-    with(LocalDensity.current) {
-        val captionSize = MaterialTheme.typography.labelLarge.fontSize
-        val captionScale = captionSize.toDp().value / Typography.labelLarge.fontSize.value
-        val minimumWidth = 72.dp * captionScale.coerceAtLeast(1f)
-        val columns = ((availableWidth + gap) / (minimumWidth + gap)).toInt().coerceIn(1, actions)
-        val gapsInPixels = ceil(gap.toPx()).toInt() * (columns - 1)
-        ((availableWidth.roundToPx() - gapsInPixels) / columns).toDp()
+    labels: List<String>,
+): Dp {
+    val captionStyle = MaterialTheme.typography.labelLarge
+    val measurer = rememberTextMeasurer()
+    val captionWidthPx = labels.maxOf { measurer.measure(it, captionStyle).multiParagraph.minIntrinsicWidth }
+    return with(LocalDensity.current) {
+        val captionScale = captionStyle.fontSize.toDp().value / Typography.labelLarge.fontSize.value
+        val minimumWidthPx = ceil(maxOf((72.dp * captionScale.coerceAtLeast(1f)).toPx(), captionWidthPx)).toInt()
+        val availableWidthPx = availableWidth.roundToPx()
+        val gapPx = gap.roundToPx()
+        val maxColumns = ((availableWidthPx + gapPx) / (minimumWidthPx + gapPx)).coerceIn(1, labels.size)
+        val rows = (labels.size + maxColumns - 1) / maxColumns
+        val columns = (labels.size + rows - 1) / rows
+        ((availableWidthPx - gapPx * (columns - 1)) / columns).toDp()
     }
+}
 
 /** Segmented member presentation around the existing identity, copy and role-mutation controls. */
 @Suppress("FunctionNaming")

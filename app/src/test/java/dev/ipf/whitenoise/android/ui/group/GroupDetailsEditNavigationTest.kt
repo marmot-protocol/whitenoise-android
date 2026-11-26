@@ -114,7 +114,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_edit_shared_fields_amoled_compact.png")
     }
 
-    /** Unavailable call actions do not occupy the primary action row. */
+    /** At 360 dp, the four actions use two balanced rows to fit the longest caption. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
         render(controller(group()), onOpenSearch = {})
@@ -127,11 +127,13 @@ class GroupDetailsEditNavigationTest {
         val search = composeRule.onNodeWithContentDescription(context.getString(R.string.quick_action_search))
         val actions = listOf(addMembers, mute, timer, search)
         actions.forEach { it.assertIsDisplayed().assertHeightIsAtLeast(56.dp) }
-        val bounds = actions.map { it.fetchSemanticsNode().boundsInRoot }
-        bounds.zipWithNext().forEach { (first, second) ->
-            assertEquals(first.width, second.width, 1f)
-            assertTrue(first.right <= second.left)
-        }
+        val (addBounds, muteBounds, timerBounds, searchBounds) = actions.map { it.fetchSemanticsNode().boundsInRoot }
+        assertEquals(addBounds.top, muteBounds.top, 1f)
+        assertEquals(timerBounds.top, searchBounds.top, 1f)
+        assertTrue(addBounds.bottom < timerBounds.top)
+        assertTrue(addBounds.right <= muteBounds.left)
+        assertTrue(timerBounds.right <= searchBounds.left)
+        listOf(muteBounds, timerBounds, searchBounds).forEach { assertEquals(addBounds.width, it.width, 1f) }
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
     }
 
