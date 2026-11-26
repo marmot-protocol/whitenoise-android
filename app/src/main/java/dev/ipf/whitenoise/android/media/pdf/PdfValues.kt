@@ -76,3 +76,14 @@ internal class PdfSyntaxException : RuntimeException() {
 }
 
 internal fun pdfSyntaxError(): Nothing = throw PdfSyntaxException()
+
+/** Only strings parsed as real object values are excluded from the conservative reference scan. */
+internal fun PdfValue.collectStringRanges(ranges: MutableList<IntRange>) {
+    when (this) {
+        is PdfString -> ranges += start until end
+        is PdfDict -> entries.forEach { (_, value) -> value.collectStringRanges(ranges) }
+        is PdfArray -> items.forEach { it.collectStringRanges(ranges) }
+        else -> Unit
+    }
+    if (ranges.size > 250_000) throw PdfLimitException()
+}

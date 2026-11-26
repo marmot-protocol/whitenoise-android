@@ -44,11 +44,16 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.CRC32
 import java.util.zip.DataFormatException
 import java.util.zip.Inflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 /**
  * Invariant gate for #3377: every PDF a person attaches through Files reaches MDK without its private document
@@ -225,8 +230,7 @@ class DocumentUploadPrivacyCoverageTest {
                             uri,
                             ComposerPdfState("kept-signed.pdf", PdfMetadataScrubber.inspect(signed)),
                         )
-                        sender.pdfChoices.confirmThen(listOf(uri), {}) {}
-                        sender.pdfChoices.confirm()
+                        sender.pdfChoices.approveForTest(uri)
                     }
 
                 assertTrue(sent.accepted)
@@ -254,15 +258,72 @@ class DocumentUploadPrivacyCoverageTest {
                         send(listOf(uri), expectedUploads = 1) { sender ->
                             val choices = sender.pdfChoices
                             choices.record(uri, ComposerPdfState("signed.pdf", PdfMetadataScrubber.inspect(signed)))
-                            choices.confirmThen(listOf(uri), {}) {}
-                            assertNotNull("a refused PDF asks before it is sent", choices.decision)
-                            choices.confirm()
-                            assertTrue(choices.keepsOriginal(uri))
+                            choices.approveForTest(uri)
                         }
 
                     assertTrue("$uri is accepted", sent.accepted)
                     assertArrayEquals("$uri is sent as it is", signed, sent.uploads.values.single())
                 }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A ZIP with an ordinary, uncompressed PDF entry stays intact through Files. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun zipContainingPdfKeepsItsBytesAndCrc() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val pdf = fixture("ghostscript")
+                val buffer = ByteArrayOutputStream()
+                ZipOutputStream(buffer).use { zip ->
+                    val entry =
+                        ZipEntry("example.pdf").apply {
+                            method = ZipEntry.STORED
+                            size = pdf.size.toLong()
+                            crc = CRC32().apply { update(pdf) }.value
+                        }
+                    zip.putNextEntry(entry)
+                    zip.write(pdf)
+                    zip.closeEntry()
+                }
+                val original = buffer.toByteArray()
+                val uri = pick("entries.zip", "application/zip", original, original.size.toLong())
+                val sent = send(listOf(uri), expectedUploads = 1)
+
+                assertArrayEquals(original, sent.upload("entries.zip"))
+                ZipInputStream(sent.upload("entries.zip").inputStream()).use { zip ->
+                    assertEquals("example.pdf", zip.nextEntry.name)
+                    assertArrayEquals(pdf, zip.readBytes())
+                }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A supported PDF can go as its exact original after choosing Keep metadata for that attachment only. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun keepMetadataSendsOriginalPreparedBytes() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val raw = fixture("ghostscript")
+                val uri = pick("invoice.pdf", PDF, raw, raw.size.toLong())
+                val kept = PendingAttachment(raw, PDF, "invoice.pdf")
+                val sent =
+                    send(listOf(uri), mapOf(uri to kept), expectedUploads = 1) { sender ->
+                        val choices = sender.pdfChoices
+                        choices.record(uri, ComposerPdfState("invoice.pdf", PdfMetadataScrubber.inspect(raw)))
+                        choices.toggleKeepMetadata(uri)
+                        var consent = emptySet<Uri>()
+                        choices.confirmThen(listOf(uri), { error("unexpected refusal") }) { consent = it }
+                        consent
+                    }
+
+                assertArrayEquals(raw, sent.upload("invoice.pdf"))
             } finally {
                 Dispatchers.resetMain()
             }
@@ -323,7 +384,7 @@ class DocumentUploadPrivacyCoverageTest {
         documents: List<Uri>,
         prepared: Map<Uri, PendingAttachment> = emptyMap(),
         expectedUploads: Int,
-        choose: (ConversationMediaSender) -> Unit = {},
+        choose: (ConversationMediaSender) -> Set<Uri> = { emptySet() },
     ): SentDocuments {
         val state = mediaSendReconciliationAppState()
         val uploads = ConcurrentHashMap<String, ByteArray>()
@@ -352,7 +413,7 @@ class DocumentUploadPrivacyCoverageTest {
         try {
             controller.retryMembers()
             val sender = ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = { LIMITS }) {}
-            choose(sender)
+            val consent = choose(sender)
             sender.sendStagedAttachments(
                 imageSlots = emptyList(),
                 documentUris = documents,
@@ -360,6 +421,7 @@ class DocumentUploadPrivacyCoverageTest {
                 preparedDocumentAttachments = prepared,
                 onAccepted = { outcome.complete(true) },
                 onRejected = { outcome.complete(false) },
+                keepPdfMetadata = consent,
             )
             val accepted = outcome.await()
             if (accepted && expectedUploads > 0) uploaded.await()
@@ -368,6 +430,14 @@ class DocumentUploadPrivacyCoverageTest {
         } finally {
             finishMediaFixture(controller, state)
         }
+    }
+
+    private fun dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices.approveForTest(uri: Uri): Set<Uri> {
+        var approved = emptySet<Uri>()
+        confirmThen(listOf(uri), { error("unexpected refusal") }) { approved = it }
+        assertNotNull("a refused PDF asks before it is sent", decision)
+        confirm()
+        return approved
     }
 
     /** Checks that [uploaded] is a same-length rewrite of the tagged [source] with no private value left. */

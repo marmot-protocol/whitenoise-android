@@ -4,6 +4,7 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.hardware.biometrics.BiometricManager
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -53,6 +54,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowBiometricManager
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
@@ -101,6 +104,56 @@ class AccountKeysExportDeliveryTest {
         export(false, KeyExportDestination.File)
         checkNotNull(pending).invoke()
         assertEquals(listOf(KeyExportDestination.File), exports)
+    }
+
+    /** Android 11 can deliver CreateDocument before the activity reaches STARTED. */
+    @Test
+    @Config(sdk = [30])
+    fun destinationDeliveredWhileStoppedWaitsForStart() = assertDeferredPickerReturn(lock = false, encrypted = false)
+
+    /** The real picker host outlives disposal of Account Keys while the lock owns the root. */
+    @Test
+    fun rawDestinationDeliveredUnderAppLockWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = false)
+
+    @Test
+    fun encryptedDestinationDeliveredUnderAppLockWaitsForUnlock() = assertDeferredPickerReturn(lock = true, encrypted = true)
+
+    private fun assertDeferredPickerReturn(
+        lock: Boolean,
+        encrypted: Boolean,
+    ) {
+        val fixture = render()
+        val uri = Uri.parse("content://key-export-test/deferred")
+        val bytes = ByteArrayOutputStream()
+        val opens = AtomicInteger()
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) {
+            opens.incrementAndGet()
+            bytes
+        }
+        beginExport(encrypted)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        composeRule.runOnIdle {
+            fixture.owner.stop()
+            if (lock) {
+                Shadow
+                    .extract<ShadowBiometricManager>(context.getSystemService(BiometricManager::class.java))
+                    .setCanAuthenticate(true)
+                fixture.appState.appLock.updateRequired(true)
+                fixture.owner.resume()
+                assertTrue(fixture.appState.appLock.screenVisible)
+            }
+        }
+        composeRule.runOnIdle { fixture.picker.deliver(uri) }
+        composeRule.waitForIdle()
+        assertEquals(0, opens.get())
+
+        composeRule.runOnIdle {
+            if (lock) fixture.appState.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
+            fixture.owner.resume()
+        }
+        val expected = if (encrypted) ENCRYPTED_KEY else RAW_KEY
+        composeRule.waitUntil(TIMEOUT_MILLIS) { bytes.toString(Charsets.UTF_8.name()) == expected }
+        assertEquals(1, opens.get())
     }
 
     /** The actual save action cannot read the key or open a destination before authentication. */
@@ -651,11 +704,15 @@ class AccountKeysExportDeliveryTest {
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(
-                        appState = appState,
-                        onBack = {},
-                        rawExportAuthenticator = authenticator,
-                    )
+                    CompositionLocalProvider(LocalKeyFileExportLauncher provides rememberKeyFileExport(appState)) {
+                        if (!appState.appLock.screenVisible) {
+                            AccountKeysScreen(
+                                appState = appState,
+                                onBack = {},
+                                rawExportAuthenticator = authenticator,
+                            )
+                        }
+                    }
                 }
             }
         }

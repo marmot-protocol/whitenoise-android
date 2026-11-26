@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -148,7 +149,7 @@ internal fun ComposerAttachmentShelf(
     val context = LocalContext.current
     val pdfRenderer = rememberComposerPdfPageRenderer()
     val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
-    if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata)
+    if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata, preparing)
     Column(Modifier.fillMaxWidth()) {
         LazyRow(
             modifier =
@@ -227,7 +228,14 @@ private fun ComposerAttachmentShelfItem(
         document?.attachment?.fileName ?: metadata?.displayName ?: item.uri.lastPathSegment
             ?: stringResource(R.string.reply_media_document)
     val pdfMediaType = document?.attachment?.mediaType.orEmpty()
-    if (media == null && pdfs != null && documentAttachmentKind(pdfMediaType, label) == DocumentAttachmentKind.Pdf) {
+    val inspected = pdfs?.choices?.state(item.uri)?.metadata
+    if (media == null &&
+        pdfs != null &&
+        (
+            documentAttachmentKind(pdfMediaType, label) == DocumentAttachmentKind.Pdf ||
+                (inspected != null && inspected != PdfMetadataResult.NotPdf)
+        )
+    ) {
         val tag = Modifier.testTag("conversation.composer.attachment.$index")
         ComposerPdfShelfItem(item.uri, label, document, pdfs.choices, pdfs.renderer, onPreview, onRemove, tag, enabled)
         return

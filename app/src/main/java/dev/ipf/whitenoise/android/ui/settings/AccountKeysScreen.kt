@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.net.Uri
 import android.os.SystemClock
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -83,28 +80,25 @@ private object ProfileKeysDefaults {
 }
 
 /** Transient screen state; everything sensitive clears on stop and on dispose. */
-internal class ProfileKeysUiState {
+internal class ProfileKeysUiState(
+    private val fileExport: KeyFileExport = KeyFileExport(),
+) {
     var privateKey by mutableStateOf<String?>(null)
     var revealRequested by mutableStateOf(false)
     var copiedKey by mutableStateOf<CopiedProfileKey?>(null)
-    var pendingExport by mutableStateOf<PendingKeyExport?>(null)
     var encryptedBackup by mutableStateOf<PendingKeyExport?>(null)
     var shareErrorDialog by mutableStateOf(false)
     var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
     var rawKeyConsent = Any()
-    var saveErrorDialog by mutableStateOf(false)
-    var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
-    var savingExport by mutableStateOf(false)
     var wipeSheet by mutableStateOf(false)
     var wipeConfirm by mutableStateOf(false)
     var wipeConfirmInput by mutableStateOf("")
     val exportOperation = ProfileKeyOperation()
     val copyOperation = ProfileKeyOperation()
     val revealOperation = ProfileKeyOperation()
-    val saveOperation = ProfileKeyOperation()
     val password = TextFieldState()
     val confirmation = TextFieldState()
 
@@ -133,16 +127,14 @@ internal class ProfileKeysUiState {
 
     /** True when no export is being prepared, picked or written. */
     val exportIdle: Boolean
-        get() = !exportBusy && pendingExport == null && !savingExport
+        get() = !exportBusy && fileExport.idle
 
     /**
-     * Prevents delayed exports, file saves and feedback, clipboard writes and reveals after backgrounding or leaving
+     * Prevents delayed export preparation, clipboard writes and reveals after backgrounding or leaving
      * this account.
      */
     fun stopSensitiveOperations() {
         cancelExport()
-        saveOperation.cancel()
-        savingExport = false
         copyOperation.cancel()
         hidePrivateKey()
         copiedKey = null
@@ -187,7 +179,8 @@ internal fun AccountKeysScreen(
     val shareTitle = stringResource(R.string.share_secret_key)
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
-    val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
+    val fileExport = LocalKeyFileExportLauncher.current ?: rememberKeyFileExport(appState)
+    val ui = remember(accountIdHex, accountRef, runtimeGeneration, fileExport.state) { ProfileKeysUiState(fileExport.state) }
     var showSignOut by remember(ui) { mutableStateOf(false) }
     val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui, appState)
 
@@ -205,46 +198,15 @@ internal fun AccountKeysScreen(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    fun saveExport(
-        uri: Uri,
-        content: String,
-    ) {
-        ui.savingExport = true
-        val started =
-            ui.saveOperation.start(
-                scope = scope,
-                canDeliver = ::canDeliverSecret,
-                load = { writeKeyExport(content) { context.contentResolver.openOutputStream(uri) } },
-                onResult = { saved -> ui.saveErrorDialog = !saved },
-                onFinished = { ui.savingExport = false },
-            )
-        if (!started) ui.savingExport = false
-    }
-
-    val exportLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-            val request = ui.pendingExport
-            ui.pendingExport = null
-            when {
-                uri == null || !canDeliverSecret() -> Unit
-                request == null || request.isExpired() -> ui.expiredExportDialog = true
-                else -> saveExport(uri, request.content)
-            }
-        }
-
     fun launchExport(
         encrypted: Boolean,
         content: String,
         createdAtMillis: Long = SystemClock.elapsedRealtime(),
     ) {
-        ui.pendingExport = PendingKeyExport(encrypted, content, createdAtMillis)
         ui.hideSensitive()
         val stem = npub.take(ProfileKeysDefaults.FILE_STEM_LENGTH)
         val filename = if (encrypted) "$stem-white-noise-key.wnkey.txt" else "$stem-white-noise-key.txt"
-        if (runCatching { exportLauncher.launch(filename) }.isFailure) {
-            ui.pendingExport = null
-            ui.saveErrorDialog = true
-        }
+        fileExport.launch(PendingKeyExport(encrypted, content, createdAtMillis), filename)
     }
 
     fun beginExport(
@@ -305,7 +267,6 @@ internal fun AccountKeysScreen(
     LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
         if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
             ui.stopSensitiveOperations()
-            ui.pendingExport = null
         }
     }
 
@@ -393,7 +354,7 @@ internal fun AccountKeysScreen(
                 launchExport(true, backup.content, backup.createdAtMillis)
             } else {
                 ui.encryptedBackup = null
-                if (canDeliverSecret()) ui.expiredExportDialog = true
+                if (canDeliverSecret()) fileExport.state.feedback = KeyFileExportFeedback.Expired
             }
         },
     )
@@ -409,7 +370,7 @@ internal fun AccountKeysScreen(
     }
 }
 
-/** Reveal loading and expiry, pending-export expiry, copied-glyph reset, and hiding everything sensitive on stop. */
+/** Reveal loading and expiry, copied-glyph reset, and hiding everything sensitive on stop. */
 @Suppress("FunctionNaming")
 @Composable
 private fun ProfileKeysEffects(
@@ -421,14 +382,6 @@ private fun ProfileKeysEffects(
         if (ui.privateKey != null) {
             delay(PRIVATE_KEY_EXPIRY_MILLIS)
             ui.hidePrivateKey()
-        }
-    }
-    LaunchedEffect(ui.pendingExport) {
-        val request = ui.pendingExport ?: return@LaunchedEffect
-        delay(request.remainingMillis())
-        if (ui.pendingExport === request) {
-            ui.pendingExport = null
-            ui.expiredExportDialog = true
         }
     }
     LaunchedEffect(ui.encryptedBackup) {
@@ -454,7 +407,6 @@ private fun ProfileKeysEffects(
         onDispose {
             lifecycle.removeObserver(observer)
             ui.stopSensitiveOperations()
-            ui.pendingExport = null
         }
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +43,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataDialog
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -90,6 +92,8 @@ internal fun rememberAttachmentCollectionPanels(
     val anyShown by presence.first.collectAsState(initial = presence.second)
     if (!anyShown) return null
     return {
+        ComposerPdfMetadataDialog(mediaSender.collectionResumePdfChoices)
+        DisposableEffect(mediaSender) { onDispose { mediaSender.collectionResumePdfChoices.cancel() } }
         val current by operations.collectAsState()
         visible(current).forEach { operation ->
             AttachmentCollectionProgress(

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -86,14 +88,13 @@ internal fun composerPdfPrivacy(
     when (metadata) {
         null, PdfMetadataResult.NotPdf -> null
         PdfMetadataResult.Clean, is PdfMetadataResult.Scrubbed -> ComposerPdfPrivacy.Removed
-        // A draft saved before PDFs were cleaned still carries its metadata; the send cleans it first.
-        is PdfMetadataResult.Removable -> ComposerPdfPrivacy.RemovedOnSend
+        is PdfMetadataResult.Removable ->
+            if (keepsOriginal) ComposerPdfPrivacy.SendingAsIs else ComposerPdfPrivacy.RemovedOnSend
         is PdfMetadataResult.Refused ->
-            when {
-                keepsOriginal -> ComposerPdfPrivacy.SendingAsIs
-                metadata.reason == PdfMetadataRefusal.Signed -> ComposerPdfPrivacy.Signed
-                metadata.reason == PdfMetadataRefusal.Encrypted -> ComposerPdfPrivacy.Encrypted
-                else -> ComposerPdfPrivacy.Unsupported
+            when (metadata.reason) {
+                PdfMetadataRefusal.Signed -> ComposerPdfPrivacy.Signed
+                PdfMetadataRefusal.Encrypted -> ComposerPdfPrivacy.Encrypted
+                PdfMetadataRefusal.Unsupported -> ComposerPdfPrivacy.Unsupported
             }
     }
 
@@ -112,6 +113,7 @@ internal fun ComposerPdfAttachmentCard(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    onMetadataOptions: (() -> Unit)? = null,
 ) {
     val summary = composerPdfSummary(pages)
     val privacyText = privacy?.let { stringResource(it.labelRes) }
@@ -130,7 +132,12 @@ internal fun ComposerPdfAttachmentCard(
     ) {
         Box(Modifier.pressFeedbackInsideClip(press)) {
             Row(
-                Modifier.fillMaxSize().padding(start = 10.dp, top = 8.dp, bottom = 8.dp, end = 40.dp),
+                Modifier.fillMaxSize().padding(
+                    start = 10.dp,
+                    top = 8.dp,
+                    bottom = 8.dp,
+                    end = if (onMetadataOptions == null) 40.dp else 88.dp,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ComposerPdfFirstPage(firstPage)
@@ -151,6 +158,18 @@ internal fun ComposerPdfAttachmentCard(
                         )
                         if (privacy != null && privacyText != null) ComposerPdfPrivacyLine(privacy, privacyText)
                     }
+                }
+            }
+            if (onMetadataOptions != null) {
+                IconButton(
+                    onClick = onMetadataOptions,
+                    enabled = enabled,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_more_vert),
+                        stringResource(R.string.composer_pdf_metadata_options),
+                    )
                 }
             }
             ComposerAccessoryRemoveButton(

@@ -3055,6 +3055,7 @@ internal fun ConversationScreen(
         caption: String,
         onResult: (Boolean) -> Unit,
         onCaptionSettled: () -> Unit = {},
+        keepPdfMetadata: Set<Uri>,
     ) {
         attachmentSendClaim.send(
             onResult = onResult,
@@ -3085,6 +3086,7 @@ internal fun ConversationScreen(
                 caption,
                 preparedImageAttachments = mediaDraftState.preparedAttachments(),
                 preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
+                keepPdfMetadata = keepPdfMetadata,
                 onSettled = {
                     onCaptionSettled()
                     if (canSettle() && pendingMediaSlots == sendingMedia && pendingDocumentUris == sendingDocuments) {
@@ -3107,10 +3109,25 @@ internal fun ConversationScreen(
             )
         }
     }
+
     // Dictation's Send never sees the composer's staged attachments, so it asks the controller for this
     // same send. The updated reference keeps the registered sender on the newest media owner.
+    fun confirmAndSendStagedAttachments(
+        caption: String,
+        onResult: (Boolean) -> Unit,
+        onCaptionSettled: () -> Unit = {},
+    ) {
+        val documents = pendingDocumentUris
+        mediaSender.pdfChoices.confirmThen(documents, { onResult(false) }) { consent ->
+            if (pendingDocumentUris != documents) {
+                onResult(false)
+            } else {
+                sendStagedAttachmentsWithCaption(caption, onResult, onCaptionSettled, consent)
+            }
+        }
+    }
     val stagedAttachmentDispatch by rememberUpdatedState<(String, (Boolean) -> Unit) -> Unit> { caption, onResult ->
-        sendStagedAttachmentsWithCaption(caption, onResult)
+        confirmAndSendStagedAttachments(caption, onResult)
     }
     DisposableEffect(controller) {
         val sender =
@@ -3828,14 +3845,7 @@ internal fun ConversationScreen(
                                 null
                             },
                         onSendAttachments = { caption, onResult ->
-                            // PDFs whose metadata cannot be removed are sent as they are only once chosen (#3377).
-                            mediaSender.pdfChoices.confirmThen(pendingDocumentUris, { onResult(false) }) {
-                                sendStagedAttachmentsWithCaption(
-                                    caption,
-                                    onResult,
-                                    composerTextState.captureCaptionSettlement(),
-                                )
-                            }
+                            confirmAndSendStagedAttachments(caption, onResult, composerTextState.captureCaptionSettlement())
                         },
                         onAfterSend = {
                             acceptedSendRevealedTranscript = true

@@ -34,7 +34,7 @@ internal fun MaestroPdfMetadataPresentation(fixture: MaestroPresentationFixture)
         Button(
             onClick = {
                 choices.confirmThen(listOf(signed), { fixture.record("cancel") }) {
-                    check(choices.takeConsent() == setOf(signed)) { "Send as is must cover the signed PDF only" }
+                    check(it == setOf(signed)) { "Send as is must cover the signed PDF only" }
                     fixture.finish("send-as-is")
                 }
             },

@@ -3,8 +3,13 @@ package dev.ipf.whitenoise.android.media.pdf
 private val PDF_HEADER = ascii("%PDF-")
 private const val HEADER_WINDOW = 1024
 
-/** Whether [bytes] start like a PDF: `%PDF-` within the first kilobyte, as readers accept. */
-internal fun looksLikePdf(bytes: PdfBytes) = bytes.indexOf(PDF_HEADER, 0, minOf(bytes.size, HEADER_WINDOW)) >= 0
+/** The first non-whitespace bytes must be the PDF header, even for a mislabeled file. */
+internal fun looksLikePdf(bytes: PdfBytes): Boolean {
+    val end = minOf(bytes.size, HEADER_WINDOW)
+    var start = 0
+    while (start < end && isPdfWhitespace(bytes[start])) start++
+    return start + PDF_HEADER.size <= end && bytes.matches(start, PDF_HEADER)
+}
 
 /**
  * Plans the same-length edits that remove a PDF's metadata, across every revision an incremental update kept:
@@ -15,10 +20,12 @@ internal fun looksLikePdf(bytes: PdfBytes) = bytes.indexOf(PDF_HEADER, 0, minOf(
  * A signed or encrypted PDF is refused before anything is planned, and planning stops at the first refusal. So is
  * one whose stream ends the walk had to guess and cannot confirm, because what followed may have been stream data.
  */
-internal fun planPdfMetadataRemoval(bytes: PdfBytes): PdfMetadataPlan {
+internal fun planPdfMetadataRemoval(input: PdfBytes): PdfMetadataPlan {
+    val bytes = BudgetedPdfBytes(input)
     val plan = PdfMetadataPlan()
     val layout = PdfObjectWalk(bytes).walk()
     if (containsName(bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
+    if (containsName(bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
     if (layout.trailers.any { it.has("Encrypt") }) plan.refuse(PdfMetadataRefusal.Encrypted)
     val objectStreams = if (plan.refusal == null) decodeObjectStreams(bytes, layout, plan) else emptyList()
     val sources = PdfObjectSources(bytes, layout, objectStreams)
@@ -41,6 +48,7 @@ private class PdfObjectSources(
 ) {
     private val fileParser = PdfValueParser(bytes)
     private val compressed = HashMap<Int, MutableList<Pair<PdfObjectStream, Int>>>()
+    private val resolved = mutableMapOf<Pair<Int, Int>, List<Pair<PdfValue, (Int, ByteArray) -> Unit>>>()
     val plainEdits = mutableListOf<Pair<Int, ByteArray>>()
 
     init {
@@ -52,21 +60,23 @@ private class PdfObjectSources(
     }
 
     /** Every stored value of [reference], each with the edit callback that overwrites inside it. */
-    fun values(reference: Pair<Int, Int>): List<Pair<PdfValue, (Int, ByteArray) -> Unit>>? {
+    fun values(reference: Pair<Int, Int>): List<Pair<PdfValue, (Int, ByteArray) -> Unit>>? =
+        if (reference.first in layout.unreadable) null else resolved.getOrPut(reference) { parseValues(reference) }
+
+    private fun parseValues(reference: Pair<Int, Int>): List<Pair<PdfValue, (Int, ByteArray) -> Unit>> {
         val (number, generation) = reference
-        if (number in layout.unreadable) return null
         val plain =
             layout.positions(number, generation).map { position ->
                 fileParser.parse(position) to { at: Int, replacement: ByteArray -> plainEdits += at to replacement }
             }
         val packed = if (generation == 0) compressed[number].orEmpty() else emptyList()
-        return plain + packed.map { (stream, offset) -> PdfValueParser(stream.bytes).parse(offset) to stream.editor() }
+        return plain + packed.map { (stream, offset) -> stream.valueAt(offset) to stream.editor() }
     }
 
     /** Numbers of compressed dictionaries shaped like document information. */
     fun compressedInfoLike(): List<Pair<Int, Int>> =
         compressed
-            .filterValues { members -> members.any { (stream, offset) -> isInfoLikeAt(stream, offset) } }
+            .filterValues { members -> members.map { (stream, offset) -> isInfoLikeAt(stream, offset) }.any { it } }
             .keys
             .map { it to 0 }
 
@@ -75,7 +85,9 @@ private class PdfObjectSources(
         offset: Int,
     ): Boolean =
         try {
-            (PdfValueParser(stream.bytes).parse(offset) as? PdfDict)?.let(::isInfoLike) == true
+            val value = stream.valueAt(offset)
+            value.collectStringRanges(stream.strings)
+            (value as? PdfDict)?.let(::isInfoLike) == true
         } catch (_: PdfSyntaxException) {
             false
         }
@@ -98,10 +110,17 @@ private class PdfObjectSources(
 
     /** How often each of [targets] is referred to anywhere: in the file and in object streams it compresses. */
     fun referenceCounts(targets: Set<Pair<Int, Int>>): Map<Pair<Int, Int>, Int> {
-        val counts = countReferences(bytes, targets).toMutableMap()
+        if (targets.isEmpty()) return emptyMap()
+        val plainStrings =
+            layout.strings +
+                objectStreams.filterNot { it.data.compressed }.flatMap { stream ->
+                    val start = stream.data.stream.dataStart
+                    stream.strings.map { it.first + start..it.last + start }
+                }
+        val counts = countReferences(bytes, targets, plainStrings.sortedBy { it.first }).toMutableMap()
         // An unfiltered object stream's references are already in the file's own bytes.
         objectStreams.filter { it.data.compressed }.forEach { stream ->
-            countReferences(stream.bytes, targets).forEach { (key, count) -> counts[key] = (counts[key] ?: 0) + count }
+            countReferences(stream.bytes, targets, stream.strings.sortedBy { it.first }).forEach { (key, count) -> counts[key] = (counts[key] ?: 0) + count }
         }
         return counts
     }
@@ -123,7 +142,10 @@ private fun planInfoDictionaries(
     (layout.trailers.mapNotNull { it["Info"] } + layout.embeddedInfo).forEach { info ->
         when {
             // A string named indirectly, such as pdfTeX's file name, is emptied only when nothing else uses it.
-            info is PdfRef && sources.values(info.number to info.generation)?.all { it.first is PdfString } == true ->
+            info is PdfRef &&
+                sources.values(info.number to info.generation)?.let { values ->
+                    values.isNotEmpty() && values.all { it.first is PdfString }
+                } == true ->
                 references += info
             info is PdfRef -> named += info.number to info.generation
             else -> blankInfoValue(info, plan.fields, references) { at, replacement -> plan.replace(at, replacement) }

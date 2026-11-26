@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.media.pdf
 
 private const val INDEX_SHIFT = 32
 private const val LOW_BITS = 0xFFFFFFFFL
-private const val MAX_OBJECTS = 8_000_000
+private const val MAX_OBJECTS = 250_000
 private const val INITIAL_OBJECTS = 256
 
 /** A stream the metadata plan reads: its object, its dictionary and its data range. */
@@ -46,6 +46,7 @@ internal class PdfLayout(
     val embeddedInfo: List<PdfValue>,
     /** Streams whose end the walk had to guess; the plan confirms each before trusting what followed it. */
     val guessed: List<PdfGuessedStream>,
+    val strings: List<IntRange>,
 ) {
     /** Every uncompressed object numbered [number] with [generation], oldest revision first. */
     fun positions(

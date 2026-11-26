@@ -33,13 +33,18 @@ import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
 import dev.ipf.whitenoise.android.state.withStoredDraftAdmission
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.inspectComposerPdf
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
+import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
+import kotlin.coroutines.resume
 
 /** What one Send hands to a collection operation; [caption] is already trimmed and null when blank. */
 internal data class CollectionSendRequest(
@@ -140,7 +145,11 @@ internal fun ConversationMediaSender.startCollectionSend(
                     request.preparedDocuments.withoutStoredFiles(),
                     request.draftClear,
                     onAfterSend,
-                    keepPdfMetadata = request.keepPdfMetadata,
+                    keepPdfMetadata =
+                        request.documentUris
+                            .zip(operation.items.drop(request.imageSlots.size))
+                            .filter { (originalUri, _) -> originalUri in request.keepPdfMetadata }
+                            .mapTo(mutableSetOf()) { (_, item) -> Uri.parse(item.uri) },
                 )
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)
@@ -302,6 +311,7 @@ internal fun ConversationMediaSender.resumeCollection(
     val original = this
     appState.launchMutation {
         var skipped = 0
+        var keepPdfMetadata = emptySet<Uri>()
         val updated =
             try {
                 val optimistic = appState.optimisticMessages(paused.accountRef, paused.groupIdHex)
@@ -316,7 +326,8 @@ internal fun ConversationMediaSender.resumeCollection(
                     appState.present(R.string.error_try_again)
                     return@launchMutation
                 }
-                if (paused.withTokenStatuses(statuses, registry.now()).ownedByComposerDraft) {
+                val reconciled = paused.withTokenStatuses(statuses, registry.now())
+                if (reconciled.ownedByComposerDraft) {
                     // As on restore: with nothing accepted, the composer's draft still owns the selection, the
                     // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
                     registry.update(operationId) { it.withTokenStatuses(statuses, registry.now()) }
@@ -325,6 +336,17 @@ internal fun ConversationMediaSender.resumeCollection(
                         paused.accountRef,
                         paused.groupIdHex,
                     )
+                    return@launchMutation
+                }
+                keepPdfMetadata = confirmResumedPdfMetadata(reconciled) ?: return@launchMutation
+                if (!shouldAcceptMediaUploadForAccount(
+                        paused.accountRef,
+                        sessionEpoch,
+                        appState.activeAccountRef,
+                        appState.mediaUploadSessionEpoch(),
+                    ) ||
+                    registry.operations.value[operationId] != paused
+                ) {
                     return@launchMutation
                 }
                 withContext(Dispatchers.IO) {
@@ -349,7 +371,40 @@ internal fun ConversationMediaSender.resumeCollection(
                 return@launchMutation appState.present(R.string.share_import_storage)
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
-        driveResumedCollection(resumed, sessionEpoch, lease, original)
+        driveResumedCollection(resumed, sessionEpoch, lease, original, keepPdfMetadata)
+    }
+}
+
+/** Checks remaining document inputs before changing a paused journal or starting its next chunk. */
+private suspend fun ConversationMediaSender.confirmResumedPdfMetadata(operation: AttachmentCollectionOperation): Set<Uri>? {
+    val documents =
+        operation.items
+            .filter { it.kind == CollectionItemKind.DOCUMENT && !it.state.isSettled && it.id !in operation.unrecoverableItemIds }
+            .map { Uri.parse(it.uri) }
+            .distinct()
+    val choices = collectionResumePdfChoices
+    val refused =
+        documents.mapNotNull { uri ->
+            val name = safeDocumentDisplayName(uri.lastPathSegment)
+            val metadata = inspectComposerPdf(context, uri, name)
+            if (metadata is dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult.Refused) {
+                uri to ComposerPdfState(name, metadata)
+            } else {
+                null
+            }
+        }
+    if (refused.isEmpty()) return emptySet()
+    if (appState.appLock.screenVisible ||
+        appState.appLock.evaluationPending ||
+        latestCollectionSender(operation.accountRef, operation.groupIdHex) !== this
+    ) {
+        return null
+    }
+    return suspendCancellableCoroutine { continuation ->
+        val uris = refused.map { it.first }
+        choices.retainOnly(emptyList())
+        refused.forEach { (uri, state) -> choices.record(uri, state) }
+        choices.confirmThen(uris, { continuation.resume(null) }) { continuation.resume(it) }
     }
 }
 
