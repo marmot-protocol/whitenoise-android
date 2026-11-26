@@ -44,15 +44,17 @@ internal fun recordDepartedChatClaims(
         }
 }
 
-/** Whether any sign-out left inferred departed-chat claims for retention to revalidate and delete. */
+/**
+ * Whether any sign-out left inferred departed-chat claims for retention to revalidate and delete, counting a claim
+ * whose last write failed: Android drops a failed removal from memory, so only the pending marker remembers it.
+ */
 internal fun hasDepartedChatClaims(context: Context): Boolean =
     synchronized(UserEventNotificationGroup.mutationLock) {
         runCatching {
-            context.applicationContext
-                .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-                .all
-                .keys
-                .any { it.startsWith(DEPARTED_CHAT_KEY_PREFIX) }
+            val appContext = context.applicationContext
+            val stored =
+                appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE).all.keys
+            (stored + UncommittedChannelOwners.keys(appContext)).any { it.startsWith(DEPARTED_CHAT_KEY_PREFIX) }
         }.getOrDefault(true)
     }
 
@@ -72,9 +74,12 @@ internal fun pruneDepartedChatClaims(
             val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
             val uncommitted = UncommittedChannelOwners.keys(appContext)
             val editor = prefs.edit()
+            val stored = prefs.all
+            // A key whose last write failed is retried even when the failed removal already left memory.
+            val keys = (stored.keys + uncommitted).filter { it.startsWith(DEPARTED_CHAT_KEY_PREFIX) }.toSet()
             val changed =
-                prefs.all.filterKeys { it.startsWith(DEPARTED_CHAT_KEY_PREFIX) }.mapNotNull { (key, value) ->
-                    val claims = (value as? Set<*>)?.filterIsInstance<String>().orEmpty().toSet()
+                keys.mapNotNull { key ->
+                    val claims = (stored[key] as? Set<*>)?.filterIsInstance<String>().orEmpty().toSet()
                     val remaining = claims.filterNot { canonicalConversationShortcutId(it) in kept }.toSet()
                     key.takeIf { remaining != claims || key in uncommitted }?.also {
                         if (remaining.isEmpty()) editor.remove(key) else editor.putStringSet(key, remaining)

@@ -476,6 +476,41 @@ class NotificationChannelCleanupRegressionTest {
         assertNotNull(manager.getNotificationChannel(restored))
     }
 
+    /**
+     * Revalidation that drops a claim's last channel and fails to commit keeps reporting claims and retries the
+     * removal, although the failed removal already left the preferences in memory.
+     */
+    @Test
+    fun failedClaimRemovalIsRetriedAfterItLeftMemory() {
+        val restoredId = checkNotNull(conversationShortcutId("account-b", "group-b-removal"))
+        assertTrue(recordDepartedChatClaims(context, "account-a", setOf(restoredId)))
+        val failingPrefs = MemoryRetainingFailingCommitPrefs(ownerPrefs())
+        val failingContext =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences =
+                    if (name == CONVERSATION_CHANNEL_OWNERS_PREFS) {
+                        failingPrefs
+                    } else {
+                        super.getSharedPreferences(name, mode)
+                    }
+            }
+        val kept = groupChannelShortcutIds("account-b", setOf("group-b-removal"))
+
+        assertFalse(pruneDepartedChatClaims(failingContext, kept))
+        assertTrue("a failed removal still counts as a claim", hasDepartedChatClaims(failingContext))
+        val attempts = failingPrefs.commitAttempts
+
+        failingPrefs.failCommits = false
+        assertTrue(pruneDepartedChatClaims(failingContext, kept))
+        assertEquals("the removal is written again", attempts + 1, failingPrefs.commitAttempts)
+        assertFalse(hasDepartedChatClaims(failingContext))
+    }
+
     /** A failed claim commit, already applied in memory, is written again on retry instead of reported saved. */
     @Test
     fun failedClaimCommitIsRetriedRatherThanTakenFromMemory() {
