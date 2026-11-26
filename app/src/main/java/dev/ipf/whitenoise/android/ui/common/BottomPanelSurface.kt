@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlin.math.sqrt
 import android.view.WindowInsets as PlatformWindowInsets
@@ -154,7 +155,7 @@ internal fun BottomPanelSurface(
         shape = BottomPanelOutline,
         color = MaterialTheme.colorScheme.surface,
         border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
         content = content,
     )
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -41,6 +42,7 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EDITOR_VIEWPORT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
@@ -101,6 +103,7 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         assertFullScreenOwner(appState, draft)
         assertEquals(fullScreenHeight, composerHeight(), 1f)
         assertInsideViewport()
+        assertShortcutsClearOfTheEditor()
         composeRule.onRoot().captureRoboImage(
             "src/test/snapshots/conversation_composer_full_screen_retained_reentry_amoled_rtl_xhdpi.png",
         )
@@ -213,6 +216,24 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         assertTrue(composer.height > viewport.height / 2f)
         assertTrue(composer.top >= viewport.top && composer.bottom <= viewport.bottom)
         assertTrue(composer.left >= viewport.left && composer.right <= viewport.right)
+    }
+
+    /** Fails when a wrapped shortcut row is drawn over the draft instead of below it. */
+    private fun assertShortcutsClearOfTheEditor() {
+        val editor =
+            composeRule
+                .onNodeWithTag(COMPOSER_EDITOR_VIEWPORT_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val shortcuts =
+            composeRule
+                .onAllNodesWithTag("composer.shortcuts", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .map { it.boundsInRoot }
+        assertTrue("shortcut groups are present", shortcuts.isNotEmpty())
+        shortcuts.forEach { group ->
+            assertTrue("shortcuts $group must sit below the editor $editor", editor.bottom <= group.top + 1f)
+        }
     }
 
     /** Keeps draft content in the production draft owner while providing two independent test accounts. */

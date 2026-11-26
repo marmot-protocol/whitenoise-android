@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
@@ -223,6 +224,7 @@ internal fun SelectedMembersReviewScreen(
                         .then(if (busy) Modifier.semantics { disabled() } else Modifier),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                elevation = floatingControlFabElevation(),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
