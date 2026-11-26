@@ -34,6 +34,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -143,6 +144,33 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
+    }
+
+    /** A timer too long for a crowded 320dp header ends in an ellipsis instead of silently losing digits. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun overlongHeaderTimerEllipsizesInsteadOfClipping() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val retention = 9_000_000_000_000_000_001uL
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = retention))
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                HeaderShortcut.entries.toList(),
+                capacity = it,
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = false,
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("$retention seconds", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+
+        assertTrue("the shortened timer must end in an ellipsis", layouts.single().isLineEllipsized(0))
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */

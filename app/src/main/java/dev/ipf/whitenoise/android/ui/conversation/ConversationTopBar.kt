@@ -467,7 +467,15 @@ private fun HeaderTimerBadge(
             },
             label = "header-timer-label",
         ) { shown ->
-            Text(shown, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
+            // A timer too long for the header ends in an ellipsis — Chat details shows the full duration.
+            Text(
+                shown,
+                style = labelStyle,
+                color = labelColor,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
