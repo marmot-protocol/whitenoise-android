@@ -17,7 +17,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/audio/tts/TtsController.kt" to 1033,
         "dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt" to 1199,
         "dev/ipf/whitenoise/android/core/AvatarImageLoader.kt" to 808,
-        "dev/ipf/whitenoise/android/core/IdentityFormatter.kt" to 684,
+        "dev/ipf/whitenoise/android/core/IdentityFormatter.kt" to 622,
         "dev/ipf/whitenoise/android/core/MessageProjector.kt" to 730,
         "dev/ipf/whitenoise/android/core/SafeHttpsGet.kt" to 722,
         "dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt" to 695,
