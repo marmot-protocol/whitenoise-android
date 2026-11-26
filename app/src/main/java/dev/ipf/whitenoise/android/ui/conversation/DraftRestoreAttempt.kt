@@ -234,6 +234,7 @@ internal class DraftRestoreAttempt(
 internal suspend fun replaceWithDraftFileBody(
     file: File,
     size: Long,
+    propagateRevisionConflict: Boolean = false,
     read: suspend (offset: Long) -> ByteArray?,
 ): Boolean {
     val partial = File(file.parentFile, "${file.name}.partial")
@@ -245,6 +246,9 @@ internal suspend fun replaceWithDraftFileBody(
             } catch (unreadable: IOException) {
                 false
             } catch (refused: MarmotKitException) {
+                if (propagateRevisionConflict && refused is MarmotKitException.MessageDraftRevisionConflict) {
+                    throw refused
+                }
                 false
             }
         moved = copied && partial.renameTo(file)

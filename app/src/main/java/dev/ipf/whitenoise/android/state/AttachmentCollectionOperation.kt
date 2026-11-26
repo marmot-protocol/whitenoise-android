@@ -217,18 +217,22 @@ internal data class AttachmentCollectionOperation(
     val needsStoredDraftCleanup: Boolean
         get() = pendingDraftFiles.isNotEmpty()
 
-    /** A recorded native token can still establish accepted ownership after process death. */
+    /** A chunk MDK might still own must remain probeable while it can account for a native draft attachment. */
+    private val hasUnresolvedDraftToken: Boolean
+        get() {
+            val drafts = items.filter { !it.state.isSettled && it.storedDraft?.consumed == false }
+            return chunks.any { chunk ->
+                !chunk.state.isSettled && chunk.clientToken != null && drafts.any { it.id in chunk.itemIds }
+            }
+        }
+
+    /** Accepted IDs and unresolved tokens can still establish ownership after process death. */
     val mayNeedStoredDraftCleanup: Boolean
-        get() =
-            needsStoredDraftCleanup ||
-                (
-                    items.any { it.storedDraft?.consumed == false } &&
-                        chunks.any { !it.state.isSettled && it.clientToken != null }
-                )
+        get() = needsStoredDraftCleanup || hasUnresolvedDraftToken
 
     /** A paused native token must resolve before its stored draft can safely regain ownership. */
     val canDiscard: Boolean
-        get() = !paused || !mayNeedStoredDraftCleanup || needsStoredDraftCleanup
+        get() = !paused || !hasUnresolvedDraftToken
 
     /** The operation's coarse state for presentation and the runner. */
     val phase: CollectionOperationPhase

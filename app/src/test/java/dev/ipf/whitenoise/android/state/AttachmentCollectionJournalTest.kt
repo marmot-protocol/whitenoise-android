@@ -118,6 +118,47 @@ class AttachmentCollectionJournalTest {
         assertTrue(restored.items.all { it.uri.isEmpty() })
     }
 
+    /** A later unresolved token survives Discard even when an earlier accepted ID awaits native cleanup. */
+    @Test
+    fun discardWaitsForLaterDraftToken() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val plan = operation(count = 2)
+        val items = plan.items.map { it.copy(storedDraft = CollectionStoredDraft(it.id, 3L, "application/example")) }
+        val paused =
+            plan
+                .copy(items = items, paused = true)
+                .withChunkState(plan.chunks[0].id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, now)
+                .withChunkToken(plan.chunks[1].id, "later", now)
+        assertTrue(paused.needsStoredDraftCleanup)
+        assertFalse(paused.canDiscard)
+        assertTrue(registry.start(paused))
+        registry.discard(paused.id)
+        awaitAttachmentCollectionJournal()
+
+        val restored = journal.read(paused.accountRef, paused.groupIdHex).single()
+        assertEquals("later", restored.nextChunk?.clientToken)
+        assertFalse(restored.canDiscard)
+    }
+
+    /** A failed same-token retry must leave both the earlier live state and its durable record intact. */
+    @Test
+    fun failedRewritePreservesEarlierJournal() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val planned = operation()
+        val original = planned.withChunkToken(planned.chunks.first().id, "accepted-before-retry", now)
+        assertTrue(registry.start(original))
+        val file = folder.root.walkTopDown().single { it.isFile }
+        assertTrue(java.io.File(file.parentFile, file.name + ".tmp").mkdir())
+
+        assertFalse(registry.start(original.copy(updatedAtMs = now + 1)))
+
+        assertEquals(original, registry.operations.value[original.id])
+        val saved = journal.read(original.accountRef, original.groupIdHex).single()
+        assertEquals("accepted-before-retry", saved.nextChunk?.clientToken)
+    }
+
     /** A skipped pick still owns a shared native ID even when a separate occurrence was accepted. */
     @Test
     fun skippedAliasPreservesSharedOriginal() {

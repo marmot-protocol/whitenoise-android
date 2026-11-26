@@ -318,6 +318,26 @@ class DraftFilesUploadTest {
             }
         }
 
+    /** Moving the caption revision during a clean PDF copy remains a retryable revision conflict. */
+    @Test
+    fun cleanPdfReadKeepsItsRevisionConflict() =
+        runBlocking {
+            val body = pdfFixture("ghostscript").also { PdfMetadataScrubber.scrub(it) }
+            val descriptor = stored("clip").copy(plaintextSize = body.size.toULong())
+            val engine = DraftUploadEngine(content("caption", descriptor), fileBody = body)
+            val pick = storedPick("clip").copy(draftFile = DraftStoredFile("clip", body.size.toLong()))
+            val upload = DraftFilesUpload(listOf(pick), "caption")
+            engine.beforeFullRead = { engine.saveText("later caption") }
+
+            val failure = runCatching { engine.upload(upload) }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.MessageDraftRevisionConflict)
+            assertTrue(engine.uploadedIds.isEmpty())
+            engine.beforeFullRead = {}
+            engine.upload(upload)
+            assertEquals(listOf(descriptor.id), engine.uploadedIds)
+        }
+
     /** An in-memory pick that happens to share [id]'s name and type. */
     private fun inlinePick(id: String) = PendingAttachment(byteArrayOf(1), "video/mp4", "$id.mp4")
 
@@ -545,6 +565,7 @@ private class DraftUploadEngine(
     var beforeSave: () -> Unit = {}
     var refuseDraftCleanup: Boolean = false
     var onAdmission: () -> Unit = {}
+    var beforeFullRead: () -> Unit = {}
     var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
     var uploadRevision: MessageDraftRevisionFfi? = null
     var uploadedIds: List<String> = emptyList()
@@ -640,6 +661,7 @@ private class DraftUploadEngine(
             limit: UInt,
         ): ByteArray {
             calls += "read"
+            if (limit > 1_024u) beforeFullRead()
             requireCurrent(revision)
             val start = offset.toInt().coerceAtMost(fileBody.size)
             return fileBody.copyOfRange(start, minOf(fileBody.size, start + limit.toInt()))

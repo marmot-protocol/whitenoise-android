@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.ui.conversation.finishCollectionDraftCleanup
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -148,9 +149,10 @@ private suspend fun ConversationController.recordStoredDraftAdmission(
             now,
             cleanupOnly = true,
         )
+    var recorded = false
     try {
-        val recorded =
-            withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
+            recorded =
                 registry.start(record, admission) {
                     shouldAcceptMediaUploadForAccount(
                         account,
@@ -159,9 +161,16 @@ private suspend fun ConversationController.recordStoredDraftAdmission(
                         appState.mediaUploadSessionEpoch(),
                     )
                 }
-            }
+        }
         check(recorded) { "Could not record stored draft send before admission" }
         return record
+    } catch (cancelled: CancellationException) {
+        // A retry may reuse a token MDK already knows. Reconcile it rather than discarding that evidence.
+        if (recorded) {
+            registry.update(record.id) { it.copy(paused = true) }
+            appState.retainedConversationStates.recordNativeComposerCleanup(account, groupIdHex)
+        }
+        throw cancelled
     } finally {
         registry.admissions.release(admission)
     }

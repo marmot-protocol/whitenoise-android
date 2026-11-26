@@ -53,7 +53,7 @@ private suspend fun MarmotInterface.verifyNativePdf(
     val snapshot = File.createTempFile("draft-pdf-", ".pdf", directory)
     try {
         val complete =
-            replaceWithDraftFileBody(snapshot, file.byteCount) { offset ->
+            replaceWithDraftFileBody(snapshot, file.byteCount, propagateRevisionConflict = true) { offset ->
                 readMessageDraftAttachment(
                     account,
                     revision,

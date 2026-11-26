@@ -46,14 +46,26 @@ internal class AttachmentCollectionRegistry(
         canStart: () -> Boolean = { true },
     ): Boolean {
         // Live before its record exists, so a concurrent restore never adopts and deletes it as a stray record.
-        val effect =
+        val (previous, effect) =
             synchronized(lock) {
                 if (!canStart() || (admission != null && !admissions.accept(admission, operation))) return false
+                val old = state.value[operation.id]
                 state.update { it + (operation.id to operation) }
-                journaled { journal.write(operation) }
+                old to journaled { journal.write(operation) }
             }
         val written = effect.get()
-        if (!written) discard(operation.id)
+        if (!written) {
+            // An earlier attempt may still have a durable token under this ID. Only undo the failed publication.
+            synchronized(lock) {
+                state.update { current ->
+                    when {
+                        current[operation.id] !== operation -> current
+                        previous == null -> current - operation.id
+                        else -> current + (operation.id to previous)
+                    }
+                }
+            }
+        }
         return written
     }
 

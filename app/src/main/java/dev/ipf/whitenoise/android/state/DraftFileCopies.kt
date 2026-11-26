@@ -92,7 +92,7 @@ internal class DraftFileCopy(
     /** Writes the whole file to [target] through a partial file; reports whether [target] now holds all of it. */
     suspend fun into(target: File): Boolean {
         revision = heldRevision() ?: return false
-        return replaceWithDraftFileBody(target, stored.byteCount, ::readChunk)
+        return replaceWithDraftFileBody(target, stored.byteCount, read = ::readChunk)
     }
 
     /**

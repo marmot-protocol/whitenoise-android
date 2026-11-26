@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.captureDraftForSend
 import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
+import dev.ipf.whitenoise.android.state.isDraftStored
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
@@ -310,13 +311,15 @@ internal class ConversationMediaSender(
         completion: StagedMediaSendCompletion,
     ) {
         var replyAccepted = false
-        seeded.forEach { controller.retainedMediaUploads.get(it.key)?.draftSendClearToken = pendingClear }
+        val uploads = seeded.mapNotNull { controller.retainedMediaUploads.get(it.key) }
+        uploads.forEach { it.draftSendClearToken = pendingClear }
+        val sendsStoredFiles = uploads.any { it.isDraftStored }
         uploadStagedAttachments(seeded, releases) {
             if (isReply) {
                 replyAccepted = true
                 completion.accept()
             }
-            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it) }
+            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = sendsStoredFiles) }
         }
         if (isReply && !replyAccepted) completion.reject()
     }
