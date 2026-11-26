@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -116,7 +115,7 @@ internal fun WhiteNoiseTextField(
 
     CompositionLocalProvider(
         LocalTextSelectionColors provides colors.textSelectionColors,
-        LocalClipboard provides emojiFieldClipboard(useEmojiArtwork),
+        emojiFieldClipboard(useEmojiArtwork),
     ) {
         BasicTextField(
             state = state,

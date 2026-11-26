@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import android.content.ClipData
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -28,9 +27,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.Clipboard
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.copyText
 import androidx.compose.ui.semantics.cutText
@@ -96,47 +92,18 @@ private fun drawableShortcodes(
         .presentationShortcodes(text)
         .filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
 
-/**
- * Compose copies the visual selection. Strip its formatting isolates on the way to the platform clipboard.
- * Doubling the word joiner run in authored isolates distinguishes those from the isolates we insert.
- */
-private class EmojiFieldClipboard(
-    private val clipboard: Clipboard,
-) : Clipboard by clipboard {
-    override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-        val data = clipEntry?.clipData
-        val visual =
-            data
-                ?.takeIf { it.itemCount == 1 }
-                ?.getItemAt(0)
-                ?.text
-                ?.toString()
-        val canonical =
-            visual?.let { value ->
-                clipboardIsolates.replace(value) { match ->
-                    val joiners = match.groupValues[1]
-                    val code = match.groupValues[2]
-                    if (joiners.length > 1) {
-                        "\u2066" + WORD_JOINER.repeat(joiners.length / 2) +
-                            if (code.isEmpty()) "" else code + END_EMOJI_ISOLATE
-                    } else {
-                        code.ifEmpty { match.value }
-                    }
-                }
-            }
-        if (data != null && canonical != null && visual != canonical) {
-            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(data.description.label, canonical)))
+/** Removes the isolates inserted for artwork and restores the original word joiners in authored isolates. */
+internal fun decodeEmojiClipboardText(visual: String): String =
+    clipboardIsolates.replace(visual) { match ->
+        val joiners = match.groupValues[1]
+        val code = match.groupValues[2]
+        if (joiners.length > 1) {
+            "\u2066" + WORD_JOINER.repeat(joiners.length / 2) +
+                if (code.isEmpty()) "" else code + END_EMOJI_ISOLATE
         } else {
-            clipboard.setClipEntry(clipEntry)
+            code.ifEmpty { match.value }
         }
     }
-}
-
-@Composable
-internal fun emojiFieldClipboard(enabled: Boolean): Clipboard {
-    val current = LocalClipboard.current
-    return remember(current, enabled) { if (enabled) EmojiFieldClipboard(current) else current }
-}
 
 /**
  * One atomic edit range per emoji. The isolate makes the transparent shortcode act like a neutral image in

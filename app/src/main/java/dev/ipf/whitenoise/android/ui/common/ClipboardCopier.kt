@@ -4,10 +4,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ProvidedValue
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
@@ -23,6 +25,34 @@ internal fun copyToClipboard(
         val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return false
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
     }.isSuccess
+
+/** Keep the native selection actions and restore authored emoji shortcodes at the clipboard boundary. */
+@Composable
+internal fun emojiFieldClipboard(enabled: Boolean): ProvidedValue<Clipboard> {
+    val current = LocalClipboard.current
+    val fieldClipboard = remember(current, enabled) { if (enabled) EmojiFieldClipboard(current) else current }
+    return LocalClipboard provides fieldClipboard
+}
+
+private class EmojiFieldClipboard(
+    private val clipboard: Clipboard,
+) : Clipboard by clipboard {
+    override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+        val data = clipEntry?.clipData
+        val visual =
+            data
+                ?.takeIf { it.itemCount == 1 }
+                ?.getItemAt(0)
+                ?.text
+                ?.toString()
+        val canonical = visual?.let(::decodeEmojiClipboardText)
+        if (data != null && canonical != null && visual != canonical) {
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(data.description.label, canonical)))
+        } else {
+            clipboard.setClipEntry(clipEntry)
+        }
+    }
+}
 
 /**
  * The one way a user action copies public text. It writes the clip and then confirms through the shared Copied

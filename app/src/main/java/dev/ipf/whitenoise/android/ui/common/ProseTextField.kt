@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -111,7 +110,7 @@ internal fun ProseTextField(
     Box(containerModifier.emojiSheetFieldAnchor(emojiAnchor), propagateMinConstraints = true) {
         CompositionLocalProvider(
             LocalTextSelectionColors provides colors.textSelectionColors,
-            LocalClipboard provides emojiFieldClipboard(true),
+            emojiFieldClipboard(true),
         ) {
             BasicTextField(
                 state = state,
