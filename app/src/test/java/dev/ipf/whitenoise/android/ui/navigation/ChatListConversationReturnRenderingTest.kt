@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
 import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
@@ -51,6 +52,7 @@ import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.performUnreadFilterAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
@@ -340,6 +342,8 @@ internal class ReturnFixture(
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
     rowCount: Int = 6,
     customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
+    /** When given, opening any chat other than [target] waits for this signal before its timeline opens. */
+    otherChatTimelineGate: CompletableDeferred<Unit>? = null,
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
@@ -373,7 +377,7 @@ internal class ReturnFixture(
         )
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
-            timelines.subscriptions,
+            otherChatTimelineGate?.let(timelines.subscriptions::holdingOtherChats) ?: timelines.subscriptions,
             additionalAccounts = additionalAccounts,
         ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
@@ -568,3 +572,13 @@ private class ReturnGroups(
     /** Receives are owned and cancelled by the production controller. */
     override fun close() = Unit
 }
+
+/** Opens [ConversationTimelineTestIds.GROUP_ID] at once, while every other chat's timeline waits for [gate]. */
+private fun ConversationLiveSubscriptions.holdingOtherChats(gate: CompletableDeferred<Unit>) =
+    ConversationLiveSubscriptions(
+        openTimeline = { account, groupIdHex, limit ->
+            if (!groupIdHex.equals(ConversationTimelineTestIds.GROUP_ID, ignoreCase = true)) gate.await()
+            openTimeline(account, groupIdHex, limit)
+        },
+        openGroupState = openGroupState,
+    )

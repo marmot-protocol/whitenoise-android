@@ -2,39 +2,30 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
@@ -84,43 +75,28 @@ internal fun SmartFolderQuickFilterControls(
             ) {
                 listOf(positive, negative).forEach { mode ->
                     val active = root.quickMode(field) == mode
-                    val color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    OutlinedButton(
+                    WhiteNoiseFilterChip(
+                        selected = active,
                         onClick = { onChange(root.toggleQuickFilter(field, mode)) },
+                        label = {
+                            Text(
+                                stringResource(quickFilterLabel(field, mode)),
+                                Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                        },
                         modifier =
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .heightIn(min = 48.dp)
                                 .testTag("folder.quick.${field.name}.${mode.name}")
                                 .explainOnLongPress(
                                     Explanation(
                                         stringResource(quickFilterLabel(field, mode)),
                                         stringResource(quickFilterExplanation(field)),
                                     ),
-                                ).semantics {
-                                    selected = active
-                                    stateDescription = rowState
-                                },
-                        shape = MaterialTheme.shapes.small,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        colors =
-                            ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = color,
-                            ),
-                        border = BorderStroke(if (active) 2.dp else 1.dp, color),
-                    ) {
-                        if (active) {
-                            Icon(
-                                painterResource(R.drawable.ic_check),
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        Text(stringResource(quickFilterLabel(field, mode)))
-                    }
+                                ).semantics { stateDescription = rowState },
+                    )
                 }
             }
         }

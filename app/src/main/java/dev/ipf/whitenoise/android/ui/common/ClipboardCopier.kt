@@ -6,12 +6,15 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
+import kotlinx.coroutines.CancellationException
 
 /** Writes public [text] to the clipboard without any feedback; false when the system refuses the clip. */
-internal fun copyToClipboard(
+private fun copyToClipboard(
     context: Context,
     label: String,
     text: String,
@@ -35,7 +38,28 @@ internal class ClipboardCopier(
     fun copy(
         text: String,
         label: String = "plain text",
-    ): Boolean = copyToClipboard(context, label, text).also { if (it) confirmCopied() else reportNotCopied() }
+    ): Boolean = reportResult(copyToClipboard(context, label, text))
+
+    /** Keeps Compose's selection clip, including any formatting and its label. */
+    suspend fun copySelection(
+        clipboard: Clipboard,
+        clipEntry: ClipEntry?,
+    ): Boolean {
+        if (clipEntry == null) {
+            clipboard.setClipEntry(null)
+            return false
+        }
+        val result =
+            runCatching { clipboard.setClipEntry(clipEntry) }.onFailure {
+                if (it is CancellationException) throw it
+            }
+        return reportResult(result.isSuccess)
+    }
+
+    private fun reportResult(written: Boolean): Boolean {
+        if (written) confirmCopied() else reportNotCopied()
+        return written
+    }
 }
 
 /**

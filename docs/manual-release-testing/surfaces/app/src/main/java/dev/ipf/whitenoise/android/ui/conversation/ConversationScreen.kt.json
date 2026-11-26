@@ -57,6 +57,14 @@
         ]
       },
       {
+        "surface": "Compact conversation keyboard shortcut ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "ChatsReturnShortcut(",
+        "test_ids": [
+          "AXY-021"
+        ]
+      },
+      {
         "surface": "Logical destination navigation motion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "rememberConversationSettingsMotion(",
