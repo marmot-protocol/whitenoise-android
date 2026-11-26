@@ -233,7 +233,8 @@ class FcmAutoInitUncommittedEnableTest {
 
                 delivery.uncommittedNativePushEnables.incrementAndGet()
                 try {
-                    val synced = fixture.runWithMainLooperPumping { fixture.appState.syncNativePushRegistrationIfEnabled() }
+                    val appState = fixture.appState
+                    val synced = fixture.runWithMainLooperPumping { appState.syncNativePushRegistrationIfEnabled() }
                     assertTrue("the deferred sync still registers", synced)
                 } finally {
                     delivery.uncommittedNativePushEnables.decrementAndGet()
