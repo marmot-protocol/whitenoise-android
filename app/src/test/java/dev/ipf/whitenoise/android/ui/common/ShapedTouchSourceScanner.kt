@@ -40,7 +40,7 @@ private val cardDefaultShapes =
         "OutlinedCard" to "CardDefaults.outlinedShape",
     )
 private val declaration = Regex("""fun\s+$""")
-private val modifierParameter = Regex("""^\s*(@\w+\s+)*modifier\s*:""")
+
 private val leadingName = Regex("""^\s*(\w+)""")
 private val privateModifier = Regex("""\bprivate\b""")
 private val functionModifiers =
@@ -168,7 +168,7 @@ private fun String.stretchedIconButtons(path: String): List<Pair<String, Int>> =
         .filter { (_, modifier) ->
             // Only the button's own modifier sizes it, never a sized child in its `content`.
             val sized = twoArgumentSize.containsMatchIn(modifier) || oneSideSize.containsMatchIn(modifier)
-            val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.startsWith("modifier")
+            val slotSized = path.startsWith(COMPOSER_PACKAGE) && modifier.removePrefix("`").startsWith("modifier")
             sized || slotSized
         }.map { (start, _) -> STRETCHED_ICON_BUTTON to start }
 
@@ -206,11 +206,11 @@ internal data class WrapperDeclaration(
 /** The pass-through icon button wrappers declared in this code (see [passThroughIconButtonWrappers]). */
 internal fun String.wrapperDeclarations(visibleAcrossFilesOnly: Boolean): List<WrapperDeclaration> =
     iconButtonCalls()
-        .filter { (_, modifier) -> modifier.startsWith("modifier") }
+        .filter { (_, modifier) -> modifier.removePrefix("`").startsWith("modifier") }
         .mapNotNull { (start, _) -> functionMatchContaining(start, visibleAcrossFilesOnly) }
         .mapNotNull { (match, parameters) ->
             parameterList(parameters)
-                .indexOfFirst { modifierParameter.containsMatchIn(it) }
+                .indexOfFirst { it.declaredParameter().name == "modifier" }
                 .takeIf { it >= 0 }
                 ?.let { WrapperDeclaration(match.range.first, match.groupValues[1], it) }
         }

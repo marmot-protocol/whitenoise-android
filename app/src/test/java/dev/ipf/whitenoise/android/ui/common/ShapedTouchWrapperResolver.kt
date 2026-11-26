@@ -155,6 +155,9 @@ internal class WrapperCall(
     private val named = arguments.mapNotNull(::argumentName).toSet()
     private val positional = arguments.count { argumentName(it) == null }
 
+    // A positional argument after a named one maps by position again, which counting alone cannot follow.
+    private val mixed = arguments.dropWhile { argumentName(it) == null }.any { argumentName(it) == null }
+
     /** Whether this call surely applies to a function with [parameters] (its parameter list text); see [fit]. */
     fun surelyAppliesTo(parameters: String): Boolean = fit(parameters) == Fit.SURE
 
@@ -162,27 +165,38 @@ internal class WrapperCall(
     fun cannotApplyTo(parameters: String): Boolean = fit(parameters) == Fit.NEVER
 
     /**
-     * How surely this call fits a parameter list. It never fits when a named argument names no parameter, the
-     * positional ones overflow, or a parameter without a default gets no value. A `vararg`, or a trailing lambda
-     * whose slot's type the text does not show as a function type, leaves it unsure. Argument types are not read.
+     * How surely this call fits a parameter list. It never fits when [fitsArity] fails. A `vararg`, a positional
+     * argument after a named one, or a trailing lambda whose slot's type the text does not show as a function type,
+     * leaves it unsure. Argument types are not read.
      */
     private fun fit(parameters: String): Fit {
-        val declared = parameterList(parameters)
-        val parameterNames = declared.map { parameterName.find(it)?.groupValues?.get(1) }
-        val lambdaSlot = if (trailingLambda) declared.lastIndex else -1
-        val slots = declared.size - if (trailingLambda) 1 else 0
-        val filled = { index: Int -> index < positional || parameterNames[index] in named || index == lambdaSlot }
-        val arity =
-            positional <= slots &&
-                named.all { it in parameterNames } &&
-                declared.indices.all { index -> filled(index) || '=' in declared[index] }
-        val lambdaTyped = !trailingLambda || "->" in declared.lastOrNull()?.let(::parameterType).orEmpty()
+        val declared = parameterList(parameters).map { it.declaredParameter() }
+        val lambdaTyped = !trailingLambda || "->" in declared.lastOrNull()?.type.orEmpty()
         return when {
-            declared.any { "vararg" in it } -> Fit.UNSURE
-            !arity -> Fit.NEVER
+            mixed || declared.any { it.isVararg } -> Fit.UNSURE
+            !fitsArity(declared) -> Fit.NEVER
             lambdaTyped -> Fit.SURE
             else -> Fit.UNSURE
         }
+    }
+
+    /**
+     * Whether this call's arguments can fill [declared]: every named argument names a parameter that no positional
+     * argument or trailing lambda already fills, the positional ones fit, and every parameter without a default gets
+     * a value.
+     */
+    private fun fitsArity(declared: List<DeclaredParameter>): Boolean {
+        val parameterNames = declared.map { it.name }
+        val lambdaSlot = if (trailingLambda) declared.lastIndex else -1
+        val slots = declared.size - if (trailingLambda) 1 else 0
+        val filled = { index: Int -> index < positional || parameterNames[index] in named || index == lambdaSlot }
+        // A named argument for a slot a positional argument or the trailing lambda already fills rules it out.
+        val duplicated =
+            parameterNames.take(positional).any { it in named } || parameterNames.getOrNull(lambdaSlot) in named
+        return positional <= slots &&
+            !duplicated &&
+            named.all { it in parameterNames } &&
+            declared.indices.all { index -> filled(index) || declared[index].hasDefault }
     }
 }
 
@@ -193,12 +207,7 @@ private enum class Fit { SURE, NEVER, UNSURE }
 private fun sameParameterTypes(
     first: String,
     second: String,
-): Boolean = parameterList(first).map(::parameterType) == parameterList(second).map(::parameterType)
-
-/** A parameter's declared type, without its name, default value or whitespace. */
-private fun parameterType(parameter: String): String {
-    val declared = parameter.substringAfter(':').substringBefore('=')
-    return declared.filterNot(Char::isWhitespace)
+): Boolean {
+    val types = { parameters: String -> parameterList(parameters).map { it.declaredParameter().type } }
+    return types(first) == types(second)
 }
-
-private val parameterName = Regex("""(\w+)\s*:""")

@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
-private val namedArgument = Regex("""^\s*(\w+)\s*=(?!=)""")
-private val parameterName = Regex("""(\w+)\s*:""")
+// A name may be escaped in backticks, such as `when`, which a plain word pattern would miss.
+private val namedArgument = Regex("""^\s*(`[^`\n]+`|\w+)\s*=(?!=)""")
 private val typeOperator = Regex("""\b(?:as\??|is)\s+[\w.]+$""")
 private val ifCondition = Regex("""^\s*if\s*\(""")
 private val elseBlock = Regex("""\s*else\s*\{""")
@@ -52,7 +52,7 @@ internal fun modifierArgument(
     val namedModifier =
         parts.firstNotNullOfOrNull { part ->
             val name = namedArgument.find(part.text)
-            name?.takeIf { it.groupValues[1] == "modifier" }?.let { part.valueAfter(it.range.last + 1) }
+            name?.takeIf { it.argumentName() == "modifier" }?.let { part.valueAfter(it.range.last + 1) }
         }
     val positional = position?.let(parts::getOrNull)
     return namedModifier ?: positional?.takeUnless { namedArgument.containsMatchIn(it.text) }?.valueAfter(0)
@@ -65,7 +65,7 @@ internal fun namedArgumentValue(
 ): TouchArgument? =
     topLevelArgumentSpans(args).firstNotNullOfOrNull { part ->
         val name = namedArgument.find(part.text)
-        name?.takeIf { it.groupValues[1] == parameter }?.let { part.valueAfter(it.range.last + 1) }
+        name?.takeIf { it.argumentName() == parameter }?.let { part.valueAfter(it.range.last + 1) }
     }
 
 /** The top-level arguments' values, after any `name =`, with their offsets in the argument text. */
@@ -75,12 +75,20 @@ internal fun topLevelArgumentValues(args: String): List<TouchArgument> =
         part.valueAfter(name?.let { it.range.last + 1 } ?: 0)
     }
 
-/** The name of a `name = value` argument, or null for a positional one. */
-internal fun argumentName(argument: String): String? = namedArgument.find(argument)?.groupValues?.get(1)
+/** The name of a `name = value` argument, without any backticks, or null for a positional one. */
+internal fun argumentName(argument: String): String? = namedArgument.find(argument)?.argumentName()
+
+/**
+ * The name a [namedArgument] match captured, without the backticks of an escaped name such as `modifier`, so every
+ * reader compares the name Kotlin sees.
+ */
+private fun MatchResult.argumentName(): String = groupValues[1].removeSurrounding("`")
 
 /** The parameter names of a function's parameter list text, in order. */
-internal fun parameterNames(parameters: String): List<String?> =
-    topLevelArguments(parameters).map { parameter -> parameterName.find(parameter)?.groupValues?.get(1) }
+internal fun parameterNames(parameters: String): List<String?> {
+    val declared = topLevelArguments(parameters).map { it.declaredParameter() }
+    return declared.map { it.name }
+}
 
 /** The top-level arguments of a call's argument text, in order. */
 internal fun topLevelArguments(args: String): List<String> = topLevelArgumentSpans(args).map(TouchArgument::text)
@@ -88,7 +96,7 @@ internal fun topLevelArguments(args: String): List<String> = topLevelArgumentSpa
 /** The top-level named arguments of a call's argument text, by name. */
 internal fun topLevelNamedArguments(args: String): Map<String, String> =
     topLevelArguments(args)
-        .mapNotNull { part -> namedArgument.find(part)?.let { it.groupValues[1] to part.substring(it.range.last + 1) } }
+        .mapNotNull { part -> namedArgument.find(part)?.let { it.argumentName() to part.substring(it.range.last + 1) } }
         .toMap()
 
 /** Splits commas outside Kotlin brackets and explicit type arguments, retaining source offsets. */
@@ -112,7 +120,7 @@ private fun topLevelArgumentSpans(args: String): List<TouchArgument> {
 }
 
 /** Recognizes type arguments in calls and casts without swallowing commas between comparisons. */
-private fun String.typeArgumentEnd(open: Int): Int? {
+internal fun String.typeArgumentEnd(open: Int): Int? {
     val previous = getOrNull(open - 1)
     if (previous == null || (!previous.isLetterOrDigit() && previous != '_')) return null
     return closingTypeArgument(open)?.takeIf { close ->
@@ -122,14 +130,14 @@ private fun String.typeArgumentEnd(open: Int): Int? {
 }
 
 /** Finds the closing angle bracket when the intervening characters can form a type argument list. */
-private fun String.closingTypeArgument(open: Int): Int? {
+internal fun String.closingTypeArgument(open: Int): Int? {
     var depth = 1
     for (index in open + 1 until length) {
         val char = this[index]
         when {
             char == '<' -> depth++
             char == '>' -> if (this[index - 1] != '-' && --depth == 0) return index
-            !char.isLetterOrDigit() && !char.isWhitespace() && char !in "._?*,()-:" -> break
+            !char.isLetterOrDigit() && !char.isWhitespace() && char !in "._?*,()-:@" -> break
         }
     }
     return null
@@ -559,19 +567,3 @@ private fun String.continuesOnNextLine(from: Int): Boolean {
 }
 
 private val continuationLead = Regex("""\.|\?[.:]|&&|\|\||else\b""")
-
-/** A function's parameter list split at top-level commas, counting `<…>` type arguments as brackets. */
-internal fun parameterList(parameters: String): List<String> {
-    val parts = mutableListOf<String>()
-    var depth = 0
-    var start = 0
-    parameters.forEachIndexed { index, char ->
-        when {
-            char in "({[<" -> depth++
-            char in ")}]" || (char == '>' && parameters.getOrNull(index - 1) != '-') -> depth--
-            char == ',' && depth == 0 -> parts += parameters.substring(start, index).also { start = index + 1 }
-        }
-    }
-    parts += parameters.substring(start)
-    return parts.filter { it.isNotBlank() }
-}
