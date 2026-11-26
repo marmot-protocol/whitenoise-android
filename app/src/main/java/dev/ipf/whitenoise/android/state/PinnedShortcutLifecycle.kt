@@ -7,6 +7,8 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.departedChatConversationShortcutIds
+import dev.ipf.whitenoise.android.notifications.groupChannelShortcutIds
 import dev.ipf.whitenoise.android.notifications.hasUnaccountedConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +84,8 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
  * Captures the departing account's known group ids before native sign-out or wipe revokes them,
  * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
  * another account remains signed in. Pending local-delete journal groups are included, since journal
- * replay no longer runs for an account once it has signed out.
+ * replay no longer runs for an account once it has signed out. While another account remains, channels
+ * of chats no account still lists are recorded too (see [departedChatChannelShortcutIds]).
  *
  * Returns null before native revocation when native inventory remained incomplete while
  * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
@@ -100,6 +103,13 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
             withContext(Dispatchers.IO) {
                 hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
             }
+    // The last signer's sweep already deletes every ownerless channel, so only a shared device needs this.
+    val departed =
+        if (includeUnscopedLegacy || unaccountedChannelRisk) {
+            emptySet()
+        } else {
+            departedChatChannelShortcutIds(accountRef, groupIds)
+        }
     return when {
         unaccountedChannelRisk -> {
             appStateDebug { "sign-out channel capture incomplete with unaccounted conversation channels" }
@@ -107,7 +117,13 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
         }
         !retrySignOutOwnerSave {
             withContext(Dispatchers.IO) {
-                recordDepartingConversationChannelOwners(appContext, accountRef, groupIds, includeUnscopedLegacy)
+                recordDepartingConversationChannelOwners(
+                    appContext,
+                    accountRef,
+                    groupIds,
+                    includeUnscopedLegacy,
+                    departedChatShortcutIds = departed,
+                )
             }
         } -> {
             appStateDebug { "sign-out channel capture could not be saved before native revocation" }
@@ -115,6 +131,29 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
         }
         else -> groupIds
     }
+}
+
+/**
+ * Shortcut ids of `:conv:` channels whose chat no account lists any more, such as a chat an older build deleted
+ * after its vibration was reset to Default. Every other account's chats are read first, so none of their channels
+ * is ever counted. When any of them cannot be listed, nothing is, since such a channel could still be theirs.
+ */
+private suspend fun WhiteNoiseAppState.departedChatChannelShortcutIds(
+    accountRef: String,
+    groupIds: Set<String>,
+): Set<String> {
+    val kept = HashSet<String>()
+    for (other in accounts.map { it.label }.filter { it != accountRef }.distinct()) {
+        val inventory = readAccountKnownGroupIds(other)
+        if (!inventory.nativeInventoryComplete) {
+            appStateDebug { "sign-out kept unlisted chat channels: another account's chats could not be listed" }
+            return emptySet()
+        }
+        kept += groupChannelShortcutIds(other, inventory.groupIds)
+    }
+    return withContext(Dispatchers.IO) {
+        departedChatConversationShortcutIds(appContext, accountRef, groupIds, kept)
+    }.orEmpty()
 }
 
 /** Retries durable owner-record persistence before native revocation commits. */

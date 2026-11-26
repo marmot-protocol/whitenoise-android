@@ -177,10 +177,19 @@ class ConversationShortcutLifecycleCoverageTest {
                 .functionBody("captureAccountKnownGroupIds")
         val appState = appStateSource().readText()
 
-        val captureArgs = "appContext, accountRef, groupIds, includeUnscopedLegacy"
+        val captureCall =
+            capture
+                .substringAfter("recordDepartingConversationChannelOwners(", "")
+                .filterNot(Char::isWhitespace)
+        val captureArgs = "appContext,accountRef,groupIds,includeUnscopedLegacy,"
         assertTrue(
             "captureAccountKnownGroupIds must save the departing account's channel owners",
-            "recordDepartingConversationChannelOwners($captureArgs)" in capture,
+            captureCall.startsWith(captureArgs),
+        )
+        assertTrue(
+            "captureAccountKnownGroupIds must record channels of chats no remaining account lists",
+            "departedChatChannelShortcutIds(accountRef, groupIds)" in capture &&
+                captureCall.startsWith("${captureArgs}departedChatShortcutIds=departed"),
         )
         assertTrue(
             "captureAccountKnownGroupIds must guard incomplete multi-account reads against unowned :conv: channels",

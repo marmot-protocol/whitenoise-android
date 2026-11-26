@@ -15,17 +15,51 @@ private const val SHA256_HEX_LENGTH = 64
  * finds the departed account's record and deletes its upgrade-era channels, which have no shortcut or
  * earlier record. [includeUnscopedLegacy] also records a last-signer sweep before native work.
  * Startup waits to sweep until no signer remains, so a failed sign-out cannot erase a live signer's channels.
- * Returns false when the record could not be saved.
+ * [departedChatShortcutIds] (see [departedChatConversationShortcutIds]) are recorded with them, so the departing
+ * account's cleanup also deletes channels of chats no account still lists. Returns false when the record could
+ * not be saved.
  */
 internal fun recordDepartingConversationChannelOwners(
     context: Context,
     accountRef: String,
     groupIds: Collection<String>,
     includeUnscopedLegacy: Boolean = false,
+    departedChatShortcutIds: Set<String> = emptySet(),
 ): Boolean {
     val shortcutIds = groupChannelShortcutIds(accountRef, groupIds).mapTo(HashSet(), ::canonicalConversationShortcutId)
+    shortcutIds += departedChatShortcutIds
     return recordConversationChannelOwners(context, accountRef, shortcutIds, includeUnscopedLegacy)
 }
+
+/**
+ * The canonical shortcut ids of `:conv:` channels that no owner record, scoped shortcut, departing capture for
+ * [accountRef]'s [knownGroupIds] or remaining account's [keptShortcutIds] accounts for. A channel's id is a hash
+ * of its account and chat, so it cannot be traced back, but every remaining account's chats are in
+ * [keptShortcutIds]: such a channel belongs to a chat no account still lists, for example one an older build
+ * deleted after its vibration was reset, and still shows that chat's title in Android Settings. Null when the
+ * channels or owner records cannot be read.
+ */
+internal fun departedChatConversationShortcutIds(
+    context: Context,
+    accountRef: String,
+    knownGroupIds: Collection<String>,
+    keptShortcutIds: Set<String>,
+): Set<String>? =
+    synchronized(UserEventNotificationGroup.mutationLock) {
+        runCatching {
+            val appContext = context.applicationContext
+            val manager = appContext.getSystemService(NotificationManager::class.java)
+            val ownerEntries =
+                appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE).all
+            val accounted = accountedConversationShortcutIds(appContext, ownerEntries, accountRef, knownGroupIds)
+            val kept = keptShortcutIds.mapTo(HashSet(), ::canonicalConversationShortcutId)
+            checkNotNull(manager)
+                .notificationChannels
+                .mapNotNull(::conversationChannelShortcutId)
+                .filterNot { it in accounted || canonicalConversationShortcutId(it) in kept }
+                .mapTo(HashSet(), ::canonicalConversationShortcutId)
+        }.getOrNull()
+    }
 
 /**
  * Reports whether Android currently holds any `:conv:` notification channel that neither belongs to

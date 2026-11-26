@@ -298,6 +298,47 @@ class NotificationChannelCleanupRegressionTest {
     }
 
     /**
+     * On an older build a chat's vibration could create a named channel without a shortcut, and resetting it to
+     * Default then deleting the chat left nothing that names the chat. Signing out its owner while another account
+     * remains records, beside the owner's known chats, every `:conv:` channel no remaining account lists, so
+     * retention deletes those titles, whichever account's deleted chat they came from. The remaining account's
+     * own upgrade-era channel, also without a record, stays.
+     */
+    @Test
+    fun twoAccountUpgradeSignOutDeletesChannelsOfChatsNoAccountLists() {
+        val knownId = checkNotNull(conversationShortcutId("account-a", "group-known"))
+        val known = convChannel(NotificationChannelSpec.GROUP_MESSAGES, knownId, "Known Secret")
+        val deletedId = checkNotNull(conversationShortcutId("account-a", "group-deleted"))
+        val deleted = convChannel(NotificationChannelSpec.GROUP_MESSAGES, deletedId, "Deleted Secret", doublePattern)
+        val deletedReactionId = checkNotNull(reactionConversationShortcutId("account-a", "group-deleted"))
+        val deletedReaction = convChannel(NotificationChannelSpec.REACTIONS, deletedReactionId, "Deleted Reaction")
+        val otherDeletedId = checkNotNull(conversationShortcutId("account-b", "group-b-deleted"))
+        val otherDeleted = convChannel(NotificationChannelSpec.DIRECT_MESSAGES, otherDeletedId, "B Deleted Secret")
+        val liveId = checkNotNull(conversationShortcutId("account-b", "group-b-live"))
+        val live = convChannel(NotificationChannelSpec.GROUP_MESSAGES, liveId, "B Live Chat", doublePattern)
+        val kept = groupChannelShortcutIds("account-b", setOf("group-b-live"))
+
+        val departed = departedChatConversationShortcutIds(context, "account-a", setOf("group-known"), kept)
+        assertEquals(setOf(deletedId, otherDeletedId), departed)
+        assertTrue(
+            recordDepartingConversationChannelOwners(
+                context,
+                "account-a",
+                setOf("group-known"),
+                departedChatShortcutIds = checkNotNull(departed),
+            ),
+        )
+        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+
+        assertNull(manager.getNotificationChannel(known))
+        assertNull(manager.getNotificationChannel(deleted))
+        assertNull(manager.getNotificationChannel(deletedReaction))
+        assertNull(manager.getNotificationChannel(otherDeleted))
+        assertNoChannelContainsText("Known Secret", "Deleted Secret", "Deleted Reaction", "B Deleted Secret")
+        assertNotNull(manager.getNotificationChannel(live))
+    }
+
+    /**
      * Sign-out saves its capture before native revocation. If the process dies after native sign-out commits
      * but before Android cleanup, startup retention with another signer present deletes the departed account's
      * upgrade-era channels, which have no shortcut, earlier record or vibration preference. While the account
