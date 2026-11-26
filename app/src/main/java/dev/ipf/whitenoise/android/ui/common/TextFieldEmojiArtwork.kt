@@ -319,12 +319,14 @@ private fun copyAuthoredSelection(
     val selected = state.selection
     if (selected.collapsed) return false
     val text = state.text.subSequence(selected.min, selected.max).toString()
-    if (!copyToClipboard(context, "plain text", text)) return false
-    state.edit {
-        if (cut) replace(selected.min, selected.max, "")
-        selection = TextRange(if (cut) selected.min else selected.max)
+    val copied = copyToClipboard(context, "plain text", text)
+    if (copied) {
+        state.edit {
+            if (cut) replace(selected.min, selected.max, "")
+            selection = TextRange(if (cut) selected.min else selected.max)
+        }
     }
-    return true
+    return copied
 }
 
 /** The field's latest text layout getter, read in the draw phase. */

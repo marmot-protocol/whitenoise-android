@@ -253,14 +253,18 @@ class TextFieldEmojiArtworkTest {
         val selection = TextRange(5, authored.length)
         composeRule.setContent {
             WhiteNoiseTheme {
-                val context =
-                    object : ContextWrapper(LocalContext.current) {
+                val context = LocalContext.current
+                val clipboardUnavailable =
+                    object : ContextWrapper(context) {
                         override fun getSystemService(name: String): Any? {
                             if (name == Context.CLIPBOARD_SERVICE) return null
                             return super.getSystemService(name)
                         }
                     }
-                CompositionLocalProvider(LocalContext provides context, LocalCustomEmoji provides localEmoji()) {
+                CompositionLocalProvider(
+                    LocalContext provides clipboardUnavailable,
+                    LocalCustomEmoji provides localEmoji(),
+                ) {
                     WhiteNoiseTextField(state = state, modifier = Modifier.testTag(FIELD), emojiAction = true)
                 }
             }
