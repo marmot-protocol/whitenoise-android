@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.share.PEER_B
 import dev.ipf.whitenoise.android.ui.share.appStateWithDirectChats
 import dev.ipf.whitenoise.android.ui.share.applyLocalDirectChat
 import dev.ipf.whitenoise.android.ui.share.chatRow
+import dev.ipf.whitenoise.android.ui.share.completeRetainedChatList
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -145,7 +146,12 @@ class ForwardMessagePickerInteractionTest {
     fun searchOpensInTheBarAndCloseClearsItWhileSingleAccountAvatarIsNotAnAction() {
         val groupId = "20".repeat(32)
         val peerId = "40".repeat(32)
-        val state = appStateWithDirectChats(groupId to peerId, profiles = mutableMapOf(peerId to profile("Alice")))
+        val state =
+            appStateWithDirectChats(
+                groupId to peerId,
+                profiles = mutableMapOf(peerId to profile("Alice")),
+                chatListSubscriptions = completeRetainedChatList(),
+            )
         composeRule.setContent {
             WhiteNoiseTheme {
                 ForwardMessagePickerContent(

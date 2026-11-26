@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerC
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.appStateWithDirectChats
+import dev.ipf.whitenoise.android.ui.share.completeRetainedChatList
 import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -199,6 +200,7 @@ class ForwardMessagePickerScreenshotTest {
                 *chats.toTypedArray(),
                 profiles = profiles,
                 accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
+                chatListSubscriptions = if (folderFixture == FolderFixture.NONE) completeRetainedChatList() else null,
             )
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         val groupIds = chats.map { it.first }
