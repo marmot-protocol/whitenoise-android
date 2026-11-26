@@ -28,7 +28,7 @@ internal class ComposerDraftExpansionBridge(
     ) -> Unit,
     private val onCleanupFailure: (groupIdHex: String, cause: Throwable) -> Unit,
 ) {
-    private val sentPresentation = SentComposerDraftPresentation()
+    internal val sentPresentation = SentComposerDraftPresentation()
 
     /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
@@ -158,7 +158,7 @@ internal class ComposerDraftExpansionBridge(
             draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, current) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             } ?: return
-        sentPresentation.hide(token, cleanupGeneration)
+        sentPresentation.hide(token, cleanupGeneration, accepted = true)
         expansionRetention.onSendDurablyAccepted(
             accountRef,
             groupIdHex,

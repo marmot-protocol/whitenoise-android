@@ -117,9 +117,9 @@
         ]
       },
       {
-        "surface": "A stored draft file does not open in the in-app reader with an empty body",
+        "surface": "An app-owned restored PDF can open in the in-app reader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
-        "anchor": "?.takeIf { it.hasInlineBody() }",
+        "anchor": "composerDocumentReaderTarget(context, item.uri, document)",
         "test_ids": [
           "MED-067"
         ]

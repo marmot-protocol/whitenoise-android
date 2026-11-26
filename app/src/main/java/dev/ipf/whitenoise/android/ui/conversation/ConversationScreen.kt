@@ -3271,7 +3271,7 @@ internal fun ConversationScreen(
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = draftExternalRevision,
         )
-    // Capture the baseline during composition, before either editor can receive an input event.
+    ObserveAcceptedComposerCaption(appState, controller, draftAccountRef, composerTextState)
     val userTextEditRevisionOnEntry = rememberUserTextEditRevisionOnEntry(controller, composerTextState)
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 

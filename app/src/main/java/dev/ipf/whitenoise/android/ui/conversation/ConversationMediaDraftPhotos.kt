@@ -27,9 +27,11 @@ import java.util.UUID
 internal fun draftPresentationFile(
     context: Context,
     attachment: MessageDraftAttachmentFfi,
+    createDirectory: Boolean = true,
 ): File? =
     runCatching {
-        val directory = File(context.cacheDir, "composer_paste/native_drafts").apply { mkdirs() }
+        val directory = File(context.cacheDir, "composer_paste/native_drafts")
+        if (createDirectory) directory.mkdirs()
         val safeExtension =
             attachment.fileName
                 .substringAfterLast('.', "")

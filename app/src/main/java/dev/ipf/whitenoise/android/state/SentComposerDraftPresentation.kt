@@ -5,11 +5,18 @@ import dev.ipf.marmotkit.ChatListDraftPreviewFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
 
+/** Text and generation of a draft whose durable acceptance may still need to clear a reopened editor. */
+internal data class AcceptedComposerCaption(
+    val generation: MessageDraftGeneration,
+    val text: String,
+)
+
 /** Fences stale native draft selections while an accepted composer generation owns their presentation. */
 internal class SentComposerDraftPresentation {
     private data class Fence(
         val generation: MessageDraftGeneration,
         val sentText: String?,
+        val accepted: Boolean,
     )
 
     private val generations = mutableStateMapOf<Pair<String, String>, Fence>()
@@ -18,9 +25,10 @@ internal class SentComposerDraftPresentation {
     fun hide(
         token: DraftSendClearToken,
         generation: MessageDraftGeneration = token.generation,
+        accepted: Boolean = false,
     ) {
         val key = token.accountRef to token.groupIdHex
-        generations[key] = Fence(generation, token.recoveryDraft?.textFieldValue?.text)
+        generations[key] = Fence(generation, token.recoveryDraft?.textFieldValue?.text, accepted)
         // Only bounded process-lifetime UI state is retained; MDK owns the recoverable draft.
         insertionOrder.remove(key)
         insertionOrder.add(key)
@@ -31,6 +39,15 @@ internal class SentComposerDraftPresentation {
             }
         }
     }
+
+    /** A definite acceptance, distinct from the optimistic fence used while the token is still pending. */
+    fun acceptedCaption(
+        accountRef: String,
+        groupIdHex: String,
+    ): AcceptedComposerCaption? =
+        generations[accountRef to groupIdHex]?.takeIf { it.accepted }?.let { fence ->
+            fence.sentText?.takeIf { it.isNotBlank() }?.let { AcceptedComposerCaption(fence.generation, it) }
+        }
 
     fun onDraftChanged(
         accountRef: String,
