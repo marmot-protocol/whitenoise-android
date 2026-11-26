@@ -138,16 +138,12 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
     if (!voiceNotes.hasCaptureOrDraft(key) && !conversationDictation.isOwnedBy(account, group)) return@withContext
 
     val epoch = runtimeGeneration
-    val selection = accountSwitchHandoff.capture()
     val membership =
         runCatchingCancellable {
             withContext(Dispatchers.IO) { runtime.chatListRow(account, group)?.selfMembership }
         }.getOrNull()
-    if (membership?.isGroupEviction() == true &&
-        epoch == runtimeGeneration &&
-        marmotOrNull() === runtime &&
-        accountSwitchHandoff.isCurrent(selection)
-    ) {
+    // Native membership belongs to this account and chat even if another profile was selected during readback.
+    if (membership?.isGroupEviction() == true && epoch == runtimeGeneration && marmotOrNull() === runtime) {
         releaseCaptureTarget(account, group)
     }
 }

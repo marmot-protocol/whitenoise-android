@@ -329,9 +329,13 @@ class VoiceNoteFlowMotionCaptureTest {
             File(folder, "segments.txt").writeText(manifest.toString())
         }
 
+        /** Releases the recorder and removes private fixture drafts after the motion capture. */
         fun release() {
             controller.release()
-            owner?.onAccountUnavailable(FlowKey.accountRef)
+            owner?.let {
+                it.stopAccountCapture(FlowKey.accountRef)
+                it.purgeAccountDrafts(FlowKey.accountRef)
+            }
             review.release()
             scope.runCurrent()
             output.deleteRecursively()

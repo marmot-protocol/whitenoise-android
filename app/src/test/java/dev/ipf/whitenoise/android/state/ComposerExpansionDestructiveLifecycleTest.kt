@@ -751,7 +751,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
     }
 
-    /** A process runtime event purges only the confirmed evicted chat, regardless of the selected profile. */
+    /** Confirmed eviction purges only its chat even when another profile is selected during the native read. */
     @Test
     fun runtimeEvictionPurgesAfterNativeReadback() =
         runBlocking {
@@ -771,6 +771,8 @@ class ComposerExpansionDestructiveLifecycleTest {
                         groupRecord = group().copy(selfMembership = membership),
                     )
                 val appState = fixture.appState
+                val selection = appState.accountSwitchHandoff
+                fixture.calls.onChatListRow = { selection.beginRequest("another-profile") }
                 appState.reconcileCaptureEviction(VoiceNoteKey(account, GROUP_ID), appState.marmot())
 
                 assertEquals(1, fixture.calls.chatListRow.get())
@@ -1354,6 +1356,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         arguments: Array<out Any?>?,
     ): ChatListRowFfi? {
         calls.chatListRow.incrementAndGet()
+        calls.onChatListRow()
         return if (projection.missing != MissingProjection.NONE && !left) {
             null
         } else {
@@ -1544,6 +1547,7 @@ class ComposerExpansionDestructiveLifecycleTest {
     /** Counts authoritative native mutations so false results cannot pass via an earlier guard. */
     private class LifecycleCalls {
         var selectedDraft: SelectedMessageDraftContentFfi? = null
+        var onChatListRow: () -> Unit = {}
         val order = mutableListOf<String>()
         val send = AtomicInteger()
         val leave = AtomicInteger()
