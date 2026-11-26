@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -41,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -60,6 +63,8 @@ class VoiceRecordingStripFitScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
     private lateinit var voice: VoiceRecordingController
+
+    private var replyCancels = 0
 
     /** The narrowest supported width keeps Lock and Pause beside the timer in LTR. */
     @Test fun locked240Ltr() = verifyFit(240, rtl = false, capturePaused = true)
@@ -85,31 +90,45 @@ class VoiceRecordingStripFitScreenshotTest {
     /** A 412 dp composer keeps Lock and Pause in RTL. */
     @Test fun locked412Rtl() = verifyFit(412, rtl = true)
 
-    /** Locks a take at [width] dp, checks and captures the strip, then pauses and resumes it by touch. */
+    /** A locked reply at default text keeps the reply preview and its Cancel reply control clear of the strip. */
+    @Test fun lockedReply360Ltr() = verifyFit(360, rtl = false, fontScale = 1f, reply = true)
+
+    /** A locked reply at 240 dp with 200% text keeps the reply preview clear while Lock and Pause fit. */
+    @Test fun lockedReply240Rtl() = verifyFit(240, rtl = true, reply = true)
+
+    /**
+     * Locks a take at [width] dp, optionally while replying, checks and captures the strip, then pauses and resumes
+     * it by touch.
+     */
     private fun verifyFit(
         width: Int,
         rtl: Boolean,
         capturePaused: Boolean = false,
+        fontScale: Float = 2f,
+        reply: Boolean = false,
     ) {
-        val name = "voice_strip_fit_${width}_${if (rtl) "rtl" else "ltr"}_large"
+        val direction = if (rtl) "rtl" else "ltr"
+        val text = if (fontScale > 1f) "large" else "default"
+        val name = "voice_strip_fit_${if (reply) "reply_" else ""}${width}_${direction}_$text"
         ApplicationProvider
             .getApplicationContext<Context>()
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()
-        composeRule.setContent { stripHost(width, rtl) }
+        composeRule.setContent { stripHost(width, rtl, fontScale, reply) }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(HOST_TAG).captureRoboImage("src/test/snapshots/${name}_locked.png")
         val lock = glyph("Locked")
         assertTrue("Lock keeps its 16 dp glyph: $lock", lock.width >= 15.5f && lock.height >= 15.5f)
         assertControlFits("composer.voice.pause", "Pause recording", lock)
+        if (reply) assertReplyClear(lock, "composer.voice.pause")
         press("composer.voice.pause")
         composeRule.runOnIdle { assertTrue("a press on Pause pauses the take", voice.isPaused) }
         if (capturePaused) {
             composeRule.onNodeWithTag(HOST_TAG).captureRoboImage("src/test/snapshots/${name}_paused.png")
         }
-        assertControlFits("composer.voice.resume", "Resume", null)
+        assertControlFits("composer.voice.resume", "Resume", glyph("Locked"))
         press("composer.voice.resume")
         composeRule.runOnIdle { assertTrue("a press on Resume resumes the take", !voice.isPaused) }
     }
@@ -120,7 +139,7 @@ class VoiceRecordingStripFitScreenshotTest {
     private fun assertControlFits(
         tag: String,
         description: String,
-        lock: Rect?,
+        lock: Rect,
     ) {
         val host = composeRule.onNodeWithTag(HOST_TAG).fetchSemanticsNode().boundsInRoot
         val target = composeRule.onNodeWithTag(tag).fetchSemanticsNode().touchBoundsInRoot
@@ -128,11 +147,28 @@ class VoiceRecordingStripFitScreenshotTest {
         assertTrue("$tag keeps its 20 dp glyph: $icon", icon.width >= 19.5f && icon.height >= 19.5f)
         assertTrue("$tag has a 48 dp target: $target", target.width >= 47.5f && target.height >= 47.5f)
         val actions = listOf(bounds("Cancel voice message"), bounds("Stop recording"))
-        listOfNotNull(lock, target).forEach { item ->
+        listOf(lock, target).forEach { item ->
             assertTrue("$item stays inside the composer $host", host.contains(item))
             actions.forEach { action -> assertTrue("$item clears $action", !item.overlapsStrictly(action)) }
         }
-        lock?.let { assertTrue("$tag clears the Lock glyph $it", !target.overlapsStrictly(it)) }
+        assertTrue("$tag clears the Lock glyph $lock", !target.overlapsStrictly(lock))
+    }
+
+    /** The reply preview's Cancel reply stays clear of the Lock glyph and the [tag] target, and a press reaches it. */
+    private fun assertReplyClear(
+        lock: Rect,
+        tag: String,
+    ) {
+        val cancelReply = bounds("Cancel reply")
+        val target = composeRule.onNodeWithTag(tag).fetchSemanticsNode().touchBoundsInRoot
+        listOf(lock, target).forEach { item ->
+            assertTrue("$item clears the reply preview's $cancelReply", !item.overlapsStrictly(cancelReply))
+        }
+        composeRule.onNodeWithContentDescription("Cancel reply").performTouchInput {
+            down(center)
+            up()
+        }
+        composeRule.runOnIdle { assertEquals("a press on Cancel reply reaches it", 1, replyCancels) }
     }
 
     /** Presses and releases the control's center by touch, with no move between, as a still finger would. */
@@ -151,11 +187,13 @@ class VoiceRecordingStripFitScreenshotTest {
             .fetchSemanticsNode()
             .boundsInRoot
 
-    /** Hosts the real composer bar at [width] dp with 200% text and locks a recording on first composition. */
+    /** Hosts the real composer bar at [width] dp and [fontScale], optionally replying, and locks a recording. */
     @Composable
     private fun stripHost(
         width: Int,
         rtl: Boolean,
+        fontScale: Float,
+        reply: Boolean,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Unconfined) }
@@ -175,7 +213,7 @@ class VoiceRecordingStripFitScreenshotTest {
         val alice = testAccount("alice", "aa".repeat(32))
         val bob = testAccount("bob", "bb".repeat(32))
         CompositionLocalProvider(
-            LocalDensity provides Density(1f, 2f),
+            LocalDensity provides Density(1f, fontScale),
             LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
         ) {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
@@ -184,9 +222,9 @@ class VoiceRecordingStripFitScreenshotTest {
                         ComposerBar(
                             appState = emptyAppState(accounts = listOf(alice, bob), activeAccountRef = "bob"),
                             draftAccountRef = "alice",
-                            replyingTo = null,
+                            replyingTo = replyRecord().takeIf { reply },
                             messageTextCopy = MessageTextCopy.Default,
-                            onCancelReply = {},
+                            onCancelReply = { replyCancels++ },
                             onSend = { _, _ -> },
                             initialDraft = TextFieldValue(""),
                             onPickDocument = {},
@@ -217,6 +255,31 @@ private fun Rect.overlapsStrictly(other: Rect): Boolean =
 /** Whether [inner] lies inside this rectangle, allowing one pixel of rounding. */
 private fun Rect.contains(inner: Rect): Boolean =
     inner.left >= left - 1f && inner.right <= right + 1f && inner.top >= top - 1f && inner.bottom <= bottom + 1f
+
+/** A received text message for the composer to reply to. */
+private fun replyRecord() =
+    AppMessageRecordFfi(
+        invalidated = false,
+        messageIdHex = "parent",
+        direction = "received",
+        groupIdHex = "group",
+        sender = "alice",
+        plaintext = "Parent message",
+        contentTokens =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks = emptyList(),
+                blankLinesBefore = ByteArray(0),
+            ),
+        kind = 9uL,
+        tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+        sticker = null,
+    )
 
 /** A voice controller whose session records nothing and runs on unconfined dispatchers. */
 private fun fakeVoice(

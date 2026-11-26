@@ -29,6 +29,9 @@ private class VoiceSlotMemory {
     var phase: VoiceComposerPhase = VoiceComposerPhase.Idle
     var clip: VoiceReviewClip? = null
     var sending = false
+
+    /** Whether the recording strip sat above the actions, kept while Stop closes a locked take or a cancel exits. */
+    var aboveActions = false
 }
 
 /** One overlay's exit: its close-tween progress, and whether it has finished. */
@@ -95,15 +98,11 @@ internal fun rememberVoiceReviewSlot(
     }
 }
 
-/** Where the last strip sat, so a locked take's strip keeps its row while Stop closes the take or a cancel exits. */
-private class StripRowMemory {
-    var aboveActions = false
-}
-
 /**
  * The recording strip slot. It leaves [actionsWidth] free for the trailing actions beside it, on the start side when
  * a locked take's actions sit there, and swallows every pointer so nothing under the strip reacts. Once a take is
- * locked and a whole action row fits above [actionRow], the strip spans the pill's width above the actions instead.
+ * locked and a whole action row fits between any accessory, such as a reply preview, and [actionRow], the strip spans
+ * the pill's width there instead.
  * After a cancel the strip slides out toward the cancel side while the composer returns underneath.
  */
 @Composable
@@ -120,16 +119,15 @@ internal fun rememberVoiceRecordingSlot(
     SideEffect { memory.phase = phase }
     val exit = rememberVoiceSlotExit(cancelled?.takeIf { recorder != null })
     val shown = recorder?.takeIf { phase.showsStrip || exit != null }
-    val row = remember { StripRowMemory() }
     // While a hold lasts, the lock hint floats above the microphone, so the strip keeps to the side of it.
     val aboveActions =
         when (phase) {
             VoiceComposerPhase.Locked -> true
             VoiceComposerPhase.Holding -> false
             VoiceComposerPhase.Paused -> recorder?.locked == true
-            else -> row.aboveActions
+            else -> memory.aboveActions
         }
-    SideEffect { row.aboveActions = aboveActions }
+    SideEffect { memory.aboveActions = aboveActions }
     val atStart = actionRow.horizontal == Alignment.Start
     return shown?.let { recordingController ->
         {
@@ -138,11 +136,11 @@ internal fun rememberVoiceRecordingSlot(
                 reservedEnd = if (atStart) 0.dp else actionsWidth + if (expandedControlLayout) 4.dp else 12.dp,
                 actionRow = actionRow.takeIf { aboveActions },
                 shield = Modifier.swallowPointers(recordingController),
-            ) { placement ->
+            ) {
                 RecordingStripLeading(
                     controller = recordingController,
                     exit = { if (phase.showsStrip) 0f else exit?.progress?.value ?: 1f },
-                    modifier = placement.swallowPointers(recordingController),
+                    modifier = Modifier.swallowPointers(recordingController),
                 )
             }
         }
@@ -152,22 +150,22 @@ internal fun rememberVoiceRecordingSlot(
 /**
  * Lays the strip over the pill. A shield beside the actions keeps every pointer there from reaching the hidden
  * composer. The strip shares the actions' row and leaves their width free, unless [actionRow] is given and a whole
- * action row fits above the actions: then the strip spans the full width above them, so the timer, Lock and Pause
- * keep their room on a narrow screen or with large text.
+ * action row fits between the accessory above the editor and the actions: then the strip spans the full width there,
+ * so the timer, Lock and Pause keep their room on a narrow screen or with large text, and the accessory stays clear.
  */
 @Composable
 @Suppress("FunctionNaming")
 private fun BoxScope.RecordingStripPlacement(
     reservedStart: Dp,
     reservedEnd: Dp,
-    actionRow: Alignment?,
+    actionRow: ComposerActionRowAlignment?,
     shield: Modifier,
-    strip: @Composable (Modifier) -> Unit,
+    strip: @Composable () -> Unit,
 ) {
     Layout(
         content = {
             Box(shield)
-            strip(Modifier)
+            strip()
         },
         modifier = Modifier.matchParentSize(),
     ) { measurables, constraints ->
@@ -178,15 +176,16 @@ private fun BoxScope.RecordingStripPlacement(
         val rowHeight = ComposerActionRowHeight.roundToPx()
         // The same alignment places the actions, so this is the top of their row in the pill.
         val actionsTop = actionRow?.align(IntSize(0, rowHeight), IntSize(width, height), layoutDirection)?.y ?: 0
-        val above = actionsTop >= rowHeight
+        val accessory = actionRow?.accessoryInset(height, rowHeight) ?: 0
+        val above = actionsTop - accessory >= rowHeight
         val shieldPlaceable = measurables[0].measure(Constraints.fixed(besideWidth, height))
         val stripPlaceable =
             measurables[1].measure(
-                if (above) Constraints.fixed(width, actionsTop) else Constraints.fixed(besideWidth, height),
+                if (above) Constraints.fixed(width, actionsTop - accessory) else Constraints.fixed(besideWidth, height),
             )
         layout(width, height) {
             shieldPlaceable.placeRelative(start, 0)
-            stripPlaceable.placeRelative(if (above) 0 else start, 0)
+            if (above) stripPlaceable.placeRelative(0, accessory) else stripPlaceable.placeRelative(start, 0)
         }
     }
 }
