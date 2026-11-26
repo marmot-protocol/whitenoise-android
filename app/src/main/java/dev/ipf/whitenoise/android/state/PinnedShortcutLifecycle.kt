@@ -143,8 +143,8 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
 
 /**
  * Shortcut ids of `:conv:` channels whose chat no account lists any more, such as a chat an older build deleted
- * after its vibration was reset to Default. Every other account's chats are read first, so none of their channels
- * is ever counted. Null when any of them cannot be listed, or Android's channels cannot be read, since such a
+ * after its vibration was reset to Default. Every other signing account's chats are read first, so none of their
+ * channels is ever counted. Null when any of them cannot be listed, or Android's channels cannot be read, since such a
  * channel could still be theirs.
  */
 private suspend fun WhiteNoiseAppState.departedChatChannelShortcutIds(
@@ -152,7 +152,9 @@ private suspend fun WhiteNoiseAppState.departedChatChannelShortcutIds(
     groupIds: Set<String>,
 ): Set<String>? {
     val kept = HashSet<String>()
-    for (other in accounts.map { it.label }.filter { it != accountRef }.distinct()) {
+    // A signed-out or read-only profile cannot list chats natively, and its own sign-out already cleaned its channels.
+    val others = accounts.filter { it.label != accountRef && it.isSignedInSigningAccount() }.map { it.label }
+    for (other in others.distinct()) {
         val inventory = readAccountKnownGroupIds(other)
         if (!inventory.nativeInventoryComplete) {
             appStateDebug { "sign-out could not list another account's chats for unlisted chat channels" }

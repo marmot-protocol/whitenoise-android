@@ -339,6 +339,33 @@ class NotificationChannelCleanupRegressionTest {
     }
 
     /**
+     * A sign-out that inferred a departed chat's channel, then failed, and is retried after the remaining account's
+     * chat came back, claims only what is still unlisted: each capture replaces the inferred set, so that account's
+     * channel survives the departing account's cleanup.
+     */
+    @Test
+    fun retriedSignOutDropsAnInferredChannelWhoseChatIsListedAgain() {
+        val restoredId = checkNotNull(conversationShortcutId("account-b", "group-b-restored"))
+        val restored = convChannel(NotificationChannelSpec.GROUP_MESSAGES, restoredId, "B Restored Chat")
+
+        val first = checkNotNull(departedChatConversationShortcutIds(context, "account-a", emptySet(), emptySet()))
+        assertTrue(restoredId in first)
+        assertTrue(
+            recordDepartingConversationChannelOwners(context, "account-a", emptySet(), departedChatShortcutIds = first),
+        )
+
+        val kept = groupChannelShortcutIds("account-b", setOf("group-b-restored"))
+        val retried = checkNotNull(departedChatConversationShortcutIds(context, "account-a", emptySet(), kept))
+        assertFalse(restoredId in retried)
+        assertTrue(
+            recordDepartingConversationChannelOwners(context, "account-a", emptySet(), departedChatShortcutIds = retried),
+        )
+        assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
+
+        assertNotNull(manager.getNotificationChannel(restored))
+    }
+
+    /**
      * Sign-out saves its capture before native revocation. If the process dies after native sign-out commits
      * but before Android cleanup, startup retention with another signer present deletes the departed account's
      * upgrade-era channels, which have no shortcut, earlier record or vibration preference. While the account

@@ -298,6 +298,42 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             }
         }
 
+    /**
+     * A retained read-only profile cannot list chats natively. Beside a second signing account, it neither blocks
+     * sign-out nor keeps the unlisted chat's channel, since only signing accounts are asked for their chats.
+     */
+    @Test
+    fun readOnlyProfileThatCannotListChatsDoesNotBlockSignOut() =
+        runBlocking {
+            val deletedGroup = "ac".repeat(16)
+            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
+            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
+            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            val readOnlyRef = "read-only-profile"
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)),
+                    externalSignerAccount(signedOut = true).copy(label = readOnlyRef, accountIdHex = "fa".repeat(32)),
+                )
+            chatListReply = { emptyList() }
+            quarantinedGroupsReply = { emptyList() }
+            chatListFailsFor = setOf(readOnlyRef)
+            val state = appState(profileReader = { null })
+            try {
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                chatListFailsFor = emptySet()
+                manager.deleteNotificationChannel(channelId)
+                ownerPrefs.edit().clear().commit()
+            }
+        }
+
     /** Owner-record persistence retries transient failures and aborts sign-out and wipe before native revocation. */
     @Test
     fun ownerRecordSaveRetriesAndAbortsSignOutAndWipeBeforeNativeRevocationWhenUnsaved() =
