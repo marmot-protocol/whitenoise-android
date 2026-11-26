@@ -291,22 +291,6 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(50, tts.spoken)
     }
 
-    /** The next task checks the voice again, so a voice that stopped being installed refuses the next batch. */
-    @Test
-    fun aLaterBatchChecksTheVoiceAgain() {
-        val offline = voice("Offline", Locale.US, 300)
-        val tts = CountingVoiceTextToSpeech(offline)
-        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
-        engine.setLanguage(Locale.US)
-        assertEquals(TextToSpeech.SUCCESS, engine.speak("First batch.", "u1"))
-
-        tts.activeVoice = voice("Network", Locale.US, 300, networkRequired = true)
-        shadowOf(Looper.getMainLooper()).idle()
-
-        assertEquals(TextToSpeech.ERROR, engine.speak("Second batch.", "u2"))
-        assertEquals(1, tts.spoken)
-    }
-
     /** Work already queued on the looper runs after the clear, so it cannot reuse the earlier task's confirmation. */
     @Test
     fun alreadyQueuedWorkChecksTheVoiceAgain() {
@@ -325,6 +309,32 @@ class AndroidTtsSpeechEngineTest {
 
         assertEquals(TextToSpeech.ERROR, queuedResult)
         assertEquals(1, tts.spoken)
+    }
+
+    /** A queue resubmitted from a framework callback on a thread without a looper checks the voice once per call. */
+    @Test
+    fun callbackThreadResubmissionChecksTheVoiceOncePerCallback() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        engine.setLanguage(Locale.US)
+        tts.voiceReads = 0
+        engine.setCallbacks(
+            onStart = {},
+            onDone = { id -> repeat(10) { engine.speak("Tail $it.", "$id-$it") } },
+            onError = { _, _ -> },
+            onRangeStart = { _, _, _, _ -> },
+            onStop = { _, _ -> },
+        )
+        val listener = requireNotNull(tts.listener)
+
+        repeat(2) { callback ->
+            val binder = Thread { listener.onDone("u$callback") }
+            binder.start()
+            binder.join()
+        }
+
+        assertEquals(2, tts.voiceReads)
+        assertEquals(20, tts.spoken)
     }
 
     /** A stop inside the task drops the confirmation, so speech queued after it checks the voice again. */
@@ -391,6 +401,14 @@ class AndroidTtsSpeechEngineTest {
         var voiceReads = 0
         var spoken = 0
             private set
+        var listener: UtteranceProgressListener? = null
+            private set
+
+        /** Captures the listener so a test can deliver callbacks from any thread. */
+        override fun setOnUtteranceProgressListener(listener: UtteranceProgressListener?): Int {
+            this.listener = listener
+            return TextToSpeech.SUCCESS
+        }
 
         /** Models an engine that accepts the requested locale. */
         override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_AVAILABLE

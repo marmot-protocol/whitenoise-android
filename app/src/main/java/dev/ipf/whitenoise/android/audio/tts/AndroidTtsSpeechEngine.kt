@@ -8,6 +8,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /** Thin adapter that keeps Android framework calls out of the queue state machine. */
 internal class AndroidTtsSpeechEngine(
@@ -21,7 +22,7 @@ internal class AndroidTtsSpeechEngine(
     private val retired = AtomicBoolean()
     private var enforceOfflineVoice = requireOfflineVoice
 
-    /** One binder voice check per batch: a queue submits a whole batch in one main-thread task. */
+    /** One binder voice check per submission batch: a main-thread task or one framework callback. */
     private val offlineVoice = TaskScopedConfirmation()
 
     override var effectiveLocale: Locale? = null
@@ -98,16 +99,19 @@ internal class AndroidTtsSpeechEngine(
         onRangeStart: (String?, Int, Int, Int) -> Unit,
         onStop: (String?, Boolean) -> Unit,
     ) {
+        // Each callback is one submission batch, so a queue resubmitted from it checks the voice once.
         textToSpeech.setOnUtteranceProgressListener(
             androidTtsProgressListener(
-                onStart,
-                onDone,
+                { id -> offlineVoice.duringCallback { onStart(id) } },
+                { id -> offlineVoice.duringCallback { onDone(id) } },
                 { id, error ->
-                    if (error == TextToSpeech.ERROR_SERVICE || error == TextToSpeech.ERROR) retire(error)
-                    onError(id, error)
+                    offlineVoice.duringCallback {
+                        if (error == TextToSpeech.ERROR_SERVICE || error == TextToSpeech.ERROR) retire(error)
+                        onError(id, error)
+                    }
                 },
-                onRangeStart,
-                onStop,
+                { id, start, end, frame -> offlineVoice.duringCallback { onRangeStart(id, start, end, frame) } },
+                { id, interrupted -> offlineVoice.duringCallback { onStop(id, interrupted) } },
             ),
         )
     }
@@ -162,32 +166,56 @@ internal class AndroidTtsSpeechEngine(
 }
 
 /**
- * Reuses a positive check for the rest of the current task on the calling looper. A message at the front of that
- * looper's queue clears it, so it runs before any later message, such as a framework reconnection callback. Without
- * a looper every call checks again.
+ * Reuses a positive check for the rest of one submission batch, so a batch of sentences reads the framework voice
+ * once. On a looper the batch is the current task: a message at the front of that looper's queue clears it, ahead of
+ * any later message such as a framework reconnection callback. On a callback thread without a looper, such as a Binder
+ * thread requeueing after a rate change, the batch is the framework callback [duringCallback] wraps. Anywhere else
+ * every call checks again. [clear] cancels a confirmation on every thread.
  */
 private class TaskScopedConfirmation {
     @Volatile
     private var confirmedOn: Looper? = null
+    private val changes = AtomicLong()
 
-    /** Forgets the confirmation at once, for example when the voice or language may have changed. */
+    /** The [changes] count a callback on this thread confirmed at, [UNCONFIRMED] before it does, null outside one. */
+    private val callbackConfirmedAt = ThreadLocal<Long?>()
+
+    /** Forgets every confirmation at once, for example when the voice or language may have changed. */
     fun clear() {
         confirmedOn = null
+        changes.incrementAndGet()
     }
 
-    /** Returns true when this task already confirmed, or when [check] confirms now. */
+    /** Runs a framework callback as one batch: speech it submits on a thread without a looper shares one check. */
+    fun duringCallback(block: () -> Unit) {
+        val outer = callbackConfirmedAt.get()
+        callbackConfirmedAt.set(UNCONFIRMED)
+        try {
+            block()
+        } finally {
+            if (outer == null) callbackConfirmedAt.remove() else callbackConfirmedAt.set(outer)
+        }
+    }
+
+    /** Returns true when this batch already confirmed, or when [check] confirms now. */
     fun confirm(check: () -> Boolean): Boolean {
         val looper = Looper.myLooper()
-        if (looper != null && confirmedOn === looper) return true
+        val at = changes.get()
+        if ((looper != null && confirmedOn === looper) || callbackConfirmedAt.get() == at) return true
         val confirmed = check()
         if (confirmed && looper != null) {
             // Keep the confirmation only when its clear is queued; a quitting looper refuses the post.
             val clearQueued = Handler(looper).postAtFrontOfQueue { if (confirmedOn === looper) confirmedOn = null }
-            if (clearQueued) confirmedOn = looper
+            if (clearQueued && changes.get() == at) confirmedOn = looper
+        } else if (confirmed && callbackConfirmedAt.get() != null) {
+            callbackConfirmedAt.set(at)
         }
         return confirmed
     }
 }
+
+/** Marks a callback batch that has not confirmed the voice yet; [AtomicLong] change counts are never negative. */
+private const val UNCONFIRMED = -1L
 
 internal fun androidTtsProgressListener(
     onStart: (String?) -> Unit,
