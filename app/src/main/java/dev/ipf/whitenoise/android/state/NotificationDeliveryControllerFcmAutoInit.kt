@@ -162,7 +162,8 @@ internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable
                 runCatchingCancellable { nativePushDemand(accountRefs) }.getOrNull()
             }
         when (demand) {
-            NativePushDemand.Required -> applyFcmAutoInit(enabled = true)
+            // Admission is checked again with the write, since a newer change may open while demand is read.
+            NativePushDemand.Required -> enableFcmAutoInitIfAdmitted(isCurrent) ?: recordPendingRegistrationSync()
             NativePushDemand.None -> disableFcmAutoInitIfUnchanged(accountRefs)
             NativePushDemand.Unknown, null -> recordPendingRegistrationSync()
         }

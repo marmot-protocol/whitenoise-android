@@ -82,21 +82,28 @@ class FcmAutoInitCoverageTest {
     fun syncTokenReadsEnableAutoInitFirst() {
         val sync = appModuleSource(SYNC)
         val fetch = sync.functionBody("fetchFcmTokenOrNull")
-        val enable = fetch.indexOf("applyFcmAutoInit(enabled = true)")
         val read = fetch.indexOf("this::readFcmTokenFromSdk")
 
-        assertTrue("fetchFcmTokenOrNull must enable auto-init", enable >= 0)
-        val conditional = "if (current && enableAutoInit) applyFcmAutoInit(enabled = true)"
-        assertTrue("only callers that ask enable it", fetch.contains(conditional))
+        assertFalse("a token fetch never turns auto-init on unfenced", "applyFcmAutoInit(enabled = true)" in fetch)
         val forAccounts = sync.functionBody("syncNativePushRegistrationForAccountsLocked")
-        assertTrue(forAccounts.contains("uncommittedNativePushEnables.get() > 0"))
+        val decide = appModuleSource(ADMISSION).functionBody("deferOrEnableFcmAutoInitForSync")
+        assertTrue(decide.contains("uncommittedNativePushEnables.get() == 0"))
         assertTrue(
             "an open delivery-mode transaction also defers auto-init",
-            forAccounts.contains("activeDeliveryModeTransactions.get() > 0"),
+            decide.contains("activeDeliveryModeTransactions.get() == 0"),
         )
+        val fencedEnable = "enableFcmAutoInitIfAdmitted { quiet() && operationIsCurrent() } == null"
+        assertTrue("a sync admitted when it writes turns auto-init on, or defers", fencedEnable in decide)
         val deferredRetry = "val retryStored = !autoInitDeferred || recordPendingRegistrationSync()"
         assertTrue("a deferred sync records its retry", deferredRetry in forAccounts)
-        assertTrue("an open enable defers auto-init", forAccounts.contains("enableAutoInit = !autoInitDeferred"))
+        val decided = "val autoInitDeferred = deferOrEnableFcmAutoInitForSync(operationIsCurrent)"
+        assertTrue(
+            "auto-init is turned on before the token read",
+            forAccounts.indexOf(decided) in 0 until forAccounts.indexOf("tokenForNativePushSync("),
+        )
+        val unfenced = Regex("""applyFcmAutoInit\(enabled = true\)""")
+        val stateSources = listOf(SYNC, SELECTION, PUSH_CLEARS, AUTO_INIT, MODE_OWNERSHIP).map(::appModuleSource)
+        assertTrue("every on write is fenced", stateSources.none { unfenced.containsMatchIn(it) })
         val acknowledge = sync.functionBody("acknowledgeRegistrationSyncUnlessUnsettled")
         assertTrue("and keeps the pending marker", "autoInitDeferred -> true" in acknowledge)
         val unstored = "fcmAutoInitWriteFailed.get() -> !fcmAutoInitRetryUnstored.get()"
@@ -104,7 +111,6 @@ class FcmAutoInitCoverageTest {
         val acknowledged = "acknowledgeRegistrationSyncUnlessUnsettled(token, autoInitDeferred, operationIsCurrent)"
         assertTrue(acknowledged in forAccounts)
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)
-        assertTrue("auto-init must be enabled before the token read", enable < read)
         assertEquals(2, Regex("""\breadFcmTokenFromSdk\b""").findAll(sync).count())
     }
 
@@ -170,13 +176,10 @@ class FcmAutoInitCoverageTest {
         assertTrue(selection.functionBody("selectFcmTransport").contains("fetchFcmTokenForOwner(owner)"))
         assertTrue(fenced.contains("ownerFence = nativePushSyncMutex"))
         assertTrue(fenced.contains("tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) }"))
-        assertTrue("a provisional selection must not turn auto-init on", fenced.contains("enableAutoInit = false"))
-        val admit =
-            "tokenOwnerIsCurrent().also { current -> if (current && enableAutoInit) applyFcmAutoInit(enabled = true) }"
-        val admitAt = fetch.indexOf(admit)
+        assertFalse("a provisional selection must not turn auto-init on", "applyFcmAutoInit" in fetch)
+        val admitAt = fetch.indexOf("val ownerAdmitted = fence.withLock { tokenOwnerIsCurrent() }")
         val read = fetch.indexOf("reader()")
-        val fenceAt = fetch.indexOf("fence.withLock")
-        assertTrue("the owner check and auto-init write must run under the fence", fenceAt in 0 until admitAt)
+        assertTrue("the owner check must run under the fence", admitAt >= 0)
         assertTrue("the SDK read must run outside the fence", admitAt < read)
         assertTrue("the token store must run under the fence", fetch.indexOf("fence.withLock", read) > read)
     }
@@ -207,8 +210,15 @@ class FcmAutoInitCoverageTest {
         val superseded = "if (!isCurrent()) return@withLock recordPendingRegistrationSync()"
         assertTrue("a superseded commit leaves a sync pending", superseded in commit)
         assertTrue("an unsettled commit fails the selection", "return selected.getOrThrow() && settled" in select)
-        val required = "NativePushDemand.Required -> applyFcmAutoInit(enabled = true)"
-        assertTrue("Push demand turns auto-init on and reports whether it settled", required in commit)
+        val required =
+            "NativePushDemand.Required -> enableFcmAutoInitIfAdmitted(isCurrent) ?: recordPendingRegistrationSync()"
+        assertTrue("Push demand turns auto-init on only while still admitted", required in commit)
+        val admitted = appModuleSource(ADMISSION).functionBody("enableFcmAutoInitIfAdmitted")
+        val fenced = admitted.substringAfter("synchronized(fcmAutoInitAdmission) {")
+        assertTrue(
+            "admission is checked with the SDK write under the fence a new change opens under",
+            fenced.indexOf("if (admitted())") in 0 until fenced.indexOf("setFcmAutoInitEnabled(true)"),
+        )
         val toggle = appModuleSource(PUSH_CLEARS).functionBody("setNativePushEnabledSettlingAutoInit")
         assertTrue(toggle.contains("if (enabled) uncommittedNativePushEnables.incrementAndGet()"))
         val confirmed =
@@ -236,11 +246,20 @@ class FcmAutoInitCoverageTest {
         val begin = ownership.functionBody("beginDeliveryModeTransaction")
         val counted = begin.indexOf("activeDeliveryModeTransactions.incrementAndGet()")
         assertTrue("a change is counted before its intent advances", counted in 0 until begin.indexOf(".advance()"))
-        assertFalse("a newer choice never waits to supersede", "withLock" in begin)
+        assertFalse("a newer choice never waits on native work to supersede", "withLock" in begin)
+        assertTrue("a change opens under the on write's admission fence", "synchronized(fcmAutoInitAdmission)" in begin)
         val end = ownership.functionBody("endDeliveryModeTransaction")
         val lastEnd = "activeDeliveryModeTransactions.decrementAndGet() == 0 &&"
         assertTrue("the last change to end drains the retry", end.substringAfter("withLock {").contains(lastEnd))
-        assertTrue("a failed drain never replaces the result", "if (drain) runCatching {" in end)
+        val bookkeeping = end.substringBefore("when {")
+        assertTrue("only the count and marker read ignore cancellation", "withContext(NonCancellable)" in bookkeeping)
+        assertFalse("the retry itself is cancellable", "NonCancellable" in end.substringAfter("when {"))
+        assertTrue("an active caller retries inline", "isActive -> drainDeferredRegistrationSync()" in end)
+        val scheduled = "notificationScope.launch { drainDeferredRegistrationSync() }"
+        assertTrue("a cancelled caller schedules it", scheduled in end)
+        val drain = ownership.functionBody("drainDeferredRegistrationSync")
+        assertTrue("the retry is bounded", "withTimeoutOrNull(deferredRegistrationDrainTimeoutMs)" in drain)
+        assertTrue("a failed drain never replaces the result", "runCatchingCancellable {" in drain)
         val handoff = ownership.functionBody("launchNotificationDeliveryModeReconciliation")
         assertTrue("a handed-off change always ends", "launch(start = CoroutineStart.ATOMIC)" in handoff)
         val apply = appModuleSource(SELECTION).functionBody("applyMode")
@@ -345,5 +364,6 @@ class FcmAutoInitCoverageTest {
         const val AUTO_INIT = "$STATE/NotificationDeliveryControllerFcmAutoInit.kt"
         const val PUSH_CLEARS = "$STATE/NotificationDeliveryControllerPushClears.kt"
         const val MODE_OWNERSHIP = "$STATE/NotificationDeliveryControllerModeOwnership.kt"
+        const val ADMISSION = "$STATE/NotificationDeliveryControllerFcmAutoInitAdmission.kt"
     }
 }

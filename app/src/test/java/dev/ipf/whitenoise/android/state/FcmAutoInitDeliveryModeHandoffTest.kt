@@ -12,10 +12,15 @@ import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundServ
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -29,6 +34,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -301,6 +308,96 @@ class FcmAutoInitDeliveryModeHandoffTest {
             }
         }
 
+    /**
+     * An enable checks that no delivery-mode change is open, then reads account demand. A Local choice that opens
+     * during that read is seen again with the SDK write, so the enable writes nothing and stores its retry instead
+     * of starting Firebase work the Local cutover's off write cannot cancel.
+     */
+    @Test
+    fun deliveryModeChangeOpenedDuringTheDemandReadFencesTheOnWrite() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, false)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val blockReads = AtomicBoolean(false)
+            val reading = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val fixture =
+                fixture(platform, activeNative = true, onNotificationSettings = {
+                    if (blockReads.get()) {
+                        reading.countDown()
+                        release.await(10, TimeUnit.SECONDS)
+                    }
+                    null
+                })
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                store.clearPendingNativePushRegistrationSync()
+                platform.autoInitWrites.clear()
+                val delivery = fixture.appState.notificationDelivery
+
+                fixture.runWithMainLooperPumping {
+                    blockReads.set(true)
+                    val enable =
+                        async(Dispatchers.Default) {
+                            delivery.commitFcmAutoInitAfterEnable { delivery.activeDeliveryModeTransactions.get() == 0 }
+                        }
+                    assertTrue("the demand read must start", reading.await(10, TimeUnit.SECONDS))
+                    delivery.beginDeliveryModeTransaction()
+                    blockReads.set(false)
+                    release.countDown()
+                    assertTrue("the superseded enable stores its retry", enable.await())
+                }
+
+                val writes = platform.autoInitWrites.toList()
+                assertFalse("a superseded enable must not turn auto-init on: $writes", true in writes)
+                assertTrue("the retry stays for the change to drain", store.nativePushRegistrationSyncPending())
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /**
+     * The last change's deferred retry is cancellable and bounded: a Firebase token task that never completes
+     * cannot keep the native sync lock from sign-out or wipe, and the retry keeps its durable marker.
+     */
+    @Test
+    fun stalledDeferredRetryReleasesTheSyncLockAndKeepsItsRetry() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, false)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val stalled = AtomicBoolean(false)
+            val fixture =
+                fixture(platform, activeNative = true, fcmTokenReader = {
+                    if (stalled.get()) awaitCancellation()
+                    TOKEN
+                })
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                val delivery = fixture.appState.notificationDelivery
+                delivery.deferredRegistrationDrainTimeoutMs = 300L
+
+                fixture.runWithMainLooperPumping {
+                    delivery.beginDeliveryModeTransaction()
+                    store.recordPendingNativePushRegistrationSync()
+                    stalled.set(true)
+                    // Its own scope, so a retry that ignores cancellation fails this check instead of hanging the test.
+                    val ending = CoroutineScope(Dispatchers.Default).launch { delivery.endDeliveryModeTransaction() }
+                    val ended = withTimeoutOrNull(5_000L) { ending.join() }
+                    assertTrue("the change must end within the retry's bound", ended != null)
+                }
+
+                assertFalse("the stalled retry must release the sync lock", delivery.nativePushSyncMutex.isLocked)
+                assertTrue("the stalled retry keeps its marker", store.nativePushRegistrationSyncPending())
+                assertEquals(0, delivery.activeDeliveryModeTransactions.get())
+            } finally {
+                stalled.set(false)
+                fixture.close()
+            }
+        }
+
     /** A committed enable whose on write fails and whose retry cannot be stored reports auto-init unsettled. */
     @Test
     fun committedEnableWithFailedWriteAndUnstoredRetryReportsUnsettled() =
@@ -477,6 +574,7 @@ class FcmAutoInitDeliveryModeHandoffTest {
         activeNative: Boolean = false,
         capability: NativePushCapability = NativePushCapability.Available,
         onNotificationSettings: ((String) -> NotificationSettingsFfi?)? = null,
+        fcmTokenReader: suspend () -> String? = { TOKEN },
         pushServerConfig: () -> PushServerConfig? = { CONFIG },
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -485,7 +583,7 @@ class FcmAutoInitDeliveryModeHandoffTest {
         nativePushFallbackPlatform = platform,
         onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = pushServerConfig,
-        fcmTokenReader = { TOKEN },
+        fcmTokenReader = fcmTokenReader,
         nativePushCapabilityResolver = { capability },
     )
 

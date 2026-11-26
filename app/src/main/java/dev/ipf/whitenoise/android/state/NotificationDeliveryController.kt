@@ -76,6 +76,8 @@ internal interface NotificationDeliveryHost {
     )
 }
 
+private const val DEFERRED_REGISTRATION_DRAIN_TIMEOUT_MS = 15_000L
+
 /**
  * Owns local notification settings, the notification delivery mode (rendering, foreground
  * connection, native push), native push registration sync and the native-push fallback runtime.
@@ -112,6 +114,14 @@ internal class NotificationDeliveryController(
     // ends under the native sync lock. While any is open, a sync or per-account enable leaves Firebase auto-init
     // alone, since the change may still disable native push, and the last one to end drains the retry.
     internal val activeDeliveryModeTransactions = AtomicInteger()
+
+    // Held only while a delivery-mode change opens and while an on write checks it is still admitted and calls
+    // the SDK setter, never across native work, so a newer choice still supersedes an older change at once.
+    internal val fcmAutoInitAdmission = Any()
+
+    // How long the last change's deferred registration retry may hold the native sync lock, such as on a stalled
+    // Firebase token task, before it gives up and leaves its durable marker for the next sync.
+    internal var deferredRegistrationDrainTimeoutMs = DEFERRED_REGISTRATION_DRAIN_TIMEOUT_MS
 
     // Whether the latest Firebase auto-init write failed. A failed write records the pending registration
     // sync, and no sync acknowledges it until a later write succeeds, so the next sync retries the write.

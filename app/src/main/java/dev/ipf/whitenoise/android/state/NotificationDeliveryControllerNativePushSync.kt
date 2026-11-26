@@ -121,11 +121,10 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
     // acknowledging it, so the next sync settles auto-init even if that change fails before touching it.
     // Without a stored marker it still registers every account, so a committed Push account keeps its token
     // current, but it does not report success, so an open enable cannot confirm on it.
-    val autoInitDeferred =
-        uncommittedNativePushEnables.get() > 0 || activeDeliveryModeTransactions.get() > 0
+    val autoInitDeferred = deferOrEnableFcmAutoInitForSync(operationIsCurrent)
     val retryStored = !autoInitDeferred || recordPendingRegistrationSync()
     val token =
-        tokenForNativePushSync(freshCallbackToken, operationIsCurrent, enableAutoInit = !autoInitDeferred)
+        tokenForNativePushSync(freshCallbackToken, operationIsCurrent)
             ?: return false
     val tokenIsCurrent: suspend () -> Boolean = {
         operationIsCurrent() &&
@@ -176,9 +175,8 @@ internal enum class NativePushDemand {
 private suspend fun NotificationDeliveryController.tokenForNativePushSync(
     freshCallbackToken: String?,
     operationIsCurrent: () -> Boolean,
-    enableAutoInit: Boolean,
 ): String? =
-    fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent, enableAutoInit = enableAutoInit)
+    fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent)
         ?: freshCallbackToken?.takeIf {
             operationIsCurrent() &&
                 withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == it }
@@ -267,30 +265,25 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
 }
 
 /**
- * Fetches and retains a non-blank FCM token when push is available, turning Firebase auto-init on first
- * when [enableAutoInit] is set. A caller whose owner is no longer current gets null before auto-init is
- * touched, and its token is not kept. A caller that does not already hold the native sync lock passes it as
- * [ownerFence]. The owner check with any auto-init write, and the recheck with the token store, then run
- * under it, while the SDK read does not. A provisional Push selection passes `enableAutoInit = false` and
- * reads its token explicitly, because the SDK's background sync started by turning auto-init on can retry
- * registration after a later off write. It turns auto-init on only once its whole cutover commits.
+ * Fetches and retains a non-blank FCM token when push is available. It never turns Firebase auto-init on: a
+ * sync does that first through [enableFcmAutoInitIfAdmitted], fenced against a newer delivery-mode change, and
+ * a provisional Push selection only once its whole cutover commits, because the SDK's background sync started
+ * by turning auto-init on can retry registration after a later off write. A caller whose owner is no longer
+ * current gets null, and its token is not kept. A caller that does not already hold the native sync lock passes
+ * it as [ownerFence]. The owner check, and the recheck with the token store, then run under it, while the SDK
+ * read does not.
  */
 @Suppress("ReturnCount")
 internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     expectedCallbackToken: String? = null,
     tokenOwnerIsCurrent: () -> Boolean = { true },
     ownerFence: Mutex? = null,
-    enableAutoInit: Boolean = true,
 ): String? {
     val rotation = pushTokenRotationSequence.get()
     if (!nativePushCapability().isAvailable) return null
     // A caller that already holds the native sync lock passes no fence, and a private mutex never contends.
     val fence = ownerFence ?: Mutex()
-    val ownerAdmitted =
-        fence.withLock {
-            // Auto-init stays off until native push needs a token. The SDK persists it, so rotation keeps working.
-            tokenOwnerIsCurrent().also { current -> if (current && enableAutoInit) applyFcmAutoInit(enabled = true) }
-        }
+    val ownerAdmitted = fence.withLock { tokenOwnerIsCurrent() }
     if (!ownerAdmitted) return null
     val token =
         runCatchingCancellable {
@@ -352,5 +345,4 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenForOwner(owner:
     fetchFcmTokenOrNull(
         tokenOwnerIsCurrent = { ownsNotificationDeliveryMode(owner) },
         ownerFence = nativePushSyncMutex,
-        enableAutoInit = false,
     )
