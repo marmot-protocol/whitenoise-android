@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -250,6 +251,48 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
                 assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
                 assertNull(manager.getNotificationChannel(channelId))
             } finally {
+                manager.deleteNotificationChannel(channelId)
+                ownerPrefs.edit().clear().commit()
+            }
+        }
+
+    /**
+     * When the account that stays cannot list its chats, a `:conv:` channel no record claims could be its chat's or
+     * a departed one's. Sign-out and wipe stop before native revocation instead of leaving a departed chat's title,
+     * and once that account's chats list again, sign-out deletes the channel of the chat no account lists.
+     */
+    @Test
+    fun signOutAndWipeAbortBeforeRevocationWhenTheRemainingAccountCannotListItsChats() =
+        runBlocking {
+            val deletedGroup = "ab".repeat(16)
+            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
+            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
+            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)))
+            chatListReply = { emptyList() }
+            quarantinedGroupsReply = { emptyList() }
+            chatListFailsFor = setOf(otherAccountRef)
+            val state = appState(profileReader = { null })
+            try {
+                assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+                assertEquals(0, signOutCalls.get())
+                assertEquals(0, nativeDisableCalls.get())
+                assertNull(state.signOutAndWipeActiveAccount())
+                assertEquals(0, wipeCalls.get())
+                assertEquals(accountRef, state.activeAccountRef)
+                assertNotNull(manager.getNotificationChannel(channelId))
+
+                chatListFailsFor = emptySet()
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                chatListFailsFor = emptySet()
                 manager.deleteNotificationChannel(channelId)
                 ownerPrefs.edit().clear().commit()
             }

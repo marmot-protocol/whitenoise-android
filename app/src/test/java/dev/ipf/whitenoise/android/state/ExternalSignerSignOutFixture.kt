@@ -81,6 +81,9 @@ internal abstract class ExternalSignerSignOutFixture {
     protected var chatListReply: (() -> List<dev.ipf.marmotkit.ChatListRowFfi>)? = null
     protected var quarantinedGroupsReply: (() -> List<dev.ipf.marmotkit.AppQuarantinedGroupFfi>)? = null
 
+    // Accounts whose chat list fails whatever chatListReply says, so one account's inventory can break alone.
+    protected var chatListFailsFor: Set<String> = emptySet()
+
     /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     protected fun externalSignerAccount(
         signedOut: Boolean = false,
@@ -165,12 +168,16 @@ internal abstract class ExternalSignerSignOutFixture {
                 }
                 "accountUnreadSummary" -> emptyList<Any>()
                 "chatList" ->
-                    chatListReply?.let { reply ->
-                        runCatching(reply).fold(
-                            onSuccess = { it },
-                            onFailure = ::suspendFailure,
-                        )
-                    } ?: emptyList<Any>()
+                    if (arguments?.firstOrNull() in chatListFailsFor) {
+                        suspendFailure(IllegalStateException("corrupted chat table"))
+                    } else {
+                        chatListReply?.let { reply ->
+                            runCatching(reply).fold(
+                                onSuccess = { it },
+                                onFailure = ::suspendFailure,
+                            )
+                        } ?: emptyList<Any>()
+                    }
                 "quarantinedGroups" ->
                     quarantinedGroupsReply?.let { reply ->
                         runCatching(reply).fold(

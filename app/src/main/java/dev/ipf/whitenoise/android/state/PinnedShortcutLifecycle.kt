@@ -88,8 +88,9 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
  * of chats no account still lists are recorded too (see [departedChatChannelShortcutIds]).
  *
  * Returns null before native revocation when native inventory remained incomplete while
- * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
- * the departing ownership record and any last-signer sweep could not be durably saved after retries.
+ * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, for the departing
+ * account or any account that remains, or when the departing ownership record and any last-signer sweep
+ * could not be durably saved after retries.
  */
 internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
     accountRef: String,
@@ -110,8 +111,15 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
         } else {
             departedChatChannelShortcutIds(accountRef, groupIds)
         }
+    // An unlisted chat's channel could be another account's or a departed chat's. Neither may be guessed, and
+    // once native revocation commits nothing would sweep a departed one while a signer remains, so stop first.
+    val departedUnknown =
+        departed == null &&
+            withContext(Dispatchers.IO) {
+                hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
+            }
     return when {
-        unaccountedChannelRisk -> {
+        unaccountedChannelRisk || departedUnknown -> {
             appStateDebug { "sign-out channel capture incomplete with unaccounted conversation channels" }
             null
         }
@@ -122,7 +130,7 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
                     accountRef,
                     groupIds,
                     includeUnscopedLegacy,
-                    departedChatShortcutIds = departed,
+                    departedChatShortcutIds = departed.orEmpty(),
                 )
             }
         } -> {
@@ -136,24 +144,25 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
 /**
  * Shortcut ids of `:conv:` channels whose chat no account lists any more, such as a chat an older build deleted
  * after its vibration was reset to Default. Every other account's chats are read first, so none of their channels
- * is ever counted. When any of them cannot be listed, nothing is, since such a channel could still be theirs.
+ * is ever counted. Null when any of them cannot be listed, or Android's channels cannot be read, since such a
+ * channel could still be theirs.
  */
 private suspend fun WhiteNoiseAppState.departedChatChannelShortcutIds(
     accountRef: String,
     groupIds: Set<String>,
-): Set<String> {
+): Set<String>? {
     val kept = HashSet<String>()
     for (other in accounts.map { it.label }.filter { it != accountRef }.distinct()) {
         val inventory = readAccountKnownGroupIds(other)
         if (!inventory.nativeInventoryComplete) {
-            appStateDebug { "sign-out kept unlisted chat channels: another account's chats could not be listed" }
-            return emptySet()
+            appStateDebug { "sign-out could not list another account's chats for unlisted chat channels" }
+            return null
         }
         kept += groupChannelShortcutIds(other, inventory.groupIds)
     }
     return withContext(Dispatchers.IO) {
         departedChatConversationShortcutIds(appContext, accountRef, groupIds, kept)
-    }.orEmpty()
+    }
 }
 
 /** Retries durable owner-record persistence before native revocation commits. */
