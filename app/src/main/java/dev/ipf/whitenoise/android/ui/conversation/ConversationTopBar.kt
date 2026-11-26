@@ -129,8 +129,6 @@ internal fun ConversationTopBar(
     // Optional header shortcuts chosen in Chat header settings; empty keeps the plain header. The slot
     // receives how many buttons fit beside the chat name at this width and font size.
     actions: @Composable RowScope.(capacity: Int) -> Unit = {},
-    // Set only when this person may change the timer now; otherwise a tap on it opens details.
-    onTimerClick: (() -> Unit)? = null,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
     // projection until the first replacement arrives or when the seam has no window. A DM peer's
@@ -362,7 +360,6 @@ internal fun ConversationTopBar(
                                                         label = disappearingMessagesLabel(disappearingSecs),
                                                         labelStyle = labelStyle,
                                                         labelColor = labelColor,
-                                                        onClick = onTimerClick,
                                                     )
                                                 }
                                             }
@@ -444,29 +441,15 @@ private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
 // Material's titleMedium size at 100% text size.
 private val BASE_TITLE_SIZE = 16.dp
 
-/** The timer badge; with [onClick] it opens the disappearing-messages picker instead of chat details. */
+/** Read-only disappearing-messages indicator inside the header's chat-details tap target. */
 @Composable
 @Suppress("FunctionNaming")
 private fun HeaderTimerBadge(
     label: String,
     labelStyle: TextStyle,
     labelColor: Color,
-    onClick: (() -> Unit)?,
 ) {
-    val clickModifier =
-        if (onClick == null) {
-            Modifier
-        } else {
-            Modifier
-                .clip(RoundedCornerShape(Radii.sm))
-                .clickable(
-                    onClickLabel = stringResource(R.string.conversation_header_timer_change),
-                    role = Role.Button,
-                    onClick = onClick,
-                ).testTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
-        }
     Row(
-        modifier = clickModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -476,7 +459,7 @@ private fun HeaderTimerBadge(
             modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
             tint = labelColor,
         )
-        // A new timer rolls in under the old one, so a change made from the sheet is visible where it lives.
+        // A new timer rolls in under the old one when the duration changes.
         AnimatedContent(
             targetState = label,
             transitionSpec = {
@@ -488,5 +471,3 @@ private fun HeaderTimerBadge(
         }
     }
 }
-
-internal const val CONVERSATION_HEADER_TIMER_BUTTON_TAG = "conversation.header.timer.button"

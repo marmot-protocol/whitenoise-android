@@ -594,7 +594,7 @@ internal fun WhiteNoiseApp(
                         AppSelfUpdateDialog(appState = appState)
                         val setupController = appState.accountSetup.controller
                         if (setupController != null) {
-                            AccountSetupScreen(setupController, appState::randomProfilePseudonym) {
+                            AccountSetupScreen(setupController, appState::randomProfilePseudonym, appState.appLock) {
                                 appState.launchMutation { appState.accountSetup.later() }
                             }
                         } else if (appState.profileSignUpForPresentation != null) {

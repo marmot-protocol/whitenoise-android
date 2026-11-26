@@ -18,10 +18,15 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.translation.ConversationTranslationSession
+import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
 import dev.ipf.whitenoise.android.ui.common.LocalWindowFolds
 import dev.ipf.whitenoise.android.ui.common.WindowFold
 import dev.ipf.whitenoise.android.ui.common.WindowFolds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,6 +58,12 @@ class ConversationTabletopTest {
         val tabletop = mutableStateOf(true)
         val frozenIme = mutableStateOf(0.dp)
         val identities = mutableListOf<Any>()
+        val translation =
+            ConversationTranslationSession(
+                CoroutineScope(Dispatchers.Unconfined),
+                engine = { error("Bottom bar layout should never request translation") },
+                ownerCurrent = { true },
+            )
         var windowHeight = 0.dp
         composeRule.setContent {
             windowHeight = LocalWindowInfo.current.containerDpSize.height
@@ -66,9 +77,17 @@ class ConversationTabletopTest {
             CompositionLocalProvider(LocalWindowFolds provides folds) {
                 Column(Modifier.fillMaxSize().padding(bottom = frozenIme.value)) {
                     Box(Modifier.weight(1f).fillMaxWidth().testTag(MESSAGES))
-                    ConversationBottomBarFrame(routeMorph = null, bottomPadding = frozenIme.value) {
+                    ConversationBottomBarFrame(
+                        routeMorph = null,
+                        bottomPadding = frozenIme.value,
+                        translation = translation,
+                    ) {
                         val identity = remember { Any() }
-                        SideEffect { if (identities.lastOrNull() !== identity) identities += identity }
+                        val suppliedTranslation = LocalConversationTranslation.current
+                        SideEffect {
+                            assertSame(translation, suppliedTranslation)
+                            if (identities.lastOrNull() !== identity) identities += identity
+                        }
                         Box(Modifier.fillMaxWidth().height(COMPOSER_HEIGHT).testTag(COMPOSER))
                     }
                 }

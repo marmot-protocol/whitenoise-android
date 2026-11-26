@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatHistoryBackupHint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
+        "anchor": "fun ChatHistoryBackupHint(",
+        "test_ids": [
+          "SET-073"
+        ]
+      },
+      {
+        "surface": "ChatHistoryBackupHintCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
+        "anchor": "fun ChatHistoryBackupHintCard(",
+        "test_ids": [
+          "SET-073"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Chat Info history backup hint: R.string.history_backups_chat_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatHistoryBackupHint.kt",
+        "anchor": "R.string.history_backups_chat_hint",
+        "test_ids": [
+          "SET-073"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

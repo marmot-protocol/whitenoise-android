@@ -30,10 +30,10 @@ import kotlin.math.floor
  * The optional header buttons chosen in Chat header settings, in the order the person picked them. Each one
  * calls the same handler as its chat details action. A null handler hides its button: [muteControl] and
  * [readAloudOn] while the chat's account is not the active one (and [readAloudOn] without a usable speech
- * engine), [onTimer] unless this person may change the timer now, [onMembers] in a direct message and
- * [onAddMembers] unless this person may add members. Buttons use the composer's compact pitch, so their
- * 48dp touch targets overlap the same way and more fit beside the title. Only the first [capacity] buttons
- * that can show appear, so the chat name always keeps its room; see [headerShortcutCapacity].
+ * engine), [onMembers] in a direct message and [onAddMembers] unless this person may add members. Buttons
+ * use the composer's compact pitch, so their 48dp touch targets overlap the same way and more fit beside the
+ * title. Only the first [capacity] buttons that can show appear, so the chat name always keeps its room; see
+ * [headerShortcutCapacity].
  */
 @Composable
 internal fun RowScope.ConversationHeaderShortcuts(
@@ -43,7 +43,6 @@ internal fun RowScope.ConversationHeaderShortcuts(
     onSearch: () -> Unit,
     readAloudOn: Boolean? = null,
     onToggleReadAloud: () -> Unit = {},
-    onTimer: (() -> Unit)? = null,
     onMembers: (() -> Unit)? = null,
     onAddMembers: (() -> Unit)? = null,
 ) {
@@ -62,14 +61,6 @@ internal fun RowScope.ConversationHeaderShortcuts(
                     R.string.tts_auto_read_title,
                     onToggleReadAloud,
                     checked = on,
-                )
-            },
-            onTimer?.let {
-                HeaderAction(
-                    HeaderShortcut.DisappearingTimer,
-                    R.drawable.ic_timer,
-                    R.string.conversation_header_timer_change,
-                    it,
                 )
             },
             onMembers?.let {
@@ -141,7 +132,6 @@ private fun headerShortcutTag(shortcut: HeaderShortcut): String =
         HeaderShortcut.Search -> CONVERSATION_HEADER_SEARCH_TAG
         HeaderShortcut.MuteUnmute -> CONVERSATION_HEADER_MUTE_TAG
         HeaderShortcut.ReadAloud -> CONVERSATION_HEADER_READ_ALOUD_TAG
-        HeaderShortcut.DisappearingTimer -> CONVERSATION_HEADER_TIMER_TAG
         HeaderShortcut.Members -> CONVERSATION_HEADER_MEMBERS_TAG
         HeaderShortcut.AddMembers -> CONVERSATION_HEADER_ADD_MEMBERS_TAG
     }
@@ -149,6 +139,5 @@ private fun headerShortcutTag(shortcut: HeaderShortcut): String =
 internal const val CONVERSATION_HEADER_SEARCH_TAG = "conversation.header.shortcut.search"
 internal const val CONVERSATION_HEADER_MUTE_TAG = "conversation.header.shortcut.mute"
 internal const val CONVERSATION_HEADER_READ_ALOUD_TAG = "conversation.header.shortcut.readAloud"
-internal const val CONVERSATION_HEADER_TIMER_TAG = "conversation.header.shortcut.timer"
 internal const val CONVERSATION_HEADER_MEMBERS_TAG = "conversation.header.shortcut.members"
 internal const val CONVERSATION_HEADER_ADD_MEMBERS_TAG = "conversation.header.shortcut.addMembers"

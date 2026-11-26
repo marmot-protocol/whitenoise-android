@@ -2376,6 +2376,27 @@
     <string name="setup_details">Details</string>
     <string name="setup_hide_details">Hide details</string>
     <string name="setup_opening_chats">Opening your chats…</string>
+    <!-- Account setup: what a relay or key step is for, what went wrong and the next action. Each is a full sentence; a problem and a next step may show together. -->
+    <string name="setup_purpose_relays">Other Nostr apps use these relays to find your profile and posts.</string>
+    <string name="setup_purpose_inbox_relays">Inbox relays are where people send you chat invitations.</string>
+    <string name="setup_purpose_key_package">Messaging keys let people start encrypted chats with you.</string>
+    <string name="setup_problem_check_incomplete">Some relays didn’t answer, so this check couldn’t finish.</string>
+    <string name="setup_problem_no_usable_route">The relays on this list could not be used.</string>
+    <string name="setup_problem_check_failed">This check couldn’t finish.</string>
+    <string name="setup_problem_unusable">The list for this account can’t be used as it is.</string>
+    <string name="setup_problem_save_refused">The final relay check couldn’t finish. Your changes weren’t saved or published.</string>
+    <string name="setup_problem_save_not_published">Your changes weren’t saved or published.</string>
+    <string name="setup_problem_save_record_changed">Your changes weren’t saved because the relay list changed. Nothing was published.</string>
+    <string name="setup_problem_publication_failed">We couldn’t finish publishing your change.</string>
+    <string name="setup_problem_keys_failed">Your messaging keys couldn’t be published.</string>
+    <string name="setup_next_retry">Try again.</string>
+    <string name="setup_next_retry_then_review">Try again. If that doesn’t work, review the suggested changes.</string>
+    <string name="setup_next_retry_then_edit">Try again. If that doesn’t work, edit your relays.</string>
+    <string name="setup_next_review">Review the suggested changes. Nothing is published until you save.</string>
+    <string name="setup_next_edit">Edit your relays. Nothing is published until you save.</string>
+    <string name="setup_next_remove">Remove the retired relay. Nothing is published until you save.</string>
+    <string name="setup_next_remove_unusable">Remove the relays that can’t be used. Nothing is published until you save.</string>
+    <string name="setup_passed_warning">Setup continued, but these relays had a problem.</string>
     <string name="tts_read_from_sentence">Read from this sentence</string>
     <string name="tts_choose_sentence">Choose sentence to read</string>
     <string name="tts_bar_preparing">Preparing speech…</string>
