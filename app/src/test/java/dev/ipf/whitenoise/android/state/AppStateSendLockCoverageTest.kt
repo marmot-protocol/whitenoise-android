@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -500,6 +501,22 @@ class AppStateSendLockCoverageTest {
                 .substringAfter("LaunchedEffect(")
                 .substringBefore(")")
 
+        assertEquals(
+            "saved restoration restarts only when its ownership or retry changes",
+            "controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration",
+            savedRestoreKeys,
+        )
+        assertTrue("saved restoration retries only while active", "while (isCurrent())" in savedRestore)
+        assertTrue(
+            "saved restoration commits the measured position",
+            "owner.commitInitialPosition(position," in savedRestore,
+        )
+        assertTrue(
+            "saved restoration measures its anchor",
+            "viewport.initialAnchorLayout(position.index)" in savedRestore,
+        )
+        assertTrue("saved restoration retries on a new frame", "withFrameNanos { }" in savedRestore)
+
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",
             "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
@@ -508,11 +525,6 @@ class AppStateSendLockCoverageTest {
                 "ConversationViewportStructureEffect(" in source &&
                 "coordinator.commitInitialAnchor(" in owner &&
                 "coordinator.commitInitialTailAnchor(" in owner &&
-                savedRestoreKeys == "controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration" &&
-                "while (isCurrent())" in savedRestore &&
-                "owner.commitInitialPosition(position," in savedRestore &&
-                "viewport.initialAnchorLayout(position.index)" in savedRestore &&
-                "withFrameNanos { }" in savedRestore &&
                 "reanchorGate.commit(" in owner &&
                 "reanchorGate.onStructure(" in owner &&
                 "anchored && changed" in owner &&

@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -83,13 +85,14 @@ class AgentSessionControlsScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithText("Session controls").performClick()
+        // Activate each disclosure without a pressed ripple in the snapshot.
+        composeRule.onNodeWithText("Session controls").performSemanticsAction(SemanticsActions.OnClick)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/agent_session_controls_$suffix.png")
         composeRule.onNodeWithText(newValue).assertDoesNotExist()
         val disclosure = composeRule.onNodeWithText(settingLabel)
         val collapsed = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed")
         val expanded = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded")
-        disclosure.assert(collapsed).performClick().assert(expanded)
+        disclosure.assert(collapsed).performSemanticsAction(SemanticsActions.OnClick).assert(expanded)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/agent_session_setting_choices_$suffix.png")
         composeRule.onNodeWithText(newValue).performClick()
         disclosure.assert(collapsed)
