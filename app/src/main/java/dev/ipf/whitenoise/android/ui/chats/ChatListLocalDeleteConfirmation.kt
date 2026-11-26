@@ -20,8 +20,8 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 
 /** Hosts the local-delete review for the request captured by the chat list. */
-@Suppress("LongParameterList") // Keep the request, busy chats and selection owned by the caller.
 @Composable
+@Suppress("FunctionNaming", "LongParameterList") // Compose naming and explicit caller-owned state.
 internal fun ChatListLocalDeleteConfirmation(
     appState: WhiteNoiseAppState,
     controller: ChatsController,

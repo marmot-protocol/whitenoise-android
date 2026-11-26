@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteScope
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun BatchMessageDeleteConfirmation(
     selectedCount: Int,
     breakdown: BatchDeleteBreakdown,
@@ -25,6 +26,7 @@ internal fun BatchMessageDeleteConfirmation(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun MessageBubbleDeleteConfirmation(
     surfaces: MessageBubbleSurfaceState,
     capability: MessageDeleteCapability,
