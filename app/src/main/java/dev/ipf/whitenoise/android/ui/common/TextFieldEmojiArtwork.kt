@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import android.content.ClipData
+import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -18,7 +19,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -60,8 +60,6 @@ import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerEmojiDeletion
 import dev.ipf.whitenoise.android.ui.rememberEmojiArtPainter
 import dev.ipf.whitenoise.android.ui.withSpokenEmojiNames
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 private val shortcodeSlotStyle by lazy {
     // A monospace colon provides the advance for the artwork. Scale it to one em.
@@ -259,10 +257,9 @@ internal fun emojiEditableText(
     layout: TextLayoutHolder,
 ): Modifier {
     val custom = LocalCustomEmoji.current
-    val resources = LocalContext.current.resources
+    val context = LocalContext.current
+    val resources = context.resources
     val measurer = rememberTextMeasurer(cacheSize = 2)
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
     return Modifier.semantics {
         val authored = AnnotatedString(state.text.toString())
         editableText = authored.withSpokenEmojiNames(custom, resources)
@@ -281,8 +278,8 @@ internal fun emojiEditableText(
             }
         }
         if (enabled) {
-            copyText { copyAuthoredSelection(state, clipboard, scope, cut = false) }
-            if (!readOnly) cutText { copyAuthoredSelection(state, clipboard, scope, cut = true) }
+            copyText { copyAuthoredSelection(state, context, cut = false) }
+            if (!readOnly) cutText { copyAuthoredSelection(state, context, cut = true) }
         }
     }
 }
@@ -316,18 +313,17 @@ private fun TextMeasurer.authoredLayout(
 
 private fun copyAuthoredSelection(
     state: TextFieldState,
-    clipboard: Clipboard,
-    scope: CoroutineScope,
+    context: Context,
     cut: Boolean,
 ): Boolean {
     val selected = state.selection
     if (selected.collapsed) return false
-    val text = state.text.subSequence(selected.min, selected.max)
+    val text = state.text.subSequence(selected.min, selected.max).toString()
+    if (!copyToClipboard(context, "plain text", text)) return false
     state.edit {
         if (cut) replace(selected.min, selected.max, "")
         selection = TextRange(if (cut) selected.min else selected.max)
     }
-    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("plain text", text))) }
     return true
 }
 

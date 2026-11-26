@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.genericNotificationShortcut
 import dev.ipf.whitenoise.android.notifications.isConversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
 import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTitle
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -306,7 +307,6 @@ class ShareShortcutPublisher(
      * downgrading them, and applies the ranked list in one [setDynamicShortcuts]
      * call so recency is not reversed by per-item pushes.
      */
-    @Suppress("LongMethod") // Selection and final privacy-gated publication form one platform operation.
     fun publish(
         accountRef: String,
         chats: List<ChatListItem>,
@@ -319,6 +319,23 @@ class ShareShortcutPublisher(
         chats: List<ChatListItem>,
         isCurrent: () -> Boolean,
         displayTitle: (ChatListItem) -> String,
+    ) = publish(accountRef, chats, isCurrent, displayTitle) {}
+
+    /** Prepare both active and platform-readback titles before entering the publication lock. */
+    internal suspend fun publishWithEmojiLabels(
+        accountRef: String,
+        chats: List<ChatListItem>,
+        isCurrent: () -> Boolean,
+        displayTitle: (ChatListItem) -> String,
+    ) = publish(accountRef, chats, isCurrent, displayTitle) { labels -> context.prepareEmojiLabels(labels) }
+
+    @Suppress("LongMethod") // Selection and final privacy-gated publication form one platform operation.
+    private inline fun publish(
+        accountRef: String,
+        chats: List<ChatListItem>,
+        isCurrent: () -> Boolean,
+        noinline displayTitle: (ChatListItem) -> String,
+        prepareLabels: (List<String>) -> Unit,
     ) {
         val publicationGeneration = PinnedConversationTokens.captureRequest()
         if (accountRef.isBlank() || !isCurrent()) return
@@ -333,6 +350,11 @@ class ShareShortcutPublisher(
                 if (changed) target.copy(avatarBitmap = bitmap, avatarUrl = null, localContactAvatar = true) else target
             }
         val existingById = existingShortcuts().associateBy { it.id }
+        val readbackLabels =
+            existingById.values.mapNotNull { shortcut ->
+                shortcut.longLabel?.toString()?.takeIf { isConversationShortcutId(shortcut.id) }
+            }
+        prepareLabels(candidates.map { it.title } + readbackLabels)
         synchronized(UserEventNotificationGroup.mutationLock) {
             if (!isCurrent()) return@synchronized
             if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return@synchronized

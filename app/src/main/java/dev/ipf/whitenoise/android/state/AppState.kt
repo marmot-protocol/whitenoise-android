@@ -2916,9 +2916,8 @@ class WhiteNoiseAppState private constructor(
         shareShortcutPublishJob =
             mutationsScope.launch {
                 runCatchingCancellable {
-                    appContext.prepareEmojiLabels(shareTitles.values)
                     withContext(Dispatchers.IO) {
-                        shareShortcutPublisher.publish(
+                        shareShortcutPublisher.publishWithEmojiLabels(
                             accountRef,
                             chats,
                             {

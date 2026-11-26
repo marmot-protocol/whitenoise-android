@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.InterceptPlatformTextInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -40,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -240,6 +243,36 @@ class TextFieldEmojiArtworkTest {
                     ?.toString()
             assertEquals("\u2066", copied)
             assertEquals(authored.removeRange(1, 2), state.text.toString())
+        }
+    }
+
+    @Test
+    fun aFailedAccessibilityCutPreservesTextAndSelection() {
+        val authored = "Work :party:"
+        val state = TextFieldState(authored)
+        val selection = TextRange(5, authored.length)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val context =
+                    object : ContextWrapper(LocalContext.current) {
+                        override fun getSystemService(name: String): Any? {
+                            if (name == Context.CLIPBOARD_SERVICE) return null
+                            return super.getSystemService(name)
+                        }
+                    }
+                CompositionLocalProvider(LocalContext provides context, LocalCustomEmoji provides localEmoji()) {
+                    WhiteNoiseTextField(state = state, modifier = Modifier.testTag(FIELD), emojiAction = true)
+                }
+            }
+        }
+        val field = composeRule.onNodeWithTag(FIELD)
+        field.performClick()
+        composeRule.runOnIdle { state.edit { this.selection = selection } }
+        field.performSemanticsAction(SemanticsActions.CutText) { action -> assertFalse(action()) }
+
+        composeRule.runOnIdle {
+            assertEquals(authored, state.text.toString())
+            assertEquals(selection, state.selection)
         }
     }
 

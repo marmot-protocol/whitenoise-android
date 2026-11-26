@@ -14,7 +14,7 @@ import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import kotlinx.coroutines.CancellationException
 
 /** Writes public [text] to the clipboard without any feedback; false when the system refuses the clip. */
-private fun copyToClipboard(
+internal fun copyToClipboard(
     context: Context,
     label: String,
     text: String,
