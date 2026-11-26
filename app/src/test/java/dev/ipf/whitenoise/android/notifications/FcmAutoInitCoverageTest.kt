@@ -90,10 +90,14 @@ class FcmAutoInitCoverageTest {
         assertTrue("only callers that ask enable it", fetch.contains(conditional))
         val forAccounts = sync.functionBody("syncNativePushRegistrationForAccountsLocked")
         assertTrue(forAccounts.contains("val autoInitDeferred = uncommittedNativePushEnables.get() > 0"))
-        val deferredRetry = "if (autoInitDeferred) recordPendingRegistrationSync()"
+        val deferredRetry = "val retryStored = !autoInitDeferred || recordPendingRegistrationSync()"
         assertTrue("a deferred sync records its retry", deferredRetry in forAccounts)
         assertTrue("an open enable defers auto-init", forAccounts.contains("enableAutoInit = !autoInitDeferred"))
-        assertTrue("and keeps the pending marker", forAccounts.contains("autoInitDeferred ||"))
+        val acknowledge = sync.functionBody("acknowledgeRegistrationSyncUnlessUnsettled")
+        val unsettled = "if (autoInitDeferred || fcmAutoInitWriteFailed.get()) return true"
+        assertTrue("and keeps the pending marker", unsettled in acknowledge)
+        val acknowledged = "acknowledgeRegistrationSyncUnlessUnsettled(token, autoInitDeferred, operationIsCurrent)"
+        assertTrue(acknowledged in forAccounts)
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)
         assertTrue("auto-init must be enabled before the token read", enable < read)
         assertEquals(2, Regex("""\breadFcmTokenFromSdk\b""").findAll(sync).count())
@@ -194,9 +198,11 @@ class FcmAutoInitCoverageTest {
         assertTrue(select.contains("settleFcmAutoInitAfterFailedSelection()"))
         val commit = autoInit.functionBody("commitFcmAutoInitAfterEnable")
         assertTrue(commit.contains("nativePushSyncMutex.withLock"))
-        val superseded = commit.substringAfter("if (!isCurrent()) {").substringBefore("return@withLock")
-        assertTrue("a superseded commit leaves a sync pending", "recordPendingRegistrationSync()" in superseded)
-        assertTrue(commit.contains("NativePushDemand.Required -> applyFcmAutoInit(enabled = true)"))
+        val superseded = "if (!isCurrent()) return@withLock recordPendingRegistrationSync()"
+        assertTrue("a superseded commit leaves a sync pending", superseded in commit)
+        assertTrue("an unsettled commit fails the selection", "return selected.getOrThrow() && settled" in select)
+        val required = commit.substringAfter("NativePushDemand.Required -> {").substringBefore("}")
+        assertTrue("Push demand turns auto-init on", required.contains("applyFcmAutoInit(enabled = true)"))
         val toggle = appModuleSource(PUSH_CLEARS).functionBody("setNativePushEnabledSettlingAutoInit")
         assertTrue(toggle.contains("if (enabled) uncommittedNativePushEnables.incrementAndGet()"))
         assertTrue("only a confirmed enable commits", toggle.contains("if (enabled && changed) commitFcmAutoInit"))

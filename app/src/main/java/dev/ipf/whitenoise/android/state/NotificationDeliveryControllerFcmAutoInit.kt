@@ -138,17 +138,19 @@ internal suspend inline fun NotificationDeliveryController.settlingFcmAutoInitOn
  * enable, under the native sync lock: on when a loaded account uses native push, off when none does, for
  * example after reconciliation with rendering off. When the enable is no longer [isCurrent], because a newer
  * change took over, or demand is unreadable, it records the pending registration sync, so the next sync
- * settles auto-init from live demand even if the newer change fails before touching it.
+ * settles auto-init from live demand even if the newer change fails before touching it. Returns false only
+ * when that retry could not be stored, so the change does not report success with auto-init unsettled.
  */
-internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable(isCurrent: () -> Boolean) {
-    nativePushSyncMutex.withLock {
-        if (!isCurrent()) {
-            recordPendingRegistrationSync()
-            return@withLock
-        }
+@Suppress("MaxLineLength")
+internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable(isCurrent: () -> Boolean): Boolean {
+    return nativePushSyncMutex.withLock {
+        if (!isCurrent()) return@withLock recordPendingRegistrationSync()
         when (disableFcmAutoInitWithoutLoadedNativeDemand()) {
-            NativePushDemand.Required -> applyFcmAutoInit(enabled = true)
-            NativePushDemand.None -> Unit
+            NativePushDemand.Required -> {
+                applyFcmAutoInit(enabled = true)
+                true
+            }
+            NativePushDemand.None -> true
             NativePushDemand.Unknown, null -> recordPendingRegistrationSync()
         }
     }

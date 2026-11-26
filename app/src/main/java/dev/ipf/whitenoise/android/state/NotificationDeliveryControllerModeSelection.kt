@@ -81,14 +81,17 @@ internal suspend fun NotificationDeliveryController.selectFcmDelivery(
         } finally {
             uncommittedNativePushEnables.decrementAndGet()
         }
-    withContext(NonCancellable) {
-        if (selected.getOrNull() == true) {
-            commitFcmAutoInitAfterEnable { ownsNotificationDeliveryMode(owner) }
-        } else {
-            settleFcmAutoInitAfterFailedSelection()
+    val settled =
+        withContext(NonCancellable) {
+            if (selected.getOrNull() == true) {
+                commitFcmAutoInitAfterEnable { ownsNotificationDeliveryMode(owner) }
+            } else {
+                settleFcmAutoInitAfterFailedSelection()
+                true
+            }
         }
-    }
-    return selected.getOrThrow()
+    // A committed cutover that could neither settle auto-init nor store its retry does not report success.
+    return selected.getOrThrow() && settled
 }
 
 /** Registers every notification-enabled account before the device-wide persistent path is stopped. */

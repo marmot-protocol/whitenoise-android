@@ -103,13 +103,13 @@ private suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutNati
 
 /**
  * Records the durable pending registration sync, which the next sync, at the latest on the next app start,
- * acknowledges once it has settled registration and auto-init. A storage failure is ignored.
+ * acknowledges once it has settled registration and auto-init. Returns whether the marker was stored, so a
+ * caller that must not report success without it can check, and never throws on a storage failure.
  */
-internal suspend fun NotificationDeliveryController.recordPendingRegistrationSync() {
+internal suspend fun NotificationDeliveryController.recordPendingRegistrationSync(): Boolean =
     withContext(NonCancellable + pushWakeStorageDispatcher) {
-        runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }
+        runCatching { pushTokenStore.recordPendingNativePushRegistrationSync() }.isSuccess
     }
-}
 
 /**
  * Turns native push on or off for one account, confirming an enablement only once its registration is in
@@ -135,8 +135,8 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
             } finally {
                 if (enabled) uncommittedNativePushEnables.decrementAndGet()
             }
-        if (enabled && changed) commitFcmAutoInitAfterEnable { true }
-        return changed
+        // A confirmed enable reports success only once auto-init is set or its retry is stored.
+        return if (enabled && changed) commitFcmAutoInitAfterEnable { true } else changed
     } catch (cancelled: CancellationException) {
         // A cancelled enable may have left native push on without a registration, before its rollback or
         // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on

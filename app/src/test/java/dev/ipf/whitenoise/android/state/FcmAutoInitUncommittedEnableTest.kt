@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.state
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
+import dev.ipf.whitenoise.android.notifications.KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
@@ -202,10 +204,12 @@ class FcmAutoInitUncommittedEnableTest {
                 store.clearPendingNativePushRegistrationSync()
                 platform.autoInitWrites.clear()
 
-                fixture.runWithMainLooperPumping {
-                    fixture.appState.notificationDelivery.commitFcmAutoInitAfterEnable { false }
-                }
+                val settled =
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.notificationDelivery.commitFcmAutoInitAfterEnable { false }
+                    }
 
+                assertTrue("a stored retry settles the commit", settled)
                 assertTrue("the next sync must settle auto-init", store.nativePushRegistrationSyncPending())
                 assertTrue("a superseded commit writes nothing", platform.autoInitWrites.isEmpty())
             } finally {
@@ -252,6 +256,88 @@ class FcmAutoInitUncommittedEnableTest {
             }
         }
 
+    /**
+     * A deferred sync that cannot store its pending-sync marker still registers a committed Push account for a
+     * rotated token, but reports failure, so the open enable cannot confirm on it.
+     */
+    @Test
+    fun deferredSyncWithUnstoredMarkerReportsFailure() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, false)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val token = AtomicReference(TOKEN)
+            val fixture = fixture(platform, activeNative = true) { token.get() }
+            try {
+                fixture.bootstrap()
+                fixture.replacePushTokenStore(markerRejectingStore())
+                token.set(ROTATED_TOKEN)
+                platform.autoInitWrites.clear()
+                val delivery = fixture.appState.notificationDelivery
+
+                delivery.uncommittedNativePushEnables.incrementAndGet()
+                try {
+                    val appState = fixture.appState
+                    val synced = fixture.runWithMainLooperPumping { appState.syncNativePushRegistrationIfEnabled() }
+                    assertFalse("a deferred sync without its marker must not report success", synced)
+                } finally {
+                    delivery.uncommittedNativePushEnables.decrementAndGet()
+                }
+
+                assertTrue("a committed account registers the new token", ROTATED_TOKEN in fixture.upsertedPushTokens)
+                assertTrue("an open enable defers auto-init", platform.autoInitWrites.isEmpty())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A superseded commit that cannot store its retry reports that auto-init is unsettled. */
+    @Test
+    fun supersededCommitWithUnstoredRetryReportsUnsettled() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform) { TOKEN }
+            try {
+                fixture.bootstrap()
+                fixture.replacePushTokenStore(markerRejectingStore())
+                platform.autoInitWrites.clear()
+
+                val settled =
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.notificationDelivery.commitFcmAutoInitAfterEnable { false }
+                    }
+
+                assertFalse("a commit without its retry must not report success", settled)
+                assertTrue("a superseded commit writes nothing", platform.autoInitWrites.isEmpty())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A push store whose pending-registration-sync marker never commits, while every other write does. */
+    private fun markerRejectingStore(): PushTokenStore {
+        val preferences = context.getSharedPreferences("deferred-marker-rejected", Context.MODE_PRIVATE)
+        return PushTokenStore(
+            object : SharedPreferences by preferences {
+                override fun edit(): SharedPreferences.Editor {
+                    val editor = preferences.edit()
+                    var markerWritten = false
+                    return object : SharedPreferences.Editor by editor {
+                        override fun putBoolean(
+                            key: String?,
+                            value: Boolean,
+                        ): SharedPreferences.Editor {
+                            if (key == KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC) markerWritten = true
+                            editor.putBoolean(key, value)
+                            return this
+                        }
+
+                        override fun commit(): Boolean = !markerWritten && editor.commit()
+                    }
+                }
+            },
+        )
+    }
+
     /** Builds two local-signing accounts behind [platform], the active one on native push when [activeNative]. */
     private fun fixture(
         platform: RecordingNativePushFallbackPlatform,
@@ -280,6 +366,7 @@ class FcmAutoInitUncommittedEnableTest {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
         const val TOKEN = "test-token"
+        const val ROTATED_TOKEN = "rotated-token"
         val CONFIG = PushServerConfig("0".repeat(64), null)
     }
 }
