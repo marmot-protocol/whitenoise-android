@@ -66,6 +66,7 @@ class ChatHeaderSettingsScreenTest {
             .performScrollTo()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
             .performClick()
+        rule.onNodeWithTag("chatHeader.disappearing").assertDoesNotExist()
         assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud), toggled)
     }
 

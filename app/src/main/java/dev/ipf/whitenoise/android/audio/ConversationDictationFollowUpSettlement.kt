@@ -92,6 +92,7 @@ internal fun ConversationDictationController.promoteFollowUp(previousDelivered: 
                 queuedTarget.groupIdHex,
                 draft.value,
                 queuedTarget.replyToMessageIdHex,
+                queuedTarget.outgoingTranslation,
             )
         }
         return

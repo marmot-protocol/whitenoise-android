@@ -3,21 +3,23 @@ name: presentation-setup-inbox-edit-failure
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible: Account setup
-- assertVisible:
-    id: setup-open-chats
-    enabled: false
+- scrollUntilVisible:
+    element:
+      id: setup-details
+    direction: DOWN
 - tapOn:
-    id: setup-open-chats
-- assertVisible: Account setup
-- tapOn:
-    id: setup-step-INBOX_RELAYS
+    id: setup-details
+- scrollUntilVisible:
+    element:
+      id: setup-action-EDIT_DISCOVERY_RELAYS
+    direction: DOWN
 - tapOn:
     id: setup-action-EDIT_DISCOVERY_RELAYS
 - assertVisible: Discovery relays
 - assertVisible: Check these discovery relays
 - tapOn:
     id: setup-editor-save
-- assertVisible: The connection or operation stopped. Your saved progress is safe.
+- assertVisible: Setup stopped. Resume to try again.
 - assertVisible: Discovery relays
 - tapOn: Cancel
 - back

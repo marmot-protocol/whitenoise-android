@@ -7,8 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.updateMessageRetention
 
 /** Whether this person may change the group's settings, including the disappearing-messages timer. */
 internal val ConversationController.canEditGroupSettings: Boolean
@@ -42,9 +40,9 @@ internal fun disappearingPickOutcome(
     }
 
 /**
- * The disappearing-messages sheet, shared by chat details and the header timer. A pick that prunes history asks
- * inside the same sheet; everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop
- * the open sheet and any pending confirmation on account/runtime change.
+ * The disappearing-messages sheet for chat details. A pick that prunes history asks inside the same sheet;
+ * everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop the open sheet and
+ * any pending confirmation on account/runtime change.
  */
 @Composable
 @Suppress("LongParameterList")
@@ -79,19 +77,4 @@ internal fun DisappearingTimerEditor(
             )
         }
     }
-}
-
-/**
- * Header timer apply path: the same retention command details runs, behind the same lock and owner fences.
- * Does nothing when another mutation or an account/runtime change makes the pick stale.
- */
-internal fun ConversationController.applyDisappearingTimer(
-    appState: WhiteNoiseAppState,
-    reviewedRuntime: Int,
-    secs: Long,
-) {
-    if (mutationInFlight || !isCurrentGroupMutationOwner(appState, reviewedRuntime)) return
-    clearLastMutationError()
-    val controller = this
-    appState.launchMutation { controller.updateMessageRetention(secs.toULong()) }
 }

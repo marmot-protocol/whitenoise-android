@@ -100,8 +100,9 @@ class WorkManagerStartupInitializationTest {
         assertEquals(2, invocations.get())
     }
 
+    /** Checks that cold startup schedules backups, even before an account opens History backups. */
     @Test
-    fun periodicWorkInitializationRegistersBothUniqueWorks() {
+    fun periodicWorkInitializationRegistersExpectedUniqueWork() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
@@ -115,6 +116,7 @@ class WorkManagerStartupInitializationTest {
         scope.advanceUntilIdle()
 
         val workManager = WorkManager.getInstance(context)
+        assertEquals(1, workManager.getWorkInfosForUniqueWork("history_backup").get().size)
         assertEquals(1, workManager.getWorkInfosForUniqueWork("disappearing_message_sweep").get().size)
         assertEquals(
             if (BuildConfig.SELF_UPDATE_ENABLED) 1 else 0,

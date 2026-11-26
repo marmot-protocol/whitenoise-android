@@ -56,7 +56,7 @@ class DisappearingMessageSweepWorkerTest {
             val worker =
                 buildWorkerWithSweepOverride(
                     sweepOverride = { sweepCalls++ },
-                    accountOverride = { needsRetentionSweep(emptyList()) },
+                    accountOverride = { hasSignedInAccount(emptyList()) },
                 )
 
             assertNull(application.initializedAppState())
@@ -74,7 +74,7 @@ class DisappearingMessageSweepWorkerTest {
                 buildWorkerWithSweepOverride(
                     sweepOverride = { sweepCalls++ },
                     accountOverride = {
-                        needsRetentionSweep(
+                        hasSignedInAccount(
                             listOf(
                                 account(signedOut = true),
                                 account(label = "read-only", localSigning = false),
@@ -101,7 +101,7 @@ class DisappearingMessageSweepWorkerTest {
                     accountOverride = {
                         assertNull(application.initializedAppState())
                         calls += "inventory"
-                        needsRetentionSweep(listOf(account(localSigning = false, externalSigning = true)))
+                        hasSignedInAccount(listOf(account(localSigning = false, externalSigning = true)))
                     },
                 )
 

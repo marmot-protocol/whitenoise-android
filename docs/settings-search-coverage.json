@@ -389,6 +389,10 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt": {
       "controls": [
         {
+          "declaration": "\"history_backups\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
           "declaration": "\"manage_storage\"",
           "represented_by": "Data.manage_storage"
         },
@@ -861,6 +865,22 @@
         }
       ]
     },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"status\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"new_words\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"retry\"",
+          "represented_by": "home.HistoryBackups"
+        }
+      ]
+    },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt": {
       "controls": [
         {
@@ -995,6 +1015,9 @@
     },
     "NotificationDelivery": {
       "catalog_id": "home.NotificationDelivery"
+    },
+    "HistoryBackups": {
+      "catalog_id": "home.HistoryBackups"
     },
     "VoiceNotes": {
       "catalog_id": "home.VoiceNotes"

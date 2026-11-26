@@ -13,6 +13,29 @@ UI change, and the source file size ratchet. Before queueing, rebase onto the
 current `master`, re-record affected screenshots and check the combination with
 the entries already queued. Queue overlapping UI series one PR at a time.
 
+## Planning overlapping PRs
+
+The advisory `PR merge order` workflow checks a pull request when it opens,
+gets new commits, changes base or review state, including drafts. It compares
+changed paths across open PRs targeting `master` and tries cumulative squash
+merges from a pinned base. Open **Actions** and select the **PR merge order** run
+named for the PR number. Its summary shows the longest clean order it found and
+the conflict paths for any PR that should wait. When several orders can land the
+same number of PRs, it prefers ready PRs, then lower PR numbers.
+
+The scan includes up to 100 open PRs. Each plan includes the triggering PR and
+up to four direct overlaps, with shared app code and Roborazzi baselines taking
+priority. The summary lists any coverage limits. While the workflow runs, a
+change to the selected candidates triggers one new simulation on the same base.
+Unrelated PR changes do not invalidate the plan. After a preceding PR lands
+or a peer branch moves, rerun `PR merge order` from the Actions tab on
+`master` with the relevant PR number to refresh the plan.
+
+Use the recommendation to agree on the landing order before queueing. If a PR
+should wait, update it from `master` after the recommended series lands.
+The workflow checks Git conflicts. Queue CI validates combined behavior,
+screenshot baselines and the source file size limits.
+
 ## CI contract
 
 `android-ci.yml`, `android-release-runtime.yml`, `android-repro-verify.yml` and

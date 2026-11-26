@@ -465,6 +465,15 @@ internal class FakeSetupClient(
     /** Returns fixture metadata for field-preservation tests. */
     override suspend fun profile(): UserProfileMetadataFfi? = metadata
 
+    override suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ): OnboardingSnapshotFfi? {
+        val latest = snapshot()
+        val allowed = stillAllowed() && latest.allowsAutomaticRetry(SETUP_TEST_ACCOUNT, request)
+        return if (allowed) execute(request) else latest
+    }
+
     /** Uses the existing scripted proposal response while recording a distinct preview-only call. */
     override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi =
         checkNotNull(execute(SetupRequest(current.revision, step, OnboardingActionFfi.USE_RECOMMENDED_RELAYS)))

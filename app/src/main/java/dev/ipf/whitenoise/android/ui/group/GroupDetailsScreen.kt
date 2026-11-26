@@ -1790,13 +1790,11 @@ internal fun GroupDetailsScreen(
                     }
                     controller.lastMutationError?.let { error ->
                         Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
-                            GroupMutationErrorBanner(
-                                error = error,
-                                onDismiss = { controller.clearLastMutationError() },
-                            )
+                            GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
                         }
                     }
                     leaveBlockedNotice(Modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
+                    ChatHistoryBackupHint(appState, controller)
 
                     memberContent()
 
