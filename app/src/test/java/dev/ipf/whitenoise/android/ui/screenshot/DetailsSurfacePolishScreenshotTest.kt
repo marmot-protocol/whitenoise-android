@@ -189,8 +189,7 @@ class DetailsSurfacePolishScreenshotTest {
     fun transferAdminPickerLight() = captureTransferAdmin("transfer_admin_picker_light.png")
 
     @Test
-    fun transferAdminPickerLargeRtlAmoled() =
-        captureTransferAdmin("transfer_admin_picker_large_rtl_amoled.png", largeRtl = true)
+    fun transferAdminLargeRtl() = captureTransferAdmin("transfer_admin_picker_large_rtl_amoled.png", largeRtl = true)
 
     private fun captureTransferAdmin(
         snapshot: String,
