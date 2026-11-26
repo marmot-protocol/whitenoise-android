@@ -125,7 +125,8 @@ internal fun canReadCollectionUri(
 
 /** Whether an operation deserves a panel: several chunks, or any state the user must act on. */
 internal fun AttachmentCollectionOperation.needsPanel(): Boolean =
-    chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED
+    phase != CollectionOperationPhase.FINISHED &&
+        (chunks.size > 1 || phase == CollectionOperationPhase.BLOCKED || phase == CollectionOperationPhase.PAUSED)
 
 /**
  * The composer-side progress panel for one collection send: aggregate `sent / total` with a monotonic bar,
@@ -200,7 +201,9 @@ private fun AttachmentCollectionActionRow(
         when {
             operation.phase == CollectionOperationPhase.PAUSED -> {
                 TextButton(onClick = actions.onResume) { Text(stringResource(R.string.attachment_collection_resume)) }
-                TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                if (operation.canDiscard) {
+                    TextButton(onClick = actions.onDiscard) { Text(stringResource(R.string.discard)) }
+                }
             }
             blocked != null -> {
                 TextButton(onClick = { actions.onRetryChunk(blocked.id) }) { Text(stringResource(R.string.retry)) }

@@ -50,12 +50,20 @@ internal enum class CollectionChunkState {
         get() = this == ACCEPTED || this == CANCELLED || this == SKIPPED
 }
 
+/** Native identity and media type of an operation-owned copy of a stored draft file. */
+internal data class CollectionStoredDraft(
+    val attachmentId: String,
+    val byteCount: Long,
+    val mediaType: String,
+)
+
 /** One staged occurrence: [id] is the composer's stable occurrence id, so duplicate URIs stay distinct. */
 internal data class CollectionItem(
     val id: String,
     val uri: String,
     val kind: CollectionItemKind,
     val state: CollectionItemState = CollectionItemState.QUEUED,
+    val storedDraft: CollectionStoredDraft? = null,
 )
 
 /**
@@ -172,6 +180,7 @@ internal data class AttachmentCollectionOperation(
     val paused: Boolean = false,
     val unrecoverableItemIds: Set<String> = emptySet(),
     val cancelRequested: Boolean = false,
+    val storedDraftConsumed: Boolean = false,
 ) {
     /** Every item the operation started with; it never shrinks, so progress cannot run backwards. */
     val total: Int
@@ -188,6 +197,27 @@ internal data class AttachmentCollectionOperation(
     /** The first chunk that is not yet settled; chunks are sent strictly in order. */
     val nextChunk: CollectionChunk?
         get() = chunks.firstOrNull { !it.state.isSettled }
+
+    /** Stored originals can be released after MDK owns at least one chunk and all copies are journaled. */
+    val needsStoredDraftCleanup: Boolean
+        get() =
+            !storedDraftConsumed &&
+                chunks.any { it.state == CollectionChunkState.ACCEPTED } &&
+                items.any { it.storedDraft != null }
+
+    /** A recorded native token can still establish accepted ownership after process death. */
+    val mayNeedStoredDraftCleanup: Boolean
+        get() =
+            needsStoredDraftCleanup ||
+                (
+                    !storedDraftConsumed &&
+                        items.any { it.storedDraft != null } &&
+                        chunks.any { !it.state.isSettled && it.clientToken != null }
+                )
+
+    /** A paused native token must resolve before its stored draft can safely regain ownership. */
+    val canDiscard: Boolean
+        get() = !paused || !mayNeedStoredDraftCleanup || needsStoredDraftCleanup
 
     /** The operation's coarse state for presentation and the runner. */
     val phase: CollectionOperationPhase

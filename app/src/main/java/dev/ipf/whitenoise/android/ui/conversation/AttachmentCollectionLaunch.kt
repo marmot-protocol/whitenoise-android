@@ -240,7 +240,23 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
     tokenStatus: suspend (String) -> CollectionTokenStatus? = mdkCollectionTokenStatus(accountRef, groupIdHex),
 ) {
     val registry = attachmentCollections
+    registry.operations.value.values
+        .filter { it.accountRef == accountRef && it.groupIdHex == groupIdHex && it.needsStoredDraftCleanup }
+        .forEach { finishCollectionDraftCleanup(it.id) }
     withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
+        restoreCollectionOperation(journaled, readable, tokenStatus)
+    }
+}
+
+/** Reconciles the native send tokens and retains accepted records until any selected-draft cleanup succeeds. */
+private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
+    journaled: AttachmentCollectionOperation,
+    readable: (String) -> Boolean,
+    tokenStatus: suspend (String) -> CollectionTokenStatus?,
+) {
+    val registry = attachmentCollections
+    val admission = registry.admissions.begin(journaled.accountRef, journaled.groupIdHex)
+    try {
         val statuses = collectionTokenStatuses(journaled, { false }, tokenStatus)
         val reconciled = journaled.withTokenStatuses(statuses, registry.now())
         // A token MDK could not be asked about may already be sent, so its record is kept for another try.
@@ -251,12 +267,15 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
                     .filter { !it.state.isSettled && (it.uri.isBlank() || !readable(it.uri)) }
                     .mapTo(linkedSetOf()) { it.id }
             }
-        if (!unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null)) {
-            withContext(Dispatchers.IO) { registry.adopt(reconciled) }
-            registry.discard(reconciled.id)
-        } else {
-            registry.adopt(reconciled.copy(paused = true, unrecoverableItemIds = unrecoverable))
+        val restored = reconciled.copy(paused = true, unrecoverableItemIds = unrecoverable)
+        if (!registry.adopt(restored, admission)) return
+        when {
+            reconciled.needsStoredDraftCleanup -> finishCollectionDraftCleanup(reconciled.id)
+            !unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null) ->
+                registry.discard(reconciled.id)
         }
+    } finally {
+        registry.admissions.release(admission)
     }
 }
 
@@ -293,6 +312,7 @@ internal fun ConversationMediaSender.resumeCollection(
                 if (paused.withTokenStatuses(statuses, registry.now()).ownedByComposerDraft) {
                     // As on restore: with nothing accepted, the composer's draft still owns the selection, the
                     // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
+                    registry.update(operationId) { it.withTokenStatuses(statuses, registry.now()) }
                     registry.discard(operationId)
                     return@launchMutation
                 }
@@ -308,6 +328,8 @@ internal fun ConversationMediaSender.resumeCollection(
                 releaseCollectionResume(operationId)
             }
         val resumed = updated ?: return@launchMutation
+        if (resumed.needsStoredDraftCleanup) appState.finishCollectionDraftCleanup(operationId)
+        if (resumed.nextChunk == null) return@launchMutation
         val sourceAccount = appState.accounts.firstOrNull { it.label == resumed.accountRef }?.accountIdHex
         val lease =
             acquireStagedSources(context, resumed.items.map { Uri.parse(it.uri) }, sourceAccount).getOrElse {

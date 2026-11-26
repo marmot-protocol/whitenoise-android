@@ -21,8 +21,10 @@ private const val JOURNAL_NAME_HEX_CHARS = 32
  * Metadata-only record of in-progress collection sends, so a restarted process can tell what MDK already
  * accepted and what still needs sending. It holds ids, provider URIs, states and MDK send tokens — never
  * attachment bytes, captions or file names — and lives under no-backup storage, one file per operation,
- * grouped by hashed account and conversation. Records older than [ttlMs] are deleted on every read.
+ * grouped by hashed account and conversation. Once no live operation holds them, sources expire after [ttlMs].
+ * IDs needed to consume a native draft survive expiry until their acceptance can be reconciled.
  */
+@Suppress("TooManyFunctions") // The synchronized metadata store owns lifetimes, expiry and record verification.
 internal class AttachmentCollectionJournal(
     noBackupDirectory: File,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -49,6 +51,9 @@ internal class AttachmentCollectionJournal(
             val temporary = File(target.parentFile, target.name + ".tmp")
             temporary.writeBytes(bytes)
             check(temporary.renameTo(target)) { "journal rename failed" }
+            if (operation.phase == CollectionOperationPhase.FINISHED) {
+                draftSources?.deleteKey(target.nameWithoutExtension)
+            }
         }.isSuccess
     }
 
@@ -57,21 +62,21 @@ internal class AttachmentCollectionJournal(
     fun read(
         accountRef: String,
         groupIdHex: String,
+        protectedIds: Set<String> = emptySet(),
     ): List<AttachmentCollectionOperation> {
         val directory = conversationDirectory(accountRef, groupIdHex)
         val now = clock()
+        val protectedKeys = protectedIds.mapTo(HashSet(), ::journalHash)
         return directory
             .listFiles()
             .orEmpty()
-            .filter { it.name.endsWith(JOURNAL_SUFFIX) }
+            .filter { it.name.endsWith(JOURNAL_SUFFIX) && it.nameWithoutExtension !in protectedKeys }
             .mapNotNull { file ->
-                val operation = runCatching { decodeCollectionOperation(file.readBytes()) }.getOrNull()
-                val live =
-                    operation?.takeIf {
-                        it.accountRef == accountRef && it.groupIdHex == groupIdHex && now - it.updatedAtMs <= ttlMs
+                readRecoverable(file, now)?.takeIf { it.accountRef == accountRef && it.groupIdHex == groupIdHex }
+                    ?: run {
+                        deleteRecord(file)
+                        null
                     }
-                if (live == null) deleteRecord(file)
-                live
             }.sortedBy { it.createdAtMs }
     }
 
@@ -100,14 +105,14 @@ internal class AttachmentCollectionJournal(
         deleteRecordsUnder(File(root, journalHash(accountRef)))
     }
 
-    /** Deletes every expired or unreadable record in every conversation. */
+    /** Deletes expired or unreadable records across conversations, retaining [protectedIds] and their sources. */
     @Synchronized
-    fun sweepExpired() {
+    fun sweepExpired(protectedIds: Set<String> = emptySet()) {
         val now = clock()
-        val held = mutableSetOf<String>()
+        val held = protectedIds.mapTo(HashSet(), ::journalHash)
         root.walkBottomUp().filter(File::isFile).forEach { file ->
-            val operation = runCatching { decodeCollectionOperation(file.readBytes()) }.getOrNull()
-            if (operation == null || now - operation.updatedAtMs > ttlMs || file.extension != "json") {
+            if (file.extension == "json" && file.nameWithoutExtension in held) return@forEach
+            if (readRecoverable(file, now) == null) {
                 deleteRecord(file)
             } else {
                 held += file.nameWithoutExtension
@@ -115,6 +120,31 @@ internal class AttachmentCollectionJournal(
         }
         draftSources?.sweepOrphans(held, now - ttlMs)
         root.walkBottomUp().filter { it.isDirectory && it != root && it.list().isNullOrEmpty() }.forEach(File::delete)
+    }
+
+    /** Rechecks that a restore's record survived any sweeps or invalidation since it was read. */
+    @Synchronized
+    fun contains(operation: AttachmentCollectionOperation): Boolean {
+        val file = fileFor(operation.accountRef, operation.groupIdHex, operation.id)
+        val saved = readCollectionRecord(file) ?: return false
+        return saved.items.map { it.uri } == operation.items.map { it.uri }
+    }
+
+    /** An expired record can still prove native ownership; keep its IDs and tokens and release its sources. */
+    private fun readRecoverable(
+        file: File,
+        now: Long,
+    ): AttachmentCollectionOperation? {
+        val operation = readCollectionRecord(file) ?: return null
+        return when {
+            now - operation.updatedAtMs <= ttlMs -> operation
+            !operation.mayNeedStoredDraftCleanup -> null
+            else -> {
+                val metadata = operation.copy(items = operation.items.map { it.copy(uri = "") })
+                if (metadata == operation || write(metadata)) draftSources?.deleteKey(file.nameWithoutExtension)
+                metadata
+            }
+        }
     }
 
     /** Removes a metadata record and the corresponding operation's private plaintext sources. */
@@ -143,6 +173,12 @@ internal class AttachmentCollectionJournal(
     ): File = File(conversationDirectory(accountRef, groupIdHex), journalHash(operationId) + JOURNAL_SUFFIX)
 }
 
+/** Reads only complete, valid metadata records. */
+private fun readCollectionRecord(file: File): AttachmentCollectionOperation? {
+    if (file.extension != "json") return null
+    return runCatching { decodeCollectionOperation(file.readBytes()) }.getOrNull()
+}
+
 /** A short, filesystem-safe name for an identifier. */
 internal fun journalHash(value: String): String =
     MessageDigest
@@ -151,7 +187,7 @@ internal fun journalHash(value: String): String =
         .joinToString("") { "%02x".format(it) }
         .take(JOURNAL_NAME_HEX_CHARS)
 
-/** Serializes the metadata of [operation]; without [withUris] every URI is left blank. */
+/** Serializes [operation]; without [withUris], keeps only URIs to its own private copies. */
 internal fun encodeCollectionOperation(
     operation: AttachmentCollectionOperation,
     withUris: Boolean,
@@ -161,9 +197,10 @@ internal fun encodeCollectionOperation(
         items.put(
             JSONObject()
                 .put("id", item.id)
-                .put("uri", if (withUris) item.uri else "")
+                .put("uri", if (withUris || item.storedDraft != null) item.uri else "")
                 .put("kind", item.kind.name)
-                .put("state", item.state.name),
+                .put("state", item.state.name)
+                .put("draft", item.storedDraft?.let(::encodeStoredCollectionDraft)),
         )
     }
     val chunks = JSONArray()
@@ -186,10 +223,18 @@ internal fun encodeCollectionOperation(
         .put("created", operation.createdAtMs)
         .put("updated", operation.updatedAtMs)
         .put("items", items)
+        .put("draftConsumed", operation.storedDraftConsumed)
         .put("chunks", chunks)
         .toString()
         .toByteArray(StandardCharsets.UTF_8)
 }
+
+/** Keeps the selected draft identity and stored MIME independently of the provider URI. */
+private fun encodeStoredCollectionDraft(source: CollectionStoredDraft): JSONObject =
+    JSONObject()
+        .put("id", source.attachmentId)
+        .put("bytes", source.byteCount)
+        .put("mime", source.mediaType)
 
 /** Reads a record written by [encodeCollectionOperation]; a restored operation always starts paused. */
 internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOperation {
@@ -209,6 +254,14 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
                     uri = item.getString("uri"),
                     kind = CollectionItemKind.valueOf(item.getString("kind")),
                     state = CollectionItemState.valueOf(item.getString("state")),
+                    storedDraft =
+                        item.optJSONObject("draft")?.let { draft ->
+                            CollectionStoredDraft(
+                                draft.getString("id"),
+                                draft.getLong("bytes"),
+                                draft.getString("mime"),
+                            )
+                        },
                 )
             },
         chunks =
@@ -227,5 +280,6 @@ internal fun decodeCollectionOperation(bytes: ByteArray): AttachmentCollectionOp
         createdAtMs = json.getLong("created"),
         updatedAtMs = json.getLong("updated"),
         paused = true,
+        storedDraftConsumed = json.optBoolean("draftConsumed"),
     )
 }

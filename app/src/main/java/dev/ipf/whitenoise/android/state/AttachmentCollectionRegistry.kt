@@ -58,8 +58,8 @@ internal class AttachmentCollectionRegistry(
     }
 
     /**
-     * Applies [transform] to one operation and queues its journal effect. A finished operation is removed and
-     * its record deleted. Returns the result, or null when the operation is gone.
+     * Applies [transform] to one operation and queues its journal effect. A finished operation is removed
+     * once any pending native draft cleanup completes. Returns the result, or null when the operation is gone.
      */
     fun update(
         operationId: String,
@@ -86,7 +86,7 @@ internal class AttachmentCollectionRegistry(
     ): Pair<AttachmentCollectionOperation, Future<Boolean>>? {
         val next = state.value[operationId]?.let(transform) ?: return null
         val effect =
-            if (next.phase == CollectionOperationPhase.FINISHED) {
+            if (next.phase == CollectionOperationPhase.FINISHED && !next.needsStoredDraftCleanup) {
                 state.update { it - operationId }
                 journaled {
                     journal.delete(next.accountRef, next.groupIdHex, next.id)
@@ -102,7 +102,20 @@ internal class AttachmentCollectionRegistry(
     /** Forgets one operation and its record, after an explicit discard or a lost destination. */
     fun discard(operationId: String) {
         synchronized(lock) {
-            val removed = state.value[operationId] ?: return
+            val removed = state.value[operationId]?.takeIf { it.canDiscard } ?: return
+            if (removed.needsStoredDraftCleanup) {
+                apply(operationId) { current ->
+                    current.chunks.fold(current) { op, chunk ->
+                        op.withChunkState(
+                            chunk.id,
+                            CollectionChunkState.CANCELLED,
+                            CollectionItemState.CANCELLED,
+                            now(),
+                        )
+                    }
+                }
+                return
+            }
             state.update { it - operationId }
             journaled {
                 journal.delete(removed.accountRef, removed.groupIdHex, removed.id)
@@ -152,8 +165,9 @@ internal class AttachmentCollectionRegistry(
             JOURNAL_EFFECTS
                 .submit(
                     Callable {
-                        journal.sweepExpired()
-                        journal.read(accountRef, groupIdHex)
+                        val liveIds = state.value.keys
+                        journal.sweepExpired(liveIds)
+                        journal.read(accountRef, groupIdHex, liveIds)
                     },
                 ).get()
         val live = state.value.keys
@@ -163,18 +177,29 @@ internal class AttachmentCollectionRegistry(
     /** Runs the early-startup cache sweep behind any in-flight journal effects. Call from I/O. */
     fun sweepExpired() {
         journaled {
-            journal.sweepExpired()
+            journal.sweepExpired(state.value.keys)
             true
         }.get()
     }
 
-    /** Adopts a restored operation without rewriting its record until it next changes. */
-    fun adopt(operation: AttachmentCollectionOperation) {
-        synchronized(lock) {
-            state.update { current ->
-                if (operation.id in current) current else current + (operation.id to operation)
+    /** Publishes a restore only if its record survived while MDK was being queried. */
+    suspend fun adopt(
+        operation: AttachmentCollectionOperation,
+        admission: CollectionAdmission,
+    ): Boolean {
+        val effect =
+            journaled {
+                journal.contains(operation) &&
+                    synchronized(lock) {
+                        if (operation.id in state.value || !admissions.accept(admission, operation)) {
+                            false
+                        } else {
+                            state.update { it + (operation.id to operation) }
+                            true
+                        }
+                    }
             }
-        }
+        return withContext(Dispatchers.IO) { effect.get() }
     }
 }
 

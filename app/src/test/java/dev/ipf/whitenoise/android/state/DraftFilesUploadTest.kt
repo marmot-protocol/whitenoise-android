@@ -21,6 +21,8 @@ import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.media.editor.nativeHandleStub
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.media.pdf.pdfFixture
+import dev.ipf.whitenoise.android.ui.conversation.CollectionTokenStatus
+import dev.ipf.whitenoise.android.ui.conversation.restoreCollectionOperations
 import dev.ipf.whitenoise.android.ui.profile.personTestGroup
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
@@ -341,6 +343,73 @@ class DraftFilesUploadTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class StoredDraftAcceptanceTest {
+    /** Even after expiry, recovery settles the original native ID that MDK accepted before process death. */
+    @Test
+    fun acceptedCollectionTokenRecoversOriginalFileWithoutConsumingLaterDraft() =
+        runBlocking {
+            val old =
+                SelectedMessageDraftAttachmentFfi(
+                    "sent",
+                    "same.bin",
+                    "application/octet-stream",
+                    900uL,
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                    true,
+                )
+            val replacement = old.copy(id = "picked-again")
+            val updatedDraft = content("same caption", old, replacement).copy(replyToMessageIdHex = "new-reply")
+            val engine = DraftUploadEngine(updatedDraft)
+            val runtime = AppMarmotRuntime("test", engine.marmot)
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val app =
+                WhiteNoiseAppState(
+                    context = context,
+                    draftStore = DraftStore.forContext(context),
+                    accountIdHexResolver = { null },
+                    accounts = emptyList(),
+                    activeAccountRef = "acct",
+                    initialMarmotRuntime = runtime,
+                    marmotRuntimeFactory = { runtime },
+                )
+            val journal = AttachmentCollectionJournal(context.noBackupFilesDir)
+            val item =
+                CollectionItem(
+                    "pick",
+                    "content://fixture/file",
+                    CollectionItemKind.DOCUMENT,
+                    CollectionItemState.UPLOADING,
+                    CollectionStoredDraft(old.id, 900L, old.mediaType),
+                )
+            val chunk = CollectionChunk("chunk", 0, listOf(item.id), true, "accepted", CollectionChunkState.UPLOADING)
+            val now = System.currentTimeMillis()
+            val expired = now - ATTACHMENT_COLLECTION_JOURNAL_TTL_MS - 1
+            val operation =
+                AttachmentCollectionOperation(
+                    "recovery",
+                    "acct",
+                    "group",
+                    listOf(item),
+                    listOf(chunk),
+                    expired,
+                    expired,
+                )
+            try {
+                assertTrue(journal.write(operation))
+                app.restoreCollectionOperations("acct", "group", { true }) { CollectionTokenStatus.ACCEPTED }
+                awaitAttachmentCollectionJournal()
+
+                assertEquals(updatedDraft.copy(mediaAttachments = listOf(replacement)), engine.current)
+                assertTrue(app.nativeComposerCleanupRevision("acct", "group") > 0)
+                assertTrue(journal.read("acct", "group").isEmpty())
+            } finally {
+                journal.delete("acct", "group", operation.id)
+                app.mutationsScope.cancel()
+            }
+        }
+
     /** An identical edit captured by the upload cannot consume newer text or leave the reopened shelf stale. */
     @Test
     fun acceptedStoredFileRefreshesOnlyItsOwnShelfWithoutConsumingNewText() =

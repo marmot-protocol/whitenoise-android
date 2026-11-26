@@ -227,15 +227,24 @@ internal class AttachmentCollectionSender(
         current.controller.uploadQueued(queued) { onChunkAccepted(run, chunk) }
     }
 
-    /** Records a durable acceptance, and clears the composer draft once the caption-bearing chunk is MDK's. */
+    /** Records native ownership and arranges consumption of the original stored files after the journal write. */
     private fun onChunkAccepted(
         run: CollectionRun,
         chunk: CollectionChunk,
     ) {
-        registry.update(run.operationId) {
-            it.withChunkState(chunk.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, registry.now())
-        }
+        val accepted =
+            registry.update(run.operationId) {
+                it.withChunkState(
+                    chunk.id,
+                    CollectionChunkState.ACCEPTED,
+                    CollectionItemState.PUBLISHED,
+                    registry.now(),
+                )
+            }
         if (chunk.carriesCaption) run.draftClear?.let(appState::clearDraftAfterSuccessfulSend)
+        if (accepted?.needsStoredDraftCleanup == true) {
+            appState.launchMutation { appState.finishCollectionDraftCleanup(run.operationId) }
+        }
     }
 
     /**
@@ -275,6 +284,7 @@ internal class AttachmentCollectionSender(
                         staging = FileBackedSendStaging { staged += it },
                         keepPdfMetadata = run.keepPdfMetadata,
                         pickKey = run::pickKey,
+                        ownedMime = item.storedDraft?.let { mapOf(uri to it.mediaType) }.orEmpty(),
                     )
                 val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
                 val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L

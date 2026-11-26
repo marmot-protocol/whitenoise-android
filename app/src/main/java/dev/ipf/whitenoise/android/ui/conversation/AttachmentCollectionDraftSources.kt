@@ -9,16 +9,35 @@ import dev.ipf.whitenoise.android.media.sharedPlaintextSuffix
 import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionDraftSourceFiles
+import dev.ipf.whitenoise.android.state.CollectionStoredDraft
 import dev.ipf.whitenoise.android.state.DraftFileCopy
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.UnverifiedStoredDraftPdf
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentCollections
+import dev.ipf.whitenoise.android.state.consumeCollectionDraftFiles
 import dev.ipf.whitenoise.android.state.hasVerifiedDraftPdfMetadata
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.prepareStagingDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import java.io.File
 import java.io.IOException
+
+/**
+ * Records accepted ownership before removing stored originals. A failed draft read or write leaves the
+ * journal recoverable, and repeating a successful removal finds no matching native IDs.
+ */
+internal suspend fun WhiteNoiseAppState.finishCollectionDraftCleanup(operationId: String) {
+    val registry = attachmentCollections
+    if (registry.operations.value[operationId]?.needsStoredDraftCleanup != true) return
+    val recorded = registry.updateDurably(operationId) { it } ?: return
+    val consumed = runCatchingCancellable { marmotIo { consumeCollectionDraftFiles(recorded) } }.getOrDefault(false)
+    if (consumed) {
+        registry.update(operationId) { it.copy(storedDraftConsumed = true, updatedAtMs = registry.now()) }
+        retainedConversationStates.recordNativeComposerCleanup(recorded.accountRef, recorded.groupIdHex)
+    }
+}
 
 /** Copies stored bodies from their selected native revision before the collection accepts the composer shelf. */
 internal suspend fun WhiteNoiseAppState.copyStoredCollectionSources(
@@ -50,11 +69,15 @@ internal suspend fun ownCollectionDraftSources(
     val files = CollectionDraftSourceFiles(context.cacheDir)
     val owned =
         operation.items.zip(prepared).mapIndexed { index, (item, body) ->
-            if (body?.draftFile == null) {
+            val descriptor = body?.draftFile
+            if (body == null || descriptor == null) {
                 item
             } else {
                 val target = files.fileFor(context, operation, index, collectionDraftSuffix(body))
-                item.copy(uri = copyStoredCollectionItem(context, target, body, copy))
+                item.copy(
+                    uri = copyStoredCollectionItem(context, target, body, copy),
+                    storedDraft = CollectionStoredDraft(descriptor.attachmentId, descriptor.byteCount, body.mediaType),
+                )
             }
         }
     return operation.copy(items = owned)
@@ -79,8 +102,8 @@ private suspend fun copyStoredCollectionItem(
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target, name).toString()
 }
 
-/** Keeps the MIME type for FileProvider while using a bounded filesystem-safe name. */
+/** Gives the private file a filesystem-safe suffix independent of its display name. */
 private fun collectionDraftSuffix(pending: PendingAttachment): String {
     val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(pending.mediaType)
-    return sharedPlaintextSuffix(extension?.let { "body.$it" } ?: pending.fileName)
+    return sharedPlaintextSuffix(extension?.let { "body.$it" } ?: "body.bin")
 }

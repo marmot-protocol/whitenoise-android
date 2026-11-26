@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // Stored-file uploads and collections share the same selected-draft CAS.
+
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotInterface
@@ -152,20 +154,43 @@ internal suspend fun MarmotInterface.sendComposerDraftFiles(
  * and its matching caption while the send still owns the composer text. A later edit can contain identical text.
  * Newer text, the reply and attachments added since stay. A draft left empty is cleared. Cleanup is best effort.
  */
-@Suppress("ReturnCount", "SwallowedException") // Admitted either way: a draft that cannot be tidied stays as it is.
 internal fun MarmotInterface.consumeSentDraftFiles(
     account: String,
     group: String,
     upload: DraftFilesUpload,
     ownsCaption: () -> Boolean = { false },
 ) {
+    consumeSelectedDraftFiles(
+        account,
+        group,
+        matches = { sentFileOf(it, upload.attachments) },
+        consumeText = { ownsCaption() && it.trim() == upload.caption.orEmpty().trim() },
+    )
+}
+
+/** Removes just the original stored attachment IDs of an accepted, journaled collection. */
+internal fun MarmotInterface.consumeCollectionDraftFiles(operation: AttachmentCollectionOperation): Boolean {
+    val sources = operation.items.mapNotNull { it.storedDraft }.associateBy { it.attachmentId }
+    return consumeSelectedDraftFiles(operation.accountRef, operation.groupIdHex, matches = { descriptor ->
+        descriptor.fileBacked && sources[descriptor.id]?.byteCount == descriptor.plaintextSize.toLong()
+    })
+}
+
+/** Revision-checks removal of matched files, preserving the reply, unmatched rows and unclaimed text. */
+@Suppress("ReturnCount", "SwallowedException") // Failure is reported for callers that can retry after admission.
+private fun MarmotInterface.consumeSelectedDraftFiles(
+    account: String,
+    group: String,
+    matches: (SelectedMessageDraftAttachmentFfi) -> Boolean,
+    consumeText: (String) -> Boolean = { false },
+): Boolean {
     repeat(MAX_SENT_DRAFT_CONSUME_ATTEMPTS) {
-        val selected = selectedDraftOrNull(account, group) ?: return
-        val draft = selected.draft ?: return
-        val sent = draft.mediaAttachments.filter { sentFileOf(it, upload.attachments) }.mapTo(HashSet()) { it.id }
-        if (sent.isEmpty()) return
+        val selected = selectedDraftOrNull(account, group) ?: return false
+        val draft = selected.draft ?: return true
+        val sent = draft.mediaAttachments.filter(matches).mapTo(HashSet()) { it.id }
+        if (sent.isEmpty()) return true
         val kept = draft.mediaAttachments.filterNot { it.id in sent }
-        val text = draft.content.takeUnless { ownsCaption() && it.trim() == upload.caption.orEmpty().trim() }.orEmpty()
+        val text = draft.content.takeUnless(consumeText).orEmpty()
         try {
             if (kept.isEmpty() && text.isBlank() && draft.replyToMessageIdHex == null) {
                 clearMessageDraftIfRevision(account, selected.revision)
@@ -175,13 +200,14 @@ internal fun MarmotInterface.consumeSentDraftFiles(
                         sent.map { MessageDraftAttachmentInputFfi.Removed(it) }
                 saveMessageDraftInputsIfRevision(account, selected.revision, text, draft.replyToMessageIdHex, inputs)
             }
-            return
+            return true
         } catch (moved: MarmotKitException.MessageDraftRevisionConflict) {
             // Another save won the race: read the draft it left and try again.
         } catch (refused: MarmotKitException) {
-            return
+            return false
         }
     }
+    return false
 }
 
 /** Whether [descriptor] is one of [attachments]' stored files: the same id, still stored, at the same size. */

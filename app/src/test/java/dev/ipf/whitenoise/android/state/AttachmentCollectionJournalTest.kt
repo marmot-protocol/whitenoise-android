@@ -87,6 +87,36 @@ class AttachmentCollectionJournalTest {
         assertTrue(folder.root.walkTopDown().none { it.isFile })
     }
 
+    /** Discard stops remaining uploads while leaving an accepted stored-draft cleanup recoverable after expiry. */
+    @Test
+    fun discardingAcceptedCollectionPreservesOnlyCleanup() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val planned = operation()
+        val original = CollectionStoredDraft("native", 42L, "application/example")
+        val accepted =
+            planned
+                .copy(items = planned.items.map { it.copy(storedDraft = original) })
+                .withChunkState(
+                    planned.chunks.first().id,
+                    CollectionChunkState.ACCEPTED,
+                    CollectionItemState.PUBLISHED,
+                    now,
+                )
+        assertTrue(registry.start(accepted))
+        registry.discard(accepted.id)
+        awaitAttachmentCollectionJournal()
+        now += ATTACHMENT_COLLECTION_JOURNAL_TTL_MS + 1
+        val coldRegistry = AttachmentCollectionRegistry(journal) { now }
+        coldRegistry.sweepExpired()
+
+        val restored = coldRegistry.journaledFor(accepted.accountRef, accepted.groupIdHex).single()
+        assertEquals(CollectionOperationPhase.FINISHED, restored.phase)
+        assertTrue(restored.needsStoredDraftCleanup)
+        assertEquals(original, restored.items.first().storedDraft)
+        assertTrue(restored.items.all { it.uri.isEmpty() })
+    }
+
     /** A record too large with URIs is kept without them, under 256 KiB; more than 100 items is refused. */
     @Test
     fun sizeAndCountCapsAreEnforced() {

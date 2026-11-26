@@ -357,6 +357,7 @@ internal class ConversationMediaSender(
         staging: FileBackedSendStaging,
         keepPdfMetadata: Set<android.net.Uri> = emptySet(),
         pickKey: (String) -> String = { it },
+        ownedMime: Map<android.net.Uri, String> = emptyMap(),
     ): PreparedStagedAttachments {
         // Reading the native limit is a binding call, so it stays off Main.
         val albumFileBudget =
@@ -366,7 +367,7 @@ internal class ConversationMediaSender(
                 null
             }
         val checkedImages = withContext(Dispatchers.IO) { removePreparedVideoMetadata(preparedImageAttachments) }
-        val rawImages = readStagedImages(imageSlots, checkedImages, albumFileBudget, pickKey)
+        val rawImages = readStagedImages(imageSlots, checkedImages, albumFileBudget, pickKey, ownedMime)
         val images = limitAttachmentsToBudget(rawImages.attachments, MEDIA_ALBUM_MAX_TOTAL_BYTES)
         val documentBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - images.totalBytes).coerceAtLeast(0L)
         val documents =
@@ -381,6 +382,7 @@ internal class ConversationMediaSender(
                     staging,
                     keepPdfMetadata,
                     pickKey,
+                    ownedMime,
                 )
             }
         // Only a missing visual pick reads the notice. getType is provider IPC that may stall
@@ -390,7 +392,7 @@ internal class ConversationMediaSender(
                 withContext(Dispatchers.IO) {
                     imageSlots.any {
                         ensureActive()
-                        isVideoMediaType(safeGetType(context.contentResolver, it.uri))
+                        isVideoMediaType(ownedMime[it.uri] ?: safeGetType(context.contentResolver, it.uri))
                     }
                 }
         return PreparedStagedAttachments(
@@ -424,6 +426,7 @@ internal class ConversationMediaSender(
         staging: FileBackedSendStaging,
         keepPdfMetadata: Set<android.net.Uri>,
         pickKey: (String) -> String,
+        ownedMime: Map<android.net.Uri, String>,
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var totalBytes = 0L
@@ -456,7 +459,14 @@ internal class ConversationMediaSender(
                 failures += copied.failures
             } else {
                 val read =
-                    attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, staging, pickKey)
+                    attachmentReader.readPickedDocuments(
+                        listOf(uri),
+                        remaining,
+                        allowFileBacked,
+                        staging,
+                        pickKey,
+                        ownedMime,
+                    )
                 attachments += read.attachments.map { it.copy(outgoingDomain = domain) }
                 totalBytes += read.totalBytes
                 failures += read.failures
@@ -481,6 +491,7 @@ internal class ConversationMediaSender(
         preparedImages: PreparedVideoCheck<String>,
         fileBacked: FileBackedPickBudget?,
         pickKey: (String) -> String,
+        ownedMime: Map<android.net.Uri, String>,
     ): VisualReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var overflowed = false
@@ -510,13 +521,15 @@ internal class ConversationMediaSender(
                 attachments += prepared.copy(outgoingDomain = domain)
                 inMemoryBytes += prepared.plaintextBytes.size
             } else {
+                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - inMemoryBytes).coerceAtLeast(0L)
                 val read =
-                    if (fileBacked == null) {
-                        attachmentReader.readPickedImages(listOf(slot.uri), pick = pick)
-                    } else {
-                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - inMemoryBytes).coerceAtLeast(0L)
-                        attachmentReader.readPickedImages(listOf(slot.uri), fileBacked, remaining, pick = pick)
-                    }
+                    attachmentReader.readPickedImages(
+                        listOf(slot.uri),
+                        fileBacked,
+                        if (fileBacked == null) MEDIA_ALBUM_MAX_TOTAL_BYTES else remaining,
+                        pick,
+                        ownedMime[slot.uri],
+                    )
                 attachments += read.attachments.map { it.copy(outgoingDomain = domain) }
                 inMemoryBytes += read.attachments.sumOf { it.plaintextBytes.size.toLong() }
                 overflowed = overflowed || read.albumOverflowed

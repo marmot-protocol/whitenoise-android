@@ -238,12 +238,14 @@ internal class ConversationAttachmentReader(
      * counts in-memory bytes only, and the send's [staging] hears about every snapshot as soon as it is
      * created and reserves the disk its upload still needs.
      */
+    @Suppress("LongParameterList") // Owned MIME is supplied only by the collection journal.
     suspend fun readPickedDocuments(
         uris: List<android.net.Uri>,
         bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         allowFileBacked: Boolean = false,
         staging: FileBackedSendStaging = FileBackedSendStaging(),
         pickKey: (String) -> String = { it },
+        ownedMime: Map<android.net.Uri, String> = emptyMap(),
     ): DocumentReadOutcome =
         withContext(Dispatchers.IO) {
             val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, staging = staging)
@@ -252,20 +254,22 @@ internal class ConversationAttachmentReader(
                     state.albumOverflowed = true
                     break
                 }
-                readPickedDocument(uri, bytesBudget, state, allowFileBacked, pickKey(uri.toString()))
+                readPickedDocument(uri, bytesBudget, state, allowFileBacked, pickKey(uri.toString()), ownedMime[uri])
             }
             state.outcome()
         }
 
     /** Routes one document pick, [pick], to the image sanitizer or the raw-file reader. */
+    @Suppress("LongParameterList") // Combines one pick, its budget and the result of the current read pass.
     private fun readPickedDocument(
         uri: android.net.Uri,
         bytesBudget: Long,
         state: DocumentReadAccumulator,
         allowFileBacked: Boolean,
         pick: String,
+        ownedMime: String?,
     ) {
-        val resolvedMime = normalizeDocumentMime(safeGetType(context.contentResolver, uri))
+        val resolvedMime = normalizeDocumentMime(ownedMime ?: safeGetType(context.contentResolver, uri))
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
         val sniffedImageMime = MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
         if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
@@ -397,8 +401,9 @@ internal class ConversationAttachmentReader(
         fileBacked: FileBackedPickBudget? = null,
         inMemoryBytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         pick: String? = null,
+        ownedMime: String? = null,
     ): VisualReadOutcome {
-        require(pick == null || uris.size <= 1) { "One pick names one picked file" }
+        require((pick == null && ownedMime == null) || uris.size <= 1) { "One pick names one picked file" }
         // A file-backed pick copies up to 512 MiB, which belongs on the IO pool rather than a CPU worker.
         return withContext(if (fileBacked == null) Dispatchers.Default else Dispatchers.IO) {
             val checkCancellation = { ensureActive() }
@@ -413,7 +418,7 @@ internal class ConversationAttachmentReader(
                     overflowed = true
                     break
                 }
-                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation, pick)
+                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation, pick, ownedMime)
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
                 videoMetadataRefused = videoMetadataRefused || outcome.videoMetadataRefused
@@ -465,14 +470,16 @@ internal class ConversationAttachmentReader(
         }
 
     /** Reads one image or video pick; only a video may be staged to a file, and only with [fileBacked]. */
+    @Suppress("LongParameterList") // Combines one pick's metadata and read budget with its decoder domain.
     private fun readVisualAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
         fileBacked: FileBackedPickBudget?,
         checkCancellation: () -> Unit = {},
         pick: String? = null,
+        ownedMime: String? = null,
     ): ImageAttachmentReadOutcome {
-        val mime = safeGetType(context.contentResolver, uri)
+        val mime = ownedMime ?: safeGetType(context.contentResolver, uri)
         val isVideo = mime.startsWith("video/", ignoreCase = true)
         val declaredSize = if (isVideo) queryContentSize(context.contentResolver, uri) else -1L
         val inMemoryCap = minOf(MediaPipeline.VIDEO_MAX_BYTES, remainingBytes)
@@ -494,7 +501,7 @@ internal class ConversationAttachmentReader(
         fileBacked: FileBackedPickBudget?,
         checkCancellation: () -> Unit,
     ): ImageAttachmentReadOutcome =
-        when (val result = MediaPipeline.readVideoForUpload(context, uri, remainingBytes)) {
+        when (val result = MediaPipeline.readVideoForUpload(context, uri, remainingBytes, mediaType)) {
             is MediaPipeline.VideoReadResult.Success ->
                 ImageAttachmentReadOutcome(
                     PendingAttachment(
