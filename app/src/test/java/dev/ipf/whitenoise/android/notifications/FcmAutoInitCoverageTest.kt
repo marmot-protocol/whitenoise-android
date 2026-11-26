@@ -135,8 +135,9 @@ class FcmAutoInitCoverageTest {
         val demandWrite = "if (demand == NativePushDemand.None) disableFcmAutoInitIfUnchanged(accountRefs)"
         assertTrue(demandOff.contains(demandWrite))
         val unchanged = appModuleSource(AUTO_INIT).functionBody("disableFcmAutoInitIfUnchanged")
-        val liveRecheck = "if (host.nativePushAccountRefs() == readAccountRefs) applyFcmAutoInit(enabled = false)"
+        val liveRecheck = "if (host.nativePushAccountRefs() != readAccountRefs) return true"
         assertTrue("the off write must recheck the live account list", unchanged.contains(liveRecheck))
+        assertTrue(unchanged.substringAfter(liveRecheck).contains("return applyFcmAutoInit(enabled = false)"))
     }
 
     /** Every locked sync and permission pause settles auto-init from demand when it is cancelled. */
@@ -206,11 +207,13 @@ class FcmAutoInitCoverageTest {
         val superseded = "if (!isCurrent()) return@withLock recordPendingRegistrationSync()"
         assertTrue("a superseded commit leaves a sync pending", superseded in commit)
         assertTrue("an unsettled commit fails the selection", "return selected.getOrThrow() && settled" in select)
-        val required = commit.substringAfter("NativePushDemand.Required -> {").substringBefore("}")
-        assertTrue("Push demand turns auto-init on", required.contains("applyFcmAutoInit(enabled = true)"))
+        val required = "NativePushDemand.Required -> applyFcmAutoInit(enabled = true)"
+        assertTrue("Push demand turns auto-init on and reports whether it settled", required in commit)
         val toggle = appModuleSource(PUSH_CLEARS).functionBody("setNativePushEnabledSettlingAutoInit")
         assertTrue(toggle.contains("if (enabled) uncommittedNativePushEnables.incrementAndGet()"))
-        assertTrue("only a confirmed enable commits", toggle.contains("if (enabled && changed) commitFcmAutoInit"))
+        val confirmed =
+            "!enabled || !changed || commitFcmAutoInitAfterEnable { activeDeliveryModeTransactions.get() == 0 }"
+        assertTrue("only a confirmed enable commits, and not while a mode change is open", confirmed in toggle)
         val settle = autoInit.functionBody("settleFcmAutoInitAfterFailedSelection")
         assertTrue(settle.contains("nativePushSyncMutex.withLock"))
         assertTrue(
@@ -220,6 +223,40 @@ class FcmAutoInitCoverageTest {
         )
         val loaded = autoInit.functionBody("disableFcmAutoInitWithoutLoadedNativeDemand")
         assertTrue(loaded.contains("if (accountRefs.isEmpty()) null else disableFcmAutoInitWithoutNativeDemand("))
+    }
+
+    /**
+     * A device-wide delivery-mode change is counted before its intent advances and without waiting for a lock.
+     * The last one to end drains a retry that a sync or enable deferred to it, after finish clears busy, even
+     * when finish throws, and a handed-off change ends even if cancelled before it runs.
+     */
+    @Test
+    fun deliveryModeChangesHoldAutoInitUntilTheLastEnds() {
+        val ownership = appModuleSource(MODE_OWNERSHIP)
+        val begin = ownership.functionBody("beginDeliveryModeTransaction")
+        val counted = begin.indexOf("activeDeliveryModeTransactions.incrementAndGet()")
+        assertTrue("a change is counted before its intent advances", counted in 0 until begin.indexOf(".advance()"))
+        assertFalse("a newer choice never waits to supersede", "withLock" in begin)
+        val end = ownership.functionBody("endDeliveryModeTransaction")
+        val lastEnd = "activeDeliveryModeTransactions.decrementAndGet() == 0 &&"
+        assertTrue("the last change to end drains the retry", end.substringAfter("withLock {").contains(lastEnd))
+        assertTrue("a failed drain never replaces the result", "if (drain) runCatching {" in end)
+        val handoff = ownership.functionBody("launchNotificationDeliveryModeReconciliation")
+        assertTrue("a handed-off change always ends", "launch(start = CoroutineStart.ATOMIC)" in handoff)
+        val apply = appModuleSource(SELECTION).functionBody("applyMode")
+        assertTrue(apply.contains("val intentGeneration = beginDeliveryModeTransaction()"))
+        val reconcile =
+            appModuleSource("$STATE/NotificationDeliveryController.kt")
+                .functionBody("reconcileNotificationDeliveryModeAfterActivation")
+        assertTrue(reconcile.contains("val intentGeneration = beginDeliveryModeTransaction()"))
+        listOf(handoff, apply, reconcile).forEach { body ->
+            val closing = body.substringAfter("} finally {")
+            val finish = closing.indexOf("finishNotificationDeliveryModeTransaction(")
+            val nested = closing.indexOf("} finally {")
+            val ended = closing.indexOf("endDeliveryModeTransaction()")
+            assertTrue("busy clears first, and the change ends even if finish throws", finish in 0 until nested)
+            assertTrue(nested < ended)
+        }
     }
 
     /** A Local selection that fails or is cancelled after a native disable committed settles auto-init. */
@@ -307,5 +344,6 @@ class FcmAutoInitCoverageTest {
         const val SELECTION = "$STATE/NotificationDeliveryControllerModeSelection.kt"
         const val AUTO_INIT = "$STATE/NotificationDeliveryControllerFcmAutoInit.kt"
         const val PUSH_CLEARS = "$STATE/NotificationDeliveryControllerPushClears.kt"
+        const val MODE_OWNERSHIP = "$STATE/NotificationDeliveryControllerModeOwnership.kt"
     }
 }

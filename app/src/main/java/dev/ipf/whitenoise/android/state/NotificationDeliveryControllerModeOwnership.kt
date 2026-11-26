@@ -4,12 +4,12 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Resolves the device mode from authoritative account settings and identifies any incomplete invariant. */
 internal suspend fun NotificationDeliveryController.notificationDeliveryActivationPlan(
@@ -61,7 +61,8 @@ private suspend fun NotificationDeliveryController.readNotificationDeliverySetti
 
 /**
  * Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch.
- * Adopts the caller's open [activeDeliveryModeTransactions] count and releases it before draining pending syncs.
+ * Adopts the caller's open delivery-mode change and ends it after its finish. It starts atomically, so even a
+ * job cancelled before it runs reaches that `finally`.
  */
 internal fun NotificationDeliveryController.launchNotificationDeliveryModeReconciliation(
     owner: NotificationDeliveryModeOwner,
@@ -69,31 +70,59 @@ internal fun NotificationDeliveryController.launchNotificationDeliveryModeReconc
     applyDeviceWideMode: Boolean,
 ) {
     notificationDeliveryModeBusy = true
-    val released = AtomicBoolean(false)
-    val release = {
-        if (released.compareAndSet(false, true)) activeDeliveryModeTransactions.decrementAndGet()
-    }
-    notificationScope
-        .launch {
-            try {
-                notificationDeliveryModeMutex.withLock {
-                    if (!ownsNotificationDeliveryMode(owner)) return@withLock
-                    if (applyDeviceWideMode) {
-                        if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
-                        when (mode) {
-                            NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
-                            NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
-                        }
-                    } else {
-                        syncNativePushRegistrationIfEnabled()
+    notificationScope.launch(start = CoroutineStart.ATOMIC) {
+        try {
+            notificationDeliveryModeMutex.withLock {
+                if (!ownsNotificationDeliveryMode(owner)) return@withLock
+                if (applyDeviceWideMode) {
+                    if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
+                    when (mode) {
+                        NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
+                        NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
                     }
+                } else {
+                    syncNativePushRegistrationIfEnabled()
                 }
-            } finally {
-                release()
-                finishNotificationDeliveryModeTransaction(owner.intentGeneration)
             }
-        }.invokeOnCompletion { release() }
+        } finally {
+            try {
+                finishNotificationDeliveryModeTransaction(owner.intentGeneration)
+            } finally {
+                endDeliveryModeTransaction()
+            }
+        }
+    }
 }
+
+/**
+ * Opens a device-wide delivery-mode change: counts it in
+ * [NotificationDeliveryController.activeDeliveryModeTransactions], then advances the delivery intent. It never
+ * waits for a lock, so a newer choice supersedes an older change that holds the sync lock at once. Returns the
+ * change's intent generation.
+ */
+internal fun NotificationDeliveryController.beginDeliveryModeTransaction(): Long {
+    activeDeliveryModeTransactions.incrementAndGet()
+    return notificationDeliveryModeIntent.advance()
+}
+
+/**
+ * Ends a change opened by [beginDeliveryModeTransaction], after its finish has cleared the busy flag. The last
+ * open change drains a registration sync left pending meanwhile, because a sync or enable that saw an open change
+ * left auto-init to it. The count and the marker are read under the sync lock where those deferrals record it, so
+ * a deferral is either seen here or happened after the count reached zero and was not deferred. A failed drain
+ * keeps its durable marker for the next sync and never replaces the change's own result.
+ */
+internal suspend fun NotificationDeliveryController.endDeliveryModeTransaction() =
+    withContext(NonCancellable) {
+        val drain =
+            nativePushSyncMutex.withLock {
+                activeDeliveryModeTransactions.decrementAndGet() == 0 &&
+                    withContext(pushWakeStorageDispatcher) {
+                        runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                    }
+            }
+        if (drain) runCatching { syncNativePushRegistrationIfEnabled() }
+    }
 
 /** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */
 internal suspend fun NotificationDeliveryController.finishNotificationDeliveryModeTransaction(epoch: Long) =

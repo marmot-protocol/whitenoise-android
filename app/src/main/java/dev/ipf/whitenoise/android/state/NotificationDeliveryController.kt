@@ -108,9 +108,9 @@ internal class NotificationDeliveryController(
     // since turning it on starts an SDK token sync that no later off write cancels. Each sets it on commit.
     internal val uncommittedNativePushEnables = AtomicInteger()
 
-    // Active device-wide delivery-mode transactions, including handoffs when a newer mode supersedes an
-    // in-flight one. While any is open a sync leaves Firebase auto-init alone so a superseded Push cutover
-    // cannot trigger auto-init before a superseding Local cutover disables native push.
+    // Open device-wide delivery-mode changes, a reconciliation's handed-off cutover included. Each opens and
+    // ends under the native sync lock. While any is open, a sync or per-account enable leaves Firebase auto-init
+    // alone, since the change may still disable native push, and the last one to end drains the retry.
     internal val activeDeliveryModeTransactions = AtomicInteger()
 
     // Whether the latest Firebase auto-init write failed. A failed write records the pending registration
@@ -237,8 +237,7 @@ internal class NotificationDeliveryController(
         val settings = localNotificationSettings
         if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
         if (settings == null) return syncNativePushRegistrationIfEnabled()
-        val intentGeneration = notificationDeliveryModeIntent.advance()
-        activeDeliveryModeTransactions.incrementAndGet()
+        val intentGeneration = beginDeliveryModeTransaction()
         var handedOff = false
         return try {
             notificationDeliveryModeMutex.withLock {
@@ -258,8 +257,11 @@ internal class NotificationDeliveryController(
             }
         } finally {
             if (!handedOff) {
-                activeDeliveryModeTransactions.decrementAndGet()
-                finishNotificationDeliveryModeTransaction(intentGeneration)
+                try {
+                    finishNotificationDeliveryModeTransaction(intentGeneration)
+                } finally {
+                    endDeliveryModeTransaction()
+                }
             }
         }
     }

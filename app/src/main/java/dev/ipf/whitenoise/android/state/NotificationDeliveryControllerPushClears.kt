@@ -128,12 +128,6 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
     if (enabled && !nativePushCapability().isAvailable) return false
     // A native disable can commit before a cancellation surfaces, so the settle runs in finally.
     val nativeDisableAttempted = AtomicBoolean(!enabled)
-    val rotation = pushTokenRotationSequence.get()
-    // Only a marker this enable's own deferred sync left may be cleared; an earlier one is another change's retry.
-    val syncPendingBefore =
-        withContext(pushWakeStorageDispatcher) {
-            runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(true)
-        }
     try {
         if (enabled) uncommittedNativePushEnables.incrementAndGet()
         val changed =
@@ -142,23 +136,12 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
             } finally {
                 if (enabled) uncommittedNativePushEnables.decrementAndGet()
             }
-        // A confirmed enable reports success only once auto-init is set or its retry is stored.
-        return if (enabled && changed) {
-            commitFcmAutoInitAfterEnable(
-                acknowledgeSync = {
-                    val quiet = uncommittedNativePushEnables.get() == 0 && activeDeliveryModeTransactions.get() == 0
-                    if (!syncPendingBefore && quiet) {
-                        withContext(pushWakeStorageDispatcher) {
-                            pushTokenStore.completeRegistrationSyncIfCurrent(
-                                ownerIsCurrent = { pushTokenRotationSequence.get() == rotation },
-                            )
-                        }
-                    }
-                },
-            ) { true }
-        } else {
-            changed
-        }
+        // A confirmed enable reports success only once auto-init is set or its retry is stored. While a
+        // delivery-mode change is open it may still disable native push, and an on write starts an SDK token
+        // sync no off write cancels, so the enable stores the retry that the last open change drains.
+        val committed =
+            !enabled || !changed || commitFcmAutoInitAfterEnable { activeDeliveryModeTransactions.get() == 0 }
+        return changed && committed
     } catch (cancelled: CancellationException) {
         // A cancelled enable may have left native push on without a registration, before its rollback or
         // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on

@@ -19,9 +19,8 @@ internal suspend fun NotificationDeliveryController.applyMode(
     mode: NotificationDeliveryMode,
     enableRendering: Boolean,
 ): Boolean {
-    val intentGeneration = notificationDeliveryModeIntent.advance()
+    val intentGeneration = beginDeliveryModeTransaction()
     if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
-    activeDeliveryModeTransactions.incrementAndGet()
     notificationDeliveryModeBusy = true
     return try {
         notificationDeliveryModeMutex.withLock {
@@ -39,8 +38,11 @@ internal suspend fun NotificationDeliveryController.applyMode(
             }
         }
     } finally {
-        activeDeliveryModeTransactions.decrementAndGet()
-        finishNotificationDeliveryModeTransaction(intentGeneration)
+        try {
+            finishNotificationDeliveryModeTransaction(intentGeneration)
+        } finally {
+            endDeliveryModeTransaction()
+        }
     }
 }
 
@@ -295,7 +297,10 @@ internal suspend fun NotificationDeliveryController.establishPersistentMode(mode
     }
 }
 
-/** Disables native delivery for every captured signed-in account, then Firebase auto-init, behind the service. */
+/**
+ * Disables native delivery for every captured signed-in account, then Firebase auto-init, behind the service.
+ * Returns false when an account change fails or auto-init could neither be turned off nor have its retry stored.
+ */
 @Suppress("ReturnCount")
 private suspend fun NotificationDeliveryController.disableNativePushForPersistentDelivery(
     modeOwner: NotificationDeliveryModeOwner,
@@ -324,8 +329,8 @@ private suspend fun NotificationDeliveryController.disableNativePushForPersisten
             clearPushRegistrationForNotificationDeliveryOwnerLocked(modeOwner, account)
             if (!ownsNotificationDeliveryMode(modeOwner)) return@withLock false
         }
-        // Every signed-in account left native push, so Firebase must stop refreshing its token.
+        // Every signed-in account left native push, so Firebase must stop refreshing its token. A write that
+        // neither lands nor stores its retry fails the cutover, which keeps Local delivery established.
         applyFcmAutoInit(enabled = false)
-        true
     }
 }

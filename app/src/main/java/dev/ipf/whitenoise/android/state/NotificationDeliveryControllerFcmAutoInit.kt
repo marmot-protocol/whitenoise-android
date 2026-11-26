@@ -47,13 +47,13 @@ internal suspend fun NotificationDeliveryController.applyFcmAutoInit(enabled: Bo
     val applied =
         withContext(Dispatchers.IO) { runCatching { nativePushFallbackPlatform.setFcmAutoInitEnabled(enabled) } }
     fcmAutoInitWriteFailed.set(applied.isFailure)
-    return if (applied.isSuccess) {
+    val failure = applied.exceptionOrNull()
+    if (failure == null) {
         fcmAutoInitRetryUnstored.set(false)
-        true
-    } else {
-        appStateDebug(applied.exceptionOrNull()) { "FCM auto-init update failed enabled=$enabled" }
-        recordPendingRegistrationSync().also { stored -> fcmAutoInitRetryUnstored.set(!stored) }
+        return true
     }
+    appStateDebug(failure) { "FCM auto-init update failed enabled=$enabled" }
+    return recordPendingRegistrationSync().also { stored -> fcmAutoInitRetryUnstored.set(!stored) }
 }
 
 /**
@@ -73,10 +73,11 @@ internal suspend fun NotificationDeliveryController.disableFcmAutoInitWithoutNat
  * without the sync lock, so a list that changed during the settings reads may hold a Push account they
  * never saw. That account's own sync decides auto-init instead. Returns whether the off write settled.
  */
-private suspend fun NotificationDeliveryController.disableFcmAutoInitIfUnchanged(
-    readAccountRefs: List<String>,
-): Boolean =
-    if (host.nativePushAccountRefs() == readAccountRefs) applyFcmAutoInit(enabled = false) else true
+@Suppress("MaxLineLength")
+private suspend fun NotificationDeliveryController.disableFcmAutoInitIfUnchanged(readAccountRefs: List<String>): Boolean {
+    if (host.nativePushAccountRefs() != readAccountRefs) return true
+    return applyFcmAutoInit(enabled = false)
+}
 
 /**
  * Settles Firebase auto-init after a delivery change that did not complete. It turns auto-init off when no
@@ -147,13 +148,10 @@ internal suspend inline fun NotificationDeliveryController.settlingFcmAutoInitOn
  * change took over, or demand is unreadable, it records the pending registration sync, so the next sync
  * settles auto-init from live demand even if the newer change fails before touching it. Returns false when
  * auto-init could neither be written nor have its retry stored, so the change does not report success with
- * auto-init unsettled. When [acknowledgeSync] is provided and the on write succeeded, it clears the pending
- * registration marker left by the deferred confirmation sync.
+ * auto-init unsettled.
  */
-internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable(
-    acknowledgeSync: (suspend () -> Unit)? = null,
-    isCurrent: () -> Boolean,
-): Boolean {
+@Suppress("MaxLineLength")
+internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable(isCurrent: () -> Boolean): Boolean {
     return nativePushSyncMutex.withLock {
         if (!isCurrent()) return@withLock recordPendingRegistrationSync()
         val accountRefs = host.nativePushAccountRefs()
@@ -164,11 +162,7 @@ internal suspend fun NotificationDeliveryController.commitFcmAutoInitAfterEnable
                 runCatchingCancellable { nativePushDemand(accountRefs) }.getOrNull()
             }
         when (demand) {
-            NativePushDemand.Required -> {
-                val settled = applyFcmAutoInit(enabled = true)
-                if (!fcmAutoInitWriteFailed.get()) acknowledgeSync?.invoke()
-                settled
-            }
+            NativePushDemand.Required -> applyFcmAutoInit(enabled = true)
             NativePushDemand.None -> disableFcmAutoInitIfUnchanged(accountRefs)
             NativePushDemand.Unknown, null -> recordPendingRegistrationSync()
         }
