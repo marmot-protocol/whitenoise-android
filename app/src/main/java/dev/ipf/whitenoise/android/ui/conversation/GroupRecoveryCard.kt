@@ -262,7 +262,7 @@ private fun GroupHistoryNotice(
     }
 }
 
-/** Keeps the shared callout in the conversation timeline. */
+/** Gives the callout the timeline's section spacing above and below adjacent rows. */
 @Composable
 @Suppress("FunctionNaming")
 private fun RecoveryNoticeSurface(

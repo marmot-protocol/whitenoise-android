@@ -278,6 +278,7 @@ class GroupRecoveryCardScreenshotTest {
         composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
+    /** Retry scrolls into view above the composer and fires once at 200% text. */
     @Test
     fun retryRemainsReachableWhenEmptyTimelineRecoveryOverflows() {
         var retries = 0
