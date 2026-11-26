@@ -39,10 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -264,6 +267,8 @@ internal fun ConversationTopBar(
                             },
                         title = {
                             val timerHold = remember { TimerHoldArea() }
+                            val minTouchTarget = LocalViewConfiguration.current.minimumTouchTargetSize
+                            val minTouch = with(LocalDensity.current) { minTouchTarget.toSize() }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -280,8 +285,9 @@ internal fun ConversationTopBar(
                                                 stringResource(R.string.explanation_conversation_header_details),
                                             ),
                                             // A hold on the timer line belongs to its tooltip alone.
-                                            holdIgnoredAt = {
-                                                presentedGroup.disappearingMessageSecs > 0uL && timerHold.contains(it)
+                                            holdIgnoredAt = { position ->
+                                                presentedGroup.disappearingMessageSecs > 0uL &&
+                                                    timerHold.contains(position, minTouch)
                                             },
                                         ).clickable(
                                             onClickLabel = openDetailsDescription,
@@ -460,12 +466,26 @@ private class TimerHoldArea {
     var title: LayoutCoordinates? = null
     var anchor: LayoutCoordinates? = null
 
-    /** Whether [position], local to the title, falls on the tooltip's anchor. */
-    fun contains(position: Offset): Boolean {
+    /**
+     * Whether [position], local to the title, falls on the tooltip's anchor. Compose widens a small anchor's touch
+     * target to [minTouch], centred, so the area is widened the same way.
+     */
+    fun contains(
+        position: Offset,
+        minTouch: Size,
+    ): Boolean {
         val title = title?.takeIf { it.isAttached }
         val anchor = anchor?.takeIf { it.isAttached }
-        return title != null && anchor != null && title.localBoundingBoxOf(anchor).contains(position)
+        if (title == null || anchor == null) return false
+        return title.localBoundingBoxOf(anchor).widenedTo(minTouch).contains(position)
     }
+}
+
+/** This rect grown, centred, to at least [min] in each dimension. */
+private fun Rect.widenedTo(min: Size): Rect {
+    val dx = ((min.width - width) / 2).coerceAtLeast(0f)
+    val dy = ((min.height - height) / 2).coerceAtLeast(0f)
+    return Rect(left - dx, top - dy, right + dx, bottom + dy)
 }
 
 /** Read-only disappearing-messages indicator inside the header's chat-details tap target. */

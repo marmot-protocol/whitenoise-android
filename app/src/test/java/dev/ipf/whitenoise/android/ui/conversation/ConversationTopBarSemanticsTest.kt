@@ -13,6 +13,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -207,6 +208,13 @@ class ConversationTopBarSemanticsTest {
         composeRule.waitForIdle()
         assertNull("holding the timer must not also open the Chat Details explanation", host.shown)
         composeRule.onNodeWithTag("conversation.timer.tooltip").assertExists()
+
+        // Compose widens the small timer line to a 48dp touch target, so a hold just above it is still the timer's.
+        composeRule
+            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
+            .performTouchInput { longClick(Offset(centerX, -4.dp.toPx())) }
+        composeRule.waitForIdle()
+        assertNull("a hold in the timer's widened touch target must not open the explanation", host.shown)
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
