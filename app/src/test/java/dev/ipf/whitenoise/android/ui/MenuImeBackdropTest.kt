@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -19,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.animatedMenuImeBackdrop
 import dev.ipf.whitenoise.android.ui.conversation.awaitMenuImeRestore
 import dev.ipf.whitenoise.android.ui.conversation.captureMenuImeBackdrop
+import dev.ipf.whitenoise.android.ui.conversation.heldImeBottomPadding
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -40,8 +40,14 @@ class MenuImeBackdropTest {
     private var live by mutableIntStateOf(0)
     private var displayed = 0
 
-    /** Mounts a measured backdrop fixture with a frozen inset and a manually advanced clock. */
-    private fun content(initial: Int?) {
+    /**
+     * Mounts a measured backdrop fixture with a frozen inset and a manually advanced clock, padded the way
+     * ConversationScreen pads its transcript. [onComposed] runs after each composition of the caller.
+     */
+    private fun content(
+        initial: Int?,
+        onComposed: () -> Unit = {},
+    ) {
         frozen = initial
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
@@ -51,7 +57,8 @@ class MenuImeBackdropTest {
                         frozen = null
                         returning = false
                     }
-                Box(Modifier.size(400.dp).padding(bottom = (held ?: live).dp)) {
+                SideEffect(onComposed)
+                Box(Modifier.size(400.dp).heldImeBottomPadding { held?.invoke() ?: live }) {
                     Box(Modifier.fillMaxSize().onSizeChanged { displayed = 400 - it.height })
                 }
             }
@@ -99,6 +106,25 @@ class MenuImeBackdropTest {
                 assertEquals("Inset frames must not subscribe the conversation", settled, compositions)
             }
         }
+    }
+
+    /** Checks that an active hand-back animates the held geometry in layout without recomposing its caller. */
+    @Test
+    fun activeReturnAnimatesGeometryWithoutRecomposingTheCaller() {
+        var compositions = 0
+        content(320) { compositions++ }
+        val before = compositions
+        composeRule.runOnIdle {
+            live = 180
+            returning = true
+        }
+        // Nine frames stay inside the 160 ms animation, so its release does not recompose the caller either.
+        val samples = List(9) { frame() }
+        assertTrue("The held geometry must still animate: $samples", samples.distinct().size > 2)
+        assertTrue(
+            "The hand-back may recompose the caller once, for the returning flag: ${compositions - before}",
+            compositions - before <= 1,
+        )
     }
 
     /** Checks that opening with no keyboard leaves geometry tracking live insets. */

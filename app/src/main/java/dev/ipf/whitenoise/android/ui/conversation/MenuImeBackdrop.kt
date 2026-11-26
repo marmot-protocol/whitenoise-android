@@ -8,6 +8,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.offset
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -21,14 +25,18 @@ internal fun captureMenuImeBackdrop(
     liveBottom: Int,
 ): Int? = displayedBottom ?: liveBottom.takeIf { it > 0 }
 
-/** Hold menu geometry, then hand it back only at the same live IME height. */
+/**
+ * Hold menu geometry, then hand it back only at the same live IME height. Returns a reader for the held
+ * inset, or null when the live IME owns it. Read it in layout or draw: reading it in composition would
+ * recompose the caller on every frame of the hand-back.
+ */
 @Composable
 internal fun animatedMenuImeBackdrop(
     frozenBottom: Int?,
     returning: Boolean,
     liveBottom: () -> Int,
     onReleased: () -> Unit,
-): Int? {
+): (() -> Int)? {
     val readLiveBottom by rememberUpdatedState(liveBottom)
     val release by rememberUpdatedState(onReleased)
     val bottom = remember(frozenBottom) { Animatable((frozenBottom ?: 0).toFloat()) }
@@ -42,10 +50,30 @@ internal fun animatedMenuImeBackdrop(
             }
         }
     }
+    val readHeld: () -> Int =
+        remember(bottom, frozenBottom, returning) {
+            val held = frozenBottom ?: 0
+            if (returning) {
+                { bottom.value.roundToInt() }
+            } else {
+                { held }
+            }
+        }
     // Null, rather than zero, identifies ownership: zero is a valid animated
     // endpoint when restoration fails or the keyboard closes during handoff.
-    return frozenBottom?.let { if (returning) bottom.value.roundToInt() else it }
+    return readHeld.takeIf { frozenBottom != null }
 }
+
+/**
+ * Pads the bottom by the inset [bottom] reads, in pixels, like `Modifier.padding(bottom = …)`. The read
+ * happens during layout, so an animating inset relayouts the content without recomposing the caller.
+ */
+internal fun Modifier.heldImeBottomPadding(bottom: () -> Int): Modifier =
+    layout { measurable, constraints ->
+        val inset = bottom().coerceAtLeast(0)
+        val placeable = measurable.measure(constraints.offset(vertical = -inset))
+        layout(placeable.width, constraints.constrainHeight(placeable.height + inset)) { placeable.place(0, 0) }
+    }
 
 /** Give keyboard restoration a bounded chance before returning to its live inset. */
 internal suspend fun awaitMenuImeRestore(

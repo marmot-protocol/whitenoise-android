@@ -3161,7 +3161,9 @@ internal fun ConversationScreen(
     // The header opens chat details from its title and from the member shortcuts. The keyboard starts
     // closing as the composer unfolds into the details cards.
     val openDetailsFromHeader: () -> Unit = {
-        settingsMotion.launchFromComposer(captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)))
+        settingsMotion.launchFromComposer(
+            captureMenuImeBackdrop(displayedMenuImeBottom?.invoke(), imeInsets.getBottom(density)),
+        )
         keyboardController?.hide()
         showDetails = true
     }
@@ -3474,7 +3476,9 @@ internal fun ConversationScreen(
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
         batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
-    val presentedImeBottom = settingsMotion.outgoingImeBottom ?: displayedMenuImeBottom
+    // A reader, not a value: the menu keyboard hand-back animates it on every frame, and only layout reads it.
+    val outgoingImeBottom = settingsMotion.outgoingImeBottom
+    val presentedImeBottom: (() -> Int)? = outgoingImeBottom?.let { held -> { held } } ?: displayedMenuImeBottom
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
     ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled, settingsMotion) {
         WhiteNoiseScaffold(
@@ -3485,7 +3489,7 @@ internal fun ConversationScreen(
                     .then(
                         if (presentedImeBottom != null) {
                             Modifier
-                                .padding(bottom = with(density) { presentedImeBottom.toDp() })
+                                .heldImeBottomPadding(presentedImeBottom)
                                 .consumeWindowInsets(WindowInsets.ime)
                         } else {
                             Modifier
@@ -3622,11 +3626,15 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }, translator) {
+                ConversationBottomBarFrame(
+                    routeMorph,
+                    { with(density) { (presentedImeBottom?.invoke() ?: 0).toDp() } },
+                    translator,
+                ) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             settingsMotion.launchFromComposer(
-                                captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)),
+                                captureMenuImeBackdrop(displayedMenuImeBottom?.invoke(), imeInsets.getBottom(density)),
                             )
                             keyboardController?.hide()
                             showComposerSettings = true
@@ -4365,7 +4373,7 @@ internal fun ConversationScreen(
                                                             // Freeze the visible handoff geometry.
                                                             menuIme.backdropBottom =
                                                                 captureMenuImeBackdrop(
-                                                                    displayedMenuImeBottom,
+                                                                    displayedMenuImeBottom?.invoke(),
                                                                     imeInsets.getBottom(density),
                                                                 )
                                                             menuIme.backdropReturning = false
