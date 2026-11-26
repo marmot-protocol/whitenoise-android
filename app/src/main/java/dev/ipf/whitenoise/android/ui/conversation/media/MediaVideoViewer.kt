@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -21,7 +22,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -38,6 +38,8 @@ import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -294,9 +296,10 @@ internal fun VideoViewerPage(
 }
 
 /** Placeholder when a video cannot play: invalidated cache, invalidated playback or load failure. */
+@VisibleForTesting
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-private fun VideoViewerUnavailable(
+internal fun VideoViewerUnavailable(
     cacheInvalidating: Boolean,
     playbackInvalidated: Boolean,
     loadFailed: Boolean,
@@ -309,13 +312,18 @@ private fun VideoViewerUnavailable(
     ) {
         when {
             cacheInvalidating -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
-            playbackInvalidated ->
-                Icon(
-                    painterResource(R.drawable.ic_refresh),
-                    contentDescription = stringResource(R.string.video_failed),
-                    tint = Color.White,
-                    modifier = Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onPlaybackRetry),
-                )
+            playbackInvalidated -> {
+                // The whole 48 dp box takes the tap; only the press highlight is round.
+                val retryPress = remember { MutableInteractionSource() }
+                Box(Modifier.size(48.dp).shapedTouchTarget(retryPress, onClick = onPlaybackRetry)) {
+                    Icon(
+                        painterResource(R.drawable.ic_refresh),
+                        contentDescription = stringResource(R.string.video_failed),
+                        tint = Color.White,
+                        modifier = Modifier.matchParentSize().shapedPressFeedback(retryPress, CircleShape),
+                    )
+                }
+            }
             loadFailed -> MediaViewerLoadFailed(onRetry = onLoadRetry, contentColor = Color.White)
             else -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
         }

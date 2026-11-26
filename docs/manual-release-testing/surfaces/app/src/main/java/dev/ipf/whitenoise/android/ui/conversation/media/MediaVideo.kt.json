@@ -41,17 +41,6 @@
         ]
       }
     ],
-    "settings_controls": [
-      {
-        "surface": "string:video_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "R.string.video_failed",
-        "test_ids": [
-          "AXY-015",
-          "MED-001"
-        ]
-      }
-    ],
     "source_coverage": [
       {
         "surface": "Video tile unknown versus known-missing local file readiness",
@@ -68,14 +57,6 @@
         "anchor": "fun MediaVideoBubble(",
         "test_ids": [
           "MED-044"
-        ]
-      },
-      {
-        "surface": "R.string.video_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "R.string.video_failed",
-        "test_ids": [
-          "AXY-015"
         ]
       }
     ]

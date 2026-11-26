@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -587,16 +585,7 @@ internal fun MediaVideoBubble(
                     ) {
                         Box(Modifier.shapedPressFeedback(discPress, CircleShape), contentAlignment = Alignment.Center) {
                             when {
-                                uploadFailed ->
-                                    Icon(
-                                        painterResource(R.drawable.ic_refresh),
-                                        contentDescription = stringResource(R.string.video_failed),
-                                        modifier =
-                                            Modifier
-                                                .size(28.dp)
-                                                .clip(CircleShape)
-                                                .clickable { onRetryUpload?.invoke() },
-                                    )
+                                uploadFailed -> VideoRetryGlyph(onRetry = { onRetryUpload?.invoke() })
                                 uploading -> VideoUploadIndicator(uploadProgress)
                                 !cacheProbeReady ->
                                     CircularProgressIndicator(
@@ -611,16 +600,7 @@ internal fun MediaVideoBubble(
                                         modifier = Modifier.size(24.dp),
                                     )
                                 loading -> VideoDownloadingRing()
-                                failed ->
-                                    Icon(
-                                        painterResource(R.drawable.ic_refresh),
-                                        contentDescription = stringResource(R.string.video_failed),
-                                        modifier =
-                                            Modifier
-                                                .size(28.dp)
-                                                .clip(CircleShape)
-                                                .clickable(enabled = !loading) { retryFailedPlayback() },
-                                    )
+                                failed -> VideoRetryGlyph(enabled = !loading, onRetry = ::retryFailedPlayback)
                                 // An accepted download that has not started yet is still a download, never Play.
                                 localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
                                 else ->
