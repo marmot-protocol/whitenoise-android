@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,14 +44,15 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMembersReviewDialog
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.groupReviewAddMembersLabel
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -164,26 +165,24 @@ internal fun ProfileAddToGroupsContent(
                                 value = query,
                                 onValueChange = { query = it },
                                 placeholder = stringResource(R.string.forward_search_chats),
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                                modifier =
+                                    Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceMd),
                             )
                         }
                     }
                 }
                 if (groups.isNotEmpty() && filteredGroups.isEmpty()) {
                     item {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                        )
+                        WhiteNoiseEmptyState(stringResource(R.string.no_matches))
                     }
                 }
-                items(filteredGroups, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                itemsIndexed(filteredGroups, key = { _, (item, _) -> item.group.groupIdHex }) { index, (item, title) ->
                     val groupId = item.group.groupIdHex
                     val isSelected = selected.contains(groupId)
                     val avatar = rememberChatListGroupAvatar(appState, item)
-                    ContactRow(
+                    PersonRow(
+                        index = index,
+                        count = filteredGroups.size,
                         title = title,
                         subtitle = stringResource(R.string.members_count, item.memberCount),
                         avatarSeed = groupId,
@@ -346,21 +345,18 @@ internal fun ProfileMakeAdminContent(
                 WhiteNoiseLazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                     if (filteredGroups.isEmpty()) {
                         item {
-                            Text(
-                                stringResource(R.string.no_matches),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                            )
+                            WhiteNoiseEmptyState(stringResource(R.string.no_matches))
                         }
                     }
-                    items(
+                    itemsIndexed(
                         filteredGroups,
-                        key = { (item, _) -> item.group.groupIdHex },
-                    ) { (item, title) ->
+                        key = { _, (item, _) -> item.group.groupIdHex },
+                    ) { index, (item, title) ->
                         val selected = item.group.groupIdHex == selectedGroupId
                         val avatar = rememberChatListGroupAvatar(appState, item)
-                        ContactRow(
+                        PersonRow(
+                            index = index,
+                            count = filteredGroups.size,
                             title = title,
                             subtitle = stringResource(R.string.members_count, item.memberCount),
                             avatarSeed = item.group.groupIdHex,

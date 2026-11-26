@@ -107,13 +107,13 @@ class PictureDomainCoverageTest {
         assertEquals("loader references that rely on the default domain", emptyList<String>(), references)
     }
 
-    /** Each generic Avatar, ContactRow or group header given a picture URL names that picture's domain. */
+    /** Each generic Avatar, PersonRow or group header given a picture URL names that picture's domain. */
     @Test
     fun genericPictureRowsNameTheirDomain() {
         val rows =
             listOf(
                 Row("""(?<![A-Za-z0-9_])Avatar\(""", url = "pictureUrl", domain = "pictureDomain", urlPosition = 3),
-                Row("""(?<![A-Za-z0-9_])ContactRow\(""", url = "avatarUrl", domain = "avatarDomain", urlPosition = 3),
+                Row("""(?<![A-Za-z0-9_])PersonRow\(""", url = "avatarUrl", domain = "avatarDomain", urlPosition = 3),
                 Row("""(?<![A-Za-z0-9_])GroupDetailsHeader\(""", url = "pictureUrl", domain = "pictureDomain"),
             )
         val calls = mainSources().flatMap { file -> rows.flatMap { row -> calls(file, row.pattern).map { it to row } } }

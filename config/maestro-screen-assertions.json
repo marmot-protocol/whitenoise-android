@@ -849,11 +849,11 @@
         {
           "case": "presentation-group-ui-entity-empty",
           "selector": {
-            "text": "No results"
+            "text": "No matches"
           },
           "scope": "entity picker renders empty, disabled or selectable state and verifies selected stable identity; no group membership mutation.",
           "entry_assertion": {
-            "text": "No results"
+            "text": "No matches"
           },
           "visible_on_entry": true
         },

@@ -12,12 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Centred title and detail for a list with nothing in it. */
+/** Centred title and optional detail for a list with nothing in it. */
 @Suppress("FunctionNaming")
 @Composable
 fun WhiteNoiseEmptyState(
     title: String,
-    detail: String,
+    detail: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -31,12 +31,14 @@ fun WhiteNoiseEmptyState(
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.headlineSmall,
         )
-        Text(
-            text = detail,
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (detail != null) {
+            Text(
+                text = detail,
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
