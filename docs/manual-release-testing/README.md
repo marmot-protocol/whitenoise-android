@@ -30,11 +30,13 @@ them. Scenario files live in `cases/<ID>.md`; source files live in
 `surfaces/<source-path>.json` beneath this directory. No shared index is needed.
 
 A scenario file has one legacy hash comment, a blank line, and exactly one
-unchecked action → expected-result definition with ordinal `1`. The assembler
-places it at its existing position; permanent IDs never change. To add a new
-scenario, append an unused ID above the prefix's previous maximum, use
+unchecked action → expected-result definition with ordinal `1`. For long cases,
+put each sentence on a separate line and indent continuation lines by four spaces.
+The assembler joins the lines with spaces and places the scenario at its existing
+position. Use a separate case for a new, independently testable behavior. To add
+a new scenario, append an unused ID above the prefix's previous maximum, use
 `<!-- legacy-sha256: none -->`, and use the existing prefix's checklist section.
-Coordinate simultaneous new IDs; duplicate IDs are errors.
+Keep existing permanent IDs and coordinate simultaneous new IDs.
 When a prefix spans several checklist sections, add a new ID to the shared
 guide in its intended section first. Existing IDs in those sections can still
 be extracted and edited independently; the assembler never guesses a section.
@@ -46,7 +48,7 @@ A source file contains `source`, `legacy_sha256`, `categories`, and optionally
 for that source. Preserve all relevant entries, including those unaffected by
 your change. Every entry must belong to that exact source; other sources and
 global discovery exceptions remain unchanged. Updating an anchor or adding a
-scenario mapping belongs here.
+scenario mapping belongs here. Keep unrelated entries in their existing order.
 For an existing source file without any inventory entries, extraction creates
 an empty mapping with the correct legacy hash. Add the source's actual coverage
 entries before validating the production change.

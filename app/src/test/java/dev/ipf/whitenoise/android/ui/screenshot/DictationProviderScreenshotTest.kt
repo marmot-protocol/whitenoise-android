@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -21,6 +22,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.ui.settings.DictationProviderSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,7 +74,7 @@ class DictationProviderScreenshotTest {
                 WhiteNoiseTheme(darkTheme = true) {
                     DictationProviderSheet(
                         listOf(ConversationDictationProvider("example", "Example", listOf(choice))),
-                        null,
+                        choice,
                         {},
                         {},
                     )
@@ -81,6 +83,12 @@ class DictationProviderScreenshotTest {
         }
         composeRule.onNodeWithTag("dictation_provider_choices").performScrollToNode(hasText("Opens provider window"))
         composeRule.onNodeWithText("Opens provider window").assertIsDisplayed()
+        val choices = composeRule.onNodeWithTag("dictation_provider_choices").getUnclippedBoundsInRoot()
+        val engine = composeRule.onNodeWithText("Engine").assertIsSelected().getUnclippedBoundsInRoot()
+        assertTrue(
+            "The selected choice stays inside both sheet edges",
+            engine.left > choices.left && engine.right < choices.right,
+        )
         composeRule
             .onNodeWithTag("dictation_provider_choices")
             .captureRoboImage("src/test/snapshots/dictation_provider_window_large_rtl_dark.png")
