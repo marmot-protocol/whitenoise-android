@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
@@ -13,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
@@ -273,6 +275,52 @@ class AndroidTtsSpeechEngineTest {
         assertEquals(TextToSpeech.ERROR, engine.speak("Fixture text", "unavailable"))
     }
 
+    /** A batch submitted in one main-thread task checks the framework voice once, not once per sentence. */
+    @Test
+    fun oneBatchChecksTheFrameworkVoiceOnce() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        engine.setLanguage(Locale.US)
+        shadowOf(Looper.getMainLooper()).idle()
+        tts.voiceReads = 0
+
+        repeat(50) { assertEquals(TextToSpeech.SUCCESS, engine.speak("Sentence $it.", "u$it")) }
+
+        assertEquals(1, tts.voiceReads)
+        assertEquals(50, tts.spoken)
+    }
+
+    /** The next task checks the voice again, so a voice that stopped being installed refuses the next batch. */
+    @Test
+    fun aLaterBatchChecksTheVoiceAgain() {
+        val offline = voice("Offline", Locale.US, 300)
+        val tts = CountingVoiceTextToSpeech(offline)
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        engine.setLanguage(Locale.US)
+        assertEquals(TextToSpeech.SUCCESS, engine.speak("First batch.", "u1"))
+
+        tts.activeVoice = voice("Network", Locale.US, 300, networkRequired = true)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(TextToSpeech.ERROR, engine.speak("Second batch.", "u2"))
+        assertEquals(1, tts.spoken)
+    }
+
+    /** A stop inside the task drops the confirmation, so speech queued after it checks the voice again. */
+    @Test
+    fun stopDropsTheConfirmedVoiceWithinTheTask() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        engine.setLanguage(Locale.US)
+        tts.voiceReads = 0
+
+        engine.speak("Before stop.", "u1")
+        engine.stop()
+        engine.speak("After stop.", "u2")
+
+        assertEquals(2, tts.voiceReads)
+    }
+
     /** Builds a listener that records each lifecycle callback in order. */
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
@@ -313,6 +361,47 @@ class AndroidTtsSpeechEngineTest {
             activeVoice = voice
             return TextToSpeech.SUCCESS
         }
+    }
+
+    /** Counts framework voice reads and accepted utterances for an engine with one active voice. */
+    private class CountingVoiceTextToSpeech(
+        var activeVoice: Voice,
+    ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
+        var voiceReads = 0
+        var spoken = 0
+            private set
+
+        /** Models an engine that accepts the requested locale. */
+        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_AVAILABLE
+
+        /** Offers only the active voice. */
+        override fun getVoices(): MutableSet<Voice> = mutableSetOf(activeVoice)
+
+        /** Counts each binder-backed voice read. */
+        override fun getVoice(): Voice {
+            voiceReads++
+            return activeVoice
+        }
+
+        /** Accepts the offered voice. */
+        override fun setVoice(voice: Voice?): Int {
+            val accepted = voice == activeVoice
+            return if (accepted) TextToSpeech.SUCCESS else TextToSpeech.ERROR
+        }
+
+        /** Accepts every utterance without synthesizing audio. */
+        override fun speak(
+            text: CharSequence?,
+            queueMode: Int,
+            params: Bundle?,
+            utteranceId: String?,
+        ): Int {
+            spoken++
+            return TextToSpeech.SUCCESS
+        }
+
+        /** Stops without a framework connection. */
+        override fun stop(): Int = TextToSpeech.SUCCESS
     }
 
     /** Models a usable engine that relies on its default voice and exposes no catalog. */

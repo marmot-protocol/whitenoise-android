@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
@@ -19,6 +21,9 @@ internal class AndroidTtsSpeechEngine(
     private val retired = AtomicBoolean()
     private var enforceOfflineVoice = requireOfflineVoice
 
+    /** One binder voice check per batch: a queue submits a whole batch in one main-thread task. */
+    private val offlineVoice = TaskScopedConfirmation()
+
     override var effectiveLocale: Locale? = null
         private set
 
@@ -26,6 +31,7 @@ internal class AndroidTtsSpeechEngine(
     @Suppress("ReturnCount")
     override fun setLanguage(locale: Locale): Int {
         if (retired.get()) return TextToSpeech.LANG_NOT_SUPPORTED
+        offlineVoice.clear()
         val status = textToSpeech.setLanguage(locale)
         if (status == TextToSpeech.LANG_NOT_SUPPORTED) return retire(status)
         if (status < TextToSpeech.LANG_AVAILABLE) return status
@@ -58,6 +64,7 @@ internal class AndroidTtsSpeechEngine(
 
     /** Treats an ambiguous framework failure as the end of the consented connection. */
     private fun retire(status: Int): Int {
+        offlineVoice.clear()
         if (retired.compareAndSet(false, true)) onConnectionUncertain()
         return status
     }
@@ -138,7 +145,8 @@ internal class AndroidTtsSpeechEngine(
     ): Int =
         when {
             retired.get() -> TextToSpeech.ERROR
-            (enforceOfflineVoice || selectedVoice() != null) && currentFrameworkVoice()?.isInstalledOffline() != true ->
+            (enforceOfflineVoice || selectedVoice() != null) &&
+                !offlineVoice.confirm { currentFrameworkVoice()?.isInstalledOffline() == true } ->
                 TextToSpeech.ERROR
             else -> {
                 val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
@@ -148,7 +156,35 @@ internal class AndroidTtsSpeechEngine(
 
     /** Stops framework synthesis for the active queue. */
     override fun stop() {
+        offlineVoice.clear()
         if (!retired.get() && textToSpeech.stop() != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
+    }
+}
+
+/**
+ * Reuses a positive check for the rest of the current task on the calling looper. A message at the front of that
+ * looper's queue clears it, so it runs before any later message, such as a framework reconnection callback. Without
+ * a looper every call checks again.
+ */
+internal class TaskScopedConfirmation {
+    @Volatile
+    private var confirmedOn: Looper? = null
+
+    /** Forgets the confirmation at once, for example when the voice or language may have changed. */
+    fun clear() {
+        confirmedOn = null
+    }
+
+    /** Returns true when this task already confirmed, or when [check] confirms now. */
+    fun confirm(check: () -> Boolean): Boolean {
+        val looper = Looper.myLooper()
+        if (looper != null && confirmedOn === looper) return true
+        val confirmed = check()
+        if (confirmed && looper != null) {
+            confirmedOn = looper
+            Handler(looper).postAtFrontOfQueue { if (confirmedOn === looper) confirmedOn = null }
+        }
+        return confirmed
     }
 }
 
