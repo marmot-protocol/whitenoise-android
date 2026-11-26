@@ -31,11 +31,12 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingResult
 import dev.ipf.whitenoise.android.audio.VoiceRecordingSession
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -96,9 +97,12 @@ class VoiceRecordingStripFitScreenshotTest {
     /** A locked reply at 240 dp with 200% text keeps the reply preview clear while Lock and Pause fit. */
     @Test fun lockedReply240Rtl() = verifyFit(240, rtl = true, reply = true)
 
+    /** A locked reply with the microphone on the start side keeps Cancel reply pressable above the strip. */
+    @Test fun lockedReplyStartMic240Ltr() = verifyFit(240, rtl = false, reply = true, micAtStart = true)
+
     /**
-     * Locks a take at [width] dp, optionally while replying, checks and captures the strip, then pauses and resumes
-     * it by touch.
+     * Locks a take at [width] dp, optionally while replying or with the microphone on the start side, checks and
+     * captures the strip, then pauses and resumes it by touch.
      */
     private fun verifyFit(
         width: Int,
@@ -106,15 +110,19 @@ class VoiceRecordingStripFitScreenshotTest {
         capturePaused: Boolean = false,
         fontScale: Float = 2f,
         reply: Boolean = false,
+        micAtStart: Boolean = false,
     ) {
         val direction = if (rtl) "rtl" else "ltr"
         val text = if (fontScale > 1f) "large" else "default"
-        val name = "voice_strip_fit_${if (reply) "reply_" else ""}${width}_${direction}_$text"
+        val variant = (if (reply) "reply_" else "") + (if (micAtStart) "start_mic_" else "")
+        val name = "voice_strip_fit_$variant${width}_${direction}_$text"
+        val toolbar = ComposerToolbarSettings().withVoicePlacement(ComposerVoicePlacement.Left)
         ApplicationProvider
             .getApplicationContext<Context>()
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             .edit()
             .clear()
+            .apply { if (micAtStart) putString("composer_toolbar_v1", toolbar.encode()) }
             .commit()
         composeRule.setContent { stripHost(width, rtl, fontScale, reply) }
         composeRule.waitForIdle()
@@ -240,8 +248,10 @@ class VoiceRecordingStripFitScreenshotTest {
     }
 
     /** Returns the root bounds of the node with the given content description. */
-    private fun bounds(description: String): Rect =
-        composeRule.onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
+    private fun bounds(description: String): Rect {
+        val node = composeRule.onNodeWithContentDescription(description).fetchSemanticsNode()
+        return node.boundsInRoot
+    }
 
     private companion object {
         const val HOST_TAG = "strip-fit"
@@ -249,12 +259,16 @@ class VoiceRecordingStripFitScreenshotTest {
 }
 
 /** Whether two rectangles share area beyond a one-pixel rounding allowance. */
-private fun Rect.overlapsStrictly(other: Rect): Boolean =
-    left < other.right - 1f && other.left < right - 1f && top < other.bottom - 1f && other.top < bottom - 1f
+private fun Rect.overlapsStrictly(other: Rect): Boolean {
+    val acrossWidth = left < other.right - 1f && other.left < right - 1f
+    return acrossWidth && top < other.bottom - 1f && other.top < bottom - 1f
+}
 
 /** Whether [inner] lies inside this rectangle, allowing one pixel of rounding. */
-private fun Rect.contains(inner: Rect): Boolean =
-    inner.left >= left - 1f && inner.right <= right + 1f && inner.top >= top - 1f && inner.bottom <= bottom + 1f
+private fun Rect.contains(inner: Rect): Boolean {
+    val withinWidth = inner.left >= left - 1f && inner.right <= right + 1f
+    return withinWidth && inner.top >= top - 1f && inner.bottom <= bottom + 1f
+}
 
 /** A received text message for the composer to reply to. */
 private fun replyRecord() =
@@ -327,7 +341,5 @@ private object IdleDictationPlatform : ConversationDictationPlatform {
     override fun recognitionAvailable() = true
 
     /** Fails the test if dictation is ever started, since this host only renders the composer. */
-    override fun createSession(
-        listener: ConversationDictationRecognitionListener,
-    ): ConversationDictationRecognitionSession = error("Unexpected recognition")
+    override fun createSession(listener: ConversationDictationRecognitionListener) = error("Unexpected recognition")
 }

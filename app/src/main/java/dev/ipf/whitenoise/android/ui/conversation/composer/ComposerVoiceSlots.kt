@@ -151,7 +151,8 @@ internal fun rememberVoiceRecordingSlot(
  * Lays the strip over the pill. A shield beside the actions keeps every pointer there from reaching the hidden
  * composer. The strip shares the actions' row and leaves their width free, unless [actionRow] is given and a whole
  * action row fits between the accessory above the editor and the actions: then the strip spans the full width there,
- * so the timer, Lock and Pause keep their room on a narrow screen or with large text, and the accessory stays clear.
+ * so the timer, Lock and Pause keep their room on a narrow screen or with large text, and the accessory stays clear
+ * and pressable.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -178,13 +179,15 @@ private fun BoxScope.RecordingStripPlacement(
         val actionsTop = actionRow?.align(IntSize(0, rowHeight), IntSize(width, height), layoutDirection)?.y ?: 0
         val accessory = actionRow?.accessoryInset(height, rowHeight) ?: 0
         val above = actionsTop - accessory >= rowHeight
-        val shieldPlaceable = measurables[0].measure(Constraints.fixed(besideWidth, height))
+        // Above the actions, the shield starts below the accessory too, so its controls keep taking presses.
+        val shieldTop = if (above) accessory else 0
+        val shieldPlaceable = measurables[0].measure(Constraints.fixed(besideWidth, height - shieldTop))
         val stripPlaceable =
             measurables[1].measure(
                 if (above) Constraints.fixed(width, actionsTop - accessory) else Constraints.fixed(besideWidth, height),
             )
         layout(width, height) {
-            shieldPlaceable.placeRelative(start, 0)
+            shieldPlaceable.placeRelative(start, shieldTop)
             if (above) stripPlaceable.placeRelative(0, accessory) else stripPlaceable.placeRelative(start, 0)
         }
     }
