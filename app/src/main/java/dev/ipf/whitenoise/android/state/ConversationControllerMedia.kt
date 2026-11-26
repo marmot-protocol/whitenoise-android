@@ -34,7 +34,7 @@ internal fun ConversationController.canQueueAttachmentBytes(
     return if (albumExceedsRetainedCap(attachments)) {
         appState.present(R.string.media_album_too_large)
         false
-    } else if (replyTarget != null && attachments.any { it.sourceFile != null }) {
+    } else if (replyTarget != null && attachments.any { it.isFileBacked }) {
         appState.present(R.string.media_file_too_large)
         false
     } else {
@@ -192,7 +192,7 @@ internal suspend fun ConversationController.performMediaUpload(
                     ?: run {
                         val startedAtMs = diagnostics.beginMediaUpload(tempId)
                         val uploaded =
-                            if (retained.isFileBacked) {
+                            if (retained.isFileBacked || retained.isDraftStored) {
                                 uploadFileBackedRetained(account, key, tempId, retained, startedAtMs)
                             } else {
                                 mediaUploader?.invoke(account, group.groupIdHex, request)
@@ -206,7 +206,7 @@ internal suspend fun ConversationController.performMediaUpload(
                                                         group.groupIdHex,
                                                         request,
                                                         tempId,
-                                                        capturedReply = retained.replyRevision != null,
+                                                        forceUploadOnly = retained.uploadsBeforeAdmission,
                                                     )
                                                 }
                                             outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
@@ -246,16 +246,7 @@ internal suspend fun ConversationController.performMediaUpload(
                                 requireOptimisticSendNotCancelled(key)
                                 val accepted =
                                     mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
-                                        ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                            sendComposerMedia(
-                                                account,
-                                                group.groupIdHex,
-                                                references,
-                                                retained.caption,
-                                                tempId,
-                                                replyRevision = retained.replyRevision,
-                                            )
-                                        }
+                                        ?: admitRetainedMedia(account, references, retained, tempId)
                                 recordOptimisticSendAcceptance(key, accepted)
                                 accepted
                             }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
@@ -519,7 +510,7 @@ internal suspend fun ConversationController.performMediaUpload(
             }
             // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
             // reusing them would fail every Retry the same way, so the next attempt uploads again.
-            if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
+            retained.forgetUploadAfter(throwable)
             // A failed bubble offers Retry, not the bytes of the attempt that failed.
             retained.clearTransferProgress()
             optimisticMessages[key] =

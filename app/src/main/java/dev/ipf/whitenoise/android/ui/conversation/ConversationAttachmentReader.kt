@@ -42,20 +42,6 @@ internal data class DocumentReadOutcome(
     val totalBytes: Long,
 )
 
-internal enum class DocumentReadFailure {
-    TOO_LARGE,
-    UNREADABLE,
-    EMPTY,
-    UNPROCESSABLE_IMAGE,
-    STORAGE,
-
-    /** A video file whose private metadata could not be removed. It is refused, never sent as-is (#3376). */
-    VIDEO_METADATA,
-
-    /** A PDF whose metadata stays, which nobody chose to send as it is (#3377). */
-    PDF_METADATA,
-}
-
 /** The visual album read for one send. [videoMetadataRefused] reports a video refused for its private metadata. */
 internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
@@ -252,12 +238,14 @@ internal class ConversationAttachmentReader(
      * counts in-memory bytes only, and the send's [staging] hears about every snapshot as soon as it is
      * created and reserves the disk its upload still needs.
      */
+    @Suppress("LongParameterList") // Owned MIME is supplied only by the collection journal.
     suspend fun readPickedDocuments(
         uris: List<android.net.Uri>,
         bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         allowFileBacked: Boolean = false,
         staging: FileBackedSendStaging = FileBackedSendStaging(),
         pickKey: (String) -> String = { it },
+        ownedMime: Map<android.net.Uri, String> = emptyMap(),
     ): DocumentReadOutcome =
         withContext(Dispatchers.IO) {
             val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, staging = staging)
@@ -266,20 +254,22 @@ internal class ConversationAttachmentReader(
                     state.albumOverflowed = true
                     break
                 }
-                readPickedDocument(uri, bytesBudget, state, allowFileBacked, pickKey(uri.toString()))
+                readPickedDocument(uri, bytesBudget, state, allowFileBacked, pickKey(uri.toString()), ownedMime[uri])
             }
             state.outcome()
         }
 
     /** Routes one document pick, [pick], to the image sanitizer or the raw-file reader. */
+    @Suppress("LongParameterList") // Combines one pick, its budget and the result of the current read pass.
     private fun readPickedDocument(
         uri: android.net.Uri,
         bytesBudget: Long,
         state: DocumentReadAccumulator,
         allowFileBacked: Boolean,
         pick: String,
+        ownedMime: String?,
     ) {
-        val resolvedMime = normalizeDocumentMime(safeGetType(context.contentResolver, uri))
+        val resolvedMime = normalizeDocumentMime(ownedMime ?: safeGetType(context.contentResolver, uri))
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
         val sniffedImageMime = MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
         if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
@@ -404,13 +394,14 @@ internal class ConversationAttachmentReader(
      * Reads visual picks in order. Without [fileBacked], every pick shares the in-memory album budget
      * exactly as before. With it, a video that does not fit the remaining [inMemoryBytesBudget] is
      * staged to a private file, and every accepted item is charged against the message's file budget.
-     * A named [pick] is one picked file and decodes in its draft's worker, so it reads at most one URI.
+     * A named [pick] is one file and decodes in its draft's worker. [ownedMime] comes from a journaled copy.
      */
     suspend fun readPickedImages(
         uris: List<android.net.Uri>,
         fileBacked: FileBackedPickBudget? = null,
         inMemoryBytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         pick: String? = null,
+        ownedMime: String? = null,
     ): VisualReadOutcome {
         require(pick == null || uris.size <= 1) { "One pick names one picked file" }
         // A file-backed pick copies up to 512 MiB, which belongs on the IO pool rather than a CPU worker.
@@ -427,7 +418,7 @@ internal class ConversationAttachmentReader(
                     overflowed = true
                     break
                 }
-                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation, pick)
+                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation, pick, ownedMime)
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
                 videoMetadataRefused = videoMetadataRefused || outcome.videoMetadataRefused
@@ -452,31 +443,43 @@ internal class ConversationAttachmentReader(
     /**
      * Reads one visual [pick] through the same transform and in-memory limits used at send time, decoding in that
      * pick's draft's outgoing worker, while a read that names no pick decodes single-use. A send names the domain of
-     * each attachment it sends itself.
+     * each attachment it sends itself. With [toFile], a video too large for memory is copied to a private file with
+     * its metadata removed instead of refused; the copy stops once the read is cancelled, and the caller owns the file
+     * only once it receives the attachment.
      */
     suspend fun readVisualDraft(
         uri: android.net.Uri,
         pick: String? = null,
+        toFile: Boolean = false,
     ): PendingAttachment? =
-        withContext(Dispatchers.Default) {
-            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = null, pick = pick).attachment
+        ownedDraftRead { staging ->
+            // Copying a large video to a file is I/O-bound, so it runs on the IO pool, an in-memory read on Default.
+            withContext(if (toFile) Dispatchers.IO else Dispatchers.Default) {
+                val fileBacked = if (toFile) fileBackedBudget(staging) else null
+                readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked, { ensureActive() }, pick).attachment
+            }
         }
 
-    /** Reads one document pick through the same MIME and byte limits used at send time. */
-    suspend fun readDocumentDraft(uri: android.net.Uri): PendingAttachment? {
-        val outcome = readPickedDocuments(listOf(uri))
-        return outcome.attachments.singleOrNull()
-    }
+    /** Reads one document pick through the same MIME and byte limits used at send time, [toFile] as above. */
+    suspend fun readDocumentDraft(
+        uri: android.net.Uri,
+        toFile: Boolean = false,
+    ): PendingAttachment? =
+        ownedDraftRead { staging ->
+            readPickedDocuments(listOf(uri), allowFileBacked = toFile, staging = staging).attachments.singleOrNull()
+        }
 
     /** Reads one image or video pick; only a video may be staged to a file, and only with [fileBacked]. */
+    @Suppress("LongParameterList") // Combines one pick's metadata and read budget with its decoder domain.
     private fun readVisualAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
         fileBacked: FileBackedPickBudget?,
         checkCancellation: () -> Unit = {},
         pick: String? = null,
+        ownedMime: String? = null,
     ): ImageAttachmentReadOutcome {
-        val mime = safeGetType(context.contentResolver, uri)
+        val mime = ownedMime ?: safeGetType(context.contentResolver, uri)
         val isVideo = mime.startsWith("video/", ignoreCase = true)
         val declaredSize = if (isVideo) queryContentSize(context.contentResolver, uri) else -1L
         val inMemoryCap = minOf(MediaPipeline.VIDEO_MAX_BYTES, remainingBytes)
@@ -498,7 +501,7 @@ internal class ConversationAttachmentReader(
         fileBacked: FileBackedPickBudget?,
         checkCancellation: () -> Unit,
     ): ImageAttachmentReadOutcome =
-        when (val result = MediaPipeline.readVideoForUpload(context, uri, remainingBytes)) {
+        when (val result = MediaPipeline.readVideoForUpload(context, uri, remainingBytes, mediaType)) {
             is MediaPipeline.VideoReadResult.Success ->
                 ImageAttachmentReadOutcome(
                     PendingAttachment(

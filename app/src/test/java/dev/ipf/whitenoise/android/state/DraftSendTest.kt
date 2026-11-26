@@ -6,7 +6,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.NoPointer
@@ -72,6 +72,30 @@ class DraftSendTest {
             val mismatched = ScriptedEngine(draft = content("cap", attachments = listOf(jpeg("a.jpg"))))
             mismatched.marmot.sendComposerMedia("acct", "group", listOf(reference("b.pdf", "application/pdf")), "cap")
             assertEquals(listOf("selectedMessageDraft", "sendMediaAttachments"), mismatched.calls)
+        }
+
+    /** A caption change before a draft send keeps every attachment by id, a stored file included, and reads no body. */
+    @Test
+    fun captionSaveKeepsEveryAttachmentById() =
+        runBlocking {
+            val stored = descriptor("clip.mp4", "video/mp4").copy(fileBacked = true)
+            val engine = ScriptedEngine(draft = content("old", attachments = listOf(jpeg("a.jpg"), stored)))
+            val references = listOf(reference("a.jpg", "image/jpeg"), reference("clip.mp4", "video/mp4"))
+
+            engine.marmot.sendComposerMedia("acct", "group", references, "new caption")
+
+            assertEquals(
+                listOf("selectedMessageDraft", "saveMessageDraftInputsIfRevision", "sendMessageDraft"),
+                engine.calls,
+            )
+            assertEquals("new caption", engine.savedContent)
+            assertEquals(
+                listOf(
+                    MessageDraftAttachmentInputFfi.Retained("a.jpg"),
+                    MessageDraftAttachmentInputFfi.Retained("clip.mp4"),
+                ),
+                engine.savedInputs,
+            )
         }
 
     /** A draft whose media references MDK refuses, stale or unsettled epoch included, falls back to a direct send. */
@@ -158,6 +182,7 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
     private var draftSendFailure: MarmotKitException? = null
     lateinit var calls: MutableList<String>
     var savedContent: String? = null
+    var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
     private lateinit var revision: MessageDraftRevisionFfi
 
     val marmot: MarmotInterface get() = this
@@ -181,33 +206,23 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
         return SelectedMessageDraftFfi(revision, draft)
     }
 
-    /** Records the attachment re-read the revision save needs. */
+    /** A send never re-reads attachment bodies: MDK refuses that whole read once a draft holds a stored file. */
     override fun messageDraft(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftFfi? {
-        calls += "messageDraft"
-        return draft?.let {
-            MessageDraftFfi(
-                it.groupIdHex,
-                it.content,
-                it.replyToMessageIdHex,
-                it.mediaAttachments.map { d -> hydrated(d) },
-                1L,
-                1L,
-            )
-        }
-    }
+    ): MessageDraftFfi? = throw AssertionError("a draft send must not hydrate attachment bodies")
 
-    override fun saveMessageDraftIfRevision(
+    /** Records the caption save and the inputs it keeps, by id, without copying a body. */
+    override fun saveMessageDraftInputsIfRevision(
         accountRef: String,
         revision: MessageDraftRevisionFfi,
         content: String,
         replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
+        mediaAttachments: List<MessageDraftAttachmentInputFfi>,
     ): SelectedMessageDraftFfi {
-        calls += "saveMessageDraftIfRevision"
+        calls += "saveMessageDraftInputsIfRevision"
         if (conflictOnSave) throw MarmotKitException.MessageDraftRevisionConflict()
+        savedInputs = mediaAttachments
         savedContent = content
         val updated = draft?.copy(content = content, replyToMessageIdHex = replyToMessageIdHex)
         return SelectedMessageDraftFfi(this.revision, updated)
@@ -271,19 +286,6 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
             }
     }
 }
-
-/** Gives a descriptor one byte of plaintext so the hydrated draft carries attachments. */
-private fun hydrated(descriptor: SelectedMessageDraftAttachmentFfi) =
-    MessageDraftAttachmentFfi(
-        id = descriptor.id,
-        fileName = descriptor.fileName,
-        mediaType = descriptor.mediaType,
-        plaintext = byteArrayOf(1),
-        dim = null,
-        thumbhash = null,
-        durationSeconds = null,
-        waveformSamples = emptyList(),
-    )
 
 private fun content(
     text: String,
