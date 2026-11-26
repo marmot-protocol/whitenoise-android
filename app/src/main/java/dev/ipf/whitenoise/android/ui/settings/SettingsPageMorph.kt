@@ -56,7 +56,6 @@ internal class SettingsPageMorph {
     private var entryStart = 0f
     private var entryOnly = false
     internal var captureInputs: (() -> Any?)? = null
-    internal var captureSettled: (() -> Boolean)? = null
     internal var childContours: (() -> List<SettingsContour>?)? = null
     internal var childBodyTop: (() -> Float)? = null
 
@@ -421,7 +420,8 @@ internal class SettingsPageMorph {
         backplate: Color,
         captureContent: Boolean = true,
     ) {
-        val inputs = captureInputs?.invoke()
+        // Read the viewport only when this frame may record it: the read subscribes the host draw to every scroll.
+        val inputs = if (recording && captureContent) captureInputs?.invoke() else null
         if (!recording) clearPictures()
         if (!captureContent || settled?.inputs != inputs) settled = null
         val native = nativeContours(host)
@@ -431,7 +431,7 @@ internal class SettingsPageMorph {
         }
         if (bounds(host, time) == null || time >= 1f) {
             leaving = null
-            drawSettledFrame(native, host, recording && captureContent && captureSettled?.invoke() != false, inputs)
+            drawSettledFrame(native, host, recording && captureContent, inputs)
             return
         }
         updateNativeFrame(native, host, time)

@@ -134,20 +134,12 @@ internal class SettingsCardMorph(
         }
     }
 
-    /**
-     * Observe the existing child's viewport in every ancestor that retains its pixels. While [settled] reads
-     * false, such as during a scroll, frames draw live and record nothing; the next frame records once.
-     */
-    fun observeCaptureInputs(
-        settled: () -> Boolean = { true },
-        read: () -> Any?,
-    ): () -> Unit {
+    /** Observe the existing child's viewport in every ancestor that retains its pixels. */
+    fun observeCaptureInputs(read: () -> Any?): () -> Unit {
         page?.captureInputs = read
-        page?.captureSettled = settled
-        val releaseParent = parent?.observeCaptureInputs(settled, read)
+        val releaseParent = parent?.observeCaptureInputs(read)
         return {
             page?.let { if (it.captureInputs === read) it.captureInputs = null }
-            page?.let { if (it.captureSettled === settled) it.captureSettled = null }
             releaseParent?.invoke()
         }
     }
@@ -420,8 +412,9 @@ internal fun <T> rememberSettingsCardMorphHost(
 ): Pair<Boolean, Modifier> {
     // Native control borders do not opt borderless settings themes into contour motion.
     val animateContours = permitsContourMotion(morph, motion)
-    // Only a contour transition replays the settled frame, so borderless themes and reduced motion never record.
-    morph?.captureContent = captureContent && animateContours
+    // Only a contour transition replays the settled frame, which borderless themes never run. Motion is not part of
+    // this: a leg entered without motion must still record for the next leave.
+    morph?.captureContent = captureContent && (morph?.page == null || isAmoledSurfaceTheme())
     DisposableEffect(morph, ownerKey) {
         val releaseChild = morph?.observeChildContours()
         onDispose {

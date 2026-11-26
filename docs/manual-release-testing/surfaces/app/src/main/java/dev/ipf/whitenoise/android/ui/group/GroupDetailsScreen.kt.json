@@ -755,14 +755,6 @@
         "test_ids": [
           "GRP-042"
         ]
-      },
-      {
-        "surface": "Group details records its leaving frame only after scrolling stops",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "detailsMorph.observeCaptureInputs(settled =",
-        "test_ids": [
-          "SET-070"
-        ]
       }
     ]
   },
