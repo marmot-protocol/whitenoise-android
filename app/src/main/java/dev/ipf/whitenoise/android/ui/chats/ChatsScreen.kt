@@ -2447,7 +2447,8 @@ internal fun ChatsScreen(
                         !appState.wipeInProgress
                 val unreadActionsAvailable = !searchOpen && !selectionMode && unreadOwnerAvailable
                 key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
-                    val emptyPageScroll = key(visibleItems.isEmpty(), showArchived, unreadOnly) { rememberScrollState() }
+                    val emptyPageScroll =
+                        key(visibleItems.isEmpty(), showArchived, unreadOnly) { rememberScrollState() }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
