@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val CHAT_LIST_SEARCH_MODES_TAG = "global.library.modes"
@@ -77,7 +77,7 @@ internal fun GlobalSearchAttachmentModes(
                 } else {
                     state.contentFilterSelection.selectedKinds == setOf(kind)
                 }
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = selected,
                 onClick = {
                     onSelectionChange(GlobalSearchContentFilterSelection(kind?.let { setOf(it) }.orEmpty()))

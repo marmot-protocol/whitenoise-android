@@ -65,6 +65,44 @@ class AttachmentCollectionJournalTest {
         assertFalse("captions or names never reach the journal", text.contains("caption\":\""))
     }
 
+    /** A caption's token and draft save times survive the journal, and its text never reaches the record. */
+    @Test
+    fun sentCaptionRoundTripsWithoutItsText() {
+        val journal = journal()
+        val base = operation()
+        val token = "token-0"
+        val caption = CollectionSentCaption(token, draftCreatedAtMs = 7L, draftUpdatedAtMs = 9L)
+        val written = base.withChunkToken(base.chunks[0].id, token, now).copy(sentCaption = caption)
+
+        assertTrue(journal.write(written))
+
+        assertEquals(caption, journal.read("account", "group").single().sentCaption)
+        assertNull(decodeCollectionOperation(encodeCollectionOperation(base, withUris = true)).sentCaption)
+    }
+
+    /** A captured caption waits for cleanup only once MDK accepted the chunk its token names. */
+    @Test
+    fun sentCaptionIsPendingOnlyAfterItsTokenIsAccepted() {
+        val base = operation()
+        val first = base.chunks[0]
+        val bound =
+            base
+                .withChunkToken(first.id, "token-0", now)
+                .copy(sentCaption = CollectionSentCaption("token-0", 7L, 9L))
+        assertNull(bound.pendingSentCaption)
+        assertFalse(bound.needsStoredDraftCleanup)
+        assertTrue("an unresolved caption token outlives expiry", bound.mayNeedStoredDraftCleanup)
+
+        val accepted =
+            bound.withChunkState(first.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, now)
+        assertEquals(bound.sentCaption, accepted.pendingSentCaption)
+        assertTrue(accepted.needsStoredDraftCleanup)
+
+        val otherToken = accepted.copy(sentCaption = CollectionSentCaption("another", 7L, 9L))
+        assertNull(otherToken.pendingSentCaption)
+        assertFalse(otherToken.needsStoredDraftCleanup)
+    }
+
     /** Records are scoped: another account or conversation sees nothing. */
     @Test
     fun recordsAreScopedToAccountAndConversation() {
@@ -85,6 +123,122 @@ class AttachmentCollectionJournalTest {
         journal.write(operation(id = "later").copy(updatedAtMs = 0L))
         journal.sweepExpired()
         assertTrue(folder.root.walkTopDown().none { it.isFile })
+    }
+
+    /** Discard stops remaining uploads while leaving an accepted stored-draft cleanup recoverable after expiry. */
+    @Test
+    fun discardingAcceptedCollectionPreservesOnlyCleanup() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val planned = operation()
+        val original = CollectionStoredDraft("native", 42L, "application/example")
+        val items = planned.items.map { item -> item.copy(storedDraft = original.copy(attachmentId = item.id)) }
+        val accepted =
+            planned
+                .copy(items = items)
+                .withChunkState(
+                    planned.chunks.first().id,
+                    CollectionChunkState.ACCEPTED,
+                    CollectionItemState.PUBLISHED,
+                    now,
+                )
+        assertTrue(registry.start(accepted))
+        registry.discard(accepted.id)
+        awaitAttachmentCollectionJournal()
+        now += ATTACHMENT_COLLECTION_JOURNAL_TTL_MS + 1
+        val coldRegistry = AttachmentCollectionRegistry(journal) { now }
+        coldRegistry.sweepExpired()
+
+        val restored = coldRegistry.journaledFor(accepted.accountRef, accepted.groupIdHex).single()
+        assertEquals(CollectionOperationPhase.FINISHED, restored.phase)
+        assertTrue(restored.needsStoredDraftCleanup)
+        assertEquals(original.copy(attachmentId = planned.items.first().id), restored.items.first().storedDraft)
+        assertTrue(restored.items.all { it.uri.isEmpty() })
+    }
+
+    /** A later unresolved token survives Discard even when an earlier accepted ID awaits native cleanup. */
+    @Test
+    fun discardWaitsForLaterDraftToken() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val plan = operation(count = 2)
+        val items = plan.items.map { it.copy(storedDraft = CollectionStoredDraft(it.id, 3L, "application/example")) }
+        val paused =
+            plan
+                .copy(items = items, paused = true)
+                .withChunkState(plan.chunks[0].id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, now)
+                .withChunkToken(plan.chunks[1].id, "later", now)
+        assertTrue(paused.needsStoredDraftCleanup)
+        assertFalse(paused.canDiscard)
+        assertTrue(registry.start(paused))
+        registry.discard(paused.id)
+        awaitAttachmentCollectionJournal()
+
+        val restored = journal.read(paused.accountRef, paused.groupIdHex).single()
+        assertEquals("later", restored.nextChunk?.clientToken)
+        assertFalse(restored.canDiscard)
+    }
+
+    /** A failed same-token retry must leave both the earlier live state and its durable record intact. */
+    @Test
+    fun failedRewritePreservesEarlierJournal() {
+        val journal = journal()
+        val registry = AttachmentCollectionRegistry(journal) { now }
+        val planned = operation()
+        val original = planned.withChunkToken(planned.chunks.first().id, "accepted-before-retry", now)
+        assertTrue(registry.start(original))
+        val file = folder.root.walkTopDown().single { it.isFile }
+        assertTrue(java.io.File(file.parentFile, file.name + ".tmp").mkdir())
+
+        assertFalse(registry.start(original.copy(updatedAtMs = now + 1)))
+
+        assertEquals(original, registry.operations.value[original.id])
+        val saved = journal.read(original.accountRef, original.groupIdHex).single()
+        assertEquals("accepted-before-retry", saved.nextChunk?.clientToken)
+    }
+
+    /** An expiry cleanup that cannot rewrite the journal still returns adoptable durable metadata. */
+    @Test
+    fun failedExpiryRewriteKeepsRecoverableUris() {
+        val journal = journal()
+        val planned = operation(count = 1)
+        val source = CollectionStoredDraft("native", 3L, "application/example")
+        val owned = planned.items.single().copy(storedDraft = source)
+        val recorded = planned.copy(items = listOf(owned)).withChunkToken(planned.chunks.single().id, "pending", now)
+        assertTrue(journal.write(recorded))
+        val file = folder.root.walkTopDown().single { it.isFile }
+        assertTrue(java.io.File(file.parentFile, file.name + ".tmp").mkdir())
+        now += ATTACHMENT_COLLECTION_JOURNAL_TTL_MS + 1
+
+        val reopened = journal.read(recorded.accountRef, recorded.groupIdHex).single()
+
+        assertEquals(owned.uri, reopened.items.single().uri)
+        assertTrue(journal.contains(reopened))
+    }
+
+    /** A skipped pick still owns a shared native ID even when a separate occurrence was accepted. */
+    @Test
+    fun skippedAliasPreservesSharedOriginal() {
+        val planned = operation()
+        val shared = CollectionStoredDraft("shared", 10L, "application/example")
+        val first = planned.items[0].copy(state = CollectionItemState.PUBLISHED, storedDraft = shared)
+        val skipped = planned.items[1].copy(state = CollectionItemState.SKIPPED, storedDraft = shared)
+        val sent =
+            planned.items[2].copy(
+                state = CollectionItemState.PUBLISHED,
+                storedDraft =
+                    shared.copy(
+                        attachmentId = "sent",
+                    ),
+            )
+        val restored =
+            decodeCollectionOperation(
+                encodeCollectionOperation(
+                    planned.copy(items = listOf(first, skipped, sent)),
+                    withUris = true,
+                ),
+            )
+        assertEquals(listOf(sent.storedDraft), restored.pendingDraftFiles)
     }
 
     /** A record too large with URIs is kept without them, under 256 KiB; more than 100 items is refused. */
@@ -136,6 +290,25 @@ class AttachmentCollectionJournalTest {
         registry.discard(second.id)
         awaitAttachmentCollectionJournal()
         assertTrue(folder.root.walkTopDown().none { it.isFile })
+    }
+
+    /** Account or conversation removal during copying cannot recreate its journal after cleanup. */
+    @Test
+    fun destinationRemovalInvalidatesWaitingAdmissionsOnlyForThatDestination() {
+        val registry = AttachmentCollectionRegistry(journal(), clock = { now })
+        val leaving = registry.admissions.begin("account", "group")
+        val deleting = registry.admissions.begin("second", "deleted")
+        val retained = registry.admissions.begin("second", "retained")
+        registry.forgetAccount("account")
+        registry.invalidateConversation("second", "deleted")
+
+        assertFalse(registry.start(operation(), leaving))
+        assertFalse(registry.start(operation(id = "deleted", account = "second", group = "deleted"), deleting))
+        assertTrue(registry.start(operation(id = "retained", account = "second", group = "retained"), retained))
+
+        assertEquals(setOf("retained"), registry.operations.value.keys)
+        assertTrue(journal().read("account", "group").isEmpty())
+        assertTrue(journal().read("second", "deleted").isEmpty())
     }
 
     /** A second Resume of the same operation is refused until the first one ends its claim. */

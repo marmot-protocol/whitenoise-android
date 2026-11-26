@@ -54,6 +54,29 @@ class ComposerAcceptedCollapseTest {
     /** An acceptance without a presentation id installs no flight, so the collapse snaps. */
     @Test fun missingPresentationSnaps() = assertAcceptance("no-presentation", false)
 
+    /** Completing a reopened draft clears its field in place and leaves the original already-cleared owner alone. */
+    @Test
+    fun acceptedCaptionClearsOnlyTheReopenedDraft() {
+        val reopened = ComposerTextState(TextFieldValue("sent caption"))
+        reopened.clearReopenedAcceptedCaption("sent caption", editingMessage = false)
+        assertEquals("", reopened.valueState.value.text)
+        val clearedGeneration = reopened.contentGeneration
+
+        reopened.clearReopenedAcceptedCaption("sent caption", editingMessage = false)
+
+        assertEquals(clearedGeneration, reopened.contentGeneration)
+        val editing = ComposerTextState(TextFieldValue("in-progress edit"))
+        editing.preEditState.value = TextFieldValue("sent caption")
+        editing.clearReopenedAcceptedCaption("sent caption", editingMessage = true)
+        assertEquals("in-progress edit", editing.valueState.value.text)
+        assertEquals("", editing.preEditState.value?.text)
+
+        editing.preEditState.value = TextFieldValue("sent caption")
+        editing.clearReopenedAcceptedCaption("sent caption", editingMessage = false)
+        assertEquals("in-progress edit", editing.valueState.value.text)
+        assertEquals("", editing.preEditState.value?.text)
+    }
+
     /** Sends a two-line draft via the real Send button under [scenario] and checks whether the collapse animates. */
     private fun assertAcceptance(
         scenario: String,

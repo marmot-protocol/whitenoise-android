@@ -10,14 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -47,8 +43,12 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
@@ -58,7 +58,6 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
 
@@ -125,16 +124,10 @@ internal fun ProfileQrSheet(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    ModalBottomSheet(
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = ::dismissSheet,
         sheetState = sheetState,
-        sheetGesturesEnabled = sheetActive,
-        properties =
-            ModalBottomSheetProperties(
-                shouldDismissOnBackPress = sheetActive,
-                shouldDismissOnClickOutside = sheetActive,
-            ),
-        containerColor = amoledSheetContainerColor(),
+        interactionEnabled = sheetActive,
     ) {
         Column(
             Modifier
@@ -142,7 +135,7 @@ internal fun ProfileQrSheet(
                 .fadingVerticalScroll(
                     state = contentScrollState,
                     enabled = contentScrollState.maxValue > 0,
-                ).padding(24.dp),
+                ).padding(WhiteNoiseSheetInset),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -174,7 +167,7 @@ internal fun ProfileQrSheet(
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
-                    OutlinedButton(
+                    WhiteNoiseOutlinedButton(
                         onClick = { shareMenuExpanded = true },
                         enabled = npub.isNotBlank() && !pictureShareInProgress,
                         modifier = Modifier.fillMaxWidth(),
@@ -248,7 +241,7 @@ internal fun ProfileQrSheet(
                     )
                 }
                 if (showScan) {
-                    Button(
+                    WhiteNoiseButton(
                         onClick = {
                             scanError = null
                             showScanner = true

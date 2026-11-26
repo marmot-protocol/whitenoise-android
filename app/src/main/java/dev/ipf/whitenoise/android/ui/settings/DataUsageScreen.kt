@@ -83,6 +83,7 @@ internal fun DataUsageScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenManageStorage: () -> Unit = {},
+    onOpenHistoryBackups: () -> Unit = {},
 ) {
     var picker by rememberSaveable { mutableStateOf<MediaAutoDownloadType?>(null) }
     var qualityPicker by rememberSaveable { mutableStateOf(false) }
@@ -106,6 +107,16 @@ internal fun DataUsageScreen(
                     destination = SettingsDetail.Data,
                     surface = "data-storage",
                 ) {
+                    row("history_backups") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.history_backups),
+                            routeKey = SettingsDetail.HistoryBackups,
+                            explanation = stringResource(R.string.explanation_organize_hub_history_backups),
+                            onClick = onOpenHistoryBackups,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_history) },
+                        )
+                    }
                     row("manage_storage") { context ->
                         SettingsLink(
                             context = context,

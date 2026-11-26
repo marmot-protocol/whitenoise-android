@@ -264,20 +264,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
-      "calls": {
-        "fadingVerticalScroll": 1
-      },
-      "family": "common",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -292,7 +278,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StatePage.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -1803,6 +1789,34 @@
       "policy": "Local generated licence list and selectable text retain native remembered scroll owners; shared viewport fades mask content and leave fixed navigation chrome unchanged.",
       "test_ids": [
         "SET-019"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
       ]
     },
     {

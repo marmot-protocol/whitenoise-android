@@ -5,18 +5,17 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -30,12 +29,16 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
  * Non-cancellable staged progress sheet shown while the engine's
@@ -50,8 +53,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WipeProgressSheet() {
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         // The teardown cannot be cancelled: swallow scrim taps, reject the
         // hide gesture, keep back from dismissing, and drop the drag handle so
         // the sheet doesn't advertise a dismissal it won't honor.
@@ -61,24 +63,28 @@ internal fun WipeProgressSheet() {
                 skipPartiallyExpanded = true,
                 confirmValueChange = { it != SheetValue.Hidden },
             ),
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
+        interactionEnabled = false,
         dragHandle = null,
     ) {
         // Large text can push the keep-open note past the screen, so the sheet scrolls.
-        Column(
-            Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.wipe_progress_title), style = MaterialTheme.typography.titleLarge)
-            WipeProgressStageRow(stringResource(R.string.wipe_stage_leaving_groups))
-            WipeProgressStageRow(stringResource(R.string.wipe_stage_deleting_key_packages))
-            WipeProgressStageRow(stringResource(R.string.wipe_stage_wiping_local_data))
-            // Leaving a chat with another admin first steps this account down, which can wait on relays.
-            Text(
-                stringResource(R.string.wipe_progress_keep_open),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Column(Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
+            // Without a handle the title needs its own top inset.
+            Spacer(Modifier.height(WhiteNoiseSpacing.FormField))
+            WhiteNoiseSheetHeader(stringResource(R.string.wipe_progress_title))
+            Column(
+                Modifier.padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+            ) {
+                WipeProgressStageRow(stringResource(R.string.wipe_stage_leaving_groups))
+                WipeProgressStageRow(stringResource(R.string.wipe_stage_deleting_key_packages))
+                WipeProgressStageRow(stringResource(R.string.wipe_stage_wiping_local_data))
+                // Leaving a chat with another admin first steps this account down, which can wait on relays.
+                Text(
+                    stringResource(R.string.wipe_progress_keep_open),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -110,19 +116,17 @@ internal fun WipeOutcomeSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
-    ModalBottomSheet(
-        containerColor = amoledSheetContainerColor(),
+    WhiteNoiseModalBottomSheet(
         onDismissRequest = { terminal.close(onDismiss) },
         sheetState = sheetState,
     ) {
+        WhiteNoiseSheetHeader(
+            pluralStringResource(R.plurals.wipe_finished_with_issues, report.issueCount, report.issueCount),
+        )
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSheetInset).padding(bottom = WhiteNoiseSheetInset),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
-            Text(
-                pluralStringResource(R.plurals.wipe_finished_with_issues, report.issueCount, report.issueCount),
-                style = MaterialTheme.typography.titleLarge,
-            )
             report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
             // Chats handed to the account's other devices are not counted as left, a failed handoff is said plainly.
             if (report.chatsLeftToOtherDevices > 0) {
@@ -134,7 +138,7 @@ internal fun WipeOutcomeSheet(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Button(onClick = { terminal.close(onDismiss) }, modifier = Modifier.fillMaxWidth()) {
+            WhiteNoiseButton(onClick = { terminal.close(onDismiss) }, modifier = Modifier.fillMaxWidth()) {
                 ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
             }
         }

@@ -12,6 +12,7 @@ internal data class ConversationDictationTarget(
     val finishAfterSilenceMillis: Long? = null,
     val silenceDeliveryMode: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     val pauseOtherAudio: Boolean = true,
+    val outgoingTranslation: ConversationDictationTranslationChoice? = null,
 ) {
     /** Compares the stable account and group identifiers without changing the captured target. */
     fun matchesConversation(
@@ -20,7 +21,32 @@ internal data class ConversationDictationTarget(
     ): Boolean =
         this.accountRef.equals(accountRef, ignoreCase = true) &&
             this.groupIdHex.equals(groupIdHex, ignoreCase = true)
+
+    /** A fresh in-app retry uses the current origin choice, including an explicit toggle off. */
+    fun retryTranslation(binding: ConversationDictationTranslationBinding?): ConversationDictationTranslationChoice? {
+        val origin = binding?.takeIf { mode == ConversationDictationMode.InApp && it.matches(this) }
+        return if (origin == null) outgoingTranslation else origin.resolve()?.choice
+    }
 }
+
+/** A non-null choice requires translation, even while the target language is unset. */
+internal data class ConversationDictationTranslationChoice(
+    val target: String?,
+)
+
+internal class ConversationDictationTranslationBinding(
+    val key: ConversationDictationKey,
+    val resolve: () -> ConversationDictationTranslation?,
+) {
+    /** Match the conversation that owns the captured translation choice. */
+    fun matches(target: ConversationDictationTarget) = target.matchesConversation(key.accountRef, key.groupIdHex)
+}
+
+internal class ConversationDictationTranslation(
+    val choice: ConversationDictationTranslationChoice,
+    val currentEpoch: () -> Long?,
+    val translate: suspend (String) -> String?,
+)
 
 internal enum class ConversationDictationMode {
     InApp,

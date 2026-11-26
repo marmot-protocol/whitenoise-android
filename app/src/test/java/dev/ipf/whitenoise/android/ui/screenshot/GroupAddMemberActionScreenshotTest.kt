@@ -13,7 +13,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsAddMemberAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -55,14 +55,14 @@ class GroupAddMemberActionScreenshotTest {
     }
 
     @Test
-    fun addMemberKeyExpandsWithoutSelectingThePerson() {
+    fun addMemberKeyCopiesWithoutGrowingOrSelectingTheRow() {
         val npub = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
         val shortKey = "npub142424…4qamrcaj"
         var selections = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface {
-                    ContactRow(
+                    PersonRow(
                         title = "Alice",
                         subtitle = shortKey,
                         avatarSeed = npub,
@@ -76,11 +76,12 @@ class GroupAddMemberActionScreenshotTest {
             }
         }
         composeRule.onNodeWithText(shortKey, useUnmergedTree = true).performTouchInput { click(center) }
-        composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(shortKey, useUnmergedTree = true).assertExists()
         assertEquals(0, selections)
         composeRule
             .onNodeWithTag("add-member-row")
-            .captureRoboImage("src/test/snapshots/add_member_expanded_key_light.png")
+            .captureRoboImage("src/test/snapshots/add_member_copied_key_light.png")
         composeRule.onNodeWithText("Alice", useUnmergedTree = true).performTouchInput { click(center) }
         composeRule.runOnIdle { assertEquals(1, selections) }
     }

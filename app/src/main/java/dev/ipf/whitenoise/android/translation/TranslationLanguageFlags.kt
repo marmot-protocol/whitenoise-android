@@ -1,0 +1,45 @@
+package dev.ipf.whitenoise.android.translation
+
+/** Representative picker artwork. Languages without a clear country cue use the neutral language icon. */
+internal fun translationLanguageFlag(code: String): String? = LanguageFlags[code]
+
+private val LanguageFlags =
+    mapOf(
+        "az" to "🇦🇿",
+        "be" to "🇧🇾",
+        "bg" to "🇧🇬",
+        "bs" to "🇧🇦",
+        "cs" to "🇨🇿",
+        "da" to "🇩🇰",
+        "de" to "🇩🇪",
+        "el" to "🇬🇷",
+        "et" to "🇪🇪",
+        "fi" to "🇫🇮",
+        "fr" to "🇫🇷",
+        "he" to "🇮🇱",
+        "hr" to "🇭🇷",
+        "hu" to "🇭🇺",
+        "id" to "🇮🇩",
+        "is" to "🇮🇸",
+        "it" to "🇮🇹",
+        "ja" to "🇯🇵",
+        "ka" to "🇬🇪",
+        "lt" to "🇱🇹",
+        "lv" to "🇱🇻",
+        "nb" to "🇳🇴",
+        "nn" to "🇳🇴",
+        "no" to "🇳🇴",
+        "nl" to "🇳🇱",
+        "pl" to "🇵🇱",
+        "ro" to "🇷🇴",
+        "ru" to "🇷🇺",
+        "sk" to "🇸🇰",
+        "sl" to "🇸🇮",
+        "sr" to "🇷🇸",
+        "sv" to "🇸🇪",
+        "th" to "🇹🇭",
+        "tl" to "🇵🇭",
+        "tr" to "🇹🇷",
+        "uk" to "🇺🇦",
+        "vi" to "🇻🇳",
+    )

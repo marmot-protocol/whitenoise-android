@@ -66,6 +66,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -82,6 +83,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Suppress("LargeClass")
 class DetailRouteMotionScreenshotTest {
     @get:Rule val rule = createComposeRule()
+
+    @get:Rule val visualErrors = ErrorCollector()
+
     private val app: Application = ApplicationProvider.getApplicationContext()
     private val transitionSources = mutableMapOf<String, Bitmap>()
     private val captureFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
@@ -799,9 +803,9 @@ class DetailRouteMotionScreenshotTest {
                     assertFirstFrameBackplate(name, bitmap)
                 }
                 if (!captureFrames && snapshotFrame) {
-                    bitmap.captureRoboImage(
-                        "src/test/snapshots/detail_motion_${name}_$frame.png",
-                    )
+                    visualErrors.checkSucceeds {
+                        bitmap.captureRoboImage("src/test/snapshots/detail_motion_${name}_$frame.png")
+                    }
                 }
             }
             rule.mainClock.advanceTimeBy(16)

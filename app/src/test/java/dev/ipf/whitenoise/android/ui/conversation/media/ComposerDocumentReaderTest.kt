@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.sandbox.PdfPagePolicy
 import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
+import dev.ipf.whitenoise.android.ui.conversation.draftPresentationFile
+import dev.ipf.whitenoise.android.ui.conversation.draftPresentationUri
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -27,6 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
+import java.io.RandomAccessFile
 
 @RunWith(RobolectricTestRunner::class)
 class ComposerDocumentReaderTest {
@@ -66,6 +69,37 @@ class ComposerDocumentReaderTest {
         assertFalse(selection.isCurrent(listOf(uri), mapOf(uri to artifact.copy()), false))
         assertFalse(selection.isCurrent(listOf(uri), emptyMap(), false))
     }
+
+    /** The restored large PDF previews from its existing private file, with no inline bytes or new reader copy. */
+    @Test
+    fun restoredPdfUsesItsBackedPresentationFile() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val staged = prepared("application/pdf", "restored.pdf")
+            val document =
+                staged.copy(
+                    attachment = staged.attachment.copy(plaintext = byteArrayOf()),
+                    restoredFromNative = true,
+                    storedBytes = 33L * 1024 * 1024,
+                )
+            val stored = checkNotNull(draftPresentationFile(context, document.attachment))
+            try {
+                RandomAccessFile(stored, "rw").use { it.setLength(document.storedBytes) }
+                val restoredUri = checkNotNull(draftPresentationUri(context, stored, document.attachment))
+                val pickerUri = Uri.parse("content://picker/document/restored.pdf")
+
+                val target = composerDocumentReaderTarget(context, restoredUri, document)
+                assertEquals(DocumentAttachmentKind.Pdf, target?.documentKind)
+                withComposerPdfFile(context, document) { assertEquals(stored, it) }
+                assertTrue(stored.isFile)
+                assertNull(composerDocumentReaderTarget(context, pickerUri, document))
+                assertNull(composerDocumentReaderTarget(context, pickerUri, document.copy(restoredFromNative = false)))
+                val oversized = document.copy(storedBytes = PdfPagePolicy.MAX_INPUT + 1)
+                assertNull(composerDocumentReaderTarget(context, restoredUri, oversized))
+            } finally {
+                stored.delete()
+            }
+        }
 
     @Test fun pdfFileLivesThroughUseAndIsDeletedOnDismiss() =
         runBlocking {

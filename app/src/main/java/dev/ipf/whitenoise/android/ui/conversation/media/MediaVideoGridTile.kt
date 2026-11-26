@@ -108,7 +108,7 @@ internal fun MediaVideoGridTile(
     val retainedPendingVideoBytes = pendingAttachment?.takeIf { it.isPendingVideo }?.inMemoryBytes
     val retainedPlaintextOnEntry = pendingAttachment?.inMemoryBytes != null
     // A large own video is sent from its staged file, with nothing in memory or published to fetch until it lands.
-    val sendingFromStagedFile = pendingAttachment?.sourceFile != null
+    val sendingFromStagedFile = pendingAttachment?.isFileBacked == true
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the

@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerDelivery.kt",
         "anchor": "internal fun ConversationDictationController.sendTranscriptOnFinish(",
         "test_ids": [
-          "DIC-013"
+          "DIC-013",
+          "CON-045"
         ]
       }
     ]

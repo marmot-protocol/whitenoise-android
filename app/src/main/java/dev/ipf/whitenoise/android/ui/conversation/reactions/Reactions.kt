@@ -9,9 +9,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -41,8 +40,10 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
@@ -120,6 +121,7 @@ internal fun ReactionDetailsSheet(
 }
 
 /** Renders complete reactor snapshots, preserving filters during refresh and offering Retry after failed reads. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
 internal fun ReactionDetailsContent(
@@ -141,14 +143,15 @@ internal fun ReactionDetailsContent(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = amoledSheetContainerColor(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        // Same shape and insets as WhiteNoiseModalBottomSheet; the popup keeps its own non-focus-stealing window.
+        shape = BottomSheetDefaults.ExpandedShape,
     ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
+                .padding(horizontal = WhiteNoiseSheetInset)
+                .padding(bottom = WhiteNoiseSheetInset),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ReactionDetailsReadStatus(readState.loading, readState.failed, readState.hasSnapshot, readState.onRetry)
@@ -229,13 +232,13 @@ private fun ReactionFilterChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
+        WhiteNoiseFilterChip(
             selected = selectedEmoji == null,
             onClick = { onSelectedEmoji(null) },
             label = { Text("${stringResource(R.string.reaction_filter_all)} · $participantCount") },
         )
         emojiCounts.forEach { (emoji, count) ->
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = selectedEmoji == emoji,
                 onClick = { onSelectedEmoji(emoji) },
                 label = {

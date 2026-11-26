@@ -906,6 +906,7 @@ class WhiteNoiseAppState private constructor(
         StartupDiagnostics.bindNative(runtime.marmot)
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
+        HistoryBackupConditions.attach(appContext, runtime.marmot) { historyBackupFacts() }
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
         }
@@ -915,6 +916,7 @@ class WhiteNoiseAppState private constructor(
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
         StartupDiagnostics.unbindNative(runtime.marmot)
+        HistoryBackupConditions.detach(runtime.marmot)
         AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
@@ -1495,7 +1497,7 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val retainedConversationStates =
+    internal val retainedConversationStates =
         RetainedConversationStates(
             MAX_RETAINED_CONVERSATION_STATES,
             isProtected = inFlightMediaUploads::hasUploads,
@@ -1679,7 +1681,7 @@ class WhiteNoiseAppState private constructor(
             onFailed = { present(R.string.toast_reply_draft_restore_failed) },
         ) { draftHydrationRevision += 1 }
     }
-    private val composerDraftExpansionBridge =
+    internal val composerDraftExpansionBridge =
         ComposerDraftExpansionBridge(
             draftWriter = draftWriter,
             draftStore = draftStore,
@@ -2251,16 +2253,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    internal fun captureDraftForSend(
-        accountRef: String?,
-        groupIdHex: String,
-    ): DraftSendClearToken? = composerDraftExpansionBridge.captureForSend(accountRef, groupIdHex)
-
-    /** Clears only the draft and geometry generation durably accepted by MDK. */
-    internal fun clearDraftAfterSuccessfulSend(pendingClear: DraftSendClearToken) {
-        composerDraftExpansionBridge.clearAfterDurableAcceptance(pendingClear)
-    }
-
     internal suspend fun sendConversationText(
         controller: ConversationController,
         text: String,
@@ -2281,7 +2273,7 @@ class WhiteNoiseAppState private constructor(
             },
             onDurablyAccepted = {
                 durablyAccepted = true
-                pendingClear?.let(::clearDraftAfterSuccessfulSend)
+                pendingClear?.let { clearDraftAfterSuccessfulSend(it, textOnly = true) }
                 onSendSettled(true)
             },
             onTerminalFailure = {
@@ -6002,11 +5994,13 @@ class WhiteNoiseAppState private constructor(
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
+            HistoryBackupConditions.report()
             noteUsableValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
+        HistoryBackupConditions.report()
         noteUsableValidatedInternetSnapshot()
         pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
     }
@@ -6029,14 +6023,6 @@ class WhiteNoiseAppState private constructor(
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
     }
-
-    private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
-        MediaAutoDownloadNetwork.matching(
-            hasWifiTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI),
-            hasCellularTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR),
-            isRoaming = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING),
-            isMetered = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
-        )
 
     /**
      * Refreshes [mediaAutoDownloadMatrix] for the current active account.

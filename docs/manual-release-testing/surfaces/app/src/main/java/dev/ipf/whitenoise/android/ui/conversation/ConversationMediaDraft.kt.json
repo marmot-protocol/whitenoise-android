@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "A fresh selection of the same document keeps a separate native identity from an in-flight send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "fun savedDocumentIds(",
+        "test_ids": [
+          "MED-067"
+        ]
+      },
+      {
         "surface": "ConversationMediaDraftContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
         "anchor": "fun ConversationMediaDraftContent(",
@@ -20,7 +28,8 @@
         "anchor": "restorePersistedAttachments(",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-067"
         ]
       },
       {
@@ -59,6 +68,14 @@
         "anchor": "fun removeStagedDocumentAt(",
         "test_ids": [
           "MED-001"
+        ]
+      },
+      {
+        "surface": "A pick too large for memory is kept in the draft as a stored file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "readDocumentDraft(uri, toFile = true)",
+        "test_ids": [
+          "MED-067"
         ]
       }
     ]

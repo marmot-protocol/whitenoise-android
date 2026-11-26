@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PersonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "fun PersonRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "PersonRow public-key copy label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "PublicKeyCopyText(",
+        "test_ids": [
+          "NCH-001",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: PersonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Modifier.nativeOutlineDestination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "fun Modifier.nativeOutlineDestination(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:user_search_you_follow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/PersonRow.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
+    ]
+  }
+}

@@ -52,8 +52,12 @@ internal fun ConversationController.discardOptimisticSend(
     optimisticMessages.remove(optimisticKey)
     durableAcceptanceCallbacks.remove(optimisticKey)
     messageById.remove(tempId)
+    val discarded = retainedMediaUploads.get(optimisticKey)
+    val ownedDraftAttachments = discarded != null && discarded.draftAttachmentIds.isNotEmpty()
     retainedMediaUploads.remove(optimisticKey)
     activeUploadKeys.remove(optimisticKey)
+    // The draft still holds what a discarded send was built from, so the shelf it was hidden from reads it again.
+    if (ownedDraftAttachments) recordStoredDraftConsumption()
     if (discard.rollsBackPreview) {
         retentionAtSendByMessageId.remove(tempId)
         rollbackOptimisticChatListPreview(tempId)

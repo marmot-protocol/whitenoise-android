@@ -89,6 +89,9 @@ internal fun clearSensitiveClipboard(context: Context) {
 /** How long a copied secret may stay on the clipboard before the app removes it. */
 internal const val SENSITIVE_CLIP_LIFETIME_MS = 60_000L
 
+/** How long a copy control shows its Copied state before returning to Copy. */
+internal const val COPIED_FEEDBACK_MILLIS = 2_000L
+
 /** Unique WorkManager name of the one pending sensitive-clip clear. */
 internal const val SENSITIVE_CLIP_CLEAR_WORK = "sensitive_clipboard_clear"
 

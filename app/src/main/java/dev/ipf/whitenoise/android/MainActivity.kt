@@ -62,9 +62,12 @@ import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
+import dev.ipf.whitenoise.android.ui.keyboard.appLockShortcutRouter
+import dev.ipf.whitenoise.android.ui.keyboard.installHardwareShortcuts
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeLifecycleClass
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeActivityLifecycleClass
+import dev.ipf.whitenoise.android.ui.onboarding.setup.recordAccountSetupBackground
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 import java.util.concurrent.atomic.AtomicLong
@@ -106,6 +109,9 @@ class MainActivity : AppCompatActivity() {
     }
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
+
+    // Hardware keyboard shortcuts (#4005), held while App Lock is shown or still deciding.
+    internal val hardwareShortcuts = appLockShortcutRouter { appState.appLock }
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
     private var warmResumeTraceToken = 0
     private var warmResumeEpoch by mutableIntStateOf(0)
@@ -148,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         setTheme(preComposeThemeFor(firstFrameTheme(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        installHardwareShortcuts(window, hardwareShortcuts)
         val processProjectionAlreadyOwned =
             (application as WhiteNoiseApplication)
                 .mainShellProcessState
@@ -523,6 +530,7 @@ class MainActivity : AppCompatActivity() {
         if (::appState.isInitialized) {
             foregroundHostReady.cancel()
             retainAppLockBackgroundSecureFlagIfNeeded()
+            if (!isChangingConfigurations) appState.recordAccountSetupBackground()
             appState.setAppInForeground(false)
         }
         WarmResumeTrace.foregroundStopped(warmResumeTraceToken, warmResumeEpoch)
