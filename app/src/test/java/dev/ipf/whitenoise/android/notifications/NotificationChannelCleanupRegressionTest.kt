@@ -327,6 +327,23 @@ class NotificationChannelCleanupRegressionTest {
         assertFalse(ownerPrefs().contains(sha256Hex("account-a")))
     }
 
+    /** A last-signer departure survives a restart even when a read-only profile remains. */
+    @Test
+    fun restartSweepsOwnerlessChannelsAfterLastSignerLeavesReadOnlyProfile() {
+        val shortcut = checkNotNull(conversationShortcutId("retired-account", "legacy-chat"))
+        val channel = convChannel(NotificationChannelSpec.GROUP_MESSAGES, shortcut, "Ownerless private title")
+
+        assertTrue(recordDepartingConversationChannelOwners(context, "account-a", emptySet(), true))
+        assertTrue(retainConversationChannelOwners(context, listOf("account-a", "readonly")))
+        assertNotNull(manager.getNotificationChannel(channel))
+
+        assertTrue(retainConversationChannelOwners(context, listOf("readonly"), signingAccountRemains = false))
+
+        assertNull(manager.getNotificationChannel(channel))
+        assertNoChannelContainsText("Ownerless private title")
+        assertFalse(ownerPrefs().contains(LEGACY_SWEEP_PENDING_KEY))
+    }
+
     /**
      * When Android updates SharedPreferences memory before a disk write fails, a subsequent call with
      * the same shortcut ids must not treat the uncommitted in-memory set as durably saved.

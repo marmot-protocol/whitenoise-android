@@ -5039,9 +5039,8 @@ class WhiteNoiseAppState private constructor(
         completed: (OwnedSignOutCompletion) -> Unit,
     ): OwnedSignOutCompletion {
         val draftsSaved = draftWriter.flushAccount(request.requested)
-        val includeUnscopedLegacy = accounts.none { it.label != request.requested && it.isSignedInSigningAccount() }
         val knownGroupIds =
-            captureAccountKnownGroupIds(request.requested, includeUnscopedLegacy)
+            captureAccountKnownGroupIds(request.requested)
                 ?: return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
         var admitted = false
         return runCatchingCancellable {
@@ -5054,15 +5053,6 @@ class WhiteNoiseAppState private constructor(
             appStateDebug(failure) { "account sign-out credential revocation failed before native work" }
             OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
         }
-    }
-
-    private suspend fun rethrowSignOutCancellation(
-        native: CancellationException?,
-        boundary: CancellationException?,
-    ) {
-        val cancellation = native ?: boundary
-        if (cancellation != null) throw cancellation
-        currentCoroutineContext().ensureActive()
     }
 
     /** Lifetime is already owned; acquire both push locks cancellably before admitting any cleanup intent. */
@@ -5253,11 +5243,7 @@ class WhiteNoiseAppState private constructor(
         wipedRef: String,
         wipedShareAccount: String? = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex,
     ): AccountWipeCompletion? {
-        val inView = activeAccountRef
-        val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
-        val includeUnscopedLegacy =
-            retireSession && accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() }
-        val knownGroupIds = captureAccountKnownGroupIds(wipedRef, includeUnscopedLegacy) ?: return null
+        val knownGroupIds = captureAccountKnownGroupIds(wipedRef) ?: return null
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {

@@ -13,16 +13,18 @@ private const val SHA256_HEX_LENGTH = 64
  * Records the departing [accountRef]'s conversation channels for [groupIds] before native sign-out or
  * wipe commits. If the process dies before Android cleanup runs, [retainConversationChannelOwners] still
  * finds the departed account's record and deletes its upgrade-era channels, which have no shortcut or
- * earlier record. A sign-out that never commits leaves accurate links for an account that still owns them.
+ * earlier record. [includeUnscopedLegacy] also records a last-signer sweep before native work.
+ * Startup waits to sweep until no signer remains, so a failed sign-out cannot erase a live signer's channels.
  * Returns false when the record could not be saved.
  */
 internal fun recordDepartingConversationChannelOwners(
     context: Context,
     accountRef: String,
     groupIds: Collection<String>,
+    includeUnscopedLegacy: Boolean = false,
 ): Boolean {
     val shortcutIds = groupChannelShortcutIds(accountRef, groupIds).mapTo(HashSet(), ::canonicalConversationShortcutId)
-    return recordConversationChannelOwners(context, accountRef, shortcutIds)
+    return recordConversationChannelOwners(context, accountRef, shortcutIds, includeUnscopedLegacy)
 }
 
 /**

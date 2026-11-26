@@ -73,11 +73,12 @@ internal fun recordConversationChannelOwner(
     recordConversationChannelOwners(context, accountRef, listOf(conversationShortcutId))
 }
 
-/** Adds [conversationShortcutIds] to [accountRef]'s owner record, returning false when it could not be saved. */
+/** Persists [accountRef]'s owner links and any last-signer sweep intent in one transaction. */
 internal fun recordConversationChannelOwners(
     context: Context,
     accountRef: String?,
     conversationShortcutIds: Collection<String>,
+    includeUnscopedLegacy: Boolean = false,
 ): Boolean {
     val ownerKey = channelOwnerAccountHash(accountRef) ?: return false
     val shortcutIds = conversationShortcutIds.filter(::isConversationShortcutId)
@@ -88,11 +89,12 @@ internal fun recordConversationChannelOwners(
             val uncommitted = UncommittedChannelOwners.keys(appContext)
             val owned = prefs.getStringSet(ownerKey, emptySet()).orEmpty()
             // Every routed post lands here, so skip the synchronous commit once the links are durably stored.
-            if (ownerKey !in uncommitted && owned.containsAll(shortcutIds)) {
+            if (!includeUnscopedLegacy && ownerKey !in uncommitted && owned.containsAll(shortcutIds)) {
                 true
             } else {
                 uncommitted.add(ownerKey)
                 val editor = prefs.edit().putStringSet(ownerKey, owned + shortcutIds)
+                if (includeUnscopedLegacy) editor.putStringSet(LEGACY_SWEEP_PENDING_KEY, emptySet())
                 val committed = editor.commit()
                 if (committed) uncommitted.remove(ownerKey)
                 committed

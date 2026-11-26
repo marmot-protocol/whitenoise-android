@@ -184,7 +184,7 @@ class ConversationShortcutLifecycleCoverageTest {
 
         assertTrue(
             "captureAccountKnownGroupIds must save the departing account's channel owners",
-            "recordDepartingConversationChannelOwners(appContext, accountRef, groupIds)" in capture,
+            "recordDepartingConversationChannelOwners(appContext, accountRef, groupIds, includeUnscopedLegacy)" in capture,
         )
         assertTrue(
             "captureAccountKnownGroupIds must guard incomplete multi-account reads against unowned :conv: channels",
@@ -200,7 +200,7 @@ class ConversationShortcutLifecycleCoverageTest {
         )
         assertTrue(
             "signOutAndWipeActiveAccountLocked must abort before revocation when channel capture fails",
-            "captureAccountKnownGroupIds(wipedRef, includeUnscopedLegacy) ?: return null" in wipeBody,
+            "captureAccountKnownGroupIds(wipedRef) ?: return null" in wipeBody,
         )
     }
 
