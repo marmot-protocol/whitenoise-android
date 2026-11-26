@@ -26,6 +26,19 @@ class DisappearingLabelPluralCoverageTest {
         }
     }
 
+    /** The shared helper formats the exact count through the plural resource, with an `Int`-safe quantity. */
+    @Test
+    fun countLabelHelperFormatsTheFullCountThroughThePluralResource() {
+        val label = groupSource("DisappearingMessages.kt").replace(Regex("""\s+"""), " ").trim()
+        val body =
+            label
+                .substringAfter("private fun disappearingCountLabel(")
+                .substringAfter("): String = ")
+                .substringBefore(" /**")
+                .substringBefore(" @")
+        assertEquals("pluralStringResource(id, disappearingPluralQuantity(count), count)", body)
+    }
+
     /** No locale ships a plain-number duration string, and every locale defines each unit as a plural. */
     @Test
     fun noPlainNumberDurationStringRemainsInAnyLocale() {
