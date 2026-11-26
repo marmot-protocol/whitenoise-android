@@ -139,8 +139,8 @@ internal class ComposerDraftExpansionBridge(
     }
 
     /**
-     * Evicts only the durably accepted generation, then deletes its MDK draft
-     * asynchronously without allowing an older hydration to resurrect it.
+     * Evicts only the accepted generation, then clears its native draft asynchronously. Text-only cleanup
+     * preserves unsent files and still completes the same send presentation and expansion lifecycle.
      */
     fun clearAfterDurableAcceptance(
         token: DraftSendClearToken,
@@ -149,17 +149,13 @@ internal class ComposerDraftExpansionBridge(
         val accountRef = token.accountRef
         val groupIdHex = token.groupIdHex
         val sentGeneration = token.generation
+        val current = if (keepAttachments) draftWriter.generation(accountRef, groupIdHex) else sentGeneration
         if (keepAttachments) {
-            val current = draftWriter.generation(accountRef, groupIdHex)
-            if (draftRepository.coordinated.isTextCurrent(accountRef, groupIdHex, sentGeneration) &&
-                setDraftIfCurrent(accountRef, groupIdHex, current.value, TextFieldValue(""))
-            ) {
-                onDraftPresentationChanged(accountRef, groupIdHex, false)
-            }
-            return
+            val ownsText = draftRepository.coordinated.isTextCurrent(accountRef, groupIdHex, sentGeneration)
+            if (!ownsText) return
         }
         val cleanupGeneration =
-            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
+            draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, current) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             } ?: return
         sentPresentation.hide(token, cleanupGeneration)
@@ -170,7 +166,8 @@ internal class ComposerDraftExpansionBridge(
             token.composerExpansionRevision,
         )
         scope.launch {
-            when (val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration)) {
+            val deletion = draftWriter.deleteIfCurrent(accountRef, groupIdHex, cleanupGeneration, keepAttachments)
+            when (deletion) {
                 is MessageDraftConditionalDeleteResult.Applied -> {
                     when (val result = deletion.result) {
                         is MessageDraftMutationResult.Success -> {

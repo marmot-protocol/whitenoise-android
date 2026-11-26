@@ -225,14 +225,26 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Clears the accepted draft, or just its text, releasing only its own hydration fence on success. */
     suspend fun deleteIfCurrent(
         accountRef: String,
         groupIdHex: String,
         generation: MessageDraftGeneration,
+        keepAttachments: Boolean = false,
     ): MessageDraftConditionalDeleteResult {
         val key = Key(accountRef, groupIdHex)
         flush(key)
-        val deletion = drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+        val deletion =
+            if (keepAttachments) {
+                val saved = drafts.coordinated.saveAcceptedTextIfCurrent(accountRef, groupIdHex, "", generation)
+                when (saved) {
+                    is MessageDraftConditionalSaveResult.Applied ->
+                        MessageDraftConditionalDeleteResult.Applied(saved.result)
+                    MessageDraftConditionalSaveResult.Superseded -> MessageDraftConditionalDeleteResult.Superseded
+                }
+            } else {
+                drafts.coordinated.deleteIf(accountRef, groupIdHex, generation)
+            }
         if (deletion is MessageDraftConditionalDeleteResult.Applied &&
             deletion.result is MessageDraftMutationResult.Success
         ) {
