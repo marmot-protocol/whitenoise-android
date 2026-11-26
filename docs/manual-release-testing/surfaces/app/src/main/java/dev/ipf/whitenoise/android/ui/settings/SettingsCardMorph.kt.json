@@ -1,1 +1,44 @@
-{"source":"app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt","legacy_sha256":"355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8","categories":{"composable_surfaces":[{"surface":"Modifier.settingsCardMorph","source":"app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt","anchor":"fun Modifier.settingsCardMorph(","test_ids":["NAV-011","SET-069"]},{"surface":"Modifier.settingsMorphAnchorOutline","source":"app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt","anchor":"fun Modifier.settingsMorphAnchorOutline(","test_ids":["NAV-011"]},{"surface":"Card-morph route host motion","source":"app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt","anchor":"fun <T> rememberSettingsCardMorphHost(","test_ids":["SET-070"]}]},"discovery_exceptions":[]}
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.settingsCardMorph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt",
+        "anchor": "fun Modifier.settingsCardMorph(",
+        "test_ids": [
+          "NAV-011",
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "Modifier.settingsMorphAnchorOutline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt",
+        "anchor": "fun Modifier.settingsMorphAnchorOutline(",
+        "test_ids": [
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Card-morph route host motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt",
+        "anchor": "fun <T> rememberSettingsCardMorphHost(",
+        "test_ids": [
+          "SET-070"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Settled-frame capture waits for contour motion and a stopped scroll",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsCardMorph.kt",
+        "anchor": "fun observeCaptureInputs(",
+        "test_ids": [
+          "SET-070"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

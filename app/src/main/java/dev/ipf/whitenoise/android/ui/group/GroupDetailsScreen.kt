@@ -519,7 +519,8 @@ internal fun GroupDetailsScreen(
         DisposableEffect(detailsMorph, detailsDestination, detailsScrollState, detailsScrollBehavior) {
             val release =
                 if (detailsDestination == "details") {
-                    detailsMorph.observeCaptureInputs {
+                    // Recording waits for the scroll to stop instead of re-recording the page every frame.
+                    detailsMorph.observeCaptureInputs(settled = { !detailsScrollState.isScrollInProgress }) {
                         Triple(
                             detailsScrollState.value,
                             detailsScrollBehavior.state.contentOffset to detailsScrollBehavior.state.heightOffset,

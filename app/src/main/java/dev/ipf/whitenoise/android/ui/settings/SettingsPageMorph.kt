@@ -56,6 +56,7 @@ internal class SettingsPageMorph {
     private var entryStart = 0f
     private var entryOnly = false
     internal var captureInputs: (() -> Any?)? = null
+    internal var captureSettled: (() -> Boolean)? = null
     internal var childContours: (() -> List<SettingsContour>?)? = null
     internal var childBodyTop: (() -> Float)? = null
 
@@ -430,7 +431,7 @@ internal class SettingsPageMorph {
         }
         if (bounds(host, time) == null || time >= 1f) {
             leaving = null
-            drawSettledFrame(native, host, recording && captureContent, inputs)
+            drawSettledFrame(native, host, recording && captureContent && captureSettled?.invoke() != false, inputs)
             return
         }
         updateNativeFrame(native, host, time)
