@@ -275,7 +275,11 @@ private fun ConversationController.initialTimelineBackfillSnapshot() =
         loadInFlight = isLoading || isLoadingPage,
         hasLoadFailure = error != null,
         rawWindowMessageIds =
-            timelineSubscription?.latestInstalledWindow()?.page?.messages?.map { it.messageIdHex }
+            timelineSubscription
+                ?.latestInstalledWindow()
+                ?.page
+                ?.messages
+                ?.map { it.messageIdHex }
                 ?: timeline.map { it.record.messageIdHex },
     )
 

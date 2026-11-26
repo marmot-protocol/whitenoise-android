@@ -84,3 +84,16 @@ The account database moves from schema 0218 to 0225.
 The upgrade is one way. A 0.19.0 build cannot reopen a migrated account, so a preview built from
 this pin must not be installed over data another 0.19.0 preview still needs.
 See [INT-010](manual-release-testing/cases/INT-010.md).
+
+The [hosted upgrade run](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45719974512)
+tested Android commit `c2982e32d` against populated 0.19.0 accounts with audit
+sharing enabled and declined. Both
+runs opened the retained conversation through MainActivity, preserved account
+keys and retained media across restart, sent the original pending upload, and
+recovered missing and corrupt media.
+
+All seven recovery cases passed when the relay refused history comparison.
+Six passed when it silently ignored comparison. In both audit modes,
+`healthyAccountReceivesAfterLocalDeletionAndRestart` failed before the restart.
+The healthy chat's first peer message missed the 60-second receive window. This relay behavior
+remains open in [MDK #3643](https://github.com/marmot-protocol/mdk/issues/3643).
