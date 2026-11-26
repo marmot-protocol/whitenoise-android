@@ -24,6 +24,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -214,6 +215,8 @@ private fun Modifier.explainOnHold(
     pointerInput(holdClaim) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // This parent sees the press before its children, so a claim left by an earlier press never carries over.
+            holdClaim?.clear()
             val released =
                 withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     var finished = false
@@ -251,14 +254,23 @@ internal class HoldClaim {
         claimed = id
     }
 
-    /** Whether the child received the press [id]; pointer ids never repeat, so an older claim never matches. */
+    /** Forgets any earlier claim, since a stylus that stays in range can keep its pointer id across presses. */
+    fun clear() {
+        claimed = null
+    }
+
+    /** Whether the child received the press [id]. */
     fun isClaimed(id: PointerId): Boolean = claimed == id
 }
 
-/** Claims, through [claim], every press Compose delivers to this element, without consuming it. */
+/**
+ * Claims, through [claim], each touch or stylus press Compose delivers to this element, without consuming it. Those
+ * are the presses a Material tooltip opens on, so a mouse hold still explains.
+ */
 internal fun Modifier.claimsHold(claim: HoldClaim): Modifier =
     pointerInput(claim) {
         awaitEachGesture {
-            claim.claim(awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).id)
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.type == PointerType.Touch || down.type == PointerType.Stylus) claim.claim(down.id)
         }
     }

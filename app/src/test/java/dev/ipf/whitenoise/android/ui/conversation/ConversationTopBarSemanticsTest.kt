@@ -38,6 +38,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -208,6 +209,15 @@ class ConversationTopBarSemanticsTest {
         val (explained, tooltip) = holdInTimerHeader(TIMER_TAG) { Offset(centerX, bottom + 3.dp.toPx()) }
         assertFalse("a hold in the timer's widened touch target must not open the explanation", explained)
         assertTrue("a hold in the timer's widened touch target opens its tooltip", tooltip)
+    }
+
+    /** A mouse hold on the timer still explains Chat Details, since Material's tooltip opens on touch and stylus. */
+    @Test
+    fun mouseHoldOnTheTimerStillExplainsDetails() {
+        val host = renderTimerHeader()
+        composeRule.onNodeWithTag(TIMER_TAG, useUnmergedTree = true).performMouseInput { longClick() }
+        composeRule.waitForIdle()
+        assertTrue("a mouse hold on the timer explains Chat Details", host.shown != null)
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -557,23 +567,15 @@ class ConversationTopBarSemanticsTest {
         composeRule.onNodeWithText("Benchmark group").assertDoesNotExist()
     }
 
-    /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
-    @Suppress("LongParameterList")
     /**
-     * Renders a header with the timer on and its first-run hint already spent, holds [tag] at [at], and returns
-     * whether the Chat Details explanation and the timer tooltip opened. [at] gets the timer's centre x in [tag]'s
-     * local coordinates.
+     * Renders the timer header, holds [tag] at [at], and returns whether the Chat Details explanation and the timer
+     * tooltip opened. [at] gets the timer's centre x in [tag]'s local coordinates.
      */
     private fun holdInTimerHeader(
         tag: String,
         at: TouchInjectionScope.(timerX: Float) -> Offset,
     ): Pair<Boolean, Boolean> {
-        val appState = appState()
-        appState.markDisappearingTooltipShown()
-        val host = ExplanationHostState()
-        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
-        render(appState, controller, explanationHost = host)
-        composeRule.onNodeWithTag("conversation.timer.tooltip").assertDoesNotExist()
+        val host = renderTimerHeader()
         val held = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
         val timer = composeRule.onNodeWithTag(TIMER_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val timerX = timer.center.x - held.fetchSemanticsNode().boundsInRoot.left
@@ -583,6 +585,19 @@ class ConversationTopBarSemanticsTest {
         return (host.shown != null) to tooltips.isNotEmpty()
     }
 
+    /** Renders a header with the timer on, its first-run hint spent and the tooltip closed, and returns its host. */
+    private fun renderTimerHeader(): ExplanationHostState {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val host = ExplanationHostState()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
+        render(appState, controller, explanationHost = host)
+        composeRule.onNodeWithTag("conversation.timer.tooltip").assertDoesNotExist()
+        return host
+    }
+
+    /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
+    @Suppress("LongParameterList")
     private fun render(
         appState: WhiteNoiseAppState,
         controller: ConversationController,
