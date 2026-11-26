@@ -520,7 +520,7 @@ class AppStateSendLockCoverageTest {
         val visibility = conversationScreenSource().resolveSibling("AgentActivityProjection.kt").motionOwnerSource()
 
         assertTrue(
-            "auto-chain should skip background agent, edit and group-system rows before checking the next voice message",
+            "Voice autoplay skips background agent, edit and group-system rows",
             "!conversationTimelineRowVisible(controller.timeline[nextIdx])" in autoChain &&
                 "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain &&
                 "if (MessageProjector.isEdit(row.record)) return false" in visibility,
