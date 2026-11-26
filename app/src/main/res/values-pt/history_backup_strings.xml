@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Backups do histórico</string>
-    <string name="explanation_organize_hub_history_backups">Guarde uma cópia criptografada do histórico de conversas, desbloqueada por palavras de recuperação, para restaurá-lo numa nova instalação.</string>
+    <string name="explanation_organize_hub_history_backups">Salve o histórico criptografado de conversas online e restaure as mensagens das conversas em que você está neste dispositivo.</string>
+    <string name="history_backups_storage">O White Noise salva o histórico criptografado em servidores de arquivos online (servidores Blossom). Seus relays Nostr guardam um registro criptografado que o aplicativo usa para encontrar seus backups.</string>
+    <string name="history_backups_restore_scope">Você só pode restaurar mensagens das conversas em que você ainda está neste dispositivo. Se perder o acesso a um grupo, peça um novo convite a alguém com permissão para convidar.</string>
     <string name="history_backups_status">Cópias de segurança</string>
     <string name="history_backups_status_loading">Verificando…</string>
     <string name="history_backups_status_unavailable">Ainda não disponível</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Digite a palavra %1$d e a palavra %2$d da sua lista. Se não as anotou, cancele e comece de novo para obter novas palavras.</string>
     <string name="history_backups_word_label">Palavra %1$d</string>
     <string name="history_backups_restore_words">Palavras de recuperação</string>
-    <string name="history_backups_restore_words_help">Digite as 12 palavras, separadas por espaços.</string>
+    <string name="history_backups_restore_words_help">Primeiro, entre nas conversas neste dispositivo. Depois, digite as 12 palavras, separadas por espaços.</string>
     <string name="history_backups_restore">Restaurar histórico</string>
     <string name="history_backups_restoring">Iniciando restauração</string>
     <string name="history_backups_cancel_restore">Cancelar restauração</string>

@@ -320,6 +320,24 @@
         "test_ids": [
           "SET-074"
         ]
+      },
+      {
+        "surface": "R.string.history_backups_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_storage",
+        "test_ids": [
+          "SET-074",
+          "SET-073"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_restore_scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_restore_scope",
+        "test_ids": [
+          "SET-074",
+          "SET-073"
+        ]
       }
     ]
   },
