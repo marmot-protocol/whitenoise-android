@@ -592,7 +592,7 @@ internal class IsolatedAutomaticAvTransport(
                     what = MediaDecodePolicy.DECODE
                     arg1 = reply.id
                     replyTo = selected.capability
-                    data = requestPayload(input, output, request)
+                    data = automaticAvDecodeRequest(context, input, output, request)
                 },
             )
             if (!await(reply.ready, ticket)) return null
@@ -724,34 +724,6 @@ internal class IsolatedAutomaticAvTransport(
         check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
         return requestDispatched && pending != null
     }
-
-    /** Construct only the bounded operation fields and selected descriptor capabilities admitted by this protocol. */
-    private fun requestPayload(
-        input: ParcelFileDescriptor,
-        output: SharedMemory,
-        request: MediaDecodeRequest,
-    ): Bundle =
-        Bundle().apply {
-            if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
-                val canary = File(context.filesDir, "media-containment-canary")
-                if (canary.isFile) putString("canaryPath", canary.absolutePath)
-            }
-            putInt("version", MediaDecodePolicy.VERSION)
-            putInt("operation", request.operation)
-            putInt("edge", request.edge)
-            putBoolean("oriented", request.option)
-            putLong("positionUs", request.positionUs)
-            putLong("offset", request.offset)
-            putLong("length", request.length ?: input.statSize)
-            request.region?.let {
-                putInt("left", it.left)
-                putInt("top", it.top)
-                putInt("right", it.right)
-                putInt("bottom", it.bottom)
-            }
-            putParcelable("input", input)
-            putParcelable("output", output)
-        }
 
     /**
      * Distinguish definite framework refusal from uncertain binding outcomes before admitting or retaining the

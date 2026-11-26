@@ -899,21 +899,10 @@ internal class RawAvPlaybackEngine(
                             if (probe == null) {
                                 video.render(it, lastBitmapRotation)
                             } else {
-                                val mediaBefore = renderer.positionUs()
-                                val before = android.os.SystemClock.elapsedRealtimeNanos()
-                                val submitted = video.render(it, lastBitmapRotation, probe)
-                                val after = android.os.SystemClock.elapsedRealtimeNanos()
-                                probe.submission(
-                                    activation,
-                                    seekRevision,
-                                    lastBitmapPtsUs,
-                                    mediaBefore,
-                                    renderer.positionUs(),
-                                    before,
-                                    after,
-                                    submitted,
-                                )
-                                submitted
+                                val generation = RawAvGeneration(activation, seekRevision)
+                                val rotation = lastBitmapRotation
+                                val pts = lastBitmapPtsUs
+                                probe.renderAndObserve(video, it, rotation, generation, pts, renderer::positionUs)
                             }
                         } == true
                     }
