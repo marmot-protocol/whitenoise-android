@@ -22,6 +22,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.test.espresso.Espresso
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
@@ -176,6 +177,10 @@ class ForwardMessagePickerInteractionTest {
         composeRule.onNodeWithText("No matches").assertIsDisplayed()
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
         composeRule.onNodeWithTag("forward.selectAll").assertIsNotEnabled()
+        composeRule.onNodeWithText("Retry").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/forward_message_picker_no_matches.png")
         Espresso.pressBack()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("forward.searchField").assertDoesNotExist()

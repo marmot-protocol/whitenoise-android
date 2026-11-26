@@ -11,12 +11,10 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -26,7 +24,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerC
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.appStateWithDirectChats
-import dev.ipf.whitenoise.android.ui.share.completeRetainedChatList
 import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -54,45 +51,6 @@ class ForwardMessagePickerScreenshotTest {
             snapshotPath = "src/test/snapshots/forward_message_picker_dark.png",
             folderFixture = FolderFixture.NONE,
         )
-    }
-
-    @Test
-    fun noMatchesAfterSearchingACompleteDestinationList() {
-        val groupId = hexId(0x20)
-        val peerId = hexId(0x40)
-        val appState =
-            appStateWithDirectChats(
-                groupId to peerId,
-                profiles = mutableMapOf(peerId to profile("Person 1")),
-                chatListSubscriptions = completeRetainedChatList(),
-            )
-        appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface {
-                    ForwardMessagePickerContent(
-                        appState = appState,
-                        messageCount = 11,
-                        attachmentCount = 11,
-                        originGroupIdHex = "ff".repeat(32),
-                        sourceAccountRef = ACCOUNT_REF,
-                        onDismiss = {},
-                        onForward = { _, _ -> true },
-                    )
-                }
-            }
-        }
-        composeRule.onNodeWithText("Person 1").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Search chats").performClick()
-        composeRule.onNodeWithTag("forward.searchField").performTextInput("missing destination")
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodes(hasText("No matches")).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithText("No matches").assertIsDisplayed()
-        composeRule.onNodeWithText("Retry").assertDoesNotExist()
-        composeRule
-            .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
-            .captureRoboImage("src/test/snapshots/forward_message_picker_no_matches_dark.png")
     }
 
     /** A mixed-selection folder remains compact beside enlarged destination text. */
