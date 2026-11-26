@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Empty timeline recovery clears the composer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": ".padding(bottom = overlayPadding)",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
         "surface": "share_import_recovered_limit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.share_import_recovered_limit",
