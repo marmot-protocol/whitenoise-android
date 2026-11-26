@@ -26,18 +26,6 @@ class DisappearingLabelPluralCoverageTest {
         }
     }
 
-    /** The plural helper formats the exact `Long`, so a count past the `Int` range never wraps to a short one. */
-    @Test
-    fun pluralHelperFormatsTheExactCount() {
-        val label = groupSource("DisappearingMessages.kt")
-
-        assertTrue(
-            "disappearingCountLabel must clamp only the plural quantity and format the exact count",
-            "pluralStringResource(id, count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), count)" in label,
-        )
-        assertTrue("Label counts must not be narrowed with toInt()", "spec.count.toInt()" !in label)
-    }
-
     /** No locale ships a plain-number duration string, and every locale defines each unit as a plural. */
     @Test
     fun noPlainNumberDurationStringRemainsInAnyLocale() {

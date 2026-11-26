@@ -23,10 +23,7 @@ internal fun disappearingMessagesLabel(secs: Long): String =
 
 /** Label for a protocol retention value. Past `Long.MAX_VALUE` it reads as the longest duration, never negative. */
 @Composable
-internal fun disappearingMessagesLabel(secs: ULong): String {
-    val clamped = secs.coerceAtMost(Long.MAX_VALUE.toULong()).toLong()
-    return disappearingMessagesLabel(clamped)
-}
+internal fun disappearingMessagesLabel(secs: ULong): String = disappearingMessagesLabel(secs.clampedDisappearingSecs())
 
 /** Formats the exact [count]; only the plural form is chosen from a count clamped to the `Int` range. */
 @Composable

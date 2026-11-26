@@ -2029,7 +2029,7 @@ internal fun GroupDetailsScreen(
 
                     DisappearingTimerEditor(
                         open = showDisappearingPicker,
-                        currentSecs = controller.group.disappearingMessageSecs.toLong(),
+                        currentSecs = controller.group.disappearingMessageSecs.clampedDisappearingSecs(),
                         editable = disappearingTimerEditable(canEdit, mutationsBlocked),
                         identity = ownIdentity,
                         resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
