@@ -20,6 +20,8 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
+import dev.ipf.marmotkit.OnboardingRelayRemovalReasonFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
@@ -121,12 +123,29 @@ private fun SetupRelayChange(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        findings.filter { it.endpoint != null && it.endpoint == change.endpoint }.distinct().forEach {
+        val endpointFindings = findings.filter { it.endpoint != null && it.endpoint == change.endpoint }.distinct()
+        endpointFindings.forEach {
             SetupFindingEvidence(it)
             Text(stringResource(setupFindingTitle(it.issue)), style = MaterialTheme.typography.bodySmall)
         }
+        removalReasonIssue(change)
+            ?.takeIf { reason -> endpointFindings.none { it.issue == reason } }
+            ?.let { Text(stringResource(setupFindingTitle(it)), style = MaterialTheme.typography.bodySmall) }
     }
 }
+
+/** Why MDK removes this entry, when no finding beside it already says so. */
+private fun removalReasonIssue(change: OnboardingRelayTagChangeFfi): OnboardingIssueFfi? =
+    if (change.disposition != OnboardingRelayTagDispositionFfi.REMOVED) {
+        null
+    } else {
+        when (change.removalReason) {
+            OnboardingRelayRemovalReasonFfi.NONE -> null
+            OnboardingRelayRemovalReasonFfi.RETIRED -> OnboardingIssueFfi.RETIRED_RELAY
+            OnboardingRelayRemovalReasonFfi.AUTHENTICATION_REQUIRED -> OnboardingIssueFfi.AUTHENTICATION_REQUIRED
+            OnboardingRelayRemovalReasonFfi.PAYMENT_REQUIRED -> OnboardingIssueFfi.PAYMENT_REQUIRED
+        }
+    }
 
 /** Quotes opaque fields as JSON while keeping relay URL slashes readable. */
 internal fun relayTagJson(fields: List<String>): String =

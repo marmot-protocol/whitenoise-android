@@ -49,6 +49,10 @@ internal class AppLockController(
     var screenVisible by mutableStateOf(false)
         private set
 
+    /** Admission for foreground work that requires an unobscured screen, also read off Main. */
+    val foregroundWorkAllowed: Boolean
+        get() = foregroundEvaluated && appInForeground() && !screenVisible && !evaluationPending
+
     /** Notification admission re-evaluates the monotonic deadline from the runtime's IO dispatcher. */
     val notificationActionsAllowed: Boolean
         get() =
@@ -57,7 +61,7 @@ internal class AppLockController(
                 requireUnlock = required,
                 credentialAvailable = credentialAvailable,
                 authenticatedSessionAvailable =
-                    (notificationForegroundEvaluated && appInForeground()) ||
+                    (foregroundEvaluated && appInForeground()) ||
                         notificationBackgroundGraceAllows(
                             notificationBackgroundedAt,
                             SystemClock.elapsedRealtime(),
@@ -69,7 +73,7 @@ internal class AppLockController(
     private var notificationBackgroundedAt: Long? = null
 
     @Volatile
-    private var notificationForegroundEvaluated = false
+    private var foregroundEvaluated = false
 
     var unlockError by mutableStateOf<AppText?>(null)
         private set
@@ -154,7 +158,7 @@ internal class AppLockController(
         ttsBoundaryJob = null
         notificationBackgroundedAt = null
         maybeShowForForeground(nowMillis)
-        notificationForegroundEvaluated = true
+        foregroundEvaluated = true
     }
 
     fun maybeShowForForeground(nowMillis: Long = System.currentTimeMillis()) {
@@ -174,7 +178,7 @@ internal class AppLockController(
 
     /** Start the away-time grace period only for an authenticated, credentialed background transition. */
     fun onAppBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
-        notificationForegroundEvaluated = false
+        foregroundEvaluated = false
         sessions.clearForegroundReturn()
         notificationBackgroundedAt = null
         refreshCredentialAvailability()

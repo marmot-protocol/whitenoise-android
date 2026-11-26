@@ -173,6 +173,58 @@ class AccountSetupPinnedActionsTest {
         assertEquals(SetupSurface.Ready, AccountSetupState(snapshot = setupSnapshot(ready = true)).setupSurface())
     }
 
+    /** A failed inbox check explains the step and pins Try again beside the suggested review. */
+    @Test fun failedInboxCheckExplainsAndPinsRetry() {
+        show(AccountSetupState(snapshot = inboxDiscoveryIncompleteSnapshot()))
+        composeRule.onNodeWithText("Inbox relays are where people send you chat invitations.").assertIsDisplayed()
+        composeRule.onNodeWithText("Some relays didn’t answer, so this check couldn’t finish.").assertIsDisplayed()
+        assertEquals("Try again is the filled primary", primary, containerPixel("setup-action-RETRY"))
+        pinned("setup-action-USE_RECOMMENDED_RELAYS").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-action-EDIT_DISCOVERY_RELAYS").assertDoesNotExist()
+        pinned("setup-action-RETRY").performClick()
+        assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
+    }
+
+    /** A refused Save says why and that nothing was published; only Try again is pinned. */
+    @Test fun refusedSaveExplainsAndPinsOnlyRetry() {
+        show(AccountSetupState(snapshot = refusedSaveSnapshot()))
+        composeRule
+            .onNodeWithText(
+                "The final relay check couldn’t finish. Your changes weren’t saved or published.",
+            ).assertIsDisplayed()
+        pinned("setup-action-RETRY").assertIsDisplayed()
+        composeRule
+            .onNode(hasTestTag("setup-action-EDIT_DISCOVERY_RELAYS") and !hasAnyAncestor(hasScrollAction()))
+            .assertDoesNotExist()
+    }
+
+    /** Details lists a relay problem recorded on a step that passed, under that step. */
+    @Test fun detailsListPassedStepWarnings() {
+        show(AccountSetupState(snapshot = passedWithWarningsSnapshot(), detailsExpanded = true))
+        composeRule.onNodeWithTag("setup-passed-warnings").scrollToIfScrollable().assertIsDisplayed()
+        composeRule.onNodeWithText("Setup continued, but these relays had a problem.").assertExists()
+    }
+
+    /** A passed cleanup action carries that step's grant into the native preview. */
+    @Test fun passedWarningCleanupTargetsItsOwnStep() {
+        show(AccountSetupState(snapshot = passedWithCleanupSnapshot(), detailsExpanded = true))
+        composeRule.onNodeWithTag("setup-action-REMOVE_UNUSABLE_RELAYS").scrollToIfScrollable().performClick()
+        assertEquals(
+            SetupRequest(3uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS),
+            actions.single(),
+        )
+    }
+
+    /** A cleanup for a passed step opens its preview with Save and that preview's own reason. */
+    @Test fun passedCleanupPreviewShowsTheNativeRemovalReason() {
+        val snapshot = passedCleanupPreviewSnapshot()
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings = emptyList()
+        show(AccountSetupState(snapshot))
+        pinned("setup-action-APPROVE_REPAIR").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("This relay requires authentication.").assertExists()
+        assertEquals(SetupRequest(4uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.APPROVE_REPAIR), actions.single())
+    }
+
     /** Samples a node's container colour just inside its leading edge, where a filled button differs from outlined. */
     private fun containerPixel(tag: String): Int {
         val image = composeRule.onNodeWithTag(tag).captureToImage().toPixelMap()

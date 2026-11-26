@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
+import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.whiteNoiseInboxRelays
 import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,12 @@ internal interface AccountSetupClient {
 
     /** Dispatches a user decision with its reviewed proposal data and revision. */
     suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi?
+
+    /** Rechecks the failed checkpoint and foreground eligibility before issuing a serialized native retry. */
+    suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ): OnboardingSnapshotFfi?
 
     /** Creates an unapproved relay preview without advancing optional setup decisions. */
     suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi
@@ -142,6 +151,25 @@ internal class MarmotAccountSetupClient(
         }
     }
 
+    /** Rechecks both the native checkpoint and the signer, which can change since the route mounted. */
+    override suspend fun retryFailedCheck(
+        request: SetupRequest,
+        stillAllowed: () -> Boolean,
+    ): OnboardingSnapshotFfi? =
+        withLifetime {
+            withContext(Dispatchers.IO) {
+                val latest = marmot.onboardingSnapshot(account)
+                if (latest?.allowsAutomaticRetry(account, request) == true &&
+                    marmot.signsLocallyForSetup(account) &&
+                    stillAllowed()
+                ) {
+                    defaults.advance(marmot.retryOnboardingStep(account, request.step))
+                } else {
+                    latest
+                }
+            }
+        }
+
     /** Retains ownership until IO delivery succeeds, cleaning up previews discarded by cancellation. */
     override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi {
         var acquired: OnboardingSnapshotFfi? = null
@@ -192,6 +220,18 @@ internal class MarmotAccountSetupClient(
             marmot.proposeOnboardingRelayRepair(account, request.step)
         }
 
+    /**
+     * Native can report a failed approval by saving the refusal checkpoint and throwing. Keep the more specific
+     * checkpoint when it belongs to exactly the proposal the user tried to approve.
+     */
+    private suspend fun approveRepair(request: SetupRequest): OnboardingSnapshotFfi =
+        runCatchingCancellable {
+            marmot.approveSetupRepair(account, request.revision, request.recoveryEpoch)
+        }.getOrElse { error ->
+            val latest = runCatchingCancellable { marmot.onboardingSnapshot(account) }.getOrNull()
+            if (latest?.reportsFailedApproval(account, request) == true) latest else throw error
+        }
+
     /** Maps each explicit decision to the published native command. */
     private suspend fun dispatch(request: SetupRequest): OnboardingSnapshotFfi? =
         with(request) {
@@ -218,7 +258,7 @@ internal class MarmotAccountSetupClient(
                         account,
                         requireNotNull(profile),
                     )
-                OnboardingActionFfi.APPROVE_REPAIR -> marmot.approveSetupRepair(account, revision, recoveryEpoch)
+                OnboardingActionFfi.APPROVE_REPAIR -> approveRepair(request)
                 OnboardingActionFfi.CANCEL_REPAIR -> marmot.cancelOnboardingRepair(account)
                 OnboardingActionFfi.CONTINUE_ANYWAY ->
                     marmot.acknowledgeSetupSingleDevice(account, revision, recoveryEpoch)
@@ -234,3 +274,18 @@ internal class MarmotAccountSetupClient(
             }
         }
 }
+
+/** Checks evidence from the current relay setup attempt, with the proposal invalidated before publication. */
+internal fun OnboardingSnapshotFfi.reportsFailedApproval(
+    account: String,
+    request: SetupRequest,
+): Boolean =
+    accountIdHex == account &&
+        recoveryEpoch == request.recoveryEpoch &&
+        revision > request.revision &&
+        proposal == null &&
+        steps.any { step ->
+            step.step == request.step &&
+                step.status == OnboardingStatusFfi.RETRYABLE_FAILURE &&
+                step.findings.any { it.context == OnboardingFindingContextFfi.REPAIR_APPROVAL }
+        }
