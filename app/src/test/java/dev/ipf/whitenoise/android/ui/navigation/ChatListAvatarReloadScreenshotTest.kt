@@ -187,11 +187,14 @@ class ChatListAvatarReloadScreenshotTest {
                     if (tag.startsWith("chat.row.")) {
                         hasPaintedRow(tag)
                     } else {
-                        rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed()
+                        // The list header fades in with the list body on one clock; sample it on the
+                        // first frame that paints any row, so a neutral placeholder cannot be skipped.
+                        rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed() &&
+                            hasPaintedRow("chat.row.${fixture.rows.first().groupIdHex}")
                     }
                 }
             visible.forEach { (tag, color) ->
-                val contrast = if (tag.startsWith("chat.row.")) FIRST_ROW_CONTRAST else 0.4f
+                val contrast = FIRST_ROW_CONTRAST
                 if (!containsAvatar(tag, color, exact = false, minContrast = contrast)) {
                     missing += "$tag ${firstFrameDiagnostic(tag, color, contrast)}"
                 }

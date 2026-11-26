@@ -17,7 +17,8 @@
         "anchor": "fun <T> ConversationRouteAnimatedContent(",
         "test_ids": [
           "NAV-005",
-          "NAV-006"
+          "NAV-006",
+          "NAV-015"
         ]
       },
       {
