@@ -249,6 +249,10 @@ class ShapedTouchScannerRegressionTest {
         assertEquals(emptyList<String>(), shapedTouchFindings(extended))
         val positional = "Tile(Modifier.shapedTouchTarget(press, go), press = press)\n"
         assertEquals(emptyList<String>(), shapedTouchFindings("$positional$header { Box(ignored) { $feedback } }"))
+        // A generic parameter before the hand-off keeps its commas, so the positional target maps to its own name.
+        val generic = "fun Tile(values: Map<String, Int>, ignored: Modifier, press: MutableInteractionSource)"
+        val afterGeneric = "Tile(emptyMap(), Modifier.shapedTouchTarget(press, go), press = press)\n"
+        assertEquals(emptyList<String>(), shapedTouchFindings("$afterGeneric$generic { Box(ignored) { $feedback } }"))
         val unapplied =
             listOf(
                 "val unused: @Composable () -> Unit = { Box(ignored) }",
@@ -337,6 +341,7 @@ class ShapedTouchScannerRegressionTest {
             listOf(
                 "fun Tile(Corners: CornerValues) {\n%s\n}",
                 "fun Tile() { all.forEach { Corners ->\n%s\n} }",
+                "fun Tile() { all.forEach { (Corners, _) ->\n%s\n} }",
                 "fun Tile() { val Corners = other\n%s\n}",
                 "fun Tile() { val (Corners, rest) = pair\n%s\n}",
                 "fun Tile() { for (Corners in all) {\n%s\n} }",

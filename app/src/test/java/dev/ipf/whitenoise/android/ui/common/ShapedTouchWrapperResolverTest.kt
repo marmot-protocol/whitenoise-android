@@ -154,6 +154,10 @@ class ShapedTouchWrapperResolverTest {
                 "fun Keyed(onClick: () -> Unit, values: Map<String, Int> = mapOf<String, Int>(), modifier: Modifier)",
                 "fun First(enabled: Boolean = 1 < 2, wide: Boolean = 2 > 1, onClick: () -> Unit, modifier: Modifier)",
                 "fun Bounds(low: Boolean = a <= b, high: Boolean = a >= b, onClick: () -> Unit, modifier: Modifier)",
+                "fun Annotated(onClick: () -> Unit, values: Map<@Ann(x = 1) String, Int>, modifier: Modifier)",
+                "fun EscapedType(onClick: () -> Unit, labels: Map<`when`, Int>, modifier: Modifier)",
+                "fun AnnotatedDefault(onClick: () -> Unit, " +
+                    "values: Map<String, Int> = mapOf<@Ann(x = 1) String, Int>(), modifier: Modifier)",
             ).joinToString("\n", prefix = "package df\n") { "$it $handOff" }
         val calls =
             mapOf(
@@ -163,6 +167,9 @@ class ShapedTouchWrapperResolverTest {
                 "Keyed.kt" to "Keyed(go, modifier = Modifier.width(36.dp))",
                 "First.kt" to "First(onClick = go, modifier = Modifier.width(36.dp))",
                 "Bounds.kt" to "Bounds(onClick = go, modifier = Modifier.width(36.dp))",
+                "Annotated.kt" to "Annotated(go, emptyMap(), Modifier.width(36.dp))",
+                "EscapedType.kt" to "EscapedType(go, emptyMap(), Modifier.width(36.dp))",
+                "AnnotatedDefault.kt" to "AnnotatedDefault(go, emptyMap(), Modifier.width(36.dp))",
             ).mapValues { (_, call) -> "package dc\nimport df.*\nfun Screen() { $call }" }
         val findings = stretchedWrapperFindings(calls + ("Defaults.kt" to wrappers))
         for (file in calls.keys) assertEquals(file, listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue(file))

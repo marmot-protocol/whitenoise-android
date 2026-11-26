@@ -86,7 +86,8 @@ private fun MatchResult.argumentName(): String = groupValues[1].removeSurroundin
 
 /** The parameter names of a function's parameter list text, in order. */
 internal fun parameterNames(parameters: String): List<String?> {
-    val declared = topLevelArguments(parameters).map { it.declaredParameter() }
+    // The declaration splitter, unlike a call's, keeps `Map<String, Int>` in one parameter.
+    val declared = parameterList(parameters).map { it.declaredParameter() }
     return declared.map { it.name }
 }
 
@@ -132,13 +133,17 @@ internal fun String.typeArgumentEnd(open: Int): Int? {
 /** Finds the closing angle bracket when the intervening characters can form a type argument list. */
 internal fun String.closingTypeArgument(open: Int): Int? {
     var depth = 1
-    for (index in open + 1 until length) {
+    var index = open + 1
+    while (index < length) {
         val char = this[index]
         when {
+            // A bracketed span, such as a function type's parameters or an annotation's arguments, is skipped whole.
+            char in "([{" -> index = closingBracket(index)
             char == '<' -> depth++
             char == '>' -> if (this[index - 1] != '-' && --depth == 0) return index
-            !char.isLetterOrDigit() && !char.isWhitespace() && char !in "._?*,()-:@" -> break
+            !char.isLetterOrDigit() && !char.isWhitespace() && char !in "._?*,-:@`" -> break
         }
+        index++
     }
     return null
 }

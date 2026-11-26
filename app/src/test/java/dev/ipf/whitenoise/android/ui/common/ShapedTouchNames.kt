@@ -108,7 +108,8 @@ internal class ShapedTouchNames(
     /**
      * Whether [name] is bound anywhere in this file other than at [except]: a `val` or `var` (members, delegated,
      * getter or `lateinit` ones included), a loop variable, a destructured name, a parameter of any function, lambda
-     * or constructor, a type or function declaration, an extension property or an enum entry.
+     * (destructured ones included) or constructor, a type or function declaration, an extension property or an enum
+     * entry.
      */
     fun isBoundAnywhere(
         name: String,
@@ -119,7 +120,9 @@ internal class ShapedTouchNames(
             Regex(
                 """\b(?:val|var)\s+$escaped\b|\bfor\s*\(\s*$escaped\b|""" +
                     """\b(?:val|var|for)\s*\(\s*\(?[^)]*\b$escaped\b|""" +
-                    """[(,]\s*$escaped\s*:|[{,]\s*$escaped\s*(?::[^,{}]*)?(?:,[^{}]*?)?->""",
+                    """[(,]\s*$escaped\s*:|[{,]\s*$escaped\s*(?::[^,{}]*)?(?:,[^{}]*?)?->|""" +
+                    // A destructured lambda parameter, such as `{ (name, _) -> … }`, binds the name too.
+                    """[{,]\s*\([^)]*\b$escaped\b[^)]*\)\s*(?::[^{}]*?)?(?:,[^{}]*?)?->""",
             )
         val typeDeclaration = Regex("""\b(?:object|class|interface|typealias|fun)\s+$escaped\b""")
         // Any `.` before the name inside a declaration makes it an extension, whatever the receiver's spelling.
