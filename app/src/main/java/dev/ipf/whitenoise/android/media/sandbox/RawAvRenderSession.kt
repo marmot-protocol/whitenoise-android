@@ -332,7 +332,8 @@ internal class RawAvRenderSession(
         seek: (Long) -> Unit,
     ) {
         synchronized(clockLock) { sourceHasAudio = wantAudio && info.hasAudio }
-        val progress = RawAvRenderProgress(owner.intent().positionUs, !wantVideo || !info.hasVideo, !wantAudio || !info.hasAudio)
+        val videoEnded = !wantVideo || !info.hasVideo
+        val progress = RawAvRenderProgress(owner.intent().positionUs, videoEnded, !wantAudio || !info.hasAudio)
         try {
             while (valid(activation)) {
                 val intent = owner.intent()
@@ -529,9 +530,9 @@ internal class RawAvRenderSession(
             }
         }
         val pending = progress.audio
+        val sink = pcm
         var acceptedInput = false
-        if (pending != null && valid(activation, appliedSeek)) {
-            val sink = pcm ?: return false
+        if (pending != null && sink != null && valid(activation, appliedSeek)) {
             val frames = pending.frame.sampleRate / 100
             val frameBytes = pending.frame.channels * 2
             val count: Int
@@ -590,7 +591,8 @@ internal class RawAvRenderSession(
         val expected = synchronized(clockLock) { audioAnchorUs } + sink.writtenPositionUs()
         val delta = clipped.timestampUs - expected
         val gap = if (delta > 1000) delta * sink.sampleRate / 1_000_000 else 0
-        progress.audio = RawAvPendingPcm(frame, clipped.offset, clipped.offset + clipped.byteCount, clipped.timestampUs, gap)
+        val limit = clipped.offset + clipped.byteCount
+        progress.audio = RawAvPendingPcm(frame, clipped.offset, limit, clipped.timestampUs, gap)
     }
 
     /**

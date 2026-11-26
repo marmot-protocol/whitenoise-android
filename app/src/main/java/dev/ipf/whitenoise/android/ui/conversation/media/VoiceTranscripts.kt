@@ -118,12 +118,21 @@ internal class VoiceTranscriptionScope(
     private val keyPrefix = "$account|$group|"
 
     val active: Boolean
-        get() = transcripts.generation == generation && transcripts.accountEpoch(account) == accountEpoch && recognitionAllowed()
+        get() {
+            if (transcripts.generation != generation) return false
+            return transcripts.accountEpoch(account) == accountEpoch && recognitionAllowed()
+        }
 
-    fun shown(messageIdHex: String): Boolean = active && (transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic)
+    fun shown(messageIdHex: String): Boolean {
+        if (!active) return false
+        return transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
+    }
 
     /** True only when the person asked for this message's transcript, rather than the automatic setting. */
-    fun requestedExplicitly(messageIdHex: String): Boolean = active && transcripts.shownOverride(messageKey(messageIdHex)) == true
+    fun requestedExplicitly(messageIdHex: String): Boolean {
+        if (!active) return false
+        return transcripts.shownOverride(messageKey(messageIdHex)) == true
+    }
 
     fun setShown(
         messageIdHex: String,

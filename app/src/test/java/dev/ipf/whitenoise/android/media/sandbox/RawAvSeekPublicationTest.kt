@@ -102,7 +102,8 @@ class RawAvSeekPublicationTest {
             assertEquals(0L, engine.snapshot().renderedFrame)
             val retry = engine.seekToAsync(2000) as SettableFuture<Void?>
             val current = engine.intent()
-            val retryRequest = RawAvPausedSeekRequest(RawAvPosterTarget(RawAvGeneration(current.activation, current.seek), 2000), retry)
+            val retryTarget = RawAvPosterTarget(RawAvGeneration(current.activation, current.seek), 2000)
+            val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
             assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
             assertEquals(2000L, engine.positionMs())
         }

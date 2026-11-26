@@ -469,13 +469,15 @@ internal class RawAvPlaybackEngine(
     fun seekToAsync(positionMs: Long): ListenableFuture<Void?> {
         val completion = SettableFuture.create<Void?>()
         synchronized(lock) {
-            if (!current()) {
-                completion.setException(IOException("Media source owner retired"))
-                return completion
-            }
-            renderer.revokeAudioBefore(seekRevision + 1)?.let { refusal ->
+            val refusal =
+                if (current()) {
+                    renderer.revokeAudioBefore(seekRevision + 1)
+                } else {
+                    IOException("Media source owner retired")
+                }
+            if (refusal != null) {
                 completion.setException(refusal)
-                failPlaybackLocked(refusal)
+                if (refusal is RawOutputFailure) failPlaybackLocked(refusal)
                 return completion
             }
             pendingSeek?.cancel(false)
