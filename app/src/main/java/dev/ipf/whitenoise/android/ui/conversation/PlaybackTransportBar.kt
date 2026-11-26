@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +25,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.useVoiceTransport
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.formatVoiceTime
 import dev.ipf.whitenoise.android.ui.conversation.media.voiceSpeedLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -119,7 +119,7 @@ internal fun VoiceTransportBarContent(
             ) {
                 Text(
                     "${formatVoiceTime(state.positionMs)} / ${formatVoiceTime(state.durationMs)}",
-                    modifier = Modifier.width(IntrinsicSize.Max),
+                    modifier = Modifier.boundedIntrinsicWidth(IntrinsicSize.Max),
                     style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Ltr),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
