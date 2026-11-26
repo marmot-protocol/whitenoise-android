@@ -102,6 +102,28 @@ class RawPcmOutputSonicTest {
         }
     }
 
+    @Test fun presentationClockLagsMixerAndHoldsEndOfStreamUntilTheAudibleTail() {
+        val device = Device().apply { presented = 0L }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+            assertEquals(0L, output.positionUs())
+            assertFalse(output.drained())
+
+            device.presented = 40L
+            output.prepareForWait(true)
+            assertEquals(5000L, output.positionUs())
+            assertFalse(output.drained())
+
+            device.presented = 80L
+            output.prepareForWait(true)
+            assertEquals(10_000L, output.positionUs())
+            assertTrue(output.drained())
+        }
+    }
+
     /** Tiny Nonzero Audio Is Flushed At Every Supported Representative Rate. */
     @Test fun tinyNonzeroAudioIsFlushedAtEverySupportedRepresentativeRate() {
         for (rate in listOf(.25f, .5f, 1f, 2f)) {
@@ -238,6 +260,7 @@ class RawPcmOutputSonicTest {
         var autoAdvance = true
         var failRestore = false
         var head = 0
+        var presented: Long? = null
         var calls = 0
         var fail = false
         var pauseAttempted = false
@@ -263,6 +286,8 @@ class RawPcmOutputSonicTest {
             access()
             return head
         }
+
+        override fun presentationFrames(): Long? = presented
 
         override fun write(
             buffer: ByteBuffer,

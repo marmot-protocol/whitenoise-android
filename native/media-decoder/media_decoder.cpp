@@ -179,9 +179,10 @@ void check(bool condition, const char* reason) {
 }
 
 constexpr size_t kMaxQueuedBytes = 8U * 1024 * 1024;
+constexpr size_t kMaxQueuedPackets = 512;
 
 // Charge copied packet data and referenced buffer view bytes retained by clone.
-// Allocator bookkeeping is bounded separately by the 512-packet limit.
+// Allocator bookkeeping is bounded separately by the packet limit.
 /** Add retained queue bytes only after subtraction-based overflow and aggregate-budget checks. */
 constexpr bool addRetainedBytes(size_t bytes, size_t& total) {
     if (total > kMaxQueuedBytes || bytes > kMaxQueuedBytes - total) return false;
@@ -404,12 +405,35 @@ int workerThreads() {
     return int(std::clamp<long>(online, 1, kMaxWorkerThreads));
 }
 
-/** Select a supported stream of the requested media type without opening an unapproved decoder. */
+/** Resolve only a reviewed decoder, without opening it during stream selection. */
+const AVCodec* reviewedDecoder(AVCodecID id, AVMediaType type) {
+    if (!(type == AVMEDIA_TYPE_VIDEO ? allowedVideo(id) : allowedAudio(id))) return nullptr;
+    return id == AV_CODEC_ID_AV1 ? avcodec_find_decoder_by_name("libdav1d") : avcodec_find_decoder(id);
+}
+
+bool selectableTrack(const AVStream& stream, AVMediaType type) {
+    return stream.codecpar->codec_type == type &&
+        !(type == AVMEDIA_TYPE_VIDEO && (stream.disposition & AV_DISPOSITION_ATTACHED_PIC));
+}
+
+/** Keep the preferred stream when supported; otherwise prefer a supported default, then the first supported track. */
 void selectTrack(Session& s, Track& track, AVMediaType type) {
-    int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
-    if (best < 0) return;
-    if (type == AVMEDIA_TYPE_VIDEO && (s.format->streams[best]->disposition & AV_DISPOSITION_ATTACHED_PIC)) return;
-    track.index = best;
+    const int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
+    if (best >= 0 && selectableTrack(*s.format->streams[best], type)) {
+        track.index = best; // Preserve explicit codec refusal if there is no supported alternative.
+        if (reviewedDecoder(s.format->streams[best]->codecpar->codec_id, type)) return;
+    }
+    int fallback = -1;
+    for (unsigned i = 0; i < s.format->nb_streams; ++i) {
+        const auto& stream = *s.format->streams[i];
+        if (!selectableTrack(stream, type) || !reviewedDecoder(stream.codecpar->codec_id, type)) continue;
+        if (fallback < 0) fallback = static_cast<int>(i);
+        if (stream.disposition & AV_DISPOSITION_DEFAULT) {
+            fallback = static_cast<int>(i);
+            break;
+        }
+    }
+    if (fallback >= 0) track.index = fallback;
 }
 
 /** Open the selected bounded software decoder and validate its video/audio resource limits. */
@@ -418,8 +442,7 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     auto* parameters = s.format->streams[track.index]->codecpar;
     check(type == AVMEDIA_TYPE_VIDEO ? allowedVideo(parameters->codec_id) : allowedAudio(parameters->codec_id),
           "unsupported_codec");
-    const AVCodec* decoder = parameters->codec_id == AV_CODEC_ID_AV1 ?
-        avcodec_find_decoder_by_name("libdav1d") : avcodec_find_decoder(parameters->codec_id);
+    const AVCodec* decoder = reviewedDecoder(parameters->codec_id, type);
     check(decoder, "unsupported_decoder");
     if (type == AVMEDIA_TYPE_VIDEO) {
         check(parameters->width > 0 && parameters->height > 0 && parameters->width <= kMaxDimension &&
@@ -780,7 +803,7 @@ bool pump(Session& s, Track& track) {
 }
 
 /** Admit a cloned packet only after the complete retained-view cost and packet-count budgets pass. */
-void queuePacket(Session& s) {
+void queuePacket(Session& s, size_t packetLimit = kMaxQueuedPackets) {
     const int result = av_read_frame(s.format, s.packet);
     if (invalidContainerRead(result)) throw MalformedContainerRead();
     check(result >= 0 || result == AVERROR_EOF, "media_container_read_failed");
@@ -791,7 +814,7 @@ void queuePacket(Session& s) {
     if (track && !track->ended) {
         size_t retainedBytes = 0;
         check(packetRetainedBytes(*s.packet, retainedBytes) &&
-              s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < 512,
+              s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < packetLimit,
               "compressed_lookahead_budget_refused");
         auto* owned = av_packet_clone(s.packet);
         check(owned, "packet_queue_allocation_refused");
@@ -818,7 +841,7 @@ bool skipPrerollVideo(Session& s, int step) {
         s.videoSkipBeforeUs = INT64_MIN;
         return false;
     }
-    return step < kMaxReadSteps / 2 && s.queuedPackets < 256 && s.queuedBytes < kMaxQueuedBytes / 2 &&
+    return step < kMaxReadSteps / 2 && s.queuedPackets < kMaxQueuedPackets / 2 && s.queuedBytes < kMaxQueuedBytes / 2 &&
         monotonicMs() + kPrerollReserveMs < s.deadline;
 }
 
@@ -838,6 +861,11 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     }
     check(s.wantVideo == wantVideo && s.wantAudio == wantAudio, "output_track_selection_changed");
     Track& selected = preferred == 1 ? s.video : s.audio;
+    // Frame threads may need several video packets before returning a frame, with
+    // hundreds of small audio packets in between. Retained bytes stay capped.
+    const bool frameThreadedVideo = preferred == 1 && s.wantAudio && selected.codec &&
+        (selected.codec->active_thread_type & FF_THREAD_FRAME);
+    const size_t packetLimit = kMaxQueuedPackets * (frameThreadedVideo ? s.threads : 1);
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
         pump(s, selected);
@@ -868,7 +896,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
         }
         check(!s.inputEnded, "media_track_drain_stalled");
-        queuePacket(s);
+        queuePacket(s, packetLimit);
     }
     throw Failure("media_decode_work_budget_refused");
 }

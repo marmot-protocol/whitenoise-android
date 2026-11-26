@@ -30,6 +30,8 @@ internal class RawPcmOutput(
     private var lastHead = 0L
     private var headWrap = 0L
     private var lastHardwareFrames = 0L
+    private var lastHeadAdvanceMs = 0L
+    private var presentationLagFrames = 0L
     private var stalledSinceMs: Long? = null
     private var position = 0L
     private var buffered = 0L
@@ -212,13 +214,15 @@ internal class RawPcmOutput(
         val terminal = segmentEnding && segment.ended && !output.hasRemaining()
         val tolerance = queue.prepareForWait(terminal)
         queue.poll()
-        val playedOutputUs = framesToUs(queue.playedOutputFrames)
-        position = maxOf(position, segmentSourceUs + segment.mediaDurationUs(playedOutputUs)).coerceAtMost(written)
-        val queuedMediaUs = segmentSourceUs + segment.mediaDurationUs(queue.writtenPositionUs())
-        buffered = maxOf(position, queuedMediaUs).coerceAtMost(written)
         val physical = physicalBase + queue.acceptedDeviceFrames
         val now = SystemClock.elapsedRealtime()
         val head = physicalBase + queue.physicalHeadFrames
+        if (head > lastHardwareFrames) lastHeadAdvanceMs = now
+        val presented = presentedOutputFrames(head, now)
+        val playedOutputUs = framesToUs(presented)
+        position = maxOf(position, segmentSourceUs + segment.mediaDurationUs(playedOutputUs)).coerceAtMost(written)
+        val queuedMediaUs = segmentSourceUs + segment.mediaDurationUs(queue.writtenPositionUs())
+        buffered = maxOf(position, queuedMediaUs).coerceAtMost(written)
         val pendingDevice = output.hasRemaining() || head < physical
         if (head > lastHardwareFrames || !pendingDevice) {
             stalledSinceMs = null
@@ -231,14 +235,34 @@ internal class RawPcmOutput(
             }
         }
         lastHardwareFrames = maxOf(lastHardwareFrames, head)
-        if (terminal && queue.mediaDrained && inputEnded) {
+        val mediaPresented = presented >= queue.outputFrames
+        if (terminal && mediaPresented && inputEnded) {
             position = written
             buffered = written
             finished = true
-        } else if (terminal && queue.fullyDrained && !inputEnded) {
+        } else if (terminal && mediaPresented && queue.fullyDrained && !inputEnded) {
             completeRateSegment()
         }
         return tolerance
+    }
+
+    /** Converts the device presentation clock to this Sonic segment, excluding device-only padding. */
+    private fun presentedOutputFrames(
+        head: Long,
+        nowMs: Long,
+    ): Long {
+        // Both Android frame counters can wrap at 32 bits. Their short difference stays signed.
+        val lag = device.presentationFrames()?.let { (head - it).toInt().toLong() }
+        val remainingLag =
+            if (lag != null && lag in -sampleRate.toLong()..sampleRate.toLong()) {
+                lag.coerceAtLeast(0L).also { presentationLagFrames = it }
+            } else {
+                // During a timestamp gap, allow the last observed latency to drain even if
+                // the mixer has taken the final frame and the head has stopped moving.
+                val elapsedMs = (nowMs - lastHeadAdvanceMs).coerceIn(0L, 1000L)
+                (presentationLagFrames - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
+            }
+        return (head - physicalBase - remainingLag).coerceIn(0L, queue.playedOutputFrames)
     }
 
     /**

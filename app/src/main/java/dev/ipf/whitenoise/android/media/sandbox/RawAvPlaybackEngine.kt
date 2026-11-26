@@ -360,7 +360,11 @@ internal class RawAvPlaybackEngine(
     private fun restorePosterLocked() {
         redraw = true
         firstFrameForOutput = false
-        val matching = synchronized(frameLock) { lastBitmap != null && lastBitmapSeek == seekRevision }
+        val matching =
+            synchronized(frameLock) {
+                val hasPlaybackFrame = lastBitmapPtsUs >= 0 || targetUs == 0L
+                lastBitmap != null && lastBitmapSeek == seekRevision && hasPlaybackFrame
+            }
         if (wantVideo && !matching) {
             pendingSeek?.cancel(false)
             val completion = SettableFuture.create<Void?>()
@@ -451,6 +455,7 @@ internal class RawAvPlaybackEngine(
                     pendingSeek = null
                     activation++
                     revision++
+                    restorePosterLocked()
                 }
                 // Repeated paused commands preserve the admitted poster/seek, but still surrender focus below.
                 resumeOnGain = retainFocus
@@ -532,14 +537,18 @@ internal class RawAvPlaybackEngine(
         synchronized(lock) {
             val currentRequest = posterCurrent(request.target) && pendingSeek === request.completion
             if (!currentRequest || request.completion.isCancelled) return@synchronized false
-            probe?.poster?.let {
-                width = probe.width
-                height = probe.height
-                rotation = 0 // Automatic poster dimensions and pixels are already display-oriented.
-                retainFrame(it, 0)
-            }
-            request.finish(true) // Acknowledgement and frame publication share the generation lock.
+            val poster = probe?.poster
             pendingSeek = null
+            if (probe == null || poster == null) {
+                request.finish(false)
+                return@synchronized false
+            }
+            width = probe.width
+            height = probe.height
+            rotation = 0 // Automatic poster dimensions and pixels are already display-oriented.
+            retainFrame(poster, 0)
+            synchronized(frameLock) { lastBitmapPtsUs = request.target.positionMs * 1000L }
+            request.finish(true) // Acknowledgement and frame publication share the generation lock.
             signal.trySend(Unit)
             true
         }

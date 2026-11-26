@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Account-bound playback rejects stale results and closes raw outputs",
+        "surface": "Paused playback renders the current frame and refuses failed poster seeks",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/RawAvPlaybackEngine.kt",
         "anchor": "internal class RawAvPlaybackEngine",
         "test_ids": [

@@ -42,7 +42,7 @@ Automatic A/V demuxing and decoding execute in the permissionless native worker.
 
 Playback speed is applied to raw PCM by the pinned Media3 1.11.1 Sonic processor. AudioTrack remains at unity speed and pitch. Each fixed-rate segment receives at most ten milliseconds of aligned PCM per input; its owned output must be consumed before another input or explicit end-of-input flush. A rate change drains the old segment before starting the latest requested rate on the same device. Position snapshots use cached source-time anchors and never resize or query the device from a UI getter. The source-derived maximum individual processor payload is 442,800 bytes; reachable payload plus one resize is below 2 MiB. Object headers, garbage awaiting collection and total process memory are outside that bound. A Media3 upgrade requires a new allocation proof.
 
-Preferred per-track reads retain one copied video frame and one PCM block suffix in the parent. They do not remove the native compressed-packet limit of 8 MiB or 512 packets. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
+Preferred per-track reads retain one copied video frame and one PCM block suffix in the parent. The native compressed queue remains bounded to 8 MiB and 512 packets, or up to 2048 packets during a frame-threaded video read with interleaved audio. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
 
 
 The host rechecks source ownership and cancellation when a provider returns a
@@ -60,8 +60,10 @@ decoder preparation. Closing the writer after successful decoder EOF completes
 the utterance. Decode/feed errors and unrecognized audio cannot
 produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
-Transcripts remain transient in-bubble state toggled from the side Transcribe disc and are cleared when toggled off, on background,
-source disposal or account/chat replacement. This path does not add MDK persistence
+Transcripts and their visibility choices are cached in memory per account and chat while the app is in the
+foreground. Backgrounding, App Lock and account replacement clear the cache. Removing a chat clears its
+entries and rejects late recognition results. Turning the Transcribe disc off hides that message's text.
+This path does not add MDK persistence
 or claim isolation of the external recognition provider. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.
 

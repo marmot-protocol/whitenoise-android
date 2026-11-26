@@ -230,6 +230,9 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
 
     cleanupStep("launcher shortcuts") { removePinnedConversationShortcuts(account, groupIdHex) }
     cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
+    cleanupStep("voice transcripts") {
+        withContext(Dispatchers.Main.immediate) { receivedVoiceTranscripts.forgetGroup(account, groupIdHex) }
+    }
     if (pending.mediaCacheKeys.isNotEmpty()) {
         cleanupStep("memory media") {
             removeMediaMemoryCacheKeys(
@@ -269,6 +272,7 @@ internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     account: String,
     groupIdHex: String,
 ) {
+    withContext(Dispatchers.Main.immediate) { receivedVoiceTranscripts.forgetGroup(account, groupIdHex) }
     val media =
         runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
             .getOrNull()

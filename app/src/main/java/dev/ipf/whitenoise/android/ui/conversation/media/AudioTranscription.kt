@@ -87,8 +87,8 @@ private data class AudioTranscriptSlot(
 /**
  * The per-message switch behind the side transcribe disc. Each received recording registers whether its file is
  * ready and whether work is in flight; the disc shows when any recording is registered and drives them all.
- * Whether the transcript is shown lives in the conversation's [VoiceTranscriptionScope], so it survives scrolling
- * and backgrounding; outside a conversation the toggle keeps its own scope.
+ * The conversation's [VoiceTranscriptionScope] retains the visible choice while scrolling. Outside a
+ * conversation the toggle keeps its own scope.
  */
 @Stable
 internal class AudioTranscriptionToggleState(
@@ -158,8 +158,8 @@ internal fun rememberReceivedAudioTranscription(
 /**
  * Transcribes the received recording on this device while its message's transcript is shown, either because the
  * automatic setting is on or because the person turned the side disc on, and reveals the text beneath the voice
- * row once it is ready. A finished transcript is kept for the process lifetime; turning the disc off hides it and
- * cancels pending work. Leaving the foreground cancels work, which resumes on return. An automatic attempt that
+ * row once it is ready. Turning the disc off hides it and cancels pending work. Leaving the foreground clears
+ * the conversation cache and cancels work. An automatic attempt that
  * fails stays quiet. An explicit request retries and can show guidance. Transcripts never enter the message
  * store or composer.
  */

@@ -238,6 +238,7 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     // in-flight immutable dictation target before any late provider result
     // can reach the draft persistence path.
     appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
+    appState.receivedVoiceTranscripts.forgetGroup(account, group.groupIdHex)
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
 }
 

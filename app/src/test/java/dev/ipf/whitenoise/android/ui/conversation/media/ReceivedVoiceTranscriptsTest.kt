@@ -66,6 +66,43 @@ class ReceivedVoiceTranscriptsTest {
         assertEquals(complete, current.result("attachment"))
     }
 
+    @Test
+    fun removingAChatKeepsOtherResultsAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val removed = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "other")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+        assertNull(other.result("attachment"))
+        other.storeResult("attachment", complete)
+
+        transcripts.forgetGroup("alice", "removed")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+
+        assertNull(removed.result("attachment"))
+        assertFalse(removed.shown("message"))
+        assertEquals(complete, other.result("attachment"))
+    }
+
+    @Test
+    fun clearingForegroundStateDropsResultsAndChoicesAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val old = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        transcripts.clear()
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        val current = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        assertNull(current.result("attachment"))
+        assertFalse(current.shown("message"))
+        current.storeResult("attachment", complete)
+        assertEquals(complete, current.result("attachment"))
+    }
+
     /** The oldest entries leave first once the cache is full, and a re-stored entry counts as new. */
     @Test
     fun evictsOldestPastCapacity() {

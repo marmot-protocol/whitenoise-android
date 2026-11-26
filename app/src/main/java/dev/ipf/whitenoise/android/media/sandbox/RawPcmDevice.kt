@@ -4,10 +4,15 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioRouting
+import android.media.AudioTimestamp
 import android.media.AudioTrack
 import android.media.PlaybackParams
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Synchronous parent PCM-only hardware operations; the output owns this exact device through close. */
 internal interface RawPcmDevice : AutoCloseable {
@@ -27,6 +32,9 @@ internal interface RawPcmDevice : AutoCloseable {
 
     /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     fun headPosition(): Int
+
+    /** Estimates the current speaker presentation frame on the same device counter, when available. */
+    fun presentationFrames(): Long? = null
 
     /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
     fun write(
@@ -52,12 +60,18 @@ internal interface RawPcmDevice : AutoCloseable {
 
 @Suppress("TooManyFunctions") // One synchronous AudioTrack implements the fixed testable PCM device boundary.
 internal class AndroidRawPcmDevice(
-    rate: Int,
+    private val rate: Int,
     channels: Int,
     attributes: AudioAttributes,
 ) : RawPcmDevice {
     override val underruns: Int get() = track.underrunCount
     private val track: AudioTrack
+    private val timestamp = AudioTimestamp()
+    private var nextTimestampNs = Long.MIN_VALUE
+    private var hasTimestamp = false
+    private var sampledTimestamp = false
+    private val routeChanged = AtomicBoolean()
+    private val routingListener = AudioRouting.OnRoutingChangedListener { routeChanged.set(true) }
     override val legacyPriming: Boolean get() = Build.VERSION.SDK_INT < 31
     override val normalFrames: Int
     override val capacityFrames: Int get() = track.bufferCapacityInFrames
@@ -88,6 +102,7 @@ internal class AndroidRawPcmDevice(
             val unity = track.playbackParams
             if (unity.speed != 1f || unity.pitch != 1f) throw RawOutputFailure("Unity raw audio output refused")
             normalFrames = track.bufferSizeInFrames
+            track.addOnRoutingChangedListener(routingListener, Handler(Looper.getMainLooper()))
         } catch (failure: Exception) {
             runCatching { track.release() }
             throw RawOutputFailure("Raw audio device initialization refused", failure)
@@ -108,6 +123,33 @@ internal class AndroidRawPcmDevice(
     /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     override fun headPosition(): Int = track.playbackHeadPosition
 
+    override fun presentationFrames(): Long? {
+        val now = System.nanoTime()
+        if (routeChanged.getAndSet(false)) resetTimestamp()
+        if (now >= nextTimestampNs) {
+            val previousFrame = timestamp.framePosition
+            val previousTime = timestamp.nanoTime
+            val available = runCatching { track.getTimestamp(timestamp) }.getOrDefault(false)
+            val moved = timestamp.framePosition != previousFrame && timestamp.nanoTime > previousTime
+            val advancing = available && (!sampledTimestamp || moved)
+            val interval = if (sampledTimestamp && advancing) TIMESTAMP_STABLE_NS else TIMESTAMP_WARMUP_NS
+            nextTimestampNs = now + interval
+            sampledTimestamp = sampledTimestamp || available
+            hasTimestamp = advancing
+        }
+        if (!hasTimestamp) return null
+        val elapsed = now - timestamp.nanoTime
+        return elapsed.takeIf { it in -NANOS_PER_SECOND..MAX_TIMESTAMP_AGE_NS }?.let {
+            (timestamp.framePosition + it * rate / NANOS_PER_SECOND).coerceAtLeast(0L)
+        }
+    }
+
+    private fun resetTimestamp() {
+        sampledTimestamp = false
+        hasTimestamp = false
+        nextTimestampNs = Long.MIN_VALUE
+    }
+
     /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
     override fun write(
         buffer: ByteBuffer,
@@ -121,7 +163,10 @@ internal class AndroidRawPcmDevice(
     ): Int = track.write(bytes, 0, byteCount, AudioTrack.WRITE_NON_BLOCKING)
 
     /** Starts the owned raw-PCM device without enabling a compressed-media parser. */
-    override fun play() = track.play()
+    override fun play() {
+        resetTimestamp()
+        track.play()
+    }
 
     /** Pauses the owned raw-PCM device while retaining its buffers and clock for a later resume. */
     override fun pause() = track.pause()
@@ -134,9 +179,17 @@ internal class AndroidRawPcmDevice(
     /** Flushes and releases the exact AudioTrack, with release attempted even if flushing fails. */
     override fun close() {
         try {
+            track.removeOnRoutingChangedListener(routingListener)
             track.flush()
         } finally {
             track.release()
         }
+    }
+
+    private companion object {
+        const val NANOS_PER_SECOND = 1_000_000_000L
+        const val TIMESTAMP_WARMUP_NS = 50_000_000L
+        const val TIMESTAMP_STABLE_NS = 10_000_000_000L
+        const val MAX_TIMESTAMP_AGE_NS = TIMESTAMP_STABLE_NS + NANOS_PER_SECOND
     }
 }

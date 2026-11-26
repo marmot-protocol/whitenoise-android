@@ -1578,6 +1578,7 @@ class WhiteNoiseAppState private constructor(
             persistenceDispatcher = appLockPersistenceDispatcher,
             appInForeground = { appInForeground },
             stopSpeaking = ::stopSpeaking,
+            onScreenShown = receivedVoiceTranscripts::clear,
             presentNotice = { present(it) },
             resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
             resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
@@ -4920,6 +4921,7 @@ class WhiteNoiseAppState private constructor(
             .resetForAccount()
         // Revoke decrypted speech before another identity can use platform Resume.
         stopSpeaking()
+        receivedVoiceTranscripts.clear()
         diagnostics.observations.invalidate()
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch { diagnostics.activity(engine, ProductAnalyticsActivityFfi.ACCOUNT_CHANGED) }
@@ -6128,6 +6130,7 @@ class WhiteNoiseAppState private constructor(
                 dismissVisibleConversationNotifications()
             }
         } else {
+            receivedVoiceTranscripts.clear()
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
             voiceNotes.onAppBackgrounded()
@@ -7093,7 +7096,10 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
+        if (accountRef != null) {
+            releaseCaptureTarget(accountRef, groupIdHex)
+            receivedVoiceTranscripts.forgetGroup(accountRef, groupIdHex)
+        }
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

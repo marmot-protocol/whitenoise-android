@@ -649,9 +649,9 @@ internal class RawAvRenderSession(
         seek: (Long) -> Unit,
     ) {
         operationSeek = intent.seek
-        seek(intent.positionUs)
         val previous = synchronized(clockLock) { pcm.also { pcm = null } }
         previous?.close()
+        seek(intent.positionUs)
         synchronized(clockLock) {
             audioAnchorUs = intent.positionUs
             wallAnchorUs = intent.positionUs

@@ -772,7 +772,10 @@ internal class IsolatedAvStream private constructor(
             edge: Int = playbackEdge(context),
             lane: AvStreamLane = AvStreamLane.Playback,
         ): IsolatedAvStream {
-            require(uri.scheme == "file" || uri.scheme == "content")
+            if (uri.scheme == "file") {
+                return openFile(context, File(requireNotNull(uri.path)), wantVideo, wantAudio, edge, lane)
+            }
+            require(uri.scheme == "content")
             return openFixed(context, wantVideo, wantAudio, edge, lane) { stream ->
                 val initialized =
                     stream.sources.withMediaUriInput(context.contentResolver, uri) { input ->

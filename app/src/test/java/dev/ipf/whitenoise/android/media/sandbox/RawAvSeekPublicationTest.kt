@@ -81,6 +81,21 @@ class RawAvSeekPublicationTest {
         }
     }
 
+    @Test fun missingPausedPosterRefusesTheSeek() {
+        withEngine { engine ->
+            val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
+            val intent = engine.intent()
+            val request =
+                RawAvPausedSeekRequest(
+                    RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500),
+                    completion,
+                )
+            assertFalse(engine.posterResult(request, null))
+            assertTrue(completion.isCancelled)
+            assertEquals(0L, engine.snapshot().renderedFrame)
+        }
+    }
+
     /**
      * Stops background consumers so the test explicitly schedules the real private adoption/render boundary.
      * The worker's cancellation `finally` recycles the retained frame, so it must finish before any adoption —

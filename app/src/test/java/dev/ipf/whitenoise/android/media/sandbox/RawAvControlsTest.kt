@@ -432,7 +432,14 @@ class RawAvControlsTest {
     fun heldSeekAcknowledgementUsesLatestAcceptedSpeedAndGainForItsNewSink() {
         val owner = FakeOwner()
         val sink = FakeSink()
-        val renderer = renderer(owner) { _, _, _ -> sink }
+        val frame = AvStreamFrame.Audio(ByteArray(192), 48000, 1, 1500000)
+        val initial = FakeSink()
+        var firstSink = true
+        val renderer =
+            renderer(owner) { _, _, _ ->
+                if (firstSink) initial.also { firstSink = false } else sink
+            }
+        renderer.createPcm(frame, 1500000, 7)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val executor = Executors.newSingleThreadExecutor()
@@ -445,11 +452,12 @@ class RawAvControlsTest {
             }
         try {
             assertTrue(entered.await(2, TimeUnit.SECONDS))
+            assertTrue(initial.closed)
             assertNull(renderer.speed(2f))
             assertNull(renderer.volume(0.4f))
             release.countDown()
             pending.get(2, TimeUnit.SECONDS)
-            renderer.createPcm(AvStreamFrame.Audio(ByteArray(192), 48000, 1, 1500000), 1500000, 7)
+            renderer.createPcm(frame, 1500000, 7)
             assertEquals(2f, sink.appliedSpeed, 0f)
             assertEquals(0.4f, sink.appliedVolume, 0f)
             assertEquals(2f, field(renderer, "clockSpeed") as Float, 0f)

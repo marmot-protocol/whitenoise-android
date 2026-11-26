@@ -8,3 +8,8 @@ PCM16. These samples contain generated pixels and samples only.
 `MediaAvNativeCorpusDeviceTest` checks bounded poster colors, duration,
 waveforms and fresh restricted-worker receipts. These fixtures cover basic
 format handling; camera files, HDR fidelity and performance need separate tests.
+
+`sparse-h264-aac-with-default-ac3.mp4` has four solid-red H.264 frames five
+seconds apart and two generated 600 Hz audio tracks. AC-3 is marked default
+and AAC is supported. There are 705 AAC packets before the fourth video packet.
+The device test reads the first video frame, then confirms decoded AAC is available.

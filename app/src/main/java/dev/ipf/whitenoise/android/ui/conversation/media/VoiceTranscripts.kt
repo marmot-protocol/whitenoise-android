@@ -7,6 +7,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -15,9 +16,8 @@ import kotlinx.coroutines.sync.Mutex
 
 /**
  * Received voice-message transcripts for this process. Results are derived on this device, never enter the
- * message store and are dropped when the process ends; the cache only spares a recording from being transcribed
- * again after it scrolls away or the app returns from the background. Entries are scoped by account and evicted
- * oldest first past [capacity].
+ * message store. The foreground cache spares a recording from being transcribed again after it scrolls away.
+ * Entries are scoped by account and chat and evicted oldest first past [capacity].
  */
 @Stable
 internal class ReceivedVoiceTranscripts(
@@ -28,6 +28,8 @@ internal class ReceivedVoiceTranscripts(
     private val shown = mutableStateMapOf<String, Boolean>()
     private val shownOrder = ArrayDeque<String>()
     private val accountEpochs = mutableMapOf<String, Int>()
+    var generation by mutableIntStateOf(0)
+        private set
 
     /** One recognition at a time: OSTT runs a single model, and automatic mode may queue a whole screen of clips. */
     val gate = Mutex()
@@ -55,12 +57,30 @@ internal class ReceivedVoiceTranscripts(
 
     fun forgetAccount(account: String) {
         accountEpochs[account] = accountEpoch(account) + 1
-        val resultPrefix = "$account|a|"
-        val shownPrefix = "$account|m|"
-        results.keys.removeAll { it.startsWith(resultPrefix) }
-        resultOrder.removeAll { it.startsWith(resultPrefix) }
-        shown.keys.removeAll { it.startsWith(shownPrefix) }
-        shownOrder.removeAll { it.startsWith(shownPrefix) }
+        forgetPrefix("$account|")
+    }
+
+    fun forgetGroup(
+        account: String,
+        group: String,
+    ) {
+        generation++ // Reject writes already in flight, including work with no cached entry yet.
+        forgetPrefix("$account|$group|")
+    }
+
+    fun clear() {
+        generation++
+        results.clear()
+        resultOrder.clear()
+        shown.clear()
+        shownOrder.clear()
+    }
+
+    private fun forgetPrefix(prefix: String) {
+        results.keys.removeAll { it.startsWith(prefix) }
+        resultOrder.removeAll { it.startsWith(prefix) }
+        shown.keys.removeAll { it.startsWith(prefix) }
+        shownOrder.removeAll { it.startsWith(prefix) }
     }
 
     private fun <T> put(
@@ -81,16 +101,24 @@ internal class ReceivedVoiceTranscripts(
 }
 
 /**
- * One conversation's view of [ReceivedVoiceTranscripts]: keys are scoped to [account] so two signed-in accounts
- * in the same group never share a transcript, and [automatic] mirrors the Dictation setting.
+ * One conversation's view of [ReceivedVoiceTranscripts], scoped to its account, chat and foreground generation.
+ * [automatic] mirrors the Dictation setting.
  */
 @Stable
 internal class VoiceTranscriptionScope(
     val transcripts: ReceivedVoiceTranscripts,
     private val account: String,
     val automatic: Boolean,
+    group: String = "",
 ) {
     private val accountEpoch = transcripts.accountEpoch(account)
+    private val generation = transcripts.generation
+    private val keyPrefix = "$account|$group|"
+
+    private fun current(): Boolean {
+        val accountCurrent = transcripts.accountEpoch(account) == accountEpoch
+        return transcripts.generation == generation && accountCurrent
+    }
 
     fun shown(messageIdHex: String): Boolean = transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
 
@@ -101,7 +129,7 @@ internal class VoiceTranscriptionScope(
         messageIdHex: String,
         value: Boolean,
     ) {
-        if (transcripts.accountEpoch(account) == accountEpoch) transcripts.setShown(messageKey(messageIdHex), value)
+        if (current()) transcripts.setShown(messageKey(messageIdHex), value)
     }
 
     fun result(attachmentKey: String): AudioTranscriptUi? = transcripts.result(attachmentKey(attachmentKey))
@@ -110,13 +138,13 @@ internal class VoiceTranscriptionScope(
         attachmentKey: String,
         value: AudioTranscriptUi,
     ) {
-        if (transcripts.accountEpoch(account) != accountEpoch) return
+        if (!current()) return
         transcripts.storeResult(attachmentKey(attachmentKey), value)
     }
 
-    private fun messageKey(messageIdHex: String) = "$account|m|$messageIdHex"
+    private fun messageKey(messageIdHex: String) = "${keyPrefix}m|$messageIdHex"
 
-    private fun attachmentKey(key: String) = "$account|a|$key"
+    private fun attachmentKey(key: String) = "${keyPrefix}a|$key"
 }
 
 /** Null outside a conversation; transcription then falls back to the per-message toggle's own scope. */
@@ -130,7 +158,9 @@ internal fun rememberVoiceTranscription(
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
     val account = controller.boundAccountRef.orEmpty()
     val automatic = preferences.transcribeVoiceMessages
-    return remember(appState, account, automatic) {
-        VoiceTranscriptionScope(appState.receivedVoiceTranscripts, account, automatic)
+    val group = controller.group.groupIdHex
+    val transcripts = appState.receivedVoiceTranscripts
+    return remember(transcripts, account, group, automatic, transcripts.generation) {
+        VoiceTranscriptionScope(transcripts, account, automatic, group)
     }
 }

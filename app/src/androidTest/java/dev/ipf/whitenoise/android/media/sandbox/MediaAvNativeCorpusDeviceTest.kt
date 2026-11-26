@@ -68,6 +68,22 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Preferred video reads tolerate interleaved AAC while an unsupported default audio track is skipped. */
+    @Test
+    fun sparseVideoStartsAndPlaysItsSupportedAlternativeAudioTrack() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        withFixture("sparse-h264-aac-with-default-ac3.mp4") { source ->
+            val stream = IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), edge = 64)
+            stream.use {
+                val first = stream.read(AvStreamProtocol.VIDEO_TRACK)
+                assertTrue(first is AvStreamFrame.Video)
+                (first as AvStreamFrame.Video).bitmap.recycle()
+                assertTrue(stream.read(AvStreamProtocol.AUDIO_TRACK) is AvStreamFrame.Audio)
+            }
+            assertTrue(stream.awaitRetired())
+        }
+    }
+
     /** Silent Audio Returns No Waveform From Fresh Restricted Worker. */
     @Test
     fun silentAudioReturnsNoWaveformFromFreshRestrictedWorker() {
