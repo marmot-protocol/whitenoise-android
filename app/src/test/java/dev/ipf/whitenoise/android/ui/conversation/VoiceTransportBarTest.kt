@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -21,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -29,6 +32,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
+import dev.ipf.whitenoise.android.ui.conversation.messages.fitsItsSlot
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -72,12 +76,24 @@ class VoiceTransportBarTest {
     @Test fun narrowVoiceBarKeepsTheFullTimeOnTheFirstRow() {
         render(barWidth = 308)
 
-        val time = rule.onNodeWithText("0:12 / 0:45").getUnclippedBoundsInRoot()
+        val time = rule.onNodeWithText("0:12 / 0:45")
+        val timeBounds = time.getUnclippedBoundsInRoot()
+        val stripBounds = rule.onNodeWithTag("voice-transport").getUnclippedBoundsInRoot()
+        val layouts = mutableListOf<TextLayoutResult>()
+        time.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
         val close =
             rule
                 .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
                 .getUnclippedBoundsInRoot()
-        assertTrue(close.top >= time.bottom)
+        assertEquals(1, layout.lineCount)
+        assertEquals(layout.layoutInput.text.length, layout.getLineEnd(0, visibleEnd = true))
+        assertTrue("The timer text must fit in its slot", layout.fitsItsSlot())
+        val lineWidth = layout.getLineRight(0) - layout.getLineLeft(0)
+        val nodeWidth = with(layout.layoutInput.density) { (timeBounds.right - timeBounds.left).toPx() }
+        assertTrue("Timer text uses $lineWidth px in a $nodeWidth px node", lineWidth <= nodeWidth + 0.5f)
+        assertTrue(timeBounds.left >= stripBounds.left && timeBounds.right <= stripBounds.right)
+        assertTrue(close.top >= timeBounds.bottom)
     }
 
     /** Source and transport buttons never trigger each other or overlap destination content. */
