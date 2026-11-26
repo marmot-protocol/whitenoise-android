@@ -351,14 +351,24 @@ class NotificationChannelCleanupRegressionTest {
         val first = checkNotNull(departedChatConversationShortcutIds(context, "account-a", emptySet(), emptySet()))
         assertTrue(restoredId in first)
         assertTrue(
-            recordDepartingConversationChannelOwners(context, "account-a", emptySet(), departedChatShortcutIds = first),
+            recordDepartingConversationChannelOwners(
+                context,
+                "account-a",
+                emptySet(),
+                departedChatShortcutIds = first,
+            ),
         )
 
         val kept = groupChannelShortcutIds("account-b", setOf("group-b-restored"))
         val retried = checkNotNull(departedChatConversationShortcutIds(context, "account-a", emptySet(), kept))
         assertFalse(restoredId in retried)
         assertTrue(
-            recordDepartingConversationChannelOwners(context, "account-a", emptySet(), departedChatShortcutIds = retried),
+            recordDepartingConversationChannelOwners(
+                context,
+                "account-a",
+                emptySet(),
+                departedChatShortcutIds = retried,
+            ),
         )
         assertTrue(retainConversationChannelOwners(context, listOf("account-b"), signingAccountRemains = true))
 
