@@ -31,7 +31,6 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -3409,18 +3408,6 @@ class ConversationController(
         if (ownsInviteAcceptanceResult && inviteAcceptanceResolutionPending) {
             withMutationLockResult(Unit) { if (inviteAcceptanceResolutionPending) refreshMembers() }
         }
-    }
-
-    /**
-     * Latch the authoritative local self-leave marker (issue #787). Set on a
-     * confirmed self-leave (leaveGroup success) or engine eviction
-     * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
-     * roster application so a transient round-trip can't restore self
-     * before the engine eviction is observed locally. A removed device
-     * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
-     */
-    internal fun recordSelfLeft() {
-        selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
     /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */

@@ -47,24 +47,6 @@ internal class RawAvPlaybackEngine(
     RawAvPausedPosterOwner {
     enum class Status { Idle, Buffering, Ready, Ended }
 
-    data class Snapshot(
-        val status: Status,
-        val prepared: Boolean,
-        val playWhenReady: Boolean,
-        val playWhenReadyChangeReason: Int,
-        val positionMs: Long,
-        val durationMs: Long,
-        val speed: Float,
-        val volume: Float,
-        val repeat: Boolean,
-        val videoWidth: Int,
-        val videoHeight: Int,
-        val audioRate: Int,
-        val audioChannels: Int,
-        val error: IOException?,
-        val renderedFrame: Long,
-    )
-
     interface Listener {
         /**
          * Receives a Main-thread state notification only while its posted revision remains current.
@@ -170,10 +152,10 @@ internal class RawAvPlaybackEngine(
      * Snapshots presentation state under the engine lock, converting time to milliseconds
      * and swapping display dimensions for orthogonal video rotation.
      */
-    fun snapshot(): Snapshot =
+    fun snapshot(): RawAvPlaybackSnapshot =
         synchronized(lock) {
             val rotated = rotation == 90 || rotation == 270
-            Snapshot(
+            RawAvPlaybackSnapshot(
                 status,
                 headerReady,
                 playIntent,
@@ -369,7 +351,7 @@ internal class RawAvPlaybackEngine(
             pendingSeek?.cancel(false)
             val completion = SettableFuture.create<Void?>()
             pendingSeek = completion
-            dispatchPausedSeek(completion)
+            dispatchPausedSeek(completion, explicit = false)
         }
         signal.trySend(Unit)
     }
@@ -412,6 +394,7 @@ internal class RawAvPlaybackEngine(
                 pausedUs = 0
                 seekRevision++
             }
+            if (pendingSeek != null) pausedUs = targetUs
             pendingSeek?.cancel(false)
             pendingSeek = null
             error = null
@@ -490,10 +473,15 @@ internal class RawAvPlaybackEngine(
                 completion.setException(IOException("Media source owner retired"))
                 return completion
             }
+            renderer.revokeAudioBefore(seekRevision + 1)?.let { refusal ->
+                completion.setException(refusal)
+                failPlaybackLocked(refusal)
+                return completion
+            }
             pendingSeek?.cancel(false)
             pendingSeek = completion
             targetUs = RawAvPosterTarget.positionUs(positionMs, durationUs)
-            pausedUs = targetUs
+            if (playIntent || !wantVideo) pausedUs = targetUs
             seekRevision++
             revision++
             firstFrameForOutput = false
@@ -508,10 +496,13 @@ internal class RawAvPlaybackEngine(
     /**
      * Queues a generation-bound video poster attempt, or immediately acknowledges an audio-only paused seek.
      */
-    private fun dispatchPausedSeek(completion: SettableFuture<Void?>) {
+    private fun dispatchPausedSeek(
+        completion: SettableFuture<Void?>,
+        explicit: Boolean = true,
+    ) {
         if (wantVideo) {
             val target = RawAvPosterTarget(RawAvGeneration(activation, seekRevision), targetUs / 1000)
-            pausedPoster.submit(RawAvPausedSeekRequest(target, completion))
+            pausedPoster.submit(RawAvPausedSeekRequest(target, completion, explicit))
         } else {
             completion.set(null)
             pendingSeek = null
@@ -538,11 +529,19 @@ internal class RawAvPlaybackEngine(
             val currentRequest = posterCurrent(request.target) && pendingSeek === request.completion
             if (!currentRequest || request.completion.isCancelled) return@synchronized false
             val poster = probe?.poster
-            pendingSeek = null
             if (probe == null || poster == null) {
-                request.finish(false)
+                if (request.explicit) {
+                    failPlaybackLocked(IOException("Paused video frame unavailable"))
+                } else {
+                    pendingSeek = null
+                    request.finish(false)
+                }
                 return@synchronized false
             }
+            pendingSeek = null
+            pausedUs = targetUs
+            error = null
+            if (headerReady) status = Status.Ready
             width = probe.width
             height = probe.height
             rotation = 0 // Automatic poster dimensions and pixels are already display-oriented.
@@ -665,6 +664,7 @@ internal class RawAvPlaybackEngine(
         synchronized(lock) {
             pendingSeek?.cancel(false)
             pendingSeek = null
+            targetUs = pausedUs
             activation++
             revision++
             preparationRequested = false

@@ -31,7 +31,8 @@ internal class RawPcmOutput(
     private var headWrap = 0L
     private var lastHardwareFrames = 0L
     private var lastHeadAdvanceMs = 0L
-    private var presentationLagFrames = 0L
+    private var presentationLagFrames: Long? = null
+    private var presentationRouteGeneration = 0
     private var stalledSinceMs: Long? = null
     private var position = 0L
     private var buffered = 0L
@@ -253,6 +254,12 @@ internal class RawPcmOutput(
     ): Long {
         // Both Android frame counters can wrap at 32 bits. Their short difference stays signed.
         val lag = device.presentationFrames()?.let { (head - it).toInt().toLong() }
+        val route = device.presentationRouteGeneration
+        if (route != presentationRouteGeneration) {
+            presentationRouteGeneration = route
+            presentationLagFrames = null
+            lastHeadAdvanceMs = nowMs
+        }
         val remainingLag =
             if (lag != null && lag in -sampleRate.toLong()..sampleRate.toLong()) {
                 lag.coerceAtLeast(0L).also { presentationLagFrames = it }
@@ -260,7 +267,8 @@ internal class RawPcmOutput(
                 // During a timestamp gap, allow the last observed latency to drain even if
                 // the mixer has taken the final frame and the head has stopped moving.
                 val elapsedMs = (nowMs - lastHeadAdvanceMs).coerceIn(0L, 1000L)
-                (presentationLagFrames - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
+                val estimatedLag = presentationLagFrames ?: device.fallbackPresentationLatencyMs * sampleRate / 1000L
+                (estimatedLag - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
             }
         return (head - physicalBase - remainingLag).coerceIn(0L, queue.playedOutputFrames)
     }

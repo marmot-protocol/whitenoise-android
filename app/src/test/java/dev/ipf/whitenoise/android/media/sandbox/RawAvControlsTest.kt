@@ -428,6 +428,22 @@ class RawAvControlsTest {
         assertTrue(engine.snapshot().playWhenReady)
     }
 
+    /** The command retires device output even when the renderer cannot start the worker seek yet. */
+    @Test
+    fun acceptingASeekClosesOldAudioBeforeTheRendererTakesTheCommand() {
+        val engine = newEngine()
+        val sink = FakeSink()
+        seedActiveOutput(engine, sink)
+        val renderer = field(engine, "renderer") as RawAvRenderSession
+        val oldSeek = renderer.appliedSeek
+
+        engine.seekToAsync(3100)
+
+        assertTrue(sink.closed)
+        assertEquals(oldSeek, renderer.appliedSeek)
+        assertEquals(3100L, engine.positionMs())
+    }
+
     /** Held Seek Acknowledgement Uses Latest Accepted Speed And Gain For Its New Sink. */
     @Test
     fun heldSeekAcknowledgementUsesLatestAcceptedSpeedAndGainForItsNewSink() {

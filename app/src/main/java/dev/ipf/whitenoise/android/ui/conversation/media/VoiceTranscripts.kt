@@ -111,26 +111,25 @@ internal class VoiceTranscriptionScope(
     private val account: String,
     val automatic: Boolean,
     group: String = "",
+    private val recognitionAllowed: () -> Boolean = { true },
 ) {
     private val accountEpoch = transcripts.accountEpoch(account)
     private val generation = transcripts.generation
     private val keyPrefix = "$account|$group|"
 
-    private fun current(): Boolean {
-        val accountCurrent = transcripts.accountEpoch(account) == accountEpoch
-        return transcripts.generation == generation && accountCurrent
-    }
+    val active: Boolean
+        get() = transcripts.generation == generation && transcripts.accountEpoch(account) == accountEpoch && recognitionAllowed()
 
-    fun shown(messageIdHex: String): Boolean = transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
+    fun shown(messageIdHex: String): Boolean = active && (transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic)
 
     /** True only when the person asked for this message's transcript, rather than the automatic setting. */
-    fun requestedExplicitly(messageIdHex: String): Boolean = transcripts.shownOverride(messageKey(messageIdHex)) == true
+    fun requestedExplicitly(messageIdHex: String): Boolean = active && transcripts.shownOverride(messageKey(messageIdHex)) == true
 
     fun setShown(
         messageIdHex: String,
         value: Boolean,
     ) {
-        if (current()) transcripts.setShown(messageKey(messageIdHex), value)
+        if (active) transcripts.setShown(messageKey(messageIdHex), value)
     }
 
     fun result(attachmentKey: String): AudioTranscriptUi? = transcripts.result(attachmentKey(attachmentKey))
@@ -139,7 +138,7 @@ internal class VoiceTranscriptionScope(
         attachmentKey: String,
         value: AudioTranscriptUi,
     ) {
-        if (!current()) return
+        if (!active) return
         transcripts.storeResult(attachmentKey(attachmentKey), value)
     }
 
@@ -161,7 +160,10 @@ internal fun rememberVoiceTranscription(
     val automatic = preferences.transcribeVoiceMessages
     val group = controller.group.groupIdHex
     val transcripts = appState.receivedVoiceTranscripts
-    return remember(transcripts, account, group, automatic, transcripts.generation) {
-        VoiceTranscriptionScope(transcripts, account, automatic, group)
+    return remember(transcripts, controller, account, group, automatic, transcripts.generation) {
+        VoiceTranscriptionScope(transcripts, account, automatic, group) {
+            val foreground = appState.appInForeground && !appState.appLock.screenVisible
+            foreground && controller.isSelfMember && !controller.group.disbanded
+        }
     }
 }

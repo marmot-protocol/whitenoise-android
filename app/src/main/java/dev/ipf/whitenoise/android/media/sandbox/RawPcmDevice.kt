@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioRouting
 import android.media.AudioTimestamp
@@ -35,6 +36,10 @@ internal interface RawPcmDevice : AutoCloseable {
 
     /** Estimates the current speaker presentation frame on the same device counter, when available. */
     fun presentationFrames(): Long? = null
+
+    /** Estimated output delay until this route provides a usable hardware timestamp. */
+    val fallbackPresentationLatencyMs: Long get() = 0L
+    val presentationRouteGeneration: Int get() = 0
 
     /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
     fun write(
@@ -70,6 +75,19 @@ internal class AndroidRawPcmDevice(
     private var nextTimestampNs = Long.MIN_VALUE
     private var hasTimestamp = false
     private var sampledTimestamp = false
+    private var routeType: Int? = null
+    override var presentationRouteGeneration = 0
+        private set
+    override val fallbackPresentationLatencyMs: Long
+        get() =
+            when (routeType) {
+                AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                -> LOCAL_ROUTE_LATENCY_MS
+                else -> UNKNOWN_ROUTE_LATENCY_MS
+            }
     private val routeChanged = AtomicBoolean()
     private val routingListener = AudioRouting.OnRoutingChangedListener { routeChanged.set(true) }
     override val legacyPriming: Boolean get() = Build.VERSION.SDK_INT < 31
@@ -125,8 +143,13 @@ internal class AndroidRawPcmDevice(
 
     override fun presentationFrames(): Long? {
         val now = System.nanoTime()
-        if (routeChanged.getAndSet(false)) resetTimestamp()
+        if (routeChanged.getAndSet(false)) {
+            presentationRouteGeneration++
+            routeType = null
+            resetTimestamp()
+        }
         if (now >= nextTimestampNs) {
+            if (routeType == null) routeType = runCatching { track.routedDevice?.type }.getOrNull()
             val previousFrame = timestamp.framePosition
             val previousTime = timestamp.nanoTime
             val available = runCatching { track.getTimestamp(timestamp) }.getOrDefault(false)
@@ -191,5 +214,7 @@ internal class AndroidRawPcmDevice(
         const val TIMESTAMP_WARMUP_NS = 50_000_000L
         const val TIMESTAMP_STABLE_NS = 10_000_000_000L
         const val MAX_TIMESTAMP_AGE_NS = TIMESTAMP_STABLE_NS + NANOS_PER_SECOND
+        const val LOCAL_ROUTE_LATENCY_MS = 60L
+        const val UNKNOWN_ROUTE_LATENCY_MS = 300L
     }
 }

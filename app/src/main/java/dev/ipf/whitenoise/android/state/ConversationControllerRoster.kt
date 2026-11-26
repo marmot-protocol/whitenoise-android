@@ -238,8 +238,16 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     // in-flight immutable dictation target before any late provider result
     // can reach the draft persistence path.
     appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
-    appState.receivedVoiceTranscripts.forgetGroup(account, group.groupIdHex)
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
+}
+
+/** Latches authoritative departure, even when a removed device leaves its account on the roster. */
+internal fun ConversationController.recordSelfLeft() {
+    val wasLeft = selfMembership.selfLeft
+    selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
+    if (!wasLeft) {
+        boundAccountRef?.let { appState.receivedVoiceTranscripts.forgetGroup(it, group.groupIdHex) }
+    }
 }
 
 private fun ConversationController.applyGroupDetails(

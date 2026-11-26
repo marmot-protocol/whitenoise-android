@@ -61,7 +61,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleFooterLastLineW
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlin.coroutines.coroutineContext
@@ -186,7 +185,7 @@ internal fun ReceivedAudioTranscription(
     val ui = if (shown) complete ?: pending.takeUnless { failedAutomatically } else null
     val working = ui?.phase == AudioTranscriptPhase.WORKING
 
-    val ready = file != null || complete != null
+    val ready = scope.active && (file != null || complete != null)
     LaunchedEffect(toggle, ready, working, failedAutomatically) {
         toggle.register(slotKey, ready, working, failedAutomatically)
     }
@@ -200,9 +199,9 @@ internal fun ReceivedAudioTranscription(
             return@LaunchedEffect
         }
         pending = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
-        val result = loadAudioTranscript(context, file, scope.transcripts.gate)
+        val result = loadAudioTranscript(context, file, scope)
         coroutineContext.ensureActive()
-        if (result.phase == AudioTranscriptPhase.COMPLETE) {
+        if (result?.phase == AudioTranscriptPhase.COMPLETE) {
             scope.storeResult(attachmentKey, result)
             pending = null
         } else {
@@ -225,11 +224,14 @@ internal fun ReceivedAudioTranscription(
 private suspend fun loadAudioTranscript(
     context: Context,
     file: File,
-    gate: Mutex,
-): AudioTranscriptUi {
+    scope: VoiceTranscriptionScope,
+): AudioTranscriptUi? {
     holdCacheFileInUse(file)
     return try {
-        gate.withLock { AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, transcribeAttachment(context, file)) }
+        scope.transcripts.gate.withLock {
+            if (!scope.active) return@withLock null
+            AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, transcribeAttachment(context, file))
+        }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: AttachmentSpeechException) {

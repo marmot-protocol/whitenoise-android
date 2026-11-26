@@ -13,6 +13,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +23,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
+import java.util.concurrent.ExecutionException
 
 /** Exercises the actual fenced sink path at the adoption/render boundary without worker timing races. */
 @RunWith(RobolectricTestRunner::class)
@@ -56,6 +59,7 @@ class RawAvSeekPublicationTest {
                 val old = bitmap()
                 adopt(engine, old)
                 val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
+                assertEquals(0L, engine.positionMs())
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
                 render(engine)
@@ -70,6 +74,7 @@ class RawAvSeekPublicationTest {
                 val matching = bitmap()
                 assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching)))
                 assertTrue(completion.isDone)
+                assertEquals(1500L, engine.positionMs())
                 render(engine)
                 assertEquals(1, RecordingCanvasSurface.posts)
                 assertEquals(1L, engine.snapshot().renderedFrame)
@@ -91,8 +96,15 @@ class RawAvSeekPublicationTest {
                     completion,
                 )
             assertFalse(engine.posterResult(request, null))
-            assertTrue(completion.isCancelled)
+            val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
+            assertSame(refusal.cause, engine.snapshot().error)
+            assertEquals(0L, engine.positionMs())
             assertEquals(0L, engine.snapshot().renderedFrame)
+            val retry = engine.seekToAsync(2000) as SettableFuture<Void?>
+            val current = engine.intent()
+            val retryRequest = RawAvPausedSeekRequest(RawAvPosterTarget(RawAvGeneration(current.activation, current.seek), 2000), retry)
+            assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
+            assertEquals(2000L, engine.positionMs())
         }
     }
 

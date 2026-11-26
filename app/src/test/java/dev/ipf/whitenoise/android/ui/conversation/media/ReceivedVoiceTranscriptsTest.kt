@@ -86,6 +86,22 @@ class ReceivedVoiceTranscriptsTest {
     }
 
     @Test
+    fun removedHistoryCannotRestartAutomaticTranscriptionWithAFreshScope() {
+        val transcripts = ReceivedVoiceTranscripts()
+        var member = true
+        val existing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        assertTrue(existing.shown("message"))
+        member = false
+        assertFalse(existing.active)
+        transcripts.forgetGroup("alice", "chat")
+        val history = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        history.setShown("message", true)
+        history.storeResult("attachment", complete)
+        assertFalse(history.shown("message"))
+        assertNull(history.result("attachment"))
+    }
+
+    @Test
     fun clearingForegroundStateDropsResultsAndChoicesAndRejectsLateWrites() {
         val transcripts = ReceivedVoiceTranscripts()
         val old = VoiceTranscriptionScope(transcripts, "alice", automatic = false)

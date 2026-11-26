@@ -8,8 +8,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.time.Duration
 
 /** Real pinned Sonic processing; the device seam records accepted PCM, not an assumed audible hardware head. */
 @RunWith(RobolectricTestRunner::class)
@@ -118,6 +120,23 @@ class RawPcmOutputSonicTest {
             assertFalse(output.drained())
 
             device.presented = 80L
+            output.prepareForWait(true)
+            assertEquals(10_000L, output.positionUs())
+            assertTrue(output.drained())
+        }
+    }
+
+    @Test fun endOfStreamWaitsForRouteLatencyBeforeTheFirstTimestamp() {
+        val device = Device().apply { fallbackPresentationLatencyMs = 150 }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+            assertEquals(0L, output.positionUs())
+            assertFalse(output.drained())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(150))
             output.prepareForWait(true)
             assertEquals(10_000L, output.positionUs())
             assertTrue(output.drained())
@@ -261,6 +280,7 @@ class RawPcmOutputSonicTest {
         var failRestore = false
         var head = 0
         var presented: Long? = null
+        override var fallbackPresentationLatencyMs = 0L
         var calls = 0
         var fail = false
         var pauseAttempted = false

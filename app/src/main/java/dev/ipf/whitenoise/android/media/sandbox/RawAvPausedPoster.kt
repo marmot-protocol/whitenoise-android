@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 internal class RawAvPausedSeekRequest(
     val target: RawAvPosterTarget,
     val completion: SettableFuture<Void?>,
+    val explicit: Boolean = true,
 ) {
     /**
      * Completes the exact seek future on acceptance or cancels it on refusal without interruption.

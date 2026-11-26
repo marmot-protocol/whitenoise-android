@@ -110,6 +110,18 @@ internal class IsolatedAttachmentPlayer(
     /** Delegates preparation to the single raw playback owner and returns its asynchronous completion. */
     override fun handlePrepare(): ListenableFuture<*> = engine.prepare()
 
+    /** Keep Media3's paused playhead on the committed frame while a seek poster is pending. */
+    override fun getPlaceholderState(suggestedPlaceholderState: State): State {
+        if (suggestedPlaceholderState.playWhenReady) return suggestedPlaceholderState
+        val committed = engine.positionMs()
+        return suggestedPlaceholderState
+            .buildUpon()
+            .setContentPositionMs(committed)
+            .setContentBufferedPositionMs(
+                PositionSupplier { committed },
+            ).build()
+    }
+
     /** Updates requested playback through the engine so focus, pause and lifetime ownership stay centralized. */
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         engine.setPlaying(playWhenReady)
@@ -197,7 +209,7 @@ internal class IsolatedAttachmentPlayer(
     fun setHandleAudioBecomingNoisy(enabled: Boolean) = engine.setHandleAudioBecomingNoisy(enabled)
 
     /** Builds presentation-only track descriptions from validated raw metadata. */
-    private fun tracks(state: RawAvPlaybackEngine.Snapshot): Tracks {
+    private fun tracks(state: RawAvPlaybackSnapshot): Tracks {
         val formats = ArrayList<Format>()
         if (state.videoWidth > 0 && state.videoHeight > 0) {
             formats +=

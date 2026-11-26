@@ -109,6 +109,7 @@ internal class RawAvRenderSession(
     private var sourceHasAudio = false
     private var outputGain = 1f
     private var cancelledRun = -1L
+    private var audioSeekFloor = -1L
     private var operationSeek: Long? = null
     private var eofWallClock = false
 
@@ -232,6 +233,20 @@ internal class RawAvRenderSession(
             outputGain = value
         }
 
+    /** Revokes old output before publishing a seek, even while the decoder thread is in an RPC. */
+    fun revokeAudioBefore(seek: Long): RawOutputFailure? =
+        applyControl("seek") {
+            audioSeekFloor = seek
+            closePcm()
+        }
+
+    /** Caller holds the clock lock, which also fences adoption and device writes. */
+    private fun closePcm() {
+        val selected = pcm
+        pcm = null
+        selected?.close()
+    }
+
     /**
      * Applies the rate under the clock lock and reanchors elapsed time without a position jump.
      */
@@ -297,37 +312,12 @@ internal class RawAvRenderSession(
             }
         } finally {
             if (stream === selected) stream = null
-            pcm?.close()
-            pcm = null
+            synchronized(clockLock) { closePcm() }
             activeRun = -1L
             appliedSeek = -1L
             // Any failure retires the worker; a paused or ended run keeps it for this source only.
             selected?.let { if (reusable) park(it, activation) else it.close() }
         }
-    }
-
-    private class PendingPcm(
-        val frame: AvStreamFrame.Audio,
-        var offset: Int,
-        val limit: Int,
-        val timestampUs: Long,
-        var gapFrames: Long,
-        var silence: ByteArray? = null,
-    ) {
-        val initialOffset = offset
-    }
-
-    private class Progress(
-        var targetUs: Long,
-        var videoEnded: Boolean,
-        var audioEnded: Boolean,
-    ) {
-        var lastVideoPts = -1L
-        var lastVideoDelta = 33_333L
-        var audioEndUs = targetUs
-        var prerollAudioUs = Long.MIN_VALUE
-        var video: AvStreamFrame.Video? = null
-        var audio: PendingPcm? = null
     }
 
     /**
@@ -342,7 +332,7 @@ internal class RawAvRenderSession(
         seek: (Long) -> Unit,
     ) {
         synchronized(clockLock) { sourceHasAudio = wantAudio && info.hasAudio }
-        val progress = Progress(owner.intent().positionUs, !wantVideo || !info.hasVideo, !wantAudio || !info.hasAudio)
+        val progress = RawAvRenderProgress(owner.intent().positionUs, !wantVideo || !info.hasVideo, !wantAudio || !info.hasAudio)
         try {
             while (valid(activation)) {
                 val intent = owner.intent()
@@ -427,7 +417,7 @@ internal class RawAvRenderSession(
 
     /** Discard only pre-target PCM; retain one crossing-target suffix through the existing clip/adoption owner. */
     private fun drainPrerollAudio(
-        progress: Progress,
+        progress: RawAvRenderProgress,
         discardedVideoUs: Long,
         activation: Long,
         read: (Int) -> AvStreamFrame,
@@ -457,7 +447,7 @@ internal class RawAvRenderSession(
      * Requires preroll audio only while its live generation has not reached the discarded video timestamp.
      */
     private fun needsPrerollAudio(
-        progress: Progress,
+        progress: RawAvRenderProgress,
         discardedVideoUs: Long,
         activation: Long,
     ): Boolean {
@@ -470,7 +460,7 @@ internal class RawAvRenderSession(
      * All timestamps and the 1 ms horizon tolerance are expressed in microseconds.
      */
     private suspend fun ensureAudioForVideo(
-        progress: Progress,
+        progress: RawAvRenderProgress,
         timestampUs: Long,
         activation: Long,
         read: (Int) -> AvStreamFrame,
@@ -496,7 +486,7 @@ internal class RawAvRenderSession(
      * Written credits cap source admission while DSP output still waits to enter the actual device buffer.
      */
     private suspend fun refillAudioReserve(
-        progress: Progress,
+        progress: RawAvRenderProgress,
         targetUs: Long,
         activation: Long,
         read: (Int) -> AvStreamFrame,
@@ -521,7 +511,7 @@ internal class RawAvRenderSession(
      */
     @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Partial source credits and both EOF guards commit together.
     private suspend fun feedAudioStep(
-        progress: Progress,
+        progress: RawAvRenderProgress,
         activation: Long,
         read: (Int) -> AvStreamFrame,
         waitOnBackpressure: Boolean = true,
@@ -541,7 +531,7 @@ internal class RawAvRenderSession(
         val pending = progress.audio
         var acceptedInput = false
         if (pending != null && valid(activation, appliedSeek)) {
-            val sink = checkNotNull(pcm)
+            val sink = pcm ?: return false
             val frames = pending.frame.sampleRate / 100
             val frameBytes = pending.frame.channels * 2
             val count: Int
@@ -549,14 +539,17 @@ internal class RawAvRenderSession(
             if (pending.gapFrames > 0) {
                 val silent = pending.silence ?: ByteArray(frames * frameBytes).also { pending.silence = it }
                 count = minOf(pending.gapFrames, frames.toLong()).toInt() * frameBytes
-                accepted = sink.write(silent, 0, count)
+                accepted = synchronized(clockLock) { if (pcm === sink) sink.write(silent, 0, count) else 0 }
                 if (accepted !in 0..count || accepted % frameBytes != 0) {
                     throw RawOutputFailure("Raw audio accepted invalid input credit")
                 }
                 pending.gapFrames -= accepted / frameBytes
             } else {
                 count = minOf(pending.limit - pending.offset, frames * frameBytes)
-                accepted = sink.write(pending.frame.bytes, pending.offset, count)
+                accepted =
+                    synchronized(clockLock) {
+                        if (pcm === sink) sink.write(pending.frame.bytes, pending.offset, count) else 0
+                    }
                 if (accepted !in 0..count || accepted % frameBytes != 0) {
                     throw RawOutputFailure("Raw audio accepted invalid input credit")
                 }
@@ -584,7 +577,7 @@ internal class RawAvRenderSession(
      */
     private fun adoptPcm(
         frame: AvStreamFrame.Audio,
-        progress: Progress,
+        progress: RawAvRenderProgress,
         activation: Long,
     ) {
         val size = frame.bytes.size
@@ -597,27 +590,26 @@ internal class RawAvRenderSession(
         val expected = synchronized(clockLock) { audioAnchorUs } + sink.writtenPositionUs()
         val delta = clipped.timestampUs - expected
         val gap = if (delta > 1000) delta * sink.sampleRate / 1_000_000 else 0
-        progress.audio = PendingPcm(frame, clipped.offset, clipped.offset + clipped.byteCount, clipped.timestampUs, gap)
+        progress.audio = RawAvPendingPcm(frame, clipped.offset, clipped.offset + clipped.byteCount, clipped.timestampUs, gap)
     }
 
     /**
      * Pumps device progress/EOS and returns allowed video lead in microseconds.
      * After audio drains, reanchors an elapsed-time clock so remaining video can advance.
      */
-    private fun pumpAudio(progress: Progress): Long {
-        val sink = pcm
-        val ending = progress.audioEnded && progress.audio == null
-        val tolerance = sink?.prepareForWait(ending) ?: 1000L
-        val drained = ending && (sink == null || sink.drained())
-        if (drained && sourceHasAudio && !eofWallClock) {
-            synchronized(clockLock) {
+    private fun pumpAudio(progress: RawAvRenderProgress): Long =
+        synchronized(clockLock) {
+            val sink = pcm
+            val ending = progress.audioEnded && progress.audio == null
+            val tolerance = sink?.prepareForWait(ending) ?: 1000L
+            val drained = ending && (sink == null || sink.drained())
+            if (drained && sourceHasAudio && !eofWallClock) {
                 wallAnchorUs = positionUs()
                 wallStartedMs = SystemClock.elapsedRealtime()
                 eofWallClock = true
             }
+            tolerance
         }
-        return tolerance
-    }
 
     /**
      * Waits for device drain and terminal media time before notifying a still-current owner.
@@ -626,7 +618,7 @@ internal class RawAvRenderSession(
     private suspend fun finishFrames(
         info: AvStreamInfo,
         activation: Long,
-        progress: Progress,
+        progress: RawAvRenderProgress,
     ) {
         while (valid(activation, appliedSeek) && pcm?.drained() == false) {
             pumpAudio(progress)
@@ -649,8 +641,7 @@ internal class RawAvRenderSession(
         seek: (Long) -> Unit,
     ) {
         operationSeek = intent.seek
-        val previous = synchronized(clockLock) { pcm.also { pcm = null } }
-        previous?.close()
+        synchronized(clockLock) { closePcm() }
         seek(intent.positionUs)
         synchronized(clockLock) {
             audioAnchorUs = intent.positionUs
@@ -681,7 +672,7 @@ internal class RawAvRenderSession(
             val output = pcmFactory(frame.sampleRate, frame.channels, attributes)
             created = output
             synchronized(clockLock) {
-                if (cancelledRun == activation) return null
+                if (cancelledRun == activation || appliedSeek < audioSeekFloor) return null
                 output.speed(clockSpeed)
                 output.volume(outputGain)
                 output.play()
@@ -720,7 +711,7 @@ internal class RawAvRenderSession(
     private suspend fun waitForVideo(
         timestampUs: Long,
         activation: Long,
-        progress: Progress,
+        progress: RawAvRenderProgress,
         reserveTargetUs: Long,
         read: (Int) -> AvStreamFrame,
     ): Boolean {

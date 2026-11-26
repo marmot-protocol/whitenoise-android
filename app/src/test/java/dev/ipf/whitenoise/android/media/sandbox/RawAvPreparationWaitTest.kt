@@ -294,6 +294,7 @@ class RawAvPreparationWaitTest {
         return RawAvPausedSeekRequest(
             RawAvPosterTarget(RawAvGeneration(engine.intent().activation, seek), positionMs),
             completion,
+            explicit = false,
         )
     }
 
