@@ -53,13 +53,29 @@ internal class NotificationConversationShortcuts(
         shortcutLastUsed.clear()
     }
 
-    /** Clears platform/cache presentation while the caller holds an acknowledged credential-revocation fence. */
+    /** Clears platform shortcuts, owned channels, and caches while holding a credential-revocation fence. */
     fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
+        knownGroupIds: Collection<String> = emptySet(),
     ) {
-        runCatching { clearRevokedConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy) }
-        val accountScope = conversationShortcutAccountScope(accountRef) ?: return
+        val accountScope = conversationShortcutAccountScope(accountRef)
+        val snapshotShortcutIds =
+            if (accountScope != null) {
+                shortcutSnapshots.filterValues { it.accountScope == accountScope }.keys.toSet()
+            } else {
+                emptySet()
+            }
+        runCatching {
+            clearRevokedConversationShortcutsForAccount(
+                context = context,
+                accountRef = accountRef,
+                includeUnscopedLegacy = includeUnscopedLegacy,
+                additionalShortcutIds = snapshotShortcutIds,
+                knownGroupIds = knownGroupIds,
+            )
+        }
+        if (accountScope == null) return
         shortcutSnapshots
             .filterValues { it.accountScope == accountScope }
             .keys
@@ -226,6 +242,7 @@ internal class NotificationConversationShortcuts(
                     val retainedShortcut = if (retainable === shortcut) currentShortcut else finish(retainable)
                     shortcutPublisher(currentShortcut)
                     shortcutSnapshots[shortcutId] = snapshot
+                    recordConversationChannelOwner(context, update.accountRef, shortcutId)
                     InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
                     InFlightConversationShortcuts.rememberPublished(

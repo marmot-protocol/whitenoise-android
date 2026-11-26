@@ -233,6 +233,21 @@ internal class PinnedConversationTokens(
                 revocations.isCurrent(generation) && removals.isEmpty()
             }
 
+        /** Rejects queued writes for an account or conversation revoked or currently removing after [generation]. */
+        fun isTargetCurrent(
+            generation: Long,
+            accountRef: String,
+            groupIdHex: String? = null,
+        ): Boolean =
+            synchronized(lock) {
+                val account = accountRef.takeIf { it.isNotBlank() && it == it.trim() } ?: return@synchronized false
+                val accountKey = accountKey(account)
+                val groupKey = groupIdHex?.lowercase(Locale.ROOT)?.let { groupKey(account, it) }
+                listOfNotNull(accountKey, groupKey).all { key ->
+                    generation >= (revokedAfter[key] ?: 0L) && !removals.containsKey(key)
+                }
+            }
+
         /** App-private, backup-excluded launcher authority; callers must never export these preferences. */
         fun create(context: Context): PinnedConversationTokens =
             PinnedConversationTokens(

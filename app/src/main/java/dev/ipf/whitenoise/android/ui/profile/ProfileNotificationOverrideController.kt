@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.content.Context
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.EffectiveConversationVibration
+import dev.ipf.whitenoise.android.notifications.NotificationChannelWriteGuard
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverride
@@ -53,29 +54,41 @@ internal class ProfileNotificationOverrideController(
     fun refresh(title: String) {
         if (!current() || mutableState.value.busy) return
         val request = ++generation
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
+        val writeAllowed = { current() && NotificationChannelWriteGuard.isCurrent(writeEpoch, account) }
         scope.launch {
             val selection = preferences.get(account, author)
             val effective =
                 withContext(ioDispatcher) {
-                    if (selection.mode == ProfileNotificationMode.CUSTOM && current()) {
-                        channels.existing(account, author, selection.vibration, title)
+                    if (selection.mode == ProfileNotificationMode.CUSTOM && writeAllowed()) {
+                        channels.existing(
+                            accountRef = account,
+                            author = author,
+                            pattern = selection.vibration,
+                            title = title,
+                            isWriteAllowed = writeAllowed,
+                        )
                         channels.effectiveVibration(account, author, selection.vibration)
                     } else {
                         null
                     }
                 }
-            if (current() && request == generation && !mutableState.value.busy) {
+            if (writeAllowed() && request == generation && !mutableState.value.busy) {
                 mutableState.value = mutableState.value.copy(selection = selection, effectiveVibration = effective)
             }
         }
     }
 
-    /** Default/mute changes only local routing; dormant OS settings remain untouched. */
+    /**
+     * Default/mute changes only local routing so dormant OS settings survive routine resets,
+     * while destructive account Sign Out and Sign Out & Wipe explicitly delete the leaving
+     * account's profile channels.
+     */
     fun selectMode(mode: ProfileNotificationMode) =
-        change {
+        change { writeAllowed ->
             check(mode != ProfileNotificationMode.CUSTOM)
             val selection = preferences.get(account, author).copy(mode = mode)
-            check(preferences.set(account, author, selection, ::current))
+            check(preferences.set(account, author, selection, writeAllowed))
             null
         }
 
@@ -84,17 +97,25 @@ internal class ProfileNotificationOverrideController(
         title: String,
         pattern: ConversationVibrationPattern? = null,
         openSettings: Boolean = true,
-    ) = change {
+    ) = change { writeAllowed ->
         val previous = preferences.get(account, author)
         val selectedPattern = pattern ?: previous.vibration
-        val channelId = channels.customize(account, author, title, selectedPattern, previous.vibration)
-        check(current())
+        val channelId =
+            channels.customize(
+                accountRef = account,
+                author = author,
+                title = title,
+                pattern = selectedPattern,
+                previous = previous.vibration,
+                isWriteAllowed = writeAllowed,
+            )
+        check(writeAllowed())
         check(
             preferences.set(
                 account,
                 author,
                 ProfileNotificationOverride(ProfileNotificationMode.CUSTOM, selectedPattern),
-                ::current,
+                writeAllowed,
             ),
         )
         channelId.takeIf { openSettings }
@@ -107,16 +128,18 @@ internal class ProfileNotificationOverrideController(
     }
 
     /** Run blocking platform/storage work off-main, then validate ownership again before launching Android UI. */
-    private fun change(operation: () -> String?) {
+    private fun change(operation: (() -> Boolean) -> String?) {
         if (!current() || mutableState.value.busy) return
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
+        val writeAllowed = { current() && NotificationChannelWriteGuard.isCurrent(writeEpoch, account) }
         generation += 1
         mutableState.value = mutableState.value.copy(busy = true, failed = false, choosingVibration = false)
         scope.launch {
             try {
                 val (channel, selection, vibration) =
                     withContext(ioDispatcher) {
-                        check(current())
-                        val target = operation()
+                        check(writeAllowed())
+                        val target = operation(writeAllowed)
                         val selected = preferences.get(account, author)
                         val effective =
                             if (selected.mode == ProfileNotificationMode.CUSTOM) {
@@ -126,14 +149,14 @@ internal class ProfileNotificationOverrideController(
                             }
                         Triple(target, selected, effective)
                     }
-                if (current()) {
+                if (writeAllowed()) {
                     mutableState.value = mutableState.value.copy(selection = selection, effectiveVibration = vibration)
                     if (channel != null) context.startActivity(notificationChannelSettingsIntent(context, channel))
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: RuntimeException) {
-                if (current()) mutableState.value = mutableState.value.copy(failed = true)
+                if (writeAllowed()) mutableState.value = mutableState.value.copy(failed = true)
             } finally {
                 if (current()) mutableState.value = mutableState.value.copy(busy = false)
             }

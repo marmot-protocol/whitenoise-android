@@ -1,12 +1,26 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.notifications.NotificationChannelWriteGuard
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedConversationNavigation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
+import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.hasUnaccountedConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+
+private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
+private const val SIGN_OUT_OWNER_SAVE_ATTEMPTS = 3
+
+/** Captured departing-account group inventory together with whether every native listing succeeded. */
+private data class AccountGroupInventory(
+    val groupIds: Set<String>,
+    val nativeInventoryComplete: Boolean,
+)
 
 /** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
 internal fun WhiteNoiseAppState.pinnedShortcutLockDecision(): PinnedShortcutLockDecision =
@@ -27,10 +41,11 @@ internal fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(target: Notificati
 }
 
 /**
- * Confirmed local removal invalidates pending launcher requests as well as already-visible pins. The notification
- * presenter's snapshot of the removed conversation shortcut is dropped in the same publication-lock section as the
- * platform removal, off the main thread, so no card can publish between the two and a new conversation under the
- * same group id publishes its shortcut again before its first card.
+ * Confirmed local removal invalidates pending launcher requests, already-visible pins, and the
+ * conversation's `:conv:` notification channels. All three run together with dropping the
+ * presenter's shortcut snapshot inside the publication lock, off the main thread, so no card can
+ * publish between them and a recreated conversation under the same group id publishes cleanly.
+ * Incomplete channel cleanup throws so [finishLocalGroupDeleteCleanup] retains its durable retry.
  */
 internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     accountRef: String,
@@ -38,30 +53,144 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
 ) {
     withContext(Dispatchers.IO) {
         synchronized(UserEventNotificationGroup.mutationLock) {
-            try {
-                PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
-            } finally {
-                forgetNotificationConversationShortcut(accountRef, groupIdHex)
-            }
+            // Channels go first so shortcut removal cannot soft-delete one with its private name intact. If they
+            // fail, revoke credentials and relabel shortcuts until the journal retry deletes channels first.
+            val channelsResult =
+                runCatching {
+                    check(deleteConversationNotificationChannels(appContext, accountRef, groupIdHex)) {
+                        "Conversation notification channel cleanup incomplete"
+                    }
+                }
+            val shortcutsResult =
+                if (channelsResult.isSuccess) {
+                    runCatching { PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex) }
+                } else {
+                    val revocationResult =
+                        runCatching { PinnedConversationTokens.create(appContext).revokeGroup(accountRef, groupIdHex) }
+                    runCatching { PinnedConversationShortcuts(appContext).relabelGroup(accountRef, groupIdHex) }
+                        .onFailure { appStateDebug(it) { "conversation shortcut relabel failed" } }
+                    revocationResult
+                }
+            forgetNotificationConversationShortcut(accountRef, groupIdHex)
+            shortcutsResult.getOrThrow()
+            channelsResult.getOrThrow()
         }
     }
 }
 
 /**
- * Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup.
- * The notification presenter's snapshot of the removed conversation shortcut is dropped either way, in the same
- * publication-lock section as the platform removal and off the main thread.
+ * Captures the departing account's known group ids before native sign-out or wipe revokes them,
+ * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
+ * another account remains signed in. Pending local-delete journal groups are included, since journal
+ * replay no longer runs for an account once it has signed out.
+ *
+ * Returns null before native revocation when native inventory remained incomplete while
+ * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
+ * the departing ownership record and any last-signer sweep could not be durably saved after retries.
  */
-internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts(
+internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
+    accountRef: String,
+    includeUnscopedLegacy: Boolean = accounts.none { it.label != accountRef && it.isSignedInSigningAccount() },
+): Set<String>? {
+    val inventory = readAccountKnownGroupIds(accountRef)
+    val groupIds = inventory.groupIds
+    val unaccountedChannelRisk =
+        !inventory.nativeInventoryComplete &&
+            !includeUnscopedLegacy &&
+            withContext(Dispatchers.IO) {
+                hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
+            }
+    return when {
+        unaccountedChannelRisk -> {
+            appStateDebug { "sign-out channel capture incomplete with unaccounted conversation channels" }
+            null
+        }
+        !retrySignOutOwnerSave {
+            withContext(Dispatchers.IO) {
+                recordDepartingConversationChannelOwners(appContext, accountRef, groupIds, includeUnscopedLegacy)
+            }
+        } -> {
+            appStateDebug { "sign-out channel capture could not be saved before native revocation" }
+            null
+        }
+        else -> groupIds
+    }
+}
+
+/** Retries durable owner-record persistence before native revocation commits. */
+private suspend fun retrySignOutOwnerSave(save: suspend () -> Boolean): Boolean {
+    repeat(SIGN_OUT_OWNER_SAVE_ATTEMPTS) { attempt ->
+        if (save()) return true
+        if (attempt + 1 < SIGN_OUT_OWNER_SAVE_ATTEMPTS) yield()
+    }
+    return false
+}
+
+/** Reads every group id the account's channels may be named after, retrying transient native reads before fallback. */
+private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
+    val chats = readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
+    val quarantined =
+        readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }
+    val groupIds =
+        buildSet {
+            chats?.forEach { row -> add(row.groupIdHex) }
+            quarantined?.forEach { group -> add(group.groupIdHex) }
+            // Retain already-mounted active/archived chats if native listing fails on a degraded store.
+            boundChats(accountRef)?.let { controller ->
+                controller.items.forEach { item -> add(item.group.groupIdHex) }
+                controller.archivedItems.forEach { item -> add(item.group.groupIdHex) }
+            }
+            runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
+                .getOrDefault(emptySet())
+                .forEach(::add)
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
+            }.getOrDefault(emptySet()).forEach(::add)
+        }
+    return AccountGroupInventory(
+        groupIds = groupIds,
+        nativeInventoryComplete = chats != null && quarantined != null,
+    )
+}
+
+/** Retries transient native inventory reads before sign-out revocation, returning null if every attempt fails. */
+private suspend fun <T> readGroupInventoryWithRetry(
+    label: String,
+    read: suspend () -> List<T>,
+): List<T>? {
+    var lastFailure: Throwable? = null
+    repeat(SIGN_OUT_GROUP_READ_ATTEMPTS) { attempt ->
+        val result = runCatchingCancellable { read() }
+        if (result.isSuccess) return result.getOrDefault(emptyList())
+        lastFailure = result.exceptionOrNull()
+        if (attempt + 1 < SIGN_OUT_GROUP_READ_ATTEMPTS) yield()
+    }
+    lastFailure?.let { appStateDebug(it) { "sign-out channel capture could not list $label" } }
+    return null
+}
+
+/**
+ * Captures live account ownership, credential revocation, and channel-cleanup epochs before a
+ * conversation channel write suspends or waits on [UserEventNotificationGroup.mutationLock].
+ */
+internal fun WhiteNoiseAppState.captureConversationChannelWriteGuard(
     accountRef: String,
     groupIdHex: String,
-) {
-    withContext(Dispatchers.IO) {
-        synchronized(UserEventNotificationGroup.mutationLock) {
-            runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
-                .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
-            forgetNotificationConversationShortcut(accountRef, groupIdHex)
-        }
+    shortcutId: String,
+): () -> Boolean {
+    val runtime = runtimeGeneration
+    val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
+    val revocationGeneration = PinnedConversationTokens.captureRequest()
+    return {
+        val accountActive = runtimeGeneration == runtime && activeAccountRef == accountRef
+        val accountSignedIn =
+            !signOutInProgress &&
+                !wipeInProgress &&
+                accounts.any { it.label == accountRef && it.isSignedInSigningAccount() }
+        val cleanupCurrent =
+            NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef, shortcutId) &&
+                PinnedConversationTokens.isTargetCurrent(revocationGeneration, accountRef, groupIdHex)
+        accountActive && accountSignedIn && cleanupCurrent
     }
 }
 

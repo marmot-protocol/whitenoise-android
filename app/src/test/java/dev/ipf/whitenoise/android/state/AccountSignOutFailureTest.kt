@@ -1,7 +1,18 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
+import dev.ipf.marmotkit.AppGroupHydrationQuarantineReasonFfi
+import dev.ipf.marmotkit.AppQuarantinedGroupFfi
 import dev.ipf.marmotkit.RelayFailureFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_CHANNEL_OWNERS_PREFS
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.sha256Hex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -15,6 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Native acknowledgement loss must never masquerade as durable local sign-out. */
 @RunWith(RobolectricTestRunner::class)
@@ -138,6 +150,178 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             assertNull(state.activeAccountRef)
             assertEquals(AppPhase.Onboarding, state.phase)
             assertTrue(state.accounts.single().signedOut)
+        }
+
+    /** Transient chat-list and quarantined-group read errors are retried before native sign-out revocation. */
+    @Test
+    fun captureAccountKnownGroupIdsRetriesTransientNativeReadsAndSavesOwners() =
+        runBlocking {
+            val chatGroup = "aa".repeat(16)
+            val quarantinedGroup = "bb".repeat(16)
+            val chatAttempts = AtomicInteger(0)
+            val quarantinedAttempts = AtomicInteger(0)
+            chatListReply = {
+                if (chatAttempts.incrementAndGet() == 1) error("transient chatList lock")
+                listOf(chatRow(chatGroup))
+            }
+            quarantinedGroupsReply = {
+                if (quarantinedAttempts.incrementAndGet() == 1) error("transient quarantinedGroups lock")
+                listOf(
+                    AppQuarantinedGroupFfi(
+                        quarantinedGroup,
+                        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED,
+                    ),
+                )
+            }
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            val state = appState()
+
+            val captured = checkNotNull(state.captureAccountKnownGroupIds(accountRef))
+
+            assertEquals(2, chatAttempts.get())
+            assertEquals(2, quarantinedAttempts.get())
+            assertTrue(chatGroup in captured)
+            assertTrue(quarantinedGroup in captured)
+            val stored = ownerPrefs.getStringSet(sha256Hex(accountRef), emptySet()).orEmpty()
+            assertTrue(checkNotNull(conversationShortcutId(accountRef, chatGroup)) in stored)
+            assertTrue(checkNotNull(conversationShortcutId(accountRef, quarantinedGroup)) in stored)
+        }
+
+    /** Permanent inventory read errors still capture mounted chats and never trap sign-out on a degraded store. */
+    @Test
+    fun permanentInventoryReadFailureUsesMountedChatsWithoutBlockingSignOut() =
+        runBlocking {
+            val mountedGroup = "cc".repeat(16)
+            val chatAttempts = AtomicInteger(0)
+            chatListReply = {
+                chatAttempts.incrementAndGet()
+                error("corrupted chat table")
+            }
+            quarantinedGroupsReply = { error("corrupted quarantine table") }
+            val state = appState()
+            val controller = ChatsController(state, accountRef) { _, _ -> emptyList() }
+            try {
+                state.chatsController = controller
+                controller.setChatListVisible(false)
+                controller.applyChatListRow(chatRow(mountedGroup))
+                controller.setChatListVisible(true)
+
+                val captured = checkNotNull(state.captureAccountKnownGroupIds(accountRef))
+
+                assertEquals(3, chatAttempts.get())
+                assertTrue(mountedGroup in captured)
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Multi-account sign-out and wipe abort before native revocation if reads fail with an unowned :conv: channel. */
+    @Test
+    fun multiAccountSignOutAndWipeAbortBeforeRevocationWhenInventoryFailsWithUnownedChannel() =
+        runBlocking {
+            val unmountedGroup = "dd".repeat(16)
+            val shortcutId = checkNotNull(conversationShortcutId(accountRef, unmountedGroup))
+            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
+            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Secret Upgrade Chat", NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            additionalAccounts =
+                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)))
+            chatListReply = { error("corrupted chat table") }
+            quarantinedGroupsReply = { error("corrupted quarantine table") }
+            val state = appState(profileReader = { null })
+            try {
+                assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+                assertEquals(0, signOutCalls.get())
+                assertEquals(0, nativeDisableCalls.get())
+                assertEquals(accountRef, state.activeAccountRef)
+
+                assertNull(state.signOutAndWipeActiveAccount())
+                assertEquals(0, wipeCalls.get())
+                assertEquals(accountRef, state.activeAccountRef)
+
+                chatListReply = { listOf(chatRow(unmountedGroup)) }
+                quarantinedGroupsReply = { emptyList() }
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+                assertNull(manager.getNotificationChannel(channelId))
+            } finally {
+                manager.deleteNotificationChannel(channelId)
+                ownerPrefs.edit().clear().commit()
+            }
+        }
+
+    /** Owner-record persistence retries transient failures and aborts sign-out and wipe before native revocation. */
+    @Test
+    fun ownerRecordSaveRetriesAndAbortsSignOutAndWipeBeforeNativeRevocationWhenUnsaved() =
+        runBlocking {
+            val groupHex = "ef".repeat(16)
+            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
+            ownerPrefs.edit().clear().commit()
+            chatListReply = { listOf(chatRow(groupHex)) }
+            quarantinedGroupsReply = { emptyList() }
+            try {
+                val transientAttempts = AtomicInteger(0)
+                val recoveringState =
+                    appState(ownerContext = ownerSaveFailureContext { transientAttempts.incrementAndGet() <= 2 })
+                val captured = checkNotNull(recoveringState.captureAccountKnownGroupIds(accountRef))
+                assertEquals(3, transientAttempts.get())
+                assertTrue(groupHex in captured)
+
+                ownerPrefs.edit().clear().commit()
+                val persistentAttempts = AtomicInteger(0)
+                val failingState =
+                    appState(
+                        ownerContext =
+                            ownerSaveFailureContext {
+                                persistentAttempts.incrementAndGet()
+                                true
+                            },
+                    )
+                assertEquals(SignOutCompletion.AccountCleanupIncomplete, failingState.signOutActiveAccount())
+                assertEquals(3, persistentAttempts.get())
+                assertEquals(0, signOutCalls.get())
+                assertEquals(0, nativeDisableCalls.get())
+                assertEquals(accountRef, failingState.activeAccountRef)
+
+                assertNull(failingState.signOutAndWipeActiveAccount())
+                assertEquals(6, persistentAttempts.get())
+                assertEquals(0, wipeCalls.get())
+                assertEquals(accountRef, failingState.activeAccountRef)
+            } finally {
+                ownerPrefs.edit().clear().commit()
+            }
+        }
+
+    /** Fails only owner-store commits while keeping every other preference namespace operational. */
+    private fun ownerSaveFailureContext(shouldFail: () -> Boolean): Context =
+        object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+
+            override fun getSharedPreferences(
+                name: String,
+                mode: Int,
+            ): SharedPreferences {
+                val original = super.getSharedPreferences(name, mode)
+                if (name != CONVERSATION_CHANNEL_OWNERS_PREFS) return original
+                return object : SharedPreferences by original {
+                    override fun edit(): SharedPreferences.Editor {
+                        val editor = original.edit()
+                        return object : SharedPreferences.Editor by editor {
+                            override fun putStringSet(
+                                key: String?,
+                                values: MutableSet<String>?,
+                            ): SharedPreferences.Editor = apply { editor.putStringSet(key, values) }
+
+                            override fun commit(): Boolean = if (shouldFail()) false else editor.commit()
+                        }
+                    }
+                }
+            }
         }
 
     /** Pump the actual app-owned UI mutation rather than substituting a direct completion mapper. */

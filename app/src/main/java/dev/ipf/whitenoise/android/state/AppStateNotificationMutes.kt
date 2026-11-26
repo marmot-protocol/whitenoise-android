@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
 import dev.ipf.whitenoise.android.notifications.isNotificationProfileMessage
 import dev.ipf.whitenoise.android.notifications.notificationProfileSuppresses
+import dev.ipf.whitenoise.android.notifications.retainConversationChannelOwners
 
 private val memberMuteLock = Any()
 private var profileNotificationHolder: Pair<Context, ProfileNotificationOverridePreferences>? = null
@@ -186,11 +187,21 @@ internal suspend fun WhiteNoiseAppState.retainProfileAlertsForAccounts(
     canRetain: () -> Boolean,
 ): Boolean =
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val saved =
+        val retained = accounts.filterNot { it.signedOut }.map { it.label }
+        val alertsSaved =
             runCatching {
-                val retained = accounts.filterNot { it.signedOut }.map { it.label }
                 profileNotificationOverrides.retainAccounts(retained, canRetain)
             }.getOrDefault(false)
+        val ownersSaved =
+            runCatching {
+                retainConversationChannelOwners(
+                    context = appContext,
+                    retainedAccountRefs = retained,
+                    signingAccountRemains = accounts.any { it.isSignedInSigningAccount() },
+                    canRetain = canRetain,
+                )
+            }.getOrDefault(false)
+        val saved = alertsSaved && ownersSaved
         if (!saved) appStateDebug { "profile alert preference retention failed; retry on the next account refresh" }
         saved
     }

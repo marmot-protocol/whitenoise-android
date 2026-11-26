@@ -37,6 +37,7 @@ internal data class LocalGroupDeleteFixture(
     val controller: ChatsController,
     val calls: ConcurrentLinkedQueue<String>,
     val failureMethod: AtomicReference<String?>,
+    val present: AtomicBoolean,
 )
 
 /**
@@ -89,7 +90,7 @@ internal fun TestScope.localGroupDeleteFixture(
         listOf(LOCAL_DELETE_GROUP),
         controller.items.map { it.id },
     )
-    return LocalGroupDeleteFixture(state, controller, calls, failureMethod)
+    return LocalGroupDeleteFixture(state, controller, calls, failureMethod, present)
 }
 
 /** Exercise the production debounced projection before checking visible-row mutations. */

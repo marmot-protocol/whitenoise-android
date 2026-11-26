@@ -35,6 +35,14 @@
         "test_ids": [
           "NTF-042"
         ]
+      },
+      {
+        "surface": "account sign-out and wipe shortcut and channel cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+        "anchor": "fun clearRevokedConversationShortcutsForAccount(",
+        "test_ids": [
+          "NTF-059"
+        ]
       }
     ]
   }

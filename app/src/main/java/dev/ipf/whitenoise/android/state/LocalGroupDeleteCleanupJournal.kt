@@ -69,6 +69,12 @@ internal class LocalGroupDeleteCleanupJournal(
                 result.getOrNull()
             }
 
+    /** Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. */
+    fun groupIdsForAccount(account: String): Set<String> =
+        pending()
+            .filter { it.account == account }
+            .mapTo(HashSet()) { it.groupIdHex }
+
     /** Explicit retries must fail closed on a corrupt intent rather than overwrite its cleanup keys. */
     fun find(
         account: String,
