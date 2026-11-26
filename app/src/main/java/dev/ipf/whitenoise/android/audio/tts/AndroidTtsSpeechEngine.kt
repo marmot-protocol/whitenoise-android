@@ -166,7 +166,7 @@ internal class AndroidTtsSpeechEngine(
  * looper's queue clears it, so it runs before any later message, such as a framework reconnection callback. Without
  * a looper every call checks again.
  */
-internal class TaskScopedConfirmation {
+private class TaskScopedConfirmation {
     @Volatile
     private var confirmedOn: Looper? = null
 
@@ -181,8 +181,9 @@ internal class TaskScopedConfirmation {
         if (looper != null && confirmedOn === looper) return true
         val confirmed = check()
         if (confirmed && looper != null) {
-            confirmedOn = looper
-            Handler(looper).postAtFrontOfQueue { if (confirmedOn === looper) confirmedOn = null }
+            // Keep the confirmation only when its clear is queued; a quitting looper refuses the post.
+            val clearQueued = Handler(looper).postAtFrontOfQueue { if (confirmedOn === looper) confirmedOn = null }
+            if (clearQueued) confirmedOn = looper
         }
         return confirmed
     }

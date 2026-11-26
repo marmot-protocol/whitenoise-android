@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -303,6 +304,26 @@ class AndroidTtsSpeechEngineTest {
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(TextToSpeech.ERROR, engine.speak("Second batch.", "u2"))
+        assertEquals(1, tts.spoken)
+    }
+
+    /** Work already queued on the looper runs after the clear, so it cannot reuse the earlier task's confirmation. */
+    @Test
+    fun alreadyQueuedWorkChecksTheVoiceAgain() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        engine.setLanguage(Locale.US)
+        shadowOf(Looper.getMainLooper()).idle()
+        var queuedResult: Int? = null
+        Handler(Looper.getMainLooper()).post {
+            tts.activeVoice = voice("Network", Locale.US, 300, networkRequired = true)
+            queuedResult = engine.speak("Queued batch.", "u2")
+        }
+
+        assertEquals(TextToSpeech.SUCCESS, engine.speak("First batch.", "u1"))
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(TextToSpeech.ERROR, queuedResult)
         assertEquals(1, tts.spoken)
     }
 
