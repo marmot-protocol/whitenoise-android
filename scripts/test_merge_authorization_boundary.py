@@ -37,6 +37,20 @@ class AuthorizationBoundaryTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate('android-ci.yml', {'permissions': {}, 'jobs': {'merge-group-fail-fast': widened}})
 
+    def test_merge_order_publisher_has_only_job_scoped_pull_request_write(self):
+        """The advisory publisher can update its comment with job-only PR write access."""
+        name = 'pr-merge-order.yml'
+        permissions = {'pull-requests': 'write'}
+        validate(name, {'permissions': {}, 'jobs': {'report': {'permissions': permissions}}})
+        with self.assertRaises(ValueError):
+            validate(name, {'permissions': permissions, 'jobs': {'report': {}}})
+        with self.assertRaises(ValueError):
+            validate(name, {'permissions': {}, 'jobs': {'other': {'permissions': permissions}}})
+        for extra in ('contents', 'checks', 'statuses'):
+            with self.assertRaises(ValueError):
+                widened = {**permissions, extra: 'write'}
+                validate(name, {'permissions': {}, 'jobs': {'report': {'permissions': widened}}})
+
     def test_reserved_or_unbounded_dynamic_job_names_are_rejected(self):
         for name in ['Android merge authorization','Android merge authorization (${{ matrix.x }})',
                      '${{ inputs.name }}','Android merge ${{ matrix.name }}','android MERGE authorization',

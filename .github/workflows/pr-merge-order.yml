@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   report:
@@ -24,6 +23,9 @@ jobs:
     concurrency:
       group: pr-merge-order-${{ github.event.pull_request.number || inputs.pr_number }}
       cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
