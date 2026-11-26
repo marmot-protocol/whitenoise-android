@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.system.Os
 import android.system.OsConstants
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -108,7 +109,10 @@ internal class MediaSourceAccess(
         file: File,
         block: (ParcelFileDescriptor) -> T?,
     ): T? {
-        if (closed || !file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) return null
+        if (closed || !file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) {
+            if (!closed && !file.exists()) throw FileNotFoundException("Selected media file unavailable")
+            return null
+        }
         return own(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { input ->
             if (closed || input.value.statSize !in 1..MAX_MEDIA_SOURCE_BYTES) null else block(input.value)
         }

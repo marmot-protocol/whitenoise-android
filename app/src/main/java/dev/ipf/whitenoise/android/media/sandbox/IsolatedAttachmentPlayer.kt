@@ -117,9 +117,9 @@ internal class IsolatedAttachmentPlayer(
         return suggestedPlaceholderState
             .buildUpon()
             .setContentPositionMs(committed)
-            .setContentBufferedPositionMs(
-                PositionSupplier { committed },
-            ).build()
+            .setContentBufferedPositionMs(PositionSupplier { committed })
+            .setPlayerError(suggestedPlaceholderState.playerError?.takeUnless { it.cause is RawPausedSeekFailure })
+            .build()
     }
 
     /** Updates requested playback through the engine so focus, pause and lifetime ownership stay centralized. */

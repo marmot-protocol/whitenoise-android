@@ -15,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -36,6 +38,20 @@ import java.util.concurrent.atomic.AtomicReference
 @Config(application = android.app.Application::class, shadows = [BorrowedDescriptorStatShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AvStreamSourceOwnershipTest {
+    @Test
+    fun deletedLocalMediaUriPreservesFileNotFound() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File.createTempFile("deleted-local-media-", ".mp4")
+        assertTrue(file.delete())
+        MediaSourceAccess(context).use { sources ->
+            assertThrows(FileNotFoundException::class.java) {
+                sources.withMediaUriInput(context.contentResolver, Uri.fromFile(file)) {
+                    error("Missing media must not reach the decoder")
+                }
+            }
+        }
+    }
+
     @Test
     fun localMediaUriCanOpenWhileProviderAdmissionIsOccupied() {
         val context = ApplicationProvider.getApplicationContext<Context>()

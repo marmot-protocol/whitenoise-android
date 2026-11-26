@@ -533,7 +533,7 @@ internal class RawAvPlaybackEngine(
             val poster = probe?.poster
             if (probe == null || poster == null) {
                 if (request.explicit) {
-                    failPlaybackLocked(IOException("Paused video frame unavailable"))
+                    failPlaybackLocked(RawPausedSeekFailure(request.target.positionMs))
                 } else {
                     pendingSeek = null
                     request.finish(false)

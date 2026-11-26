@@ -13,6 +13,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -98,14 +99,18 @@ class RawAvSeekPublicationTest {
             assertFalse(engine.posterResult(request, null))
             val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
             assertSame(refusal.cause, engine.snapshot().error)
+            val failedSeek = refusal.cause as RawPausedSeekFailure
+            assertEquals(1500L, failedSeek.positionMs)
             assertEquals(0L, engine.positionMs())
             assertEquals(0L, engine.snapshot().renderedFrame)
-            val retry = engine.seekToAsync(2000) as SettableFuture<Void?>
+            val retry = engine.seekToAsync(failedSeek.positionMs) as SettableFuture<Void?>
             val current = engine.intent()
-            val retryTarget = RawAvPosterTarget(RawAvGeneration(current.activation, current.seek), 2000)
+            val generation = RawAvGeneration(current.activation, current.seek)
+            val retryTarget = RawAvPosterTarget(generation, failedSeek.positionMs)
             val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
             assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
-            assertEquals(2000L, engine.positionMs())
+            assertEquals(1500L, engine.positionMs())
+            assertNull(engine.snapshot().error)
         }
     }
 
