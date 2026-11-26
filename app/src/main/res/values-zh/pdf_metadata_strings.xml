@@ -3,6 +3,10 @@
     <plurals name="composer_pdf_pages">
         <item quantity="other">PDF · %d 页</item>
     </plurals>
+    <string name="composer_pdf_metadata_options">PDF 元数据选项</string>
+    <string name="composer_pdf_keep_metadata">保留元数据</string>
+    <string name="composer_pdf_remove_metadata">移除元数据</string>
+    <string name="composer_pdf_metadata_options_body">接收者可以查看 %1$s 原始文件中的作者、日期和其他属性。</string>
     <string name="composer_pdf_metadata_removed">已移除元数据</string>
     <string name="composer_pdf_metadata_removed_on_send">发送时移除元数据</string>
     <string name="composer_pdf_metadata_signed">已签名：保留元数据</string>

@@ -1,14 +1,27 @@
 package dev.ipf.whitenoise.android.media.pdf
 
-private const val MAX_OBJECT_STREAM_BYTES = 256L * 1024 * 1024
+private const val MAX_OBJECT_STREAM_BYTES = 16 * 1024 * 1024
+private const val MAX_PACKED_OBJECTS = 50_000
 
 /** One decoded object stream (`/Type /ObjStm`) and where each compressed object's value starts in it. */
 internal class PdfObjectStream(
     val data: PdfStreamData,
     val offsets: Map<Int, Int>,
 ) {
-    val bytes = ArrayPdfBytes(data.data)
+    val bytes = BudgetedPdfBytes(ArrayPdfBytes(data.data))
+    val strings = mutableListOf<IntRange>()
+    private val limits =
+        offsets.values
+            .sorted()
+            .zipWithNext()
+            .toMap()
     var changed = false
+
+    fun valueAt(offset: Int): PdfValue {
+        val value = PdfValueParser(bytes).parse(offset)
+        if (value.end > (limits[offset] ?: bytes.size)) pdfSyntaxError()
+        return value
+    }
 }
 
 /**
@@ -20,19 +33,23 @@ internal fun decodeObjectStreams(
     layout: PdfLayout,
     plan: PdfMetadataPlan,
 ): List<PdfObjectStream> {
-    var total = 0L
+    var remainingBytes = MAX_OBJECT_STREAM_BYTES
+    var remainingObjects = MAX_PACKED_OBJECTS
     val decoded = mutableListOf<PdfObjectStream>()
     for (stream in layout.streams.filter { it.dict.name("Type") == "ObjStm" }) {
-        val data = decodeStreamData(bytes, layout, stream)
-        total += data?.data?.size ?: 0
-        val offsets = data?.let { objectOffsets(it.data, stream.dict) }
-        if (data == null || offsets == null || total > MAX_OBJECT_STREAM_BYTES) {
+        val data = decodeStreamData(bytes, layout, stream, remainingBytes)
+        val offsets = data?.let { objectOffsets(it.data, stream.dict, remainingObjects) }
+        if (data == null || offsets == null) {
             plan.refuse(PdfMetadataRefusal.Unsupported)
-            break
+        } else {
+            remainingBytes -= data.data.size
+            remainingObjects -= offsets.size
+            val objectStream = PdfObjectStream(data, offsets)
+            if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
+            if (containsName(objectStream.bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
+            if (plan.refusal == null) decoded += objectStream
         }
-        val objectStream = PdfObjectStream(data, offsets)
-        if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
-        decoded += objectStream
+        if (plan.refusal != null) break
     }
     return decoded
 }
@@ -42,22 +59,27 @@ internal fun decodeObjectStreams(
 private fun objectOffsets(
     data: ByteArray,
     dict: PdfDict,
+    remainingObjects: Int,
 ): Map<Int, Int>? {
     val count = (dict["N"] as? PdfNumber)?.intOrNull() ?: return null
     val first = (dict["First"] as? PdfNumber)?.intOrNull() ?: return null
-    if (count < 0 || first < 0 || first > data.size) return null
+    if (count !in 0..remainingObjects || first !in 0..data.size) return null
     val bytes = ArrayPdfBytes(data)
     val parser = PdfValueParser(bytes)
     val offsets = HashMap<Int, Int>()
     var position = 0
+    var previousStart = first - 1
     return try {
         repeat(count) {
             val number = parser.parse(position) as? PdfNumber ?: return null
             val offset = parser.parse(number.end) as? PdfNumber ?: return null
             position = offset.end
-            val start = first + (offset.intOrNull() ?: return null)
-            if (start !in first until data.size) return null
-            offsets[number.intOrNull() ?: return null] = start
+            val relative = offset.intOrNull() ?: return null
+            if (position > first || relative !in 0 until (data.size - first)) return null
+            val start = first + relative
+            val objectNumber = number.intOrNull()?.takeIf { it > 0 } ?: return null
+            if (start <= previousStart || offsets.put(objectNumber, start) != null) return null
+            previousStart = start
         }
         offsets
     } catch (_: PdfSyntaxException) {

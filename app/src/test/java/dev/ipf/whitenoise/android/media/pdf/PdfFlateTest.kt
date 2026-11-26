@@ -4,6 +4,8 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.util.zip.DeflaterOutputStream
 import java.util.zip.InflaterInputStream
 
 /** Same-length zlib rewriting for compressed metadata and object streams (#3377). */
@@ -27,6 +29,12 @@ class PdfFlateTest {
     @Test
     fun refusesALengthTooShortForTheContent() {
         assertNull(PdfFlate.encodeExactly(ByteArray(4_000) { it.toByte() }, ByteArray(0), 100))
+    }
+
+    @Test
+    fun standardEmptyZlibMemberInflatesAtZeroLimit() {
+        val compressed = ByteArrayOutputStream().apply { DeflaterOutputStream(this).close() }.toByteArray()
+        assertArrayEquals(ByteArray(0), PdfFlate.inflate(compressed, 0))
     }
 
     @Test

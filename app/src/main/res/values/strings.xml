@@ -3009,6 +3009,7 @@
     <string name="remote_signer_try_again">Try again</string>
     <string name="remote_signer_start_over">Start over</string>
     <string name="remote_signer_error_not_bunker_link">Paste a link that starts with bunker://</string>
+    <string name="toast_unsupported_link">This link isn’t supported.</string>
     <string name="remote_signer_error_invalid_link">This bunker link isn’t valid. Copy it again from your signer.</string>
     <string name="remote_signer_error_declined">Your signer declined the request.</string>
     <string name="remote_signer_error_timeout">Your signer didn’t answer in time.</string>

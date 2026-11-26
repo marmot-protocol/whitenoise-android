@@ -138,12 +138,12 @@ internal fun ProfileKeysDialogs(
     ProfileKeyFeedbackDialogs(
         nativeExportError = ui.nativeExportError,
         shareErrorDialog = ui.shareErrorDialog,
-        saveErrorDialog = ui.saveErrorDialog,
-        expiredExportDialog = ui.expiredExportDialog,
+        saveErrorDialog = false,
+        expiredExportDialog = false,
         onNativeErrorDismiss = { ui.nativeExportError = null },
         onShareErrorDismiss = { ui.shareErrorDialog = false },
-        onSaveErrorDismiss = { ui.saveErrorDialog = false },
-        onExpiryDismiss = { ui.expiredExportDialog = false },
+        onSaveErrorDismiss = {},
+        onExpiryDismiss = {},
     )
 }
 

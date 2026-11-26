@@ -31,7 +31,7 @@ class KeyExportProviderDispatchCoverageTest {
     /** The returned-URI callback hands the provider only to [writeKeyExport] through the cancellable save operation. */
     @Test
     fun pickerCallbackReachesTheProviderOnlyThroughTheOffMainWriter() {
-        val screen = appModuleSource(ACCOUNT_KEYS)
+        val screen = appModuleSource(FILE_EXPORT)
         val launcher =
             screen.kotlinBlockFrom(
                 openDelimiter = screen.indexOf("val exportLauncher"),
@@ -42,8 +42,8 @@ class KeyExportProviderDispatchCoverageTest {
         val parts = ACCOUNT_KEYS_PARTS.joinToString("\n") { appModuleSource(it) }
 
         assertFalse("the picker callback opens the provider itself", "contentResolver" in launcher)
-        assertTrue("the picker callback no longer uses saveExport", "saveExport(" in launcher)
-        assertTrue("saveExport must run through the save operation", "ui.saveOperation.start(" in save)
+        assertTrue("the picker callback retains the destination", "state.destination = uri" in launcher)
+        assertTrue("saveExport must run through the save operation", "state.saveOperation.start(" in save)
         assertTrue("saveExport must write through writeKeyExport", "writeKeyExport(" in save)
         assertEquals(
             "only writeKeyExport may receive the provider stream",
@@ -52,7 +52,7 @@ class KeyExportProviderDispatchCoverageTest {
         )
         assertTrue(
             "stop and dispose must cancel a queued save",
-            "saveOperation.cancel()" in screen.functionBody("stopSensitiveOperations"),
+            "saveOperation.cancel()" in screen.functionBody("cancelSave"),
         )
         assertTrue(
             "the writer must leave the caller's thread for IO",
@@ -154,6 +154,7 @@ class KeyExportProviderDispatchCoverageTest {
 
     private companion object {
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
+        const val FILE_EXPORT = "src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt"
         const val WRITER = "src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyExportWrite.kt"
         const val CONTENT = "synthetic-private-key-for-test"
         const val TIMEOUT_SECONDS = 5L
@@ -162,6 +163,7 @@ class KeyExportProviderDispatchCoverageTest {
         val ACCOUNT_KEYS_PARTS =
             listOf(
                 ACCOUNT_KEYS,
+                FILE_EXPORT,
                 "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
                 "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
                 "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
