@@ -39,7 +39,7 @@ private val cardDefaultShapes =
         "ElevatedCard" to "CardDefaults.elevatedShape",
         "OutlinedCard" to "CardDefaults.outlinedShape",
     )
-private val declaration = Regex("""fun\s+$""")
+private val declaration = Regex("""fun\s+(?:$TYPE_PARAMETERS\s*)?$""")
 
 private val leadingName = Regex("""^\s*(\w+)""")
 private val privateModifier = Regex("""\bprivate\b""")
@@ -48,10 +48,14 @@ private val functionModifiers =
         """(?:\b(?:private|public|internal|protected|inline|suspend|tailrec|operator|infix)\s+|""" +
             """@[\w.]+(?:\([^()]*\))?\s+)+$""",
     )
-internal val enclosingFunction = Regex("""\bfun\s+(?:[\w.<>]+\.)?(\w+)\s*\(""")
+
+/** A declaration's or call's `<…>` type parameters or arguments, nested up to three levels deep. */
+internal const val TYPE_PARAMETERS = """<(?:[^<>]|<(?:[^<>]|<[^<>]*>)*>)*>"""
+
+internal val enclosingFunction = Regex("""\bfun\s+(?:$TYPE_PARAMETERS\s*)?(?:[\w.<>]+\.)?(\w+)\s*\(""")
 
 /** How far before a round component's name the scanner looks for `fun`, to skip its own declaration. */
-private const val DECLARATION_LOOKBEHIND = 12
+private const val DECLARATION_LOOKBEHIND = 64
 
 /**
  * Every shape-rule finding in [source], as "<kind> @<line>". [path] is the file's path below `ui/`, with `/`
@@ -236,9 +240,8 @@ private fun String.stretchedCalls(
 ): List<String> =
     names
         .flatMap { name ->
-            calls(name)
-                .filter { (start, args) ->
-                    val nameStart = start - 1 - name.length
+            callSites(name)
+                .filter { (nameStart, start, args) ->
                     val before = substring(maxOf(0, nameStart - DECLARATION_LOOKBEHIND), maxOf(0, nameStart))
                     val trailing = trailingLambda.matchAt(this, start + args.length + 1) != null
                     val call = WrapperCall(args, trailing)
@@ -398,12 +401,21 @@ private fun String.hasShapedClip(
     }
 
 /** Each call of [name] as (offset of its argument text, argument text), not counting longer names. */
-private fun String.calls(name: String): List<Pair<Int, String>> =
-    Regex("""(?<![\w.])$name\s*\(""")
+private fun String.calls(name: String): List<Pair<Int, String>> {
+    val sites = callSites(name)
+    return sites.map { (_, start, args) -> start to args }
+}
+
+/**
+ * Each call of [name], explicit type arguments such as `Gen<Int>(…)` included, as (offset of the name, offset of its
+ * argument text, argument text), not counting longer names.
+ */
+private fun String.callSites(name: String): List<Triple<Int, Int, String>> =
+    Regex("""(?<![\w.])$name\s*(?:$TYPE_PARAMETERS\s*)?\(""")
         .findAll(this)
         .map { match ->
             val open = match.range.last
-            open + 1 to substring(open + 1, closingBracket(open))
+            Triple(match.range.first, open + 1, substring(open + 1, closingBracket(open)))
         }.toList()
 
 /** The calls chained after the call that closes at [close], as (name, argument text). */

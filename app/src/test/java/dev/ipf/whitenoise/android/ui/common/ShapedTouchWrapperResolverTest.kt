@@ -78,17 +78,16 @@ class ShapedTouchWrapperResolverTest {
      */
     @Test
     fun uncertainOverloadsLeaveTheWrapperReachable() {
-        val call = WRAPPER_CALL
         val files =
             mapOf(
-                "Vararg.kt" to "package v\nimport a.*\n$call\nfun ActionButton(vararg parts: Any) {}",
+                "Vararg.kt" to "package v\nimport a.*\n$WRAPPER_CALL\nfun ActionButton(vararg parts: Any) {}",
                 "TypeMismatch.kt" to
                     "package x\nimport a.ActionButton\nfun Screen() { fun ActionButton(onClick: () -> Unit, " +
-                    "modifier: String) {}; $call }",
+                    "modifier: String) {}; $WRAPPER_CALL }",
                 "PackageMismatch.kt" to
-                    "package y\nimport a.*\n$call\nfun ActionButton(onClick: () -> Unit, modifier: String) {}",
+                    "package y\nimport a.*\n$WRAPPER_CALL\nfun ActionButton(onClick: () -> Unit, modifier: String) {}",
                 "ReceiverOverload.kt" to
-                    "package rr\nimport a.*\n$call\n" +
+                    "package rr\nimport a.*\n$WRAPPER_CALL\n" +
                     "fun RowScope.ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier) {}",
                 // A wrapper whose modifier has no default, and one with a defaulted count.
                 "Plain.kt" to
@@ -133,9 +132,12 @@ class ShapedTouchWrapperResolverTest {
                     "package ls\nimport f2.Framed\nfun Screen() { fun Framed(onClick: () -> Unit, " +
                     "modifier: Modifier, after: () -> Unit = {}, content: () -> Unit) {}; " +
                     "Framed(go, Modifier.width(36.dp), content = {}) {} }",
+                "Slotted.kt" to
+                    "package sl\nfun Slotted(onClick: () -> Unit, modifier: Modifier, content: () -> Unit) " +
+                    "{ IconButton(onClick, modifier) {} }",
                 "LambdaIntoInt.kt" to
-                    "package z\nimport a.*\nActionButton(go, Modifier.width(36.dp)) {}\n" +
-                    "fun ActionButton(onClick: () -> Unit, modifier: Modifier, count: Int) {}",
+                    "package z\nimport sl.*\nSlotted(go, Modifier.width(36.dp)) {}\n" +
+                    "fun Slotted(onClick: () -> Unit, modifier: Modifier, count: Int) {}",
             )
         assertWrapperCalls(files, reached = files.keys.filterNot { it in WRAPPER_DEFINITIONS }, unreached = emptyList())
     }
@@ -178,6 +180,48 @@ class ShapedTouchWrapperResolverTest {
             parameterList("onClick: () -> Unit, values: Map<String, Int> = mapOf<String, Int>(), modifier: Modifier")
                 .map(String::trim),
         )
+    }
+
+    /**
+     * A generic wrapper is a wrapper, whether its call infers or spells out the type arguments, and whitespace before
+     * a default's type arguments keeps its commas inside one parameter.
+     */
+    @Test
+    fun genericWrappersAndSpacedTypeArgumentsAreRead() {
+        val handOff = "{ IconButton(onClick, modifier) {} }"
+        val wrappers =
+            listOf(
+                "fun <T> Gen(onClick: () -> Unit, modifier: Modifier, value: T)",
+                "fun <T : kotlin.Any> Bound(onClick: () -> Unit, modifier: Modifier, value: T)",
+                "fun Spaced(onClick: () -> Unit, values: Map<String, Int> = mapOf <String, Int>(), modifier: Modifier)",
+            ).joinToString("\n", prefix = "package gw\n") { "$it $handOff" }
+        val calls =
+            mapOf(
+                "Inferred.kt" to "Gen(go, Modifier.width(36.dp), 1)",
+                "Explicit.kt" to "Gen<Int>(go, Modifier.width(36.dp), 1)",
+                "Bound.kt" to "Bound<String>(go, Modifier.width(36.dp), \"x\")",
+                "Spaced.kt" to "Spaced(go, emptyMap(), Modifier.width(36.dp))",
+            ).mapValues { (_, call) -> "package gc\nimport gw.*\nfun Screen() { $call }" }
+        val findings = stretchedWrapperFindings(calls + ("Generic.kt" to wrappers))
+        for (file in calls.keys) assertEquals(file, listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue(file))
+    }
+
+    /** A wrapper overload the call cannot apply to never reports it; the overload that takes the call decides. */
+    @Test
+    fun inapplicableWrapperOverloadsAreSkipped() {
+        val overloads =
+            "package ov\n" +
+                "fun Chip(onClick: () -> Unit, modifier: Modifier) { IconButton(onClick, modifier) {} }\n" +
+                "fun Chip(onClick: () -> Unit, modifier: Modifier, variant: Int) " +
+                "{ SlotIconButton(onClick, modifier) {} }"
+        val calls =
+            mapOf(
+                "Variant.kt" to "Chip(go, Modifier.width(36.dp), variant = 1)",
+                "Plain.kt" to "Chip(go, Modifier.width(36.dp))",
+            ).mapValues { (_, call) -> "package oc\nimport ov.Chip\nfun Screen() { $call }" }
+        val findings = stretchedWrapperFindings(calls + ("Chips.kt" to overloads))
+        assertEquals(emptyList<String>(), findings.getValue("Variant.kt"))
+        assertEquals(listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue("Plain.kt"))
     }
 
     /** A local function shadows an imported wrapper at the calls in its scope, and a local wrapper still counts. */
@@ -268,7 +312,7 @@ class ShapedTouchWrapperResolverTest {
 
     private companion object {
         /** The fixtures that only define wrappers for the calls around them. */
-        val WRAPPER_DEFINITIONS = setOf("Plain.kt", "Counted.kt", "Keyword.kt", "Extra.kt", "Framed.kt")
+        val WRAPPER_DEFINITIONS = setOf("Plain.kt", "Counted.kt", "Keyword.kt", "Extra.kt", "Framed.kt", "Slotted.kt")
 
         const val WRAPPER_SIGNATURE = "fun ActionButton(onClick: () -> Unit, modifier: Modifier = Modifier)"
         const val WRAPPER_CALL = "fun Screen() { ActionButton(go, Modifier.width(36.dp)) }"

@@ -186,7 +186,10 @@ private fun localPatterns(escaped: String): List<Regex> =
     )
 
 /** A `fun [name](` declaration, with or without a receiver, matched from `fun` as [enclosingFunction] is. */
-internal fun functionDeclaration(name: String) = Regex("""\bfun\s+(?:[\w.<>]+\.)?${Regex.escape(name)}\s*\(""")
+internal fun functionDeclaration(name: String): Regex {
+    val escaped = Regex.escape(name)
+    return Regex("""\bfun\s+(?:$TYPE_PARAMETERS\s*)?(?:[\w.<>]+\.)?$escaped\s*\(""")
+}
 
 /** Whether [index] sits outside every brace, at the top level of the file. */
 internal fun String.isTopLevelAt(index: Int): Boolean {
@@ -308,7 +311,8 @@ private fun String.typeArgumentsAt(
     open: Int,
     inDefault: Boolean,
 ): Int? {
-    val previous = getOrNull(open - 1)
+    // Kotlin allows whitespace between a name and its type arguments, as in `mapOf <String, Int>()`.
+    val previous = substring(0, open).trimEnd().lastOrNull()
     val afterName = previous != null && (previous.isLetterOrDigit() || previous == '_')
     return if (inDefault) typeArgumentEnd(open) else closingTypeArgument(open)?.takeIf { afterName }
 }

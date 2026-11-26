@@ -33,7 +33,11 @@ internal class WrapperResolver(
         call: WrapperCall,
     ): Set<Int>? {
         val locals = names.localFunctionsAt(name, nameStart).map { start -> listOf(own(start)) }
-        val levels = locals + names.functionCandidates(name).flatMap { levelsFor(it).toList() }
+        // A function the call surely cannot apply to, wrapper or not, is never what Kotlin picks, so it is dropped.
+        val levels =
+            (locals + names.functionCandidates(name).flatMap { levelsFor(it).toList() })
+                .map { level -> level.filterNot { it.parameters != null && call.cannotApplyTo(it.parameters) } }
+                .filter { it.isNotEmpty() }
         val decisive =
             levels.indices.firstOrNull { index ->
                 val level = levels[index]
@@ -138,7 +142,8 @@ private fun String.declaredFunctions(): List<DeclaredFunction> =
         .findAll(this)
         .map { match ->
             val open = match.range.last
-            val receiver = '.' in match.value
+            // Dots in type parameters, such as `<T : kotlin.Any>`, are not a receiver.
+            val receiver = '.' in match.value.replace(Regex("""^fun\s+$TYPE_PARAMETERS"""), "fun ")
             val parameters = substring(open + 1, closingBracket(open))
             DeclaredFunction(match.range.first, match.groupValues[1], parameters, receiver)
         }.toList()

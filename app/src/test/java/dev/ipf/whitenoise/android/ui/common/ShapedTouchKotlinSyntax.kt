@@ -122,7 +122,8 @@ private fun topLevelArgumentSpans(args: String): List<TouchArgument> {
 
 /** Recognizes type arguments in calls and casts without swallowing commas between comparisons. */
 internal fun String.typeArgumentEnd(open: Int): Int? {
-    val previous = getOrNull(open - 1)
+    // Kotlin allows whitespace between a name and its type arguments, as in `mapOf <String, Int>()`.
+    val previous = substring(0, open).trimEnd().lastOrNull()
     if (previous == null || (!previous.isLetterOrDigit() && previous != '_')) return null
     return closingTypeArgument(open)?.takeIf { close ->
         val next = getOrNull(indexOfNonWhitespace(close + 1))
