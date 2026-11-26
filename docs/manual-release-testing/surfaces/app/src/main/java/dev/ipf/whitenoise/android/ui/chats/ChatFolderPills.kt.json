@@ -18,7 +18,8 @@
         "anchor": "fun ChatFolderPill(",
         "test_ids": [
           "FLD-001",
-          "CHL-002"
+          "CHL-002",
+          "MSG-010"
         ]
       },
       {
@@ -36,6 +37,14 @@
         "anchor": "R.string.explanation_chat_list_manage_folders",
         "test_ids": [
           "CHL-037"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "surface": "Chat folder pill edit action",
+        "anchor": "R.string.edit",
+        "test_ids": [
+          "FLD-001"
         ]
       }
     ],

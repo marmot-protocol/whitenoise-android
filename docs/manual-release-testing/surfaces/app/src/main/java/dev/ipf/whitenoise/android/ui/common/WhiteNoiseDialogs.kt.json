@@ -52,6 +52,16 @@
         ]
       },
       {
+        "surface": "WhiteNoiseChoiceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseChoiceRow(",
+        "test_ids": [
+          "DIC-001",
+          "NTF-051",
+          "SET-006"
+        ]
+      },
+      {
         "surface": "WhiteNoiseDialogChoiceRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
         "anchor": "fun WhiteNoiseDialogChoiceRow(",

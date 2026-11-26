@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.media.VideoContent
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
 import dev.ipf.whitenoise.android.media.VideoScrubResult
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.rememberingNativeDraftBody
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
@@ -141,13 +142,24 @@ private fun <K> recheckPrepared(
     val refused = LinkedHashSet<K>()
     prepared.forEach { (key, attachment) ->
         val stagedVideo = attachment.sourceFile != null && isVideoMediaType(attachment.mediaType)
+        // A stored draft file was copied into the draft only after its metadata was removed, so it is sent as stored.
+        val action =
+            when {
+                attachment.draftFile != null -> DocumentVideoAction.Keep
+                stagedVideo -> DocumentVideoAction.Refuse
+                else -> actionFor(attachment)
+            }
         val checked =
-            when (if (stagedVideo) DocumentVideoAction.Refuse else actionFor(attachment)) {
+            when (action) {
                 DocumentVideoAction.Keep -> attachment
                 DocumentVideoAction.Refuse -> null
                 DocumentVideoAction.Scrub ->
                     VideoMetadataScrubber.scrubbedOrNull(attachment.plaintextBytes)?.let { clean ->
-                        if (clean === attachment.plaintextBytes) attachment else attachment.copy(plaintextBytes = clean)
+                        if (clean === attachment.plaintextBytes) {
+                            attachment
+                        } else {
+                            attachment.rememberingNativeDraftBody().copy(plaintextBytes = clean)
+                        }
                     }
             }
         if (checked == null) refused += key else ready[key] = checked

@@ -1,177 +1,12 @@
 package dev.ipf.whitenoise.android.media.editor
 
-import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
-import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
-import dev.ipf.marmotkit.SelectedMessageDraftFfi
-import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-internal interface MessageDraftGateway {
-    fun read(
-        accountRef: String,
-        groupIdHex: String,
-    ): MessageDraftFfi?
-
-    fun save(
-        accountRef: String,
-        groupIdHex: String,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi
-
-    fun delete(
-        accountRef: String,
-        groupIdHex: String,
-    )
-
-    fun summaries(accountRef: String): List<MessageDraftSummaryFfi>
-
-    /** The selected draft with its opaque revision, or null when this gateway cannot write revision-safely. */
-    fun selected(
-        accountRef: String,
-        groupIdHex: String,
-    ): SelectedMessageDraftFfi? = null
-
-    /** Writes only while the store still holds [revision]; gateways without revisions save unconditionally. */
-    fun saveIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi = save(accountRef, groupIdHex, content, replyToMessageIdHex, mediaAttachments)
-
-    /** Clears only while the store still holds [revision]; gateways without revisions delete unconditionally. */
-    fun clearIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-    ) = delete(accountRef, groupIdHex)
-}
-
-internal class MarmotMessageDraftGateway(
-    private val marmot: () -> MarmotInterface,
-) : MessageDraftGateway {
-    override fun read(
-        accountRef: String,
-        groupIdHex: String,
-    ): MessageDraftFfi? = marmot().messageDraft(accountRef, groupIdHex)
-
-    override fun save(
-        accountRef: String,
-        groupIdHex: String,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi =
-        marmot().saveMessageDraft(
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            content = content,
-            replyToMessageIdHex = replyToMessageIdHex,
-            mediaAttachments = mediaAttachments,
-        )
-
-    override fun delete(
-        accountRef: String,
-        groupIdHex: String,
-    ) = marmot().deleteMessageDraft(accountRef, groupIdHex)
-
-    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = marmot().messageDrafts(accountRef)
-
-    /** Reads MDK's selected draft and revision for the group. */
-    override fun selected(
-        accountRef: String,
-        groupIdHex: String,
-    ): SelectedMessageDraftFfi = marmot().selectedMessageDraft(accountRef, groupIdHex)
-
-    /**
-     * Revision-safe upsert; a changed selected draft surfaces as `MessageDraftRevisionConflict`. MDK returns
-     * descriptors only, so the hydrated draft is rebuilt from the bytes this write submitted.
-     */
-    override fun saveIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi {
-        val saved =
-            marmot().saveMessageDraftIfRevision(accountRef, revision, content, replyToMessageIdHex, mediaAttachments)
-        val now = System.currentTimeMillis()
-        return MessageDraftFfi(
-            groupIdHex = groupIdHex,
-            content = content,
-            replyToMessageIdHex = replyToMessageIdHex,
-            mediaAttachments = mediaAttachments,
-            createdAtMs = saved.draft?.createdAtMs ?: now,
-            updatedAtMs = saved.draft?.updatedAtMs ?: now,
-        )
-    }
-
-    /** Revision-safe clear; a changed selected draft surfaces as `MessageDraftRevisionConflict`. */
-    override fun clearIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-    ) {
-        marmot().clearMessageDraftIfRevision(accountRef, revision)
-    }
-}
-
-internal sealed interface MessageDraftMutationResult {
-    data class Success(
-        val draft: MessageDraftFfi?,
-        val previousEditorSession: EditorAttachmentSession? = null,
-        val editorSessionRecoveryPending: Boolean = false,
-    ) : MessageDraftMutationResult
-
-    data object MissingAttachment : MessageDraftMutationResult
-
-    data object StaleAttachment : MessageDraftMutationResult
-
-    data object DuplicateAttachment : MessageDraftMutationResult
-
-    data object InvalidEditorSession : MessageDraftMutationResult
-
-    data object SessionPersistenceFailed : MessageDraftMutationResult
-
-    data class Failure(
-        val cause: Throwable,
-    ) : MessageDraftMutationResult
-}
-
-internal sealed interface MessageDraftConditionalDeleteResult {
-    data class Applied(
-        val result: MessageDraftMutationResult,
-    ) : MessageDraftConditionalDeleteResult
-
-    data object Superseded : MessageDraftConditionalDeleteResult
-}
-
-/** Outcome of a draft save that only writes while its generation is still authoritative. */
-internal sealed interface MessageDraftConditionalSaveResult {
-    data class Applied(
-        val result: MessageDraftMutationResult,
-    ) : MessageDraftConditionalSaveResult
-
-    data object Superseded : MessageDraftConditionalSaveResult
-}
-
-internal data class MessageDraftGeneration(
-    val value: Long,
-)
 
 /**
  * The only Android-side mutation boundary for hydrated MDK message drafts.
@@ -195,6 +30,9 @@ internal class MessageDraftRepository(
             mutationGenerations = mutationGenerations,
             ioDispatcher = ioDispatcher,
         )
+
+    /** File-backed attachments, under the same per-draft locks and generations as every other mutation. */
+    internal val files = MessageDraftFiles(gateway, draftLocks, mutationGenerations, ioDispatcher)
 
     @Suppress("TooGenericExceptionCaught") // FFI gateway failures are returned; cancellation is rethrown first.
     suspend fun draft(
@@ -232,6 +70,7 @@ internal class MessageDraftRepository(
             saveDraftText(gateway, accountRef, groupIdHex, content)
         }
 
+    /** Appends [incoming] to the draft text on a new line, keeping its reply and attachments. */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
@@ -239,27 +78,28 @@ internal class MessageDraftRepository(
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
             val trimmedIncoming = incoming.trim()
-            if (trimmedIncoming.isEmpty()) {
-                return@mutate MessageDraftMutationResult.Success(gateway.read(accountRef, groupIdHex))
-            }
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            if (trimmedIncoming.isEmpty()) return@mutate MessageDraftMutationResult.Success(base.draft)
+            val current = base.draft
             val merged =
                 if (current?.content.isNullOrBlank()) {
                     trimmedIncoming
                 } else {
                     "${current.content.trimEnd()}\n$trimmedIncoming"
                 }
-            saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+            saveDraftText(gateway, accountRef, groupIdHex, merged, base)
         }
 
+    /** Appends [attachment] inline; an id the draft already holds is a duplicate. */
     suspend fun addAttachment(
         accountRef: String,
         groupIdHex: String,
         attachment: MessageDraftAttachmentFfi,
         pendingSession: EditorAttachmentSession? = null,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
-            val current = gateway.read(accountRef, groupIdHex)
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             if (current?.mediaAttachments.orEmpty().any { it.id == attachment.id }) {
                 return@mutate MessageDraftMutationResult.DuplicateAttachment
             }
@@ -271,7 +111,7 @@ internal class MessageDraftRepository(
                 editorSessions = editorSessions,
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
-                before = current,
+                base = base,
                 updatedAttachments = current?.mediaAttachments.orEmpty() + attachment,
                 changedAttachment = attachment,
                 pendingSession = pendingSession,
@@ -279,6 +119,7 @@ internal class MessageDraftRepository(
             )
         }
 
+    /** Replaces one attachment in place while it still matches [expectedDigest]. */
     suspend fun replaceAttachment(
         accountRef: String,
         groupIdHex: String,
@@ -287,13 +128,14 @@ internal class MessageDraftRepository(
         replacement: MessageDraftAttachmentFfi,
         pendingSession: EditorAttachmentSession,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
             if (replacement.id != attachmentId ||
                 !pendingSession.matches(accountRef, groupIdHex, replacement)
             ) {
                 return@mutate MessageDraftMutationResult.InvalidEditorSession
             }
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             val currentAttachments =
                 current?.mediaAttachments
                     ?: return@mutate MessageDraftMutationResult.MissingAttachment
@@ -311,7 +153,7 @@ internal class MessageDraftRepository(
                 editorSessions = editorSessions,
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
-                before = current,
+                base = base,
                 updatedAttachments = updated,
                 changedAttachment = replacement,
                 pendingSession = pendingSession,
@@ -319,6 +161,7 @@ internal class MessageDraftRepository(
             )
         }
 
+    /** Removes one attachment, deleting the draft when nothing else remains in it. */
     @Suppress("TooGenericExceptionCaught") // FFI gateways can surface unchecked failures; cancellation is rethrown.
     suspend fun removeAttachment(
         accountRef: String,
@@ -326,8 +169,9 @@ internal class MessageDraftRepository(
         attachmentId: String,
         expectedDigest: String? = null,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
-            val current = gateway.read(accountRef, groupIdHex)
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             val attachments = current?.mediaAttachments ?: return@mutate MessageDraftMutationResult.MissingAttachment
             val target =
                 attachments.firstOrNull { it.id == attachmentId }
@@ -340,15 +184,14 @@ internal class MessageDraftRepository(
             try {
                 val saved =
                     if (deleteEmptyDraft) {
-                        gateway.deleteAgainstSelected(accountRef, groupIdHex)
+                        gateway.clearRevisioned(accountRef, groupIdHex, base)
                         null
                     } else {
-                        gateway.saveAgainstSelected(
-                            accountRef = accountRef,
-                            groupIdHex = groupIdHex,
-                            content = current.content,
-                            replyToMessageIdHex = current.replyToMessageIdHex,
-                            mediaAttachments = updated,
+                        gateway.saveRevisioned(
+                            accountRef,
+                            groupIdHex,
+                            base,
+                            MessageDraftWrite(current.content, current.replyToMessageIdHex, updated),
                         )
                     }
                 val removedSession = editorSessions.remove(accountRef, groupIdHex, attachmentId)
@@ -427,9 +270,14 @@ internal class MessageDraftRepository(
             }
         }
 
+    /**
+     * Runs one mutation under the draft's lock, re-running it once after a lost revision race. An [attachmentOnly]
+     * mutation leaves text that was accepted before it current, so a queued text save still lands.
+     */
     private suspend fun mutate(
         accountRef: String,
         groupIdHex: String,
+        attachmentOnly: Boolean = false,
         block: suspend () -> MessageDraftMutationResult,
     ): MessageDraftMutationResult {
         val key = DraftKey(accountRef, groupIdHex)
@@ -439,7 +287,9 @@ internal class MessageDraftRepository(
                 // the same lock, so the user's newest edit is applied on top of the other writer's state.
                 var result = runDraftMutation(block)
                 if (result.isRevisionConflict()) result = runDraftMutation(block)
-                if (result is MessageDraftMutationResult.Success) mutationGenerations.advance(key)
+                if (result is MessageDraftMutationResult.Success) {
+                    mutationGenerations.advance(key, fencesText = !attachmentOnly)
+                }
                 result
             }
         }
@@ -478,6 +328,13 @@ internal class MessageDraftCoordinatedOperations(
         generation: MessageDraftGeneration,
     ): Boolean = mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
 
+    /** Whether text accepted at [generation] may still be written; only attachment-only mutations have landed since. */
+    fun isTextCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+    ): Boolean = mutationGenerations.isTextCurrent(DraftKey(accountRef, groupIdHex), generation)
+
     /**
      * Writes [content] only while [generation] is still authoritative for this account and
      * group, making the same currency check [deleteIf] and [draftIf] already make.
@@ -495,16 +352,22 @@ internal class MessageDraftCoordinatedOperations(
         generation: MessageDraftGeneration,
     ): MessageDraftConditionalSaveResult =
         withContext(ioDispatcher) {
-            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
-                if (!mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)) {
+            val key = DraftKey(accountRef, groupIdHex)
+            draftLocks.withLock(key) {
+                if (!mutationGenerations.isTextCurrent(key, generation)) {
                     return@withLock MessageDraftConditionalSaveResult.Superseded
                 }
-                MessageDraftConditionalSaveResult.Applied(
-                    runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) },
-                )
+                // A lost revision race, such as a send saving its caption, re-reads and saves once more while the
+                // text is still current; a pass superseded meanwhile does not.
+                var result = runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+                if (result.isRevisionConflict() && mutationGenerations.isTextCurrent(key, generation)) {
+                    result = runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+                }
+                MessageDraftConditionalSaveResult.Applied(result)
             }
         }
 
+    /** Merges [incoming] once per [receipt], so a retried merge does not repeat the text. */
     suspend fun mergeAcceptedText(
         accountRef: String,
         groupIdHex: String,
@@ -514,13 +377,14 @@ internal class MessageDraftCoordinatedOperations(
         withContext(ioDispatcher) {
             draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
                 runDraftMutation {
-                    val current = gateway.read(accountRef, groupIdHex)
+                    val base = gateway.readRevisioned(accountRef, groupIdHex)
+                    val current = base.draft
                     if (current != null && current.content == receipt?.proposedContent) {
                         MessageDraftMutationResult.Success(current)
                     } else {
                         val merged = mergeDraftText(current?.content.orEmpty(), incoming)
                         receipt?.proposedContent = merged
-                        saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+                        saveDraftText(gateway, accountRef, groupIdHex, merged, base)
                     }
                 }
             }
@@ -564,40 +428,9 @@ internal class MessageDraftCoordinatedOperations(
         }
 }
 
-internal class MessageDraftMutationGenerations {
-    private val lock = Any()
-    private val lifetimes = mutableMapOf<DraftKey, StalenessGuard>()
-
-    /** Accepts a new mutation for [key] and returns its guarded generation. */
-    fun advance(key: DraftKey): MessageDraftGeneration =
-        synchronized(lock) {
-            MessageDraftGeneration(lifetime(key).advance())
-        }
-
-    /** Atomically accepts a mutation only while [expected] still owns [key]. */
-    fun advanceIfCurrent(
-        key: DraftKey,
-        expected: MessageDraftGeneration,
-    ): MessageDraftGeneration? =
-        synchronized(lock) {
-            lifetime(key).advanceIfCurrent(expected.value)?.let(::MessageDraftGeneration)
-        }
-
-    /** Captures the mutation generation currently visible for [key]. */
-    fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(lifetime(key).capture()) }
-
-    /** Reports whether [generation] remains the newest accepted mutation for [key]. */
-    fun isCurrent(
-        key: DraftKey,
-        generation: MessageDraftGeneration,
-    ): Boolean = synchronized(lock) { lifetime(key).isCurrent(generation.value) }
-
-    /** Returns the single staleness primitive assigned to one draft key. */
-    private fun lifetime(key: DraftKey): StalenessGuard = lifetimes.getOrPut(key, ::StalenessGuard)
-}
-
+/** Runs one mutation, returning gateway failures as results and rethrowing cancellation. */
 @Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.
-private suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
+internal suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
     try {
         block()
     } catch (cancelled: CancellationException) {
@@ -626,15 +459,17 @@ private fun deleteDraft(
         }
     }
 
+/** Saves [content] against one read, keeping its reply and attachments, or clears an emptied draft. */
 @Suppress("TooGenericExceptionCaught")
 private fun saveDraftText(
     gateway: MessageDraftGateway,
     accountRef: String,
     groupIdHex: String,
     content: String,
-    alreadyRead: MessageDraftFfi? = null,
+    alreadyRead: RevisionedMessageDraft? = null,
 ): MessageDraftMutationResult {
-    val current = alreadyRead ?: gateway.read(accountRef, groupIdHex)
+    val base = alreadyRead ?: gateway.readRevisioned(accountRef, groupIdHex)
+    val current = base.draft
     val deleteEmpty =
         content.isBlank() &&
             current?.replyToMessageIdHex == null &&
@@ -642,15 +477,14 @@ private fun saveDraftText(
     return try {
         val saved =
             if (deleteEmpty) {
-                gateway.deleteAgainstSelected(accountRef, groupIdHex)
+                gateway.clearRevisioned(accountRef, groupIdHex, base)
                 null
             } else {
-                gateway.saveAgainstSelected(
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                    content = content,
-                    replyToMessageIdHex = current?.replyToMessageIdHex,
-                    mediaAttachments = current?.mediaAttachments.orEmpty(),
+                gateway.saveRevisioned(
+                    accountRef,
+                    groupIdHex,
+                    base,
+                    MessageDraftWrite(content, current?.replyToMessageIdHex, current?.mediaAttachments.orEmpty()),
                 )
             }
         MessageDraftMutationResult.Success(saved)
@@ -673,14 +507,17 @@ private fun saveDraftText(
     }
 }
 
-// Re-read after any non-cancellation gateway failure resolves commit ambiguity.
+/**
+ * Writes an attachment change against [base] and settles its editor session against what was saved. A re-read after
+ * any non-cancellation gateway failure resolves whether the write committed.
+ */
 @Suppress("TooGenericExceptionCaught")
 private fun commitDraftAttachmentMutation(
     gateway: MessageDraftGateway,
     editorSessions: EditorSessionStore,
     accountRef: String,
     groupIdHex: String,
-    before: MessageDraftFfi?,
+    base: RevisionedMessageDraft,
     updatedAttachments: List<MessageDraftAttachmentFfi>,
     changedAttachment: MessageDraftAttachmentFfi,
     pendingSession: EditorAttachmentSession?,
@@ -692,12 +529,11 @@ private fun commitDraftAttachmentMutation(
     val changedDigest = changedAttachment.editorDigest()
     return try {
         val saved =
-            gateway.saveAgainstSelected(
-                accountRef = accountRef,
-                groupIdHex = groupIdHex,
-                content = before?.content.orEmpty(),
-                replyToMessageIdHex = before?.replyToMessageIdHex,
-                mediaAttachments = updatedAttachments,
+            gateway.saveRevisioned(
+                accountRef,
+                groupIdHex,
+                base,
+                MessageDraftWrite(base.draft?.content.orEmpty(), base.draft?.replyToMessageIdHex, updatedAttachments),
             )
         finishAttachmentCommit(
             editorSessions = editorSessions,
@@ -780,69 +616,3 @@ private fun finishAttachmentCommit(
         editorSessionRecoveryPending = recoveryPending,
     )
 }
-
-internal data class DraftKey(
-    val accountRef: String,
-    val groupIdHex: String,
-)
-
-internal class MessageDraftLocks {
-    private val tableGuard = Any()
-    private val table = mutableMapOf<DraftKey, DraftLock>()
-
-    suspend fun <T> withLock(
-        key: DraftKey,
-        block: suspend () -> T,
-    ): T {
-        val entry =
-            synchronized(tableGuard) {
-                table.getOrPut(key) { DraftLock() }.also { it.users += 1 }
-            }
-        return try {
-            entry.mutex.withLock { block() }
-        } finally {
-            synchronized(tableGuard) {
-                entry.users -= 1
-                if (entry.users == 0 && table[key] === entry) table.remove(key)
-            }
-        }
-    }
-
-    private class DraftLock(
-        val mutex: Mutex = Mutex(),
-        var users: Int = 0,
-    )
-}
-
-private fun editorSessionStoreUnavailable() = IllegalStateException(EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE)
-
-private fun editorSourceStoreUnavailable() = IllegalStateException(EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE)
-
-private const val EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE =
-    "Encrypted editor sessions are temporarily unavailable"
-
-private const val EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE =
-    "Encrypted editor sources are temporarily unavailable"
-
-internal fun MessageDraftAttachmentFfi.editorDigest(): String =
-    editorAttachmentDigest(
-        attachmentId = id,
-        fileName = fileName,
-        mediaType = mediaType,
-        plaintext = plaintext,
-        dim = dim,
-        thumbhash = thumbhash,
-        durationSeconds = durationSeconds,
-        waveformSamples = waveformSamples,
-    )
-
-private fun EditorAttachmentSession.matches(
-    accountRef: String,
-    groupIdHex: String,
-    attachment: MessageDraftAttachmentFfi,
-): Boolean =
-    phase == EditorSessionPhase.Pending &&
-        this.accountRef == accountRef &&
-        this.groupIdHex == groupIdHex &&
-        attachmentId == attachment.id &&
-        attachmentDigest == attachment.editorDigest()

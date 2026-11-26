@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -38,9 +39,14 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutCommand
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutRouter
+import dev.ipf.whitenoise.android.ui.keyboard.KeyboardShortcut
+import dev.ipf.whitenoise.android.ui.keyboard.LocalHardwareShortcutRouter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -120,6 +126,40 @@ class SettingsTopLevelUnderlayTest {
         assertTrue("Chats leaves when the open settles", !chatsComposed)
     }
 
+    /** The Chats underlay beneath an opening Settings page withdraws its hardware shortcuts while it is inert. */
+    @Test fun chatsUnderTheOpeningContainerWithdrawsItsHardwareShortcuts() {
+        val section = mutableStateOf(0)
+        val router = HardwareShortcutRouter()
+        var searches = 0
+        var chatsComposed = false
+        host(section, router) { route ->
+            if (route == 0) {
+                DisposableEffect(Unit) {
+                    chatsComposed = true
+                    onDispose { chatsComposed = false }
+                }
+                KeyboardShortcut(HardwareShortcutCommand.GlobalSearch, available = true) { searches++ }
+                Chats(open = { section.value = 1 }) {}
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow))
+            }
+        }
+        var handled = false
+        rule.runOnUiThread { handled = router.dispatch(HardwareShortcutCommand.GlobalSearch) }
+        assertTrue("live Chats takes Ctrl+F", handled)
+
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag(AVATAR).performClick()
+        repeat(OPEN_FRAMES) { step() }
+        assertTrue("Chats is still composed beneath the arriving Settings page", chatsComposed)
+        rule.runOnUiThread { handled = router.dispatch(HardwareShortcutCommand.GlobalSearch) }
+        assertFalse("the inert underlay does not take Ctrl+F", handled)
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+
+        assertEquals(1, searches)
+    }
+
     @Test fun reopeningFromAPicturelessCloseBringsSettingsInkInFromNone() {
         val section = mutableStateOf(0)
         host(section) { route ->
@@ -197,21 +237,25 @@ class SettingsTopLevelUnderlayTest {
 
     private var backDispatcher: androidx.activity.OnBackPressedDispatcher? = null
 
+    /** Hosts top-level Settings route motion over [section], with [router] as the window's shortcut router. */
     private fun host(
         section: MutableState<Int>,
+        router: HardwareShortcutRouter? = null,
         content: @Composable (Int) -> Unit,
     ) {
         rule.setContent {
             backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-            WhiteNoiseTheme(darkTheme = false) {
-                SettingsRouteMotion(
-                    target = section.value,
-                    depth = section.value,
-                    ownerKey = "account",
-                    topLevelBubble = true,
-                    cardMorph = true,
-                    content = content,
-                )
+            CompositionLocalProvider(LocalHardwareShortcutRouter provides router) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    SettingsRouteMotion(
+                        target = section.value,
+                        depth = section.value,
+                        ownerKey = "account",
+                        topLevelBubble = true,
+                        cardMorph = true,
+                        content = content,
+                    )
+                }
             }
         }
         rule.mainClock.advanceTimeBy(SETTLE_MILLIS)

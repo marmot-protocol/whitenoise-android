@@ -8,28 +8,19 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -46,13 +37,8 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
-import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Current native person reference plus sanitized display data; this is not a discovery cache. */
 internal data class GroupCreationPerson(
@@ -75,87 +61,29 @@ internal fun GroupCreationPersonRow(
     onLongClick: ((Rect?) -> Unit)? = null,
 ) {
     val candidate = person.candidate
-    val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
-    val followed =
-        if (isFollowedPerson(candidate.isFollowing, candidate.accountIdHex)) {
-            stringResource(R.string.user_search_you_follow)
-        } else {
-            null
-        }
+    val key = personKeyPlacement(candidate.displayName, person.subtitle, candidate.npub)
     val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
-    val native =
-        rememberSettingsNativeSurface(
-            destination = candidate.accountIdHex,
-            shape = shapes.shape,
-            strokeColor = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outlineVariant else Color.Unspecified,
-        ).first
-    val modifier =
-        Modifier
-            .fillMaxWidth()
-            .then(profileModifier)
-            .then(native)
-            .amoledSurfaceBorder(shapes.shape)
-            .testTag("new_group.person.${candidate.accountIdHex}")
-            .recipientRelationshipSemantics(followed, selected)
-    val leading: @Composable () -> Unit = {
-        Avatar(
-            candidate.displayName,
-            candidate.accountIdHex,
-            48.dp,
-            pictureUrl = person.avatarUrl,
-            pictureDomain = AvatarImageLoader.publicProfiles(),
-            followedAccount = candidate.accountIdHex,
-        )
-    }
-    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
-    val keyFocusable = onClick == null || !enabled
-    val supporting: (@Composable () -> Unit)? =
-        person.subtitle?.takeUnless { titleIsKey && abbreviatesPublicKey(it, candidate.npub) }?.let { subtitle ->
-            {
-                if (abbreviatesPublicKey(subtitle, candidate.npub)) {
-                    PublicKeyCopyText(subtitle, candidate.npub, keyboardFocusable = keyFocusable)
-                } else {
-                    Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    val headline: @Composable () -> Unit = {
-        if (titleIsKey) {
-            PublicKeyCopyText(candidate.displayName, candidate.npub, keyboardFocusable = keyFocusable)
-        } else {
-            EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        if (onClick == null) {
-            Surface(shape = shapes.shape, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                ListItem(
-                    headlineContent = headline,
-                    supportingContent = supporting,
-                    leadingContent = leading,
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    modifier = modifier,
-                )
-            }
-        } else {
-            ListItem(
-                onClick = onClick,
-                onLongClick = profileClick.takeIf { onLongClick != null },
-                enabled = enabled,
-                shapes = shapes,
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = modifier.semantics { role = Role.Checkbox },
-                leadingContent = leading,
-                supportingContent = supporting,
-                trailingContent = if (selected == true) ({ SelectedPersonCheck() }) else null,
-                content = headline,
-            )
-        }
-        // The prototype separates the segmented rows with the list gap, not a drawn line.
-        if (index < count - 1) {
-            Spacer(Modifier.height(WhiteNoiseListItemDefaults.segmentedGap))
-        }
-    }
+    PersonRow(
+        title = candidate.displayName,
+        subtitle = key.subtitle,
+        avatarSeed = candidate.accountIdHex,
+        avatarUrl = person.avatarUrl,
+        modifier = profileModifier.testTag("new_group.person.${candidate.accountIdHex}"),
+        index = index,
+        count = count,
+        isFollowed = candidate.isFollowing,
+        followedAccount = candidate.accountIdHex,
+        selectionState = selected,
+        enabled = enabled,
+        publicKeyCopyEnabled = true,
+        nativeDestination = candidate.accountIdHex,
+        onClick = onClick,
+        onLongClick = profileClick.takeIf { onLongClick != null },
+        publicKey = key.publicKey,
+        publicKeyInTitle = key.inTitle,
+        trailing = if (selected == true) ({ SelectedPersonCheck() }) else null,
+        avatarDomain = AvatarImageLoader.publicProfiles(),
+    )
 }
 
 /** The prototype marks a chosen person with the primary check glyph instead of a checkbox. */

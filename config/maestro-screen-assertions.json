@@ -849,11 +849,11 @@
         {
           "case": "presentation-group-ui-entity-empty",
           "selector": {
-            "text": "No results"
+            "text": "No matches"
           },
           "scope": "entity picker renders empty, disabled or selectable state and verifies selected stable identity; no group membership mutation.",
           "entry_assertion": {
-            "text": "No results"
+            "text": "No matches"
           },
           "visible_on_entry": true
         },
@@ -4552,6 +4552,38 @@
             "id": "notifications.permission.group"
           },
           "scope": "global notification destination and permission group; toolbar Back."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsScreen",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.list"
+          },
+          "scope": "generated-account history backups destination; status only, no recovery words generated."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsContent",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.status"
+          },
+          "scope": "generated-account history backups status row; the turn-off confirmation is not opened.",
+          "entry_assertion": {
+            "id": "history_backups.list"
+          },
+          "opened_by": {
+            "text": "History backups"
+          }
         }
       ]
     },

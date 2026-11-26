@@ -27,11 +27,11 @@ class HeaderShortcutPreferencesTest {
         assertEquals(listOf(HeaderShortcut.Search), HeaderShortcutPreferences(prefs).shortcuts)
     }
 
-    /** A stored value can never put duplicates or unknown names in the header. */
+    /** A stored value drops removed or unknown names and duplicates so upgrades stay clean. */
     @Test
     fun storedValueKeepsOnlyKnownDistinctShortcuts() {
         val prefs = preferences("bounded")
-        prefs.edit().putString(KEY, "Pin,Search,Search,MuteUnmute,ReadAloud").commit()
+        prefs.edit().putString(KEY, "Pin,DisappearingTimer,Search,Search,MuteUnmute,ReadAloud").commit()
         assertEquals(
             listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute, HeaderShortcut.ReadAloud),
             HeaderShortcutPreferences(prefs).shortcuts,

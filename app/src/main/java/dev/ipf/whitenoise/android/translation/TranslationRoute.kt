@@ -49,12 +49,14 @@ internal fun rememberConversationTranslation(
     val scope = rememberCoroutineScope()
     val runtime = appState.runtimeGeneration
     val active by rememberUpdatedState(routeActive)
+    val detector = IncomingLanguageDetector.shared(context.applicationContext.resources)
     val session =
         remember(account, group, runtime) {
             ConversationTranslationSession(
                 scope,
                 { withContext(Dispatchers.IO) { OfflineTranslatorClient(context.applicationContext) } },
                 { active && account != null && appState.translationOwnerCurrent(account, runtime, lifecycle) },
+                detectIncoming = { text -> withContext(Dispatchers.Default) { detector.detect(text) } },
             )
         }
     val preferencesRevision by preferences.changes.collectAsState()

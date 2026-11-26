@@ -26,12 +26,10 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
@@ -261,17 +259,11 @@ private suspend fun PointerInputScope.copyOnShortTap(
 }
 
 /**
- * Copies [npub] to the clipboard and confirms it through [rememberCopyConfirmation].
+ * Copies the latest [npub] through the shared clipboard copier.
  */
 @Composable
 private fun rememberPublicKeyCopy(npub: String): () -> Unit {
-    val clipboard = LocalClipboardManager.current
-    val confirmCopied = rememberCopyConfirmation()
+    val copier = rememberClipboardCopier()
     val current by rememberUpdatedState(npub)
-    return remember(clipboard, confirmCopied) {
-        {
-            clipboard.setText(AnnotatedString(current))
-            confirmCopied()
-        }
-    }
+    return remember(copier) { { copier.copy(current) } }
 }

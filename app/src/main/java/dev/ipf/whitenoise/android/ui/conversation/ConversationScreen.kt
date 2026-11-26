@@ -157,7 +157,6 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
@@ -238,12 +237,9 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
-import dev.ipf.whitenoise.android.ui.group.DisappearingTimerEditor
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.group.MuteDurationHost
-import dev.ipf.whitenoise.android.ui.group.applyDisappearingTimer
 import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
-import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
@@ -607,7 +603,7 @@ internal fun ConversationScreen(
     var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
     var bottomInputRevision by bottomInsetState.bottomInputRevision
     var routePresentationFrozen by bottomInsetState.routePresentationFrozen
-    val translationSession =
+    val translator =
         dev.ipf.whitenoise.android.translation.rememberConversationTranslation(
             appState,
             conversationAccountRef,
@@ -1616,6 +1612,9 @@ internal fun ConversationScreen(
     var pendingDocumentUris by rememberSaveable(conversationAccountRef, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
+    var documentDraftIds by rememberSaveable(conversationAccountRef, chat.id, stateSaver = ComposerDocumentIdsSaver) {
+        mutableStateOf<Map<String, String>>(emptyMap())
+    }
     val importedShareFiles =
         remember(context) {
             dev.ipf.whitenoise.android.share
@@ -1643,7 +1642,7 @@ internal fun ConversationScreen(
         }
         exitConversationRoute()
     }
-
+    ChatsReturnShortcut(available = !freezeRoutePresentation && !transcriptRoutedAway, exit = exitConversation)
     // Read the latest projections without changing every visible row callback when the timeline changes.
     val currentSelectableMessages by rememberUpdatedState(selectableMessages)
 
@@ -1910,15 +1909,7 @@ internal fun ConversationScreen(
     }
     voicePlaybackHosts()
 
-    // Documents take a separate launcher because `OpenMultipleDocuments`
-    // accepts any MIME — the image picker can't surface PDFs, archives, etc.
-    // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
-    // same staging shelf as image picks; one Send dispatches both sides
-    // through one kind:9 album. Non-image bytes pass through without
-    // recompression, while detected images use the same metadata-safe policy
-    // as Photo Picker. The send-quality audio bitrate is intentionally scoped
-    // to recorded voice notes until this client grows a general audio
-    // transcode path.
+    // The document picker admits any MIME to the same send shelf as image picks.
     val documentPickerLauncher =
         rememberOriginGuardedResultLauncher(
             ActivityResultContracts.OpenMultipleDocuments(),
@@ -1926,12 +1917,10 @@ internal fun ConversationScreen(
             attachmentOwnerCurrent,
         ) { uris ->
             if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
-            // Append into the document side of the staging shelf rather than
-            // sending immediately. The preview sheet renders both lists and
-            // a single Send dispatches both decoders into one kind-9 album.
             // Every occurrence counts, a file picked twice included, so nothing leaves the pick unreported.
             val admission =
                 admitComposerAttachments(uris, pendingMediaSlots.size, pendingDocumentUris.size, MEDIA_PICKER_MAX_ITEMS)
+            documentDraftIds = newPickerDocumentIds(documentDraftIds, pendingDocumentUris, admission.accepted)
             pendingDocumentUris = pendingDocumentUris + admission.accepted
             appState.presentAdmission(context, admission)
         }
@@ -2970,7 +2959,7 @@ internal fun ConversationScreen(
             controller = controller,
             chatId = chat.id,
             mediaSlots = pendingMediaSlots,
-            documentUris = pendingDocumentUris,
+            documentShelf = DraftDocumentShelf(pendingDocumentUris, documentDraftIds),
         )
 
     val nativeComposerCleanupRevision =
@@ -2989,12 +2978,14 @@ internal fun ConversationScreen(
         ) {
             val capturedSlots = pendingMediaSlots
             val capturedDocuments = pendingDocumentUris
+            val capturedIds = documentDraftIds
             val capturedAccount = controller.boundAccountRef
-            mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount)
+            mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount, capturedIds)
             val restored =
                 mediaDraftState.restorePersistedAttachments {
                     pendingMediaSlots == capturedSlots &&
                         pendingDocumentUris == capturedDocuments &&
+                        documentDraftIds == capturedIds &&
                         controller.boundAccountRef == capturedAccount
                 } ?: return@LaunchedEffect
             val merged =
@@ -3006,7 +2997,8 @@ internal fun ConversationScreen(
                 )
             pendingMediaSlots = merged.mediaSlots
             pendingDocumentUris = merged.documentUris
-            mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount)
+            documentDraftIds = mediaDraftState.savedDocumentIds(merged.documentUris)
+            mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount, documentDraftIds)
             mediaDraftState.prepareMissingAttachments()
         }
     }
@@ -3174,18 +3166,18 @@ internal fun ConversationScreen(
         keyboardController?.hide()
         showDetails = true
     }
-    // Chat details and the optional header shortcut open the same in-chat search.
-    val openConversationSearch: () -> Unit = {
-        showDetails = false
-        presentationState.searchState.value =
-            conversationSearchPreset(
-                conversationAccountRef,
-                appState.runtimeGeneration,
-                chat.id,
-                controller.title(groupTitleCopy),
-            )
-        navigationState.searchOpen = true
-    }
+    val openConversationSearch =
+        navigationState.searchShortcut(!freezeRoutePresentation && !transcriptRoutedAway && !selectionMode) {
+            showDetails = false
+            presentationState.searchState.value =
+                conversationSearchPreset(
+                    conversationAccountRef,
+                    appState.runtimeGeneration,
+                    chat.id,
+                    controller.title(groupTitleCopy),
+                )
+            navigationState.searchOpen = true
+        }
     val headerShortcuts = appState.headerShortcutPreferences.shortcuts
     // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
     // notification-routed open is still waiting for its account switch.
@@ -3220,23 +3212,6 @@ internal fun ConversationScreen(
             null
         }
     headerMuteControl?.let { MuteDurationHost(it) }
-    var showHeaderTimerPicker by remember(controller) { mutableStateOf(false) }
-    val headerTimerRuntime = remember(controller) { appState.runtimeGeneration }
-    val headerTimerEditable =
-        disappearingTimerEditable(
-            canEdit = controller.canEditGroupSettings,
-            mutationsBlocked =
-                controller.mutationInFlight || !controller.isCurrentGroupMutationOwner(appState, headerTimerRuntime),
-        )
-    DisappearingTimerEditor(
-        open = showHeaderTimerPicker && headerTimerEditable,
-        currentSecs = controller.group.disappearingMessageSecs.toLong(),
-        editable = headerTimerEditable,
-        identity = { GroupActingAccountIdentity(appState, controller.boundAccountRef) },
-        resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
-        onDismiss = { showHeaderTimerPicker = false },
-        onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
-    )
     // The composer and long-message reader share a draft, including while chat settings covers it.
     val draftAccountRef = controller.boundAccountRef
 
@@ -3275,7 +3250,7 @@ internal fun ConversationScreen(
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = draftExternalRevision,
         )
-    // Capture the baseline during composition, before either editor can receive an input event.
+    ObserveAcceptedComposerCaption(appState, controller, draftAccountRef, composerTextState)
     val userTextEditRevisionOnEntry = rememberUserTextEditRevisionOnEntry(controller, composerTextState)
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
@@ -3621,7 +3596,6 @@ internal fun ConversationScreen(
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,
                                         onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
-                                        onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                                         onMembers =
                                             if (controller.isDm) {
                                                 null
@@ -3642,7 +3616,6 @@ internal fun ConversationScreen(
                                             },
                                     )
                                 },
-                                onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                             )
                         }
                     },
@@ -3650,7 +3623,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }, translator) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             settingsMotion.launchFromComposer(
@@ -4004,7 +3977,7 @@ internal fun ConversationScreen(
         ) { padding ->
             val reactionArtwork = remember(appState, controller) { conversationReactionArtwork(appState, controller) }
             CompositionLocalProvider(
-                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
+                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translator,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,

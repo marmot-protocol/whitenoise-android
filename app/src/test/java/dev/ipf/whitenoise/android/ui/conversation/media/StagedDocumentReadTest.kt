@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.state.DraftStoredFile
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
@@ -33,6 +34,7 @@ class StagedDocumentReadTest {
         assertEquals(0, root.listFiles()!!.size)
     }
 
+    /** Diagnostics name no document, bytes, private path or stored draft id, only sizes and where content lives. */
     @Test
     fun diagnosticsOmitDocumentNamesPlaintextAndPrivatePaths() {
         val root = temporary.newFolder("private-document")
@@ -40,10 +42,18 @@ class StagedDocumentReadTest {
         val source = (result as StagedDocumentRead.Success).source
         val staged = PendingAttachment(byteArrayOf(), "text/plain", "confidential.txt", sourceFile = source)
         val memory = PendingAttachment(byteArrayOf(42, 99), "text/plain", "confidential.txt")
+        val stored =
+            PendingAttachment(
+                plaintextBytes = byteArrayOf(),
+                mediaType = "text/plain",
+                fileName = "confidential.txt",
+                draftFile = DraftStoredFile("confidential-draft-id", 2L),
+            )
         try {
             assertEquals("StagedUploadSource(byteCount=2)", source.toString())
-            assertEquals("PendingAttachment(byteCount=2, fileBacked=true)", staged.toString())
-            assertEquals("PendingAttachment(byteCount=2, fileBacked=false)", memory.toString())
+            assertEquals("PendingAttachment(byteCount=2, fileBacked=true, stored=false)", staged.toString())
+            assertEquals("PendingAttachment(byteCount=2, fileBacked=false, stored=false)", memory.toString())
+            assertEquals("PendingAttachment(byteCount=2, fileBacked=false, stored=true)", stored.toString())
         } finally {
             source.close()
         }

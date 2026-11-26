@@ -1,26 +1,40 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.whitenoise.android.appModuleSource
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Header shortcuts and the header timer reuse the chat details owners instead of copying their commands. */
+/**
+ * Header shortcuts reuse the chat details owners instead of copying their commands; timer editing stays in Chat Info.
+ */
 class ConversationHeaderShortcutCoverageTest {
     private val conversation = appModuleSource("$UI/conversation/ConversationScreen.kt")
+    private val topBar = appModuleSource("$UI/conversation/ConversationTopBar.kt")
+    private val headerShortcuts = appModuleSource("$UI/conversation/ConversationHeaderShortcuts.kt")
     private val details = appModuleSource("$UI/group/GroupDetailsScreen.kt")
     private val overview = appModuleSource("$UI/group/ChatInfoOverview.kt")
 
-    /** Header and details mount the same mute control, duration host and timer editor. */
+    /** Header and details mount the same mute control and duration host; only Chat Info hosts the timer editor. */
     @Test
-    fun headerAndDetailsShareMuteAndTimerOwners() {
+    fun headerAndDetailsShareMuteOwnerAndTimerLivesInChatInfo() {
         for (source in listOf(conversation, details)) {
             assertContains(source, "rememberConversationMuteControl(appState, controller)")
             assertContains(source, "MuteDurationHost(")
-            assertContains(source, "DisappearingTimerEditor(")
-            assertContains(source, "disappearingTimerEditable(")
         }
         assertContains(details, "muteControl = muteControl")
         assertContains(overview, "onClick = muteControl::toggle")
+        assertContains(details, "DisappearingTimerEditor(")
+        assertContains(details, "disappearingTimerEditable(")
+        assertContains(details, "controller.updateMessageRetention(")
+        assertNotContains(conversation, "DisappearingTimerEditor(")
+        assertNotContains(conversation, "disappearingTimerEditable(")
+        assertNotContains(conversation, "updateMessageRetention(")
+        assertNotContains(conversation, "onTimer =")
+        assertNotContains(conversation, "onTimerClick =")
+        assertNotContains(topBar, "onTimerClick")
+        assertNotContains(headerShortcuts, "onTimer")
+        assertNotContains(headerShortcuts, "DisappearingTimer")
     }
 
     /** The header search button and the details search row open search through one handler. */
@@ -31,17 +45,13 @@ class ConversationHeaderShortcutCoverageTest {
     }
 
     /**
-     * The timer shortcut opens the same picker as the timer badge, and Members/Add members open the details
-     * pages through the auto-open routes the empty-group prompt already uses.
+     * Members and Add members open the details pages through the auto-open routes the empty-group prompt already uses.
      */
     @Test
     fun groupShortcutsReuseTheDetailsRoutes() {
-        val openPicker = "if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null"
-        assertContains(conversation, "onTimer = $openPicker")
-        assertContains(conversation, "onTimerClick = $openPicker")
         assertContains(conversation, "autoOpenMembers = openMembersOnDetails")
         assertContains(conversation, "autoOpenAddMember = openAddMemberOnDetails")
-        val addMembers = conversation.substringAfter("onAddMembers =").substringBefore("onTimerClick")
+        val addMembers = conversation.substringAfter("onAddMembers =").substringBefore("playbackTransport =")
         assertContains(addMembers, "openAddMemberOnDetails = true")
         assertContains(addMembers, "openDetailsFromHeader()")
         assertContains(details, "LaunchedEffect(autoOpenMembers)")
@@ -76,6 +86,12 @@ class ConversationHeaderShortcutCoverageTest {
         source: String,
         expected: String,
     ) = assertTrue("Missing `$expected`", source.contains(expected))
+
+    /** Fails when a removed header timer hook reappears in the conversation screen. */
+    private fun assertNotContains(
+        source: String,
+        forbidden: String,
+    ) = assertFalse("Unexpected `$forbidden`", source.contains(forbidden))
 
     private companion object {
         const val UI = "src/main/java/dev/ipf/whitenoise/android/ui"

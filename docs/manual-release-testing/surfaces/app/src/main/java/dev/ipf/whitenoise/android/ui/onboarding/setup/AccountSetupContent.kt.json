@@ -506,6 +506,14 @@
         ]
       },
       {
+        "surface": "General setup publication failure is explained once",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_problem_publication_failed",
+        "test_ids": [
+          "ONB-030"
+        ]
+      },
+      {
         "surface": "Setup failure callout",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": ".testTag(\"setup-failure\")",

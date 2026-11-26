@@ -32,6 +32,52 @@
           "NCH-003",
           "GRP-005"
         ]
+      },
+      {
+        "surface": "string:recipient_search_empty_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.recipient_search_empty_hint",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:user_search_searching",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_searching",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:user_search_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_failed",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:user_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_incomplete",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "string:no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
       }
     ],
     "source_coverage": [

@@ -14,6 +14,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComposerTranslationStateTest {
+    @Test
+    fun suggestionStaysFixedUntilToggleAndExplicitChoiceIsSaved() =
+        runTest {
+            var candidate = "fr"
+            val saved = mutableListOf<String>()
+            val state =
+                ComposerTranslationState(
+                    scope = backgroundScope,
+                    engine = { error("Opening an empty draft does not call the engine") },
+                    ownerCurrent = { true },
+                    initialTarget = null,
+                    onTargetSaved = { saved += it },
+                    suggestedTarget = { candidate },
+                )
+            state.toggle()
+            assertEquals("fr", state.target)
+            assertTrue(saved.isEmpty())
+            candidate = "es"
+            assertEquals("fr", state.target)
+            state.toggle()
+            state.toggle()
+            assertEquals("es", state.target)
+            state.selectTarget("es")
+            candidate = "de"
+            state.toggle()
+            state.toggle()
+            assertEquals(listOf("es"), saved)
+            assertEquals("es", state.target)
+        }
+
     @Test fun consentCannotApproveAReplacementOrRetiredOwner() =
         runTest {
             var current = true

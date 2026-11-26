@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
 import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingFindingContextFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.whitenoise.android.R
 
 /** Names the native observation's source without inferring current relay health. */
@@ -34,3 +36,10 @@ internal fun setupFindingOutcomeTitle(value: OnboardingCheckOutcomeFfi): Int =
         OnboardingCheckOutcomeFfi.SUCCESS -> R.string.setup_finding_outcome_success
         OnboardingCheckOutcomeFfi.FAILURE -> R.string.setup_finding_outcome_failure
     }
+
+/** Native reuses RecordChanged when it rejects the declaration before publishing. */
+internal val OnboardingFindingFfi.isRepairDeclarationRefusal: Boolean
+    get() =
+        context == OnboardingFindingContextFfi.REPAIR_APPROVAL &&
+            purpose == OnboardingCheckPurposeFfi.DECLARATION_VALIDATION &&
+            issue == OnboardingIssueFfi.RECORD_CHANGED

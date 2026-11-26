@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -58,8 +57,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -68,10 +65,12 @@ import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private val EditorContentInset = 12.dp
 
@@ -309,7 +308,10 @@ private fun ComposerVoicePlacementRow(
                 overflow = TextOverflow.Ellipsis,
             )
             if (enabled) {
-                Row(Modifier.selectableGroup()) {
+                Row(
+                    Modifier.selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                ) {
                     ComposerVoicePlacement.entries.forEach { placement ->
                         ComposerVoicePlacementChoice(placement, current == placement, state, saving)
                     }
@@ -325,6 +327,7 @@ private fun ComposerVoicePlacementRow(
     }
 }
 
+/** One single-choice chip for where the voice note button sits: on send, left or right. */
 @Composable
 private fun ComposerVoicePlacementChoice(
     placement: ComposerVoicePlacement,
@@ -332,29 +335,15 @@ private fun ComposerVoicePlacementChoice(
     state: ComposerToolbarEditState,
     saving: Boolean,
 ) {
-    TextButton(
+    WhiteNoiseFilterChip(
+        selected = chosen,
         onClick = { state.change(state.draft.withVoicePlacement(placement)) },
+        label = { Text(stringResource(placement.labelRes), maxLines = 1, softWrap = false) },
         enabled = !saving,
-        contentPadding = ComposerChoicePadding,
-        modifier =
-            Modifier
-                .testTag("composer.customize.voice.${placement.name.lowercase()}")
-                .semantics {
-                    role = Role.RadioButton
-                    selected = chosen
-                },
-    ) {
-        Text(
-            stringResource(placement.labelRes),
-            maxLines = 1,
-            softWrap = false,
-            fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
-            textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
-        )
-    }
+        modifier = Modifier.testTag("composer.customize.voice.${placement.name.lowercase()}"),
+        role = Role.RadioButton,
+    )
 }
-
-private val ComposerChoicePadding = PaddingValues(horizontal = 8.dp)
 
 private val ComposerVoicePlacement.labelRes: Int
     get() =
@@ -371,33 +360,31 @@ private fun ComposerShortcutSideChoices(
     state: ComposerToolbarEditState,
     saving: Boolean,
 ) {
-    ComposerShortcutSide.entries.forEach { side ->
-        val onThisSide = state.draft.side(shortcut) == side
-        TextButton(
-            onClick = { state.change(state.draft.withSide(shortcut, side)) },
-            enabled = !saving,
-            modifier =
-                Modifier.semantics {
-                    role = Role.RadioButton
-                    this.selected = onThisSide
+    Row(horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+        ComposerShortcutSide.entries.forEach { side ->
+            val onThisSide = state.draft.side(shortcut) == side
+            WhiteNoiseFilterChip(
+                selected = onThisSide,
+                onClick = { state.change(state.draft.withSide(shortcut, side)) },
+                label = {
+                    Text(
+                        stringResource(
+                            if (side == ComposerShortcutSide.Left) {
+                                R.string.composer_side_left
+                            } else {
+                                R.string.composer_side_right
+                            },
+                        ),
+                    )
                 },
-        ) {
-            val label =
-                if (side == ComposerShortcutSide.Left) {
-                    R.string.composer_side_left
-                } else {
-                    R.string.composer_side_right
-                }
-            Text(
-                stringResource(label),
-                fontWeight = if (onThisSide) FontWeight.Bold else FontWeight.Normal,
-                textDecoration = if (onThisSide) TextDecoration.Underline else TextDecoration.None,
+                enabled = !saving,
+                role = Role.RadioButton,
             )
         }
     }
 }
 
-/** Shows the draft layout choice with a visible radio indicator. */
+/** Shows the draft layout choice as single-select chips. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposerToolbarLayoutChoices(
@@ -405,35 +392,28 @@ private fun ComposerToolbarLayoutChoices(
     saving: Boolean,
 ) {
     Text(stringResource(R.string.composer_layout), style = MaterialTheme.typography.titleSmall)
-    FlowRow(Modifier.selectableGroup()) {
+    FlowRow(
+        Modifier.selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
         ComposerToolbarLayout.entries.forEach { layout ->
-            TextButton(
+            WhiteNoiseFilterChip(
+                selected = state.draft.layout == layout,
                 onClick = { state.change(state.draft.copy(layout = layout)) },
+                label = {
+                    Text(
+                        stringResource(
+                            if (layout == ComposerToolbarLayout.Automatic) {
+                                R.string.composer_layout_automatic
+                            } else {
+                                R.string.composer_layout_expanded
+                            },
+                        ),
+                    )
+                },
                 enabled = !saving,
-                modifier =
-                    Modifier.semantics {
-                        role = Role.RadioButton
-                        selected = state.draft.layout == layout
-                    },
-            ) {
-                RadioButton(
-                    selected = state.draft.layout == layout,
-                    onClick = null,
-                    enabled = !saving,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-                Text(
-                    stringResource(
-                        if (layout ==
-                            ComposerToolbarLayout.Automatic
-                        ) {
-                            R.string.composer_layout_automatic
-                        } else {
-                            R.string.composer_layout_expanded
-                        },
-                    ),
-                )
-            }
+                role = Role.RadioButton,
+            )
         }
     }
 }

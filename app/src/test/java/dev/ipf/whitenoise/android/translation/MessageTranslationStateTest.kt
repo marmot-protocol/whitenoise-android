@@ -9,11 +9,56 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageTranslationStateTest {
     private val source = TranslationSource("message", "original", "de")
+
+    @Test
+    fun replyUsesItsLanguageAndChatOnlyUsesRecentUnambiguousIncomingResults() =
+        runTest {
+            var current = true
+            val identified = mutableListOf<String>()
+            val session =
+                session(backgroundScope, { current }, detectIncoming = {
+                    identified += it
+                    it
+                }) { "English rendition" }
+            val now = 100_000uL
+            val recent = source.copy(messageId = "recent", text = "fr", target = "en", incomingRecordedAt = now)
+            val old = recent.copy(messageId = "old", text = "de", incomingRecordedAt = 1uL)
+            val mine = recent.copy(messageId = "mine", text = "it", incomingRecordedAt = null)
+            listOf(recent, old, mine).forEach { session.request(it) }
+            runCurrent()
+            assertEquals(setOf("fr", "de"), identified.toSet())
+            assertEquals("English rendition", session.renditions[recent]?.text)
+            assertEquals("fr", session.suggestedTarget(null, now))
+            assertEquals("de", session.suggestedTarget(old.messageId, now))
+
+            val mixed = recent.copy(messageId = "mixed", text = "es")
+            session.request(mixed)
+            runCurrent()
+            assertNull(session.suggestedTarget(null, now))
+            assertEquals("fr", session.suggestedTarget(recent.messageId, now))
+
+            session.remove(mixed)
+            val unsupported = recent.copy(messageId = "unsupported", text = "af")
+            session.request(unsupported)
+            runCurrent()
+            assertEquals("fr", session.suggestedTarget(unsupported.messageId, now))
+            assertNull(session.suggestedTarget(null, now))
+
+            session.replyLanguage.select(old.messageId)
+            session.remove(old)
+            assertEquals("de", session.suggestedTarget(old.messageId, now))
+            session.replyLanguage.sourceChanged(old.messageId, old.copy(revision = "edit"))
+            session.remove(unsupported)
+            assertEquals("fr", session.suggestedTarget(old.messageId, now))
+            current = false
+            assertNull(session.suggestedTarget(old.messageId, now))
+        }
 
     @Test
     fun duplicateCompositionDoesNotCreateDuplicateRequest() =
@@ -276,6 +321,7 @@ class MessageTranslationStateTest {
     private fun session(
         scope: CoroutineScope,
         current: () -> Boolean = { true },
+        detectIncoming: suspend (String) -> String? = { null },
         translate: suspend () -> String,
     ): ConversationTranslationSession =
         ConversationTranslationSession(scope, {
@@ -289,5 +335,5 @@ class MessageTranslationStateTest {
                     target: String,
                 ): String = translate()
             }
-        }, current)
+        }, current, detectIncoming)
 }

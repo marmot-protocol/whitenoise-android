@@ -49,11 +49,12 @@ import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.exportActiveAccountNsec
 import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
+import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
-import dev.ipf.whitenoise.android.ui.common.copyToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
@@ -74,7 +75,6 @@ internal enum class KeyExportDestination { File, Preview, Share }
 
 /** Timing and geometry the prototype fixes for Profile Keys. */
 private object ProfileKeysDefaults {
-    const val COPIED_MILLIS = 2_000L
     const val MASK = "••••••••••••••••••••••••••••••••"
     const val FILE_STEM_LENGTH = 16
     val ValueRowMinHeight = 64.dp
@@ -301,6 +301,7 @@ internal fun AccountKeysScreen(
     }
 
     ProfileKeysEffects(ui, lifecycle, rawAuthentication::cancel)
+    val copier = rememberClipboardCopier()
     LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
         if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
             ui.stopSensitiveOperations()
@@ -331,7 +332,7 @@ internal fun AccountKeysScreen(
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
-                if (copyToClipboard(context, publicKeyLabel, npub)) ui.copiedKey = CopiedProfileKey.Public
+                if (copier.copy(npub, publicKeyLabel)) ui.copiedKey = CopiedProfileKey.Public
             },
             onToggleReveal = {
                 if (ui.revealRequested) {
@@ -437,7 +438,7 @@ private fun ProfileKeysEffects(
     }
     LaunchedEffect(ui.copiedKey) {
         if (ui.copiedKey != null) {
-            delay(ProfileKeysDefaults.COPIED_MILLIS)
+            delay(COPIED_FEEDBACK_MILLIS)
             ui.copiedKey = null
         }
     }

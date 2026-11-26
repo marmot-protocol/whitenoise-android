@@ -168,9 +168,9 @@
         ]
       },
       {
-        "surface": "R.string.translation_composer_dictation_off",
+        "surface": "Dictation pauses the outgoing translation preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.translation_composer_dictation_off",
+        "anchor": "ComposerTranslationSync(it, text, dictationInComposer)",
         "test_ids": [
           "CON-045"
         ]
