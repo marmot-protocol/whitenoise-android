@@ -5126,7 +5126,7 @@ class WhiteNoiseAppState private constructor(
         }
         notificationDelivery.localNotificationSettings = settings
         // The native SQLite transaction committed false plus durable registration removals before returning.
-        withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
+        notificationDelivery.settleFcmAutoInitAfterSignOutNativeDisable(account)
         val result =
             runCatching {
                 withContext(marmotIoDispatcher) { runtime.marmot.signOut(account, deleteKeyPackages) }
@@ -5189,7 +5189,7 @@ class WhiteNoiseAppState private constructor(
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
         wipeDecryptedMediaFromDisk()
-        if (next == null && refreshed.isEmpty()) runCatching { pushTokenStore.clear() }
+        notificationDelivery.settleFcmAfterSignOut(next, refreshed)
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return OwnedSignOutCompletion(
@@ -5267,7 +5267,8 @@ class WhiteNoiseAppState private constructor(
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
-                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+                    notificationDelivery
+                        .wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
@@ -5276,11 +5277,8 @@ class WhiteNoiseAppState private constructor(
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
-                                val survivingSigner =
-                                    accounts.any { it.label != wipedRef && it.isSignedInSigningAccount() }
-                                if (retireSession && !survivingSigner) {
-                                    runCatching { pushTokenStore.clear() }
-                                }
+                                val lastSigner = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() }
+                                if (retireSession && lastSigner) notificationDelivery.forgetFcmTokenAfterLastAccount()
                             }
                         }
                 }

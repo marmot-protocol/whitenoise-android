@@ -12,7 +12,9 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
+import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
@@ -67,8 +69,14 @@ internal abstract class ExternalSignerSignOutFixture {
         )
     protected var engineWiped = false
     protected var additionalAccounts: List<AccountSummaryFfi> = emptyList()
+
+    /** Native-push flags of [additionalAccounts] by label, off when absent. */
+    protected val additionalNativePush = mutableMapOf<String, Boolean>()
     protected var beforeListAccounts: () -> Unit = {}
     protected var beforeSignOutReply: () -> Unit = {}
+
+    /** Runs after the native wipe has committed, before its reply returns to the caller. */
+    protected var beforeWipeReply: () -> Unit = {}
 
     // Both setup reads are synchronous bindings, so a scenario holds them on their IO thread instead of suspending.
     protected var setupRecoveryReply: (() -> Boolean)? = null
@@ -124,6 +132,16 @@ internal abstract class ExternalSignerSignOutFixture {
                         NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
                     }
                 }
+                // Each account's native flag, for reads such as Firebase auto-init demand.
+                "notificationSettings" -> {
+                    val requested = arguments?.get(0) as String
+                    if (requested == accountRef) {
+                        NotificationSettingsFfi(accountRef, accountHex, true, nativePushEnabled)
+                    } else {
+                        val hex = additionalAccounts.firstOrNull { it.label == requested }?.accountIdHex.orEmpty()
+                        NotificationSettingsFfi(requested, hex, true, additionalNativePush[requested] ?: false)
+                    }
+                }
                 "signOut" -> {
                     signOutCalls.incrementAndGet()
                     nativeCallOrder += "signOut"
@@ -136,15 +154,19 @@ internal abstract class ExternalSignerSignOutFixture {
                 }
                 "signOutAndWipe" -> {
                     wipeCalls.incrementAndGet()
-                    wipeOutcome.also { engineWiped = it.localCleanup.completed }
+                    wipeOutcome.also {
+                        engineWiped = it.localCleanup.completed
+                        beforeWipeReply()
+                    }
                 }
                 "listAccounts" -> {
                     beforeListAccounts()
                     listAccountsCalls.incrementAndGet()
                     // The account list is a synchronous binding: a failure is thrown, not resumed.
                     listAccountsFailure?.let { throw it }
+                    // A wipe removes only this fixture's account, so other signers stay listed.
                     if (engineWiped) {
-                        emptyList()
+                        additionalAccounts
                     } else {
                         listOf(externalSignerAccount(signedOut = engineSignedOut)) + additionalAccounts
                     }
@@ -223,13 +245,20 @@ internal abstract class ExternalSignerSignOutFixture {
 
     /**
      * Installs the scripted native runtime into a real app state using the supplied preference-failure context
-     * and, when given, a scripted push token store in place of the Keystore-backed default.
+     * and, when given, a scripted push token store in place of the Keystore-backed default, a recording
+     * push platform in place of the Android one, and native-push capability and token seams.
      */
     protected fun appState(
         ownerContext: Context = context,
         pushTokenStore: PushTokenStore? = null,
         marmotIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
+        nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(ownerContext),
+        pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+        fcmTokenReader: (suspend () -> String?)? = null,
+        nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
+            nativePushCapabilityForContext(ownerContext.applicationContext, it)
+        },
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -240,6 +269,10 @@ internal abstract class ExternalSignerSignOutFixture {
             pushTokenStore = pushTokenStore,
             marmotIoDispatcher = marmotIoDispatcher,
             profileReader = profileReader,
+            nativePushFallbackPlatform = nativePushFallbackPlatform,
+            pushServerConfigProvider = pushServerConfigProvider,
+            fcmTokenReader = fcmTokenReader,
+            nativePushCapabilityResolver = nativePushCapabilityResolver,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")

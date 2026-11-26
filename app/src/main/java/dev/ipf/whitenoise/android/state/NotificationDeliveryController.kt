@@ -26,7 +26,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 internal const val FCM_REGISTRATION_BATCH_SIZE = 3
 
@@ -73,6 +76,8 @@ internal interface NotificationDeliveryHost {
     )
 }
 
+private const val DEFERRED_REGISTRATION_DRAIN_TIMEOUT_MS = 15_000L
+
 /**
  * Owns local notification settings, the notification delivery mode (rendering, foreground
  * connection, native push), native push registration sync and the native-push fallback runtime.
@@ -95,6 +100,35 @@ internal class NotificationDeliveryController(
 ) {
     internal val nativePushSyncMutex = Mutex()
     internal val pushTokenRotationSequence = AtomicLong()
+
+    // The token of the latest onNewToken callback, published before its sequence increment so a token
+    // read that sees the new sequence also sees which token caused it.
+    internal val lastRotatedFcmToken = AtomicReference<String?>()
+
+    // Native-push enables that can still roll back: a Push selection before its cutover commits, or a
+    // per-account enable before it is confirmed. While any is open a sync leaves Firebase auto-init alone,
+    // since turning it on starts an SDK token sync that no later off write cancels. Each sets it on commit.
+    internal val uncommittedNativePushEnables = AtomicInteger()
+
+    // Open device-wide delivery-mode changes, a reconciliation's handed-off cutover included. Each opens and
+    // ends under the native sync lock. While any is open, a sync or per-account enable leaves Firebase auto-init
+    // alone, since the change may still disable native push, and the last one to end drains the retry.
+    internal val activeDeliveryModeTransactions = AtomicInteger()
+
+    // Held only while a delivery-mode change opens and while an on write checks it is still admitted and calls
+    // the SDK setter, never across native work, so a newer choice still supersedes an older change at once.
+    internal val fcmAutoInitAdmission = Any()
+
+    // How long the last change's deferred registration retry may hold the native sync lock, such as on a stalled
+    // Firebase token task, before it gives up and leaves its durable marker for the next sync.
+    internal var deferredRegistrationDrainTimeoutMs = DEFERRED_REGISTRATION_DRAIN_TIMEOUT_MS
+
+    // Whether the latest Firebase auto-init write failed. A failed write records the pending registration
+    // sync, and no sync acknowledges it until a later write succeeds, so the next sync retries the write.
+    internal val fcmAutoInitWriteFailed = AtomicBoolean()
+
+    // Whether the latest failed Firebase auto-init write also failed to store its durable retry marker.
+    internal val fcmAutoInitRetryUnstored = AtomicBoolean()
     internal val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     internal val notificationDeliveryModeMutex = Mutex()
     internal val notificationDeliveryModeIntent = StalenessGuard()
@@ -213,7 +247,7 @@ internal class NotificationDeliveryController(
         val settings = localNotificationSettings
         if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
         if (settings == null) return syncNativePushRegistrationIfEnabled()
-        val intentGeneration = notificationDeliveryModeIntent.advance()
+        val intentGeneration = beginDeliveryModeTransaction()
         var handedOff = false
         return try {
             notificationDeliveryModeMutex.withLock {
@@ -232,7 +266,13 @@ internal class NotificationDeliveryController(
                 true
             }
         } finally {
-            if (!handedOff) finishNotificationDeliveryModeTransaction(intentGeneration)
+            if (!handedOff) {
+                try {
+                    finishNotificationDeliveryModeTransaction(intentGeneration)
+                } finally {
+                    endDeliveryModeTransaction()
+                }
+            }
         }
     }
 
@@ -328,6 +368,7 @@ internal class NotificationDeliveryController(
      */
     fun onPushTokenRotated(token: String): Job? {
         if (token.isBlank()) return null
+        lastRotatedFcmToken.set(token)
         val rotation = pushTokenRotationSequence.incrementAndGet()
         val runtime = marmotRuntime
         val generation = runtimeGeneration
@@ -422,7 +463,7 @@ internal class NotificationDeliveryController(
                 ) {
                     return@withLock false
                 }
-                setNativePushEnabledLocked(requested, enabled)
+                setNativePushEnabledSettlingAutoInit(requested, enabled)
             }
         }
     }
