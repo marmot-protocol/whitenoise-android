@@ -156,7 +156,11 @@ internal fun ChatInfoQuickActions(
 }
 
 @Composable
-private fun quickActionWidth(availableWidth: Dp, gap: Dp, actions: Int): Dp =
+private fun quickActionWidth(
+    availableWidth: Dp,
+    gap: Dp,
+    actions: Int,
+): Dp =
     with(LocalDensity.current) {
         val captionSize = MaterialTheme.typography.labelLarge.fontSize
         val captionScale = captionSize.toDp().value / Typography.labelLarge.fontSize.value
