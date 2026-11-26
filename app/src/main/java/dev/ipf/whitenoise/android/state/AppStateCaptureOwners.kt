@@ -125,17 +125,17 @@ internal fun WhiteNoiseAppState.checkCaptureEvictionOnRuntimeEvent(
                 }
             else -> null
         } ?: return
-    scope.launch { reconcileCaptureEviction(key, runtime) }
+    scope.launch(Dispatchers.Main.immediate) { reconcileCaptureEviction(key, runtime) }
 }
 
-/** Confirms current native membership before a runtime event can drop capture or a draft. */
+/** On the capture owner's dispatcher, confirms native membership before revoking capture or purging its draft. */
 internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
     key: VoiceNoteKey,
     runtime: MarmotInterface,
-): Unit = withContext(Dispatchers.Main.immediate) {
+) {
     val (account, group) = key
-    if (marmotOrNull() !== runtime) return@withContext
-    if (!voiceNotes.hasCaptureOrDraft(key) && !conversationDictation.isOwnedBy(account, group)) return@withContext
+    if (marmotOrNull() !== runtime) return
+    if (!voiceNotes.hasCaptureOrDraft(key) && !conversationDictation.isOwnedBy(account, group)) return
 
     val epoch = runtimeGeneration
     val membership =

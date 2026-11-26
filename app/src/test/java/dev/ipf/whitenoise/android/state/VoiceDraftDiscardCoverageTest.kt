@@ -45,6 +45,7 @@ class VoiceDraftDiscardCoverageTest {
         val events = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt")
         assertTrue("checkCaptureEvictionOnRuntimeEvent(event, marmot, scope = this)" in events)
         val capture = source("state/AppStateCaptureOwners.kt", "checkCaptureEvictionOnRuntimeEvent")
+        assertTrue("scope.launch(Dispatchers.Main.immediate)" in capture)
         assertTrue("reconcileCaptureEviction(key, runtime)" in capture)
     }
 
