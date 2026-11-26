@@ -119,11 +119,12 @@ internal fun ConversationMediaSender.startCollectionSend(
                 }
             // Record the handoff inside I/O so cancellation during return cannot delete a journal-owned source.
             withContext(Dispatchers.IO) {
-                started = registry.start(operation, admission) {
-                    val active = appState.activeAccountRef
-                    val epoch = appState.mediaUploadSessionEpoch()
-                    shouldAcceptMediaUploadForAccount(account, sessionEpoch, active, epoch)
-                }
+                started =
+                    registry.start(operation, admission) {
+                        val active = appState.activeAccountRef
+                        val epoch = appState.mediaUploadSessionEpoch()
+                        shouldAcceptMediaUploadForAccount(account, sessionEpoch, active, epoch)
+                    }
             }
             if (!started) return@launchMutation appState.present(R.string.share_import_storage)
             completion.accept()

@@ -202,7 +202,8 @@ internal class CollectionAdmissionFence(
         operation: AttachmentCollectionOperation,
     ): Boolean =
         synchronized(lock) {
-            admission.accountRef == operation.accountRef && admission.groupIdHex == operation.groupIdHex &&
+            admission.accountRef == operation.accountRef &&
+                admission.groupIdHex == operation.groupIdHex &&
                 preparing.remove(admission)
         }
 

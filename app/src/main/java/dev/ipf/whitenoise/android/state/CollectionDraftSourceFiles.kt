@@ -45,6 +45,7 @@ internal class CollectionDraftSourceFiles(
     /** Enumerates only the files owned by collection operations, including partial copies. */
     private fun sources(): List<Pair<File, String>> =
         root.listFiles().orEmpty().mapNotNull { file ->
-            sourceName.matchEntire(file.name)?.groupValues?.get(1)?.let { file to it }
+            val match = sourceName.matchEntire(file.name)
+            match?.groupValues?.get(1)?.let { file to it }
         }
 }

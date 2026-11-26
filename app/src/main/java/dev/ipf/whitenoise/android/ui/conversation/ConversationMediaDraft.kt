@@ -176,9 +176,10 @@ internal class ConversationMediaDraftState(
         currentSlots = slots
         currentDocumentUris = documentUris
         if (documentIds != currentDocumentIds) {
-            preparedDocuments = preparedDocuments.filter { (uri, prepared) ->
-                documentIds[uri.toString()]?.let { id -> id == prepared.attachment.id } != false
-            }
+            preparedDocuments =
+                preparedDocuments.filter { (uri, prepared) ->
+                    documentIds[uri.toString()]?.let { id -> id == prepared.attachment.id } != false
+                }
         }
         currentDocumentIds = documentIds
         currentAccountRef = accountRef
@@ -547,10 +548,11 @@ internal class ConversationMediaDraftState(
 
     /** Preserves native identity for shelf entries relinked to a presentation file during restoration. */
     fun savedDocumentIds(uris: List<Uri>): Map<String, String> =
-        uris.mapNotNull { uri ->
-            val id = currentDocumentIds[uri.toString()] ?: preparedDocuments[uri]?.attachment?.id
-            id?.let { uri.toString() to it }
-        }.toMap()
+        uris
+            .mapNotNull { uri ->
+                val id = currentDocumentIds[uri.toString()] ?: preparedDocuments[uri]?.attachment?.id
+                id?.let { uri.toString() to it }
+            }.toMap()
 
     /** Resolves the selected document's identity for both staging and explicit removal. */
     private fun documentAttachmentId(

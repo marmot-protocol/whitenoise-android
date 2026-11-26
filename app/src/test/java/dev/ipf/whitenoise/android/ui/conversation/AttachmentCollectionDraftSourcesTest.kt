@@ -40,15 +40,16 @@ class AttachmentCollectionDraftSourcesTest {
             originals.zip(bodies).forEach { (file, bytes) -> file.writeBytes(bytes) }
             val shelf = originals.map(Uri::fromFile)
             val prepared =
-                shelf.mapIndexed { index, uri ->
-                    uri to
-                        PendingAttachment(
-                            byteArrayOf(),
-                            "application/zip",
-                            originals[index].name,
-                            draftFile = DraftStoredFile("document-$index", bodies[index].size.toLong()),
-                        )
-                }.toMap()
+                shelf
+                    .mapIndexed { index, uri ->
+                        uri to
+                            PendingAttachment(
+                                byteArrayOf(),
+                                "application/zip",
+                                originals[index].name,
+                                draftFile = DraftStoredFile("document-$index", bodies[index].size.toLong()),
+                            )
+                    }.toMap()
             val request = CollectionSendRequest(emptyList(), shelf, null, preparedDocuments = prepared)
             val now = System.currentTimeMillis()
             val plan = planCollectionOperation(context, "account", "group", request, now)
@@ -56,12 +57,13 @@ class AttachmentCollectionDraftSourcesTest {
             val journal = AttachmentCollectionJournal(context.noBackupFilesDir, draftSources = sources)
             val copied = mutableListOf<File>()
             try {
-                val owned = ownCollectionDraftSources(context, plan, request) { pending, target ->
-                    val index = checkNotNull(pending.draftFile).attachmentId.substringAfterLast('-').toInt()
-                    target.writeBytes(bodies[index])
-                    copied += target
-                    true
-                }
+                val owned =
+                    ownCollectionDraftSources(context, plan, request) { pending, target ->
+                        val index = checkNotNull(pending.draftFile).attachmentId.substringAfterLast('-').toInt()
+                        target.writeBytes(bodies[index])
+                        copied += target
+                        true
+                    }
                 assertTrue(journal.write(owned))
                 assertEquals(2, owned.chunks.size)
                 assertTrue(composer.deleteRecursively())
