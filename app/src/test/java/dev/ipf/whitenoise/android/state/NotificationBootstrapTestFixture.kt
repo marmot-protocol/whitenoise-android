@@ -143,6 +143,8 @@ internal class NotificationBootstrapTestFixture(
     private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
     private val onUsageDiagnosticsRead: (() -> Unit)? = null,
     private val onCreateIdentity: (() -> AccountSummaryFfi)? = null,
+    private val onRuntimeStart: (() -> Unit)? = null,
+    private val onListAccountsAfterStart: (() -> Unit)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     // Separate activation's presented-row boundary from concurrent raw unread folds.
@@ -339,6 +341,7 @@ internal class NotificationBootstrapTestFixture(
                 "start" -> {
                     runtimeStartCalls.incrementAndGet()
                     runtimeStartGate.await()
+                    onRuntimeStart?.invoke()
                     runtimeStarted.set(true)
                     Unit
                 }
@@ -524,7 +527,10 @@ internal class NotificationBootstrapTestFixture(
                     "npub1coldidentityfallback"
                 }
                 "createIdentity" -> checkNotNull(onCreateIdentity) { "Unexpected identity creation" }.invoke()
-                "listAccounts" -> accounts.toList()
+                "listAccounts" -> {
+                    if (runtimeStarted.get()) onListAccountsAfterStart?.invoke()
+                    accounts.toList()
+                }
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"

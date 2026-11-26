@@ -5,17 +5,23 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Exercises the remembered account's chat-list read that runs beside native startup. */
 @RunWith(RobolectricTestRunner::class)
@@ -95,6 +101,81 @@ class StartupChatListPrefetchTest {
             }
         }
 
+    /** Retrying after native startup succeeds reads the current rows instead of reusing the failed attempt. */
+    @Test
+    fun retryAfterAccountRefreshFailureReadsRowsAgain() =
+        runBlocking {
+            val reads = Collections.synchronizedList(mutableListOf<String>())
+            val firstRead = CompletableDeferred<Unit>()
+            val failRefresh = AtomicBoolean(true)
+            val fixture =
+                fixture(
+                    blockStart = true,
+                    onListAccountsAfterStart = {
+                        if (failRefresh.getAndSet(false)) error("synthetic account refresh failure")
+                    },
+                ) { accountRef ->
+                    reads += accountRef
+                    firstRead.complete(Unit)
+                }
+            try {
+                val bootstrap = async { fixture.bootstrap() }
+                try {
+                    withTimeout(5_000) { firstRead.await() }
+                } finally {
+                    fixture.allowRuntimeStart()
+                }
+                bootstrap.await()
+                assertTrue(fixture.appState.phase is AppPhase.Failed)
+                assertEquals(listOf("self"), reads.toList())
+
+                fixture.retryBootstrap()
+
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                assertEquals(listOf("self", "self"), reads.toList())
+                assertEquals(listOf(GROUP), seededGroupIds(fixture))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Startup failure discards a pending read even if the native read returns later. */
+    @Test
+    fun failedRuntimeStartCancelsThePendingPrefetch() =
+        runBlocking {
+            val entered = CompletableDeferred<Unit>()
+            val allowReadToFinish = CountDownLatch(1)
+            val fixture =
+                fixture(blockStart = true, onRuntimeStart = { error("synthetic start failure") }) {
+                    entered.complete(Unit)
+                    check(allowReadToFinish.await(10, TimeUnit.SECONDS))
+                }
+            try {
+                val bootstrap = async { fixture.bootstrap() }
+                try {
+                    withTimeout(5_000) { entered.await() }
+                    val slot = fixture.appState.accountSwitchHandoff.startupPrefetch
+                    val pending = checkNotNull(slot.take())
+                    slot.replace(pending)
+
+                    fixture.allowRuntimeStart()
+                    bootstrap.await()
+                    assertTrue(fixture.appState.phase is AppPhase.Failed)
+                    assertNull(slot.take())
+
+                    allowReadToFinish.countDown()
+                    val cancellation = withTimeout(5_000) { runCatching { pending.await() }.exceptionOrNull() }
+                    assertTrue(cancellation is CancellationException)
+                } finally {
+                    fixture.allowRuntimeStart()
+                    allowReadToFinish.countDown()
+                }
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** Group ids of the one-shot snapshot that startup activation handed to the chat list. */
     private fun seededGroupIds(fixture: NotificationBootstrapTestFixture) =
         fixture.appState
@@ -106,6 +187,8 @@ class StartupChatListPrefetchTest {
     private fun fixture(
         blockStart: Boolean = false,
         rememberedAccount: String = "self",
+        onRuntimeStart: (() -> Unit)? = null,
+        onListAccountsAfterStart: (() -> Unit)? = null,
         onRead: (String) -> Unit,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -114,6 +197,8 @@ class StartupChatListPrefetchTest {
         initialActiveAccountRef = rememberedAccount,
         emitStartupNotification = false,
         localDisplayName = null,
+        onRuntimeStart = onRuntimeStart,
+        onListAccountsAfterStart = onListAccountsAfterStart,
         onUserProfile = { null },
         onPresentedChatList = { accountRef ->
             onRead(accountRef)
