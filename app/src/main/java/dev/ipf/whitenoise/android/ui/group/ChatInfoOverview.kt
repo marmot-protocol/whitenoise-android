@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -42,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeRow
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
+import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
@@ -104,7 +104,7 @@ internal fun ChatInfoQuickActions(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = gap),
     ) {
         val actions = 2 + listOf(onOpenProfile, onAddMembers, onOpenSearch).count { it != null }
-        val actionModifier = Modifier.width(quickActionWidth(maxWidth, gap, actions, LocalDensity.current))
+        val actionModifier = Modifier.width(quickActionWidth(maxWidth, gap, actions))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             if (onOpenProfile != null) {
                 val profileLaunch = rememberMeasuredControlClick(onOpenProfile)
@@ -155,14 +155,12 @@ internal fun ChatInfoQuickActions(
     }
 }
 
-private fun quickActionWidth(
-    availableWidth: Dp,
-    gap: Dp,
-    actions: Int,
-    density: Density,
-): Dp =
-    with(density) {
-        val minimumWidth = 72.dp * fontScale.coerceAtLeast(1f)
+@Composable
+private fun quickActionWidth(availableWidth: Dp, gap: Dp, actions: Int): Dp =
+    with(LocalDensity.current) {
+        val captionSize = MaterialTheme.typography.labelLarge.fontSize
+        val captionScale = captionSize.toDp().value / Typography.labelLarge.fontSize.value
+        val minimumWidth = 72.dp * captionScale.coerceAtLeast(1f)
         val columns = ((availableWidth + gap) / (minimumWidth + gap)).toInt().coerceIn(1, actions)
         val gapsInPixels = ceil(gap.toPx()).toInt() * (columns - 1)
         ((availableWidth.roundToPx() - gapsInPixels) / columns).toDp()
