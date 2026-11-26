@@ -14,6 +14,10 @@ name: groups-notifications-back
     direction: DOWN
 - tapOn: "Sounds & notifications"
 - assertVisible: "Sounds & notifications"
+- scrollUntilVisible:
+    element:
+      id: "conversation-mute-switch-row"
+    direction: DOWN
 - assertVisible:
     id: "conversation-mute-switch-row"
 - back

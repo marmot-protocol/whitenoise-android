@@ -1862,10 +1862,7 @@ internal fun ConversationScreen(
                     val completedMsgId = completedKey.substringBefore('#')
                     val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
                     if (completedIdx >= 0) {
-                        // Walk forward only as long as the next item is a derived-
-                        // state row (edit / group system) — those are invisible to
-                        // the user, so skipping them doesn't violate "immediate
-                        // neighbor" semantics.
+                        // Skip hidden chat rows and group system events before checking the next voice note.
                         var nextIdx = completedIdx + 1
                         while (nextIdx < controller.timeline.size &&
                             (

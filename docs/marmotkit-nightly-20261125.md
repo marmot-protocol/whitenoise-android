@@ -66,6 +66,28 @@ workflow, the builder nor any job log passes `--dev-device-groups` or
 Not adopted in this change: `sendCustomEventWithClientToken`, the
 `submitTagged…` acceptance calls, invite delivery state and
 `agentItemFirstEventMissing` (a late joiner's row is drawn like any other).
+Android continues to leave device-group and multi-device APIs unused.
+
+## Native runtime changes
+
+- History recovery checks incomplete seconds when relay metadata is unavailable.
+  Recovery sweeps and known-history fetches use bounded requests that keep bulk
+  history off the live SDK reader. A relay's explicit refusal can release live
+  messages held behind recovery. [MDK #3608](https://github.com/marmot-protocol/mdk/pull/3608),
+  [#3641](https://github.com/marmot-protocol/mdk/pull/3641),
+  [#3644](https://github.com/marmot-protocol/mdk/pull/3644),
+  [#3664](https://github.com/marmot-protocol/mdk/pull/3664).
+- Invitation delivery tracks partial KeyPackage reads and attempts every known
+  inbox relay on the first Welcome pass. MDK records delivery and delays retries
+  when a recipient has no inbox route. [MDK #3669](https://github.com/marmot-protocol/mdk/pull/3669),
+  [#3686](https://github.com/marmot-protocol/mdk/pull/3686),
+  [#3687](https://github.com/marmot-protocol/mdk/pull/3687),
+  [#3701](https://github.com/marmot-protocol/mdk/pull/3701).
+- Newly linked devices receive small state before MDK adds them to chats. MDK
+  refuses small state from devices the roster no longer lists.
+  [MDK #3635](https://github.com/marmot-protocol/mdk/pull/3635),
+  [#3650](https://github.com/marmot-protocol/mdk/pull/3650),
+  [#3680](https://github.com/marmot-protocol/mdk/pull/3680).
 
 ## Upgrade
 

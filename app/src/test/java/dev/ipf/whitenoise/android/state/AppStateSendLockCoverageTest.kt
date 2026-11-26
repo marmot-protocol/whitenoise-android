@@ -510,18 +510,20 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun voiceAutoChainSkipsDerivedEditRows() {
+    fun voiceAutoChainSkipsHiddenConversationRowsAndGroupSystemRows() {
         val source = conversationScreenSource().motionOwnerSource()
         val autoChain =
             source.substring(
                 source.indexOf("fun voicePlaybackHosts()"),
                 source.indexOf("val nextMsg", source.indexOf("fun voicePlaybackHosts()")),
             )
+        val visibility = conversationScreenSource().resolveSibling("AgentActivityProjection.kt").motionOwnerSource()
 
         assertTrue(
-            "auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor",
-            "MessageProjector.isEdit(controller.timeline[nextIdx].record)" in autoChain &&
-                "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain,
+            "auto-chain should skip background agent, edit and group-system rows before checking the next voice message",
+            "!conversationTimelineRowVisible(controller.timeline[nextIdx])" in autoChain &&
+                "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain &&
+                "if (MessageProjector.isEdit(row.record)) return false" in visibility,
         )
     }
 

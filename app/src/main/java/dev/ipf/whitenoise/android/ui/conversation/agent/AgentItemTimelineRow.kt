@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -75,6 +76,7 @@ internal fun AgentItemTimelineRow(
                     seed = agentItem.agentPubkeyHex,
                     size = 30.dp,
                     pictureUrl = appState.contactAvatarSource(agentItem.agentPubkeyHex),
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
                 )
             }
         }
