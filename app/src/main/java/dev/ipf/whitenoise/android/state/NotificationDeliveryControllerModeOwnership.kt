@@ -112,39 +112,40 @@ internal fun NotificationDeliveryController.beginDeliveryModeTransaction(): Long
 }
 
 /**
- * Ends a change opened by [beginDeliveryModeTransaction], after its finish has cleared the busy flag. The last
- * open change drains a registration sync left pending meanwhile, because a sync or enable that saw an open change
- * left auto-init to it. The count and the marker are read under the sync lock where those deferrals record it, so
- * a deferral is either seen here or happened after the count reached zero and was not deferred. A failed drain
- * keeps its durable marker for the next sync and never replaces the change's own result. Only that bookkeeping
- * ignores cancellation: the retry itself is cancellable and bounded (see [drainDeferredRegistrationSync]), and a
- * caller already cancelled, ending its change in a `finally`, schedules it instead.
+ * Ends a change opened by [beginDeliveryModeTransaction], after its finish has cleared the busy flag. The count
+ * drops at once, without waiting for any lock, so ending never blocks on a registration sync another caller holds.
+ * The last open change then drains a registration sync left pending meanwhile, because a sync or enable that saw an
+ * open change left auto-init to it, through [drainDeferredRegistrationSync], which is cancellable and bounded. A
+ * caller already cancelled, ending its change in a `finally`, schedules that retry instead.
  */
 internal suspend fun NotificationDeliveryController.endDeliveryModeTransaction() {
-    val drain =
-        withContext(NonCancellable) {
-            nativePushSyncMutex.withLock {
-                activeDeliveryModeTransactions.decrementAndGet() == 0 &&
-                    withContext(pushWakeStorageDispatcher) {
-                        runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
-                    }
-            }
-        }
-    when {
-        !drain -> Unit
-        currentCoroutineContext().isActive -> drainDeferredRegistrationSync()
-        else -> notificationScope.launch { drainDeferredRegistrationSync() }
+    if (activeDeliveryModeTransactions.decrementAndGet() != 0) return
+    if (currentCoroutineContext().isActive) {
+        drainDeferredRegistrationSync()
+    } else {
+        notificationScope.launch { drainDeferredRegistrationSync() }
     }
 }
 
 /**
  * Runs the registration sync a delivery-mode change deferred, cancellably and for at most
- * [NotificationDeliveryController.deferredRegistrationDrainTimeoutMs], so a stalled Firebase token task cannot keep
- * the native sync lock from sign-out or wipe. A failed, cancelled or timed-out retry keeps its durable marker.
+ * [NotificationDeliveryController.deferredRegistrationDrainTimeoutMs], waiting for the native sync lock included,
+ * so a stalled Firebase token task cannot keep it from sign-out or wipe. The marker is read under that lock, where
+ * a deferral records it: a sync that read the count before it dropped and deferred has recorded its marker by the
+ * time this holds the lock, and one that read it after did not defer. A failed, cancelled or timed-out retry keeps
+ * its durable marker for the next sync and never replaces the change's own result.
  */
 private suspend fun NotificationDeliveryController.drainDeferredRegistrationSync() {
     withTimeoutOrNull(deferredRegistrationDrainTimeoutMs) {
-        runCatchingCancellable { syncNativePushRegistrationIfEnabled() }
+        runCatchingCancellable {
+            val pending =
+                nativePushSyncMutex.withLock {
+                    withContext(pushWakeStorageDispatcher) {
+                        runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                    }
+                }
+            if (pending) syncNativePushRegistrationIfEnabled()
+        }
     }
 }
 

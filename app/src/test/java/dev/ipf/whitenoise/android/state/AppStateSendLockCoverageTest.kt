@@ -243,11 +243,11 @@ class AppStateSendLockCoverageTest {
             "finish never syncs: a stalled token task there would hold both locks without a bound",
             "syncNativePushRegistrationIfEnabled()" in finishBody,
         )
-        val endBody = notificationDeliveryFunctionBody("endDeliveryModeTransaction")
+        val drainBody = notificationDeliveryFunctionBody("drainDeferredRegistrationSync")
         assertTrue(
             "the last change's end drains token work left pending, through the bounded retry",
-            endBody.indexOf("nativePushRegistrationSyncPending()") in
-                0 until endBody.indexOf("drainDeferredRegistrationSync()"),
+            drainBody.indexOf("nativePushRegistrationSyncPending()") in
+                0 until drainBody.indexOf("syncNativePushRegistrationIfEnabled()"),
         )
         modeEntryBodies.forEach { body ->
             assertTrue(

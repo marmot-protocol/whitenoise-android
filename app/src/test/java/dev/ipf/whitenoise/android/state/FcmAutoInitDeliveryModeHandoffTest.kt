@@ -37,6 +37,7 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * A device-wide delivery-mode change can still take every account off native push, and turning Firebase
@@ -405,6 +406,86 @@ class FcmAutoInitDeliveryModeHandoffTest {
                 assertEquals(0, delivery.activeDeliveryModeTransactions.get())
             } finally {
                 stalled.set(false)
+                fixture.close()
+            }
+        }
+
+    /**
+     * Ending a change never waits for a registration sync another caller holds: with the native sync lock held, as
+     * by a sync stalled on Firebase, a change closes within the retry's bound even with no retry pending.
+     */
+    @Test
+    fun endingWhileAnotherSyncHoldsTheLockIsBounded() =
+        runBlocking {
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val fixture = fixture(platform, activeNative = true)
+            try {
+                fixture.bootstrap()
+                val delivery = fixture.appState.notificationDelivery
+                delivery.deferredRegistrationDrainTimeoutMs = 300L
+                PushTokenStore.create(context).clearPendingNativePushRegistrationSync()
+
+                val generation = delivery.beginDeliveryModeTransaction()
+                delivery.nativePushSyncMutex.lock()
+                try {
+                    val ending =
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                delivery.finishNotificationDeliveryModeTransaction(generation)
+                            } finally {
+                                delivery.endDeliveryModeTransaction()
+                            }
+                        }
+                    val ended = withTimeoutOrNull(5_000L) { ending.join() }
+                    assertTrue("the change must end within the bound", ended != null)
+                    assertEquals(0, delivery.activeDeliveryModeTransactions.get())
+                } finally {
+                    delivery.nativePushSyncMutex.unlock()
+                }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * Through setNotificationDeliveryMode, a Push choice whose deferred retry meets a Firebase token read that never
+     * completes still returns within the retry's bound, releases both locks and keeps the retry marker.
+     */
+    @Test
+    fun setNotificationDeliveryModeReturnsWhenItsRetryStalls() =
+        runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, false)
+            val platform = RecordingNativePushFallbackPlatform(context)
+            val reads = AtomicInteger(0)
+            val stallAfter = AtomicInteger(Int.MAX_VALUE)
+            val fixture =
+                fixture(platform, activeNative = true, fcmTokenReader = {
+                    if (reads.incrementAndGet() > stallAfter.get()) awaitCancellation()
+                    TOKEN
+                })
+            try {
+                fixture.bootstrap()
+                val store = PushTokenStore.create(context)
+                val delivery = fixture.appState.notificationDelivery
+                delivery.deferredRegistrationDrainTimeoutMs = 300L
+
+                fixture.runWithMainLooperPumping {
+                    store.recordPendingNativePushRegistrationSync()
+                    stallAfter.set(reads.get() + 1)
+                    val choosing =
+                        CoroutineScope(Dispatchers.Default).launch {
+                            fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                        }
+                    val returned = withTimeoutOrNull(10_000L) { choosing.join() }
+                    assertTrue("the mode change must return within the retry's bound", returned != null)
+                }
+
+                assertTrue("the stalled token read must be reached", reads.get() > stallAfter.get())
+                assertFalse(delivery.nativePushSyncMutex.isLocked)
+                assertFalse(delivery.notificationDeliveryModeMutex.isLocked)
+                assertEquals(0, delivery.activeDeliveryModeTransactions.get())
+            } finally {
+                stallAfter.set(Int.MAX_VALUE)
                 fixture.close()
             }
         }

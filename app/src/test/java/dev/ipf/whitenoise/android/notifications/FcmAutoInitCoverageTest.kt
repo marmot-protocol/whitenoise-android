@@ -249,16 +249,25 @@ class FcmAutoInitCoverageTest {
         assertFalse("a newer choice never waits on native work to supersede", "withLock" in begin)
         assertTrue("a change opens under the on write's admission fence", "synchronized(fcmAutoInitAdmission)" in begin)
         val end = ownership.functionBody("endDeliveryModeTransaction")
-        val lastEnd = "activeDeliveryModeTransactions.decrementAndGet() == 0 &&"
-        assertTrue("the last change to end drains the retry", end.substringAfter("withLock {").contains(lastEnd))
-        val bookkeeping = end.substringBefore("when {")
-        assertTrue("only the count and marker read ignore cancellation", "withContext(NonCancellable)" in bookkeeping)
-        assertFalse("the retry itself is cancellable", "NonCancellable" in end.substringAfter("when {"))
-        assertTrue("an active caller retries inline", "isActive -> drainDeferredRegistrationSync()" in end)
+        val lastEnd = "if (activeDeliveryModeTransactions.decrementAndGet() != 0) return"
+        assertTrue(
+            "only the last change to end drains the retry",
+            end.indexOf(lastEnd) in 0 until end.indexOf("drainDeferredRegistrationSync()"),
+        )
+        assertFalse(
+            "ending never waits for a lock or ignores cancellation",
+            "withLock" in end || "NonCancellable" in end,
+        )
         val scheduled = "notificationScope.launch { drainDeferredRegistrationSync() }"
-        assertTrue("a cancelled caller schedules it", scheduled in end)
+        assertTrue("a cancelled caller schedules the retry", scheduled in end)
         val drain = ownership.functionBody("drainDeferredRegistrationSync")
-        assertTrue("the retry is bounded", "withTimeoutOrNull(deferredRegistrationDrainTimeoutMs)" in drain)
+        val bounded = drain.substringAfter("withTimeoutOrNull(deferredRegistrationDrainTimeoutMs) {", "")
+        assertTrue("the wait for the sync lock is inside the bound", "nativePushSyncMutex.withLock" in bounded)
+        assertTrue(
+            "the marker is read under the sync lock, before the retry",
+            bounded.indexOf("nativePushRegistrationSyncPending()") in
+                0 until bounded.indexOf("syncNativePushRegistrationIfEnabled()"),
+        )
         assertTrue("a failed drain never replaces the result", "runCatchingCancellable {" in drain)
         val handoff = ownership.functionBody("launchNotificationDeliveryModeReconciliation")
         assertTrue("a handed-off change always ends", "launch(start = CoroutineStart.ATOMIC)" in handoff)
