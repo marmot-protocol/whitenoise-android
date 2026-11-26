@@ -20,11 +20,11 @@ size, every cross-reference offset and incremental revision stays valid, and
 page content, fonts, images, form values, structure tags, bookmarks, links and
 annotations are never touched.
 
-The scrubber detects a PDF from its content (`%PDF-` within the first kilobyte),
-never from the reported MIME type. It walks every object and trailer in file
+A PDF starts with `%PDF-`, optionally preceded by whitespace within the first
+kilobyte. The reported MIME type has no effect on detection. It walks every object and trailer in file
 order, so it sees each revision an incremental update kept. All parsing is
-bounded: nesting depth, object count, name length and the size of each inflated
-stream. It plans every edit first, applies them, then plans again on the result.
+bounded through inspection, planning and verification. The limits cover work,
+nesting, object count, retained object-stream bytes and replacement bytes. It plans every edit first, applies them, then plans again on the result.
 If anything is left or anything fails, every write is undone, so a PDF it
 refuses always keeps its original bytes.
 
@@ -34,9 +34,9 @@ refuses always keeps its original bytes.
 | --- | --- | --- |
 | Document information (`/Info`) in every revision, stored plainly or inside an object stream | Every string value, including author, title, subject, keywords, creator and producer apps, creation and modification dates, and custom entries such as a company. Each value becomes `()` or `<>` padded with spaces. Strings referenced indirectly are emptied too. | The keys themselves and non-string values such as `/Trapped`. |
 | Copies of document information left behind | Information dictionaries that no trailer points to any more, and the copies pdfTeX embeds for included PDFs (`/PTEX.InfoDict`, `/PTEX.FileName`), are emptied the same way. | — |
-| XMP metadata streams (document, page, image or font level) | The whole packet: Dublin Core, XMP basic, PDF properties, rights, media management history and IDs, and vendor namespaces. It is replaced by an empty packet padded with spaces. A `/FlateDecode` stream is re-encoded to exactly its original length. | PDF/A (`pdfaid:part`, `pdfaid:conformance`) and PDF/UA (`pdfuaid:part`) identification, when the original declared it. |
+| XMP metadata streams (document, page, image or font level) | The whole packet: Dublin Core, XMP basic, PDF properties, rights, media management history and IDs, and vendor namespaces. It is replaced by an empty packet padded with spaces. A `/FlateDecode` stream is re-encoded to exactly its original length. | PDF/A identification (`pdfaid:part`, `pdfaid:rev` for part 4, and `pdfaid:conformance` if present). The PDF/UA declaration is removed with its required title. Tags and structure stay. |
 | XMP packets stored plainly elsewhere | Replaced by the same empty packet. | — |
-| Embedded baseline JPEG photos (`/DCTDecode`) | The payloads of EXIF and XMP (APP1), IPTC and Photoshop records (APP13), vendor segments (APP3 to APP12, APP15) and comments become zeros, including segments placed after the image data. | JFIF (APP0), ICC colour profiles (APP2), Adobe colour transforms (APP14) and the image data. |
+| Embedded baseline JPEG photos (`/DCTDecode`) | The payloads of EXIF and XMP (APP1), IPTC and Photoshop records (APP13), vendor segments (APP3 to APP12, APP15) and comments become zeros, including segments after scan data and in trailing JPEG images. | JFIF (APP0), ICC colour profiles (APP2), Adobe colour transforms (APP14) and the image data. |
 
 Not covered:
 
@@ -55,32 +55,44 @@ chooses **Send as is**:
 | --- | --- |
 | Digitally signed or certified (a `/ByteRange` signature dictionary anywhere, including in an object stream) | Any change invalidates the signature. |
 | Encrypted or password protected (`/Encrypt` in a trailer) | Its strings and streams cannot be read or rewritten without the key. |
+| Application-specific `/PieceInfo` or opaque data after a JPEG's final image | These can hold private data whose format or role is unknown. |
 | Metadata the scrubber cannot rewrite at the same length, an embedded JPEG wrapped in another filter, a metadata string that another part of the document also uses, or a structure it cannot read | A different length would move every later object, and emptying a shared string would change visible content. |
 
-The composer reads every staged PDF, on screen or not, and its card shows the
-state before sending: "Metadata removed", "Metadata removed on send" for a draft
-an earlier version saved, or why the metadata stays. A PDF too large to prepare
-is read where it is. Sending waits until every staged PDF has been read, then
-asks once for the PDFs that keep their metadata, naming them; **Cancel** keeps
-everything on the shelf. The answer covers that one send, every chunk of it:
-the sender takes it when the send starts, so the next send of the same PDF asks
-again. It is never saved with a draft, and removing a PDF forgets it. A PDF that
-nobody chose to send as it is never leaves the device by any path; the send
-reports that it wasn't sent.
+The composer inspects each staged PDF before a send. Supported PDFs use
+**Remove metadata** by default. Open the card's metadata options and choose
+**Keep metadata** to send that attachment's original bytes, for example to
+preserve the XMP that identifies an invoice's embedded XML. Recipients can
+read those properties. The choice belongs to the current attachment on the
+shelf and the draft records its original bytes without recording that choice.
+
+For PDFs that require **Send as is**, the composer names the affected files.
+**Cancel** keeps the attachments and caption. Confirmation belongs to one
+send across all its chunks. Dictation uses the same composer confirmation.
+A paused collection asks again for affected PDFs in its remaining chunks.
+
+The first-page preview uses the isolated reader and its 64 MiB input limit.
+Provider streams are copied into bounded private files before the preview or
+metadata parser sees them. Temporary copies are released after use.
 
 ## Where it runs
 
-- Files picks, incoming shares and draft preparation read the PDF and remove its
-  metadata in place, in memory or in a private staged file, before the bytes are
-  saved as a draft or offered for upload.
-- Drafts that an earlier version saved are cleaned again on a copy before a send
-  reuses them, because a draft's bytes are shared with its native draft.
-- The send checks every document's bytes once more. It drops a PDF whose
-  metadata could not be removed, and one that keeps it without the person's
-  choice for this send.
+Android retains the selected source in the local encrypted composer draft and
+applies the PDF policy before upload. Inline draft bytes are cleaned on a copy.
+File-backed drafts are read from their selected native revision into a bounded
+private upload file, with cleanup after acceptance. Refused PDFs require the
+sender's decision before upload. Restored drafts default to removal. A draft
+prepared by an earlier release may already contain a cleaned copy.
 
-The composer previews each staged PDF's first page through the isolated document
-parser that the in-app reader uses, one fresh worker per PDF.
+## Office formats
+
+| Format | Privacy scope |
+| --- | --- |
+| Office Open XML (`.docx`, `.xlsx`, `.pptx`) | The ZIP package can carry core and custom properties, comments, tracked changes, workbook links, signatures and embedded documents. Safe preparation needs a package-aware policy and independent round-trip checks. |
+| OpenDocument (`.odt`, `.ods`, `.odp`) | The ZIP package stores core properties in `meta.xml`, with other identifying data possible in the content and embedded objects. Its manifests and signatures need distinct handling. |
+| Legacy Office (`.doc`, `.xls`, `.ppt`) | OLE compound files need a separate reader for property streams and embedded content. |
+
+Office files follow the generic file path and preserve their bytes. The PDF
+metadata control applies to PDFs.
 
 ## Tests
 

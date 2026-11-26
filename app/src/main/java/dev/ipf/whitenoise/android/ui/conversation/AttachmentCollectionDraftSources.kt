@@ -5,6 +5,8 @@ import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.SharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.media.sharedPlaintextSuffix
 import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
@@ -18,7 +20,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.captureDraftSource
 import dev.ipf.whitenoise.android.state.consumeCollectionDraftFiles
-import dev.ipf.whitenoise.android.state.hasVerifiedDraftPdfMetadata
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendOwnedDraftIds
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
@@ -151,7 +152,14 @@ internal suspend fun ownCollectionDraftSources(
             } else {
                 val target = files.fileFor(context, operation, index, collectionDraftSuffix(body))
                 item.copy(
-                    uri = copyStoredCollectionItem(context, target, body, copy),
+                    uri =
+                        copyStoredCollectionItem(
+                            context,
+                            target,
+                            body,
+                            android.net.Uri.parse(item.uri) in request.keepPdfMetadata,
+                            copy,
+                        ),
                     storedDraft = body.captureDraftSource(),
                 )
             }
@@ -164,6 +172,7 @@ private suspend fun copyStoredCollectionItem(
     context: Context,
     target: File,
     pending: PendingAttachment,
+    keepPdfMetadata: Boolean,
     copy: suspend (PendingAttachment, File) -> Boolean,
 ): String {
     val name = MediaPipeline.safeDisplayName(pending.fileName, "attachment")
@@ -174,7 +183,9 @@ private suspend fun copyStoredCollectionItem(
     ) {
         throw IOException("Could not retain stored collection attachment")
     }
-    if (!target.hasVerifiedDraftPdfMetadata()) throw UnverifiedStoredDraftPdf()
+    if (!keepPdfMetadata && PdfMetadataScrubber.scrub(target) is PdfMetadataResult.Refused) {
+        throw UnverifiedStoredDraftPdf()
+    }
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target, name).toString()
 }
 

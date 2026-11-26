@@ -29,6 +29,8 @@ data class PendingAttachment(
      * bytes: cleaned of metadata, or moved into a staged file. Null while the bytes are still the draft's own.
      */
     val nativeDraftBody: NativeDraftBody? = null,
+    /** The stored row to settle after send preparation copied or cleaned its body into [sourceFile]. */
+    val nativeDraftFileBody: DraftStoredFile? = null,
 ) {
     init {
         val representations = listOf(plaintextBytes.isNotEmpty(), sourceFile != null, draftFile != null)

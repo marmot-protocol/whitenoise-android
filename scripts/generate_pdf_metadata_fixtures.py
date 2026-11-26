@@ -99,7 +99,7 @@ def form_photo(target):
     pdf.Root.AcroForm = Dictionary(Fields=Array([field]))
     pdf.Root.MarkInfo = Dictionary(Marked=True)
     author = pdf.make_indirect(String("WNPrivateIndirect"))
-    pdf.trailer.Info = pdf.make_indirect(Dictionary(Author=author, Title=String("WNPrivateTitle"), Trapped=Name.false))
+    pdf.trailer.Info = pdf.make_indirect(Dictionary(Author=author, Title=String("WNPrivateTitle"), Trapped=Name("/False")))
     pdf.save(target, compress_streams=False)
 
 

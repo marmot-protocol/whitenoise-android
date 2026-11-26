@@ -7277,6 +7277,26 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataOptions",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Keep metadata"
+          },
+          "scope": "The production options dialog defaults to removing metadata, then offers Remove metadata after Keep metadata is chosen for the fixture invoice.",
+          "entry_assertion": {
+            "text": "PDF metadata options"
+          },
+          "opened_by": {
+            "text": "Open fixture PDF options"
+          }
+        }
+      ],
+      "remaining": "Send a real PDF with this setting and verify the recipient gets the original bytes (MED-064)."
     }
   ]
 }

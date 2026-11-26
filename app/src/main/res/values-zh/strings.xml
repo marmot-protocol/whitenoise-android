@@ -2827,4 +2827,5 @@
     <string name="remote_signer_switcher_attention">远程签名器需要你的处理</string>
     <string name="dictation_transcribe_voice_messages_title">自动转写语音消息</string>
     <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天时显示已下载语音消息的转写文本。 需要 Offline Speech to Text。</string>
+    <string name="toast_unsupported_link">不支持此链接。</string>
 </resources>

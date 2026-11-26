@@ -12,15 +12,19 @@ private const val PLUS = '+'.code
 internal fun countReferences(
     bytes: PdfBytes,
     targets: Set<Pair<Int, Int>>,
+    strings: List<IntRange>,
 ): Map<Pair<Int, Int>, Int> {
     val counts = HashMap<Pair<Int, Int>, Int>()
     var position = 0
+    var stringIndex = 0
     while (position < bytes.size) {
-        if (!startsNumber(bytes, position)) {
-            position++
+        while (stringIndex < strings.size && strings[stringIndex].last < position) stringIndex++
+        val string = strings.getOrNull(stringIndex)
+        if (string != null && position in string) {
+            position = string.last + 1
             continue
         }
-        val number = readInteger(bytes, position)
+        val number = if (startsNumber(bytes, position)) readInteger(bytes, position) else null
         val reference = number?.let { referenceAfter(bytes, it.second, it.first) }
         if (reference != null && reference.first in targets) {
             counts[reference.first] = (counts[reference.first] ?: 0) + 1
