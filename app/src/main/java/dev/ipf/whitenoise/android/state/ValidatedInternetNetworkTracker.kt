@@ -15,6 +15,15 @@ internal fun NetworkCapabilities.providesValidatedNonVpnInternet(): Boolean =
         hasNotVpnCapability = hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN),
     )
 
+/** Classifies the default network for media downloads and backup admission. */
+internal fun networkTypesFor(caps: NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
+    MediaAutoDownloadNetwork.matching(
+        hasWifiTransport = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI),
+        hasCellularTransport = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR),
+        isRoaming = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING),
+        isMetered = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+    )
+
 internal fun hasUsableValidatedInternet(
     hasActiveDefaultNetwork: Boolean,
     hasValidatedPhysicalNetwork: Boolean,

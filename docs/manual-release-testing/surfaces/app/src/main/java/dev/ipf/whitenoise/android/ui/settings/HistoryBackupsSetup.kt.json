@@ -1,0 +1,180 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RecoveryWordsSetupContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun RecoveryWordsSetupContent(",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun RecoveryWordsGrid(",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "CopyRecoveryWordsIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun CopyRecoveryWordsIcon(",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "SetupButtons",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun SetupButtons(",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsInput",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun RecoveryWordsInput(",
+        "test_ids": [
+          "SET-074",
+          "SET-073"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "fun RecoveryWordsControls(",
+        "test_ids": [
+          "SET-074"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_confirm_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_confirm_message",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_confirm_title",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_word_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_word_label",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_words_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_words_title",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_words_written",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_words_written",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_copy_words",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_copy_words",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_reveal_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_reveal_warning",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_word_correct",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_word_correct",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_word_incorrect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.history_backups_word_incorrect",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.hide",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.show",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsSetup.kt",
+        "anchor": "R.string.show",
+        "test_ids": [
+          "SET-074"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

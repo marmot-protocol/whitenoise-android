@@ -906,6 +906,7 @@ class WhiteNoiseAppState private constructor(
         StartupDiagnostics.bindNative(runtime.marmot)
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
+        HistoryBackupConditions.attach(appContext, runtime.marmot) { historyBackupFacts() }
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
         }
@@ -915,6 +916,7 @@ class WhiteNoiseAppState private constructor(
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
         StartupDiagnostics.unbindNative(runtime.marmot)
+        HistoryBackupConditions.detach(runtime.marmot)
         AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
@@ -6002,11 +6004,13 @@ class WhiteNoiseAppState private constructor(
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
+            HistoryBackupConditions.report()
             noteUsableValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
+        HistoryBackupConditions.report()
         noteUsableValidatedInternetSnapshot()
         pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
     }
@@ -6029,14 +6033,6 @@ class WhiteNoiseAppState private constructor(
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
     }
-
-    private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
-        MediaAutoDownloadNetwork.matching(
-            hasWifiTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI),
-            hasCellularTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR),
-            isRoaming = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING),
-            isMetered = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
-        )
 
     /**
      * Refreshes [mediaAutoDownloadMatrix] for the current active account.

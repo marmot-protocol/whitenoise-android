@@ -4576,6 +4576,38 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsScreen",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.list"
+          },
+          "scope": "generated-account history backups destination; status only, no recovery words generated."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+      "symbol": "HistoryBackupsContent",
+      "bindings": [
+        {
+          "case": "settings-history-backups",
+          "selector": {
+            "id": "history_backups.status"
+          },
+          "scope": "generated-account history backups status row; the turn-off confirmation is not opened.",
+          "entry_assertion": {
+            "id": "history_backups.list"
+          },
+          "opened_by": {
+            "text": "History backups"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
       "symbol": "QuarantinedGroupsScreen",
       "bindings": [
