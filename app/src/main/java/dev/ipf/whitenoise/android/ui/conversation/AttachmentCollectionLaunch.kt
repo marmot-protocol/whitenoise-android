@@ -5,6 +5,7 @@ import android.net.Uri
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
 import dev.ipf.whitenoise.android.state.CollectionChunkState
@@ -33,6 +34,7 @@ import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
 import dev.ipf.whitenoise.android.state.skipItems
 import dev.ipf.whitenoise.android.state.withChunkState
 import dev.ipf.whitenoise.android.state.withStoredDraftAdmission
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfDecision
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.inspectComposerPdf
@@ -301,6 +303,7 @@ private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
  */
 internal fun ConversationMediaSender.resumeCollection(
     operationId: String,
+    canAskForPdfConsent: () -> Boolean = { false },
     tokenStatus: (suspend (String) -> CollectionTokenStatus?)? = null,
 ) {
     val registry = appState.attachmentCollections
@@ -338,7 +341,7 @@ internal fun ConversationMediaSender.resumeCollection(
                     )
                     return@launchMutation
                 }
-                keepPdfMetadata = confirmResumedPdfMetadata(reconciled) ?: return@launchMutation
+                keepPdfMetadata = confirmResumedPdfMetadata(reconciled, canAskForPdfConsent) ?: return@launchMutation
                 if (!shouldAcceptMediaUploadForAccount(
                         paused.accountRef,
                         sessionEpoch,
@@ -376,7 +379,10 @@ internal fun ConversationMediaSender.resumeCollection(
 }
 
 /** Checks remaining document inputs before changing a paused journal or starting its next chunk. */
-private suspend fun ConversationMediaSender.confirmResumedPdfMetadata(operation: AttachmentCollectionOperation): Set<Uri>? {
+private suspend fun ConversationMediaSender.confirmResumedPdfMetadata(
+    operation: AttachmentCollectionOperation,
+    canAskForPdfConsent: () -> Boolean,
+): Set<Uri>? {
     val documents =
         operation.items
             .filter { it.kind == CollectionItemKind.DOCUMENT && !it.state.isSettled && it.id !in operation.unrecoverableItemIds }
@@ -387,24 +393,32 @@ private suspend fun ConversationMediaSender.confirmResumedPdfMetadata(operation:
         documents.mapNotNull { uri ->
             val name = safeDocumentDisplayName(uri.lastPathSegment)
             val metadata = inspectComposerPdf(context, uri, name)
-            if (metadata is dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult.Refused) {
+            if (metadata is PdfMetadataResult.Refused) {
                 uri to ComposerPdfState(name, metadata)
             } else {
                 null
             }
         }
     if (refused.isEmpty()) return emptySet()
-    if (appState.appLock.screenVisible ||
+    if (!canAskForPdfConsent() ||
+        choices.decision != null ||
+        appState.appLock.screenVisible ||
         appState.appLock.evaluationPending ||
         latestCollectionSender(operation.accountRef, operation.groupIdHex) !== this
     ) {
         return null
     }
-    return suspendCancellableCoroutine { continuation ->
-        val uris = refused.map { it.first }
-        choices.retainOnly(emptyList())
-        refused.forEach { (uri, state) -> choices.record(uri, state) }
-        choices.confirmThen(uris, { continuation.resume(null) }) { continuation.resume(it) }
+    var decision: ComposerPdfDecision? = null
+    try {
+        return suspendCancellableCoroutine { continuation ->
+            val uris = refused.map { it.first }
+            choices.retainOnly(emptyList())
+            refused.forEach { (uri, state) -> choices.record(uri, state) }
+            choices.confirmThen(uris, { continuation.resume(null) }) { continuation.resume(it) }
+            decision = choices.decision
+        }
+    } finally {
+        if (decision != null && choices.decision === decision) choices.cancel()
     }
 }
 

@@ -20,6 +20,7 @@ internal class ComposerPdfDecision(
     val names: List<String>,
     val reasons: Set<PdfMetadataRefusal>,
     internal val uris: List<Uri>,
+    internal val sendUris: List<Uri>,
     internal val send: (Set<Uri>) -> Unit,
     internal val cancel: () -> Unit,
 )
@@ -53,6 +54,7 @@ internal class ComposerPdfMetadataChoices {
     fun reading(uri: Uri) {
         keepMetadata -= uri
         reading[uri] = Unit
+        if (decision?.sendUris?.contains(uri) == true) cancel()
     }
 
     fun record(
@@ -90,7 +92,7 @@ internal class ComposerPdfMetadataChoices {
         states.keys.filter { it !in staged }.forEach(states::remove)
         reading.keys.filter { it !in staged }.forEach(reading::remove)
         if (!staged.containsAll(keepMetadata)) keepMetadata = keepMetadata intersect staged
-        if (pendingSend?.uris?.any { it !in staged } == true || decision?.uris?.any { it !in staged } == true) {
+        if (pendingSend?.uris?.any { it !in staged } == true || decision?.sendUris?.any { it !in staged } == true) {
             cancel()
         } else {
             resumeWaitingSend()
@@ -114,7 +116,7 @@ internal class ComposerPdfMetadataChoices {
             refused.isEmpty() -> send(selected)
             else ->
                 decision =
-                    decisionFor(refused.mapNotNull(states::get), refused, onCancel) { approved ->
+                    decisionFor(refused.mapNotNull(states::get), refused, uris, onCancel) { approved ->
                         send(selected + approved)
                     }
         }
@@ -142,12 +144,14 @@ internal class ComposerPdfMetadataChoices {
 private fun decisionFor(
     pending: List<ComposerPdfState>,
     undecided: List<Uri>,
+    sendUris: List<Uri>,
     onCancel: () -> Unit,
     send: (Set<Uri>) -> Unit,
 ) = ComposerPdfDecision(
     names = pending.map { it.name },
     reasons = pending.mapNotNullTo(linkedSetOf()) { (it.metadata as? PdfMetadataResult.Refused)?.reason },
     uris = undecided,
+    sendUris = sendUris,
     send = send,
     cancel = onCancel,
 )

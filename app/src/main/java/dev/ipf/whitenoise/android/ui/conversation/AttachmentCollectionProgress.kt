@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataDialog
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 
 private val ITEM_LIST_MAX_HEIGHT = 240.dp
 private val SHOW_ITEMS = R.string.attachment_collection_show_items
@@ -92,6 +94,7 @@ internal fun rememberAttachmentCollectionPanels(
     val anyShown by presence.first.collectAsState(initial = presence.second)
     if (!anyShown) return null
     return {
+        val promptScope = rememberCoroutineScope()
         ComposerPdfMetadataDialog(mediaSender.collectionResumePdfChoices)
         DisposableEffect(mediaSender) { onDispose { mediaSender.collectionResumePdfChoices.cancel() } }
         val current by operations.collectAsState()
@@ -105,7 +108,9 @@ internal fun rememberAttachmentCollectionPanels(
                         },
                         onSkipChunk = { appState.launchMutation { controller.skipCollectionChunk(operation.id, it) } },
                         onCancel = { appState.launchMutation { controller.cancelCollection(operation.id) } },
-                        onResume = { mediaSender.resumeCollection(operation.id) },
+                        onResume = {
+                            mediaSender.resumeCollection(operation.id, canAskForPdfConsent = { promptScope.isActive })
+                        },
                         onDiscard = { appState.discardCollection(operation.id) },
                     ),
                 modifier = Modifier.padding(8.dp),

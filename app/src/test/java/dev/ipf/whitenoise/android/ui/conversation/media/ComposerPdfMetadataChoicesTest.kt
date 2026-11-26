@@ -129,6 +129,19 @@ class ComposerPdfMetadataChoicesTest {
     }
 
     @Test
+    fun aChangedPdfCancelsAnOpenSendDecision() {
+        var cancelled = 0
+        choices.confirmThen(listOf(cleaned, signed), { cancelled++ }) { error("sent") }
+        assertNotNull(choices.decision)
+
+        choices.reading(cleaned)
+        choices.confirm()
+
+        assertEquals(1, cancelled)
+        assertNull(choices.decision)
+    }
+
+    @Test
     fun perFileKeepMetadataChoiceStartsOffAndIsClearedWhenTheBodyChanges() {
         val removable = ComposerPdfState("invoice.pdf", PdfMetadataResult.Removable(setOf(PdfMetadataField.Author)))
         choices.record(cleaned, removable)
