@@ -199,6 +199,7 @@ class ShapedTouchWrapperResolverTest {
                     "Long(modifier: Modifier, v: T)",
                 "fun Slot(onClick: () -> Unit, modifier: Modifier, content: () -> Unit)",
                 "fun Spaced(onClick: () -> Unit, values: Map<String, Int> = mapOf <String, Int>(), modifier: Modifier)",
+                "fun <T,> Trailing(onClick: () -> Unit, modifier: Modifier, value: T)",
             ).joinToString("\n", prefix = "package gw\n") { "$it $handOff" }
         val calls =
             mapOf(
@@ -211,6 +212,8 @@ class ShapedTouchWrapperResolverTest {
                 "NextLine.kt" to "Slot(go, Modifier.width(36.dp))\n{}",
                 "LongBound.kt" to "Long(Modifier.width(36.dp), mutableMapOf())",
                 "Spaced.kt" to "Spaced(go, emptyMap(), Modifier.width(36.dp))",
+                "TrailingComma.kt" to "Trailing<Int,>(go, Modifier.width(36.dp), 1)",
+                "TrailingInferred.kt" to "Trailing(go, Modifier.width(36.dp), 1)",
             ).mapValues { (_, call) -> "package gc\nimport gw.*\nfun Screen() { $call }" }
         val findings = stretchedWrapperFindings(calls + ("Generic.kt" to wrappers))
         for (file in calls.keys) assertEquals(file, listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue(file))
@@ -256,6 +259,23 @@ class ShapedTouchWrapperResolverTest {
         assertEquals(emptyList<String>(), findings.getValue("SlotExplicit.kt"))
         assertEquals(listOf("$STRETCHED_ICON_BUTTON @3"), findings.getValue("IconExplicit.kt"))
         assertEquals(emptyList<String>(), findings.getValue("TwoArguments.kt"))
+    }
+
+    /** Kotlin's trailing comma ends a type list without adding an entry, at any depth and around arrows. */
+    @Test
+    fun typeArgumentCountIgnoresTrailingCommas() {
+        val counts =
+            mapOf(
+                "<Int>" to 1,
+                "<Int,>" to 1,
+                "<Int , >" to 1,
+                "<A, B,>" to 2,
+                "<Map<String, Int>,>" to 1,
+                "<T : () -> Unit,>" to 1,
+                "<T : Comparable<T>, R,>" to 2,
+            )
+        for ((list, count) in counts) assertEquals(list, count, list.typeArgumentCount())
+        assertEquals(null, "Int".typeArgumentCount())
     }
 
     /** A local function shadows an imported wrapper at the calls in its scope, and a local wrapper still counts. */

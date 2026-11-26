@@ -231,26 +231,62 @@ internal class WrapperCall(
 private val leadingTypeParameters = Regex("""^fun\s+($TYPE_PARAMETERS)""")
 
 /**
- * How many entries the `<…>` type-argument or type-parameter list starting this text holds, counting commas outside
- * nested `<…>` lists and brackets; an arrow's `>` closes nothing. Null when the text does not start with a list,
- * such as a call without type arguments.
+ * How many entries the `<…>` type-argument or type-parameter list starting this text holds, counting the entries
+ * with text between commas outside nested `<…>` lists and brackets, so Kotlin's trailing comma in `<Int,>` adds
+ * none; an arrow's `>` closes nothing. Null when the text does not start with a list, such as a call without type
+ * arguments.
  */
 internal fun String.typeArgumentCount(): Int? {
-    var depth = 0
-    var entries = 1
-    var closed = false
+    if (!startsWith('<')) return null
+    val scan = TypeListScan()
     var index = 0
-    while (startsWith('<') && !closed && index < length) {
+    while (!scan.closed && index < length) {
         val char = this[index]
         when {
-            char in "([{" -> index = closingBracket(index)
-            char == '<' -> depth++
-            char == '>' && getOrNull(index - 1) != '-' -> closed = --depth == 0
-            char == ',' && depth == 1 -> entries++
+            char in "([{" -> index = scan.text(closingBracket(index))
+            char == '<' -> scan.open()
+            char == '>' && getOrNull(index - 1) != '-' -> scan.close()
+            char == ',' && scan.depth == 1 -> scan.separate()
+            !char.isWhitespace() -> scan.text(index)
         }
         index++
     }
-    return entries.takeIf { closed }
+    return scan.entries.takeIf { scan.closed && it > 0 }
+}
+
+/** The running state of [typeArgumentCount]: nesting depth, entries finished and whether the current has text. */
+private class TypeListScan {
+    var depth = 0
+        private set
+    var entries = 0
+        private set
+    var closed = false
+        private set
+    private var entryHasText = false
+
+    /** Opens the outer list, or a nested one, which is text of the current entry. */
+    fun open() {
+        entryHasText = entryHasText || depth > 0
+        depth++
+    }
+
+    /** Closes a list, counting the current entry when the outer list closes on text. */
+    fun close() {
+        closed = --depth == 0
+        if (closed && entryHasText) entries++
+    }
+
+    /** Ends the current entry at a top-level comma, counting it only when it holds text. */
+    fun separate() {
+        if (entryHasText) entries++
+        entryHasText = false
+    }
+
+    /** Marks the current entry as holding text, returning [index] for the caller to continue from. */
+    fun text(index: Int): Int {
+        entryHasText = true
+        return index
+    }
 }
 
 /** How surely a call fits a parameter list: it surely does, surely does not, or the text cannot tell. */
