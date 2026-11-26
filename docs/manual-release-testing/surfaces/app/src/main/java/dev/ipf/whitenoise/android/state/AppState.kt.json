@@ -325,6 +325,14 @@
         "test_ids": [
           "NTF-060"
         ]
+      },
+      {
+        "surface": "Departure from a closed conversation clears its voice transcript cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "receivedVoiceTranscripts.forgetGroup(accountRef, row.groupIdHex, onlyIfCached",
+        "test_ids": [
+          "MED-038"
+        ]
       }
     ]
   },

@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.endsVoiceTranscription
 import kotlinx.coroutines.sync.Mutex
 
 /**
@@ -64,9 +65,17 @@ internal class ReceivedVoiceTranscripts(
     fun forgetGroup(
         account: String,
         group: String,
+        onlyIfCached: Boolean = false,
     ) {
+        val prefix = "$account|$group|"
+        if (onlyIfCached &&
+            resultOrder.none { it.startsWith(prefix) } &&
+            shownOrder.none { it.startsWith(prefix) }
+        ) {
+            return
+        }
         generation++ // Reject writes already in flight, including work with no cached entry yet.
-        forgetPrefix("$account|$group|")
+        forgetPrefix(prefix)
     }
 
     fun clear() {
@@ -172,7 +181,11 @@ internal fun rememberVoiceTranscription(
     return remember(transcripts, controller, account, group, automatic, transcripts.generation) {
         VoiceTranscriptionScope(transcripts, account, automatic, group) {
             val foreground = appState.appInForeground && !appState.appLock.screenVisible
-            foreground && controller.isSelfMember && !controller.group.disbanded
+            foreground &&
+                controller.isSelfMember &&
+                !controller.group.disbanded &&
+                controller.acceptsConversationActionOwner(account, group) &&
+                controller.latestChatListRow?.endsVoiceTranscription() != true
         }
     }
 }

@@ -109,9 +109,10 @@ class RawAvPreparationWaitTest {
                 override fun posterResult(
                     request: RawAvPausedSeekRequest,
                     probe: MediaProbe?,
+                    missing: java.io.FileNotFoundException?,
                 ): Boolean {
                     results.incrementAndGet()
-                    return engine.posterResult(request, probe).also { returned.countDown() }
+                    return engine.posterResult(request, probe, missing).also { returned.countDown() }
                 }
             }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

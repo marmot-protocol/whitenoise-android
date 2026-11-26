@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import com.google.common.util.concurrent.SettableFuture
 import org.junit.After
@@ -11,13 +12,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -176,6 +181,40 @@ class RawAvPausedPreparationTest {
         } finally {
             release.countDown()
         }
+    }
+
+    @Test
+    fun missingFileDuringPausedSeekKeepsCacheRecoveryErrorCode() {
+        val missing = FileNotFoundException("Deleted cached file")
+        IsolatedMediaDecoder.installTestTransport(
+            object : ProbeTransport() {
+                override fun probeUri(
+                    resolver: ContentResolver,
+                    uri: Uri,
+                    edge: Int,
+                ) = MediaProbe(2, 2, 4000, Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
+
+                override fun probeUriAt(
+                    resolver: ContentResolver,
+                    uri: Uri,
+                    positionMs: Long,
+                    edge: Int,
+                ): MediaProbe = throw missing
+            },
+        )
+        val player = player()
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        player.prepare()
+        engine.prepare().get(2, TimeUnit.SECONDS)
+        val completion = engine.seekToAsync(1500L)
+        val refused = assertThrows(ExecutionException::class.java) { completion.get(2, TimeUnit.SECONDS) }
+        assertSame(missing, refused.cause)
+        assertSame(missing, engine.snapshot().error)
+        assertEquals(0L, engine.positionMs())
+        val mapError = player.javaClass.getDeclaredMethod("playbackError", IOException::class.java)
+        mapError.isAccessible = true
+        val error = mapError.invoke(player, missing) as PlaybackException
+        assertEquals(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, error.errorCode)
     }
 
     /** Real Pause Still Revokes Playing Generation And Repeated Pause Clears Transient Resume. */

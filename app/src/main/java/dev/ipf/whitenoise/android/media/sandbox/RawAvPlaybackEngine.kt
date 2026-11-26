@@ -24,6 +24,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -519,21 +520,19 @@ internal class RawAvPlaybackEngine(
             target.matches(RawAvGeneration(activation, seekRevision), current(), playIntent, targetUs / 1000)
         }
 
-    /**
-     * Adopts an optional poster only for the exact current pending paused seek.
-     * True transfers bitmap ownership; false leaves recycling to the producer.
-     */
+    /** Adopts the current paused seek's poster; false leaves recycling to the producer. */
     override fun posterResult(
         request: RawAvPausedSeekRequest,
         probe: MediaProbe?,
+        missing: FileNotFoundException?,
     ): Boolean =
         synchronized(lock) {
             val currentRequest = posterCurrent(request.target) && pendingSeek === request.completion
             if (!currentRequest || request.completion.isCancelled) return@synchronized false
-            val poster = probe?.poster
-            if (probe == null || poster == null) {
-                if (request.explicit) {
-                    failPlaybackLocked(RawPausedSeekFailure(request.target.positionMs))
+            if (probe?.poster == null) {
+                if (missing != null || request.explicit) {
+                    redraw = missing == null
+                    failPlaybackLocked(missing ?: RawPausedSeekFailure(request.target.positionMs))
                 } else {
                     pendingSeek = null
                     request.finish(false)
@@ -547,7 +546,7 @@ internal class RawAvPlaybackEngine(
             width = probe.width
             height = probe.height
             rotation = 0 // Automatic poster dimensions and pixels are already display-oriented.
-            retainFrame(poster, 0)
+            retainFrame(probe.poster, 0)
             synchronized(frameLock) { lastBitmapPtsUs = request.target.positionMs * 1000L }
             request.finish(true) // Acknowledgement and frame publication share the generation lock.
             signal.trySend(Unit)
@@ -894,14 +893,14 @@ internal class RawAvPlaybackEngine(
                 redraw = false
                 val rendered =
                     synchronized(frameLock) {
-                        // A seek can supersede adoption before this second engine-lock acquisition.
-                        // Consume stale redraw; a matching new frame or surface event requests its own redraw.
-                        lastBitmap?.takeIf { lastBitmapSeek == seekRevision }?.let {
+                        // A settled refusal leaves the previous frame committed, including on a new surface.
+                        val settledRefusal = error is RawPausedSeekFailure && pendingSeek == null && !playIntent
+                        lastBitmap?.takeIf { lastBitmapSeek == seekRevision || settledRefusal }?.let {
                             val probe = observation
                             if (probe == null) {
                                 video.render(it, lastBitmapRotation)
                             } else {
-                                val generation = RawAvGeneration(activation, seekRevision)
+                                val generation = RawAvGeneration(activation, lastBitmapSeek)
                                 val rotation = lastBitmapRotation
                                 val pts = lastBitmapPtsUs
                                 probe.renderAndObserve(video, it, rotation, generation, pts, renderer::positionUs)

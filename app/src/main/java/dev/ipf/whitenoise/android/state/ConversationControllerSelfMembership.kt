@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 
 /**
@@ -14,8 +16,13 @@ internal fun groupStateUpdateRemovesSelf(
 ): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
 
 /** Pending LEFT can still resolve to a joined account after cancellation. */
-internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
-    selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
+internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean = selfMembership.hasSettledDeparture(leaveRequestPending)
+
+internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
+    lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
+
+private fun SelfMembershipFfi.hasSettledDeparture(leaveRequestPending: Boolean): Boolean =
+    isNonMember() && !(this == SelfMembershipFfi.LEFT && leaveRequestPending)
 
 /** Distinguishes an actual eviction from a provisional voluntary departure. */
 internal fun SelfMembershipFfi.isGroupEviction(): Boolean =

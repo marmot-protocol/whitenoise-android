@@ -87,30 +87,45 @@ class RawAvSeekPublicationTest {
         }
     }
 
-    @Test fun missingPausedPosterRefusesTheSeek() {
-        withEngine { engine ->
-            val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
-            val intent = engine.intent()
-            val request =
-                RawAvPausedSeekRequest(
-                    RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500),
-                    completion,
-                )
-            assertFalse(engine.posterResult(request, null))
-            val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
-            assertSame(refusal.cause, engine.snapshot().error)
-            val failedSeek = refusal.cause as RawPausedSeekFailure
-            assertEquals(1500L, failedSeek.positionMs)
-            assertEquals(0L, engine.positionMs())
-            assertEquals(0L, engine.snapshot().renderedFrame)
-            val retry = engine.seekToAsync(failedSeek.positionMs) as SettableFuture<Void?>
-            val current = engine.intent()
-            val generation = RawAvGeneration(current.activation, current.seek)
-            val retryTarget = RawAvPosterTarget(generation, failedSeek.positionMs)
-            val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
-            assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
-            assertEquals(1500L, engine.positionMs())
-            assertNull(engine.snapshot().error)
+    @Test fun missingPausedPosterKeepsTheCommittedFrameAfterReattachment() {
+        withSurface { surface ->
+            withEngine { engine ->
+                val old = bitmap()
+                adopt(engine, old)
+                val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
+                val intent = engine.intent()
+                val request =
+                    RawAvPausedSeekRequest(
+                        RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500),
+                        completion,
+                    )
+                assertFalse(engine.posterResult(request, null))
+                val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
+                assertSame(refusal.cause, engine.snapshot().error)
+                val failedSeek = refusal.cause as RawPausedSeekFailure
+                assertEquals(1500L, failedSeek.positionMs)
+                assertEquals(0L, engine.positionMs())
+                assertEquals(0L, engine.snapshot().renderedFrame)
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertFalse(old.isRecycled)
+
+                val retry = engine.seekToAsync(failedSeek.positionMs) as SettableFuture<Void?>
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                val current = engine.intent()
+                val generation = RawAvGeneration(current.activation, current.seek)
+                val retryTarget = RawAvPosterTarget(generation, failedSeek.positionMs)
+                val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
+                assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
+                assertEquals(1500L, engine.positionMs())
+                assertNull(engine.snapshot().error)
+                render(engine)
+                assertEquals(2, RecordingCanvasSurface.posts)
+                assertTrue(old.isRecycled)
+            }
         }
     }
 
