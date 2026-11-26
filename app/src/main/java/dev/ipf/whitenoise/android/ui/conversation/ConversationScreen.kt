@@ -4088,6 +4088,7 @@ internal fun ConversationScreen(
                                 ConversationGroupRecoveryCard(controller, appState)
                                 ConversationEmptyMessage(
                                     conversationEmptyState(controller.group.disappearingMessageSecs),
+                                    verticalPadding = 0.dp,
                                 )
                             }
                         renderedTimeline.isEmpty() &&
