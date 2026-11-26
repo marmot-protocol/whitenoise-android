@@ -108,9 +108,17 @@ internal class NotificationDeliveryController(
     // since turning it on starts an SDK token sync that no later off write cancels. Each sets it on commit.
     internal val uncommittedNativePushEnables = AtomicInteger()
 
+    // Active device-wide delivery-mode transactions, including handoffs when a newer mode supersedes an
+    // in-flight one. While any is open a sync leaves Firebase auto-init alone so a superseded Push cutover
+    // cannot trigger auto-init before a superseding Local cutover disables native push.
+    internal val activeDeliveryModeTransactions = AtomicInteger()
+
     // Whether the latest Firebase auto-init write failed. A failed write records the pending registration
     // sync, and no sync acknowledges it until a later write succeeds, so the next sync retries the write.
     internal val fcmAutoInitWriteFailed = AtomicBoolean()
+
+    // Whether the latest failed Firebase auto-init write also failed to store its durable retry marker.
+    internal val fcmAutoInitRetryUnstored = AtomicBoolean()
     internal val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     internal val notificationDeliveryModeMutex = Mutex()
     internal val notificationDeliveryModeIntent = StalenessGuard()
@@ -230,6 +238,7 @@ internal class NotificationDeliveryController(
         if (!localNotificationPermissionGranted) return pauseNotificationDeliveryReconciliation()
         if (settings == null) return syncNativePushRegistrationIfEnabled()
         val intentGeneration = notificationDeliveryModeIntent.advance()
+        activeDeliveryModeTransactions.incrementAndGet()
         var handedOff = false
         return try {
             notificationDeliveryModeMutex.withLock {
@@ -248,7 +257,10 @@ internal class NotificationDeliveryController(
                 true
             }
         } finally {
-            if (!handedOff) finishNotificationDeliveryModeTransaction(intentGeneration)
+            if (!handedOff) {
+                activeDeliveryModeTransactions.decrementAndGet()
+                finishNotificationDeliveryModeTransaction(intentGeneration)
+            }
         }
     }
 

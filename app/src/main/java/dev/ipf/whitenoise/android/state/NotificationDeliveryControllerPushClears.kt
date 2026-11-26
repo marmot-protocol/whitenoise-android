@@ -61,7 +61,8 @@ internal suspend fun NotificationDeliveryController.drainPendingPushDisables() {
  */
 internal suspend fun NotificationDeliveryController.settleFcmAutoInitAfterSignOutNativeDisable(account: String) {
     withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
-    disableFcmAutoInitWithoutLoadedNativeDemand()
+    val demand = disableFcmAutoInitWithoutLoadedNativeDemand()
+    if (demand == NativePushDemand.Unknown || demand == null) recordPendingRegistrationSync()
 }
 
 /**
@@ -127,6 +128,12 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
     if (enabled && !nativePushCapability().isAvailable) return false
     // A native disable can commit before a cancellation surfaces, so the settle runs in finally.
     val nativeDisableAttempted = AtomicBoolean(!enabled)
+    val rotation = pushTokenRotationSequence.get()
+    // Only a marker this enable's own deferred sync left may be cleared; an earlier one is another change's retry.
+    val syncPendingBefore =
+        withContext(pushWakeStorageDispatcher) {
+            runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(true)
+        }
     try {
         if (enabled) uncommittedNativePushEnables.incrementAndGet()
         val changed =
@@ -136,7 +143,22 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledSettling
                 if (enabled) uncommittedNativePushEnables.decrementAndGet()
             }
         // A confirmed enable reports success only once auto-init is set or its retry is stored.
-        return if (enabled && changed) commitFcmAutoInitAfterEnable { true } else changed
+        return if (enabled && changed) {
+            commitFcmAutoInitAfterEnable(
+                acknowledgeSync = {
+                    val quiet = uncommittedNativePushEnables.get() == 0 && activeDeliveryModeTransactions.get() == 0
+                    if (!syncPendingBefore && quiet) {
+                        withContext(pushWakeStorageDispatcher) {
+                            pushTokenStore.completeRegistrationSyncIfCurrent(
+                                ownerIsCurrent = { pushTokenRotationSequence.get() == rotation },
+                            )
+                        }
+                    }
+                },
+            ) { true }
+        } else {
+            changed
+        }
     } catch (cancelled: CancellationException) {
         // A cancelled enable may have left native push on without a registration, before its rollback or
         // during it. The durable pending-sync marker makes the next sync register it, turning auto-init on

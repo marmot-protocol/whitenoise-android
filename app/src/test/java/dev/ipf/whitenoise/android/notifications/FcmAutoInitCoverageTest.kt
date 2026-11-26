@@ -89,13 +89,18 @@ class FcmAutoInitCoverageTest {
         val conditional = "if (current && enableAutoInit) applyFcmAutoInit(enabled = true)"
         assertTrue("only callers that ask enable it", fetch.contains(conditional))
         val forAccounts = sync.functionBody("syncNativePushRegistrationForAccountsLocked")
-        assertTrue(forAccounts.contains("val autoInitDeferred = uncommittedNativePushEnables.get() > 0"))
+        assertTrue(forAccounts.contains("uncommittedNativePushEnables.get() > 0"))
+        assertTrue(
+            "an open delivery-mode transaction also defers auto-init",
+            forAccounts.contains("activeDeliveryModeTransactions.get() > 0"),
+        )
         val deferredRetry = "val retryStored = !autoInitDeferred || recordPendingRegistrationSync()"
         assertTrue("a deferred sync records its retry", deferredRetry in forAccounts)
         assertTrue("an open enable defers auto-init", forAccounts.contains("enableAutoInit = !autoInitDeferred"))
         val acknowledge = sync.functionBody("acknowledgeRegistrationSyncUnlessUnsettled")
-        val unsettled = "if (autoInitDeferred || fcmAutoInitWriteFailed.get()) return true"
-        assertTrue("and keeps the pending marker", unsettled in acknowledge)
+        assertTrue("and keeps the pending marker", "autoInitDeferred -> true" in acknowledge)
+        val unstored = "fcmAutoInitWriteFailed.get() -> !fcmAutoInitRetryUnstored.get()"
+        assertTrue("a failed write settles only when its retry was stored", unstored in acknowledge)
         val acknowledged = "acknowledgeRegistrationSyncUnlessUnsettled(token, autoInitDeferred, operationIsCurrent)"
         assertTrue(acknowledged in forAccounts)
         assertTrue("fetchFcmTokenOrNull must read the SDK token", read >= 0)

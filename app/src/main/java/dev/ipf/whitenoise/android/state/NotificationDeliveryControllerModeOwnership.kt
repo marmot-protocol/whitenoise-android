@@ -9,6 +9,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Resolves the device mode from authoritative account settings and identifies any incomplete invariant. */
 internal suspend fun NotificationDeliveryController.notificationDeliveryActivationPlan(
@@ -58,31 +59,40 @@ private suspend fun NotificationDeliveryController.readNotificationDeliverySetti
     return settingsByAccount
 }
 
-/** Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch. */
+/**
+ * Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch.
+ * Adopts the caller's open [activeDeliveryModeTransactions] count and releases it before draining pending syncs.
+ */
 internal fun NotificationDeliveryController.launchNotificationDeliveryModeReconciliation(
     owner: NotificationDeliveryModeOwner,
     mode: NotificationDeliveryMode,
     applyDeviceWideMode: Boolean,
 ) {
     notificationDeliveryModeBusy = true
-    notificationScope.launch {
-        try {
-            notificationDeliveryModeMutex.withLock {
-                if (!ownsNotificationDeliveryMode(owner)) return@withLock
-                if (applyDeviceWideMode) {
-                    if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
-                    when (mode) {
-                        NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
-                        NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
-                    }
-                } else {
-                    syncNativePushRegistrationIfEnabled()
-                }
-            }
-        } finally {
-            finishNotificationDeliveryModeTransaction(owner.intentGeneration)
-        }
+    val released = AtomicBoolean(false)
+    val release = {
+        if (released.compareAndSet(false, true)) activeDeliveryModeTransactions.decrementAndGet()
     }
+    notificationScope
+        .launch {
+            try {
+                notificationDeliveryModeMutex.withLock {
+                    if (!ownsNotificationDeliveryMode(owner)) return@withLock
+                    if (applyDeviceWideMode) {
+                        if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
+                        when (mode) {
+                            NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
+                            NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
+                        }
+                    } else {
+                        syncNativePushRegistrationIfEnabled()
+                    }
+                }
+            } finally {
+                release()
+                finishNotificationDeliveryModeTransaction(owner.intentGeneration)
+            }
+        }.invokeOnCompletion { release() }
 }
 
 /** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */

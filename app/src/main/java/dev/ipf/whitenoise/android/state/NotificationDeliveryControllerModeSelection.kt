@@ -21,6 +21,7 @@ internal suspend fun NotificationDeliveryController.applyMode(
 ): Boolean {
     val intentGeneration = notificationDeliveryModeIntent.advance()
     if (mode == NotificationDeliveryMode.Local) nativePushFallback.invalidateAll()
+    activeDeliveryModeTransactions.incrementAndGet()
     notificationDeliveryModeBusy = true
     return try {
         notificationDeliveryModeMutex.withLock {
@@ -38,6 +39,7 @@ internal suspend fun NotificationDeliveryController.applyMode(
             }
         }
     } finally {
+        activeDeliveryModeTransactions.decrementAndGet()
         finishNotificationDeliveryModeTransaction(intentGeneration)
     }
 }

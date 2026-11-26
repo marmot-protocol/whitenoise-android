@@ -86,8 +86,11 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
         } finally {
             // Once the fallback has moved every account off native push, Firebase must stop refreshing a
             // token. A cancelled fallback may already have committed a native disable, so this always runs.
-            // A storage failure here must not replace the fallback's own result or cancellation.
-            withContext(NonCancellable) { disableFcmAutoInitWithoutNativeDemand(accountRefs) }
+            // Unreadable demand records a pending sync retry since the fallback may have cleared the marker.
+            withContext(NonCancellable) {
+                val demand = disableFcmAutoInitWithoutNativeDemand(accountRefs)
+                if (demand == NativePushDemand.Unknown || demand == null) recordPendingRegistrationSync()
+            }
         }
     }
     config ?: return false
@@ -112,13 +115,14 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
         NativePushDemand.None -> return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)
         NativePushDemand.Required -> Unit
     }
-    // An enable that can still roll back sets auto-init itself once it commits. While one is open, read after
-    // demand so it covers any flag that demand saw, this sync leaves auto-init alone and records the pending
-    // marker without acknowledging it, so the next sync settles auto-init even if that enable fails before
-    // touching it. Without a stored marker it still registers every account, so a committed Push account keeps
-    // its token current, but it does not report success, so the open enable cannot confirm on it. A failed
-    // auto-init write keeps the marker the same way.
-    val autoInitDeferred = uncommittedNativePushEnables.get() > 0
+    // An enable that can still roll back, or any active delivery-mode transaction (including a Local cutover
+    // superseding a Push selection), settles auto-init itself. While one is open, read after demand so it
+    // covers any flag that demand saw, this sync leaves auto-init alone and records the pending marker without
+    // acknowledging it, so the next sync settles auto-init even if that change fails before touching it.
+    // Without a stored marker it still registers every account, so a committed Push account keeps its token
+    // current, but it does not report success, so an open enable cannot confirm on it.
+    val autoInitDeferred =
+        uncommittedNativePushEnables.get() > 0 || activeDeliveryModeTransactions.get() > 0
     val retryStored = !autoInitDeferred || recordPendingRegistrationSync()
     val token =
         tokenForNativePushSync(freshCallbackToken, operationIsCurrent, enableAutoInit = !autoInitDeferred)
@@ -140,19 +144,22 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationFor
 
 /**
  * Acknowledges the pending registration sync once this sync registered every account, unless auto-init is
- * still unsettled: deferred to an open enable, or its last write failed. Then the marker stays for the next
- * sync, and the registration still counts as done.
+ * still unsettled: deferred to an open enable/transaction, or its last write failed. A failed auto-init write
+ * keeps the pending marker and reports success only when that retry marker was stored.
  */
 private suspend fun NotificationDeliveryController.acknowledgeRegistrationSyncUnlessUnsettled(
     token: String,
     autoInitDeferred: Boolean,
     operationIsCurrent: () -> Boolean,
-): Boolean {
-    if (autoInitDeferred || fcmAutoInitWriteFailed.get()) return true
-    return withContext(pushWakeStorageDispatcher) {
-        pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+): Boolean =
+    when {
+        autoInitDeferred -> true
+        fcmAutoInitWriteFailed.get() -> !fcmAutoInitRetryUnstored.get()
+        else ->
+            withContext(pushWakeStorageDispatcher) {
+                pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+            }
     }
-}
 
 /**
  * Whether any captured account still needs an FCM token, as far as its settings could be read. Firebase
