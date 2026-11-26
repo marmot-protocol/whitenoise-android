@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,6 +12,7 @@ import androidx.compose.ui.unit.Dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** A locked take's trailing row: delete the take, or stop it into review. Both stay enabled throughout. */
@@ -24,7 +24,7 @@ internal fun VoiceLockedActions(
     actionColors: AccountActionColors,
 ) {
     ComposerToolbarTargets {
-        IconButton(
+        SlotIconButton(
             onClick = { controller.cancel() },
             modifier =
                 Modifier

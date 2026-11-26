@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.relayAddressAttention
@@ -102,7 +101,7 @@ internal fun AddRelaySheet(
                 }
                 if (roles.isEmpty()) SettingsExplainer(stringResource(R.string.choose_at_least_one_role))
             }
-            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, elevated = false) {
                 WhiteNoiseButton(
                     onClick = { onAdd(currentValue, roles) { terminal.close(onDismiss) } },
                     modifier =

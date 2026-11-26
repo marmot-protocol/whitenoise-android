@@ -31,6 +31,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -209,7 +210,7 @@ class ComposerCompactResizeTargetsTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_compact_draft_jump_fits.png")
     }
 
-    /** Renders a crowded compact row at double font and checks the jumps never take a core tool's slot. */
+    /** With large text, core tools remain reachable through overflow without admitting draft jumps. */
     private fun verifyCompactJumpsExcluded(
         direction: LayoutDirection,
         atTop: Boolean,
@@ -231,8 +232,13 @@ class ComposerCompactResizeTargetsTest {
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
         if (atTop) assertEquals(0f, scroll(), 0f) else assertTrue(scroll() > 0f)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.attachment_camera)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsDisplayed()
+        val camera = composeRule.onNodeWithContentDescription(context.getString(R.string.attachment_camera))
+        camera.assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+            .performScrollTo()
+            .assertIsDisplayed()
+        camera.performScrollTo().assertIsDisplayed()
         for (tag in listOf(COMPOSER_DRAFT_TOP_TAG, COMPOSER_DRAFT_BOTTOM_TAG)) {
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }

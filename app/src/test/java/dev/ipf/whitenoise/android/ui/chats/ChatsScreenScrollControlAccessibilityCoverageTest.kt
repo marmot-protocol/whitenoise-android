@@ -5,27 +5,29 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenScrollControlAccessibilityCoverageTest {
+    /**
+     * The scroll-to-top control keeps the button semantics of the FAB it replaced: it is the shared floating
+     * disc, and `FloatingControlDiscTest.chatListJumpToTopIsAButton` asserts the composed node's button role.
+     */
     @Test
     fun scrollToTopControlIsExposedAsButton() {
-        val source = jumpToTopSource().readText()
         val scrollControl =
-            source.requiredSection(
-                start = "val scrollToTopLabel = stringResource(R.string.scroll_to_top)",
-                end = "contentAlignment = Alignment.Center,",
+            appSource("ui/chats/ChatListJumpToTop.kt").requiredSection(
+                start = "internal fun ChatListJumpToTopButton(",
+                end = "internal val JUMP_TO_TOP_END_INSET",
             )
 
-        assertTrue(
-            "scroll-to-top control must retain button semantics from the replaced FAB",
-            ".clickable(role = Role.Button" in scrollControl,
-        )
+        assertTrue("scroll-to-top must be the shared floating disc", "FloatingControlDisc(" in scrollControl)
     }
 
-    private fun jumpToTopSource(): File =
+    /** Reads a main source below `ui/`'s package root from the module or repository working directory. */
+    private fun appSource(path: String): String =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListJumpToTop.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListJumpToTop.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/$path"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing ChatListJumpToTop.kt source file")
+            ?.readText()
+            ?: error("Missing $path source file")
 
     private fun String.requiredSection(
         start: String,

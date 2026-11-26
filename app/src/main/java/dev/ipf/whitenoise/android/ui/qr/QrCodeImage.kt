@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** A QR code drawn on a white rounded frame so it scans in every theme. */
 @Composable
 internal fun QrCodeImage(
     content: String,
@@ -37,7 +38,7 @@ internal fun QrCodeImage(
         value = withContext(Dispatchers.Default) { qrBitmap(content, 900).asImageBitmap() }
     }
 
-    Surface(color = Color.White, shape = RoundedCornerShape(Radii.lg), tonalElevation = 1.dp) {
+    Surface(color = Color.White, shape = RoundedCornerShape(Radii.lg)) {
         if (image == null) {
             Box(Modifier.size(257.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
