@@ -29,6 +29,25 @@ internal fun EmojiLabel(
     suffix: String = "",
 ) {
     val custom = LocalCustomEmoji.current
+    val hasArtwork =
+        remember(text, custom) {
+            ':' in text && EmojiShortcodes.presentationShortcodes(text).any {
+                EmojiShortcodes.art(it, custom, emptyMap()) != null
+            }
+        }
+    if (!hasArtwork) {
+        Text(
+            text = text + suffix,
+            modifier = modifier,
+            color = color,
+            fontWeight = fontWeight,
+            textAlign = textAlign,
+            maxLines = maxLines,
+            overflow = overflow,
+            style = style,
+        )
+        return
+    }
     val resources = LocalContext.current.resources
     Text(
         text =
@@ -43,7 +62,7 @@ internal fun EmojiLabel(
                     }
                 }
             },
-        inlineContent = if (':' in text) EmojiShortcodes.content(receivedEmoji = ReceivedEmoji.None) else emptyMap(),
+        inlineContent = EmojiShortcodes.content(receivedEmoji = ReceivedEmoji.None),
         modifier = modifier,
         color = color,
         fontWeight = fontWeight,

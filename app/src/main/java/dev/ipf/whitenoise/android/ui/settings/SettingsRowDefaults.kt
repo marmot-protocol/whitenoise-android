@@ -8,6 +8,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -48,9 +49,15 @@ internal fun SettingsRowTitle(
     title: String,
     editable: Boolean,
     destructive: Boolean = false,
+    titleCanContainEmoji: Boolean = true,
 ) {
     val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-    EmojiLabel(title, color = color.dimmedUnless(editable))
+    val textColor = color.dimmedUnless(editable)
+    if (titleCanContainEmoji) {
+        EmojiLabel(title, color = textColor)
+    } else {
+        Text(title, color = textColor)
+    }
 }
 
 /** Supporting values wrap onto as many lines as they need instead of truncating. */

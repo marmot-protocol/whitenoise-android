@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -108,12 +109,15 @@ internal fun WhiteNoiseTextField(
     val emojiAnchor = rememberEmojiSheetFieldAnchor()
     val useEmojiArtwork = emojiArtwork && outputTransformation == null
     val artwork = rememberTextFieldEmojiArtwork(state, useEmojiArtwork)
-    val spokenValue = if (useEmojiArtwork) emojiEditableText(state) else Modifier
+    val spokenValue = if (useEmojiArtwork) emojiEditableText(state, enabled) else Modifier
     val fieldInput = artwork.inputWith(inputTransformation)
     val scrollState = rememberScrollState()
     val textLayout = remember { TextLayoutHolder() }
 
-    CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
+    CompositionLocalProvider(
+        LocalTextSelectionColors provides colors.textSelectionColors,
+        LocalClipboard provides emojiFieldClipboard(useEmojiArtwork),
+    ) {
         BasicTextField(
             state = state,
             modifier =

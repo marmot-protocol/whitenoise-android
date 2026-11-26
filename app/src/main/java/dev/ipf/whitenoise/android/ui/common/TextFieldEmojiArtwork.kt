@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import android.content.ClipData
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -26,12 +27,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.editableText
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setSelection
+import androidx.compose.ui.semantics.textSelectionRange
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -60,31 +67,87 @@ private val shortcodeSlotStyle by lazy {
 }
 
 private val collapsedShortcodeStyle =
-    SpanStyle(color = Color.Transparent, letterSpacing = 0.em, textGeometricTransform = TextGeometricTransform(scaleX = 0f))
+    SpanStyle(
+        color = Color.Transparent,
+        letterSpacing = 0.em,
+        textGeometricTransform = TextGeometricTransform(scaleX = 0f),
+    )
+
+private const val EMOJI_ISOLATE = "\u2066\u2060" // Left-to-right isolate and a word joiner marking our opening.
+private const val END_EMOJI_ISOLATE = "\u2069"
+private const val WORD_JOINER = "\u2060"
+private val authoredIsolates = Regex("\u2066\u2060+")
+private val clipboardIsolates =
+    Regex("\u2066(\u2060+)(?:(:[A-Za-z0-9_-]{1,${EmojiShortcodes.MAX_CODE_LENGTH}}:)\u2069)?")
 
 private fun drawableShortcodes(
     text: String,
     custom: CustomEmojiSet,
-): List<String> = EmojiShortcodes.presentationShortcodes(text).filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
+): List<String> =
+    EmojiShortcodes.presentationShortcodes(text).filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
 
 /**
- * Records each drawable shortcode as an atomic edit range, keeping the actual text in that range for Cut, Copy
- * and accessibility. Only the layout changes: the first character reserves one em, and the remaining ones collapse.
- * The transformation stays the same instance as codes are entered and artwork becomes available.
+ * Compose copies the visual selection. Strip its formatting isolates on the way to the platform clipboard.
+ * Doubling the word joiner run in authored isolates distinguishes those from the isolates we insert.
+ */
+private class EmojiFieldClipboard(
+    private val clipboard: Clipboard,
+) : Clipboard by clipboard {
+    override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+        val data = clipEntry?.clipData
+        val visual = data?.takeIf { it.itemCount == 1 }?.getItemAt(0)?.text?.toString()
+        val canonical =
+            visual?.let { value ->
+                clipboardIsolates.replace(value) { match ->
+                    val joiners = match.groupValues[1]
+                    val code = match.groupValues[2]
+                    if (joiners.length > 1) {
+                        "\u2066" + WORD_JOINER.repeat(joiners.length / 2) +
+                            if (code.isEmpty()) "" else code + END_EMOJI_ISOLATE
+                    } else {
+                        code.ifEmpty { match.value }
+                    }
+                }
+            }
+        if (data != null && canonical != null && visual != canonical) {
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(data.description.label, canonical)))
+        } else {
+            clipboard.setClipEntry(clipEntry)
+        }
+    }
+}
+
+@Composable
+internal fun emojiFieldClipboard(enabled: Boolean): Clipboard {
+    val current = LocalClipboard.current
+    return remember(current, enabled) { if (enabled) EmojiFieldClipboard(current) else current }
+}
+
+/**
+ * One atomic edit range per emoji. The isolate makes the transparent shortcode act like a neutral image in
+ * bidirectional text. One character reserves one em and the rest collapse. The backing state stays canonical.
  */
 private class TextFieldEmojiOutput(
     private val custom: State<CustomEmojiSet>,
 ) : OutputTransformation {
     @OptIn(ExperimentalFoundationApi::class)
     override fun TextFieldBuffer.transformOutput() {
+        val source = asCharSequence().toString()
+        for (match in authoredIsolates.findAll(source).toList().asReversed()) {
+            replace(match.range.first, match.range.last + 1, match.value + WORD_JOINER.repeat(match.value.length - 1))
+        }
         val ranges =
             EmojiShortcodes
                 .presentationRanges(asCharSequence().toString())
                 .filter { EmojiShortcodes.art(it.item, custom.value, emptyMap()) != null }
-        for (range in ranges) replace(range.start, range.end, range.item)
-        for (range in ranges) {
-            addStyle(shortcodeSlotStyle, range.start, range.start + 1)
-            addStyle(collapsedShortcodeStyle, range.start + 1, range.end)
+        for (range in ranges.asReversed()) {
+            replace(range.start, range.end, EMOJI_ISOLATE + range.item + END_EMOJI_ISOLATE)
+        }
+        val isolateLength = EMOJI_ISOLATE.length + END_EMOJI_ISOLATE.length
+        ranges.forEachIndexed { index, range ->
+            val start = range.start + index * isolateLength + EMOJI_ISOLATE.length
+            addStyle(shortcodeSlotStyle, start, start + 1)
+            addStyle(collapsedShortcodeStyle, start + 1, start + range.item.length)
         }
     }
 }
@@ -158,9 +221,10 @@ internal class TextFieldEmojiArtwork(
                     val painter = painters[range.item] ?: continue
                     val box = layout.getBoundingBox(range.start)
                     val side = minOf(box.width, box.height)
-                    if (side <= 0f) continue
-                    translate(box.center.x - side / 2, box.center.y - side / 2) {
-                        with(painter) { draw(Size(side, side)) }
+                    if (side > 0f) {
+                        translate(box.center.x - side / 2, box.center.y - side / 2) {
+                            with(painter) { draw(Size(side, side)) }
+                        }
                     }
                 }
             }
@@ -169,11 +233,24 @@ internal class TextFieldEmojiArtwork(
 }
 
 @Composable
-internal fun emojiEditableText(state: TextFieldState): Modifier {
+internal fun emojiEditableText(
+    state: TextFieldState,
+    enabled: Boolean,
+): Modifier {
     val custom = LocalCustomEmoji.current
     val resources = LocalContext.current.resources
     return Modifier.semantics {
         editableText = AnnotatedString(state.text.toString()).withSpokenEmojiNames(custom, resources)
+        textSelectionRange = state.selection
+        setSelection { start, end, _ ->
+            val offsets = 0..state.text.length
+            if (!enabled || start !in offsets || end !in offsets) {
+                false
+            } else {
+                state.edit { selection = TextRange(start, end) }
+                true
+            }
+        }
     }
 }
 

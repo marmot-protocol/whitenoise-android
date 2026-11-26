@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.VerbatimTtsAnnotation
 import androidx.compose.ui.unit.LayoutDirection
@@ -89,7 +90,8 @@ class TextFieldEmojiArtworkTest {
     fun copyingAndCuttingArtworkLeavesTheCanonicalTextOnTheClipboard() {
         val state = TextFieldState("Work :party:")
         setField(state)
-        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         val field = composeRule.onNodeWithTag(FIELD)
         field.performClick()
 
@@ -128,6 +130,57 @@ class TextFieldEmojiArtworkTest {
         composeRule.runOnIdle { state.edit { placeCursorAtEnd() } }
 
         assertArtworkVisible()
+    }
+
+    @Test
+    fun customAndUnicodeEmojiHaveTheSamePositionInBidirectionalText() {
+        val state = TextFieldState("אב A :party: אב")
+        setField(state, LayoutDirection.Rtl)
+
+        val field = composeRule.onNodeWithTag(FIELD)
+        fun isLeftOfEnglishLetter(emoji: String): Boolean {
+            val layouts = mutableListOf<TextLayoutResult>()
+            field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
+            val layout = layouts.single()
+            val text = layout.layoutInput.text.text
+            val emojiX = layout.getBoundingBox(text.indexOf(emoji)).center.x
+            val englishX = layout.getBoundingBox(text.indexOf('A')).center.x
+            return emojiX < englishX
+        }
+        val customLeft = isLeftOfEnglishLetter(":party:")
+        composeRule.runOnIdle { state.edit { replace(0, length, "אב A 🙂 אב") } }
+        assertTrue(isLeftOfEnglishLetter("🙂"))
+        assertTrue(customLeft)
+    }
+
+    @Test
+    fun accessibilitySelectionUsesCanonicalOffsets() {
+        val state = TextFieldState("Work :party: there")
+        setField(state)
+        val field = composeRule.onNodeWithTag(FIELD)
+        field.performClick()
+        field.performSemanticsAction(SemanticsActions.SetSelection) { action ->
+            assertTrue(action(5, 12, false))
+        }
+
+        composeRule.runOnIdle { assertEquals(TextRange(5, 12), state.selection) }
+        assertEquals(TextRange(5, 12), field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange])
+    }
+
+    @Test
+    fun copyingPreservesAuthoredIsolatesAndShortcodesInsideCode() {
+        val authored = "`\u2066\u2060:party:\u2069` :party:"
+        val state = TextFieldState(authored)
+        setField(state)
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        val field = composeRule.onNodeWithTag(FIELD)
+        field.performClick()
+        composeRule.runOnIdle { state.edit { selection = TextRange(0, length) } }
+        field.performSemanticsAction(SemanticsActions.CopyText)
+        composeRule.runOnIdle {
+            assertEquals(authored, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+        }
     }
 
     /** One Backspace removes the whole custom emoji, as it removes a Unicode emoji. */
@@ -203,7 +256,10 @@ class TextFieldEmojiArtworkTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
-                CompositionLocalProvider(LocalCustomEmoji provides localEmoji(), LocalLayoutDirection provides direction) {
+                CompositionLocalProvider(
+                    LocalCustomEmoji provides localEmoji(),
+                    LocalLayoutDirection provides direction,
+                ) {
                     WhiteNoiseTextField(
                         state = state,
                         modifier = Modifier.testTag(FIELD),

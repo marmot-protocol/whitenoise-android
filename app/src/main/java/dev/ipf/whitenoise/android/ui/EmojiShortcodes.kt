@@ -291,7 +291,8 @@ internal fun AnnotatedString.withSpokenEmojiNames(
         buildAnnotatedString {
             append(this@withSpokenEmojiNames)
             for (range in ranges) {
-                addTtsAnnotation(VerbatimTtsAnnotation(EmojiShortcodes.plainLabel(range.item, resources)), range.start, range.end)
+                val speech = VerbatimTtsAnnotation(EmojiShortcodes.plainLabel(range.item, resources))
+                addTtsAnnotation(speech, range.start, range.end)
             }
         }
     }

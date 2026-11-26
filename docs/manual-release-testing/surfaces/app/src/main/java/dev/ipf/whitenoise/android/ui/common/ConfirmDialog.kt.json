@@ -31,6 +31,14 @@
         "test_ids": [
           "MSG-037"
         ]
+      },
+      {
+        "surface": "ConfirmText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+        "anchor": "fun ConfirmText(",
+        "test_ids": [
+          "AXY-001"
+        ]
       }
     ],
     "settings_controls": [

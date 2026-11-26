@@ -11,7 +11,10 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 internal suspend fun Context.prepareEmojiLabels(labels: Iterable<String?>) {
     val app = applicationContext as? WhiteNoiseApplication ?: return
     if (labels.none { label ->
-            label != null && EmojiShortcodes.presentationShortcodes(label).any { EmojiShortcodes.builtinDrawable(it) == null }
+            label != null &&
+                EmojiShortcodes.presentationShortcodes(label).any {
+                    EmojiShortcodes.builtinDrawable(it) == null
+                }
         }
     ) {
         return
@@ -24,14 +27,19 @@ internal suspend fun Context.prepareNotificationEmojiLabels(
     conversationTitle: String?,
     senderName: String?,
     recipientLabel: String?,
-) = prepareEmojiLabels(
-    listOf(
-        conversationTitle ?: update.groupName,
-        senderName ?: update.sender.displayName,
-        update.receiver.displayName,
-        recipientLabel,
-    ),
-)
+) {
+    if (!NotificationPreviewPreferences.capture(this).allowed) return
+    prepareEmojiLabels(
+        listOf(
+            conversationTitle,
+            update.groupName,
+            senderName,
+            update.sender.displayName,
+            update.receiver.displayName,
+            recipientLabel,
+        ),
+    )
+}
 
 /**
  * [text] for a surface that can only draw text (notification names, shortcut labels, widget and tile text): every
@@ -44,8 +52,9 @@ internal fun Context.emojiPlainText(text: String): String {
     return EmojiShortcodes.plainText(text, custom, resources)
 }
 
-/** [emojiPlainText] for a nullable [context], leaving [text] untouched where no platform context exists. */
-internal fun plainEmojiText(
-    context: Context?,
-    text: String,
-): String = context?.emojiPlainText(text) ?: text
+/** Freeze the local catalog so the first-write projection and presenter format the same labels. */
+internal fun Context?.notificationEmojiLabelFormatter(): (String) -> String {
+    val resources = this?.resources ?: return { it }
+    val custom = (applicationContext as? WhiteNoiseApplication)?.customEmojiStore?.emoji ?: CustomEmojiSet.Empty
+    return { EmojiShortcodes.plainText(it, custom, resources) }
+}

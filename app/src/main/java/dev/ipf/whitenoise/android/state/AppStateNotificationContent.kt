@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeEvent
+import dev.ipf.whitenoise.android.notifications.notificationEmojiLabelFormatter
 import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -1033,6 +1034,7 @@ private suspend fun WhiteNoiseAppState.showInitialNotificationUpdate(
             useDirectLayout = useDirectLayout,
             redactContent = redactContent,
             directShareEligible = !redactContent && candidate.accountRef == activeAccountRef,
+            emojiLabel = firstPost.emojiLabel,
             shortNpub = ::cachedShortNpubOrUnknown,
             onNotificationWritten = onNotificationWritten,
             isPostStillAllowed = {
@@ -1527,13 +1529,16 @@ private suspend fun WhiteNoiseAppState.resolveNotificationFirstPost(
             is NotificationFirstPostContentResult.Resolved -> result.value
             else -> null
         }
+    val emojiLabel = appContext.notificationEmojiLabelFormatter()
     return NotificationFirstPost(
         epoch = postEpoch,
         accountCacheEpoch = accountCacheEpoch,
         engineMuted = engineMuted,
         shouldPost = shouldPost,
         content = content,
-        presentation = notificationContentPresentation(appContext, update, content, ::cachedShortNpubOrUnknown),
+        presentation =
+            notificationContentPresentation(appContext, update, content, emojiLabel, ::cachedShortNpubOrUnknown),
+        emojiLabel = emojiLabel,
         avatars = readyNotificationAvatars(update),
     )
 }

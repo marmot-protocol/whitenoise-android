@@ -361,15 +361,13 @@ class LocalNotificationPresenter(
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
         isPostStillAllowed: () -> Boolean = { true },
+        emojiLabel: (String) -> String = context.notificationEmojiLabelFormatter(),
         shortNpub: (String) -> String,
     ): Boolean {
         val channelWriteEpoch = NotificationChannelWriteGuard.captureEpoch()
         val profileAllowsPost = { isPostStillAllowed() && !profileNotificationOverrides.isMuted(update) }
         if (!profileAllowsPost()) return false
         val previewToken = NotificationPreviewPreferences.capture(context)
-        if (previewToken.allowed && !redactContent) {
-            context.prepareNotificationEmojiLabels(update, conversationTitleOverride, senderNameOverride, recipientAccountSubtext)
-        }
         val formattedContent =
             LocalNotificationFormatter.content(
                 update = update,
@@ -380,6 +378,7 @@ class LocalNotificationPresenter(
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
                 useDirectLayout = useDirectLayout,
+                emojiLabel = emojiLabel,
                 shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
@@ -664,7 +663,7 @@ class LocalNotificationPresenter(
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     // Name the recipient identity in the header when multi-account (#836).
                     if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
-                        builder.setSubText(context.emojiPlainText(recipientAccountSubtext))
+                        builder.setSubText(emojiLabel(recipientAccountSubtext))
                     }
                     if (
                         decision.style == NotificationStyleChoice.Plain ||

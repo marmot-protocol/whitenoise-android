@@ -41,6 +41,7 @@ internal fun ConfirmDialog(
     confirmModifier: Modifier = Modifier,
     confirmTag: String = "confirmation.confirm",
     cancelTag: String = "confirmation.cancel",
+    emojiLabels: Boolean = true,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
@@ -65,15 +66,24 @@ internal fun ConfirmDialog(
                 Text(dismissLabel ?: stringResource(R.string.cancel))
             }
         },
-        title = { EmojiLabel(title) },
+        title = { ConfirmText(title, emojiLabels) },
         text = {
             Column(
                 Modifier.fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                message?.let { EmojiLabel(it) }
+                message?.let { ConfirmText(it, emojiLabels) }
                 identity?.invoke()
             }
         },
     )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun ConfirmText(
+    text: String,
+    emoji: Boolean,
+) {
+    if (emoji) EmojiLabel(text) else Text(text)
 }
