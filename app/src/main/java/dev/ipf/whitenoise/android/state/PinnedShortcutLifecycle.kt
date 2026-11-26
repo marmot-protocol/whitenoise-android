@@ -17,7 +17,7 @@ private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
 private const val SIGN_OUT_OWNER_SAVE_ATTEMPTS = 3
 
 /** Captured departing-account group inventory together with whether every native listing succeeded. */
-internal data class AccountGroupInventory(
+private data class AccountGroupInventory(
     val groupIds: Set<String>,
     val nativeInventoryComplete: Boolean,
 )
@@ -82,13 +82,11 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
  * Captures the departing account's known group ids before native sign-out or wipe revokes them,
  * so upgrade-era `:conv:` channels without a shortcut or ownership record are still deleted when
  * another account remains signed in. Pending local-delete journal groups are included, since journal
- * replay no longer runs for an account once it has signed out. While another account remains, channels
- * of chats no account still lists are recorded too (see [departedChatChannelShortcutIds]).
+ * replay no longer runs for an account once it has signed out.
  *
  * Returns null before native revocation when native inventory remained incomplete while
- * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, for the departing
- * account or any account that remains, or when the departing ownership record and any last-signer sweep
- * could not be durably saved after retries.
+ * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
+ * the departing ownership record and any last-signer sweep could not be durably saved after retries.
  */
 internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
     accountRef: String,
@@ -102,34 +100,14 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
             withContext(Dispatchers.IO) {
                 hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
             }
-    // The last signer's sweep already deletes every ownerless channel, so only a shared device needs this.
-    val departed =
-        if (includeUnscopedLegacy || unaccountedChannelRisk) {
-            emptySet()
-        } else {
-            departedChatChannelShortcutIds(accountRef, groupIds)
-        }
-    // An unlisted chat's channel could be another account's or a departed chat's. Neither may be guessed, and
-    // once native revocation commits nothing would sweep a departed one while a signer remains, so stop first.
-    val departedUnknown =
-        departed == null &&
-            withContext(Dispatchers.IO) {
-                hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
-            }
     return when {
-        unaccountedChannelRisk || departedUnknown -> {
+        unaccountedChannelRisk -> {
             appStateDebug { "sign-out channel capture incomplete with unaccounted conversation channels" }
             null
         }
         !retrySignOutOwnerSave {
             withContext(Dispatchers.IO) {
-                recordDepartingConversationChannelOwners(
-                    appContext,
-                    accountRef,
-                    groupIds,
-                    includeUnscopedLegacy,
-                    departedChatShortcutIds = departed,
-                )
+                recordDepartingConversationChannelOwners(appContext, accountRef, groupIds, includeUnscopedLegacy)
             }
         } -> {
             appStateDebug { "sign-out channel capture could not be saved before native revocation" }
@@ -149,7 +127,7 @@ private suspend fun retrySignOutOwnerSave(save: suspend () -> Boolean): Boolean 
 }
 
 /** Reads every group id the account's channels may be named after, retrying transient native reads before fallback. */
-internal suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
+private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: String): AccountGroupInventory {
     val chats = readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
     val quarantined =
         readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }

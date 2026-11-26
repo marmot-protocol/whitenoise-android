@@ -11,16 +11,13 @@ import dev.ipf.marmotkit.RelayFailureFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_CHANNEL_OWNERS_PREFS
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
-import dev.ipf.whitenoise.android.notifications.channelOwnerAccountHash
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
-import dev.ipf.whitenoise.android.notifications.departedChatOwnerKey
 import dev.ipf.whitenoise.android.notifications.sha256Hex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -253,120 +250,6 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
                 assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
                 assertNull(manager.getNotificationChannel(channelId))
             } finally {
-                manager.deleteNotificationChannel(channelId)
-                ownerPrefs.edit().clear().commit()
-            }
-        }
-
-    /**
-     * When the account that stays cannot list its chats, a `:conv:` channel no record claims could be its chat's or
-     * a departed one's. Sign-out and wipe stop before native revocation instead of leaving a departed chat's title,
-     * and once that account's chats list again, sign-out deletes the channel of the chat no account lists.
-     */
-    @Test
-    fun signOutAndWipeAbortBeforeRevocationWhenTheRemainingAccountCannotListItsChats() =
-        runBlocking {
-            val deletedGroup = "ab".repeat(16)
-            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
-            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
-            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
-            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-            ownerPrefs.edit().clear().commit()
-            manager.createNotificationChannel(
-                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-            additionalAccounts =
-                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)))
-            chatListReply = { emptyList() }
-            quarantinedGroupsReply = { emptyList() }
-            chatListFailsFor = setOf(otherAccountRef)
-            val state = appState(profileReader = { null })
-            try {
-                assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-                assertEquals(0, signOutCalls.get())
-                assertEquals(0, nativeDisableCalls.get())
-                assertNull(state.signOutAndWipeActiveAccount())
-                assertEquals(0, wipeCalls.get())
-                assertEquals(accountRef, state.activeAccountRef)
-                assertNotNull(manager.getNotificationChannel(channelId))
-
-                chatListFailsFor = emptySet()
-                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
-                assertNull(manager.getNotificationChannel(channelId))
-            } finally {
-                chatListFailsFor = emptySet()
-                manager.deleteNotificationChannel(channelId)
-                ownerPrefs.edit().clear().commit()
-            }
-        }
-
-    /**
-     * A retained read-only profile cannot list chats natively. Beside a second signing account, it neither blocks
-     * sign-out nor keeps the unlisted chat's channel, since only signing accounts are asked for their chats.
-     */
-    @Test
-    fun readOnlyProfileThatCannotListChatsDoesNotBlockSignOut() =
-        runBlocking {
-            val deletedGroup = "ac".repeat(16)
-            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
-            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
-            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
-            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-            ownerPrefs.edit().clear().commit()
-            manager.createNotificationChannel(
-                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-            val readOnlyRef = "read-only-profile"
-            additionalAccounts =
-                listOf(
-                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)),
-                    externalSignerAccount(signedOut = true).copy(label = readOnlyRef, accountIdHex = "fa".repeat(32)),
-                )
-            chatListReply = { emptyList() }
-            quarantinedGroupsReply = { emptyList() }
-            chatListFailsFor = setOf(readOnlyRef)
-            val state = appState(profileReader = { null })
-            try {
-                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
-                assertNull(manager.getNotificationChannel(channelId))
-            } finally {
-                chatListFailsFor = emptySet()
-                manager.deleteNotificationChannel(channelId)
-                ownerPrefs.edit().clear().commit()
-            }
-        }
-
-    /**
-     * A retried capture whose remaining account cannot list its chats aborts instead of treating its own earlier
-     * inferred claims as proof, and keeps those claims rather than replacing them with nothing.
-     */
-    @Test
-    fun incompleteRetryKeepsTheEarlierInferredClaims() =
-        runBlocking {
-            val deletedGroup = "ad".repeat(16)
-            val shortcutId = checkNotNull(conversationShortcutId(accountRef, deletedGroup))
-            val channelId = "${NotificationChannelSpec.GROUP_MESSAGES.id}:conv:$shortcutId"
-            val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
-            val ownerPrefs = context.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-            ownerPrefs.edit().clear().commit()
-            manager.createNotificationChannel(
-                NotificationChannel(channelId, "Deleted Chat Secret", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-            additionalAccounts =
-                listOf(externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "ee".repeat(32)))
-            chatListReply = { emptyList() }
-            quarantinedGroupsReply = { emptyList() }
-            val state = appState(profileReader = { null })
-            val claimKey = checkNotNull(channelOwnerAccountHash(accountRef)).departedChatOwnerKey
-            try {
-                assertNotNull(state.captureAccountKnownGroupIds(accountRef))
-                assertEquals(setOf(shortcutId), ownerPrefs.getStringSet(claimKey, emptySet()))
-
-                chatListFailsFor = setOf(otherAccountRef)
-                assertNull(state.captureAccountKnownGroupIds(accountRef))
-                assertEquals(setOf(shortcutId), ownerPrefs.getStringSet(claimKey, emptySet()))
-            } finally {
-                chatListFailsFor = emptySet()
                 manager.deleteNotificationChannel(channelId)
                 ownerPrefs.edit().clear().commit()
             }

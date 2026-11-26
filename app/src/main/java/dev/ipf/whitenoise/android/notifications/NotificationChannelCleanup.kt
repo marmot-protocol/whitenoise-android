@@ -27,7 +27,7 @@ private const val CONVERSATION_CHANNEL_INFIX = ":conv:"
 private const val VIBRATION_SUFFIX_MARKER = ":vibration:"
 
 /** Tracks owner keys whose latest in-memory mutation has not yet been durably committed to disk. */
-internal object UncommittedChannelOwners {
+private object UncommittedChannelOwners {
     private val byContext = WeakHashMap<Context, MutableSet<String>>()
 
     /** Returns the mutable uncommitted-key set for [appContext] under `UserEventNotificationGroup.mutationLock`. */
@@ -241,14 +241,12 @@ private fun updateOwnerStoreAfterAccountCleanup(
 
 /**
  * Retries channel deletion for each departed account key in [staleKeys] and removes only keys whose
- * channels were enumerated, redacted, and deleted without error. An inferred departed-chat claim key never deletes
- * a channel in [claimProtection], what retained accounts own now.
+ * channels were enumerated, redacted, and deleted without error.
  */
 internal fun pruneStaleAccountChannelsAndOwners(
     appContext: Context,
     prefs: SharedPreferences,
     staleKeys: List<String>,
-    claimProtection: Set<String> = emptySet(),
 ): Boolean {
     val clearedKeys = mutableListOf<String>()
     var allCleared = true
@@ -259,8 +257,6 @@ internal fun pruneStaleAccountChannelsAndOwners(
                 .getStringSet(staleKey, emptySet())
                 .orEmpty()
                 .flatMapTo(mutableSetOf(), ::channelShortcutIdsFromShortcutId)
-        // An inferred departed-chat claim never deletes what a retained account owns.
-        if (staleKey.startsWith(DEPARTED_CHAT_KEY_PREFIX)) staleShortcutIds -= claimProtection
         val deleted =
             deleteMatchingNotificationChannels(appContext) { channel ->
                 val isStaleProfile = channel.id.startsWith(staleProfilePrefix)
@@ -331,11 +327,7 @@ private fun otherAccountShortcutIds(
         }.flatMapTo(mutableSetOf()) { channelShortcutIdsFromShortcutId(it.id) }
 }
 
-/**
- * Returns every conversation shortcut id variant recorded for [accountRef] in the hashed owner store. Channels
- * its sign-out inferred from chats no account lists are not among them: retention deletes those only after
- * every signing account's chats are read again (see [departedChatOwnerKey]).
- */
+/** Returns every conversation shortcut id variant recorded for [accountRef] in the hashed owner store. */
 private fun storedAccountShortcutIds(
     preferences: SharedPreferences,
     accountRef: String,
