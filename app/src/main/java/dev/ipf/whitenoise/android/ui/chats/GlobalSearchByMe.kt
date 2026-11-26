@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import java.util.Locale
 
 /** Test tag of the By me quick filter chip. */
@@ -87,7 +87,7 @@ internal fun GlobalSearchByMeChip(
     selected: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    FilterChip(
+    WhiteNoiseFilterChip(
         selected = selected,
         onClick = byMe.onToggle,
         label = { Text(stringResource(R.string.search_quick_filter_by_me)) },

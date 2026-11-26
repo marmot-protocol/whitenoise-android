@@ -25,6 +25,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.LocalWindowFolds
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowHeightClass
+import dev.ipf.whitenoise.android.ui.keyboard.chatPaneKeyInput
+import dev.ipf.whitenoise.android.ui.keyboard.rememberChatPaneKeyOwner
 import kotlin.math.abs
 
 internal const val TWO_PANE_LIST_TAG = "two_pane_list"
@@ -40,6 +42,8 @@ internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeh
  *
  * Side by side, each pane touches only one outer edge, so a camera cutout or navigation bar on the
  * other edge must not pad it: the list drops the end-side inset and the conversation the start-side.
+ *
+ * Side by side, the pane holding focus (or pressed last) owns the hardware keyboard's in-chat search (#4005).
  */
 @Composable
 internal fun TwoPaneChatFrame(
@@ -50,6 +54,7 @@ internal fun TwoPaneChatFrame(
     val shortWindow = LocalWindowLayout.current.heightClass == WindowHeightClass.Compact
     val folds = LocalWindowFolds.current.upright
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
+    val keyOwner = rememberChatPaneKeyOwner(twoPane)
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -57,6 +62,7 @@ internal fun TwoPaneChatFrame(
                 Box(
                     Modifier
                         .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+                        .chatPaneKeyInput(keyOwner, list = true)
                         .testTag(TWO_PANE_LIST_TAG),
                 ) {
                     listPane()
@@ -64,11 +70,13 @@ internal fun TwoPaneChatFrame(
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
             Box(
-                if (twoPane) {
-                    Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
-                } else {
-                    Modifier
-                },
+                Modifier.chatPaneKeyInput(keyOwner, list = false).then(
+                    if (twoPane) {
+                        Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                    } else {
+                        Modifier
+                    },
+                ),
             ) {
                 conversationPane()
             }

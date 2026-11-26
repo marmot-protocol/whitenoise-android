@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -54,6 +53,7 @@ import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
@@ -259,7 +259,7 @@ internal fun PollCreateForm(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = !multiple,
                 onClick = { onMultipleChange(false) },
                 modifier =
@@ -269,7 +269,7 @@ internal fun PollCreateForm(
                 label = { Text(stringResource(R.string.poll_single_choice)) },
                 enabled = enabled,
             )
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = multiple,
                 onClick = { onMultipleChange(true) },
                 modifier =
@@ -307,7 +307,7 @@ private fun PollDeadlineChoices(
             POLL_WEEK_SECONDS to R.string.poll_duration_1_week,
             MAX_POLL_DEADLINE_SECONDS to R.string.poll_30_days,
         ).forEach { (duration, label) ->
-            FilterChip(
+            WhiteNoiseFilterChip(
                 selected = !selection.customSelected && selection.presetSeconds == duration,
                 onClick = { onSelect(selection.copy(presetSeconds = duration, customSelected = false)) },
                 label = {
@@ -319,7 +319,7 @@ private fun PollDeadlineChoices(
                 enabled = enabled,
             )
         }
-        FilterChip(
+        WhiteNoiseFilterChip(
             selected = selection.customSelected,
             onClick = { onSelect(selection.copy(customSelected = true)) },
             label = { Text(stringResource(R.string.poll_custom_time)) },
@@ -342,7 +342,7 @@ private fun PollDeadlineChoices(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             PollDurationUnit.entries.forEach { unit ->
-                FilterChip(
+                WhiteNoiseFilterChip(
                     selected = selection.customUnit == unit,
                     onClick = { onSelect(selection.copy(customUnit = unit)) },
                     label = { Text(stringResource(unit.labelRes)) },

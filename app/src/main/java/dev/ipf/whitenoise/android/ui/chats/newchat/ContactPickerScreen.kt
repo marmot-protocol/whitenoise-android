@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -50,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.keyboard.HardwareShortcutBlocker
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -62,9 +64,9 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
 /**
- * Multi-select people picker shared by the New Group flow and the group
+ * Multi-select people picker shared by a conversation's Share user flow and the group
  * details Add Members flow. Selection lives in the caller's [selected] list so
- * flows can carry it across steps.
+ * flows can carry it across steps. While shown it holds the hardware keyboard shortcuts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +118,9 @@ internal fun ContactPickerScreen(
             if (reviewingSelection) reviewingSelection = false else onBack()
         }
     }
+    // The picker is drawn in the activity window over its caller, so it holds the hardware shortcuts as Back holds
+    // the screen beneath: Ctrl+F or Ctrl+N must not leave a conversation behind it and drop the selection (#4005).
+    HardwareShortcutBlocker()
 
     if (reviewingSelection && reviewGroup == null) {
         SelectedMembersReviewScreen(
@@ -343,7 +348,7 @@ internal fun ContactPickerScreen(
                             rememberMeasuredControlClick { origin ->
                                 appState.presentProfile(candidate.npub, origin = origin)
                             }
-                        ContactRow(
+                        PersonRow(
                             modifier = profileModifier,
                             title = candidate.displayName,
                             subtitle =
@@ -371,27 +376,21 @@ internal fun ContactPickerScreen(
                     }
                 } else if (matches.isEmpty()) {
                     item {
-                        if (userSearch.isSearching) {
-                            UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
-                        } else {
-                            Text(
-                                stringResource(
-                                    when {
-                                        query.isBlank() -> R.string.recipient_search_empty_hint
-                                        userSearch.failed -> R.string.user_search_failed
-                                        userSearch.isIncomplete -> R.string.user_search_incomplete
-                                        else -> R.string.no_matches
-                                    },
-                                ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                            )
+                        when {
+                            userSearch.isSearching ->
+                                UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
+                            userSearch.failed -> UserSearchStatusRow(R.string.user_search_failed)
+                            userSearch.isIncomplete -> UserSearchStatusRow(R.string.user_search_incomplete)
+                            else ->
+                                WhiteNoiseEmptyState(
+                                    stringResource(R.string.no_matches),
+                                    if (query.isBlank()) stringResource(R.string.recipient_search_empty_hint) else null,
+                                )
                         }
                     }
                 } else {
                     item { SectionHeader(stringResource(R.string.contacts)) }
-                    items(matches, key = { it.accountIdHex }) { candidate ->
+                    itemsIndexed(matches, key = { _, person -> person.accountIdHex }) { index, candidate ->
                         val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
                         val subtitleIsKey =
                             !addressQuery && !candidate.isFollowing && candidate.searchProfile == null
@@ -409,8 +408,10 @@ internal fun ContactPickerScreen(
                                     appState.presentProfile(candidate.npub, origin = origin)
                                 }
                             }
-                        ContactRow(
+                        PersonRow(
                             modifier = profileModifier,
+                            index = index,
+                            count = matches.size,
                             title = candidate.displayName,
                             subtitle =
                                 when {
