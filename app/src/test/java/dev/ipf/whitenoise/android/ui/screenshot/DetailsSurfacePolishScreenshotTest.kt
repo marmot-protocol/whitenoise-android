@@ -73,7 +73,7 @@ class DetailsSurfacePolishScreenshotTest {
         )
 
     @Test
-    @Config(qualifiers = "ar-rSA-w360dp-h780dp-mdpi")
+    @Config(qualifiers = "ar-rSA-w360dp-h1160dp-mdpi")
     fun groupMemberLargeTextRtl() =
         captureGroupDetails(
             snapshot = "group_details_member_large_rtl_amoled.png",
@@ -94,7 +94,7 @@ class DetailsSurfacePolishScreenshotTest {
         )
 
     @Test
-    @Config(qualifiers = "ar-rSA-w360dp-h780dp-mdpi")
+    @Config(qualifiers = "ar-rSA-w360dp-h1160dp-mdpi")
     fun dmLargeTextRtl() =
         captureGroupDetails(
             snapshot = "dm_details_large_rtl_dark.png",
