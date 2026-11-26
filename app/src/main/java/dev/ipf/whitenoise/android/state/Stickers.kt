@@ -87,6 +87,10 @@ class StickerLibrary(
     /** Advances on every install or uninstall, so a read that started before it can't overwrite its effect. */
     private var membershipGeneration = 0L
 
+    /** Numbers installed reads as they start; [appliedInstalledRead] is the newest one whose outcome was applied. */
+    private var installedReadSequence = 0L
+    private var appliedInstalledRead = 0L
+
     /** Whether the pack at [coordinate] was in the last installed list. */
     fun isInstalled(coordinate: String): Boolean = installed.any { it.coordinate == coordinate }
 
@@ -98,21 +102,29 @@ class StickerLibrary(
 
     /**
      * A failed read keeps the last list and settles as [installedReadFailed]; the next caller tries again. A read,
-     * or a read failure, that overlapped an install or uninstall is dropped, because it may predate that change.
+     * or a read failure, that overlapped an install or uninstall is dropped, because it may predate that change. Reads
+     * can also finish out of order, so one that started before an already applied read is dropped too.
      */
     @Suppress("TooGenericExceptionCaught")
     suspend fun reloadInstalled() {
         val generation = membershipGeneration
+        val sequence = ++installedReadSequence
+
+        /** Whether this read is still the newest outcome to apply; claims the slot when it is. */
+        fun claim(): Boolean =
+            (generation == membershipGeneration && sequence > appliedInstalledRead).also {
+                if (it) appliedInstalledRead = sequence
+            }
         try {
             val read = packs(true, null)
-            if (generation == membershipGeneration) {
+            if (claim()) {
                 installed = read
                 hasLoadedInstalled = true
                 installedReadFailed = false
             }
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
-            if (generation == membershipGeneration) installedReadFailed = true
+            if (claim()) installedReadFailed = true
         }
         hasTriedInstalled = true
     }

@@ -75,6 +75,15 @@ internal class DiscoveryResults {
         private set
     private var search: String? = null
 
+    /** Advances on a load-failed retry, so the browser re-reads the store without waiting on a relay sync first. */
+    var retries by mutableIntStateOf(0)
+        private set
+
+    /** Asks for another read of the current query. */
+    fun retry() {
+        retries++
+    }
+
     /**
      * Reads [query]; a failed read keeps this query's last results, minus packs installed since, but never shows
      * another query's.
@@ -146,7 +155,7 @@ internal fun StickerBrowserPage(
         syncing = false
         syncGeneration++
     }
-    LaunchedEffect(search, library.installed, syncGeneration) {
+    LaunchedEffect(search, library.installed, syncGeneration, discovery.retries) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
         discovery.read(library, search)
     }
@@ -185,6 +194,7 @@ internal fun StickerBrowserPage(
             packs = discoverable,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
+            onReload = discovery::retry,
         )
         item { StickerDisclosure(stringResource(R.string.sticker_packs_public_footer)) }
     }
@@ -254,12 +264,16 @@ private fun StickerSearchField(
     )
 }
 
-/** Adds the discovered packs, or a loading, empty or unreachable-with-retry state, to the list. */
+/**
+ * Adds the discovered packs, or a loading, empty or unreachable-with-retry state, to the list. [onRetry] syncs the
+ * relays again; [onReload] re-reads the local store after a failed read, without waiting on the relays.
+ */
 private fun LazyListScope.discoveryResults(
     state: DiscoveryState,
     packs: List<StickerPackFfi>,
     onOpen: (StickerPackFfi) -> Unit,
     onRetry: () -> Unit,
+    onReload: () -> Unit,
 ) {
     when (state) {
         DiscoveryState.Packs ->
@@ -268,7 +282,7 @@ private fun LazyListScope.discoveryResults(
         DiscoveryState.NoneOnRelays -> item { StickerDisclosure(stringResource(R.string.sticker_packs_none_on_relays)) }
         DiscoveryState.NoMatches -> item { StickerDisclosure(stringResource(R.string.sticker_packs_no_matches)) }
         DiscoveryState.Unreachable -> item { DiscoveryRetry(R.string.sticker_packs_unreachable, onRetry) }
-        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onRetry) }
+        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onReload) }
     }
 }
 

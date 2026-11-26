@@ -250,6 +250,14 @@
         "test_ids": [
           "MSG-046"
         ]
+      },
+      {
+        "surface": "Load-failed retry re-reads the store without a relay sync",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "onReload = discovery::retry",
+        "test_ids": [
+          "MSG-046"
+        ]
       }
     ]
   },

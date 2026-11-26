@@ -260,6 +260,72 @@ class StickersTest {
             assertFalse(library.isInstalled(coordinate("a")))
         }
 
+    /** An older installed read that fails after a newer one succeeded cannot bring the error back. */
+    @Test
+    fun anOlderFailedReadCannotReplaceANewerSuccessfulOne() =
+        runTest {
+            val olderRead = CompletableDeferred<Unit>()
+            var reads = 0
+            val library =
+                StickerLibrary(
+                    packs = { _, _ ->
+                        if (++reads == 1) {
+                            olderRead.await()
+                            error("relay timeout")
+                        } else {
+                            listOf(pack("a", installed = true))
+                        }
+                    },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = {},
+                )
+
+            val older = async { library.reloadInstalled() }
+            runCurrent()
+            library.reloadInstalled()
+            assertTrue(library.isInstalled(coordinate("a")))
+
+            olderRead.complete(Unit)
+            older.await()
+            assertFalse(library.installedReadFailed)
+            assertTrue(library.isInstalled(coordinate("a")))
+        }
+
+    /** An older read still applies when the newer read that started after it is cancelled before it lands. */
+    @Test
+    fun anOlderReadAppliesWhenTheNewerReadIsCancelled() =
+        runTest {
+            val olderRead = CompletableDeferred<Unit>()
+            val newerRead = CompletableDeferred<Unit>()
+            var reads = 0
+            val library =
+                StickerLibrary(
+                    packs = { _, _ ->
+                        when (++reads) {
+                            1 -> olderRead.await()
+                            2 -> newerRead.await()
+                        }
+                        listOf(pack("a", installed = true))
+                    },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = {},
+                )
+
+            val older = async { library.reloadInstalled() }
+            runCurrent()
+            val newer = async { library.reloadInstalled() }
+            runCurrent()
+            olderRead.complete(Unit)
+            older.await()
+            newer.cancel()
+            assertTrue(library.hasLoadedInstalled)
+            assertTrue(library.isInstalled(coordinate("a")))
+        }
+
     /** A failed uninstall leaves the pack installed. */
     @Test
     fun aFailedUninstallKeepsThePackInstalled() =
