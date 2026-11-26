@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.THREAD_MESSAGE_KIND
 
@@ -12,7 +15,6 @@ internal enum class AgentRequestStatus {
     Idle,
     Sending,
     AwaitingAgent,
-    Unconfirmed,
 }
 
 /** Tracks requests across the inline rows, background activity and native row updates. */
@@ -24,18 +26,18 @@ internal class AgentRequestProgress {
     )
 
     private val pending = mutableStateMapOf<String, Pending>()
-    private val unconfirmed = mutableStateMapOf<String, String>()
+
+    var historyRevision by mutableLongStateOf(0L)
+        private set
 
     val hasAdmittedRequests: Boolean get() = pending.values.any { it.admission != null }
     val admittedEventIds: Set<String> get() = pending.values.mapNotNull { it.admission?.eventId }.toSet()
-    val nextExpiryMillis: Long? get() = pending.values.mapNotNull { it.admission?.expiresAtMillis }.minOrNull()
 
     fun status(rowId: String): AgentRequestStatus {
         val request = pending[rowId]
         return when {
             request?.admission != null -> AgentRequestStatus.AwaitingAgent
             request != null -> AgentRequestStatus.Sending
-            rowId in unconfirmed -> AgentRequestStatus.Unconfirmed
             else -> AgentRequestStatus.Idle
         }
     }
@@ -44,7 +46,6 @@ internal class AgentRequestProgress {
         rowId: String,
         agent: String,
     ) {
-        unconfirmed.remove(rowId)
         pending[rowId] = Pending(agent)
     }
 
@@ -58,41 +59,25 @@ internal class AgentRequestProgress {
 
     fun clear() {
         pending.clear()
-        unconfirmed.clear()
-    }
-
-    fun expire(nowMillis: Long) {
-        pending.toMap().forEach { (rowId, request) ->
-            val admission = request.admission ?: return@forEach
-            val expiry = admission.expiresAtMillis ?: return@forEach
-            if (expiry <= nowMillis) {
-                pending.remove(rowId)
-                unconfirmed[rowId] = admission.eventId
-            }
-        }
+        historyRevision += 1L
     }
 
     fun reconcileHistory(
         history: AgentNativeRequestHistory,
         targets: List<AgentRequestTarget>,
-    ) {
-        pending.toMap().forEach { (rowId, request) ->
-            val id = request.admission?.eventId ?: return@forEach
-            if (history.concluded(request.agent, id)) pending.remove(rowId)
-        }
+        readRevision: Long,
+    ): Boolean {
+        if (readRevision != historyRevision) return false
+        removeAdmissions { agent, id -> (agent to id) in history.confirmations }
+        val rejected = reject(history.invalidatedIds)
         targets.forEach { target ->
-            val unconfirmedId = unconfirmed[target.rowId]
-            if (unconfirmedId != null && history.concluded(target.agent, unconfirmedId)) {
-                unconfirmed.remove(target.rowId)
-            }
             if (target.rowId !in pending) {
-                val admission = history.outstanding(target) ?: return@forEach
-                if (admission.eventId != unconfirmed[target.rowId]) {
+                history.outstanding(target)?.let { admission ->
                     pending[target.rowId] = Pending(target.agent, admission)
                 }
             }
         }
-        expire(System.currentTimeMillis())
+        return rejected
     }
 
     fun reconcile(rows: Sequence<TimelineMessageRecordFfi>) {
@@ -106,16 +91,20 @@ internal class AgentRequestProgress {
     ) {
         val confirmed = eventIds.toSet()
         if (confirmed.isEmpty()) return
-        pending.toMap().forEach { (rowId, request) ->
-            val id = request.admission?.eventId
-            if (id != null && request.agent == sender && id in confirmed) pending.remove(rowId)
-        }
+        removeAdmissions { agent, id -> agent == sender && id in confirmed }
     }
 
-    fun reject(ids: Set<String>): Boolean {
-        val failed = pending.entries.filter { it.value.admission?.eventId in ids }.map { it.key }
-        failed.forEach(pending::remove)
-        return failed.isNotEmpty()
+    fun reject(ids: Set<String>): Boolean = ids.isNotEmpty() && removeAdmissions { _, id -> id in ids }
+
+    private fun removeAdmissions(matches: (agent: String, eventId: String) -> Boolean): Boolean {
+        val completed =
+            pending.entries.mapNotNull { (rowId, request) ->
+                rowId.takeIf { request.admission?.eventId?.let { matches(request.agent, it) } == true }
+            }
+        if (completed.isEmpty()) return false
+        completed.forEach(pending::remove)
+        historyRevision += 1L
+        return true
     }
 }
 

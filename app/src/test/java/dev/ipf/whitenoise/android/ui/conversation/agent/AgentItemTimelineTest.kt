@@ -132,6 +132,15 @@ class AgentItemTimelineTest {
     }
 
     @Test
+    fun explicitAgentErrorStaysInChat() {
+        val turn = AgentRecordingFixtures.load("claude_failing_command").single { read(it)?.body is AgentItemBody.Turn }
+        val projected = requireNotNull(turn.projected)
+        val item = requireNotNull(projected.agentItem)
+        val error = item.copy(itemType = "error", state = AgentItemStateFfi.FAILED)
+        assertTrue(conversationTimelineRowVisible(turn.copy(projected = projected.copy(agentItem = error))))
+    }
+
+    @Test
     fun requestsEncodeTheShapeMdkValidates() {
         val choice =
             AgentRequestEncoder.encode("ab".repeat(32), "cd".repeat(32), AgentRequest.Choice("c0", "Allow once"))

@@ -20,10 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.ConversationOpenModeFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.core.agent.isAgentThreadRow
 import dev.ipf.whitenoise.android.state.CONVERSATION_WINDOW_MAX_ROWS
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -34,12 +37,16 @@ import dev.ipf.whitenoise.android.state.TimelinePageOutcome
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
+import dev.ipf.whitenoise.android.state.isUsableAgentSession
+import dev.ipf.whitenoise.android.state.latestAgentSession
 import dev.ipf.whitenoise.android.state.openTimelineWithFallback
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,7 +112,6 @@ internal fun AgentActivityHistory(
     }
 }
 
-/** A historical viewport does not receive new sessions announced at the live end of the chat. */
 @Composable
 private fun activeAgentSessions(
     history: ActivityHistoryWindow,
@@ -113,15 +119,95 @@ private fun activeAgentSessions(
     controller: ConversationController,
     account: String,
 ): Map<String, String> {
-    val browsingOlder = history.page?.hasMoreAfter == true
-    val latest = remember(history, browsingOlder) { ActivityHistoryWindow() }
-    LaunchedEffect(latest) {
-        if (browsingOlder) latest.collect { openLatestAgentActivity(appState, controller, account) }
+    val visible = history.page?.sessionRows().orEmpty()
+    if (visible.isEmpty()) return emptyMap()
+    val group = controller.group.groupIdHex
+    val changes = remember(controller, account, group) { Channel<Unit>(Channel.CONFLATED) }
+    var selected by remember(changes, visible) { mutableStateOf(emptyMap<String, String>()) }
+    LaunchedEffect(changes) {
+        observeAgentSessionChanges(controller, account, group, changes)
     }
-    if (browsingOlder && latest.page == null) return emptyMap()
-    val sessions = latestAgentSessions(history.latestSessions, latest.latestSessions.values.toList())
-    return sessions.mapValues { it.value.messageIdHex }
+    LaunchedEffect(changes, visible) {
+        val senders = visible.map { it.first }.toSet()
+        selected = appState.readActiveAgentSessions(account, group, senders)
+        for (ignored in changes) {
+            delay(AGENT_SESSION_REFRESH_MS)
+            selected = appState.readActiveAgentSessions(account, group, senders)
+        }
+    }
+    return selected
 }
+
+private suspend fun WhiteNoiseAppState.readActiveAgentSessions(
+    account: String,
+    group: String,
+    senders: Set<String>,
+): Map<String, String> =
+    runCatchingCancellable {
+        marmotIo {
+            senders
+                .mapNotNull { agent ->
+                    latestAgentSession(account, group, agent)?.let { agent to it.messageIdHex }
+                }.toMap()
+        }
+    }.getOrDefault(emptyMap())
+
+/** The bounded history window can omit a newer session and its subsequent deletion. */
+private suspend fun observeAgentSessionChanges(
+    controller: ConversationController,
+    account: String,
+    group: String,
+    changes: Channel<Unit>,
+) = withContext(Dispatchers.IO) {
+    while (true) {
+        val stream =
+            withContext(NonCancellable) {
+                runCatchingCancellable { controller.runtimeEventStreamOpener() }.getOrNull()
+            }
+        try {
+            currentCoroutineContext().ensureActive()
+            if (stream != null) {
+                changes.trySend(Unit)
+                runCatchingCancellable {
+                    while (true) {
+                        val event = stream.next() ?: break
+                        if (event.affectsAgentSessions(account, group)) changes.trySend(Unit)
+                    }
+                }
+            }
+        } finally {
+            stream?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
+        }
+        delay(AGENT_SESSION_STREAM_RETRY_MS)
+    }
+}
+
+internal fun MarmotEventFfi.affectsAgentSessions(
+    account: String,
+    group: String,
+): Boolean {
+    val projection = (this as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+    val update = projection.update
+    if (projection.accountLabel != account || update.groupIdHex != group) return false
+    return update.messages.any(TimelineMessageRecordFfi::mayChangeAgentSession) ||
+        update.changes.any { change ->
+            when (change) {
+                is TimelineMessageChangeFfi.Remove -> true
+                is TimelineMessageChangeFfi.Upsert -> change.message.mayChangeAgentSession()
+            }
+        }
+}
+
+private fun TimelineMessageRecordFfi.mayChangeAgentSession(): Boolean {
+    val type = agentItem?.itemType
+    return kind == AgentItemReader.ITEM_KIND && (type == null || type == "session")
+}
+
+private const val AGENT_SESSION_REFRESH_MS = 250L
+private const val AGENT_SESSION_STREAM_RETRY_MS = 5_000L
+
+private fun TimelinePageFfi.sessionRows(): List<Pair<String, String>> =
+    messages.filter(TimelineMessageRecordFfi::isUsableAgentSession).map { it.sender to it.messageIdHex }
 
 private suspend fun openLatestAgentActivity(
     appState: WhiteNoiseAppState,
@@ -172,8 +258,6 @@ internal class ActivityHistoryWindow {
     var paging by mutableStateOf(false)
         private set
     var disconnected by mutableStateOf(false)
-        private set
-    var latestSessions by mutableStateOf(emptyMap<String, TimelineMessageRecordFfi>())
         private set
 
     suspend fun collect(open: suspend () -> ConversationTimelineSubscriptionHandle) {
@@ -243,28 +327,9 @@ internal class ActivityHistoryWindow {
         replacement: TimelinePageFfi,
     ) {
         if (subscription !== active) return
-        val installed = active.latestInstalledWindow()?.page ?: replacement
-        latestSessions = latestAgentSessions(latestSessions, installed.messages)
-        page = installed
+        page = active.latestInstalledWindow()?.page ?: replacement
     }
 }
-
-/** Paging starts at the newest rows. The active session's first event may be on an older page. */
-internal fun latestAgentSessions(
-    known: Map<String, TimelineMessageRecordFfi>,
-    rows: List<TimelineMessageRecordFfi>,
-): Map<String, TimelineMessageRecordFfi> {
-    val latest = known.toMutableMap()
-    rows
-        .filter { it.agentItem?.itemType == "session" }
-        .forEach { row ->
-            val previous = latest[row.sender]
-            if (previous == null || SESSION_ORDER.compare(row, previous) >= 0) latest[row.sender] = row
-        }
-    return latest
-}
-
-private val SESSION_ORDER = compareBy<TimelineMessageRecordFfi>({ it.timelineAt }, { it.messageIdHex })
 
 internal fun activityHistoryRows(
     page: TimelinePageFfi,

@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.agent.AgentItem
+import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
@@ -39,12 +40,14 @@ internal fun AgentItemTimelineRow(
     appState: WhiteNoiseAppState,
     context: AgentItemRowContext,
 ) {
-    val agentName = appState.displayName(agentItem.agentPubkeyHex)
+    val account = controller.conversationAccountRef
+    val agentName = appState.displayNameForAccount(account, agentItem.agentPubkeyHex)
     val requests = rememberAgentRequestSender(agentItem, controller, appState)
+    val sessionCanSend = agentItem.state.isOpen && !agentItem.session.isNullOrBlank()
     val actions =
         AgentItemActions(
             agentName = agentName,
-            enabled = !context.readOnly,
+            enabled = !context.readOnly && (agentItem.body !is AgentItemBody.Session || sessionCanSend),
             status = requests.status,
             onSend = requests::send,
             sessionControls = context.sessionControls,
@@ -87,7 +90,7 @@ internal fun AgentItemTimelineRow(
                     title = agentName,
                     seed = agentItem.agentPubkeyHex,
                     size = 30.dp,
-                    pictureUrl = appState.contactAvatarSource(agentItem.agentPubkeyHex),
+                    pictureUrl = appState.contactAvatarSource(agentItem.agentPubkeyHex, accountRef = account),
                     pictureDomain = AvatarImageLoader.publicProfiles(),
                 )
             }

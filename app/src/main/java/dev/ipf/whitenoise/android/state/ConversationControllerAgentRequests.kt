@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import android.util.Log
+import dev.ipf.marmotkit.AgentItemStateFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentRequestEncoder
@@ -21,8 +24,7 @@ internal suspend fun ConversationController.sendAgentRequest(
     request: AgentRequest,
     token: String,
 ): AgentRequestAdmission? {
-    val targetRowId = target.rowId.takeIf { target.sessionStartedAt == null }
-    val event = AgentRequestEncoder.encode(target.agent, targetRowId, request)
+    val event = AgentRequestEncoder.encode(target.agent, target.rowId, request)
     // The chat and account are fixed before the first suspension and checked again under the lock.
     val groupId = group.groupIdHex
     return try {
@@ -32,11 +34,7 @@ internal suspend fun ConversationController.sendAgentRequest(
                 check(canSendMessages && boundAccountRef == account && group.groupIdHex == groupId)
                 appState.marmotIo {
                     check(isCurrentAgentSession(account, groupId, target))
-                    val waiting = agentNativeRequestHistory(account, groupId, listOf(target)).outstanding(target)
-                    val now = System.currentTimeMillis()
-                    if (waiting != null && (waiting.expiresAtMillis == null || waiting.expiresAtMillis > now)) {
-                        waiting
-                    } else {
+                    agentNativeRequestHistory(account, groupId, listOf(target)).outstanding(target) ?: run {
                         val accepted =
                             admitLocalSend(account, groupId, token, probeExistingAdmission = false) {
                                 sendCustomEventWithClientToken(
@@ -48,10 +46,7 @@ internal suspend fun ConversationController.sendAgentRequest(
                                     token,
                                 )
                             }
-                        AgentRequestAdmission(
-                            accepted.messageIds.single(),
-                            target.sessionStartedAt?.let { untargetedAgentRequestDeadline(now) },
-                        )
+                        AgentRequestAdmission(accepted.messageIds.single())
                     }
                 }
             }
@@ -65,30 +60,47 @@ internal suspend fun ConversationController.sendAgentRequest(
     }
 }
 
-/** Untargeted controls operate on the current session, so validate the displayed session before admission. */
+/** Prevents a control from an older activity page acting on a session the UI has since replaced. */
 private fun MarmotInterface.isCurrentAgentSession(
     account: String,
     group: String,
     target: AgentRequestTarget,
 ): Boolean {
-    val startedAt = target.sessionStartedAt ?: return true
+    if (!target.isSession) return true
+    val currentSession = latestAgentSession(account, group, target.agent)
+    val item = currentSession?.agentItem
+    val open = item?.state == AgentItemStateFfi.RUNNING || item?.state == AgentItemStateFfi.WAITING
+    return currentSession?.messageIdHex == target.rowId && open && !item?.session.isNullOrBlank()
+}
+
+internal fun MarmotInterface.latestAgentSession(
+    account: String,
+    group: String,
+    agent: String,
+): TimelineMessageRecordFfi? = readLatestAgentSession(group, agent) { timelineMessages(account, it) }
+
+/** Both the activity sheet and request admission use authoritative native session order. */
+internal fun readLatestAgentSession(
+    group: String,
+    agent: String,
+    read: (TimelineMessageQueryFfi) -> TimelinePageFfi,
+): TimelineMessageRecordFfi? {
     var query =
         TimelineMessageQueryFfi
             .page(group, null, null, null, null, null, CONVERSATION_WINDOW_MAX_ROWS)
-            .copy(sender = target.agent, since = startedAt)
-    var currentSession: String?
-    do {
-        val page = timelineMessages(account, query)
-        currentSession =
-            page.messages
-                .lastOrNull {
-                    it.agentItem?.itemType == "session" && !it.deleted && it.invalidationStatus == null
-                }?.messageIdHex
+            .copy(sender = agent)
+    while (true) {
+        val page = read(query)
+        page.messages.lastOrNull(TimelineMessageRecordFfi::isUsableAgentSession)?.let { return it }
         val oldest = page.messages.firstOrNull()
-        if (oldest == null || !page.hasMoreBefore) break
+        if (oldest == null || !page.hasMoreBefore || oldest.messageIdHex == query.beforeMessageId) return null
         query = query.copy(before = oldest.timelineAt, beforeMessageId = oldest.messageIdHex)
-    } while (currentSession == null)
-    return currentSession == target.rowId
+    }
+}
+
+internal fun TimelineMessageRecordFfi.isUsableAgentSession(): Boolean {
+    val isSession = agentItem?.itemType == "session"
+    return isSession && !deleted && invalidationStatus == null
 }
 
 private val AgentRequest.logName: String

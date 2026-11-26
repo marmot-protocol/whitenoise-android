@@ -6,9 +6,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+
+internal data class BubbleCustomColor(
+    val argb: Long?,
+    val active: Boolean,
+)
+
+internal data class MessageBubbleAppearance(
+    val presentation: BubblePresentation,
+    val background: Color,
+    val content: Color,
+)
+
+/** Keeps the semantic presentation for borders and status while quieting agent commentary. */
+@Composable
+internal fun messageBubbleAppearance(
+    record: AppMessageRecordFfi,
+    deleted: Boolean,
+    mine: Boolean,
+    persistedFailure: Boolean,
+    customColor: BubbleCustomColor,
+): MessageBubbleAppearance {
+    val presentation = messageBubblePresentation(deleted, mine, customColor.argb, persistedFailure)
+    val liveIncoming = !mine && !deleted && !persistedFailure
+    if (liveIncoming && !customColor.active && AgentItemReader.isCommentary(record)) {
+        val colorScheme = MaterialTheme.colorScheme
+        return MessageBubbleAppearance(presentation, colorScheme.surface, colorScheme.onSurfaceVariant)
+    }
+    return MessageBubbleAppearance(
+        presentation,
+        colorFromArgb(presentation.backgroundArgb),
+        colorFromArgb(presentation.contentArgb),
+    )
+}
 
 /** Draws semantic, saved-colour, or directional AMOLED borders in that precedence order. */
 @Composable

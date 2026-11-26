@@ -165,6 +165,7 @@ internal fun AgentActivityList(
     readOnly: Boolean,
     activeSessions: Map<String, String> = emptyMap(),
 ) {
+    val account = controller.conversationAccountRef
     val latestTurn = rows.indexOfLast { it.projected?.agentItem?.itemType == "turn" }
     val answeredBy = rememberAgentAnswerAttribution(controller, rows)
     val state = rememberLazyListState(initialFirstVisibleItemIndex = latestTurn.coerceAtLeast(0))
@@ -179,7 +180,7 @@ internal fun AgentActivityList(
         itemsIndexed(rows, key = { _, row -> row.presentationId }) { index, row ->
             val item = remember(row) { AgentItemReader.read(row.record, row.projected) }
             if (item == null) {
-                row.projected?.let { AgentThreadMessage(it, appState.displayName(it.sender)) }
+                row.projected?.let { AgentThreadMessage(it, appState.displayNameForAccount(account, it.sender)) }
             } else {
                 val previous = rows.getOrNull(index - 1)
                 val showSenderName =
@@ -195,7 +196,7 @@ internal fun AgentActivityList(
                             readOnly = readOnly,
                             sessionControls = row.id == activeSessions[row.record.sender],
                             threadTaskId = item.rowId.takeIf { (item.body as? AgentItemBody.Task)?.kind == "subagent" },
-                            answeredBy = answeredBy[row.id]?.let(appState::displayName),
+                            answeredBy = answeredBy[row.id]?.let { appState.displayNameForAccount(account, it) },
                         ),
                 )
             }

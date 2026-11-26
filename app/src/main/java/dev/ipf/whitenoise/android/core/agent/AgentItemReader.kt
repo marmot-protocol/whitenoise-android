@@ -52,7 +52,6 @@ internal object AgentItemReader {
                 outputCutLength = record.cutValue("output"),
                 diffsCut = record.cutValue("diffs")?.toInt() ?: 0,
                 firstEventMissing = projected.agentItemFirstEventMissing,
-                recordedAt = record.recordedAt,
             )
         }
     }

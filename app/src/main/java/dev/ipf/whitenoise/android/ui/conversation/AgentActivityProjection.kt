@@ -19,6 +19,7 @@ internal fun conversationTimelineRowVisible(row: TimelineMessage): Boolean {
             when (item.itemType) {
                 "approval", "question" -> item.state == AgentItemStateFfi.WAITING
                 "turn" -> item.state == AgentItemStateFfi.FAILED
+                "error" -> true
                 "notice" -> isAgentRefusal(item.fieldsJson)
                 else -> false
             }

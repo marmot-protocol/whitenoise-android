@@ -152,7 +152,6 @@ internal fun AgentRequestStatusLabel(actions: AgentItemActions) {
             AgentRequestStatus.Idle -> return
             AgentRequestStatus.Sending -> stringResource(R.string.sending)
             AgentRequestStatus.AwaitingAgent -> stringResource(R.string.agent_request_sent, actions.agentName)
-            AgentRequestStatus.Unconfirmed -> stringResource(R.string.agent_request_unconfirmed)
         }
     Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

@@ -33,7 +33,6 @@
     <string name="agent_approval_declined">已拒绝</string>
     <string name="agent_approval_expired">不再需要</string>
     <string name="agent_request_sent">等待 %1$s。</string>
-    <string name="agent_request_unconfirmed">代理尚未确认请求。你可以重试。</string>
     <string name="agent_question_send">发送回答</string>
     <string name="agent_question_single_choice">选择一项</string>
     <string name="agent_question_multiple_choice">可多选</string>

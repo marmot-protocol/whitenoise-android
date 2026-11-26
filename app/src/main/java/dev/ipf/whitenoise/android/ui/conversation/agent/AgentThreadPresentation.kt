@@ -25,8 +25,10 @@ internal fun agentThreadDestination(
     timeline: () -> List<TimelineMessage>,
 ): String? {
     val item = row?.takeIf { it.isAgentThreadRow() } ?: return null
+    val placement = requireNotNull(item.thread)
+    val needsAncestors = !item.hasAgentTaskParent() && placement.parentMessageIdHex != placement.rootMessageIdHex
     val known =
-        if (item.agentItemFirstEventMissing) {
+        if (item.agentItemFirstEventMissing || needsAncestors) {
             timeline().mapNotNull { it.projected }.associateBy { it.messageIdHex }
         } else {
             emptyMap()

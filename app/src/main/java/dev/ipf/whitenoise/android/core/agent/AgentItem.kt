@@ -27,7 +27,6 @@ data class AgentItem(
     /** How many file diffs the agent left out to fit the 64 KB limit. */
     val diffsCut: Int = 0,
     val firstEventMissing: Boolean = false,
-    val recordedAt: ULong = 0uL,
 )
 
 /** An item's state, as MDK reports it. */

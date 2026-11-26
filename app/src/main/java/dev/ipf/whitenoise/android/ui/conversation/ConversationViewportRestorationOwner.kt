@@ -137,6 +137,16 @@ internal class ConversationViewportRestorationOwner(
         return true
     }
 
+    /** There is no row to measure in an exhausted window. Follow the first future message. */
+    fun completeEmptyPosition(
+        structure: ConversationTimelineStructure,
+        viewportHeight: Int,
+    ): Boolean {
+        if (!isActive) return false
+        coordinator.settleLandingAt(ConversationScrollAnchor(0, 0, null, null), atNewestEdge = true)
+        return completeSupersededPosition(structure, viewportHeight)
+    }
+
     /**
      * Takes ownership of a live incoming row whose beginning an append revealed, so a later viewport, row-height or
      * structure change reruns the same measured settle a notification landing uses instead of replaying a stale offset,

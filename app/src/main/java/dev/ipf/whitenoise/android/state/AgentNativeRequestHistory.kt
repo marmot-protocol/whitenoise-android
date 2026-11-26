@@ -6,16 +6,15 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import org.json.JSONObject
 
-/** Identity of a UI action row. Session controls address the agent and have no row target on the wire. */
+/** The first-event ID addresses a request to this row, including a session's controls. */
 internal data class AgentRequestTarget(
     val rowId: String,
     val agent: String,
-    val sessionStartedAt: ULong? = null,
+    val isSession: Boolean = false,
 )
 
 internal data class AgentRequestAdmission(
     val eventId: String,
-    val expiresAtMillis: Long? = null,
 )
 
 internal class AgentNativeRequestHistory(
@@ -23,31 +22,27 @@ internal class AgentNativeRequestHistory(
 ) {
     private val requests =
         records.filter { it.kind == AgentItemReader.REQUEST_KIND && it.direction == "sent" }
-    private val settlements =
+    val invalidatedIds: Set<String> = requests.filter { it.invalidated }.map { it.messageIdHex }.toSet()
+    val confirmations: Set<Pair<String, String>> =
         records
             .asSequence()
             .filter { !it.invalidated && it.kind in AGENT_SETTLEMENT_KINDS }
             .flatMap { row -> row.tags.agentSettlementIds().map { row.sender to it } }
             .toSet()
 
-    fun outstanding(target: AgentRequestTarget): AgentRequestAdmission? =
-        requests
-            .latestFor(target)
-            ?.takeUnless { concluded(target.agent, it.messageIdHex) }
-            ?.let { request ->
-                val sentAtMillis = request.receivedAt.toLong() * 1000
-                val expiry = target.sessionStartedAt?.let { untargetedAgentRequestDeadline(sentAtMillis) }
-                AgentRequestAdmission(request.messageIdHex, expiry)
-            }
-
-    fun concluded(
-        agent: String,
-        eventId: String,
-    ): Boolean = (agent to eventId) in settlements || requests.any { it.messageIdHex == eventId && it.invalidated }
+    fun outstanding(target: AgentRequestTarget): AgentRequestAdmission? {
+        val matched = requests.filter { it.matchesTarget(target) }
+        val newest = matched.maxWithOrNull(compareBy({ it.recordedAt }, { it.receivedAt })) ?: return null
+        // Retention can prune the settlement for a previous request independently of the request.
+        return matched
+            .asSequence()
+            .filter { request ->
+                request.recordedAt == newest.recordedAt && request.receivedAt == newest.receivedAt
+            }.filterNot { it.invalidated || (target.agent to it.messageIdHex) in confirmations }
+            .maxByOrNull { it.messageIdHex }
+            ?.let { AgentRequestAdmission(it.messageIdHex) }
+    }
 }
-
-/** Real agents discard untargeted controls more than five minutes old. Allow one extra second. */
-internal fun untargetedAgentRequestDeadline(sentAtMillis: Long): Long = sentAtMillis + UNTARGETED_CONTROL_TIMEOUT_MILLIS
 
 /** The native send transaction records the raw request before returning durable acceptance. */
 internal fun MarmotInterface.agentNativeRequestHistory(
@@ -57,7 +52,12 @@ internal fun MarmotInterface.agentNativeRequestHistory(
     admittedIds: Set<String> = emptySet(),
 ): AgentNativeRequestHistory {
     val requests = ownAgentRequests(account, group)
-    val relevant = targets.mapNotNull(requests::latestFor) + requests.filter { it.messageIdHex in admittedIds }
+    val targetsById = targets.associateBy(AgentRequestTarget::rowId)
+    val relevant =
+        requests.filter { request ->
+            val target = targetsById[request.singleTag("e")]
+            request.messageIdHex in admittedIds || (target != null && request.matchesTarget(target))
+        }
     val awaiting =
         relevant
             .filterNot { it.invalidated }
@@ -77,11 +77,6 @@ internal fun MarmotInterface.ownAgentRequests(
     val kinds = listOf(AgentItemReader.REQUEST_KIND)
     return messages(account, group, null, kinds).filter { it.direction == "sent" }
 }
-
-private fun List<AppMessageRecordFfi>.latestFor(target: AgentRequestTarget): AppMessageRecordFfi? =
-    asSequence()
-        .filter { it.matchesTarget(target) }
-        .maxWithOrNull(compareBy({ it.recordedAt }, { it.receivedAt }, { it.messageIdHex }))
 
 /** Agent-created timestamps can predate the request by any amount. Stop on a match or exhaustion. */
 internal fun readAgentSettlements(
@@ -106,13 +101,11 @@ internal fun readAgentSettlements(
 }
 
 private fun AppMessageRecordFfi.matchesTarget(target: AgentRequestTarget): Boolean {
-    val details = singleTag("details")?.takeIf { singleTag("p") == target.agent } ?: return false
+    val details =
+        singleTag("details")?.takeIf { singleTag("p") == target.agent && singleTag("e") == target.rowId }
+            ?: return false
     val action = runCatching { JSONObject(details).optString("action") }.getOrNull()
-    return if (target.sessionStartedAt == null) {
-        singleTag("e") == target.rowId && action in TARGETED_ACTIONS
-    } else {
-        tags.none { it.values.firstOrNull() == "e" } && action in SESSION_ACTIONS
-    }
+    return action in if (target.isSession) SESSION_ACTIONS else ITEM_ACTIONS
 }
 
 private fun AppMessageRecordFfi.singleTag(name: String): String? {
@@ -125,8 +118,7 @@ internal fun List<MessageTagFfi>.agentSettlementIds(): Sequence<String> =
         tag.values.getOrNull(1)?.takeIf { tag.values.firstOrNull() == "settles" }
     }
 
-private val TARGETED_ACTIONS = setOf("choice", "questions", "interrupt")
+private val ITEM_ACTIONS = setOf("choice", "questions", "interrupt")
 private val SESSION_ACTIONS = setOf("set", "new_session", "own")
 internal val AGENT_SETTLEMENT_KINDS = listOf(9uL, 1009uL, 1111uL, AgentItemReader.ITEM_KIND)
 private const val AGENT_SETTLEMENT_REPLAY_PAGE = 400u
-private const val UNTARGETED_CONTROL_TIMEOUT_MILLIS = 301_000L

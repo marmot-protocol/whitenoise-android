@@ -85,7 +85,6 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
-import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
@@ -355,19 +354,15 @@ internal fun MessageBubble(
     val colorScheme = MaterialTheme.colorScheme
     val customBubbleColorActive =
         bubbleTheme != BubbleTheme.Amoled && customBubbleArgb != null && !deleted && !persistedFailure
-    val bubblePresentation =
-        messageBubblePresentation(
+    // Reply quotes use the displayed fill; status and borders use the semantic presentation.
+    val (bubblePresentation, bubbleBackgroundColor, bubbleContentColor) =
+        messageBubbleAppearance(
+            record = record,
             deleted = deleted,
             mine = mine,
-            customArgb = customBubbleArgb,
             persistedFailure = persistedFailure,
+            customColor = BubbleCustomColor(customBubbleArgb, customBubbleColorActive),
         )
-    val quietCommentary =
-        !mine && !deleted && !persistedFailure && !customBubbleColorActive && AgentItemReader.isCommentary(record)
-    val bubbleBackgroundColor =
-        if (quietCommentary) colorScheme.surface else colorFromArgb(bubblePresentation.backgroundArgb)
-    val bubbleContentColor =
-        if (quietCommentary) colorScheme.onSurfaceVariant else colorFromArgb(bubblePresentation.contentArgb)
     val replyQuoteColors =
         messageReplyQuoteColors(
             customBubbleColorActive = customBubbleColorActive,

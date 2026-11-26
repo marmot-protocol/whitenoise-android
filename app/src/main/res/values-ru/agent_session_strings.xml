@@ -33,7 +33,6 @@
     <string name="agent_approval_declined">Отклонено</string>
     <string name="agent_approval_expired">Больше не нужно</string>
     <string name="agent_request_sent">Ждём %1$s.</string>
-    <string name="agent_request_unconfirmed">Агент не подтвердил запрос. Можно повторить попытку.</string>
     <string name="agent_question_send">Отправить ответ</string>
     <string name="agent_question_single_choice">Выберите один вариант</string>
     <string name="agent_question_multiple_choice">Выберите любые варианты</string>

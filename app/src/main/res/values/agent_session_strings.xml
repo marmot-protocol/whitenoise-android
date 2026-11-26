@@ -61,7 +61,6 @@
     <string name="agent_approval_expired">No longer needed</string>
     <!-- Shown after the device accepted an answer and before the agent confirms it. %1$s is the agent's name. -->
     <string name="agent_request_sent">Waiting for %1$s.</string>
-    <string name="agent_request_unconfirmed">No confirmation from the agent. You can try again.</string>
     <!-- Button that sends the selected answers to an AI agent's question. -->
     <string name="agent_question_send">Send answer</string>
     <!-- The agent asks for one choice. -->

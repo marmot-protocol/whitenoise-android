@@ -33,7 +33,6 @@
     <string name="agent_approval_declined">Rechazado</string>
     <string name="agent_approval_expired">Ya no hace falta</string>
     <string name="agent_request_sent">Esperando a %1$s.</string>
-    <string name="agent_request_unconfirmed">El agente no ha confirmado la solicitud. Puedes volver a intentarlo.</string>
     <string name="agent_question_send">Enviar respuesta</string>
     <string name="agent_question_single_choice">Elige una</string>
     <string name="agent_question_multiple_choice">Elige las que quieras</string>

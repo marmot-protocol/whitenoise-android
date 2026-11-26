@@ -1,12 +1,19 @@
 package dev.ipf.whitenoise.android.ui.conversation.agent
 
 import dev.ipf.marmotkit.AgentItemStateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineThreadRefFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.state.isUnreadEligible
+import dev.ipf.whitenoise.android.state.readLatestAgentSession
 import dev.ipf.whitenoise.android.ui.conversation.conversationTimelineRowVisible
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -42,6 +49,8 @@ class AgentThreadPresentationTest {
         val rows = listOf(task, nested, waiting, words, reply, replyToApproval)
         val page = TimelinePageFfi(rows, false, false)
 
+        val timeline = activityHistoryRows(page, emptySet(), threadTaskId = child)
+        assertEquals(child, agentThreadDestination(reply) { timeline })
         assertEquals(listOf(root), activityHistoryRows(page, emptySet()).map { it.id })
         assertEquals(listOf(child), activityHistoryRows(page, emptySet(), threadTaskId = root).map { it.id })
         assertEquals(
@@ -116,15 +125,52 @@ class AgentThreadPresentationTest {
     }
 
     @Test
-    fun latestSessionRemainsActionableWhenPagingToItsOpeningRow() {
+    fun latestSessionUsesNativeOrderAcrossPagesAndSkipsUnavailableRows() {
         val base = requireNotNull(approval.projected)
         val session = base.copy(agentItem = item.copy(itemType = "session"), timelineAt = 20uL)
-        val older = session.copy(messageIdHex = "88".repeat(32), timelineAt = 10uL)
+        val older = session.copy(messageIdHex = "88".repeat(32), timelineAt = 30uL)
+        val invalidated = session.copy(messageIdHex = "89".repeat(32), invalidationStatus = "LosingBranch")
+        val deleted = session.copy(messageIdHex = "90".repeat(32), deleted = true)
+        val cursors = mutableListOf<String?>()
+        val selected =
+            readLatestAgentSession("group", session.sender) { query ->
+                assertEquals(session.sender, query.sender)
+                cursors += query.beforeMessageId
+                if (query.beforeMessageId == null) {
+                    TimelinePageFfi(listOf(invalidated, deleted), true, false)
+                } else {
+                    assertEquals(invalidated.timelineAt, query.before)
+                    TimelinePageFfi(listOf(older, session), false, true)
+                }
+            }
+        assertEquals(listOf(null, invalidated.messageIdHex), cursors)
+        assertEquals(session, selected)
+    }
 
-        val visitedLatest = latestAgentSessions(emptyMap(), listOf(base))
-        val visitedSession = latestAgentSessions(visitedLatest, listOf(older, session))
-        assertEquals(session.messageIdHex, visitedSession[session.sender]?.messageIdHex)
-        assertEquals(visitedSession, latestAgentSessions(visitedSession, listOf(older)))
+    @Test
+    fun offWindowSessionChangesRefreshOnlyTheirOwnAccountAndGroup() {
+        val base = requireNotNull(approval.projected)
+        val session = base.copy(agentItem = item.copy(itemType = "session"))
+
+        fun event(row: TimelineMessageRecordFfi) =
+            MarmotEventFfi.ProjectionUpdated(
+                RuntimeProjectionUpdateFfi(
+                    "account-id",
+                    "account",
+                    TimelineProjectionUpdateFfi(
+                        "group",
+                        emptyList(),
+                        listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.AGENT_ITEM, row)),
+                        null,
+                        ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+                    ),
+                ),
+            )
+        assertTrue(event(session).affectsAgentSessions("account", "group"))
+        assertTrue(event(session.copy(deleted = true, agentItem = null)).affectsAgentSessions("account", "group"))
+        assertFalse(event(session).affectsAgentSessions("other", "group"))
+        assertFalse(event(session).affectsAgentSessions("account", "other"))
+        assertFalse(event(base).affectsAgentSessions("account", "group"))
     }
 
     private fun TimelineMessageRecordFfi.inThread(parent: String) =

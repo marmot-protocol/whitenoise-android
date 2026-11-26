@@ -33,7 +33,6 @@
     <string name="agent_approval_declined">Reddedildi</string>
     <string name="agent_approval_expired">Artık gerekmiyor</string>
     <string name="agent_request_sent">%1$s bekleniyor.</string>
-    <string name="agent_request_unconfirmed">Ajan isteği onaylamadı. Tekrar deneyebilirsin.</string>
     <string name="agent_question_send">Yanıtı gönder</string>
     <string name="agent_question_single_choice">Birini seç</string>
     <string name="agent_question_multiple_choice">İstediğin kadarını seç</string>

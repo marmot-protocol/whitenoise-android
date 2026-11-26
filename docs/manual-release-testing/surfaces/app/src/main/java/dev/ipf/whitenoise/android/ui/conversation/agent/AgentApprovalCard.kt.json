@@ -59,14 +59,6 @@
         "test_ids": [
           "CON-058"
         ]
-      },
-      {
-        "surface": "R.string.agent_request_unconfirmed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentApprovalCard.kt",
-        "anchor": "R.string.agent_request_unconfirmed",
-        "test_ids": [
-          "CON-057"
-        ]
       }
     ]
   },

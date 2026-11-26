@@ -26,7 +26,7 @@ internal data class AgentItemActions(
     val onSend: (AgentRequest) -> Unit = {},
     val sessionControls: Boolean = false,
 ) {
-    val canSend: Boolean get() = enabled && status.permitsSend
+    val canSend: Boolean get() = enabled && status == AgentRequestStatus.Idle
 }
 
 @Stable
@@ -39,15 +39,12 @@ internal class AgentRequestSender(
     val status: AgentRequestStatus get() = progress.status(rowId)
 
     fun send(request: AgentRequest) {
-        if (!status.permitsSend) return
+        if (status != AgentRequestStatus.Idle) return
         val token = UUID.randomUUID().toString()
         progress.begin(rowId, agent)
         start(request, token) { eventId -> progress.completeAdmission(rowId, eventId) }
     }
 }
-
-private val AgentRequestStatus.permitsSend: Boolean
-    get() = this == AgentRequestStatus.Idle || this == AgentRequestStatus.Unconfirmed
 
 /** Shared by the inline requests and the activity sheet for one conversation. */
 internal val LocalAgentRequestProgress = compositionLocalOf { AgentRequestProgress() }
@@ -67,8 +64,7 @@ internal fun rememberAgentRequestSender(
     appState: WhiteNoiseAppState,
 ): AgentRequestSender {
     val progress = LocalAgentRequestProgress.current
-    val sessionStartedAt = item.recordedAt.takeIf { item.body is AgentItemBody.Session }
-    val target = AgentRequestTarget(item.rowId, item.agentPubkeyHex, sessionStartedAt)
+    val target = AgentRequestTarget(item.rowId, item.agentPubkeyHex, isSession = item.body is AgentItemBody.Session)
     return remember(progress, controller, target) {
         AgentRequestSender(progress, item.rowId, item.agentPubkeyHex) { request, token, onCompleted ->
             appState.launchMutation {

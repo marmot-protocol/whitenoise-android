@@ -9,6 +9,9 @@ import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.state.AgentRequestTarget
 import dev.ipf.whitenoise.android.state.readAgentSettlements
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentRequestProgressTest {
@@ -70,8 +73,12 @@ class AgentRequestProgressTest {
     }
 
     @Test
-    fun untargetedControlRecoversAcrossClockSkewAndSessionChanges() {
-        val session = AgentRecordingFixtures.load("codex_approval_allowed", events = 6).first().record
+    fun restoresOnlyControlsForTheSameSessionFirstEvent() {
+        val session =
+            AgentRecordingFixtures
+                .load("codex_approval_allowed", events = 6)
+                .single { it.projected?.agentItem?.itemType == "session" }
+                .record
         val request =
             session.copy(
                 messageIdHex = "92".repeat(32),
@@ -82,24 +89,26 @@ class AgentRequestProgressTest {
                 tags =
                     listOf(
                         MessageTagFfi(listOf("p", session.sender)),
+                        MessageTagFfi(listOf("e", session.messageIdHex)),
                         MessageTagFfi(listOf("details", """{"action":"new_session"}""")),
                     ),
             )
-        val target = AgentRequestTarget(session.messageIdHex, session.sender, sessionStartedAt = 120uL)
-        val newer = target.copy(rowId = "93".repeat(32), sessionStartedAt = 200uL)
-        val history = AgentNativeRequestHistory(listOf(request))
+        val target = AgentRequestTarget(session.messageIdHex, session.sender, isSession = true)
+        val newer = target.copy(rowId = "93".repeat(32))
+        val earlier = request.copy(messageIdHex = "ff".repeat(32))
+        val settlement =
+            session.copy(
+                kind = 1009uL,
+                tags = listOf(MessageTagFfi(listOf("settles", earlier.messageIdHex))),
+            )
+        val history = AgentNativeRequestHistory(listOf(earlier, request, settlement))
 
         assertEquals(request.messageIdHex, history.outstanding(target)?.eventId)
-        assertEquals(request.messageIdHex, history.outstanding(newer)?.eventId)
-
-        val progress = AgentRequestProgress()
-        progress.begin(target.rowId, target.agent)
-        progress.begin(newer.rowId, newer.agent)
-        progress.completeAdmission(target.rowId, AgentRequestAdmission(request.messageIdHex))
-        progress.completeAdmission(newer.rowId, AgentRequestAdmission(request.messageIdHex))
-        progress.confirm(newer.agent, sequenceOf(request.messageIdHex))
-        assertEquals(AgentRequestStatus.Idle, progress.status(target.rowId))
-        assertEquals(AgentRequestStatus.Idle, progress.status(newer.rowId))
+        assertNull(history.outstanding(newer))
+        val older = request.copy(recordedAt = 101uL, receivedAt = 101uL)
+        assertNull(AgentNativeRequestHistory(listOf(earlier, older, settlement)).outstanding(target))
+        val legacy = request.copy(tags = request.tags.filterNot { it.values.firstOrNull() == "e" })
+        assertNull(AgentNativeRequestHistory(listOf(legacy)).outstanding(target))
     }
 
     @Test
@@ -146,30 +155,22 @@ class AgentRequestProgressTest {
         progress.reconcileHistory(
             AgentNativeRequestHistory(listOf(request, settlement.copy(sender = "a3".repeat(32)))),
             listOf(target),
+            progress.historyRevision,
         )
         assertEquals(AgentRequestStatus.AwaitingAgent, progress.status(target.rowId))
-        progress.reconcileHistory(AgentNativeRequestHistory(listOf(request, settlement)), listOf(target))
+        val oldReadRevision = progress.historyRevision
+        val settledHistory = AgentNativeRequestHistory(listOf(request, settlement))
+        progress.reconcileHistory(settledHistory, listOf(target), oldReadRevision)
+        assertEquals(AgentRequestStatus.Idle, progress.status(target.rowId))
+        progress.reconcileHistory(AgentNativeRequestHistory(listOf(request)), listOf(target), oldReadRevision)
         assertEquals(AgentRequestStatus.Idle, progress.status(target.rowId))
 
-        val restoredAfterFailure = AgentRequestProgress()
-        restoredAfterFailure.reconcileHistory(
-            AgentNativeRequestHistory(listOf(request.copy(invalidated = true))),
-            listOf(target),
-        )
-        assertEquals(AgentRequestStatus.Idle, restoredAfterFailure.status(target.rowId))
-    }
-
-    @Test
-    fun expiredUntargetedControlShowsAnUnconfirmedResult() {
-        val progress = AgentRequestProgress()
-        val rowId = "34".repeat(32)
-        progress.begin(rowId, "56".repeat(32))
-        progress.completeAdmission(rowId, AgentRequestAdmission("78".repeat(32), expiresAtMillis = 301_000))
-        progress.expire(300_999)
-        assertEquals(AgentRequestStatus.AwaitingAgent, progress.status(rowId))
-        progress.expire(301_000)
-        assertEquals(AgentRequestStatus.Unconfirmed, progress.status(rowId))
-        progress.begin(rowId, "56".repeat(32))
-        assertEquals(AgentRequestStatus.Sending, progress.status(rowId))
+        progress.begin(target.rowId, target.agent)
+        progress.completeAdmission(target.rowId, AgentRequestAdmission(request.messageIdHex))
+        val invalidated = AgentNativeRequestHistory(listOf(request.copy(invalidated = true)))
+        val failed = progress.reconcileHistory(invalidated, listOf(target), progress.historyRevision)
+        assertTrue(failed)
+        assertFalse(progress.reject(setOf(request.messageIdHex)))
+        assertEquals(AgentRequestStatus.Idle, progress.status(target.rowId))
     }
 }

@@ -34,24 +34,16 @@ internal fun ObserveAgentSettlements(
     val account = controller.conversationAccountRef ?: return
     val group = controller.group.groupIdHex
     val targets = remember(rows) { rows.mapNotNull { it.requestTarget() } }
-    val admitted = progress.hasAdmittedRequests
-    if (admitted) SideEffect { progress.reconcile(rows.asSequence()) }
-    LaunchedEffect(controller, targets, controller.groupRecoveryStatus, admitted) {
-        if (targets.isEmpty() && !admitted) return@LaunchedEffect
-        val ids = progress.admittedEventIds
+    val ids = progress.admittedEventIds
+    val revision = progress.historyRevision
+    if (ids.isNotEmpty()) SideEffect { progress.reconcile(rows.asSequence()) }
+    LaunchedEffect(controller, targets, controller.groupRecoveryStatus, ids, revision) {
+        if (targets.isEmpty() && ids.isEmpty()) return@LaunchedEffect
         val native =
             runCatchingCancellable {
                 controller.appState.marmotIo { agentNativeRequestHistory(account, group, targets, ids) }
             }.getOrNull() ?: return@LaunchedEffect
-        progress.reconcileHistory(native, targets)
-        progress.reconcile(rows.asSequence())
-    }
-    val expiry = progress.nextExpiryMillis
-    LaunchedEffect(progress, expiry) {
-        if (expiry != null) {
-            delay((expiry - System.currentTimeMillis()).coerceAtLeast(0))
-            progress.expire(System.currentTimeMillis().coerceAtLeast(expiry))
-        }
+        if (progress.reconcileHistory(native, targets, revision)) controller.presentAgentDeliveryFailure()
     }
 }
 
@@ -104,22 +96,23 @@ private suspend fun observeAgentDeliveryFailures(
                         .toSet()
                 }
             }.getOrNull().orEmpty()
-        if (progress.reject(failed)) {
-            controller.presentConversationTransient(R.string.agent_request_failed, TransientNoticeKind.Information)
-        }
+        if (progress.reject(failed)) controller.presentAgentDeliveryFailure()
     }
 }
 
 private fun TimelineMessageRecordFfi.requestTarget(): AgentRequestTarget? {
     val item = agentItem?.takeUnless { deleted || invalidationStatus != null } ?: return null
-    val startedAt = timelineAt.takeIf { item.itemType == "session" }
     val canAct =
         when (item.itemType) {
-            "session" -> true
+            "session" -> item.state in OPEN_STATES && !item.session.isNullOrBlank()
             "turn", "approval", "question" -> item.state in OPEN_STATES
             else -> false
         }
-    return AgentRequestTarget(messageIdHex, sender, startedAt).takeIf { canAct }
+    return AgentRequestTarget(messageIdHex, sender, isSession = item.itemType == "session").takeIf { canAct }
+}
+
+private fun ConversationController.presentAgentDeliveryFailure() {
+    presentConversationTransient(R.string.agent_request_failed, TransientNoticeKind.Information)
 }
 
 private val OPEN_STATES = setOf(AgentItemStateFfi.RUNNING, AgentItemStateFfi.WAITING)

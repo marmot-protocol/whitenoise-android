@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.isLoadingPage
+
 internal data class ConversationInitialTimelineBackfillSnapshot(
     val hasRenderableRows: Boolean,
     val hasMoreBefore: Boolean,
@@ -16,6 +19,22 @@ internal enum class ConversationInitialTimelineBackfillResult {
     NotReady,
     Superseded,
 }
+
+/** Captures only the bounded state needed to decide whether startup backfill can progress. */
+internal fun ConversationController.initialTimelineBackfillSnapshot() =
+    ConversationInitialTimelineBackfillSnapshot(
+        hasRenderableRows = timeline.any(::conversationTimelineRowVisible),
+        hasMoreBefore = hasMoreBefore,
+        loadInFlight = isLoading || isLoadingPage,
+        hasLoadFailure = error != null,
+        rawWindowMessageIds =
+            timelineSubscription
+                ?.latestInstalledWindow()
+                ?.page
+                ?.messages
+                ?.map { it.messageIdHex }
+                ?: timeline.map { it.record.messageIdHex },
+    )
 
 /**
  * Walks backward through raw timeline pages until the conversation has a row

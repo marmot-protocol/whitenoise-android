@@ -7,9 +7,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
@@ -23,6 +24,7 @@ internal data class ConversationViewportRestorationInputs(
     val seedTailAwaitingAuthoritative: Boolean,
     // The tapped card's message, already verified against this controller's account and group.
     val notificationTargetMessageId: String? = null,
+    val savedBackfillRetryGeneration: Long = 0L,
 )
 
 internal data class ConversationViewportRestorationCallbacks(
@@ -30,6 +32,7 @@ internal data class ConversationViewportRestorationCallbacks(
     val onAnchored: (latestItemId: String?) -> Unit,
     val retireUnreadDivider: () -> Unit,
     val notification: ConversationNotificationLandingCallbacks = ConversationNotificationLandingCallbacks(),
+    val onSavedBackfillStalled: (Boolean) -> Unit = {},
 )
 
 /** Initial/unread/saved positioning and post-initial geometry, not IME or lifecycle ownership. */
@@ -56,7 +59,7 @@ internal fun ConversationViewportRestorationEffects(
             .distinctUntilChanged()
             .collect { owner.onReadingStartGeometry(currentCallbacks.navigation.currentAnchor) }
     }
-    ConversationSavedViewportEffect(controller, viewport, owner, inputs, callbacks.onAnchored)
+    ConversationSavedViewportEffect(controller, viewport, owner, inputs, callbacks)
     ConversationEntryViewportEffect(controller, viewport, owner, inputs, callbacks)
 }
 
@@ -93,32 +96,112 @@ private fun ConversationSavedViewportEffect(
     viewport: ConversationTimelineViewport,
     owner: ConversationViewportRestorationOwner,
     inputs: ConversationViewportRestorationInputs,
-    onAnchored: (String?) -> Unit,
+    callbacks: ConversationViewportRestorationCallbacks,
 ) {
     val restore = inputs.scrollRestore
-    LaunchedEffect(controller, restore, owner) {
+    val invitePending = controller.group.pendingConfirmation
+    LaunchedEffect(controller, restore, owner, invitePending, inputs.savedBackfillRetryGeneration) {
         // A replacement coordinator must not replay an old saved position after
         // this screen has established its current reading position.
-        if (restore == null || inputs.presentation.anchored) return@LaunchedEffect
-        snapshotFlow { controller.initialTimelineSeedActive }.filter { !it }.first()
+        if (restore == null || inputs.presentation.anchored || invitePending) return@LaunchedEffect
+        controller.awaitSavedViewportTimeline()
+        val isCurrent = { owner.isActive && !controller.group.pendingConfirmation }
+        if (!isCurrent()) return@LaunchedEffect
         restore.anchorMessageIdHex?.takeIf { it.isNotBlank() }?.let { controller.loadUntilMessageAvailable(it) }
-        if (!owner.isActive) return@LaunchedEffect
-        val position =
-            snapshotFlow {
-                val rendered = controller.timeline.filter(::conversationTimelineRowVisible)
-                conversationViewportSavedPosition(
-                    restore,
-                    rendered.map { it.id to it.record.messageIdHex },
-                    controller.conversationTrailingRowCount(rendered.size),
-                )
-            }.filterNotNull().first()
-        while (!owner.commitInitialPosition(position, { viewport.initialAnchorLayout(position.index) })) {
-            if (!owner.isActive) return@LaunchedEffect
-            withFrameNanos { }
+        val result = backfillSavedViewport(controller, isCurrent)
+        if (!isCurrent()) return@LaunchedEffect
+        val exhausted = result == ConversationInitialTimelineBackfillResult.Exhausted
+        when {
+            exhausted && controller.timeline.none(::conversationTimelineRowVisible) -> {
+                if (owner.completeEmptyPosition(controller.conversationTimelineStructure(), viewport.height())) {
+                    callbacks.onAnchored(null)
+                }
+            }
+            result == ConversationInitialTimelineBackfillResult.Superseded -> Unit
+            else -> controller.commitSavedViewport(restore, viewport, owner, callbacks, isCurrent)
         }
-        val completion = controller.savedViewportCompletion(position, restore)
-        val completed = owner.completeInitialPosition(completion.position, completion.structure, viewport.height())
-        if (completed) onAnchored(completion.latestItemId)
+    }
+}
+
+private suspend fun ConversationController.awaitSavedViewportTimeline() {
+    snapshotFlow {
+        val published = hasPublishedAuthoritativeTimeline || error != null
+        val busy = initialTimelineSeedActive || isLoading || isLoadingPage
+        published && !busy
+    }.first { it }
+}
+
+/** A saved target can load a centered, background-only window. Fall back to visible history, then to Latest. */
+private suspend fun backfillSavedViewport(
+    controller: ConversationController,
+    isCurrent: () -> Boolean,
+): ConversationInitialTimelineBackfillResult {
+    suspend fun backfill() =
+        backfillInitialConversationTimeline(
+            snapshot = controller::initialTimelineBackfillSnapshot,
+            loadOlder = controller::loadOlderTimelinePage,
+            isCurrent = isCurrent,
+        )
+    val beganAtLatest = !controller.hasMoreAfterTimeline
+    val result = backfill()
+    if (result != ConversationInitialTimelineBackfillResult.Exhausted || !controller.hasMoreAfterTimeline) return result
+    return when {
+        !isCurrent() -> ConversationInitialTimelineBackfillResult.Superseded
+        !controller.returnToLatestWindow() -> ConversationInitialTimelineBackfillResult.NoProgress
+        beganAtLatest -> result
+        else -> {
+            val latest = backfill()
+            val exhausted = latest == ConversationInitialTimelineBackfillResult.Exhausted
+            val detachedEmpty = exhausted && controller.hasMoreAfterTimeline
+            if (detachedEmpty && isCurrent() && !controller.returnToLatestWindow()) {
+                ConversationInitialTimelineBackfillResult.NoProgress
+            } else {
+                latest
+            }
+        }
+    }
+}
+
+private suspend fun ConversationController.commitSavedViewport(
+    restore: ConversationScrollSnapshot,
+    viewport: ConversationTimelineViewport,
+    owner: ConversationViewportRestorationOwner,
+    callbacks: ConversationViewportRestorationCallbacks,
+    isCurrent: () -> Boolean,
+) {
+    while (isCurrent()) {
+        val (restored, _) =
+            snapshotFlow { savedViewportPosition(this, restore) to (error == null) }.first { (position, canRetry) ->
+                if (isCurrent()) callbacks.onSavedBackfillStalled(position == null && canRetry)
+                position != null || !isCurrent()
+            }
+        val position = restored?.takeIf { isCurrent() } ?: break
+        if (owner.commitInitialPosition(position, { viewport.initialAnchorLayout(position.index) }) && isCurrent()) {
+            val completion = savedViewportCompletion(position, restore)
+            if (owner.completeInitialPosition(completion.position, completion.structure, viewport.height())) {
+                callbacks.onAnchored(completion.latestItemId)
+            }
+            return
+        }
+        withFrameNanos { }
+    }
+}
+
+private fun savedViewportPosition(
+    controller: ConversationController,
+    restore: ConversationScrollSnapshot,
+): ConversationViewportInitialPosition? {
+    val rows = controller.timeline.filter(::conversationTimelineRowVisible).map { it.id to it.record.messageIdHex }
+    val trailing = controller.conversationTrailingRowCount(rows.size)
+    val position = conversationViewportSavedPosition(restore, rows, trailing) ?: return null
+    val index = conversationTimelineIndexForListIndex(position.index, rows.size, trailing)
+    return if (index in rows.indices) {
+        position
+    } else {
+        val (itemId, messageId) = rows.last()
+        val fallback =
+            restore.copy(anchorItemId = itemId, anchorMessageIdHex = messageId, firstVisibleItemScrollOffset = 0)
+        conversationViewportSavedPosition(fallback, rows, trailing)
     }
 }
 

@@ -264,22 +264,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Captures only the bounded state needed to decide whether startup backfill can progress. */
-private fun ConversationController.initialTimelineBackfillSnapshot() =
-    ConversationInitialTimelineBackfillSnapshot(
-        hasRenderableRows = timeline.any(::conversationTimelineRowVisible),
-        hasMoreBefore = hasMoreBefore,
-        loadInFlight = isLoading || isLoadingPage,
-        hasLoadFailure = error != null,
-        rawWindowMessageIds =
-            timelineSubscription
-                ?.latestInstalledWindow()
-                ?.page
-                ?.messages
-                ?.map { it.messageIdHex }
-                ?: timeline.map { it.record.messageIdHex },
-    )
-
 private val InitialTimelineBackfillNoProgressError =
     ErrorPresentation(
         message = AppText.Resource(R.string.error_loaded_content_kept),
@@ -2166,6 +2150,7 @@ internal fun ConversationScreen(
         LaunchedEffect(
             controller,
             navigationState.initialTimelineLoadStarted,
+            controller.group.pendingConfirmation,
             controller.timeline.isEmpty(),
             latestTimelineItemId,
             navigationState.initialTimelineBackfillRetryGeneration,
@@ -2175,7 +2160,7 @@ internal fun ConversationScreen(
             val timelineCannotBackfill =
                 !navigationState.initialTimelineLoadStarted || controller.group.pendingConfirmation
             if (hasEstablishedInitialPosition || timelineCannotBackfill || renderedTimeline.isNotEmpty()) {
-                if (renderedTimeline.isNotEmpty()) {
+                if (renderedTimeline.isNotEmpty() || controller.group.pendingConfirmation) {
                     navigationState.initialTimelineBackfillNoProgress = false
                 }
                 return@LaunchedEffect
@@ -2184,9 +2169,9 @@ internal fun ConversationScreen(
                 backfillInitialConversationTimeline(
                     snapshot = controller::initialTimelineBackfillSnapshot,
                     loadOlder = controller::loadOlderTimelinePage,
-                    isCurrent = { currentController === controller },
+                    isCurrent = { currentController === controller && !controller.group.pendingConfirmation },
                 )
-            if (currentController !== controller) return@LaunchedEffect
+            if (currentController !== controller || controller.group.pendingConfirmation) return@LaunchedEffect
             when (result) {
                 ConversationInitialTimelineBackfillResult.Exhausted -> {
                     navigationState.initialTimelineBackfillNoProgress = false
@@ -2623,6 +2608,7 @@ internal fun ConversationScreen(
                     entryProjectionAvailable = entryProjectionAvailable,
                     notificationOpenRequestId = notificationOpenRequestId,
                     seedTailAwaitingAuthoritative = navigationState.seedTailAwaitingAuthoritative,
+                    savedBackfillRetryGeneration = navigationState.initialTimelineBackfillRetryGeneration,
                     notificationTargetMessageId =
                         notificationLandingTarget?.messageIdFor(
                             controller.boundAccountRef,
@@ -2642,6 +2628,7 @@ internal fun ConversationScreen(
                         navigationState.lastFollowedLatestId = latestId
                     },
                     retireUnreadDivider = { entryUnreadDividerRetired = true },
+                    onSavedBackfillStalled = { navigationState.initialTimelineBackfillNoProgress = it },
                     notification =
                         ConversationNotificationLandingCallbacks(
                             beginNavigation = navigationState.targetNavigation::begin,
@@ -4014,7 +4001,7 @@ internal fun ConversationScreen(
                             .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
                     when {
-                        navigationState.initialTimelineBackfillNoProgress ->
+                        navigationState.initialTimelineBackfillNoProgress && !controller.group.pendingConfirmation ->
                             ConversationLoadErrorContent(
                                 error = InitialTimelineBackfillNoProgressError,
                                 onRetry = {
