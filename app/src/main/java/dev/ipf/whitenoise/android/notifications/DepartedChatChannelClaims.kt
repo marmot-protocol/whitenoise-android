@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import androidx.core.content.pm.ShortcutManagerCompat
 
 // Prefixes an owner hash for the channels a departing account's sign-out inferred, from chats no account lists.
 // They are kept apart from the account's own record and replaced on every capture, so a retried sign-out claims
@@ -84,3 +85,39 @@ internal fun pruneDepartedChatClaims(
         }.getOrDefault(false)
     }
 }
+
+/**
+ * Every conversation shortcut id variant of the platform shortcuts scoped to an account in [retainedScopes]: chats a
+ * retained account shows now, whose channels an inferred departed-chat claim must never delete. Null when the
+ * shortcuts cannot be read, so no claim is deleted unchecked.
+ */
+internal fun retainedScopedShortcutIds(
+    appContext: Context,
+    retainedScopes: Set<String>,
+): Set<String>? =
+    runCatching {
+        val flags =
+            ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                ShortcutManagerCompat.FLAG_MATCH_PINNED
+        ShortcutManagerCompat
+            .getShortcuts(appContext, flags)
+            .filter { it.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) in retainedScopes }
+            .flatMapTo(HashSet()) { channelShortcutIdsFromShortcutId(it.id) }
+    }.getOrNull()
+
+/**
+ * The owner-store [keys] retention prunes: records of accounts not in [retainedKeys], and their inferred
+ * departed-chat claims only when [claimsDeletable], after every signing account's chats were read again.
+ */
+internal fun staleOwnerKeys(
+    keys: Collection<String>,
+    retainedKeys: Set<String>,
+    claimsDeletable: Boolean,
+): List<String> =
+    keys.filter { key ->
+        val claims = key.startsWith(DEPARTED_CHAT_KEY_PREFIX)
+        key != LEGACY_SWEEP_PENDING_KEY &&
+            key.removePrefix(DEPARTED_CHAT_KEY_PREFIX) !in retainedKeys &&
+            (!claims || claimsDeletable)
+    }

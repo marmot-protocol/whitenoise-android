@@ -241,12 +241,14 @@ private fun updateOwnerStoreAfterAccountCleanup(
 
 /**
  * Retries channel deletion for each departed account key in [staleKeys] and removes only keys whose
- * channels were enumerated, redacted, and deleted without error.
+ * channels were enumerated, redacted, and deleted without error. An inferred departed-chat claim key never deletes
+ * a channel in [claimProtection], what retained accounts own now.
  */
 internal fun pruneStaleAccountChannelsAndOwners(
     appContext: Context,
     prefs: SharedPreferences,
     staleKeys: List<String>,
+    claimProtection: Set<String> = emptySet(),
 ): Boolean {
     val clearedKeys = mutableListOf<String>()
     var allCleared = true
@@ -257,6 +259,8 @@ internal fun pruneStaleAccountChannelsAndOwners(
                 .getStringSet(staleKey, emptySet())
                 .orEmpty()
                 .flatMapTo(mutableSetOf(), ::channelShortcutIdsFromShortcutId)
+        // An inferred departed-chat claim never deletes what a retained account owns.
+        if (staleKey.startsWith(DEPARTED_CHAT_KEY_PREFIX)) staleShortcutIds -= claimProtection
         val deleted =
             deleteMatchingNotificationChannels(appContext) { channel ->
                 val isStaleProfile = channel.id.startsWith(staleProfilePrefix)

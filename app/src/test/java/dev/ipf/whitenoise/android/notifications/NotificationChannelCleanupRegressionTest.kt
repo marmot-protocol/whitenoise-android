@@ -426,6 +426,56 @@ class NotificationChannelCleanupRegressionTest {
         assertNotNull(manager.getNotificationChannel(restored))
     }
 
+    /**
+     * Account A's sign-out inferred a claim on B's old channel and then failed, so A stays. When B signs out, A's
+     * claim is no proof of ownership: B's capture claims the channel too, and retention deletes its title.
+     */
+    @Test
+    fun anotherAccountsInferredClaimNeverHidesAChannelFromCapture() {
+        val legacyId = checkNotNull(conversationShortcutId("account-b", "group-b-old"))
+        val legacy = convChannel(NotificationChannelSpec.GROUP_MESSAGES, legacyId, "B Old Secret")
+        assertTrue(recordDepartedChatClaims(context, "account-a", setOf(legacyId)))
+
+        val captured = checkNotNull(departedChatConversationShortcutIds(context, "account-b", emptySet(), emptySet()))
+        assertTrue("A's claim must not count as ownership", legacyId in captured)
+        assertTrue(recordDepartingConversationChannelOwners(context, "account-b", emptySet(), false, captured))
+        assertTrue(
+            retainConversationChannelOwners(
+                context,
+                listOf("account-a"),
+                signingAccountRemains = true,
+                departedChatClaimsRevalidated = true,
+            ),
+        )
+
+        assertNull(manager.getNotificationChannel(legacy))
+        assertNoChannelContainsText("B Old Secret")
+    }
+
+    /**
+     * A retained account that records ownership of a claimed channel after revalidation read its chats, as when a
+     * restored chat posts, keeps that channel: retention checks current ownership under its own lock.
+     */
+    @Test
+    fun ownershipRecordedAfterRevalidationKeepsTheChannel() {
+        val restoredId = checkNotNull(conversationShortcutId("account-b", "group-b-posted"))
+        val restored = convChannel(NotificationChannelSpec.GROUP_MESSAGES, restoredId, "B Posted Chat")
+        assertTrue(recordDepartedChatClaims(context, "account-a", setOf(restoredId)))
+
+        // Revalidation already ran on an older chat list; B's restored chat then posts and records its owner.
+        assertTrue(recordConversationChannelOwners(context, "account-b", listOf(restoredId)))
+        assertTrue(
+            retainConversationChannelOwners(
+                context,
+                listOf("account-b"),
+                signingAccountRemains = true,
+                departedChatClaimsRevalidated = true,
+            ),
+        )
+
+        assertNotNull(manager.getNotificationChannel(restored))
+    }
+
     /** A failed claim commit, already applied in memory, is written again on retry instead of reported saved. */
     @Test
     fun failedClaimCommitIsRetriedRatherThanTakenFromMemory() {

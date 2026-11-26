@@ -50,13 +50,8 @@ internal fun departedChatConversationShortcutIds(
         runCatching {
             val appContext = context.applicationContext
             val manager = appContext.getSystemService(NotificationManager::class.java)
-            // This account's own earlier inference is recomputed, never taken as already accounted for.
-            val ownInferred = channelOwnerAccountHash(accountRef)?.departedChatOwnerKey
             val ownerEntries =
-                appContext
-                    .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
-                    .all
-                    .filterKeys { it != ownInferred }
+                appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE).all
             val accounted = accountedConversationShortcutIds(appContext, ownerEntries, accountRef, knownGroupIds)
             val kept = keptShortcutIds.mapTo(HashSet(), ::canonicalConversationShortcutId)
             checkNotNull(manager)
@@ -87,13 +82,10 @@ internal fun hasUnaccountedConversationNotificationChannels(
                 convShortcutIds == null -> true
                 convShortcutIds.isEmpty() -> false
                 else -> {
-                    // This account's own earlier inferred claims are not proof: they are what is being recomputed.
-                    val ownClaims = channelOwnerAccountHash(accountRef)?.departedChatOwnerKey
                     val ownerEntries =
                         appContext
                             .getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
                             .all
-                            .filterKeys { it != ownClaims }
                     val accountedIds =
                         accountedConversationShortcutIds(appContext, ownerEntries, accountRef, knownGroupIds)
                     convShortcutIds.any { it !in accountedIds }
@@ -111,7 +103,8 @@ private fun accountedConversationShortcutIds(
 ): Set<String> =
     buildSet {
         ownerEntries.forEach { (key, value) ->
-            if (key != LEGACY_SWEEP_PENDING_KEY) {
+            // An inferred departed-chat claim is no proof of ownership, for its own account or any other.
+            if (key != LEGACY_SWEEP_PENDING_KEY && !key.startsWith(DEPARTED_CHAT_KEY_PREFIX)) {
                 (value as? Set<*>)
                     ?.filterIsInstance<String>()
                     ?.flatMapTo(this, ::channelShortcutIdsFromShortcutId)
@@ -173,16 +166,16 @@ private fun retainLocked(
 ): Boolean {
     val prefs = appContext.getSharedPreferences(CONVERSATION_CHANNEL_OWNERS_PREFS, Context.MODE_PRIVATE)
     val sweepPending = prefs.contains(LEGACY_SWEEP_PENDING_KEY)
-    // Inferred departed-chat claims are deleted only once every signing account's chats were read again.
-    val staleKeys =
-        prefs.all.keys.filter { key ->
-            val claims = key.startsWith(DEPARTED_CHAT_KEY_PREFIX)
-            key != LEGACY_SWEEP_PENDING_KEY &&
-                key.removePrefix(DEPARTED_CHAT_KEY_PREFIX) !in retainedKeys &&
-                (!claims || departedChatClaimsRevalidated)
-        }
-    val ownersPruned = staleKeys.isEmpty() || pruneStaleAccountChannelsAndOwners(appContext, prefs, staleKeys)
     val retainedIds = retainedConversationShortcutIds(prefs, retainedKeys)
+    // Checked under this lock, with the deletion: a claim never takes a channel a retained account owns now, even
+    // one recorded after revalidation read the chats. Unreadable shortcuts keep every claim for the next pass.
+    val retainedScoped = retainedScopedShortcutIds(appContext, retainedScopes)
+    val claimProtection = retainedIds + retainedScoped.orEmpty()
+    // Inferred departed-chat claims are deleted only once every signing account's chats were read again.
+    val claimsDeletable = departedChatClaimsRevalidated && retainedScoped != null
+    val staleKeys = staleOwnerKeys(prefs.all.keys, retainedKeys, claimsDeletable)
+    val ownersPruned =
+        staleKeys.isEmpty() || pruneStaleAccountChannelsAndOwners(appContext, prefs, staleKeys, claimProtection)
     // A remaining read-only account owns no conversation channels; a signer that joined since may own
     // unrecorded ones, so a pending sweep waits until no signing account is present.
     val sweepUnowned = !signingAccountRemains && (retainedKeys.isEmpty() || sweepPending)
