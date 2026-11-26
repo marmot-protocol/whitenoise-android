@@ -100,12 +100,11 @@ internal fun ChatInfoQuickActions(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = gap),
     ) {
         val minimumActionWidth = 80.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
-        val columns = ((maxWidth + gap) / (minimumActionWidth + gap)).toInt().coerceAtLeast(1)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(gap),
-            maxItemsInEachRow = columns,
+            maxItemsInEachRow = ((maxWidth + gap) / (minimumActionWidth + gap)).toInt().coerceAtLeast(1),
         ) {
             if (onOpenProfile != null) {
                 val profileLaunch = rememberMeasuredControlClick(onOpenProfile)

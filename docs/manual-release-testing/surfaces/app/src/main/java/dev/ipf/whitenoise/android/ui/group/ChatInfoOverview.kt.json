@@ -42,7 +42,7 @@
       {
         "surface": "Captioned quick actions wrap",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
-        "anchor": "maxItemsInEachRow = columns",
+        "anchor": "maxItemsInEachRow = ((maxWidth + gap)",
         "test_ids": [
           "GRP-001"
         ]
