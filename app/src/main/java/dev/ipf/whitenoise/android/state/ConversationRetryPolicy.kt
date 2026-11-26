@@ -3,8 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.flow.StateFlow
 
-/** Short retry budget for background operations and base foreground backoff. */
-internal const val SEND_RETRY_ATTEMPTS: Int = 3
+/** Base foreground retry backoff. */
 internal const val SEND_RETRY_BACKOFF_MS: Long = 700L
 internal const val PENDING_SEND_RETRY_MAX_BACKOFF_MS: Long = 60_000L
 private const val PENDING_SEND_MAX_BACKOFF_DOUBLINGS: Int = 16
@@ -57,29 +56,6 @@ internal fun isAmbiguousRelayDeliveryError(throwable: Throwable): Boolean {
             "insufficient publish acknowledgements",
         ).any(text::contains)
     return transportClosed || (!explicitRejection && ambiguousPublish)
-}
-
-/** Bounded connect-phase retry used by background send operations. */
-@Suppress("TooGenericExceptionCaught") // Every non-cancellation gateway failure must be classified before retry.
-internal suspend fun <T> retryTransientRelaySend(
-    onTransientFailure: suspend (attempt: Int, throwable: Throwable) -> Unit = { _, _ -> },
-    sendAttempt: suspend (attempt: Int) -> T,
-): T {
-    var lastTransient: Throwable? = null
-    for (attempt in 1..SEND_RETRY_ATTEMPTS) {
-        try {
-            return sendAttempt(attempt)
-        } catch (throwable: Throwable) {
-            rethrowIfCancellation(throwable)
-            if (!isTransientRelaySendError(throwable)) throw throwable
-            lastTransient = throwable
-            onTransientFailure(attempt, throwable)
-            if (attempt < SEND_RETRY_ATTEMPTS) {
-                kotlinx.coroutines.delay(SEND_RETRY_BACKOFF_MS)
-            }
-        }
-    }
-    throw lastTransient ?: IllegalStateException("send retry budget exhausted")
 }
 
 internal fun pendingSendRetryBackoffMs(failedAttempt: Int): Long {
