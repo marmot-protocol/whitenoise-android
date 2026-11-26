@@ -159,6 +159,25 @@ class AttachmentCollectionJournalTest {
         assertEquals("accepted-before-retry", saved.nextChunk?.clientToken)
     }
 
+    /** An expiry cleanup that cannot rewrite the journal still returns adoptable durable metadata. */
+    @Test
+    fun failedExpiryRewriteKeepsRecoverableUris() {
+        val journal = journal()
+        val planned = operation(count = 1)
+        val source = CollectionStoredDraft("native", 3L, "application/example")
+        val owned = planned.items.single().copy(storedDraft = source)
+        val recorded = planned.copy(items = listOf(owned)).withChunkToken(planned.chunks.single().id, "pending", now)
+        assertTrue(journal.write(recorded))
+        val file = folder.root.walkTopDown().single { it.isFile }
+        assertTrue(java.io.File(file.parentFile, file.name + ".tmp").mkdir())
+        now += ATTACHMENT_COLLECTION_JOURNAL_TTL_MS + 1
+
+        val reopened = journal.read(recorded.accountRef, recorded.groupIdHex).single()
+
+        assertEquals(owned.uri, reopened.items.single().uri)
+        assertTrue(journal.contains(reopened))
+    }
+
     /** A skipped pick still owns a shared native ID even when a separate occurrence was accepted. */
     @Test
     fun skippedAliasPreservesSharedOriginal() {

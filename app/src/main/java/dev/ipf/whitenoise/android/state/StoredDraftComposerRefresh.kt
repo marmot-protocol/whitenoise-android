@@ -73,7 +73,7 @@ internal suspend fun ConversationController.admitRetainedMedia(
     retained: RetainedMediaUpload,
     token: String,
 ): SendSummaryFfi =
-    if (retained.isDraftStored) {
+    if (retained.tracksDraftAcceptance) {
         withStoredDraftAdmission(account, group.groupIdHex) {
             admitMediaWithDraftRecovery(account, references, retained, token)
         }
@@ -113,24 +113,36 @@ private suspend fun ConversationController.admitMediaWithDraftRecovery(
     }
 }
 
-/** Records exact stored-file IDs with the client token before sending to MDK; retries use the same key. */
+/** Collection chunks already carry ownership in the collection journal. */
+private val RetainedMediaUpload.tracksDraftAcceptance: Boolean
+    get() =
+        draftHandling != RetainedDraftHandling.COLLECTION_CHUNK &&
+            (
+                isDraftStored ||
+                    (
+                        draftHandling == RetainedDraftHandling.COMPOSER_SELECTION &&
+                            attachments.any { it.nativeDraftAttachmentId != null }
+                    )
+            )
+
+/** Records exact native draft IDs with the client token before sending to MDK; retries use the same key. */
 private suspend fun ConversationController.recordStoredDraftAdmission(
     account: String,
     retained: RetainedMediaUpload,
     token: String,
 ): AttachmentCollectionOperation? {
-    if (!retained.isDraftStored) return null
+    if (!retained.tracksDraftAcceptance) return null
     val items =
         retained.attachments.mapNotNull { attachment ->
-            attachment.draftFile?.let { file ->
-                CollectionItem(
-                    file.attachmentId,
-                    "",
-                    CollectionItemKind.DOCUMENT,
-                    CollectionItemState.UPLOADING,
-                    CollectionStoredDraft(file.attachmentId, file.byteCount, attachment.mediaType),
-                )
-            }
+            val stored = attachment.draftFile
+            val id = stored?.attachmentId ?: attachment.nativeDraftAttachmentId ?: return@mapNotNull null
+            CollectionItem(
+                id,
+                "",
+                CollectionItemKind.DOCUMENT,
+                CollectionItemState.UPLOADING,
+                CollectionStoredDraft(id, attachment.byteCount, attachment.mediaType, fileBacked = stored != null),
+            )
         }
     val registry = appState.attachmentCollections
     val groupIdHex = group.groupIdHex

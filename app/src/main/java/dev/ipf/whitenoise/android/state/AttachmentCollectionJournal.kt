@@ -141,8 +141,12 @@ internal class AttachmentCollectionJournal(
             !operation.mayNeedStoredDraftCleanup -> null
             else -> {
                 val metadata = operation.copy(items = operation.items.map { it.copy(uri = "") })
-                if (metadata == operation || write(metadata)) draftSources?.deleteKey(file.nameWithoutExtension)
-                metadata
+                if (metadata == operation || write(metadata)) {
+                    draftSources?.deleteKey(file.nameWithoutExtension)
+                    metadata
+                } else {
+                    operation
+                }
             }
         }
     }

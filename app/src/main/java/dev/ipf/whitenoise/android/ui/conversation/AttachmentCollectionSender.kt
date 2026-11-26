@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftSendClearToken
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.RetainedDraftHandling
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
 import dev.ipf.whitenoise.android.state.shouldAcceptMediaUploadForAccount
@@ -210,6 +211,8 @@ internal class AttachmentCollectionSender(
             }
             return
         }
+        val uploads = current.controller.retainedMediaUploads
+        uploads.get(queued.key)?.draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
         val recorded = registry.recordChunkToken(run.operationId, chunk.id, queued.tempId)
         // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
         // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.
@@ -244,13 +247,7 @@ internal class AttachmentCollectionSender(
                 )
             }
         if (chunk.carriesCaption && accepted != null) {
-            run.draftClear?.let { draft ->
-                if (accepted.items.any { it.storedDraft != null }) {
-                    appState.composerDraftExpansionBridge.clearAfterDurableAcceptance(draft, keepAttachments = true)
-                } else {
-                    appState.clearDraftAfterSuccessfulSend(draft)
-                }
-            }
+            run.draftClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = true) }
         }
         if (accepted?.needsStoredDraftCleanup == true) {
             appState.launchMutation { appState.finishCollectionDraftCleanup(run.operationId) }

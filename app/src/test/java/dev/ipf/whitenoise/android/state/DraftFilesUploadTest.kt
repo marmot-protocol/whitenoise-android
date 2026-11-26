@@ -512,6 +512,41 @@ class StoredDraftAcceptanceTest {
             }
         }
 
+    /** The accepted inline pick disappears while the unsurfaced stored file stays in the native draft. */
+    @Test
+    fun acceptedInlinePickKeepsHiddenStoredDraftAttachment() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val hidden = draftAttachment("hidden")
+            val visible = hidden.copy(id = "photo", fileBacked = false, plaintextSize = 3uL)
+            val draft = content("newer caption", visible, hidden).copy(replyToMessageIdHex = "new-reply")
+            val engine = DraftUploadEngine(draft)
+            val app = acceptanceAppState(engine)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val rendered =
+                    PendingAttachment(
+                        byteArrayOf(1, 2, 3),
+                        visible.mediaType,
+                        visible.fileName,
+                        nativeDraftAttachmentId = visible.id,
+                    )
+                val retained =
+                    RetainedMediaUpload(listOf(rendered), "sent caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "inline")
+                awaitAttachmentCollectionJournal()
+
+                assertEquals("sent caption", engine.admittedCaption)
+                assertNull(engine.admittedConsuming)
+                assertEquals(draft.copy(mediaAttachments = listOf(hidden)), engine.current)
+            } finally {
+                app.mutationsScope.cancel()
+            }
+        }
+
     /** A native stored-file descriptor that can be reselected under a different identity. */
     private fun draftAttachment(id: String) =
         SelectedMessageDraftAttachmentFfi(

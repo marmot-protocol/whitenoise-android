@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ATTACHMENT_CHUNK_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.RetainedDraftHandling
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.captureDraftForSend
 import dev.ipf.whitenoise.android.state.clearDraftAfterSuccessfulSend
@@ -319,7 +320,7 @@ internal class ConversationMediaSender(
                 replyAccepted = true
                 completion.accept()
             }
-            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = sendsStoredFiles) }
+            pendingClear?.let { appState.clearDraftAfterSuccessfulSend(it, textOnly = !isReply || sendsStoredFiles) }
         }
         if (isReply && !replyAccepted) completion.reject()
     }
@@ -620,6 +621,9 @@ internal class ConversationMediaSender(
                     replyTarget = null,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
+        }
+        seeded.forEach { queued ->
+            controller.retainedMediaUploads.get(queued.key)?.draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
         }
         return seeded
     }

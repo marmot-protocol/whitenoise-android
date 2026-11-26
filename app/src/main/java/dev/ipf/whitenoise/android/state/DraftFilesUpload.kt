@@ -89,9 +89,8 @@ private fun MarmotInterface.recoveredDraftFilesSend(
     }
 
 /**
- * Publishes a retained send. Stored draft files are admitted through [sendComposerDraftFiles], consuming the draft
- * they uploaded from only while it still says exactly what they send; every other send goes through
- * [sendComposerMedia] as before.
+ * Publishes a retained send. Composer selections and collection chunks never consume a draft revision.
+ * Captured replies and callers without explicit composer ownership retain their existing admission paths.
  */
 internal suspend fun MarmotInterface.publishRetainedMedia(
     account: String,
@@ -100,18 +99,31 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
     retained: RetainedMediaUpload,
     admission: DraftFilesAdmission,
 ): SendSummaryFfi =
-    if (retained.isDraftStored) {
-        val upload = DraftFilesUpload(retained.attachments, retained.caption)
-        sendComposerDraftFiles(account, group, references, upload, admission)
-    } else {
-        sendComposerMedia(
-            account,
-            group,
-            references,
-            retained.caption,
-            admission.token,
-            replyRevision = retained.replyRevision,
-        )
+    when {
+        retained.admitsPreparedMedia ->
+            admitLocalSend(account, group, admission.token) {
+                sendPreparedMediaWithClientToken(
+                    account,
+                    group,
+                    references,
+                    retained.caption,
+                    admission.token,
+                    consumingDraft = null,
+                )
+            }
+        retained.isDraftStored -> {
+            val upload = DraftFilesUpload(retained.attachments, retained.caption)
+            sendComposerDraftFiles(account, group, references, upload, admission)
+        }
+        else ->
+            sendComposerMedia(
+                account,
+                group,
+                references,
+                retained.caption,
+                admission.token,
+                replyRevision = retained.replyRevision,
+            )
     }
 
 /** The token, selected revision and text ownership of an admitted send. */

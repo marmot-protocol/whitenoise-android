@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+/** The component that knows which native draft attachments, if any, the send owns. */
+internal enum class RetainedDraftHandling {
+    LEGACY,
+    COMPOSER_SELECTION,
+    COLLECTION_CHUNK,
+}
+
 /**
  * Compressed bytes + metadata retained for an in-flight/failed media send.
  * The whole album is one unit: all attachments succeed/fail together, retry
@@ -25,6 +32,15 @@ internal class RetainedMediaUpload(
     val replyVersion: Long = 0L,
 ) {
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null
+    var draftHandling: RetainedDraftHandling = RetainedDraftHandling.LEGACY
+
+    /** A composer selection or collection chunk carries its own caption and uses exact native IDs for cleanup. */
+    val admitsPreparedMedia: Boolean
+        get() = draftHandling != RetainedDraftHandling.LEGACY
+
+    /** Prepared sends and captured replies defer admission until their references are available. */
+    val uploadsBeforeAdmission: Boolean
+        get() = admitsPreparedMedia || replyRevision != null
 
     // The draft a send of stored draft files may consume on admission: the one it uploaded from, while that draft
     // said exactly what it sends.

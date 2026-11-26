@@ -206,7 +206,7 @@ internal suspend fun ConversationController.performMediaUpload(
                                                         group.groupIdHex,
                                                         request,
                                                         tempId,
-                                                        capturedReply = retained.replyRevision != null,
+                                                        forceUploadOnly = retained.uploadsBeforeAdmission,
                                                     )
                                                 }
                                             outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }

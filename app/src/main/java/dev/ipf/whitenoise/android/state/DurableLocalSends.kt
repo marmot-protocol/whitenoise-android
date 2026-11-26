@@ -116,21 +116,21 @@ internal data class DurableComposerMediaUpload(
 /**
  * Uses draft admission when MDK owns matching staged bytes, otherwise asks the
  * token-aware upload call to admit draft-less non-reply voice notes and contact cards.
- * A captured reply is always upload-only until its original revision can be admitted.
+ * Captured replies and explicit composer selections upload separately from their native admission.
  */
 internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
     account: String,
     group: String,
     request: MediaUploadRequestFfi,
     token: String,
-    capturedReply: Boolean = false,
+    forceUploadOnly: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     return uploadOrAdmitComposerSubmission(
         account = account,
         group = group,
         token = token,
-        capturedReply = capturedReply,
+        forceUploadOnly = forceUploadOnly,
         descriptors = request.attachments.map { it.fileName to it.mediaType },
     ) { send -> uploadMediaWithClientToken(account, group, request.copy(send = send), token) }
 }
@@ -140,19 +140,21 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
  * MDK snapshots every source path before its first upload; [control] cancels that work before admission.
  * Captured replies never reach this path because native reply drafts hold attachment bytes.
  */
+@Suppress("LongParameterList") // The cancellable file transfer and its admission policy travel with the token.
 internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaFilesWithToken(
     account: String,
     group: String,
     request: MediaFileUploadRequestFfi,
     control: MediaFileTransferControlFfi,
     token: String,
+    forceUploadOnly: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     return uploadOrAdmitComposerSubmission(
         account = account,
         group = group,
         token = token,
-        capturedReply = false,
+        forceUploadOnly = forceUploadOnly,
         descriptors = request.attachments.map { it.fileName to it.mediaType },
     ) { send -> uploadMediaFilesWithClientToken(account, group, request.copy(send = send), control, token) }
 }
@@ -165,13 +167,13 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
     account: String,
     group: String,
     token: String,
-    capturedReply: Boolean,
+    forceUploadOnly: Boolean,
     descriptors: List<Pair<String, String>>,
     upload: suspend (send: Boolean) -> MediaUploadSubmissionFfi,
 ): DurableComposerMediaUpload {
     recoveredLocalSend(account, group, token)?.let { recovered -> return recoveredComposerUpload(recovered) }
     val draftBacked =
-        capturedReply ||
+        forceUploadOnly ||
             selectedDraftOrNull(account, group)
                 ?.draft
                 ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, descriptors) } == true

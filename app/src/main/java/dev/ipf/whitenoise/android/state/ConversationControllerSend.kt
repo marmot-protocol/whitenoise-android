@@ -104,6 +104,7 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
                                     request,
                                     control,
                                     tempId,
+                                    forceUploadOnly = retained.admitsPreparedMedia,
                                 )
                             }
                         }
