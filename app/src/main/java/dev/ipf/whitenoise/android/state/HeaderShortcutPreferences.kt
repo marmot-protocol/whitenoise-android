@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import java.util.WeakHashMap
 
 /** Optional conversation header shortcuts; each one reuses the chat details action of the same name. */
-internal enum class HeaderShortcut { Search, MuteUnmute, ReadAloud, DisappearingTimer, Members, AddMembers }
+internal enum class HeaderShortcut { Search, MuteUnmute, ReadAloud, Members, AddMembers }
 
 /** Device-wide header shortcut choice: ordered, empty by default. */
 internal class HeaderShortcutPreferences(
