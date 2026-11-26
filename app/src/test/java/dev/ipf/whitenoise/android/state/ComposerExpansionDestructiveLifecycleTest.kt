@@ -113,7 +113,14 @@ class ComposerExpansionDestructiveLifecycleTest {
             val fixture = fixture(attachConversationController = false)
             val photo =
                 SelectedMessageDraftAttachmentFfi(
-                    "photo", "photo.jpg", "image/jpeg", 1uL, null, null, null, emptyList(),
+                    "photo",
+                    "photo.jpg",
+                    "image/jpeg",
+                    1uL,
+                    null,
+                    null,
+                    null,
+                    emptyList(),
                 )
             fixture.calls.selectedDraft = SelectedMessageDraftContentFfi(GROUP_ID, "", null, listOf(photo), 1L, 1L)
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
@@ -782,7 +789,10 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     /** Seeds a finished take using the actual private voice draft format. */
-    private fun saveVoiceDraft(groupIdHex: String, account: String = ACCOUNT_REF): File {
+    private fun saveVoiceDraft(
+        groupIdHex: String,
+        account: String = ACCOUNT_REF,
+    ): File {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = VoiceDraftStore(context.noBackupFilesDir.resolve("voice-drafts"))
         val key = VoiceNoteKey(account, groupIdHex)

@@ -74,7 +74,10 @@ class VoiceDraftDiscardCoverageTest {
     }
 
     /** Reads one named production block and fails if the source or function cannot be resolved. */
-    private fun source(path: String, function: String): String {
+    private fun source(
+        path: String,
+        function: String,
+    ): String {
         val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/$path")
         return source.functionBody(function)
     }
