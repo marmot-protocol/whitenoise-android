@@ -76,12 +76,13 @@ class VoiceTransportBarTest {
     @Test fun narrowVoiceBarKeepsTheFullTimeOnTheFirstRow() {
         render(barWidth = 308)
 
-        val time = rule.onNodeWithText("0:12 / 0:45")
+        val time = rule.onNodeWithText("0:12 / 0:45", useUnmergedTree = true)
         val timeBounds = time.getUnclippedBoundsInRoot()
         val stripBounds = rule.onNodeWithTag("voice-transport").getUnclippedBoundsInRoot()
         val layouts = mutableListOf<TextLayoutResult>()
         time.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
+        assertEquals("0:12 / 0:45", layout.layoutInput.text.text)
         val close =
             rule
                 .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
