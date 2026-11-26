@@ -13,6 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.IOException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -132,7 +134,7 @@ class RawAvPreparationWaitTest {
             assertFalse(engine.posterCurrent(first.target))
             val second = request(engine, 2, 2000)
             producer.submit(second)
-            second.completion.get(2, TimeUnit.SECONDS)
+            assertThrows(CancellationException::class.java) { second.completion.get(2, TimeUnit.SECONDS) }
             assertEquals(2, results.get())
             assertEquals(1, probes.get())
             assertEquals(RawAvPlaybackEngine.Status.Ready, engine.snapshot().status)
@@ -171,7 +173,7 @@ class RawAvPreparationWaitTest {
             val admitted = engine.prepare()
             assertSame(initial, admitted)
             admitted.get(2, TimeUnit.SECONDS)
-            target.completion.get(2, TimeUnit.SECONDS)
+            assertThrows(CancellationException::class.java) { target.completion.get(2, TimeUnit.SECONDS) }
             assertEquals(1, probes.get())
             assertEquals(RawAvPlaybackEngine.Status.Ready, engine.snapshot().status)
         } finally {

@@ -100,6 +100,7 @@ class RawAvControlsTest {
         engine.prepare().get(2, TimeUnit.SECONDS)
         setField(engine, "pausedUs", 2250000L)
         setField(engine, "targetUs", 2250000L)
+        setField(engine, "lastBitmapPtsUs", 2250000L)
         engine.stop()
         engine.prepare().get(1, TimeUnit.SECONDS)
         assertSame(bitmap, field(engine, "lastBitmap"))
