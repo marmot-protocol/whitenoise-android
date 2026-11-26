@@ -2216,7 +2216,7 @@
     <string name="setup_action_retry">Повторить</string>
     <string name="setup_action_continue_without">Не сейчас</string>
     <string name="setup_action_use_recommended_relays">Исправить настройку реле</string>
-    <string name="setup_action_edit_relays">Проверить реле</string>
+    <string name="setup_action_edit_relays">Изменить реле</string>
     <string name="setup_action_remove_unusable_relays">Удалить непригодные реле</string>
     <string name="setup_action_edit_profile">Изменить профиль</string>
     <string name="setup_action_edit_follows">Изменить подписки</string>

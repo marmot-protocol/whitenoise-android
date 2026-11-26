@@ -2132,7 +2132,7 @@
     <string name="setup_action_retry">Yeniden dene</string>
     <string name="setup_action_continue_without">Şimdi değil</string>
     <string name="setup_action_use_recommended_relays">Aktarıcı kurulumunu düzelt</string>
-    <string name="setup_action_edit_relays">Röleleri incele</string>
+    <string name="setup_action_edit_relays">Röleleri düzenle</string>
     <string name="setup_action_remove_unusable_relays">Kullanılamayan röleleri kaldır</string>
     <string name="setup_action_edit_profile">Profili düzenle</string>
     <string name="setup_action_edit_follows">Takipleri düzenle</string>

@@ -2151,7 +2151,7 @@
     <string name="setup_action_retry">Erneut versuchen</string>
     <string name="setup_action_continue_without">Nicht jetzt</string>
     <string name="setup_action_use_recommended_relays">Relay-Einrichtung korrigieren</string>
-    <string name="setup_action_edit_relays">Relays prüfen</string>
+    <string name="setup_action_edit_relays">Relays bearbeiten</string>
     <string name="setup_action_remove_unusable_relays">Nicht nutzbare Relays entfernen</string>
     <string name="setup_action_edit_profile">Profil bearbeiten</string>
     <string name="setup_action_edit_follows">Kontaktliste bearbeiten</string>

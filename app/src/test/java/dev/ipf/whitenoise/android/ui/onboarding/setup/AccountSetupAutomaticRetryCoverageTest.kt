@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import kotlinx.coroutines.CompletableDeferred
@@ -55,6 +57,37 @@ class AccountSetupAutomaticRetryCoverageTest {
                 restored.tryEmit(1L)
                 runCurrent()
                 assertTrue(client.requests.isEmpty())
+                controller.close()
+            }
+        }
+
+    /** A refused Save for a changed or invalid declaration remains visible until the user retries. */
+    @Test
+    fun wakesLeaveInvalidatedApprovalsForManualRetry() =
+        runTest {
+            val purposes =
+                listOf(OnboardingCheckPurposeFfi.SOURCE_FRESHNESS, OnboardingCheckPurposeFfi.DECLARATION_VALIDATION)
+            for (purpose in purposes) {
+                val snapshot = refusedSaveSnapshot(OnboardingIssueFfi.RECORD_CHANGED, purpose)
+                val client = FakeSetupClient(snapshot)
+                val restored = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+                val controller = connectivityController(client, restored)
+                controller.reconnect()
+                runCurrent()
+
+                restored.tryEmit(1L)
+                controller.foregroundRetry.onBackgrounded()
+                controller.foregroundRetry.onForegrounded()
+                runCurrent()
+                assertTrue(client.requests.isEmpty())
+                val state = controller.state.value
+                assertEquals(snapshot, state.snapshot)
+                assertEquals(listOf(OnboardingActionFfi.RETRY to true), state.decisionButtons())
+
+                val retry = SetupRequest(snapshot.revision, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.RETRY)
+                controller.submit(retry)
+                runCurrent()
+                assertEquals(listOf(retry), client.requests)
                 controller.close()
             }
         }

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingContextFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -14,7 +16,15 @@ internal fun AccountSetupState.retryableCheckRequest(): SetupRequest? {
     val checkpoint = snapshot?.takeUnless { it.ready || it.cancellationPending || it.proposal != null }
     val step =
         currentStep?.takeIf {
-            it.status == OnboardingStatusFfi.RETRYABLE_FAILURE && OnboardingActionFfi.RETRY in it.actions
+            // Keep the refused Save visible when MDK requires rechecking a changed or invalid declaration.
+            val approvalInvalidated =
+                it.findings.any { finding ->
+                    finding.context == OnboardingFindingContextFfi.REPAIR_APPROVAL &&
+                        finding.issue == OnboardingIssueFfi.RECORD_CHANGED
+                }
+            it.status == OnboardingStatusFfi.RETRYABLE_FAILURE &&
+                OnboardingActionFfi.RETRY in it.actions &&
+                !approvalInvalidated
         }
     val idle = !busy && !showsSetupFailure && editor == null
     return if (idle && step != null && checkpoint != null) {

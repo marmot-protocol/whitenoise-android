@@ -2139,7 +2139,7 @@
     <string name="setup_action_retry">Reintentar</string>
     <string name="setup_action_continue_without">Ahora no</string>
     <string name="setup_action_use_recommended_relays">Corregir configuración de relés</string>
-    <string name="setup_action_edit_relays">Revisar relés</string>
+    <string name="setup_action_edit_relays">Editar relés</string>
     <string name="setup_action_remove_unusable_relays">Quitar los relés que no se pueden usar</string>
     <string name="setup_action_edit_profile">Editar perfil</string>
     <string name="setup_action_edit_follows">Editar seguidos</string>
