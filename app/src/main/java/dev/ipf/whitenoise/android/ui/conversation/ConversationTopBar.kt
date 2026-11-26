@@ -38,14 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -74,9 +69,11 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.HoldClaim
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.claimsHold
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
@@ -266,9 +263,7 @@ internal fun ConversationTopBar(
                                 TopAppBarDefaults.TopAppBarExpandedHeight
                             },
                         title = {
-                            val timerHold = remember { TimerHoldArea() }
-                            val minTouchTarget = LocalViewConfiguration.current.minimumTouchTargetSize
-                            val minTouch = with(LocalDensity.current) { minTouchTarget.toSize() }
+                            val timerClaim = remember { HoldClaim() }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -277,18 +272,14 @@ internal fun ConversationTopBar(
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
                                         .clip(RoundedCornerShape(Radii.md))
-                                        .onGloballyPositioned { timerHold.title = it }
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(
                                             Explanation(
                                                 openDetailsDescription,
                                                 stringResource(R.string.explanation_conversation_header_details),
                                             ),
-                                            // A hold on the timer line belongs to its tooltip alone.
-                                            holdIgnoredAt = { position ->
-                                                presentedGroup.disappearingMessageSecs > 0uL &&
-                                                    timerHold.contains(position, minTouch)
-                                            },
+                                            // A hold that reaches the timer line belongs to its tooltip alone.
+                                            holdClaim = timerClaim,
                                         ).clickable(
                                             onClickLabel = openDetailsDescription,
                                             role = Role.Button,
@@ -327,6 +318,7 @@ internal fun ConversationTopBar(
                                         style = MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag("conversation.header.name").directHitTarget(),
                                     )
                                     val membersSubtitle =
                                         if (
@@ -356,7 +348,6 @@ internal fun ConversationTopBar(
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                modifier = Modifier.onGloballyPositioned { timerHold.anchor = it },
                                             ) {
                                                 // The timer keeps its width; a long member line yields first.
                                                 if (membersSubtitle != null) {
@@ -425,6 +416,7 @@ internal fun ConversationTopBar(
                                                     }
                                                 },
                                                 state = timerTooltipState,
+                                                modifier = Modifier.claimsHold(timerClaim),
                                                 content = subtitleRow,
                                             )
                                         } else {
@@ -461,32 +453,11 @@ private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
 // Material's titleMedium size at 100% text size.
 private val BASE_TITLE_SIZE = 16.dp
 
-/** Where the timer tooltip's anchor sits inside the title, so the title's hold-to-explain can leave it alone. */
-private class TimerHoldArea {
-    var title: LayoutCoordinates? = null
-    var anchor: LayoutCoordinates? = null
-
-    /**
-     * Whether [position], local to the title, falls on the tooltip's anchor. Compose widens a small anchor's touch
-     * target to [minTouch], centred, so the area is widened the same way.
-     */
-    fun contains(
-        position: Offset,
-        minTouch: Size,
-    ): Boolean {
-        val title = title?.takeIf { it.isAttached }
-        val anchor = anchor?.takeIf { it.isAttached }
-        if (title == null || anchor == null) return false
-        return title.localBoundingBoxOf(anchor).widenedTo(minTouch).contains(position)
-    }
-}
-
-/** This rect grown, centred, to at least [min] in each dimension. */
-private fun Rect.widenedTo(min: Size): Rect {
-    val dx = ((min.width - width) / 2).coerceAtLeast(0f)
-    val dy = ((min.height - height) / 2).coerceAtLeast(0f)
-    return Rect(left - dx, top - dy, right + dx, bottom + dy)
-}
+/**
+ * Gives this element its own pointer target. Compose prefers a direct hit to a neighbour's widened touch area, so a
+ * press on the chat name stays the title's rather than reaching the timer line just below.
+ */
+private fun Modifier.directHitTarget(): Modifier = pointerInput(Unit) {}
 
 /** Read-only disappearing-messages indicator inside the header's chat-details tap target. */
 @Composable

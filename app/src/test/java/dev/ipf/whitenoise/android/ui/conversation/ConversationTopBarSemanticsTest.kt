@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -33,6 +34,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -66,8 +68,6 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -186,35 +186,28 @@ class ConversationTopBarSemanticsTest {
             .assertExists()
     }
 
-    /** After the first-run hint, holding the timer opens only its tooltip; the rest of the title still explains. */
+    /** Holding the chat name explains Chat Details, even directly above the timer, inside its widened touch area. */
+    @Test
+    fun holdingTheChatNameExplainsDetails() {
+        val (explained, tooltip) = holdInTimerHeader(NAME_TAG) { timerX -> Offset(timerX, bottom - 4.dp.toPx()) }
+        assertTrue("holding the chat name explains Chat Details", explained)
+        assertFalse("holding the chat name must not open the timer tooltip", tooltip)
+    }
+
+    /** Holding the timer opens only its tooltip, not the Chat Details explanation as well. */
     @Test
     fun holdingTheTimerOpensOnlyItsTooltip() {
-        val appState = appState()
-        appState.markDisappearingTooltipShown()
-        val host = ExplanationHostState()
-        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
-        render(appState, controller, explanationHost = host)
+        val (explained, tooltip) = holdInTimerHeader(TIMER_TAG) { center }
+        assertFalse("holding the timer must not also open the Chat Details explanation", explained)
+        assertTrue("holding the timer opens its tooltip", tooltip)
+    }
 
-        composeRule
-            .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
-            .performTouchInput { longClick() }
-        composeRule.waitForIdle()
-        assertNotNull("holding the title explains Chat Details", host.shown)
-        composeRule.runOnIdle { host.dismiss() }
-
-        composeRule
-            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
-            .performTouchInput { longClick() }
-        composeRule.waitForIdle()
-        assertNull("holding the timer must not also open the Chat Details explanation", host.shown)
-        composeRule.onNodeWithTag("conversation.timer.tooltip").assertExists()
-
-        // Compose widens the small timer line to a 48dp touch target, so a hold just above it is still the timer's.
-        composeRule
-            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
-            .performTouchInput { longClick(Offset(centerX, -4.dp.toPx())) }
-        composeRule.waitForIdle()
-        assertNull("a hold in the timer's widened touch target must not open the explanation", host.shown)
+    /** Compose widens the short timer line to a 48dp touch target, so a hold just below it is still the timer's. */
+    @Test
+    fun holdingTheTimersWidenedTargetOpensOnlyItsTooltip() {
+        val (explained, tooltip) = holdInTimerHeader(TIMER_TAG) { Offset(centerX, bottom + 3.dp.toPx()) }
+        assertFalse("a hold in the timer's widened touch target must not open the explanation", explained)
+        assertTrue("a hold in the timer's widened touch target opens its tooltip", tooltip)
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -566,6 +559,30 @@ class ConversationTopBarSemanticsTest {
 
     /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
     @Suppress("LongParameterList")
+    /**
+     * Renders a header with the timer on and its first-run hint already spent, holds [tag] at [at], and returns
+     * whether the Chat Details explanation and the timer tooltip opened. [at] gets the timer's centre x in [tag]'s
+     * local coordinates.
+     */
+    private fun holdInTimerHeader(
+        tag: String,
+        at: TouchInjectionScope.(timerX: Float) -> Offset,
+    ): Pair<Boolean, Boolean> {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val host = ExplanationHostState()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
+        render(appState, controller, explanationHost = host)
+        composeRule.onNodeWithTag("conversation.timer.tooltip").assertDoesNotExist()
+        val held = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+        val timer = composeRule.onNodeWithTag(TIMER_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val timerX = timer.center.x - held.fetchSemanticsNode().boundsInRoot.left
+        held.performTouchInput { longClick(at(timerX)) }
+        composeRule.waitForIdle()
+        val tooltips = composeRule.onAllNodesWithTag("conversation.timer.tooltip").fetchSemanticsNodes()
+        return (host.shown != null) to tooltips.isNotEmpty()
+    }
+
     private fun render(
         appState: WhiteNoiseAppState,
         controller: ConversationController,
@@ -710,6 +727,8 @@ class ConversationTopBarSemanticsTest {
         val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
         const val PHONE = "en-w411dp-h891dp-xxhdpi"
         const val SMALL_PHONE = "en-w320dp-h780dp-xxhdpi"
+        const val NAME_TAG = "conversation.header.name"
+        const val TIMER_TAG = "conversation.header.timer"
         val GROUP_SHORTCUT_TAGS = listOf(CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
 }
