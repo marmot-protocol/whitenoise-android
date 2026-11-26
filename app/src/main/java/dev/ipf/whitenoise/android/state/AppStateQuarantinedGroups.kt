@@ -20,8 +20,8 @@ internal interface QuarantinedGroupsAccess {
     suspend fun retry(groupId: String): Boolean
 }
 
-/** Eligibility is snapshot-backed and is rechecked before every native admission. */
-internal fun WhiteNoiseAppState.quarantineAccountEligible(account: String? = activeAccountRef): Boolean =
+/** A signed-in signing account not being signed out or wiped. Snapshot-backed; recheck before each native call. */
+internal fun WhiteNoiseAppState.signedInAccountEligible(account: String? = activeAccountRef): Boolean =
     !signOutInProgress &&
         !wipeInProgress &&
         accounts.any { it.label == account && it.isSignedInSigningAccount() }
@@ -31,14 +31,14 @@ internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAcce
     val account = activeAccountRef ?: return null
     val runtime = captureHostPerformanceRuntimeOwner()?.runtime
     val generation = runtimeGeneration
-    return if (runtime == null || !developerMode || !quarantineAccountEligible(account)) {
+    return if (runtime == null || !developerMode || !signedInAccountEligible(account)) {
         null
     } else {
         NativeQuarantinedGroupsAccess(account, runtime, {
             activeAccountRef == account &&
                 runtimeGeneration == generation &&
                 developerMode &&
-                quarantineAccountEligible(account)
+                signedInAccountEligible(account)
         })
     }
 }

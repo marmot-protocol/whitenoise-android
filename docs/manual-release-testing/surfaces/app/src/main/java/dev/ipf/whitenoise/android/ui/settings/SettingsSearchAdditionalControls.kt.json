@@ -821,6 +821,40 @@
           "SET-058"
         ]
       }
+    ],
+    "string_resources": [
+      {
+        "surface": "R.string.explanation_organize_hub_history_backups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.explanation_organize_hub_history_backups",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.history_backups",
+        "test_ids": [
+          "SET-074"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_restore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.history_backups_restore",
+        "test_ids": [
+          "SET-073"
+        ]
+      },
+      {
+        "surface": "R.string.data_usage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.data_usage_title",
+        "test_ids": [
+          "SET-074"
+        ]
+      }
     ]
   }
 }

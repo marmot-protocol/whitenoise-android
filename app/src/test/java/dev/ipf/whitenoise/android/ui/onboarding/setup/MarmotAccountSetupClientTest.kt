@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.OnboardingActionFfi
@@ -120,6 +121,79 @@ class MarmotAccountSetupClientTest {
             assertEquals(listOf("reattach-signer", "retryOnboardingStep"), calls)
         }
 
+    /** Rechecks foreground eligibility after dispatching to IO and before entering native retry. */
+    @Test
+    fun automaticRetryChecksEligibilityOnTheNativeDispatcher() =
+        runTest {
+            val caller = Thread.currentThread()
+            val failed = inboxDiscoveryIncompleteSnapshot()
+            val request = checkNotNull(AccountSetupState(snapshot = failed).retryableCheckRequest())
+            val calls = mutableListOf<String>()
+            val marmot = nativeBoundary(failed) { name, _ -> calls += name }
+            val client = MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}
+
+            val result =
+                client.retryFailedCheck(request) {
+                    assertTrue(Thread.currentThread() !== caller)
+                    false
+                }
+            assertEquals(failed, result)
+            assertEquals(listOf("onboardingSnapshot", "listAccounts"), calls)
+            calls.clear()
+
+            client.retryFailedCheck(request) { true }
+            assertEquals(listOf("onboardingSnapshot", "listAccounts", "retryOnboardingStep"), calls)
+        }
+
+    /** A wake for either kind of failed check requires current proof the exact account signs locally. */
+    @Test
+    fun automaticRetryLeavesExternalAndUnknownSignersToExplicitRetry() =
+        runTest {
+            for (failed in listOf(inboxDiscoveryIncompleteSnapshot(), keyPackageFailureSnapshot())) {
+                val request = checkNotNull(AccountSetupState(snapshot = failed).retryableCheckRequest())
+                val calls = mutableListOf<String>()
+                val external = localAccount.copy(label = "external", localSigning = false, externalSigning = true)
+                val possibleAccounts =
+                    listOf(
+                        listOf(external, unrelatedLocalAccount),
+                        listOf(unrelatedLocalAccount),
+                        listOf(external, localAccount),
+                    )
+                for (accounts in possibleAccounts) {
+                    val marmot = nativeBoundary(failed, accounts = { accounts }) { name, _ -> calls += name }
+                    val client = MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}
+
+                    assertEquals(failed, client.retryFailedCheck(request) { true })
+                    assertEquals(listOf("onboardingSnapshot", "listAccounts"), calls)
+                    calls.clear()
+
+                    client.execute(request)
+                    assertEquals(listOf("retryOnboardingStep"), calls)
+                    calls.clear()
+                }
+            }
+        }
+
+    /** An omitted account summary blocks one wake. A later wake can retry the same local checkpoint. */
+    @Test
+    fun automaticRetryRecoversWhenNativeAccountSummaryReturns() =
+        runTest {
+            val failed = inboxDiscoveryIncompleteSnapshot()
+            val request = checkNotNull(AccountSetupState(snapshot = failed).retryableCheckRequest())
+            val calls = mutableListOf<String>()
+            var accounts = emptyList<AccountSummaryFfi>()
+            val marmot = nativeBoundary(failed, accounts = { accounts }) { name, _ -> calls += name }
+            val client = MarmotAccountSetupClient(marmot, SETUP_TEST_ACCOUNT) {}
+
+            assertEquals(failed, client.retryFailedCheck(request) { true })
+            assertEquals(listOf("onboardingSnapshot", "listAccounts"), calls)
+
+            calls.clear()
+            accounts = listOf(localAccount)
+            client.retryFailedCheck(request) { true }
+            assertEquals(listOf("onboardingSnapshot", "listAccounts", "retryOnboardingStep"), calls)
+        }
+
     /** Checks that native approval receives the revision the user actually reviewed. */
     @Test
     fun approvalForwardsTheRenderedProposalRevision() =
@@ -208,12 +282,30 @@ class MarmotAccountSetupClientTest {
             assertEquals(listOf("proposeOnboardingRelays"), calls)
         }
 
+    private val localAccount =
+        AccountSummaryFfi(
+            label = "local",
+            accountIdHex = SETUP_TEST_ACCOUNT,
+            localSigning = true,
+            externalSigning = false,
+            signedOut = false,
+            running = true,
+            unlinked = false,
+        )
+    private val unrelatedLocalAccount = localAccount.copy(accountIdHex = "b".repeat(64))
+
     /** Builds a strict proxy that records the native method and arguments under test. */
-    private fun nativeBoundary(onCall: (String, Array<out Any?>) -> Unit): MarmotInterface {
+    private fun nativeBoundary(
+        snapshot: OnboardingSnapshotFfi =
+            setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)),
+        accounts: () -> List<AccountSummaryFfi> = { listOf(localAccount) },
+        onCall: (String, Array<out Any?>) -> Unit,
+    ): MarmotInterface {
         val nativeType = MarmotInterface::class.java
         return Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { _, method, arguments ->
-            onCall(method.name.substringBefore('-'), arguments.orEmpty())
-            setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
+            val name = method.name.substringBefore('-')
+            onCall(name, arguments.orEmpty())
+            if (name == "listAccounts") accounts() else snapshot
         } as MarmotInterface
     }
 }
