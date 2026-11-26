@@ -120,8 +120,8 @@ internal fun <T> ChoiceDialog(
     )
 }
 
-/** Dialog-owned insets, a rounded selected fill, and one radio accessibility target per row. */
-@Suppress("FunctionNaming")
+/** Extends the shared choice row into the dialog content padding, leaving an 8 dp gutter. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun WhiteNoiseDialogChoiceRow(
     title: String,
@@ -135,53 +135,79 @@ internal fun WhiteNoiseDialogChoiceRow(
     highlightSelected: Boolean = true,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        Row(
-            modifier =
-                Modifier
-                    .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
-                    .then(modifier)
-                    .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
-                    .whiteNoiseDialogSelection(selected && enabled && highlightSelected)
-                    .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
-                    .then(
-                        if (accessibilityLabel == null) {
-                            Modifier
-                        } else {
-                            Modifier.semantics(mergeDescendants = true) { contentDescription = accessibilityLabel }
-                        },
-                    ).padding(horizontal = ChoiceDialogDefaults.RowOverhang),
-            verticalAlignment = Alignment.CenterVertically,
+        WhiteNoiseChoiceRow(
+            title = title,
+            selected = selected,
+            onClick = onClick,
+            modifier = Modifier.requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2).then(modifier),
+            fontFamily = fontFamily,
+            subtitle = subtitle,
+            enabled = enabled,
+            accessibilityLabel = accessibilityLabel,
+            highlightSelected = highlightSelected,
+        )
+    }
+}
+
+/** A rounded choice with wrapping text and one radio accessibility target across the whole row. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun WhiteNoiseChoiceRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    fontFamily: FontFamily? = null,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    accessibilityLabel: String? = null,
+    highlightSelected: Boolean = true,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
+                .whiteNoiseDialogSelection(selected && enabled && highlightSelected)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .then(
+                    if (accessibilityLabel == null) {
+                        Modifier
+                    } else {
+                        Modifier.semantics(mergeDescendants = true) { contentDescription = accessibilityLabel }
+                    },
+                ).padding(horizontal = ChoiceDialogDefaults.RowOverhang),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            enabled = enabled,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = ChoiceDialogDefaults.RowOverhang)
+                .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
         ) {
-            RadioButton(
-                selected = selected,
-                onClick = null,
-                enabled = enabled,
-                modifier = Modifier.clearAndSetSemantics {},
+            Text(
+                text = title,
+                color =
+                    if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = fontFamily,
             )
-            Column(
-                Modifier
-                    .weight(1f)
-                    .padding(start = ChoiceDialogDefaults.RowOverhang)
-                    .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
-            ) {
+            if (subtitle != null) {
                 Text(
-                    text = title,
-                    color =
-                        if (enabled) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = fontFamily,
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
             }
         }
     }
