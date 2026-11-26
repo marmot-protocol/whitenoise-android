@@ -194,7 +194,7 @@ class VoiceNoteFlowMotionCaptureTest {
                 ownerIsCurrent = { true },
                 send = { _, _, _, onQueued -> queued = onQueued },
                 playback = StillPlayback,
-                deleteFile = {},
+                deleteFile = { true },
             )
         val controller = newController(output) { file, durationMs -> review.offer(file, durationMs) }
 

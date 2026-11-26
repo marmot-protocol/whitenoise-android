@@ -61,6 +61,14 @@
         "test_ids": [
           "MED-008"
         ]
+      },
+      {
+        "surface": "A failed voice discard reports the draft write error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": [
+          "MED-059"
+        ]
       }
     ]
   },

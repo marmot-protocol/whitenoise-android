@@ -57,8 +57,9 @@ class VoiceRecordingOwnershipCoverageTest {
         assertTrue(store.contains("File(root, voiceReviewRecoveryOwner(accountRef,"))
         assertTrue(store.contains("voiceReviewRecoveryOwner(key.accountRef, key.groupIdHex)"))
         val helpers = source("state/AppStateCaptureOwners.kt")
-        val account = helpers.functionBody("releaseCaptureOwners")
-        assertTrue(account.contains("conversationDictation.onAccountUnavailable(") && account.contains("voiceNotes."))
+        val account = helpers.functionBody("stopCaptureOwners")
+        assertTrue(account.contains("conversationDictation.onAccountUnavailable("))
+        assertTrue(account.contains("voiceNotes.stopAccountCapture("))
         val target = helpers.functionBody("releaseCaptureTarget")
         assertTrue(target.contains("conversationDictation.onTargetRemoved(") && target.contains("voiceNotes."))
     }

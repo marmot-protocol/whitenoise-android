@@ -5259,14 +5259,14 @@ class WhiteNoiseAppState private constructor(
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         receivedVoiceTranscripts.forgetAccount(wipedRef)
-        releaseCaptureOwners(wipedRef)
+        stopCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
                     notificationDelivery
-                        .wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }
+                        .wipeSettlingFcmAutoInit { wipeAccountAndPurgeVoiceDrafts(wipedRef) }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }

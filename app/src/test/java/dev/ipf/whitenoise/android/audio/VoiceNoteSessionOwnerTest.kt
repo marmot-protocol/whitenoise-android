@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -99,6 +100,55 @@ class VoiceNoteSessionOwnerTest {
             restarted.release()
         }
 
+    /** A failed consumption marker write keeps the same review available until Discard can commit. */
+    @Test
+    fun failedDiscardKeepsTheReviewAndAllowsRetry() =
+        runTest {
+            val fixture = Fixture(this)
+            val store = VoiceDraftStore(folder.root)
+            val recorder = fixture.owner.bind(chat) { true }
+            recorder.start()
+            runCurrent()
+            recorder.stop()
+            advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
+            runCurrent()
+            val draft = checkNotNull(fixture.owner.draft(chat))
+            val marker = store.directory(chat).resolve("take.consumed")
+            assertTrue(marker.mkdir())
+            var failures = 0
+
+            val review =
+                VoiceRecordingReview(
+                    scope = this,
+                    ownerIsCurrent = { true },
+                    send = { _, _, _, _ -> error("unexpected send") },
+                    deleteFile = { fixture.owner.consume(chat, it) },
+                    onDiscardFailure = { failures++ },
+                )
+            assertTrue(review.adopt(draft.file, draft.durationMs))
+            val clip = checkNotNull(review.clip)
+            assertFalse(review.discardByUser(clip))
+            var started = false
+            review.recordAgain(clip) { started = true }
+
+            assertEquals(2, failures)
+            assertFalse(started)
+            assertSame(clip, review.clip)
+            assertSame(draft, fixture.owner.draft(chat))
+            assertTrue(draft.file.isFile)
+
+            assertEquals(VoiceDraftRecovery.Ready(draft), store.recover(chat))
+            assertTrue(marker.delete())
+            review.recordAgain(clip) { started = true }
+
+            assertTrue(started)
+            assertNull(review.clip)
+            assertNull(fixture.owner.draft(chat))
+            assertEquals(VoiceDraftRecovery.None, VoiceDraftStore(folder.root).recover(chat))
+            fixture.release()
+        }
+
+    /** Removing a chat revokes the old recorder, and account teardown purges its remaining drafts. */
     @Test
     fun signOutAndLeavingTheChatEndTheTakeAndPurgeItsDrafts() =
         runTest {
@@ -110,6 +160,8 @@ class VoiceNoteSessionOwnerTest {
             fixture.owner.onTargetRemoved(chat.accountRef, chat.groupIdHex)
             runCurrent()
             assertFalse(recorder.isRecording)
+            assertFalse(recorder.start())
+            assertFalse(VoiceDraftStore(folder.root).directory(chat).exists())
             assertEquals(VoiceNoteActivity.None, fixture.owner.activity(chat))
 
             val other = fixture.owner.bind(otherChat) { true }
@@ -119,9 +171,31 @@ class VoiceNoteSessionOwnerTest {
             advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
             runCurrent()
             val draft = checkNotNull(fixture.owner.draft(otherChat))
-            fixture.owner.onAccountUnavailable(otherChat.accountRef)
+            fixture.owner.stopAccountCapture(otherChat.accountRef)
+            fixture.owner.purgeAccountDrafts(otherChat.accountRef)
             assertNull(fixture.owner.draft(otherChat))
             assertFalse(draft.file.exists())
+            fixture.release()
+        }
+
+    /** A take still finalizing during a quick restart belongs to the removed chat as well. */
+    @Test
+    fun removingTheChatCancelsTheOldTailDuringRestart() =
+        runTest {
+            val fixture = Fixture(this)
+            val recorder = fixture.owner.bind(chat) { true }
+            assertTrue(recorder.start())
+            runCurrent()
+            recorder.stop()
+            assertTrue(recorder.start())
+
+            assertTrue(fixture.owner.onTargetRemoved(chat.accountRef, chat.groupIdHex))
+            advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
+            runCurrent()
+
+            assertFalse(recorder.isRecording)
+            assertNull(fixture.owner.draft(chat))
+            assertFalse(VoiceDraftStore(folder.root).directory(chat).exists())
             fixture.release()
         }
 
@@ -142,7 +216,7 @@ class VoiceNoteSessionOwnerTest {
                         context = ApplicationProvider.getApplicationContext<Context>(),
                         outputDirectory = hooks.outputDirectory,
                         scope = scope,
-                        onPermissionRequest = hooks.onPermissionRequest,
+                        onPermissionRequest = { true },
                         onRecordingComplete = hooks.onRecordingComplete,
                         onError = hooks.onError,
                         microphoneCaptures = coordinator,

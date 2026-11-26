@@ -21,6 +21,14 @@
           "DIC-002",
           "DIC-010"
         ]
+      },
+      {
+        "surface": "Detached dictation checks stored attachments before transport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+        "anchor": "selected.draft?.mediaAttachments.isNullOrEmpty()",
+        "test_ids": [
+          "DIC-008"
+        ]
       }
     ]
   },

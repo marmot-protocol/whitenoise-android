@@ -229,7 +229,11 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
     }
 
     cleanupStep("launcher shortcuts") { removePinnedConversationShortcuts(account, groupIdHex) }
-    cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
+    cleanupStep("capture") {
+        withContext(Dispatchers.Main.immediate) {
+            check(releaseCaptureTarget(account, groupIdHex)) { "Could not purge voice drafts for removed chat" }
+        }
+    }
     if (pending.mediaCacheKeys.isNotEmpty()) {
         cleanupStep("memory media") {
             removeMediaMemoryCacheKeys(

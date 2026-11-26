@@ -93,7 +93,7 @@ internal class VoiceDraftStore(
         val dir = directory(key)
         val unfinished = dir.listFiles { file -> file.name.startsWith(RECORDING_PREFIX) }.orEmpty()
         unfinished.forEach { it.delete() }
-        if (File(dir, CONSUMED).exists()) {
+        if (File(dir, CONSUMED).isFile) {
             finishConsumption(dir)
             return VoiceDraftRecovery.None
         }
@@ -133,15 +133,13 @@ internal class VoiceDraftStore(
             .orEmpty()
             .flatMap { account ->
                 account.listFiles().orEmpty().filter { dir ->
-                    !File(dir, CONSUMED).exists() &&
+                    !File(dir, CONSUMED).isFile &&
                         (File(dir, METADATA).isFile || readMetadata(dir, PENDING_METADATA) != null)
                 }
             }.mapTo(HashSet()) { it.name }
 
     /** Removes the chat's whole directory, for a chat that left the account. */
-    fun purge(key: VoiceNoteKey) {
-        directory(key).deleteRecursively()
-    }
+    fun purge(key: VoiceNoteKey): Boolean = directory(key).deleteRecursively()
 
     /** Removes every draft of a signed-out or wiped account. */
     fun purgeAccount(accountRef: String) {
@@ -152,7 +150,7 @@ internal class VoiceDraftStore(
     // in place if cleanup fails, so the discarded indexes cannot restore a draft.
     private fun finishConsumption(dir: File): Boolean {
         val marker = File(dir, CONSUMED)
-        if (!marker.exists()) return true
+        if (!marker.isFile) return !marker.exists()
         val indexes = listOf(File(dir, METADATA), File(dir, PENDING_METADATA))
         val files = indexes + draftFiles(dir)
         files.forEach { it.delete() }

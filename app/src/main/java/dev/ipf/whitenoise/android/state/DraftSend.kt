@@ -38,7 +38,7 @@ internal suspend fun MarmotInterface.sendComposerText(
         sendText(accountRef, groupIdHex, text)
     }
 
-/** Publishes a completed non-reply dictation after its conversation UI controller has detached. */
+/** Publishes a detached dictation only when the native draft has no staged attachments. */
 internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: ConversationDictationSendRequest): Boolean {
     val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
     val summary =
@@ -46,11 +46,30 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
             retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
                 withGroupCommitLock(request.accountRef, request.groupIdHex) {
                     marmotIo(MarmotTraceSection.TEXT_SEND) {
-                        sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                        val selected = selectedDraftOrNull(request.accountRef, request.groupIdHex)
+                        if (selected != null && selected.draft?.mediaAttachments.isNullOrEmpty()) {
+                            sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                        } else {
+                            null
+                        }
                     }
                 }
             }
         }
+    return if (summary == null) {
+        request.onDispatchRejectedBeforeTransport()
+        false
+    } else {
+        settleDetachedDictationSend(request, summary, pendingClear)
+    }
+}
+
+/** Keeps unprojected native ownership recoverable and clears only accepted text for this send. */
+private fun WhiteNoiseAppState.settleDetachedDictationSend(
+    request: ConversationDictationSendRequest,
+    summary: SendSummaryFfi,
+    pendingClear: DraftSendClearToken?,
+): Boolean {
     // Without a projected message, retained native ownership still needs dictation recovery.
     // False keeps delivery unknown and the existing claim; it never authorizes another send.
     if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
@@ -125,7 +144,7 @@ internal fun draftDescribesUpload(
             descriptor.fileName == upload.first && descriptor.mediaType == upload.second
         }
 
-@Suppress("SwallowedException") // A draft read failure only means the direct send path is used.
+@Suppress("SwallowedException") // Each caller handles an unavailable selected draft at its send boundary.
 internal fun MarmotInterface.selectedDraftOrNull(
     accountRef: String,
     groupIdHex: String,

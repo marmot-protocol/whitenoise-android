@@ -27,6 +27,8 @@ import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -34,6 +36,8 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.VoiceDraftStore
+import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
@@ -49,6 +53,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import java.lang.reflect.Proxy
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
@@ -99,6 +104,28 @@ class ComposerExpansionDestructiveLifecycleTest {
             assertEquals(1, pendingCallbacks)
             assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
             assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** With staged media, a detached Send releases its claim before transport so the transcript can be kept. */
+    @Test
+    fun detachedDictationWithStagedMediaRejectsBeforeTransport() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            val photo =
+                SelectedMessageDraftAttachmentFfi(
+                    "photo", "photo.jpg", "image/jpeg", 1uL, null, null, null, emptyList(),
+                )
+            fixture.calls.selectedDraft = SelectedMessageDraftContentFfi(GROUP_ID, "", null, listOf(photo), 1L, 1L)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var rejected = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(onDispatchRejectedBeforeTransport = { rejected++ })
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, rejected)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
         }
 
     @Test
@@ -655,12 +682,15 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A committed local delete clears the removed chat's composer geometry and voice draft only. */
     @Test
     fun successfulLocalDeleteClearsOnlyTheRemovedConversationGeometry() =
         runBlocking {
             val fixture = fixture()
             val retained = retainExpansion(fixture.appState, GROUP_ID)
             val other = retainExpansion(fixture.appState, OTHER_GROUP)
+            val removedTake = saveVoiceDraft(GROUP_ID)
+            val retainedTake = saveVoiceDraft(OTHER_GROUP)
             val controller = fixture.seededChatsController()
             try {
                 assertEquals(
@@ -671,6 +701,8 @@ class ComposerExpansionDestructiveLifecycleTest {
                 shadowOf(Looper.getMainLooper()).idle()
 
                 assertEquals(1, fixture.calls.delete.get())
+                assertFalse(removedTake.exists())
+                assertTrue(retainedTake.isFile)
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
                 assertEquals(
                     other,
@@ -681,14 +713,17 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A failed native delete preserves both the composer geometry and the saved take. */
     @Test
     fun failedLocalDeleteRetainsTheConversationGeometry() =
         runBlocking {
             val fixture = fixture(failDelete = true)
+            val retainedTake = saveVoiceDraft(GROUP_ID)
             val retained = retainExpansion(fixture.appState, GROUP_ID)
             val controller = fixture.seededChatsController()
             try {
                 assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                assertTrue(retainedTake.isFile)
 
                 assertEquals(1, fixture.calls.delete.get())
                 assertEquals(
@@ -699,6 +734,59 @@ class ComposerExpansionDestructiveLifecycleTest {
                 controller.onCleared()
             }
         }
+
+    /** An account-wide group update purges the exact evicted chat even with no mounted conversation. */
+    @Test
+    fun projectedEvictionPurgesADetachedVoiceDraft() {
+        val fixture = fixture(attachConversationController = false)
+        val evictedTake = saveVoiceDraft(GROUP_ID)
+        val retainedTake = saveVoiceDraft(OTHER_GROUP)
+        val chats = fixture.seededChatsController()
+        try {
+            chats.foldGroup(group().copy(selfMembership = SelfMembershipFfi.REMOVED))
+            assertFalse(evictedTake.exists())
+            assertTrue(retainedTake.isFile)
+        } finally {
+            chats.onCleared()
+        }
+    }
+
+    /** A process runtime event purges only the confirmed evicted chat, regardless of the selected profile. */
+    @Test
+    fun runtimeEvictionPurgesAfterNativeReadback() =
+        runBlocking {
+            val inactive = "inactive-account"
+            val cases =
+                listOf(
+                    inactive to SelfMembershipFfi.MEMBER,
+                    inactive to SelfMembershipFfi.REMOVED,
+                    ACCOUNT_REF to SelfMembershipFfi.REMOVED,
+                )
+            for ((account, membership) in cases) {
+                val take = saveVoiceDraft(GROUP_ID, account = account)
+                val retainedTake = saveVoiceDraft(OTHER_GROUP, account = account)
+                val fixture =
+                    fixture(
+                        attachConversationController = false,
+                        groupRecord = group().copy(selfMembership = membership),
+                    )
+                val appState = fixture.appState
+                appState.reconcileCaptureEviction(VoiceNoteKey(account, GROUP_ID), appState.marmot())
+
+                assertEquals(1, fixture.calls.chatListRow.get())
+                assertEquals(membership == SelfMembershipFfi.MEMBER, take.isFile)
+                assertTrue(retainedTake.isFile)
+            }
+        }
+
+    /** Seeds a finished take using the actual private voice draft format. */
+    private fun saveVoiceDraft(groupIdHex: String, account: String = ACCOUNT_REF): File {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = VoiceDraftStore(context.noBackupFilesDir.resolve("voice-drafts"))
+        val key = VoiceNoteKey(account, groupIdHex)
+        val capture = store.recordingDirectory(key).resolve("voice-fixture.m4a").apply { writeText("audio") }
+        return checkNotNull(store.commit(key, capture, 2_000L, stopReason = null)).file
+    }
 
     @Test(timeout = 10_000)
     fun closedTransportRetriesLocalDeleteAndCleansUpOnce() =
@@ -1167,7 +1255,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         ) { proxy, method, arguments ->
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
+                "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, calls.selectedDraft)
                 "localSendStatus" -> null
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
@@ -1455,6 +1543,7 @@ class ComposerExpansionDestructiveLifecycleTest {
 
     /** Counts authoritative native mutations so false results cannot pass via an earlier guard. */
     private class LifecycleCalls {
+        var selectedDraft: SelectedMessageDraftContentFfi? = null
         val order = mutableListOf<String>()
         val send = AtomicInteger()
         val leave = AtomicInteger()

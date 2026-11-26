@@ -179,7 +179,7 @@ class AppStateSendLockCoverageTest {
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
         assertTrue("wipe must acquire the native push mutex", serializedWipeIndex >= 0)
         val serialized = body.kotlinBlockFrom(body.indexOf('{', serializedWipeIndex), "serialized native wipe")
-        val nativeWipe = serialized.indexOf("signOutAndWipe(wipedRef)")
+        val nativeWipe = serialized.indexOf("wipeAccountAndPurgeVoiceDrafts(wipedRef)")
         val completed = serialized.indexOf("if (outcome.localCleanup.completed)")
         assertTrue(
             "push cleanup must follow completed native removal under the same mutex",

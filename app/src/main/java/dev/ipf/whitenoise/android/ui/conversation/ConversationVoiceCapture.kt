@@ -83,6 +83,8 @@ internal fun rememberConversationVoiceCapture(
                 onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
                 deleteFile = { file -> owner.consume(key, file) },
                 onSendInterrupted = { appState.present(R.string.voice_send_interrupted) },
+                onDiscardFailure = { appState.present(R.string.toast_draft_save_failed) },
+                onAcceptedFile = { file -> owner.consumeAfterSend(key, file) },
             )
         }
     DisposableEffect(voiceReview) {
@@ -118,7 +120,11 @@ private fun VoiceDraftPresentation(
         rememberVoiceRecordingStopNotice(voiceReview, appState, key.accountRef, key.groupIdHex)
     val draft = owner.draft(key)
     LaunchedEffect(voiceReview, draft) {
-        if (draft == null || !voiceReview.adopt(draft.file, draft.durationMs)) return@LaunchedEffect
+        if (draft == null) {
+            voiceReview.clearAdopted()
+            return@LaunchedEffect
+        }
+        if (!voiceReview.adopt(draft.file, draft.durationMs)) return@LaunchedEffect
         val completedClip = voiceReview.clip
         if (completedClip != null && owner.takeImmediateSend(key, draft.file)) voiceReview.send(completedClip)
         draft.stopReason?.let { reason ->

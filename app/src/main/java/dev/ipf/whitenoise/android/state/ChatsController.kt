@@ -835,7 +835,7 @@ class ChatsController private constructor(
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
-                    groupRecordsById = initialGroups.mapValues { (_, group) -> withRetainedName(group) }
+                    installGroupRecordSnapshot(initialGroups)
                     groupRecordsLoaded = true
                     chatRows.forEach { settleInvitationFromMdk(it) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)

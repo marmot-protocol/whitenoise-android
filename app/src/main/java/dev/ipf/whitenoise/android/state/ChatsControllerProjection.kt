@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 
+/** Folds an authoritative or locally committed group record even when no conversation is mounted. */
 internal fun ChatsController.foldGroup(
     record: AppGroupRecordFfi,
     invalidateMembers: Boolean = true,
@@ -21,10 +22,20 @@ internal fun ChatsController.foldGroup(
     // committed record is the edit itself, so it neither needs the fence nor counts as the
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
+    appState.releaseEvictedCapture(accountRef, groupRecordsById[record.groupIdHex], folded)
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
     if (fromSubscription) chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
     if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
     scheduleRecompute()
+}
+
+/** Restores the account's group projection and settles evictions that landed while the stream was disconnected. */
+internal fun ChatsController.installGroupRecordSnapshot(groups: Map<String, AppGroupRecordFfi>) {
+    groupRecordsById =
+        groups.mapValues { (groupId, record) ->
+            appState.releaseEvictedCapture(accountRef, groupRecordsById[groupId], record)
+            withRetainedName(record)
+        }
 }
 
 /**

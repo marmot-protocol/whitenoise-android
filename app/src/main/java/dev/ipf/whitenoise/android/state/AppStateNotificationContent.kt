@@ -1231,6 +1231,7 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                     while (event != null) {
                         backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                         handleNotificationContentEvent(event, readReconciliations, scope = this)
+                        checkCaptureEvictionOnRuntimeEvent(event, marmot, scope = this)
                         presentEventNotices(event, marmot, scope = this, streamScope = streamNotices)
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the

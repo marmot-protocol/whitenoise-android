@@ -111,13 +111,28 @@ internal class VoiceNoteSessionOwner(
         }
     }
 
-    /** Deletes exactly [file] after Send or Discard; a newer take for the same chat is untouched. */
+    /** Whether this exact chat holds capture or a saved take that removal would need to clear. */
+    fun hasCaptureOrDraft(key: VoiceNoteKey): Boolean {
+        val recorder = controllers[key]
+        return recorder?.isFinalizing == true || activity(key) != VoiceNoteActivity.None
+    }
+
+    /** Commits Discard for exactly [file] before clearing its presentation. */
     fun consume(
         key: VoiceNoteKey,
         file: File,
-    ) {
-        store.delete(key, file)
+    ): Boolean {
+        if (!store.delete(key, file)) return false
         if (drafts[key]?.file == file) drafts.remove(key)
+        return true
+    }
+
+    /** A queued send owns this file even if cleanup fails; retire only the take that it accepted. */
+    fun consumeAfterSend(
+        key: VoiceNoteKey,
+        file: File,
+    ) {
+        if (!consume(key, file) && drafts[key]?.file == file) drafts.remove(key)
     }
 
     /** The chat explained an automatic stop; it is not shown again. */
@@ -126,9 +141,13 @@ internal class VoiceNoteSessionOwner(
         drafts[key] = store.withStopReason(key, draft, null)
     }
 
-    /** Sign-out or wipe: stop the account's recording and delete every draft it left. */
-    fun onAccountUnavailable(accountRef: String) {
+    /** Stops the account's capture while keeping its saved takes recoverable. */
+    fun stopAccountCapture(accountRef: String) {
         controllers.keys.filter { it.accountRef == accountRef }.forEach(::forget)
+    }
+
+    /** Deletes only this account's saved takes after it has been removed. */
+    fun purgeAccountDrafts(accountRef: String) {
         drafts.keys.removeAll { it.accountRef == accountRef }
         lost.removeAll { it.accountRef == accountRef }
         store.purgeAccount(accountRef)
@@ -139,12 +158,14 @@ internal class VoiceNoteSessionOwner(
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,
-    ) {
+    ): Boolean {
         val key = VoiceNoteKey(accountRef, groupIdHex)
         forget(key)
         drafts.remove(key)
-        store.purge(key)
+        lost.remove(key)
+        recovered.add(key)
         persisted = null
+        return store.purge(key)
     }
 
     fun foregroundRecorder(token: String): VoiceRecordingController? {
