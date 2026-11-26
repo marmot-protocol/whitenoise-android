@@ -359,8 +359,9 @@ class FcmAutoInitDeliveryModeHandoffTest {
         }
 
     /**
-     * The last change's deferred retry is cancellable and bounded: a Firebase token task that never completes
-     * cannot keep the native sync lock from sign-out or wipe, and the retry keeps its durable marker.
+     * The last change's deferred retry is cancellable and bounded: through finish and then end, as every change
+     * closes, a Firebase token task that never completes cannot keep the mode or native sync lock from sign-out or
+     * wipe, and the retry keeps its durable marker.
      */
     @Test
     fun stalledDeferredRetryReleasesTheSyncLockAndKeepsItsRetry() =
@@ -380,16 +381,26 @@ class FcmAutoInitDeliveryModeHandoffTest {
                 delivery.deferredRegistrationDrainTimeoutMs = 300L
 
                 fixture.runWithMainLooperPumping {
-                    delivery.beginDeliveryModeTransaction()
+                    val generation = delivery.beginDeliveryModeTransaction()
                     store.recordPendingNativePushRegistrationSync()
                     stalled.set(true)
-                    // Its own scope, so a retry that ignores cancellation fails this check instead of hanging the test.
-                    val ending = CoroutineScope(Dispatchers.Default).launch { delivery.endDeliveryModeTransaction() }
+                    // The real lifecycle, as applyMode closes a change: finish, then end. Its own scope, so a retry
+                    // that ignores cancellation fails this check instead of hanging the test.
+                    val ending =
+                        CoroutineScope(Dispatchers.Default).launch {
+                            try {
+                                delivery.finishNotificationDeliveryModeTransaction(generation)
+                            } finally {
+                                delivery.endDeliveryModeTransaction()
+                            }
+                        }
                     val ended = withTimeoutOrNull(5_000L) { ending.join() }
                     assertTrue("the change must end within the retry's bound", ended != null)
                 }
 
                 assertFalse("the stalled retry must release the sync lock", delivery.nativePushSyncMutex.isLocked)
+                assertFalse("finish must release the mode lock", delivery.notificationDeliveryModeMutex.isLocked)
+                assertFalse("finish clears the busy flag", delivery.notificationDeliveryModeBusy)
                 assertTrue("the stalled retry keeps its marker", store.nativePushRegistrationSyncPending())
                 assertEquals(0, delivery.activeDeliveryModeTransactions.get())
             } finally {

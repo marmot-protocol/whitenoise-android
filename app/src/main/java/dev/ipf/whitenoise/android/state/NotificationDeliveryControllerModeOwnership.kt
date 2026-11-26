@@ -148,15 +148,16 @@ private suspend fun NotificationDeliveryController.drainDeferredRegistrationSync
     }
 }
 
-/** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */
+/**
+ * Clears the busy flag of the latest cutover. Token work that arrived while it owned the mode lock left its durable
+ * marker, which the last change's [endDeliveryModeTransaction] drains, cancellably and bounded, so a stalled Firebase
+ * task can never hold the mode and native sync locks here.
+ */
 internal suspend fun NotificationDeliveryController.finishNotificationDeliveryModeTransaction(epoch: Long) =
     withContext(NonCancellable) {
         if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
         notificationDeliveryModeMutex.withLock {
-            val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-            val pending =
-                latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
-            if (pending) syncNativePushRegistrationIfEnabled()
+            notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
         }
     }
 

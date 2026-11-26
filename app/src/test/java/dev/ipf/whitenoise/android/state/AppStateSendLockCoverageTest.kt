@@ -235,13 +235,19 @@ class AppStateSendLockCoverageTest {
                 0 until rotationBody.indexOf("if (!notificationDeliveryModeBusy)"),
         )
         assertTrue(
-            "the latest delivery transaction must drain token work after clearing busy state under its mutex",
+            "the latest delivery transaction clears busy state under its mutex",
             finishBody.indexOf("notificationDeliveryModeMutex.withLock") in
-                0 until finishBody.indexOf("notificationDeliveryModeBusy = false") &&
-                finishBody.indexOf("notificationDeliveryModeBusy = false") in
-                0 until finishBody.indexOf("nativePushRegistrationSyncPending()") &&
-                finishBody.indexOf("nativePushRegistrationSyncPending()") in
-                0 until finishBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+                0 until finishBody.indexOf("notificationDeliveryModeBusy = false"),
+        )
+        assertFalse(
+            "finish never syncs: a stalled token task there would hold both locks without a bound",
+            "syncNativePushRegistrationIfEnabled()" in finishBody,
+        )
+        val endBody = notificationDeliveryFunctionBody("endDeliveryModeTransaction")
+        assertTrue(
+            "the last change's end drains token work left pending, through the bounded retry",
+            endBody.indexOf("nativePushRegistrationSyncPending()") in
+                0 until endBody.indexOf("drainDeferredRegistrationSync()"),
         )
         modeEntryBodies.forEach { body ->
             assertTrue(
