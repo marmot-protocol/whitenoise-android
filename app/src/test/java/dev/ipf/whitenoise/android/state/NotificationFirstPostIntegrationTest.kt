@@ -161,14 +161,15 @@ class NotificationFirstPostIntegrationTest {
                 )
                 delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
-                val names = FirstPostRecordingNotificationManager.posts.map { notification ->
-                    NotificationCompat.MessagingStyle
-                        .extractMessagingStyleFromNotification(notification)
-                        ?.messages
-                        ?.last()
-                        ?.person
-                        ?.name
-                }
+                val names =
+                    FirstPostRecordingNotificationManager.posts.map { notification ->
+                        NotificationCompat.MessagingStyle
+                            .extractMessagingStyleFromNotification(notification)
+                            ?.messages
+                            ?.last()
+                            ?.person
+                            ?.name
+                    }
                 assertEquals(listOf(readable), names)
             } finally {
                 fixture.close()

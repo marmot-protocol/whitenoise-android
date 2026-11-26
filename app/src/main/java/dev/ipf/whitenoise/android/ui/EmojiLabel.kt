@@ -31,9 +31,10 @@ internal fun EmojiLabel(
     val custom = LocalCustomEmoji.current
     val hasArtwork =
         remember(text, custom) {
-            ':' in text && EmojiShortcodes.presentationShortcodes(text).any {
-                EmojiShortcodes.art(it, custom, emptyMap()) != null
-            }
+            ':' in text &&
+                EmojiShortcodes.presentationShortcodes(text).any {
+                    EmojiShortcodes.art(it, custom, emptyMap()) != null
+                }
         }
     if (!hasArtwork) {
         Text(

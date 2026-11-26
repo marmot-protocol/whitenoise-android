@@ -83,8 +83,7 @@ private val clipboardIsolates =
 private fun drawableShortcodes(
     text: String,
     custom: CustomEmojiSet,
-): List<String> =
-    EmojiShortcodes.presentationShortcodes(text).filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
+): List<String> = EmojiShortcodes.presentationShortcodes(text).filter { EmojiShortcodes.art(it, custom, emptyMap()) != null }
 
 /**
  * Compose copies the visual selection. Strip its formatting isolates on the way to the platform clipboard.
@@ -95,7 +94,12 @@ private class EmojiFieldClipboard(
 ) : Clipboard by clipboard {
     override suspend fun setClipEntry(clipEntry: ClipEntry?) {
         val data = clipEntry?.clipData
-        val visual = data?.takeIf { it.itemCount == 1 }?.getItemAt(0)?.text?.toString()
+        val visual =
+            data
+                ?.takeIf { it.itemCount == 1 }
+                ?.getItemAt(0)
+                ?.text
+                ?.toString()
         val canonical =
             visual?.let { value ->
                 clipboardIsolates.replace(value) { match ->

@@ -138,6 +138,7 @@ class TextFieldEmojiArtworkTest {
         setField(state, LayoutDirection.Rtl)
 
         val field = composeRule.onNodeWithTag(FIELD)
+
         fun isLeftOfEnglishLetter(emoji: String): Boolean {
             val layouts = mutableListOf<TextLayoutResult>()
             field.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
@@ -179,7 +180,13 @@ class TextFieldEmojiArtworkTest {
         composeRule.runOnIdle { state.edit { selection = TextRange(0, length) } }
         field.performSemanticsAction(SemanticsActions.CopyText)
         composeRule.runOnIdle {
-            assertEquals(authored, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+            assertEquals(
+                authored,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
         }
     }
 
