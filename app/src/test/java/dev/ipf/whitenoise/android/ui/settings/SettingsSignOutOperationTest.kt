@@ -177,9 +177,14 @@ class SettingsSignOutOperationTest {
                 when (method.name) {
                     // Admitted sign-out confirms native push is off before the native logout.
                     "setNativePushEnabled" -> confirmNativePushDisabled(arguments)
+                    // Once native push is off, sign-out reads it back to settle Firebase auto-init.
+                    "notificationSettings" ->
+                        NotificationSettingsFfi(ACCOUNT_REF, "b".repeat(64), true, nativePushEnabled = false)
                     "signOut" -> suspendSignOut(arguments)
                     // Unfinished local cleanup re-reads the native account to decide whether it stayed signed in.
                     "listAccounts" -> listOf(account())
+                    // Sign-out captures the account's group ids first so their channels can be deleted.
+                    "chatList", "quarantinedGroups" -> emptyList<Any>()
                     "toString" -> "SuspendedSignOutTestProxy"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === arguments?.firstOrNull()

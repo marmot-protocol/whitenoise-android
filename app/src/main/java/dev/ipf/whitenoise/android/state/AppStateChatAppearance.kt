@@ -122,16 +122,19 @@ fun WhiteNoiseAppState.setConversationVibrationPattern(
 ) {
     val accountRef = activeAccountRef ?: return
     val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
+    val canWriteChannel = captureConversationChannelWriteGuard(accountRef, groupIdHex, shortcutId)
     mutationsScope.launch {
         // Channel creation performs NotificationManager Binder calls. Keep
         // them off the UI dispatcher and serialize rapid choices so an
         // older operation cannot overwrite the newest persisted choice.
         conversationVibrationChannelMutex.withLock {
+            if (!canWriteChannel()) return@withLock
             val previous = conversationVibrationPreferences.pattern(accountRef, groupIdHex)
             if (previous == pattern) return@withLock
             val activeChannelId =
                 withContext(Dispatchers.Default) {
                     runCatchingCancellable {
+                        if (!canWriteChannel()) return@runCatchingCancellable null
                         NotificationChannels.ensureChannels(appContext)
                         ConversationNotificationChannels.ensureConversationChannel(
                             context = appContext,
@@ -140,6 +143,8 @@ fun WhiteNoiseAppState.setConversationVibrationPattern(
                             conversationTitle = conversationTitle,
                             vibrationPattern = pattern,
                             sourceVibrationPattern = previous,
+                            accountRef = accountRef,
+                            isWriteAllowed = canWriteChannel,
                         )
                     }.onFailure { error ->
                         appStateDebug(error) {
@@ -149,7 +154,7 @@ fun WhiteNoiseAppState.setConversationVibrationPattern(
                 }
             // Never persist an app-only value when Android could not create
             // the channel that future posts and settings links need.
-            if (activeChannelId != null) {
+            if (activeChannelId != null && canWriteChannel()) {
                 conversationVibrationPreferences.setPattern(accountRef, groupIdHex, pattern)
             }
         }

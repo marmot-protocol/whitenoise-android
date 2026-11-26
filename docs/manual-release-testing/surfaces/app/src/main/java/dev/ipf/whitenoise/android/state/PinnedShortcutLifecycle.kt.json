@@ -10,6 +10,14 @@
         "test_ids": [
           "SYS-012"
         ]
+      },
+      {
+        "surface": "Local conversation removal deletes conversation notification channels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(",
+        "test_ids": [
+          "NTF-059"
+        ]
       }
     ]
   },

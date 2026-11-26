@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
@@ -29,6 +31,12 @@ internal interface NativePushFallbackPlatform {
 
     /** Durably records server-registration cleanup before native delivery is disabled. */
     fun recordPendingRegistrationClear(accountRef: String): Boolean
+
+    /**
+     * Sets Firebase Messaging auto-init, which the SDK persists across restarts. The manifest keeps
+     * it off so no token is requested before an account selects native push.
+     */
+    fun setFcmAutoInitEnabled(enabled: Boolean)
 }
 
 /** Production implementation of the capability-fallback persistence and service boundary. */
@@ -55,6 +63,17 @@ internal class AndroidNativePushFallbackPlatform(
         PushTokenStore
             .create(appContext)
             .recordPendingClear(accountRef)
+
+    /**
+     * Writes auto-init only when this build initialized Firebase and the value changes. The SDK persists
+     * every write, so an unchanged value costs no disk write or token-sync check. An SDK failure propagates,
+     * so the delivery controller can keep a retry pending.
+     */
+    override fun setFcmAutoInitEnabled(enabled: Boolean) {
+        if (FirebaseApp.getApps(appContext).isEmpty()) return
+        val messaging = FirebaseMessaging.getInstance()
+        if (messaging.isAutoInitEnabled != enabled) messaging.isAutoInitEnabled = enabled
+    }
 }
 
 /** One exact AppState owner waiting for a service-supervisor success boundary. */

@@ -8,14 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -28,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -41,9 +37,12 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.chats.newchat.PersonRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.personKeyPlacement
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
@@ -130,10 +129,10 @@ internal fun TransferAdminSheet(
         onDismissRequest = { terminal.close(onDismiss) },
     ) {
         WhiteNoiseSheetHeader(stringResource(R.string.transfer_admin))
+        val sheetPadding = Modifier.padding(horizontal = WhiteNoiseSheetInset)
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSheetInset)
                 .padding(bottom = WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -141,15 +140,15 @@ internal fun TransferAdminSheet(
                 stringResource(R.string.transfer_admin_picker_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = sheetPadding,
             )
             if (candidates.isNotEmpty()) {
-                OutlinedTextField(
+                WhiteNoiseCompactSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.conversation_search_open)) },
-                    singleLine = true,
-                    leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = stringResource(R.string.conversation_search_open),
+                    modifier = sheetPadding.fillMaxWidth(),
+                    outlined = true,
                 )
             }
             when {
@@ -158,65 +157,40 @@ internal fun TransferAdminSheet(
                         stringResource(R.string.transfer_admin_no_candidates),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = sheetPadding,
                     )
                 filtered.isEmpty() ->
-                    Text(
-                        stringResource(R.string.conversation_search_no_matches),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    WhiteNoiseEmptyState(stringResource(R.string.no_matches))
                 else ->
                     Column(
-                        Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = WhiteNoiseSheetInset - WhiteNoiseSpacing.CompactScreenMargin)
+                            .heightIn(max = 360.dp)
+                            .fadingVerticalScroll(rememberScrollState()),
                     ) {
-                        GroupMemberIdentityRows(filtered) { _, member ->
+                        GroupMemberIdentityRows(filtered) { index, member ->
                             val memberName = controller.memberDisplayName(member)
-                            val memberNpub = appState.npubForDisplay(member.memberIdHex)
-                            // A nameless member is titled by their own short key, so that title is the copy target.
-                            val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clickable(
-                                            enabled = !busy,
-                                            role = Role.Button,
-                                        ) { terminal.close(member, onPick) }
-                                        .padding(vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Avatar(
+                            val keys =
+                                personKeyPlacement(
                                     title = memberName,
-                                    seed = member.memberIdHex,
-                                    size = 40.dp,
-                                    pictureUrl = controller.memberAvatarUrl(member),
-                                    pictureDomain = AvatarImageLoader.publicProfiles(),
-                                    followedAccount = member.memberIdHex,
+                                    subtitle = controller.memberSubtitle(member).takeIf { it.isNotBlank() },
+                                    npub = appState.npubForDisplay(member.memberIdHex),
                                 )
-                                Spacer(Modifier.width(12.dp))
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    val keyModifier = Modifier.testTag("transfer_admin.key.${member.memberIdHex}")
-                                    if (nameIsKey) {
-                                        PublicKeyCopyText(memberName, memberNpub, keyModifier, enabled = !busy)
-                                    } else {
-                                        EmojiLabel(memberName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        // The short key copies the whole key; the rest of the row still picks (#3565).
-                                        PublicKeyCopyText(
-                                            controller.memberSubtitle(member),
-                                            memberNpub,
-                                            keyModifier,
-                                            style =
-                                                MaterialTheme.typography.bodySmall
-                                                    .copy(fontFamily = FontFamily.Monospace),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            enabled = !busy,
-                                        )
-                                    }
-                                }
-                            }
+                            PersonRow(
+                                title = memberName,
+                                subtitle = keys.subtitle,
+                                avatarSeed = member.memberIdHex,
+                                avatarUrl = controller.memberAvatarUrl(member),
+                                index = index,
+                                count = filtered.size,
+                                followedAccount = member.memberIdHex,
+                                enabled = !busy,
+                                onClick = { terminal.close(member, onPick) },
+                                publicKey = keys.publicKey,
+                                publicKeyInTitle = keys.inTitle,
+                                avatarDomain = AvatarImageLoader.publicProfiles(),
+                            )
                         }
                     }
             }

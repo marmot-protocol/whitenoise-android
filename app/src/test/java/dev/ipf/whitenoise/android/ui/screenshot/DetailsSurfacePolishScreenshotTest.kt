@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -26,15 +30,19 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_HEX
+import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_NPUB
 import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_MESSAGE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
+import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -165,11 +173,14 @@ class DetailsSurfacePolishScreenshotTest {
     /** The danger zone's reset row and its review, which names the acting account, lead to the local reset. */
     @Test
     fun groupAdminResetConfirmationLight() {
+        val selfProfile = UserProfileMetadataFfi("Alice", "Alice", null, null, null, null, null)
+        val state = appState(SELF_HEX, selfProfile).withGroupReviewActorNpub(SELF_HEX, SELF_NPUB)
+        state.presentDiscoveredProfile(SELF_NPUB, selfProfile)
         renderGroupDetails(
             group = group(admin = true),
             members = groupMembers(),
             darkTheme = false,
-            selfProfile = UserProfileMetadataFfi("Alice", "Alice", null, null, null, null, null),
+            state = state,
         )
         val reset = app.getString(R.string.group_reset_action)
         composeRule.onNodeWithText(reset).performScrollTo()
@@ -197,6 +208,39 @@ class DetailsSurfacePolishScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_details_all_admin_transfer_amoled.png")
     }
 
+    @Test
+    fun transferAdminPickerLight() = captureTransferAdmin("transfer_admin_picker_light.png")
+
+    @Test
+    fun transferAdminLargeRtl() = captureTransferAdmin("transfer_admin_picker_large_rtl_amoled.png", largeRtl = true)
+
+    private fun captureTransferAdmin(
+        snapshot: String,
+        largeRtl: Boolean = false,
+    ) {
+        val namedMember = "Trail guide"
+        val state =
+            appState(PEER_HEX, profile(namedMember))
+                .withGroupReviewActorNpub(PEER_HEX, PEER_NPUB)
+                .withGroupReviewActorNpub(REVIEW_FIRST_MEMBER_HEX, REVIEW_FIRST_MEMBER_NPUB)
+        renderGroupDetails(
+            group = group(admin = true),
+            members = listOf(member(SELF_HEX, local = true), member(PEER_HEX), member(REVIEW_FIRST_MEMBER_HEX)),
+            darkTheme = largeRtl,
+            amoled = largeRtl,
+            state = state,
+            fontScale = if (largeRtl) 2f else 1f,
+            layoutDirection = LayoutDirection.Rtl.takeIf { largeRtl },
+        )
+        composeRule.onNodeWithTag("chat_info.transfer_admin").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasText(namedMember)).fetchSemanticsNodes().isNotEmpty()
+        }
+        val unnamedKey = IdentityFormatter.short(REVIEW_FIRST_MEMBER_NPUB, prefix = 10, suffix = 8)
+        composeRule.onNodeWithText(unnamedKey).assertIsDisplayed()
+        composeRule.onNode(isDialog()).assertIsDisplayed().captureRoboImage("src/test/snapshots/$snapshot")
+    }
+
     /** Renders the details screen and records the full viewport once every asynchronous row settled. */
     @Suppress("LongParameterList") // Capture each variant with its explicit accessibility and theme settings.
     private fun captureGroupDetails(
@@ -219,30 +263,29 @@ class DetailsSurfacePolishScreenshotTest {
         members: List<AppGroupMemberRecordFfi>,
         darkTheme: Boolean,
         amoled: Boolean = false,
-        selfProfile: UserProfileMetadataFfi? = null,
+        state: WhiteNoiseAppState = appState(),
         fontScale: Float = 1f,
+        layoutDirection: LayoutDirection? = null,
     ) {
-        val appState = appState(profileHex = SELF_HEX.takeIf { selfProfile != null }, profile = selfProfile)
-        if (selfProfile != null) {
-            appState.withGroupReviewActorNpub(SELF_HEX, SELF_NPUB)
-            appState.presentDiscoveredProfile(SELF_NPUB, selfProfile)
-        }
         val controller =
             ConversationController(
-                appState = appState,
+                appState = state,
                 initialGroup = group,
                 initialMemberSnapshot = GroupMemberSnapshot(members),
             )
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
-                GroupDetailsScreen(
-                    appState = appState,
-                    controller = controller,
-                    onBack = {},
-                    onLeft = {},
-                    onOpenSearch = {},
-                )
+            val direction = layoutDirection ?: LocalLayoutDirection.current
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                    GroupDetailsScreen(
+                        appState = state,
+                        controller = controller,
+                        onBack = {},
+                        onLeft = {},
+                        onOpenSearch = {},
+                    )
+                }
             }
         }
         composeRule.waitForIdle()

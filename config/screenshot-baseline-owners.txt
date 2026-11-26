@@ -22,6 +22,8 @@
 
 *.StartupReadyRecoveryRouteTest.rootRendersRecoveryWithoutRemountingTheBindOrRestoringProtectedContent
 
+*.ForwardMessagePickerInteractionTest.searchOpensInTheBarAndCloseClearsItWhileSingleAccountAvatarIsNotAnAction
+
 *.AutoDownloadBacklogControlTest
 *.BubbleCollapsibleFooterLayoutTest.overflowingBodyIsClippedBeforeFooterRow
 *.ChatActionSheetTest.actionSheetDarkScreenshot

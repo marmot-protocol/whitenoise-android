@@ -22,6 +22,14 @@
           "NTF-002",
           "NTF-022"
         ]
+      },
+      {
+        "surface": "Selecting Local for every account turns Firebase auto-init off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerModeSelection.kt",
+        "anchor": "applyFcmAutoInit(enabled = false)",
+        "test_ids": [
+          "NTF-060"
+        ]
       }
     ]
   },
