@@ -149,19 +149,20 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun localRemovalForgetsTheConversationShortcutSnapshot() {
-        val lifecycle = File(notificationsRoot().parentFile, "state/PinnedShortcutLifecycle.kt").readText()
-        mapOf(
-            "removePinnedConversationShortcuts" to "removeGroup(",
-            "removeRevokedPinnedConversationShortcuts" to "removeRevokedGroup(",
-        ).forEach { (name, removal) ->
-            val body = lifecycle.extensionBody(name)
-            val io = body.indexOf("withContext(Dispatchers.IO)")
-            val lock = body.indexOf("synchronized(UserEventNotificationGroup.mutationLock)")
-            assertTrue("$name holds the lock off the main thread", io in 0 until lock)
-            val section = body.substring(lock)
-            val forget = section.indexOf("forgetNotificationConversationShortcut(")
-            assertTrue("$name forgets inside the removal's lock", section.indexOf(removal) in 0 until forget)
-        }
+        val localRemoval = stateSource("GroupLocalRemoval.kt")
+        val liveDelete = localRemoval.extensionBody("deleteGroupLocalWithClientCleanup")
+        val durableCleanup = localRemoval.extensionBody("finishLocalGroupDeleteCleanup")
+        assertTrue("live deletion uses the journaled path", "deleteChatGroupLocalWithRecovery(" in liveDelete)
+        assertTrue("journal replay removes the shortcut", "removePinnedConversationShortcuts(" in durableCleanup)
+
+        val lifecycle = stateSource("PinnedShortcutLifecycle.kt")
+        val body = lifecycle.extensionBody("removePinnedConversationShortcuts")
+        val io = body.indexOf("withContext(Dispatchers.IO)")
+        val lock = body.indexOf("synchronized(UserEventNotificationGroup.mutationLock)")
+        assertTrue("removal holds the lock off the main thread", io in 0 until lock)
+        val section = body.substring(lock)
+        val forgetAt = section.indexOf("forgetNotificationConversationShortcut(")
+        assertTrue("removal forgets the snapshot inside the lock", section.indexOf("removeGroup(") in 0 until forgetAt)
         val presenter = localNotificationPresenterSource()
         assertTrue(
             "local removal reaches the shortcut owner",
