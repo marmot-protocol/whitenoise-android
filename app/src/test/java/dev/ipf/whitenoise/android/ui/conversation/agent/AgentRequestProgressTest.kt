@@ -7,7 +7,6 @@ import dev.ipf.whitenoise.android.state.AgentRequestAdmission
 import dev.ipf.whitenoise.android.state.AgentRequestProgress
 import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.state.AgentRequestTarget
-import dev.ipf.whitenoise.android.state.AgentSessionTime
 import dev.ipf.whitenoise.android.state.readAgentSettlements
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -70,7 +69,7 @@ class AgentRequestProgressTest {
     }
 
     @Test
-    fun untargetedControlRecoversWhenTheAgentClockIsAhead() {
+    fun untargetedControlRecoversAcrossClockSkewAndSessionChanges() {
         val session = AgentRecordingFixtures.load("codex_approval_allowed", events = 6).first().record
         val request =
             session.copy(
@@ -85,9 +84,21 @@ class AgentRequestProgressTest {
                         MessageTagFfi(listOf("details", """{"action":"new_session"}""")),
                     ),
             )
-        val target = AgentRequestTarget(session.messageIdHex, session.sender, AgentSessionTime(timelineAt = 120uL, receivedAt = 100uL))
+        val target = AgentRequestTarget(session.messageIdHex, session.sender, sessionStartedAt = 120uL)
+        val newer = target.copy(rowId = "93".repeat(32), sessionStartedAt = 200uL)
+        val history = AgentNativeRequestHistory(listOf(request))
 
-        assertEquals(request.messageIdHex, AgentNativeRequestHistory(listOf(request)).outstanding(target)?.eventId)
+        assertEquals(request.messageIdHex, history.outstanding(target)?.eventId)
+        assertEquals(request.messageIdHex, history.outstanding(newer)?.eventId)
+
+        val progress = AgentRequestProgress()
+        progress.begin(target.rowId, target.agent)
+        progress.begin(newer.rowId, newer.agent)
+        progress.completeAdmission(target.rowId, AgentRequestAdmission(request.messageIdHex))
+        progress.completeAdmission(newer.rowId, AgentRequestAdmission(request.messageIdHex))
+        progress.confirm(newer.agent, sequenceOf(request.messageIdHex))
+        assertEquals(AgentRequestStatus.Idle, progress.status(target.rowId))
+        assertEquals(AgentRequestStatus.Idle, progress.status(newer.rowId))
     }
 
     @Test

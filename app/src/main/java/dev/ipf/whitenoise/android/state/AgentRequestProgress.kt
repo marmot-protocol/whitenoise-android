@@ -95,17 +95,8 @@ internal class AgentRequestProgress {
     }
 
     fun reconcile(rows: Sequence<TimelineMessageRecordFfi>) {
-        val admitted =
-            pending.entries
-                .mapNotNull { (rowId, request) ->
-                    request.admission?.eventId?.let { eventId -> (request.agent to eventId) to rowId }
-                }.toMap()
-        if (admitted.isEmpty()) return
-        rows.forEach { row ->
-            row.agentSettlements().forEach { eventId ->
-                admitted[row.sender to eventId]?.let(pending::remove)
-            }
-        }
+        if (!hasAdmittedRequests) return
+        rows.forEach { row -> confirm(row.sender, row.agentSettlements()) }
     }
 
     fun confirm(

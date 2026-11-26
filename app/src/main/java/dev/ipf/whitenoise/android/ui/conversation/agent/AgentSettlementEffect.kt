@@ -13,7 +13,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AGENT_SETTLEMENT_KINDS
 import dev.ipf.whitenoise.android.state.AgentRequestProgress
 import dev.ipf.whitenoise.android.state.AgentRequestTarget
-import dev.ipf.whitenoise.android.state.AgentSessionTime
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.agentNativeRequestHistory
@@ -113,14 +112,14 @@ private suspend fun observeAgentDeliveryFailures(
 
 private fun TimelineMessageRecordFfi.requestTarget(): AgentRequestTarget? {
     val item = agentItem?.takeUnless { deleted || invalidationStatus != null } ?: return null
-    val sessionTime = if (item.itemType == "session") AgentSessionTime(timelineAt, receivedAt) else null
+    val startedAt = timelineAt.takeIf { item.itemType == "session" }
     val canAct =
         when (item.itemType) {
             "session" -> true
             "turn", "approval", "question" -> item.state in OPEN_STATES
             else -> false
         }
-    return AgentRequestTarget(messageIdHex, sender, sessionTime).takeIf { canAct }
+    return AgentRequestTarget(messageIdHex, sender, startedAt).takeIf { canAct }
 }
 
 private val OPEN_STATES = setOf(AgentItemStateFfi.RUNNING, AgentItemStateFfi.WAITING)

@@ -6,16 +6,11 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
 import org.json.JSONObject
 
-/** Identity of a UI action row. A session's controls share one slot even though they carry no e tag. */
+/** Identity of a UI action row. Session controls address the agent and have no row target on the wire. */
 internal data class AgentRequestTarget(
     val rowId: String,
     val agent: String,
-    val sessionTime: AgentSessionTime? = null,
-)
-
-internal data class AgentSessionTime(
-    val timelineAt: ULong,
-    val receivedAt: ULong,
+    val sessionStartedAt: ULong? = null,
 )
 
 internal data class AgentRequestAdmission(
@@ -41,7 +36,7 @@ internal class AgentNativeRequestHistory(
             ?.takeUnless { concluded(target.agent, it.messageIdHex) }
             ?.let { request ->
                 val sentAtMillis = request.receivedAt.toLong() * 1000
-                val expiry = target.sessionTime?.let { untargetedAgentRequestDeadline(sentAtMillis) }
+                val expiry = target.sessionStartedAt?.let { untargetedAgentRequestDeadline(sentAtMillis) }
                 AgentRequestAdmission(request.messageIdHex, expiry)
             }
 
@@ -108,11 +103,10 @@ internal fun readAgentSettlements(
 private fun AppMessageRecordFfi.matchesTarget(target: AgentRequestTarget): Boolean {
     val details = singleTag("details")?.takeIf { singleTag("p") == target.agent } ?: return false
     val action = runCatching { JSONObject(details).optString("action") }.getOrNull()
-    val sessionTime = target.sessionTime
-    return if (sessionTime == null) {
+    return if (target.sessionStartedAt == null) {
         singleTag("e") == target.rowId && action in TARGETED_ACTIONS
     } else {
-        receivedAt >= sessionTime.receivedAt && tags.none { it.values.firstOrNull() == "e" } && action in SESSION_ACTIONS
+        tags.none { it.values.firstOrNull() == "e" } && action in SESSION_ACTIONS
     }
 }
 
