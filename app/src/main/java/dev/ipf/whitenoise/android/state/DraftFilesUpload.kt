@@ -89,8 +89,9 @@ private fun MarmotInterface.recoveredDraftFilesSend(
     }
 
 /**
- * Publishes a retained send. Composer selections and collection chunks never consume a draft revision.
- * Captured replies and callers without explicit composer ownership retain their existing admission paths.
+ * Publishes a retained send. A stored-file send can consume its unchanged, fully matching upload revision.
+ * Other composer selections and collection chunks admit their snapshots independently of the native draft.
+ * Captured replies and callers without explicit composer ownership keep their existing admission paths.
  */
 internal suspend fun MarmotInterface.publishRetainedMedia(
     account: String,
@@ -100,6 +101,10 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
     admission: DraftFilesAdmission,
 ): SendSummaryFfi =
     when {
+        retained.isDraftStored && retained.draftHandling != RetainedDraftHandling.COLLECTION_CHUNK -> {
+            val upload = DraftFilesUpload(retained.attachments, retained.caption)
+            sendComposerDraftFiles(account, group, references, upload, admission)
+        }
         retained.admitsPreparedMedia ->
             admitLocalSend(account, group, admission.token) {
                 sendPreparedMediaWithClientToken(
@@ -111,10 +116,6 @@ internal suspend fun MarmotInterface.publishRetainedMedia(
                     consumingDraft = null,
                 )
             }
-        retained.isDraftStored -> {
-            val upload = DraftFilesUpload(retained.attachments, retained.caption)
-            sendComposerDraftFiles(account, group, references, upload, admission)
-        }
         else ->
             sendComposerMedia(
                 account,

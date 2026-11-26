@@ -441,7 +441,10 @@ class StoredDraftAcceptanceTest {
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val pick =
                     PendingAttachment(ByteArray(0), "video/mp4", "clip.mp4", draftFile = DraftStoredFile("clip", 900L))
-                val retained = RetainedMediaUpload(listOf(pick), "caption")
+                val retained =
+                    RetainedMediaUpload(listOf(pick), "caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                    }
                 retained.draftSendClearToken = checkNotNull(app.captureDraftForSend("acct", group.groupIdHex))
                 app.messageDraftRepository.coordinated.acceptMutation("acct", group.groupIdHex)
                 engine.saveText("caption")
@@ -509,6 +512,43 @@ class StoredDraftAcceptanceTest {
             } finally {
                 journal.delete("acct", group.groupIdHex, "stored-one")
                 initial.mutationsScope.cancel()
+            }
+        }
+
+    /** An unchanged stored-file send can consume its caption and file in the same native admission. */
+    @Test
+    fun exactStoredSelectionConsumesItsCapturedRevision() =
+        runBlocking {
+            val group = personTestGroup("group", "Team", members = null).group
+            val original = draftAttachment("stored-file")
+            val engine = DraftUploadEngine(content("sent caption", original))
+            val app = acceptanceAppState(engine)
+            try {
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val pending =
+                    PendingAttachment(
+                        byteArrayOf(),
+                        original.mediaType,
+                        original.fileName,
+                        draftFile = DraftStoredFile(original.id, 900L),
+                    )
+                val revision = engine.revision
+                val retained =
+                    RetainedMediaUpload(listOf(pending), "sent caption").apply {
+                        draftHandling = RetainedDraftHandling.COMPOSER_SELECTION
+                        draftUploadRevision = revision
+                        draftSendClearToken = app.captureDraftForSend("acct", group.groupIdHex)
+                    }
+
+                controller.admitRetainedMedia("acct", emptyList(), retained, "exact")
+                awaitAttachmentCollectionJournal()
+
+                assertSame(revision, engine.admittedConsuming)
+                assertEquals("sent caption", engine.admittedCaption)
+                assertNull(engine.current)
+                assertFalse(engine.calls.contains("clear"))
+            } finally {
+                app.mutationsScope.cancel()
             }
         }
 
