@@ -31,10 +31,12 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
@@ -53,6 +55,8 @@ import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isConversationMutePending
+import dev.ipf.whitenoise.android.ui.common.ExplanationHostState
+import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
 import dev.ipf.whitenoise.android.ui.group.MuteTarget
 import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
@@ -61,6 +65,8 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -177,6 +183,30 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNode(hasText("$retention seconds") and hasAnyAncestor(hasTestTag("conversation.timer.tooltip")))
             .assertExists()
+    }
+
+    /** After the first-run hint, holding the timer opens only its tooltip; the rest of the title still explains. */
+    @Test
+    fun holdingTheTimerOpensOnlyItsTooltip() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val host = ExplanationHostState()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
+        render(appState, controller, explanationHost = host)
+
+        composeRule
+            .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+            .performTouchInput { longClick() }
+        composeRule.waitForIdle()
+        assertNotNull("holding the title explains Chat Details", host.shown)
+        composeRule.runOnIdle { host.dismiss() }
+
+        composeRule
+            .onNodeWithTag("conversation.header.timer", useUnmergedTree = true)
+            .performTouchInput { longClick() }
+        composeRule.waitForIdle()
+        assertNull("holding the timer must not also open the Chat Details explanation", host.shown)
+        composeRule.onNodeWithTag("conversation.timer.tooltip").assertExists()
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -538,10 +568,14 @@ class ConversationTopBarSemanticsTest {
         dark: Boolean = false,
         actions: @Composable RowScope.(capacity: Int) -> Unit = {},
         rtl: Boolean = false,
+        explanationHost: ExplanationHostState? = null,
     ) {
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
-            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides direction,
+                LocalExplanationHost provides explanationHost,
+            ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     Surface {
                         TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions)

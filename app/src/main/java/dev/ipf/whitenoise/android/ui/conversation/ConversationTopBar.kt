@@ -38,7 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -260,6 +263,7 @@ internal fun ConversationTopBar(
                                 TopAppBarDefaults.TopAppBarExpandedHeight
                             },
                         title = {
+                            val timerHold = remember { TimerHoldArea() }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -268,12 +272,17 @@ internal fun ConversationTopBar(
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
                                         .clip(RoundedCornerShape(Radii.md))
+                                        .onGloballyPositioned { timerHold.title = it }
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(
                                             Explanation(
                                                 openDetailsDescription,
                                                 stringResource(R.string.explanation_conversation_header_details),
                                             ),
+                                            // A hold on the timer line belongs to its tooltip alone.
+                                            holdIgnoredAt = {
+                                                presentedGroup.disappearingMessageSecs > 0uL && timerHold.contains(it)
+                                            },
                                         ).clickable(
                                             onClickLabel = openDetailsDescription,
                                             role = Role.Button,
@@ -341,6 +350,7 @@ internal fun ConversationTopBar(
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier.onGloballyPositioned { timerHold.anchor = it },
                                             ) {
                                                 // The timer keeps its width; a long member line yields first.
                                                 if (membersSubtitle != null) {
@@ -444,6 +454,19 @@ private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
 
 // Material's titleMedium size at 100% text size.
 private val BASE_TITLE_SIZE = 16.dp
+
+/** Where the timer tooltip's anchor sits inside the title, so the title's hold-to-explain can leave it alone. */
+private class TimerHoldArea {
+    var title: LayoutCoordinates? = null
+    var anchor: LayoutCoordinates? = null
+
+    /** Whether [position], local to the title, falls on the tooltip's anchor. */
+    fun contains(position: Offset): Boolean {
+        val title = title?.takeIf { it.isAttached }
+        val anchor = anchor?.takeIf { it.isAttached }
+        return title != null && anchor != null && title.localBoundingBoxOf(anchor).contains(position)
+    }
+}
 
 /** Read-only disappearing-messages indicator inside the header's chat-details tap target. */
 @Composable

@@ -20,6 +20,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -164,6 +165,7 @@ private fun ColumnScope.ExplanationContent(
  * trusted-system Paste menu. [beforeShow] lets a transient surface, such as a menu, close first.
  * [additionalActions] stay available to accessibility services whether or not holding is enabled.
  * [holdToExplain] = false keeps the Explain action but leaves the hold gesture to the element.
+ * [holdIgnoredAt] leaves a hold that starts at that local position to a child's own long press.
  */
 @Composable
 internal fun Modifier.explainOnLongPress(
@@ -172,6 +174,7 @@ internal fun Modifier.explainOnLongPress(
     holdToExplain: Boolean = true,
     beforeShow: () -> Unit = {},
     additionalActions: List<CustomAccessibilityAction> = emptyList(),
+    holdIgnoredAt: (Offset) -> Boolean = { false },
 ): Modifier {
     val host = LocalExplanationHost.current
     val bottomEdge = LocalExplanationBottomEdge.current
@@ -180,6 +183,7 @@ internal fun Modifier.explainOnLongPress(
     val latestExplanation by rememberUpdatedState(explanation)
     val latestBeforeShow by rememberUpdatedState(beforeShow)
     val latestHost by rememberUpdatedState(host)
+    val latestHoldIgnoredAt by rememberUpdatedState(holdIgnoredAt)
     val latestBottomEdge by rememberUpdatedState(bottomEdge)
     val show: () -> Unit = {
         latestExplanation?.let { current ->
@@ -196,17 +200,19 @@ internal fun Modifier.explainOnLongPress(
         semantics {
             customActions = listOf(CustomAccessibilityAction(explainLabel) { show().let { true } }) + additionalActions
         }
-    return if (holdToExplain) described.explainOnHold(haptics, show) else described
+    return if (holdToExplain) described.explainOnHold(haptics, show) { latestHoldIgnoredAt(it) } else described
 }
 
-/** Observes the hold at Initial so the explanation replaces the child's click or long press. */
+/** Observes the hold at Initial so the explanation replaces the child's click or long press, outside [ignoredAt]. */
 private fun Modifier.explainOnHold(
     haptics: HapticFeedback,
     show: () -> Unit,
+    ignoredAt: (Offset) -> Boolean,
 ): Modifier =
     pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (ignoredAt(down.position)) return@awaitEachGesture
             val released =
                 withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     var finished = false
