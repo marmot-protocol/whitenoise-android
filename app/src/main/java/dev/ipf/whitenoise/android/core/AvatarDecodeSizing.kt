@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+
 /** Decoded pixels are ARGB_8888, so a target's memory cost is four bytes each. */
 private const val DECODED_BYTES_PER_PIXEL = 4
 
@@ -69,3 +71,14 @@ internal const val PROFILE_BANNER_MAX_DIMENSION: Int = 1536
 
 /** Rendered widths round up to this bucket so neighbouring surfaces coalesce onto one decode. */
 internal const val PROFILE_BANNER_TARGET_BUCKET_PX: Int = 256
+
+/** The isolated decode validates the source again. Only larger targets need a separate sizing request. */
+internal fun profileImageDecodeTarget(
+    bytes: ByteArray,
+    maxDimension: Int,
+): Int? =
+    if (maxDimension <= PROFILE_AVATAR_MAX_DIMENSION) {
+        maxDimension
+    } else {
+        IsolatedMediaDecoder.inspect(bytes)?.let { boundedDecodeDimension(it.width, it.height, maxDimension) }
+    }

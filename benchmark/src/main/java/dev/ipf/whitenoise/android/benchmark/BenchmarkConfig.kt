@@ -13,6 +13,9 @@ internal object BenchmarkConfig {
     val groupName: String?
         get() = arguments.getString("groupName")?.trim()?.takeIf(String::isNotEmpty)
 
+    val startupGroupName: String?
+        get() = arguments.getString("startupGroupName")?.trim()?.takeIf(String::isNotEmpty)
+
     /** Synthetic, single-use unread-mention fixture; never prepared by changing native read state. */
     val mentionFixtureId: String?
         get() = arguments.getString("mentionFixtureId")?.takeIf(String::isNotBlank)

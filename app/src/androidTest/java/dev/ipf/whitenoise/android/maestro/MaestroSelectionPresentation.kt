@@ -5,10 +5,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupPhotoMenu
 import dev.ipf.whitenoise.android.ui.conversation.ConversationInitialLoadingOverlay
-import dev.ipf.whitenoise.android.ui.conversation.TtsTransportRatePicker
+import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBarContent
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.group.GroupDisbandConfirmDialog
@@ -48,11 +49,7 @@ internal fun MaestroSelectionPresentation(fixture: MaestroPresentationFixture) {
                 onDismiss = { fixture.finish("dismiss") },
             )
         fixture.scenario.startsWith("selection-photo-") -> PhotoSelection(fixture)
-        fixture.scenario == "selection-transport-rate" ->
-            TtsTransportRatePicker(rateOverride = 1f, activeRate = 1f, onRateSelected = {
-                check(it == null)
-                fixture.finish("default-selected")
-            })
+        fixture.scenario == "selection-transport-rate" -> TransportSelection(fixture)
         fixture.scenario == "selection-conversation-loading" -> ConversationInitialLoadingOverlay(visible = true)
         fixture.scenario == "selection-quick-cue" ->
             QuickAccountSwitchTransitionOverlay(
@@ -71,6 +68,36 @@ internal fun MaestroSelectionPresentation(fixture: MaestroPresentationFixture) {
             )
         else -> error("Unknown selection presentation")
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun TransportSelection(fixture: MaestroPresentationFixture) {
+    TtsTransportBarContent(
+        state =
+            TtsState.Paused(
+                chunkIndex = 1,
+                chunkCount = 3,
+                messageIndex = 0,
+                messageCount = 1,
+                sentenceIndexWithinMessage = 1,
+                sentenceCountWithinMessage = 3,
+                messagePreview = "Fixture message",
+            ),
+        rateOverride = 1f,
+        activeRate = 1f,
+        onPause = {},
+        onResume = {},
+        onPreviousSentence = {},
+        onNextSentence = {},
+        onPreviousMessage = { fixture.record("previous-message") },
+        onNextMessage = { fixture.record("next-message") },
+        onRateSelected = {
+            check(it == null)
+            fixture.finish("default-selected")
+        },
+        onStop = {},
+    )
 }
 
 @Composable

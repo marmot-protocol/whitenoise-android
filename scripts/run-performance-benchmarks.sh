@@ -717,6 +717,10 @@ if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \
 -e groupName $(quote_device_shell_arg "$group_name")"
 fi
+if [[ -n "${STARTUP_GROUP_NAME:-}" ]]; then
+  instrument_command="$instrument_command \
+-e startupGroupName $(quote_device_shell_arg "$STARTUP_GROUP_NAME")"
+fi
 # These arguments describe a manually provisioned synthetic fixture, not native read-state resets.
 if [[ -n "${MENTION_FIXTURE_ID:-}" ]]; then
   instrument_command="$instrument_command \

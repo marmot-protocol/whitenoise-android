@@ -105,6 +105,33 @@ internal fun startupMetrics(): List<Metric> =
             )
         }
 
+internal const val STARTUP_LOCAL_CHECKPOINT_TRACE = "benchmark:startup-local-checkpoint"
+
+/** End-to-end launch and accessibility observation. StartupTimingMetric still measures the platform's first draw. */
+@OptIn(ExperimentalMetricApi::class)
+internal fun populatedStartupMetrics(): List<Metric> =
+    startupMetrics() +
+        listOf(
+            TraceSectionMetric(
+                sectionName = STARTUP_LOCAL_CHECKPOINT_TRACE,
+                mode = TraceSectionMetric.Mode.First,
+                label = "startupLocalCheckpointMs",
+                targetPackageOnly = false,
+            ),
+            TraceSectionMetric(
+                sectionName = "WhiteNoise.marmot.chatList",
+                mode = TraceSectionMetric.Mode.First,
+                label = "firstChatListRead",
+                targetPackageOnly = true,
+            ),
+            TraceSectionMetric(
+                sectionName = "WhiteNoise.marmot.userProfile",
+                mode = TraceSectionMetric.Mode.First,
+                label = "firstProfileRead",
+                targetPackageOnly = true,
+            ),
+        )
+
 @OptIn(ExperimentalMetricApi::class)
 internal fun journeyMetrics(sectionName: String): List<Metric> =
     listOf(

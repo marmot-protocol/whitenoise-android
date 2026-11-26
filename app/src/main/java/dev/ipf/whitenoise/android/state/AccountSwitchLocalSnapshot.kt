@@ -213,6 +213,11 @@ internal data class AccountSwitchPreloadPlan(
      * switch resets every worker, and a new one can take longer than the whole avatar budget to start (#3496).
      */
     val awaitColdAvatarWorkers: Boolean = true,
+    /**
+     * Whether this is the launch's own account restoration. It may adopt the chat-list read started beside
+     * `Marmot.start()`, and it records startup avatar readiness.
+     */
+    val startupRestoration: Boolean = false,
 )
 
 /** What a switch to another account reads before publication, chosen by its [preloadPolicy]. */
@@ -244,6 +249,7 @@ internal fun accountSwitchPreloadPlan(
             includePresentationSeeds ||
                 (loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS),
         awaitColdAvatarWorkers = preloadPolicy != AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+        startupRestoration = preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
     )
 }
 
@@ -300,6 +306,9 @@ internal fun accountSwitchProfileSeed(
 /** Main-confined latest-wins owner for the one-shot account-switch handoff. */
 internal class AccountSwitchLocalSnapshotHandoff {
     private val requests = StalenessGuard()
+
+    /** The launch's chat-list read started beside `Marmot.start()`, until startup activation takes it. */
+    val startupPrefetch = StartupChatListPrefetchSlot()
     private var pending: AccountSwitchLocalSnapshot? = null
 
     @Volatile

@@ -57,14 +57,6 @@
         ]
       },
       {
-        "surface": "TtsTransportProgress",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "fun TtsTransportProgress(",
-        "test_ids": [
-          "TTS-001"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "surface": "Holding a read-aloud transport button explains it",
         "anchor": "R.string.explanation_conversation_tts_previous_message",
@@ -73,16 +65,47 @@
         ]
       },
       {
-        "surface": "Modifier.mirrorInRtl",
+        "surface": "TtsLeadingControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "fun Modifier.mirrorInRtl(",
+        "anchor": "fun TtsLeadingControl(",
         "test_ids": [
-          "AXY-022",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "TtsNavigationButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsNavigationButton(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "TtsMessageMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsMessageMenu(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "TtsStatusText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsStatusText(",
+        "test_ids": [
           "TTS-001"
         ]
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Read-aloud label when playback has no time estimate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.read_aloud",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
       {
         "surface": "R.string.tts_bar_next_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
@@ -116,19 +139,12 @@
         ]
       },
       {
-        "surface": "R.string.tts_bar_return_to_source",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
-        "anchor": "R.string.tts_bar_return_to_source",
-        "test_ids": [
-          "TTS-001"
-        ]
-      },
-      {
         "surface": "R.string.tts_bar_skip_next",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "R.string.tts_bar_skip_next",
         "test_ids": [
-          "TTS-001"
+          "TTS-001",
+          "AXY-022"
         ]
       },
       {
@@ -136,7 +152,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
         "anchor": "R.string.tts_bar_skip_previous",
         "test_ids": [
-          "TTS-001"
+          "TTS-001",
+          "AXY-022"
         ]
       },
       {
@@ -169,6 +186,14 @@
         "anchor": "R.string.explanation_conversation_tts_previous_sentence",
         "test_ids": [
           "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "TTS-001"
         ]
       }
     ]
