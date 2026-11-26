@@ -37,6 +37,7 @@ def main():
     def bundleMode = app.findProperty('whitenoise.playBundle') == 'true'
     def android = app.extensions.getByName('android')
     assert android.splits.abi.enable == !bundleMode : 'Wrong ABI split configuration'
+    assert android.bundle.language.enableSplit == false :'Play bundle splits languages the in-app picker selects'
     def expectedAlias = bundleMode ? 'upload-fixture' : 'direct-fixture'
     assert android.productFlavors.getByName('production').signingConfig.keyAlias == expectedAlias :
         'Unexpected signing key: run in a checkout without local signing overrides'
