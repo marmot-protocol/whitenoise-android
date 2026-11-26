@@ -151,7 +151,7 @@ class AccountKeysExportDeliveryTest {
 
         composeRule.runOnIdle {
             assertNotNull("The confirmed export must survive the stopped or locked shell", fixture.exportState.request)
-            assertEquals("The picker URI must stay queued until the shell is ready", uri, fixture.exportState.destination)
+            assertEquals("The picker URI must stay queued", uri, fixture.exportState.destination)
             if (lock) fixture.appState.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
             fixture.owner.resume()
         }
