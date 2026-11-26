@@ -27,7 +27,6 @@
     <string name="translation_install_open_failed">Mikään sovellus ei voinut avata Offline Translatoria tai sen lataussivua. Asenna verkkoselain ja yritä sitten uudelleen.</string>
     <string name="translation_composer_toggle">Käännä</string>
     <string name="translation_composer_will_send">Lähetetään</string>
-    <string name="translation_composer_dictation_off">Kääntäminen on pois sanelun aikana</string>
     <string name="translation_composer_placeholder">Käännös näkyy tässä</string>
     <string name="translation_composer_detection_failed">Kieltä ei voitu tunnistaa. Kirjoita vähän lisää.</string>
     <string name="translation_search_languages">Hae kieliä</string>
