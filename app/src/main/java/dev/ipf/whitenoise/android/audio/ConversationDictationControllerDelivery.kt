@@ -141,8 +141,8 @@ internal fun ConversationDictationController.launchGuardedDispatch(
             ),
         transport =
             ConversationDictationCompletionDispatchOwner.Transport(
-                PROCESSING_TIMEOUT_MILLIS,
-                sendTranscriptIfOriginUnchanged,
+                timeoutMillis = PROCESSING_TIMEOUT_MILLIS,
+                send = { request -> sendWithOutgoingTranslation(request, target) },
             ),
         callbacks =
             ConversationDictationCompletionDispatchOwner.DispatchCallbacks(
@@ -174,6 +174,22 @@ internal fun ConversationDictationController.launchGuardedDispatch(
                     ),
             ),
     )
+}
+
+/** Translate the complete source before claiming the existing origin-fenced dispatch. */
+private suspend fun ConversationDictationController.sendWithOutgoingTranslation(
+    request: ConversationDictationSendRequest,
+    target: ConversationDictationTarget,
+): Boolean {
+    val choice = target.outgoingTranslation ?: return sendTranscriptIfOriginUnchanged(request)
+    val binding = composerTranslationBinding?.takeIf { it.matches(target) }
+    val translation = binding?.resolve()?.takeIf { it.choice == choice }
+    val epoch = translation?.currentEpoch()
+    val outgoing = translation?.takeIf { epoch != null }?.translate(request.payload)
+    return !outgoing.isNullOrBlank() &&
+        composerTranslationBinding === binding &&
+        translation?.currentEpoch() == epoch &&
+        sendTranscriptIfOriginUnchanged(request.copy(payload = outgoing))
 }
 
 /** Our own clear/restore updates its fence; another writer never becomes the retry payload. */

@@ -570,6 +570,7 @@ internal fun MessageBubble(
             group = controller.group.groupIdHex,
             automaticEligible = !mine && !readOnly,
             selectedTarget = translationTarget,
+            incomingRecordedAt = record.recordedAt.takeUnless { mine || readOnly },
             sourceRevision =
                 listOf(record.sourceEpoch, editState?.count, editState?.versions?.lastOrNull()?.messageIdHex)
                     .joinToString(":"),

@@ -42,6 +42,7 @@ internal fun composerEditorViewportHeight(
  */
 internal class ComposerActionRowAlignment(
     private val horizontal: Alignment.Horizontal,
+    private val topInset: () -> Int = { 0 },
     private val editingProgress: () -> Float,
 ) : Alignment {
     /** Places the cluster at the horizontal edge and at the progress-weighted vertical bias. */
@@ -51,7 +52,9 @@ internal class ComposerActionRowAlignment(
         layoutDirection: LayoutDirection,
     ): IntOffset {
         val x = horizontal.align(size.width, space.width, layoutDirection)
-        return IntOffset(x, composerActionRowTop(space.height, size.height, editingProgress()))
+        // The parent can include an accessory above the actual editor and its inline actions.
+        val inset = topInset().coerceIn(0, (space.height - size.height).coerceAtLeast(0))
+        return IntOffset(x, inset + composerActionRowTop(space.height - inset, size.height, editingProgress()))
     }
 }
 

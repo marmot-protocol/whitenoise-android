@@ -1,6 +1,31 @@
 package dev.ipf.whitenoise.android.audio
 
+import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.audio.ConversationDictationState.Failed
+
+/** No queued restart: resolution only makes the next explicit Dictate gesture eligible. */
+internal fun ConversationDictationController.requestComposerStart(
+    accountRef: String,
+    groupIdHex: String,
+    draft: TextFieldValue,
+    replyToMessageIdHex: String?,
+    outgoingTranslation: ConversationDictationTranslationChoice? = null,
+): ConversationDictationComposerAccess {
+    expireRetainedRecoveryIfDue()
+    val access = composerAccess(accountRef, groupIdHex)
+    if (access.phase != ConversationDictationComposerPhase.Ready) return access
+    val started = requestStart(accountRef, groupIdHex, draft, replyToMessageIdHex, outgoingTranslation)
+    val rejected = composerAccess(accountRef, groupIdHex)
+    return when {
+        started -> access
+        rejected.phase == ConversationDictationComposerPhase.Ready ->
+            rejected.copy(
+                phase = ConversationDictationComposerPhase.Protected,
+                failure = ConversationDictationFailure.Unknown,
+            )
+        else -> rejected
+    }
+}
 
 internal fun ConversationDictationController.parkedComposerAccess(
     accountRef: String,

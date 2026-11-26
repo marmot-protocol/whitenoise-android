@@ -292,5 +292,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Data,
         SettingsDetail.AiAgents,
         -> null
-        SettingsDetail.ManageStorage -> SettingsDetail.Data
+        SettingsDetail.HistoryBackups,
+        SettingsDetail.ManageStorage,
+        -> SettingsDetail.Data
     }

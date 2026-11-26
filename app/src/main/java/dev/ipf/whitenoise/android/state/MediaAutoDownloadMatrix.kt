@@ -40,7 +40,7 @@ enum class MediaAutoDownloadNetwork(
         /**
          * Pure mapping from a live connection's transport/capability flags to
          * every condition it matches. Extracting the flags from
-         * `NetworkCapabilities` (an Android type) stays in [WhiteNoiseAppState];
+         * `NetworkCapabilities` (an Android type) stays in [networkTypesFor];
          * this keeps the fan-out rules — cellular implies Mobile and, when
          * roaming, Roaming; metered stacks on either transport — unit-testable
          * on the JVM. Empty means no/unknown connection, which
