@@ -155,14 +155,16 @@ internal fun clearRevokedConversationShortcutsForAccount(
                     knownGroupIds = knownGroupIds,
                 )
             }.getOrDefault(false)
-        if (!channelsCleared) {
-            // Keep the shortcuts but drop their private labels; account-refresh retention deletes the
-            // departed account's channels and then these shortcuts.
-            val affected = (plan.disabledIds + plan.dynamicIds + plan.longLivedIds).toSet()
-            val relabeled = shortcuts.filter { it.id in affected }.map { genericNotificationShortcut(context, it) }
-            if (relabeled.isNotEmpty()) runCatching { ShortcutManagerCompat.updateShortcuts(context, relabeled) }
-            return@synchronized
-        }
+        // Pinned shortcuts can remain on the launcher after disablement, so redact their labels first.
+        val affected = plan.disabledIds.toSet()
+        val relabeled =
+            shortcuts
+                .filter { it.id in affected && (!channelsCleared || it.isPinned) }
+                .map { genericNotificationShortcut(context, it) }
+        val redacted =
+            relabeled.isEmpty() ||
+                runCatching { ShortcutManagerCompat.updateShortcuts(context, relabeled) }.getOrDefault(false)
+        if (!channelsCleared || !redacted) return@synchronized
         if (plan.disabledIds.isNotEmpty()) {
             runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
         }

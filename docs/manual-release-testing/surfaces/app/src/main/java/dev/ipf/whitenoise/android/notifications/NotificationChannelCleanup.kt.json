@@ -4,6 +4,14 @@
   "categories": {
     "notification_content_contracts": [
       {
+        "surface": "a last-signer sweep remains pending until startup verifies shortcut and channel deletion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
+        "anchor": "private fun updateOwnerStoreAfterAccountCleanup(",
+        "test_ids": [
+          "NTF-059"
+        ]
+      },
+      {
         "surface": "the last signer records the legacy channel sweep before native account revocation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt",
         "anchor": "internal fun recordConversationChannelOwners(",

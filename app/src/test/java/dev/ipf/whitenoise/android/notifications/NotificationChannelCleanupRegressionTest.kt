@@ -327,19 +327,37 @@ class NotificationChannelCleanupRegressionTest {
         assertFalse(ownerPrefs().contains(sha256Hex("account-a")))
     }
 
-    /** A last-signer departure survives a restart even when a read-only profile remains. */
+    /** Startup replays legacy shortcut cleanup even when channel deletion completed before process death. */
     @Test
     fun restartSweepsOwnerlessChannelsAfterLastSignerLeavesReadOnlyProfile() {
         val shortcut = checkNotNull(conversationShortcutId("retired-account", "legacy-chat"))
         val channel = convChannel(NotificationChannelSpec.GROUP_MESSAGES, shortcut, "Ownerless private title")
+        ShortcutManagerCompat.pushDynamicShortcut(
+            context,
+            ShortcutInfoCompat
+                .Builder(context, shortcut)
+                .setShortLabel("Ownerless private title")
+                .setIntent(buildShareShortcutIntent(context))
+                .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+                .setLongLived(true)
+                .build(),
+        )
 
         assertTrue(recordDepartingConversationChannelOwners(context, "account-a", emptySet(), true))
         assertTrue(retainConversationChannelOwners(context, listOf("account-a", "readonly")))
         assertNotNull(manager.getNotificationChannel(channel))
 
+        // Native removal committed and the channel went away, but Android has not touched the launcher shortcut.
+        assertTrue(
+            deleteAccountNotificationChannels(context, "account-a", emptyList(), emptyList(), true),
+        )
+        assertNull(manager.getNotificationChannel(channel))
+        assertTrue(ownerPrefs().contains(LEGACY_SWEEP_PENDING_KEY))
+        assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcut })
+
         assertTrue(retainConversationChannelOwners(context, listOf("readonly"), signingAccountRemains = false))
 
-        assertNull(manager.getNotificationChannel(channel))
+        assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcut })
         assertNoChannelContainsText("Ownerless private title")
         assertFalse(ownerPrefs().contains(LEGACY_SWEEP_PENDING_KEY))
     }

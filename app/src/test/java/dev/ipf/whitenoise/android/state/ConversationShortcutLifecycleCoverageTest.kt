@@ -139,11 +139,6 @@ class ConversationShortcutLifecycleCoverageTest {
             "deleteConversationNotificationChannels(",
             ".removeGroup(",
         )
-        assertChannelsFirst(
-            pinnedLifecycle.functionBody("removeRevokedPinnedConversationShortcuts"),
-            "deleteConversationNotificationChannels(",
-            ".removeRevokedGroup(",
-        )
     }
 
     /** Asserts [body] calls [channelCall] before [shortcutCall]. */
@@ -222,7 +217,6 @@ class ConversationShortcutLifecycleCoverageTest {
         val pinnedLifecycle =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt")
         val removePinned = pinnedLifecycle.functionBody("removePinnedConversationShortcuts")
-        val removeRevoked = pinnedLifecycle.functionBody("removeRevokedPinnedConversationShortcuts")
         val channelCleanup =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt")
                 .functionBody("deleteConversationNotificationChannels")
@@ -231,11 +225,6 @@ class ConversationShortcutLifecycleCoverageTest {
             "removePinnedConversationShortcuts must delete conversation channels under mutationLock",
             "UserEventNotificationGroup.mutationLock" in removePinned &&
                 "deleteConversationNotificationChannels(appContext, accountRef, groupIdHex)" in removePinned,
-        )
-        assertTrue(
-            "removeRevokedPinnedConversationShortcuts must delete conversation channels under mutationLock",
-            "UserEventNotificationGroup.mutationLock" in removeRevoked &&
-                "deleteConversationNotificationChannels(appContext, accountRef, groupIdHex)" in removeRevoked,
         )
         assertTrue(
             "deleteConversationNotificationChannels must delete matched channels under mutationLock",

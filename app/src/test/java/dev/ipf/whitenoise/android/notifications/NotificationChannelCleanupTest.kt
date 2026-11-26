@@ -209,7 +209,7 @@ class NotificationChannelCleanupTest {
 
     /**
      * Last-account Sign Out / Wipe deletes unscoped legacy `:conv:` channels and channels owned by
-     * stale removed accounts, then clears the entire owner store while keeping all global channels.
+     * stale removed accounts, then startup retention clears the owner store while keeping global channels.
      */
     @Test
     fun lastAccountWipeDeletesOrphanedAndStaleOwnerChannelsAndClearsStore() {
@@ -233,7 +233,9 @@ class NotificationChannelCleanupTest {
         assertNull(manager.getNotificationChannel(orphanChannel))
         assertNull(manager.getNotificationChannel(staleChannel))
         assertNull(manager.getNotificationChannel(reactionChannel))
-        assertTrue("Expected owner store to be completely cleared", ownerPrefs().all.isEmpty())
+        assertTrue(ownerPrefs().contains(LEGACY_SWEEP_PENDING_KEY))
+        assertTrue(retainConversationChannelOwners(context, emptyList(), signingAccountRemains = false))
+        assertTrue(ownerPrefs().all.isEmpty())
         assertNoChannelContainsText("Solo Contact", "Orphaned Legacy Chat", "Stale Removed Chat")
         assertAllGlobalChannelsPresent()
     }

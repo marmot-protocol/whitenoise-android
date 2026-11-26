@@ -10,7 +10,6 @@ import dev.ipf.whitenoise.android.notifications.deleteConversationNotificationCh
 import dev.ipf.whitenoise.android.notifications.hasUnaccountedConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.recordDepartingConversationChannelOwners
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
@@ -76,52 +75,6 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
             shortcutsResult.getOrThrow()
             channelsResult.getOrThrow()
         }
-    }
-}
-
-/**
- * Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup.
- * The notification presenter's snapshot and `:conv:` notification channels are cleared in the same
- * publication-lock section as the platform removal, off the main thread. Incomplete channel cleanup stages
- * a media-free durable delete intent, so the journal retries it like any other local delete.
- */
-internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts(
-    accountRef: String,
-    groupIdHex: String,
-) {
-    val channelsCleared =
-        withContext(Dispatchers.IO) {
-            synchronized(UserEventNotificationGroup.mutationLock) {
-                val cleared =
-                    runCatching { deleteConversationNotificationChannels(appContext, accountRef, groupIdHex) }
-                        .getOrDefault(false)
-                // Failed channel cleanup keeps shortcuts, relabeled, for the journal retry so removal cannot hide one.
-                val shortcuts = PinnedConversationShortcuts(appContext)
-                runCatching {
-                    if (cleared) {
-                        shortcuts.removeRevokedGroup(accountRef, groupIdHex)
-                    } else {
-                        shortcuts.relabelGroup(accountRef, groupIdHex)
-                    }
-                }.onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
-                forgetNotificationConversationShortcut(accountRef, groupIdHex)
-                cleared
-            }
-        }
-    if (!channelsCleared) {
-        appStateDebug { "conversation notification channel cleanup deferred to the local delete journal" }
-        val pending = PendingLocalGroupDeleteCleanup(accountRef, groupIdHex, emptyList(), emptySet())
-        runCatchingCancellable {
-            localGroupDeleteCleanupMutex.withLock {
-                withContext(Dispatchers.IO) {
-                    // An earlier Delete chat may have staged media keys; keep that entry, which also retries channels.
-                    if (localGroupDeleteCleanupJournal.find(accountRef, groupIdHex) == null) {
-                        localGroupDeleteCleanupJournal.stage(pending)
-                    }
-                }
-            }
-        }.onFailure { appStateDebug(it) { "conversation notification channel retry could not be staged" } }
-        schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
     }
 }
 

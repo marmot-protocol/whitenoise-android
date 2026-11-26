@@ -484,17 +484,22 @@ class LocalGroupDeleteControllerTest {
         }
 
     /**
-     * A leave-path removal whose channel redaction fails stages a durable retry and keeps the shortcut, relabeled
-     * generically, until the retry deletes the channel first.
+     * A live local delete stages its journal before native commit. Failed channel redaction keeps the journal
+     * and a generic shortcut until replay removes the channel.
      */
     @Test
     @Config(sdk = [36], shadows = [FailingDeleteNotificationManager::class])
-    fun revokedRemovalChannelFailureStagesRetryAndRelabelsTheShortcut() =
+    fun liveLocalDeleteStagesBeforeNativeCommitAndRetriesChannelFailure() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             FailingDeleteNotificationManager.reset()
             try {
-                val fixture = fixture()
+                lateinit var state: WhiteNoiseAppState
+                val fixture =
+                    localGroupDeleteFixture(
+                        controllers,
+                        beforeDelete = { assertNotNull(state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP)) },
+                    ).also { state = it.state }
                 val context = fixture.state.appContext
                 NotificationChannels.ensureChannels(context)
                 val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
@@ -520,11 +525,10 @@ class LocalGroupDeleteControllerTest {
                 )
                 val manager = checkNotNull(context.getSystemService(NotificationManager::class.java))
                 FailingDeleteNotificationManager.failingCreateChannelIds = setOf(channelId)
-                // The leave path runs after native removal committed.
-                fixture.present.set(false)
 
-                fixture.state.removeRevokedPinnedConversationShortcuts(ACCOUNT, GROUP)
+                fixture.state.deleteGroupLocalWithClientCleanup(ACCOUNT, GROUP)
 
+                assertFalse(fixture.present.get())
                 assertNotNull(fixture.state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP))
                 assertNotNull(manager.getNotificationChannel(channelId))
                 val kept = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }

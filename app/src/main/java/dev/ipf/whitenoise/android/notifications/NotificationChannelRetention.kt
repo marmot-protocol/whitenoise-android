@@ -203,8 +203,12 @@ private fun removeDepartedShortcuts(
 ) {
     if (shortcuts.isEmpty()) return
     val ids = shortcuts.map { it.id }
-    val pinned = shortcuts.filter { it.isPinned }.map { it.id }
-    if (pinned.isNotEmpty()) ShortcutManagerCompat.disableShortcuts(appContext, pinned, "")
+    val pinned = shortcuts.filter { it.isPinned }
+    if (pinned.isNotEmpty()) {
+        val redacted = pinned.map { genericNotificationShortcut(appContext, it) }
+        check(ShortcutManagerCompat.updateShortcuts(appContext, redacted)) { "Could not redact retired shortcuts" }
+        ShortcutManagerCompat.disableShortcuts(appContext, pinned.map { it.id }, "")
+    }
     ShortcutManagerCompat.removeDynamicShortcuts(appContext, ids)
     ShortcutManagerCompat.removeLongLivedShortcuts(appContext, ids)
 }

@@ -221,12 +221,10 @@ private fun updateOwnerStoreAfterAccountCleanup(
         val ownerKey = channelOwnerAccountHash(accountRef)
         val uncommitted = UncommittedChannelOwners.keys(appContext)
         when {
-            allMatchedDeleted && includeUnscopedLegacy -> {
-                val editor = prefs.edit().clear()
-                if (editor.commit()) uncommitted.clear()
-            }
             allMatchedDeleted && ownerKey != null -> {
                 val editor = prefs.edit().remove(ownerKey)
+                // Retention clears this only after both the legacy channels and launcher shortcuts are gone.
+                if (includeUnscopedLegacy) editor.putStringSet(LEGACY_SWEEP_PENDING_KEY, emptySet())
                 if (editor.commit()) uncommitted.remove(ownerKey)
             }
             !allMatchedDeleted && ownerKey != null -> {
