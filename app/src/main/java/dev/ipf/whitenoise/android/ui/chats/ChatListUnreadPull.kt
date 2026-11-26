@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -13,6 +14,23 @@ import androidx.compose.ui.input.pointer.positionChange
 import kotlin.math.abs
 
 private const val UNREAD_PULL_HAPTIC_REARM_RATIO = 0.9f
+
+/** Checks the viewport the user can actually scroll before arming the unread pull. */
+internal fun LazyListState.unreadPullArmed(
+    unreadOnly: Boolean,
+    listEmpty: Boolean,
+    hasEarlierChats: Boolean,
+    emptyPageScroll: ScrollState,
+): Boolean =
+    chatListUnreadPullArmed(
+        unreadOnly = unreadOnly,
+        listEmpty = listEmpty,
+        hasEarlierChats = hasEarlierChats,
+        scrollInProgress = isScrollInProgress,
+        firstVisibleItemIndex = firstVisibleItemIndex,
+        firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+        emptyPageScroll = emptyPageScroll.takeIf { listEmpty },
+    )
 
 /**
  * The unread pull arms when an unread-only list has no rows or the list rests at its first row.

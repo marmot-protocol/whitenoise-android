@@ -269,19 +269,17 @@ class ChatListUnreadPullSurfaceTest {
                 val density = Density(LocalDensity.current.density, fontScale = 2f)
                 CompositionLocalProvider(LocalDensity provides density) {
                     scroll = rememberScrollState()
+                    val listState = rememberLazyListState()
                     Box(Modifier.size(300.dp, 200.dp)) {
                         ChatListUnreadPullSurface(
                             unreadOnly = true,
                             actionsAvailable = true,
                             gestureEnabled = true,
                             atTop = {
-                                chatListUnreadPullArmed(
+                                listState.unreadPullArmed(
                                     unreadOnly = true,
                                     listEmpty = true,
                                     hasEarlierChats = false,
-                                    scrollInProgress = false,
-                                    firstVisibleItemIndex = 0,
-                                    firstVisibleItemScrollOffset = 0,
                                     emptyPageScroll = scroll,
                                 )
                             },

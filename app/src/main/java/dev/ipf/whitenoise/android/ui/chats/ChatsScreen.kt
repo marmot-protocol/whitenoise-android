@@ -2447,8 +2447,8 @@ internal fun ChatsScreen(
                         !appState.wipeInProgress
                 val unreadActionsAvailable = !searchOpen && !selectionMode && unreadOwnerAvailable
                 key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
-                    val emptyPageScroll =
-                        key(visibleItems.isEmpty(), showArchived, unreadOnly) { rememberScrollState() }
+                    val listEmpty = visibleItems.isEmpty()
+                    val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
@@ -2458,15 +2458,7 @@ internal fun ChatsScreen(
                                 actionSheetChatId == null &&
                                 !actionMenuOwner.pointerHeld,
                         atTop = {
-                            chatListUnreadPullArmed(
-                                unreadOnly = unreadOnly,
-                                listEmpty = visibleItems.isEmpty(),
-                                hasEarlierChats = hasEarlierChats,
-                                scrollInProgress = chatListState.isScrollInProgress,
-                                firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
-                                firstVisibleItemScrollOffset = chatListState.firstVisibleItemScrollOffset,
-                                emptyPageScroll = emptyPageScroll.takeIf { visibleItems.isEmpty() },
-                            )
+                            chatListState.unreadPullArmed(unreadOnly, listEmpty, hasEarlierChats, emptyPageScroll)
                         },
                         onUnreadOnlyChange = { setUnreadOnly(it) },
                         status = {
