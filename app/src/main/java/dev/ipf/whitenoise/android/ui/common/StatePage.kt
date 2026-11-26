@@ -180,7 +180,9 @@ internal fun StateContent(
             WhiteNoiseButton(onClick = action.onClick, modifier = action.buttonModifier()) { ActionLabel(action) }
         }
         secondary?.let { action ->
-            WhiteNoiseOutlinedButton(onClick = action.onClick, modifier = action.buttonModifier()) { ActionLabel(action) }
+            WhiteNoiseOutlinedButton(onClick = action.onClick, modifier = action.buttonModifier()) {
+                ActionLabel(action)
+            }
         }
         footer()
     }
