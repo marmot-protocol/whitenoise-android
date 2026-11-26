@@ -131,7 +131,8 @@ class StartupChatListPrefetchTest {
                 assertEquals(AppPhase.Ready, fixture.appState.phase)
                 val snapshot = checkNotNull(fixture.appState.consumeAccountSwitchLocalSnapshot("self"))
                 assertTrue(snapshot.rows.single().muted)
-                assertTrue(fixture.appState.chatMutePreferences.legacyMuteEntries().isEmpty())
+                val mutePreferences = fixture.appState.chatMutePreferences
+                assertTrue(mutePreferences.legacyMuteEntries().isEmpty())
             } finally {
                 fixture.close()
                 prefs.edit().remove("mutedConversations").commit()
