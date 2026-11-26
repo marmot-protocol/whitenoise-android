@@ -1,4 +1,5 @@
 const { spawnSync } = require('node:child_process')
+const { randomUUID } = require('node:crypto')
 const { mkdtempSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
@@ -7,6 +8,7 @@ const COMMENT_MARKER = '<!-- whitenoise-android:pr-merge-order -->'
 const MAX_PRS_PER_PLAN = 5
 const MAX_PATHS_PER_PR = 6
 const MAX_INVENTORY = 100
+const SIMULATION_ID = randomUUID()
 
 /** Run Git with an argument list and keep NUL-delimited filenames intact. */
 function gitAt(cwd, args, allowedStatuses = [0]) {
@@ -40,28 +42,35 @@ function squashMerge(cwd, base, head) {
   if (result.status === 1) return { conflicts: [...new Set(paths.filter(Boolean))] }
 
   const commit = gitAt(cwd, [
-    '-c', 'commit.gpgsign=false', 'commit-tree', tree, '-p', base, '-m', 'Simulated squash merge',
+    '-c', 'commit.gpgsign=false', 'commit-tree', tree, '-p', base, '-m', `Simulated squash merge ${SIMULATION_ID}`,
   ]).stdout.trim()
-  return { commit }
+  return { commit, tree }
 }
 
 /** Search all candidate orders until a longest clean prefix is known. */
 function longestCleanOrder(cwd, base, candidates) {
   let best = { order: [], tip: base }
+  const explored = new Set()
 
   /** Extend a clean prefix with each remaining PR against the integrated tip. */
-  function search(tip, order, remaining) {
+  function search(tip, tree, order, remaining) {
+    // Synthetic squash commits share only master ancestry with the PR heads.
+    // An identical tree and remaining PRs therefore give the same future merges.
+    const state = `${tree}:${remaining.map(pr => pr.number).join(',')}`
+    if (explored.has(state)) return
+    explored.add(state)
+
     if (order.length > best.order.length) best = { order, tip }
     for (const candidate of remaining) {
       if (best.order.length === candidates.length) return
       const next = squashMerge(cwd, tip, candidate.head)
       if (next.commit) {
-        search(next.commit, [...order, candidate], remaining.filter(pr => pr !== candidate))
+        search(next.commit, next.tree, [...order, candidate], remaining.filter(pr => pr !== candidate))
       }
     }
   }
 
-  search(base, [], candidates)
+  search(base, base, [], candidates)
   const waiting = candidates
     .filter(pr => !best.order.includes(pr))
     .map(pr => ({ ...pr, paths: squashMerge(cwd, best.tip, pr.head).conflicts }))
@@ -87,12 +96,12 @@ function importantPath(path) {
 }
 
 /** Select the requested PR and its most relevant direct overlaps. */
-function selectCandidates(cwd, base, focus, open) {
-  const focusPaths = new Set(changedPaths(cwd, base, focus.head))
+function selectCandidates(focus, open, pathsByHead) {
+  const focusPaths = new Set(pathsByHead.get(focus.head))
   const overlaps = []
   for (const pr of open) {
-    if (pr === focus) continue
-    const shared = changedPaths(cwd, base, pr.head).filter(path => focusPaths.has(path))
+    if (pr.number === focus.number) continue
+    const shared = pathsByHead.get(pr.head).filter(path => focusPaths.has(path))
     if (shared.length) {
       shared.sort((a, b) => Number(importantPath(b)) - Number(importantPath(a)))
       overlaps.push({ ...pr, shared, important: importantPath(shared[0]) })
@@ -161,22 +170,39 @@ async function openPulls(github, repo) {
     .sort(byPreference)
 }
 
-/** Fetch the public repository and pin candidate heads to the API snapshot. */
+/** Fetch immutable PR heads and optionally master into the bare snapshot. */
+function fetchRevisions(cwd, pulls, includeMaster = false) {
+  const heads = [...new Set(pulls.map(pr => pr.head))]
+  const refs = heads.map(head => {
+    if (!/^[0-9a-f]{40}$/.test(head)) throw new Error('Expected a full PR head SHA')
+    return `+${head}:refs/merge-order/${head}`
+  })
+  if (includeMaster) refs.unshift('+refs/heads/master:refs/heads/master')
+  if (!refs.length) return
+  gitAt(cwd, [
+    'fetch', '--no-tags', '--no-write-fetch-head', '--filter=blob:none', 'origin',
+    ...refs,
+  ])
+}
+
+/** Initialize a bare partial clone without checking out pull request code. */
 function fetchSnapshot(cwd, repo, pulls) {
   gitAt(cwd, ['init', '--bare', '--template='])
   gitAt(cwd, ['remote', 'add', 'origin', `https://github.com/${repo.owner}/${repo.repo}.git`])
   gitAt(cwd, ['config', 'remote.origin.promisor', 'true'])
   gitAt(cwd, ['config', 'remote.origin.partialclonefilter', 'blob:none'])
-  gitAt(cwd, [
-    'fetch', '--no-tags', '--no-write-fetch-head', '--filter=blob:none', 'origin',
-    '+refs/heads/master:refs/heads/master',
-    ...pulls.map(pr => `+refs/pull/${pr.number}/head:refs/merge-order/${pr.number}`),
-  ])
-  const local = new Map(gitAt(cwd, [
-    'for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/merge-order/',
-  ]).stdout.trim().split('\n').map(line => line.split(' ')))
-  if (pulls.some(pr => local.get(`merge-order/${pr.number}`) !== pr.head)) return null
+  fetchRevisions(cwd, pulls, true)
   return gitAt(cwd, ['rev-parse', 'refs/heads/master']).stdout.trim()
+}
+
+/** Keep the focus PR in the bounded inventory regardless of its priority. */
+function inventoryFor(open, focus) {
+  return [focus, ...open.filter(pr => pr.number !== focus.number).slice(0, MAX_INVENTORY - 1)]
+}
+
+/** Identify the ordered PR heads that determine one simulation. */
+function candidateKey(candidates) {
+  return candidates.map(pr => `${pr.number}:${pr.head}`).join(',')
 }
 
 /** Update the one comment owned by this workflow, or remove it when overlaps clear. */
@@ -209,31 +235,48 @@ async function run({ github, context, core }) {
     return
   }
 
-  const inventory = [focus, ...open.filter(pr => pr !== focus).slice(0, MAX_INVENTORY - 1)]
-  const unscanned = open.length - inventory.length
+  const inventory = inventoryFor(open, focus)
   const cwd = mkdtempSync(join(tmpdir(), 'android-pr-merge-order-'))
   try {
     const base = fetchSnapshot(cwd, repo, inventory)
-    if (!base) {
-      core.notice('A pull request head moved during the fetch. Rerun to test the current heads.')
+    const pathsByHead = new Map(inventory.map(pr => [pr.head, changedPaths(cwd, base, pr.head)]))
+    let { candidates } = selectCandidates(focus, inventory, pathsByHead)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const plan = longestCleanOrder(cwd, base, candidates)
+      const [latest, comments] = await Promise.all([
+        openPulls(github, repo),
+        github.paginate(github.rest.issues.listComments, { ...repo, issue_number: number, per_page: 100 }),
+      ])
+      const currentFocus = latest.find(pr => pr.number === number)
+      if (currentFocus?.head !== focus.head) {
+        core.notice('The focus pull request changed or no longer targets master.')
+        return
+      }
+      const currentInventory = inventoryFor(latest, currentFocus)
+      const missing = currentInventory.filter(pr => !pathsByHead.has(pr.head))
+      fetchRevisions(cwd, missing)
+      for (const pr of missing) pathsByHead.set(pr.head, changedPaths(cwd, base, pr.head))
+
+      const current = selectCandidates(currentFocus, currentInventory, pathsByHead)
+      const { data: master } = await github.rest.git.getRef({ ...repo, ref: 'heads/master' })
+      if (master.object.sha !== base) {
+        core.notice('Master changed during the run. Rerun for a current plan.')
+        return
+      }
+      if (candidateKey(candidates) !== candidateKey(current.candidates)) {
+        candidates = current.candidates
+        continue
+      }
+
+      const unscanned = latest.length - currentInventory.length
+      const report = candidates.length > 1 || unscanned
+        ? renderReport(base, candidates, plan, current.omitted, unscanned)
+        : null
+      await updateComment(github, repo, number, comments, report)
+      await core.summary.addRaw(report ?? 'No other open pull request targeting master touches the same paths.').write()
       return
     }
-    const { candidates, omitted } = selectCandidates(cwd, base, focus, inventory)
-    const report = candidates.length > 1 || unscanned
-      ? renderReport(base, candidates, longestCleanOrder(cwd, base, candidates), omitted, unscanned)
-      : null
-    const comments = await github.paginate(github.rest.issues.listComments, {
-      ...repo, issue_number: number, per_page: 100,
-    })
-    const latest = new Map((await openPulls(github, repo)).map(pr => [pr.number, pr.head]))
-    const { data: master } = await github.rest.git.getRef({ ...repo, ref: 'heads/master' })
-    if (master.object.sha !== base || inventory.some(pr => latest.get(pr.number) !== pr.head) ||
-        latest.size !== open.length) {
-      core.notice('The open PRs or master changed during the run. Rerun for a current plan.')
-      return
-    }
-    await updateComment(github, repo, number, comments, report)
-    await core.summary.addRaw(report ?? 'No other open pull request targeting master touches the same paths.').write()
+    core.notice('The overlapping candidates changed twice during the run. Rerun for a current plan.')
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

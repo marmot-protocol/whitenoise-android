@@ -11,10 +11,6 @@ on:
         required: true
         type: number
 
-concurrency:
-  group: pr-merge-order-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   pull-requests: write
@@ -22,7 +18,12 @@ permissions:
 jobs:
   report:
     name: Suggest a clean merge order
-    if: github.ref == 'refs/heads/master'
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event.action != 'edited' || github.event.changes.base != null)
+    concurrency:
+      group: pr-merge-order-${{ github.event.pull_request.number || inputs.pr_number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
