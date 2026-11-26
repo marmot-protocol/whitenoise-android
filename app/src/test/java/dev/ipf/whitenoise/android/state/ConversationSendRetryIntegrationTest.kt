@@ -3448,9 +3448,10 @@ class ConversationSendRetryIntegrationTest {
         }
 
     @Test
-    fun sendKeepsRetryingPastTheShortConnectWindowAndStaysPendingUntilAccepted() =
+    fun sendStaysPendingAcrossRepeatedConnectFailuresUntilAccepted() =
         runTest {
             val appState = appState()
+            val acceptingAttempt = 4
             var attempts = 0
             lateinit var controller: ConversationController
             controller =
@@ -3461,7 +3462,7 @@ class ConversationSendRetryIntegrationTest {
                     textPublisher = { _, _, _, _ ->
                         attempts += 1
                         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
-                        if (attempts <= SEND_RETRY_ATTEMPTS) {
+                        if (attempts < acceptingAttempt) {
                             throw MarmotKitException.Publish("connect relay failed")
                         }
                         SendSummaryFfi(
@@ -3475,7 +3476,7 @@ class ConversationSendRetryIntegrationTest {
 
             controller.send("hello")
 
-            assertEquals(SEND_RETRY_ATTEMPTS + 1, attempts)
+            assertEquals(acceptingAttempt, attempts)
             assertEquals(MessageStatus.Sent, controller.timeline.single().status)
             assertEquals(null, appState.toast)
         }
