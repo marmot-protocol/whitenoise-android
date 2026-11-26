@@ -71,6 +71,15 @@
         "test_ids": [
           "CON-049"
         ]
+      },
+      {
+        "surface": "Modifier.mirrorInRtl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun Modifier.mirrorInRtl(",
+        "test_ids": [
+          "AXY-022",
+          "TTS-001"
+        ]
       }
     ],
     "source_coverage": [

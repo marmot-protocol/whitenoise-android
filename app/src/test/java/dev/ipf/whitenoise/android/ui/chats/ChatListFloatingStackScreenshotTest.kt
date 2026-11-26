@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
 import dev.ipf.whitenoise.android.ui.navigation.ConversationDictationControlOwner
 import dev.ipf.whitenoise.android.ui.navigation.DICTATION_CONTROL_EXIT_MILLIS
 import dev.ipf.whitenoise.android.ui.navigation.DictationControlExit
+import dev.ipf.whitenoise.android.ui.navigation.FLOATING_CONTROL_SLOT_TAG
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.FloatingDictationAnchor
@@ -162,15 +163,11 @@ class ChatListFloatingStackScreenshotTest {
         assertTrue("$upper should not float far above $lower, gap was $gap", gap <= FloatingControlGap.value + 6f)
     }
 
-    private fun bounds(tag: String): Rect =
-        if (tag == JUMP) {
-            composeRule
-                .onNodeWithContentDescription(context.getString(R.string.scroll_to_top))
-                .fetchSemanticsNode()
-                .boundsInWindow
-        } else {
-            tagBounds(tag)
-        }
+    /**
+     * The bounds of the layer tagged [tag]. The jump control's is the slot the stack places, whose 48 dp touch
+     * target reaches a little past it into the gaps.
+     */
+    private fun bounds(tag: String): Rect = tagBounds(if (tag == JUMP) FLOATING_CONTROL_SLOT_TAG else tag)
 
     private fun tagBounds(tag: String): Rect =
         composeRule

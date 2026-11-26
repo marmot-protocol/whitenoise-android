@@ -18,16 +18,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -43,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -97,13 +101,13 @@ internal fun ConversationDictationContinueSlot(
     visible: Boolean,
     onContinue: () -> Unit,
 ) {
+    val press = remember { MutableInteractionSource() }
     DictationLeadingSlot(visible) {
-        IconButton(
-            onClick = onContinue,
-            enabled = visible,
+        // Continue shares the listening pulse's small circle and has its own full-size touch area.
+        Box(
             modifier =
                 Modifier
-                    .width(DICTATION_LISTENING_PULSE_WIDTH)
+                    .width(ComposerShortcutPitch)
                     .height(ComposerShortcutTarget)
                     .testTag(DICTATION_CONTINUE_TAG)
                     .explainOnLongPress(
@@ -111,13 +115,19 @@ internal fun ConversationDictationContinueSlot(
                             R.string.dictation_continue_recording,
                             R.string.explanation_conversation_dictation_continue,
                         ),
-                    ),
+                    ).shapedTouchTarget(press, enabled = visible, onClick = onContinue),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painter = painterResource(DICTATION_CONTINUE_ICON),
-                contentDescription = stringResource(R.string.dictation_continue_recording),
-                modifier = Modifier.size(20.dp),
-            )
+            Box(
+                Modifier.size(DICTATION_LISTENING_PULSE_WIDTH).shapedPressFeedback(press, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(DICTATION_CONTINUE_ICON),
+                    contentDescription = stringResource(R.string.dictation_continue_recording),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

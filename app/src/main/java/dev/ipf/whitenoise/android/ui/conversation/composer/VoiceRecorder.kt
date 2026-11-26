@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 
 /**
  * Hold-to-record voice button. Press → start; release → stop and review.
@@ -63,7 +63,7 @@ internal fun MicHoldButton(
     val recording = controller.isRecording
     val label = stringResource(if (recording) R.string.voice_recording_stop else R.string.voice_message_record)
     ComposerToolbarTargets {
-        IconButton(
+        SlotIconButton(
             // Accessibility fallback: a tap (TalkBack double-tap, keyboard
             // Enter, switch access) toggles record-and-lock so users who can't
             // perform the press-and-hold gesture can still send voice notes.

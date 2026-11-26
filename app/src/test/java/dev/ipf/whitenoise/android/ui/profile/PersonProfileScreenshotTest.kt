@@ -18,6 +18,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.common.FollowedPeople
+import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -47,6 +49,9 @@ class PersonProfileScreenshotTest {
 
     /** Existing native creation busy state remains visible without navigating away. */
     @Test fun busyMessage() = profile("busy_message", busy = true)
+
+    /** A followed person's badge stays whole at the avatar's corner, because the avatar's highlight never clips it. */
+    @Test fun followedBadge() = profile("followed", followed = true)
 
     /** Native self-profile omits contact-only actions. */
     @Test fun self() = profile("self", self = true)
@@ -210,10 +215,12 @@ class PersonProfileScreenshotTest {
         follow: ProfileFollowRowState = ProfileFollowRowState(true, false, true),
         nameless: Boolean = false,
         scrollToKey: Boolean = false,
+        followed: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalFollowedPeople provides followedPeople(followed),
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     PersonProfileContent(
@@ -227,7 +234,7 @@ class PersonProfileScreenshotTest {
                             PersonProfilePresentation(
                                 if (nameless) NAMELESS_TITLE else "Alice",
                                 if (nameless) NAMELESS_TITLE else "Alice",
-                                "public-person",
+                                PERSON_SEED,
                                 null,
                                 null,
                                 false,
@@ -296,8 +303,15 @@ class PersonProfileScreenshotTest {
             PersonSharedGroupRow("local", "Local community", 12),
         )
 
+    /** The followed-people list with the shown person on it when [followed], and empty otherwise. */
+    private fun followedPeople(followed: Boolean): FollowedPeople =
+        if (followed) FollowedPeople.of(listOf(PERSON_SEED), ownAccountIdHex = null) else FollowedPeople.None
+
     private companion object {
         /** The shortened key a nameless person is titled by before the profile replaces it with the full key. */
         const val NAMELESS_TITLE = "npub1aaaaaaa…aaaaaaaa"
+
+        /** The shown person's avatar seed, which is also the key the followed-people list matches. */
+        const val PERSON_SEED = "public-person"
     }
 }

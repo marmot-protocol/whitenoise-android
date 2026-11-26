@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -24,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SlotIconButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 // Material's disabled container and content emphasis, so an inactive Send reads grey rather than accented.
@@ -49,7 +49,7 @@ internal fun ComposerActionDisc(
 ) {
     val outline = amoledOutlineBorder(enabled)
     ComposerToolbarTargets {
-        IconButton(
+        SlotIconButton(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier.composerControlTarget().width(width).height(48.dp),
