@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.os.Build
 import androidx.core.content.LocusIdCompat
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -62,3 +61,47 @@ internal suspend fun LocalNotificationPresenter.publishReactionShortcutBeforePos
         }
     return id.takeIf { published }
 }
+
+/**
+ * Resolves the post's target channel while rechecking [isWriteAllowed] inside the channel creation
+ * lock so a locally deleted conversation or departed account cannot materialize a named child channel.
+ */
+@Suppress("LongParameterList") // Post-routing parameters shared with LocalNotificationPresenter.show().
+internal suspend fun LocalNotificationPresenter.resolvePostChannelId(
+    update: NotificationUpdateFfi,
+    existingCardChannel: String?,
+    channelShortcutId: String?,
+    conversationTitleOverride: String?,
+    senderNameOverride: String?,
+    redactContent: Boolean,
+    vibrationPattern: ConversationVibrationPattern,
+    isWriteAllowed: () -> Boolean,
+): String? =
+    withContext(Dispatchers.Default) {
+        if (!isWriteAllowed()) return@withContext null
+        val channelId =
+            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
+                val selection = profileNotificationOverrides.get(update.accountRef, author)
+                if (selection.mode == ProfileNotificationMode.CUSTOM) {
+                    profileNotificationChannels.existing(
+                        accountRef = update.accountRef,
+                        author = author,
+                        pattern = selection.vibration,
+                        title = senderNameOverride ?: update.sender.displayName,
+                        redact = redactContent,
+                        isWriteAllowed = isWriteAllowed,
+                    )
+                } else {
+                    null
+                }
+            } ?: conversationNotificationRouting
+                .resolveForPost(
+                    channel = NotificationChannelSpec.forUpdate(update),
+                    conversationShortcutId = channelShortcutId,
+                    conversationTitle = conversationTitleOverride,
+                    primaryVibrationPattern = vibrationPattern,
+                    accountRef = update.accountRef,
+                    isWriteAllowed = isWriteAllowed,
+                ).channelId
+        channelId.takeIf { isWriteAllowed() }
+    }

@@ -103,13 +103,13 @@ class LocalNotificationPresenter(
             interactions = interactions,
         )
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
-    private val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
-    private val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
+    internal val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
+    internal val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
 
     // First used from show()'s Default-dispatcher routing block, so defer the
     // SharedPreferences-backed construction instead of adding disk-backed work
     // to AppState's main-thread initialization.
-    private val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
+    internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
     internal val publisher =
         NotificationCardPublisher(
             context,
@@ -146,7 +146,12 @@ class LocalNotificationPresenter(
     fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
-    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+        knownGroupIds: Collection<String> = emptySet(),
+    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(
+        accountRef,
+        includeUnscopedLegacy,
+        knownGroupIds,
+    )
 
     /** Called off the main thread in the same publication-lock section as platform removal. */
     internal fun forgetConversationShortcut(
@@ -358,6 +363,7 @@ class LocalNotificationPresenter(
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
+        val channelWriteEpoch = NotificationChannelWriteGuard.captureEpoch()
         val profileAllowsPost = { isPostStillAllowed() && !profileNotificationOverrides.isMuted(update) }
         if (!profileAllowsPost()) return false
         val previewToken = NotificationPreviewPreferences.capture(context)
@@ -545,6 +551,7 @@ class LocalNotificationPresenter(
                                                     update.isDm,
                                                     conversationTitleOverride,
                                                     ConversationVibrationPattern.SYSTEM_DEFAULT,
+                                                    update.accountRef,
                                                 ),
                                             ).filter { it.channel == category }
                                     }.orEmpty() +
@@ -584,29 +591,26 @@ class LocalNotificationPresenter(
                         } else {
                             ConversationVibrationPattern.SYSTEM_DEFAULT
                         }
+                    val channelWriteAllowed = {
+                        profileAllowsPost() &&
+                            showGenerationAllowsPost() &&
+                            NotificationChannelWriteGuard.isCurrent(
+                                channelWriteEpoch,
+                                update.accountRef,
+                                channelShortcutId,
+                            )
+                    }
                     val channelId =
-                        withContext(Dispatchers.Default) {
-                            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
-                                val selection = profileNotificationOverrides.get(update.accountRef, author)
-                                if (selection.mode == ProfileNotificationMode.CUSTOM) {
-                                    profileNotificationChannels.existing(
-                                        update.accountRef,
-                                        author,
-                                        selection.vibration,
-                                        senderNameOverride ?: update.sender.displayName,
-                                        redactContent,
-                                    )
-                                } else {
-                                    null
-                                }
-                            } ?: conversationNotificationRouting
-                                .resolveForPost(
-                                    channel = NotificationChannelSpec.forUpdate(update),
-                                    conversationShortcutId = channelShortcutId,
-                                    conversationTitle = conversationTitleOverride,
-                                    primaryVibrationPattern = vibrationPattern,
-                                ).channelId
-                        }
+                        resolvePostChannelId(
+                            update = update,
+                            existingCardChannel = existingCardChannel,
+                            channelShortcutId = channelShortcutId,
+                            conversationTitleOverride = conversationTitleOverride,
+                            senderNameOverride = senderNameOverride,
+                            redactContent = redactContent,
+                            vibrationPattern = vibrationPattern,
+                            isWriteAllowed = channelWriteAllowed,
+                        ) ?: return@withRegisteredShow false
                     val quietChannel =
                         runCatching {
                             context

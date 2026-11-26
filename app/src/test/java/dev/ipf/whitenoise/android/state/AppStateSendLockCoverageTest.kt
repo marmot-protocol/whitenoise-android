@@ -173,7 +173,7 @@ class AppStateSendLockCoverageTest {
         val revokedBody = entry.kotlinBlockFrom(entry.indexOf('{', revocation), "launcher revocation")
         assertTrue(
             "the public wipe must delegate completion inside the durable launcher-revocation bracket",
-            "finishRevokedAccountWipe(wipedRef, wipedShareAccount)" in revokedBody,
+            "finishRevokedAccountWipe(wipedRef, wipedShareAccount, knownGroupIds)" in revokedBody,
         )
         val body = appStateFunctionBody("finishRevokedAccountWipe")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")

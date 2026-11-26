@@ -180,6 +180,8 @@ class SettingsSignOutOperationTest {
                     "signOut" -> suspendSignOut(arguments)
                     // Unfinished local cleanup re-reads the native account to decide whether it stayed signed in.
                     "listAccounts" -> listOf(account())
+                    // Sign-out captures the account's group ids first so their channels can be deleted.
+                    "chatList", "quarantinedGroups" -> emptyList<Any>()
                     "toString" -> "SuspendedSignOutTestProxy"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === arguments?.firstOrNull()

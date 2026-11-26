@@ -277,7 +277,9 @@ class ConversationNotificationSettingsPreparationTest {
             context: Context,
             shortcut: ShortcutInfoCompat,
             existing: Boolean,
+            isWriteAllowed: () -> Boolean,
         ) {
+            check(isWriteAllowed())
             pushes += 1
             if (existing) updates += 1
             lastPushed = shortcut
@@ -288,13 +290,17 @@ class ConversationNotificationSettingsPreparationTest {
         }
 
         /** Returns a deterministic active id encoding the requested vibration version. */
+        @Suppress("LongParameterList") // Matches the platform boundary under test.
         override suspend fun ensureChannel(
             context: Context,
             parent: NotificationChannelSpec,
             shortcutId: String,
             conversationTitle: String,
             vibrationPattern: ConversationVibrationPattern,
-        ): String {
+            accountRef: String?,
+            isWriteAllowed: () -> Boolean,
+        ): String? {
+            if (!isWriteAllowed()) return null
             channelEnsures += 1
             return "${parent.id}:${vibrationPattern.name}"
         }

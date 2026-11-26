@@ -5,7 +5,14 @@ import android.app.NotificationManager
 import android.content.Context
 import dev.ipf.whitenoise.android.R
 
-/** One bounded channel family per local account and author, independent of conversation membership. */
+/**
+ * One bounded channel family per local account and author, independent of conversation membership.
+ *
+ * Routine resets to default and vibration-pattern switches retain dormant OS channels so Android-owned
+ * sound, importance, lights, and DND settings survive. Destructive account Sign Out and Sign Out &
+ * Wipe explicitly delete the leaving account's `profile_messages_v1:` channels via
+ * [deleteAccountNotificationChannels] so private contact nicknames do not remain in Android Settings.
+ */
 internal class ProfileNotificationChannels(
     context: Context,
 ) {
@@ -13,19 +20,25 @@ internal class ProfileNotificationChannels(
     private val manager = this.context.getSystemService(NotificationManager::class.java)
 
     /** Message/view paths may refresh an existing label, but can never materialize a new channel. */
+    @Suppress("LongParameterList") // Channel identity, label context, and lock-guarded write predicate.
     fun existing(
         accountRef: String,
         author: String,
         pattern: ConversationVibrationPattern,
         title: String?,
         redact: Boolean = false,
-    ): String? =
-        synchronized(UserEventNotificationGroup.mutationLock) {
+        isWriteAllowed: () -> Boolean = { true },
+    ): String? {
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
+        return synchronized(UserEventNotificationGroup.mutationLock) {
+            val writeCurrent = NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef)
+            if (!isWriteAllowed() || !writeCurrent) return@synchronized null
             val id = id(accountRef, author, pattern) ?: return@synchronized null
             val channel = manager?.getNotificationChannel(id) ?: return@synchronized null
             refreshLabel(channel, title, redact)
             id
         }
+    }
 
     /** Refresh at most four existing waveform versions; profile updates never create a channel. */
     fun refreshExisting(
@@ -34,21 +47,33 @@ internal class ProfileNotificationChannels(
         title: String?,
         isCurrent: () -> Boolean = { true },
     ) {
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
         synchronized(UserEventNotificationGroup.mutationLock) {
-            if (!isCurrent()) return
-            ConversationVibrationPattern.entries.forEach { pattern -> existing(accountRef, author, pattern, title) }
+            if (!isCurrent() || !NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef)) return
+            ConversationVibrationPattern.entries.forEach { pattern ->
+                existing(accountRef, author, pattern, title, isWriteAllowed = isCurrent)
+            }
         }
     }
 
-    /** Explicit customization is the only creator; dormant versions keep every Android-owned setting. */
+    /**
+     * Explicit customization is the only creator; dormant versions keep every Android-owned setting
+     * across routine resets until account Sign Out or Sign Out & Wipe deletes the account's channels.
+     */
+    @Suppress("LongParameterList") // Channel identity, migration source, and lock-guarded write predicate.
     fun customize(
         accountRef: String,
         author: String,
         title: String,
         pattern: ConversationVibrationPattern,
         previous: ConversationVibrationPattern,
-    ): String =
-        synchronized(UserEventNotificationGroup.mutationLock) {
+        isWriteAllowed: () -> Boolean = { true },
+    ): String {
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
+        return synchronized(UserEventNotificationGroup.mutationLock) {
+            check(isWriteAllowed() && NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef)) {
+                "Profile notification channel write is no longer current"
+            }
             val platform = checkNotNull(manager)
             val id = requireNotNull(id(accountRef, author, pattern))
             val existing = platform.getNotificationChannel(id)
@@ -79,6 +104,7 @@ internal class ProfileNotificationChannels(
             }
             id
         }
+    }
 
     /** Reads actual OS vibration for an honest summary after returning from Android settings. */
     fun effectiveVibration(
