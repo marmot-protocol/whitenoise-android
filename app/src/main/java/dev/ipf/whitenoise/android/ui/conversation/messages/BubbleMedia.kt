@@ -118,7 +118,7 @@ internal fun bubbleMedia(
     // the audio renderer and shows as a pending file card with its upload progress, like any large document.
     val pendingAudio =
         indexedPending.filter { (_, attachment) ->
-            attachment.mediaType.startsWith("audio/", ignoreCase = true) && attachment.sourceFile == null
+            attachment.mediaType.startsWith("audio/", ignoreCase = true) && !attachment.isFileBacked
         }
     val pendingVisuals =
         indexedPending
@@ -162,7 +162,7 @@ internal fun bubbleMedia(
 internal fun isPendingGeneralFile(pending: PendingAttachment): Boolean =
     !pending.mediaType.startsWith("image/", ignoreCase = true) &&
         !pending.mediaType.startsWith("video/", ignoreCase = true) &&
-        (!pending.mediaType.startsWith("audio/", ignoreCase = true) || pending.sourceFile != null)
+        (!pending.mediaType.startsWith("audio/", ignoreCase = true) || pending.isFileBacked)
 
 /** Keeps optimistic file chrome exclusive with confirmed, audio, and visual media renderers. */
 internal fun shouldShowPendingFilePlaceholder(

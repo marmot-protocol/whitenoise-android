@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.rememberingNativeDraftBody
 import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import java.io.IOException
 import java.nio.file.Files
@@ -55,9 +56,11 @@ internal fun <K> removePreparedDocumentMetadata(prepared: Map<K, PendingAttachme
     return checked.copy(ready = checked.ready.mapValues { (_, attachment) -> attachment.withoutPdfMetadata() })
 }
 
+/** This attachment with PDF metadata removed on a copy, remembering the body its native draft still holds. */
 private fun PendingAttachment.withoutPdfMetadata(): PendingAttachment {
     val clean = if (sourceFile != null) null else PdfMetadataScrubber.cleanedCopyOrNull(plaintextBytes)
-    return if (clean == null || clean === plaintextBytes) this else copy(plaintextBytes = clean)
+    val unchanged = clean == null || clean === plaintextBytes
+    return if (unchanged) this else rememberingNativeDraftBody().copy(plaintextBytes = checkNotNull(clean))
 }
 
 /** What this attachment's content says about PDF metadata. Reads its staged file when it has one. Call off Main. */
