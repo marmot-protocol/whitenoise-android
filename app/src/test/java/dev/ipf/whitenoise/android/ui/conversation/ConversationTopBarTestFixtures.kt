@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -8,6 +12,8 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -94,4 +100,41 @@ private class EmptyDraftPersistence : DraftPersistence {
         key: String,
         value: String?,
     ) = Unit
+}
+
+/** The production top bar with inert search, selection and navigation, opening details through [onOpenDetails]. */
+@Composable
+@Suppress("LongParameterList")
+internal fun TopBarUnderTest(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    openDetailsDescription: String,
+    compactHeight: Boolean = false,
+    frozen: Boolean = false,
+    onOpenDetails: () -> Unit = {},
+    actions: @Composable RowScope.(capacity: Int) -> Unit = {},
+) {
+    ConversationTopBar(
+        selectionMode = false,
+        selectedCount = 0,
+        onCloseSelection = {},
+        searchOpen = false,
+        searchQuery = "",
+        onSearchQueryChange = {},
+        onClearSearch = {},
+        onCloseSearch = {},
+        onSearchAction = {},
+        searchFocusRequester = remember { FocusRequester() },
+        appState = appState,
+        controller = controller,
+        groupTitleCopy = GroupTitleCopy.Default,
+        openedAsDmHint = false,
+        freezeRoutePresentation = frozen,
+        openDetailsDescription = openDetailsDescription,
+        onOpenDetails = onOpenDetails,
+        onBack = {},
+        compactHeight = compactHeight,
+        performanceSelectorsEnabled = true,
+        actions = actions,
+    )
 }

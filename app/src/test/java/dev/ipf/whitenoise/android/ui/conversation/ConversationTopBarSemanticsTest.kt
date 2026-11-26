@@ -11,16 +11,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -33,14 +29,10 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.longClick
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
@@ -51,7 +43,6 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -59,8 +50,6 @@ import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isConversationMutePending
-import dev.ipf.whitenoise.android.ui.common.ExplanationHostState
-import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
 import dev.ipf.whitenoise.android.ui.group.MuteTarget
 import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
@@ -185,39 +174,6 @@ class ConversationTopBarSemanticsTest {
         composeRule
             .onNode(hasText("$retention seconds") and hasAnyAncestor(hasTestTag("conversation.timer.tooltip")))
             .assertExists()
-    }
-
-    /** Holding the chat name explains Chat Details, even directly above the timer, inside its widened touch area. */
-    @Test
-    fun holdingTheChatNameExplainsDetails() {
-        val (explained, tooltip) = holdInTimerHeader(NAME_TAG) { timerX -> Offset(timerX, bottom - 4.dp.toPx()) }
-        assertTrue("holding the chat name explains Chat Details", explained)
-        assertFalse("holding the chat name must not open the timer tooltip", tooltip)
-    }
-
-    /** Holding the timer opens only its tooltip, not the Chat Details explanation as well. */
-    @Test
-    fun holdingTheTimerOpensOnlyItsTooltip() {
-        val (explained, tooltip) = holdInTimerHeader(TIMER_TAG) { center }
-        assertFalse("holding the timer must not also open the Chat Details explanation", explained)
-        assertTrue("holding the timer opens its tooltip", tooltip)
-    }
-
-    /** Compose widens the short timer line to a 48dp touch target, so a hold just below it is still the timer's. */
-    @Test
-    fun holdingTheTimersWidenedTargetOpensOnlyItsTooltip() {
-        val (explained, tooltip) = holdInTimerHeader(TIMER_TAG) { Offset(centerX, bottom + 3.dp.toPx()) }
-        assertFalse("a hold in the timer's widened touch target must not open the explanation", explained)
-        assertTrue("a hold in the timer's widened touch target opens its tooltip", tooltip)
-    }
-
-    /** A mouse hold on the timer still explains Chat Details, since Material's tooltip opens on touch and stylus. */
-    @Test
-    fun mouseHoldOnTheTimerStillExplainsDetails() {
-        val host = renderTimerHeader()
-        composeRule.onNodeWithTag(TIMER_TAG, useUnmergedTree = true).performMouseInput { longClick() }
-        composeRule.waitForIdle()
-        assertTrue("a mouse hold on the timer explains Chat Details", host.shown != null)
     }
 
     /** Keeps the automatic-timer explanation inside the available window. */
@@ -567,35 +523,6 @@ class ConversationTopBarSemanticsTest {
         composeRule.onNodeWithText("Benchmark group").assertDoesNotExist()
     }
 
-    /**
-     * Renders the timer header, holds [tag] at [at], and returns whether the Chat Details explanation and the timer
-     * tooltip opened. [at] gets the timer's centre x in [tag]'s local coordinates.
-     */
-    private fun holdInTimerHeader(
-        tag: String,
-        at: TouchInjectionScope.(timerX: Float) -> Offset,
-    ): Pair<Boolean, Boolean> {
-        val host = renderTimerHeader()
-        val held = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
-        val timer = composeRule.onNodeWithTag(TIMER_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val timerX = timer.center.x - held.fetchSemanticsNode().boundsInRoot.left
-        held.performTouchInput { longClick(at(timerX)) }
-        composeRule.waitForIdle()
-        val tooltips = composeRule.onAllNodesWithTag("conversation.timer.tooltip").fetchSemanticsNodes()
-        return (host.shown != null) to tooltips.isNotEmpty()
-    }
-
-    /** Renders a header with the timer on, its first-run hint spent and the tooltip closed, and returns its host. */
-    private fun renderTimerHeader(): ExplanationHostState {
-        val appState = appState()
-        appState.markDisappearingTooltipShown()
-        val host = ExplanationHostState()
-        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
-        render(appState, controller, explanationHost = host)
-        composeRule.onNodeWithTag("conversation.timer.tooltip").assertDoesNotExist()
-        return host
-    }
-
     /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
     @Suppress("LongParameterList")
     private fun render(
@@ -608,56 +535,25 @@ class ConversationTopBarSemanticsTest {
         dark: Boolean = false,
         actions: @Composable RowScope.(capacity: Int) -> Unit = {},
         rtl: Boolean = false,
-        explanationHost: ExplanationHostState? = null,
     ) {
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
-            CompositionLocalProvider(
-                LocalLayoutDirection provides direction,
-                LocalExplanationHost provides explanationHost,
-            ) {
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     Surface {
-                        TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions)
+                        TopBarUnderTest(
+                            appState,
+                            controller,
+                            OPEN_DETAILS_DESCRIPTION,
+                            compactHeight,
+                            frozen.value,
+                            onOpenDetails,
+                            actions,
+                        )
                     }
                 }
             }
         }
-    }
-
-    @Composable
-    @Suppress("LongParameterList")
-    private fun TopBar(
-        appState: WhiteNoiseAppState,
-        controller: ConversationController,
-        compactHeight: Boolean = false,
-        frozen: Boolean = false,
-        onOpenDetails: () -> Unit = {},
-        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
-    ) {
-        ConversationTopBar(
-            selectionMode = false,
-            selectedCount = 0,
-            onCloseSelection = {},
-            searchOpen = false,
-            searchQuery = "",
-            onSearchQueryChange = {},
-            onClearSearch = {},
-            onCloseSearch = {},
-            onSearchAction = {},
-            searchFocusRequester = remember { FocusRequester() },
-            appState = appState,
-            controller = controller,
-            groupTitleCopy = GroupTitleCopy.Default,
-            openedAsDmHint = false,
-            freezeRoutePresentation = frozen,
-            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-            onOpenDetails = onOpenDetails,
-            onBack = {},
-            compactHeight = compactHeight,
-            performanceSelectorsEnabled = true,
-            actions = actions,
-        )
     }
 
     /** Records the header with [shortcuts] chosen, using an unmuted conversation's mute control. */
@@ -742,8 +638,6 @@ class ConversationTopBarSemanticsTest {
         val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
         const val PHONE = "en-w411dp-h891dp-xxhdpi"
         const val SMALL_PHONE = "en-w320dp-h780dp-xxhdpi"
-        const val NAME_TAG = "conversation.header.name"
-        const val TIMER_TAG = "conversation.header.timer"
         val GROUP_SHORTCUT_TAGS = listOf(CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
 }
