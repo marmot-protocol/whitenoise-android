@@ -8,6 +8,7 @@ import android.os.CancellationSignal
 import android.provider.OpenableColumns
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.DraftStoredFile
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
@@ -35,6 +36,7 @@ internal data class DraftBackedPhoto(
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
             plaintextBytes = attachment.plaintext,
+            nativeDraftAttachmentId = attachment.id,
             mediaType = attachment.mediaType,
             fileName = attachment.fileName,
             dim = attachment.dim,
@@ -47,14 +49,22 @@ internal data class DraftPreparedPhoto(
     val attachmentDigest: String,
     // Transient shelf ownership; fresh preparation must survive cleanup of an older native draft.
     val restoredFromNative: Boolean = false,
+    // The plaintext size of a file-backed attachment, whose draft entry carries no bytes; 0 while unknown.
+    val storedBytes: Long = 0L,
 ) {
+    /** The attachment a send carries: its inline bytes, or a reference to the file the draft stores. */
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
             plaintextBytes = attachment.plaintext,
+            nativeDraftAttachmentId = attachment.id,
             mediaType = attachment.mediaType,
             fileName = attachment.fileName,
             dim = attachment.dim,
             thumbhash = attachment.thumbhash,
+            draftFile =
+                DraftStoredFile(attachment.id, storedBytes).takeIf {
+                    !attachment.hasInlineBody() && storedBytes > 0L
+                },
         )
 }
 

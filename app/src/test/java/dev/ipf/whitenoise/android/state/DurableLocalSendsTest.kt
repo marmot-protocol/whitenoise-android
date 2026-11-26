@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
 import dev.ipf.marmotkit.MediaFileUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaFileUploadRequestFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MediaUploadSubmissionFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
@@ -260,6 +261,73 @@ class DurableLocalSendsTest {
                 assertEquals(!draftBacked, result.acceptance != null)
                 assertEquals(false, result.recoveredWithoutUpload)
             }
+        }
+
+    /** Both collection upload forms bypass native draft selection and never admit early. */
+    @Test
+    fun collectionUploadsDoNotSelectOrConsumeDraft() =
+        runTest {
+            val methods = mutableListOf<String>()
+            val engine =
+                nativeBoundary { method, args ->
+                    when (method) {
+                        "localSendStatus" -> null
+                        "uploadMediaWithClientToken", "uploadMediaFilesWithClientToken" -> {
+                            val request = args[2]
+                            val send =
+                                when (request) {
+                                    is MediaUploadRequestFfi -> request.send
+                                    is MediaFileUploadRequestFfi -> request.send
+                                    else -> error("unexpected media request")
+                                }
+                            assertEquals(false, send)
+                            methods += method
+                            MediaUploadSubmissionFfi(MediaUploadResultFfi(emptyList(), null), null)
+                        }
+                        else -> error(method)
+                    }
+                }
+
+            val body = MediaUploadRequestFfi(emptyList(), "original", send = false, blossomServer = null)
+            engine.uploadOrAdmitComposerMediaWithToken("account", "group", body, "first", forceUploadOnly = true)
+            engine.uploadOrAdmitComposerMediaFilesWithToken(
+                "account",
+                "group",
+                largeDocumentRequest(),
+                MediaFileTransferControlFfi(NoPointer),
+                "later",
+                forceUploadOnly = true,
+            )
+            assertEquals(listOf("uploadMediaWithClientToken", "uploadMediaFilesWithClientToken"), methods)
+        }
+
+    /** Only a chunk's captured caption and stable token reach native admission. */
+    @Test
+    fun collectionPublicationDoesNotReadOrConsumeMatchingDraft() =
+        runTest {
+            val accepted = mutableListOf<Pair<String?, String>>()
+            val engine =
+                nativeBoundary { method, args ->
+                    when (method) {
+                        "localSendStatus" -> null
+                        "sendPreparedMediaWithClientToken" -> {
+                            val token = args[4] as String
+                            assertEquals(null, args[5])
+                            accepted += (args[3] as String?) to token
+                            LocalSendAcceptanceFfi(token, "33".repeat(32))
+                        }
+                        else -> error(method)
+                    }
+                }
+
+            for ((caption, token) in listOf("original caption" to "first", null to "later")) {
+                val retained =
+                    RetainedMediaUpload(emptyList(), caption).apply {
+                        draftHandling = RetainedDraftHandling.COLLECTION_CHUNK
+                    }
+                engine.publishRetainedMedia("account", "group", emptyList(), retained, DraftFilesAdmission(null, token))
+            }
+            assertEquals(listOf("original caption" to "first", null to "later"), accepted)
         }
 
     /** One large document staged at a private path, as the composer hands it to the file upload. */

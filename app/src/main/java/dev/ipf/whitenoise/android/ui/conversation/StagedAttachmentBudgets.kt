@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.rememberingNativeDraftBody
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 
 /**
@@ -13,7 +14,9 @@ internal fun stageDraftDocumentToFile(
 ): DocumentReadOutcome {
     val pick = budget?.stage(attachment.byteCount) { attachment.plaintextBytes.inputStream() }
     val source = pick?.source
-    val staged = source?.let { attachment.copy(plaintextBytes = ByteArray(0), sourceFile = it) }
+    // The staged copy replaces the bytes the draft's original is recognized by, so they are remembered first.
+    val staged =
+        source?.let { attachment.rememberingNativeDraftBody().copy(plaintextBytes = ByteArray(0), sourceFile = it) }
     return DocumentReadOutcome(
         attachments = listOfNotNull(staged),
         failures = if (staged == null) setOf(pick?.failure.toDocumentReadFailure()) else emptySet(),
