@@ -138,6 +138,18 @@ private fun pickCustomPickerState(
         if (fitsUnit) DisappearingCustomPickerState(index, pickerValue) else null
     }
 
+/**
+ * The plural quantity for [count]. Past the `Int` range it keeps the last six digits above one million, which
+ * keeps every shipped locale's CLDR category — Russian reads the last two digits, and the Romance "many" form
+ * needs whole millions.
+ */
+internal fun disappearingPluralQuantity(count: Long): Int {
+    if (count <= Int.MAX_VALUE) return count.toInt()
+    return (count % PLURAL_MILLION + PLURAL_MILLION).toInt()
+}
+
+private const val PLURAL_MILLION = 1_000_000L
+
 /** A protocol retention value as UI seconds. Past `Long.MAX_VALUE` it clamps, so it never wraps negative. */
 internal fun ULong.clampedDisappearingSecs(): Long = coerceAtMost(Long.MAX_VALUE.toULong()).toLong()
 

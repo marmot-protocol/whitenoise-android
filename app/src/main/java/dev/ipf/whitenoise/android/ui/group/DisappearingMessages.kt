@@ -25,9 +25,9 @@ internal fun disappearingMessagesLabel(secs: Long): String =
 @Composable
 internal fun disappearingMessagesLabel(secs: ULong): String = disappearingMessagesLabel(secs.clampedDisappearingSecs())
 
-/** Formats the exact [count]; only the plural form is chosen from a count clamped to the `Int` range. */
+/** Formats the exact [count]; the plural form comes from [disappearingPluralQuantity], which fits an `Int`. */
 @Composable
 private fun disappearingCountLabel(
     @PluralsRes id: Int,
     count: Long,
-): String = pluralStringResource(id, count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), count)
+): String = pluralStringResource(id, disappearingPluralQuantity(count), count)

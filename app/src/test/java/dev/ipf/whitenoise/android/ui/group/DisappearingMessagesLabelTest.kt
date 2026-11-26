@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /** The timer label shows the real retention count, whatever range the protocol value is in. */
 @RunWith(AndroidJUnit4::class)
@@ -35,6 +36,16 @@ class DisappearingMessagesLabelTest {
     @Test
     fun countsWithinIntRangeKeepTheirLabels() {
         assertEquals(listOf("1 second", "7 seconds"), labelsFor(1L, 7L))
+    }
+
+    /** Past the `Int` range, Russian still picks the one, few or many form from the real count. */
+    @Test
+    @Config(qualifiers = "ru")
+    fun russianCountsBeyondIntRangeKeepTheirPluralForm() {
+        val year = 31_536_000L
+        val labels = labelsFor(2_147_483_651L * year, 2_147_483_652L * year, 2_147_483_655L * year)
+
+        assertEquals(listOf("2147483651 год", "2147483652 года", "2147483655 лет"), labels)
     }
 
     /** A protocol value above `Long.MAX_VALUE` reads as the longest duration, never a negative one. */
