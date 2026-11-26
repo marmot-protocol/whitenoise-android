@@ -235,12 +235,12 @@ internal class RawPcmOutput(
             }
         }
         lastHardwareFrames = maxOf(lastHardwareFrames, head)
-        val mediaPresented = presented >= queue.outputFrames
-        if (terminal && mediaPresented && inputEnded) {
+        val mediaPresented = terminal && presented >= queue.outputFrames
+        if (mediaPresented && inputEnded) {
             position = written
             buffered = written
             finished = true
-        } else if (terminal && mediaPresented && queue.fullyDrained && !inputEnded) {
+        } else if (mediaPresented && queue.fullyDrained) {
             completeRateSegment()
         }
         return tolerance

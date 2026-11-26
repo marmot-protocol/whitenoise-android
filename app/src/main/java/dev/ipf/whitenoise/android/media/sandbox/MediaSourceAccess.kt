@@ -163,8 +163,8 @@ internal class MediaSourceAccess(
     }
 
     /**
-     * Accepts file/content URI ranges after size and offset validation under provider admission.
-     * Whole files keep the descriptor path; slices are staged. The separate capability passed to
+     * Borrows local files directly and validates content URI ranges under provider admission.
+     * Whole files keep the descriptor path; slices are staged. The capability passed to
      * [block] closes on return and does not retain the provider admission slot.
      */
     fun <T> withMediaUriInput(
@@ -172,7 +172,10 @@ internal class MediaSourceAccess(
         uri: android.net.Uri,
         block: (ParcelFileDescriptor) -> T?,
     ): T? {
-        if (uri.scheme != "file" && uri.scheme != "content") return null
+        if (uri.scheme != "content") {
+            val filePath = uri.path?.takeIf { uri.scheme == "file" }
+            return filePath?.let { withMediaFileInput(File(it), block) }
+        }
         val selected =
             withProviderDeadline { signal, opened ->
                 resolver.openAssetFileDescriptor(uri, "r", signal)?.let(::own)?.use { owner ->

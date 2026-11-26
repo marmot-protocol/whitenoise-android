@@ -27,6 +27,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -35,6 +36,44 @@ import java.util.concurrent.atomic.AtomicReference
 @Config(application = android.app.Application::class, shadows = [BorrowedDescriptorStatShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AvStreamSourceOwnershipTest {
+    @Test
+    fun localMediaUriCanOpenWhileProviderAdmissionIsOccupied() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File.createTempFile("local-media-", ".bin")
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        try {
+            file.writeBytes(byteArrayOf(42))
+            MediaSourceAccess(context).use { provider ->
+                MediaSourceAccess(context).use { playback ->
+                    val providerRead =
+                        FutureTask {
+                            provider.withProviderDeadline { _, _ ->
+                                entered.countDown()
+                                release.await(5, TimeUnit.SECONDS)
+                            }
+                        }
+                    val localRead =
+                        FutureTask {
+                            playback.withMediaUriInput(context.contentResolver, Uri.fromFile(file)) { it.statSize }
+                        }
+                    Thread(providerRead).start()
+                    try {
+                        assertTrue(entered.await(2, TimeUnit.SECONDS))
+                        Thread(localRead).start()
+                        assertEquals(1L, localRead.get(2, TimeUnit.SECONDS))
+                    } finally {
+                        release.countDown()
+                        localRead.cancel(true)
+                        assertEquals(true, providerRead.get(2, TimeUnit.SECONDS))
+                    }
+                }
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
     /** Duplicated Descriptors Report Their Actual File Length Without Replacing Original Objects. */
     @Test
     fun duplicatedDescriptorsReportTheirActualFileLengthWithoutReplacingOriginalObjects() {
