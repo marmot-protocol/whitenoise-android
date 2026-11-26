@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -60,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.icons.filled.Help
 import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -830,13 +833,18 @@ private fun SettingsProfileRow(
                         }
                     },
                 leadingContent = {
+                    val avatarPress = remember { MutableInteractionSource() }
                     Box(
                         modifier =
                             Modifier
                                 .size(SettingsHomeDefaults.ProfileAvatarSize)
                                 .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
-                                .clickable(role = Role.Button, onClick = onAvatarClick)
-                                .testTag("settings.active_profile_avatar")
+                                .clickable(
+                                    interactionSource = avatarPress,
+                                    indication = null,
+                                    role = Role.Button,
+                                    onClick = onAvatarClick,
+                                ).testTag("settings.active_profile_avatar")
                                 .semantics {
                                     contentDescription = editPictureDescription
                                     role = Role.Button
@@ -849,6 +857,9 @@ private fun SettingsProfileRow(
                             pictureUrl = account.pictureUrl,
                             pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
+                        // The highlight is drawn over the round avatar, which clips itself, so nothing is clipped
+                        // twice.
+                        Box(Modifier.matchParentSize().shapedPressFeedback(avatarPress, CircleShape))
                     }
                 },
                 trailingContent = { SettingsProfileTrailing() },

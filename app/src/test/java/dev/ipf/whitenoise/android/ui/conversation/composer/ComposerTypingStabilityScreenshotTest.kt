@@ -60,6 +60,7 @@ class ComposerTypingStabilityScreenshotTest {
 
     /** The wide dark toolbar retains its inline navigation width while typing and deleting. */
     @Test
+    @Config(qualifiers = WIDE_QUALIFIERS)
     fun typingKeepsTheWideDarkToolbar() = checkTyping("dark", narrow = false)
 
     /** Large RTL text retains the separate navigation row and its editor bounds on every edit frame. */
@@ -68,6 +69,7 @@ class ComposerTypingStabilityScreenshotTest {
 
     /** AMOLED contrast and toolbar space remain stable across per-character edits. */
     @Test
+    @Config(qualifiers = WIDE_QUALIFIERS)
     fun typingKeepsTheWideAmoledToolbar() = checkTyping("amoled", narrow = false)
 
     /** Updating an IME composing range and its characters retains the already settled row. */
@@ -317,7 +319,11 @@ class ComposerTypingStabilityScreenshotTest {
         }
     }
 
-    /** Exercises the production pill with active dictation so a narrow window requires a separate navigation row. */
+    /**
+     * Exercises the production pill with active dictation so a narrow window requires a separate navigation row.
+     * The wide case needs 412 dp: three 48 dp leading slots and the four-slot dictation reserve leave no room for
+     * inline navigation at 360 dp.
+     */
     private fun render(
         theme: String,
         narrow: Boolean,
@@ -325,7 +331,7 @@ class ComposerTypingStabilityScreenshotTest {
         mode: ComposerExpansionMode = ComposerExpansionMode.Manual,
         expectTop: Boolean = true,
     ) {
-        val width = if (narrow) 240.dp else 360.dp
+        val width = if (narrow) 240.dp else 412.dp
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -367,6 +373,7 @@ class ComposerTypingStabilityScreenshotTest {
     }
 
     private companion object {
+        const val WIDE_QUALIFIERS = "en-w412dp-h780dp-mdpi"
         const val FRAME_STEP_MS = 16
         const val TAG = "composer-typing-stability"
     }

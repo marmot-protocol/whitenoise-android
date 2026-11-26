@@ -60,6 +60,15 @@
         ]
       },
       {
+        "surface": "Markdown disclosure chevron",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "DisclosureChevron(expanded)",
+        "test_ids": [
+          "MSG-002",
+          "RDR-001"
+        ]
+      },
+      {
         "surface": "MarkdownDetailsScaffold",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownDetailsScaffold(",

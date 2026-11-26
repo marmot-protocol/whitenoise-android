@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Email
 import dev.ipf.whitenoise.android.ui.icons.filled.Phone
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 
 /**
  * Full-screen confirmation for a contact share: the picked contact's name plus
@@ -165,6 +166,7 @@ internal fun ContactPreviewScreen(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
+                    elevation = floatingControlFabElevation(),
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_arrow_upward),

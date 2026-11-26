@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -486,7 +487,7 @@ internal fun ConversationSearchNavBar(
     val navEnabled = status.allowsSearchSteps(matchCount)
     Surface(
         border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
+        tonalElevation = WhiteNoiseElevation.Docked,
     ) {
         Row(
             modifier =

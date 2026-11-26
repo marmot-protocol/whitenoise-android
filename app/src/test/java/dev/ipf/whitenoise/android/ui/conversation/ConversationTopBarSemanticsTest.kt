@@ -257,7 +257,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = PHONE)
     fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
 
-    /** With every shortcut chosen, a typical phone shows the first four and the chat name keeps half the bar. */
+    /** A typical phone keeps room for the title when more shortcuts are configured than fit. */
     @Test
     @Config(qualifiers = PHONE)
     fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
@@ -267,7 +267,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = PHONE)
     fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
 
-    /** Every shortcut chosen on a small phone at double font: only two fit, with the members line and timer badge. */
+    /** Every shortcut chosen on a small phone at double font, with the members line and timer badge. */
     @Test
     @Config(qualifiers = SMALL_PHONE)
     fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
@@ -293,9 +293,10 @@ class ConversationTopBarSemanticsTest {
                 onAddMembers = {},
             )
         })
-        // 360dp at normal font fits three: the reversed list starts with Add members, Members and Read aloud.
-        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertExists()
-        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertExists()
+        // At 360 dp, only the first two full-size targets fit without crowding the title.
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_ADD_MEMBERS_TAG).assertExists()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MEMBERS_TAG).assertExists()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertDoesNotExist()
     }
@@ -303,16 +304,17 @@ class ConversationTopBarSemanticsTest {
     /** Capacity keeps the chat name at least as wide as the buttons and readable at large font sizes. */
     @Test
     fun shortcutCapacityLeavesTheChatNameRoom() {
-        assertEquals(3, headerShortcutCapacity(360.dp, 1f))
-        assertEquals(4, headerShortcutCapacity(411.dp, 1f))
-        assertEquals(2, headerShortcutCapacity(320.dp, 2f))
-        assertEquals(6, headerShortcutCapacity(600.dp, 1f))
+        assertEquals(2, headerShortcutCapacity(360.dp, 1f))
+        assertEquals(3, headerShortcutCapacity(411.dp, 1f))
+        assertEquals(1, headerShortcutCapacity(320.dp, 2f))
+        assertEquals(5, headerShortcutCapacity(600.dp, 1f))
         assertEquals(0, headerShortcutCapacity(120.dp, 1f))
         assertEquals(Int.MAX_VALUE, headerShortcutCapacity(Dp.Infinity, 1f))
     }
 
     /** Members and Add members run their handlers and stay hidden when their handler is absent. */
     @Test
+    @Config(qualifiers = "en-w600dp-h780dp-mdpi")
     fun groupShortcutsRunHandlersAndHideWithoutOne() {
         val appState = appState()
         val controller = ConversationController(appState, group())
@@ -330,7 +332,11 @@ class ConversationTopBarSemanticsTest {
             )
         })
         for (tag in GROUP_SHORTCUT_TAGS) {
-            composeRule.onNodeWithTag(tag).assertTouchHeightIsEqualTo(48.dp).performClick()
+            composeRule
+                .onNodeWithTag(tag)
+                .assertWidthIsEqualTo(48.dp)
+                .assertTouchHeightIsEqualTo(48.dp)
+                .performClick()
         }
         composeRule.runOnIdle {
             assertEquals(listOf("members", "add"), taps)

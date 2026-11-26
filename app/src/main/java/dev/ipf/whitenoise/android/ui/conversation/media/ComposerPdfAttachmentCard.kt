@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataRefusal
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
+import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.PictureAsPdf
@@ -114,28 +116,19 @@ internal fun ComposerPdfAttachmentCard(
     val summary = composerPdfSummary(pages)
     val privacyText = privacy?.let { stringResource(it.labelRes) }
     val previewLabel = stringResource(R.string.composer_preview_attachment)
+    val press = remember { MutableInteractionSource() }
     Surface(
         modifier =
             modifier
                 .width(PDF_CARD_WIDTH.dp)
                 .height(PDF_CARD_HEIGHT.dp)
-                .then(
-                    if (onPreview != null) {
-                        Modifier.clickable(
-                            enabled = enabled,
-                            onClickLabel = previewLabel,
-                            role = Role.Button,
-                            onClick = onPreview,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ).semantics { contentDescription = listOfNotNull(label, summary, privacyText).joinToString(", ") },
+                .previewClick(press, enabled, previewLabel, onPreview)
+                .semantics { contentDescription = listOfNotNull(label, summary, privacyText).joinToString(", ") },
         shape = PDF_CARD_SHAPE,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Box {
+        Box(Modifier.pressFeedbackInsideClip(press)) {
             Row(
                 Modifier.fillMaxSize().padding(start = 10.dp, top = 8.dp, bottom = 8.dp, end = 40.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -274,3 +267,26 @@ private val ComposerPdfPrivacy.labelRes: Int
             ComposerPdfPrivacy.Unsupported -> R.string.composer_pdf_metadata_unsupported
             ComposerPdfPrivacy.SendingAsIs -> R.string.composer_pdf_metadata_sending_as_is
         }
+
+/**
+ * The card's preview click, or nothing without [onPreview]. It draws no highlight of its own: [press] draws it
+ * inside the card's clip, so the outline is not clipped twice.
+ */
+private fun Modifier.previewClick(
+    press: MutableInteractionSource,
+    enabled: Boolean,
+    label: String,
+    onPreview: (() -> Unit)?,
+): Modifier =
+    if (onPreview == null) {
+        this
+    } else {
+        clickable(
+            interactionSource = press,
+            indication = null,
+            enabled = enabled,
+            onClickLabel = label,
+            role = Role.Button,
+            onClick = onPreview,
+        )
+    }
