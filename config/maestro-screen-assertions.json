@@ -1190,6 +1190,26 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+      "symbol": "TtsMessageMenu",
+      "bindings": [
+        {
+          "case": "presentation-selection-transport-rate",
+          "selector": {
+            "text": "Next message"
+          },
+          "scope": "Paused transport fixture opens More options, dismisses with Back, and dispatches both message callbacks on selection.",
+          "entry_assertion": {
+            "text": "Previous message"
+          },
+          "opened_by": {
+            "text": "More options"
+          }
+        }
+      ],
+      "remaining": "Native speech queue movement, disabled navigation while loading, and device accessibility require separate execution."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
       "symbol": "TtsTransportRatePicker",
       "bindings": [
