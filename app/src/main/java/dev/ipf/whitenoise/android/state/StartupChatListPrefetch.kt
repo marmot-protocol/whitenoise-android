@@ -52,7 +52,7 @@ internal class StartupChatListPrefetchSlot {
 internal fun WhiteNoiseAppState.beginStartupChatListPrefetch(runtime: MarmotInterface) =
     accountSwitchHandoff.startupPrefetch.replace(launchStartupChatListPrefetch(runtime))
 
-/** Cancels the read for a runtime that failed to start. */
+/** Discards rows from a failed startup or from before a local migration write. */
 internal fun WhiteNoiseAppState.abandonStartupChatListPrefetch() = accountSwitchHandoff.startupPrefetch.replace(null)
 
 /**

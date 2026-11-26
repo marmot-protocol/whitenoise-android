@@ -4674,6 +4674,7 @@ class WhiteNoiseAppState private constructor(
         recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
     }
 
+    /** Records how many stored chat images are available and decoded at activation. */
     internal fun recordStartupAvatarPreparation(
         renderableAssets: Int,
         decodedAssets: Int,

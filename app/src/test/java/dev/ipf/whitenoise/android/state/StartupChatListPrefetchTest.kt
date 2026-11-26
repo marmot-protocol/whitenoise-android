@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Application
+import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -101,6 +103,41 @@ class StartupChatListPrefetchTest {
             }
         }
 
+    /** Rows prefetched before a legacy mute write cannot seed the first frame after the write. */
+    @Test
+    fun legacyMuteMigrationRefreshesTheFirstRow() =
+        runBlocking {
+            val prefs = context.getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
+            prefs.edit().putStringSet("mutedConversations", setOf("self|$GROUP")).commit()
+            val firstRead = CompletableDeferred<Unit>()
+            val muted = AtomicBoolean()
+            val fixture =
+                fixture(
+                    blockStart = true,
+                    rowMuted = muted::get,
+                    onSetChatMuted = { account, group, until ->
+                        muted.set(true)
+                        ChatNotificationSettingsFfi(account, SELF, group, true, until, 1L)
+                    },
+                ) { firstRead.complete(Unit) }
+            try {
+                val bootstrap = async { fixture.bootstrap() }
+                try {
+                    withTimeout(5_000) { firstRead.await() }
+                } finally {
+                    fixture.allowRuntimeStart()
+                }
+                bootstrap.await()
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+                val snapshot = checkNotNull(fixture.appState.consumeAccountSwitchLocalSnapshot("self"))
+                assertTrue(snapshot.rows.single().muted)
+                assertTrue(fixture.appState.chatMutePreferences.legacyMuteEntries().isEmpty())
+            } finally {
+                fixture.close()
+                prefs.edit().remove("mutedConversations").commit()
+            }
+        }
+
     /** Retrying after native startup succeeds reads the current rows instead of reusing the failed attempt. */
     @Test
     fun retryAfterAccountRefreshFailureReadsRowsAgain() =
@@ -184,11 +221,14 @@ class StartupChatListPrefetchTest {
             ?.map(ChatListRowFfi::groupIdHex)
 
     /** A one-account bootstrap whose presented chat-list reads report their account to [onRead]. */
+    @Suppress("LongParameterList") // Each case controls just the startup boundary it needs.
     private fun fixture(
         blockStart: Boolean = false,
         rememberedAccount: String = "self",
         onRuntimeStart: (() -> Unit)? = null,
         onListAccountsAfterStart: (() -> Unit)? = null,
+        rowMuted: () -> Boolean = { false },
+        onSetChatMuted: ((String, String, Long?) -> ChatNotificationSettingsFfi)? = null,
         onRead: (String) -> Unit,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -200,9 +240,11 @@ class StartupChatListPrefetchTest {
         onRuntimeStart = onRuntimeStart,
         onListAccountsAfterStart = onListAccountsAfterStart,
         onUserProfile = { null },
+        onSetChatMuted = onSetChatMuted,
         onPresentedChatList = { accountRef ->
+            val presented = row().copy(muted = rowMuted())
             onRead(accountRef)
-            listOf(row())
+            listOf(presented)
         },
     )
 

@@ -19,6 +19,8 @@ internal suspend fun WhiteNoiseAppState.migrateLegacyMutePreferences() {
             if (authoritative.muted || authoritative.updatedAtMs > 0L) {
                 authoritative
             } else {
+                // Activation needs a projection from after the migration, even if the write reply fails.
+                abandonStartupChatListPrefetch()
                 chatMuteRepository
                     .setMuted(
                         legacy.accountRef,
@@ -77,6 +79,7 @@ private suspend fun WhiteNoiseAppState.migrateDecodedLegacyDraft(
     if (currentResult.isSuccess) {
         val result =
             if (current == null || (current.content.isBlank() && legacyContent.isNotBlank())) {
+                abandonStartupChatListPrefetch()
                 messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
             } else {
                 MessageDraftMutationResult.Success(current)

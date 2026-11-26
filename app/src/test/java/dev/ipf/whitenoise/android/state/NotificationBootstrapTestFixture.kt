@@ -164,6 +164,7 @@ internal class NotificationBootstrapTestFixture(
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi?)? = null,
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
+    private val onSetChatMuted: ((String, String, Long?) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
     fcmTokenReader: suspend () -> String? = { null },
@@ -414,6 +415,12 @@ internal class NotificationBootstrapTestFixture(
                             updatedAtMs = 0L,
                         )
                 }
+                "setChatMuted" ->
+                    onSetChatMuted?.invoke(
+                        arguments?.get(0) as String,
+                        arguments[1] as String,
+                        arguments[2] as Long?,
+                    ) ?: throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
                 "groupRecoveryStatus" ->
                     GroupRecoveryStatusFfi(
                         groupIdHex = arguments?.get(1) as String,
