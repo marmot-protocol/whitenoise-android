@@ -103,7 +103,7 @@ internal fun composerPdfPrivacy(
  * presentation; [ComposerPdfShelfItem] reads the PDF.
  */
 @Composable
-@Suppress("LongParameterList")
+@Suppress("LongMethod", "LongParameterList") // The card keeps its preview, status and two independent touch targets.
 internal fun ComposerPdfAttachmentCard(
     label: String,
     pages: Int?,
@@ -117,6 +117,8 @@ internal fun ComposerPdfAttachmentCard(
 ) {
     val summary = composerPdfSummary(pages)
     val privacyText = privacy?.let { stringResource(it.labelRes) }
+    val compact = composerTextScale() >= COMPACT_FONT_SCALE
+    val optionsInset = if (onMetadataOptions == null) 0.dp else 48.dp
     val previewLabel = stringResource(R.string.composer_preview_attachment)
     val press = remember { MutableInteractionSource() }
     Surface(
@@ -136,22 +138,23 @@ internal fun ComposerPdfAttachmentCard(
                     start = 10.dp,
                     top = 8.dp,
                     bottom = 8.dp,
-                    end = if (onMetadataOptions == null) 40.dp else 88.dp,
+                    end = if (compact) 40.dp + optionsInset else 40.dp,
                 ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ComposerPdfFirstPage(firstPage)
                 Spacer(Modifier.width(10.dp))
-                if (composerTextScale() >= COMPACT_FONT_SCALE) {
+                if (compact) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (privacy != null) ComposerPdfPrivacyIcon(privacy, Modifier.padding(end = 6.dp).size(20.dp))
                         ComposerPdfFilename(label)
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        ComposerPdfFilename(label)
+                        ComposerPdfFilename(label, Modifier.padding(end = optionsInset))
                         Text(
                             summary,
+                            modifier = Modifier.padding(end = optionsInset),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -160,12 +163,8 @@ internal fun ComposerPdfAttachmentCard(
                     }
                 }
             }
-            if (onMetadataOptions != null) {
-                ComposerPdfOptionsButton(
-                    enabled,
-                    onMetadataOptions,
-                    Modifier.align(Alignment.TopEnd).padding(end = 48.dp),
-                )
+            onMetadataOptions?.let { open ->
+                ComposerPdfOptionsButton(enabled, open, Modifier.align(Alignment.TopEnd).padding(end = 48.dp))
             }
             ComposerAccessoryRemoveButton(
                 onClick = onRemove,
@@ -224,10 +223,13 @@ private fun ComposerPdfFirstPage(firstPage: ImageBitmap?) {
 
 /** Filename direction remains LTR even in RTL chats so its extension stays at the physical suffix. */
 @Composable
-private fun ComposerPdfFilename(label: String) {
+private fun ComposerPdfFilename(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
     val (leading, suffix) = remember(label) { composerFilenameParts(label) }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Row {
+        Row(modifier) {
             if (leading.isNotEmpty()) {
                 Text(
                     leading,

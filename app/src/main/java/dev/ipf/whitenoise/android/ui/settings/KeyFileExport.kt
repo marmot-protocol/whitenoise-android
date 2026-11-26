@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -21,7 +22,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.discardInterruptedCreatedDocument
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class KeyFileExport {
     internal var picking by mutableStateOf(false)
@@ -81,18 +85,22 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
             !appState.appLock.screenVisible &&
             !appState.appLock.evaluationPending
 
+    fun deliver() = deliverKeyFile(state, scope, context, appState.keyFileExportOwner(), ::canDeliver)
+
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
             state.picking = false
             state.destination = uri
             if (uri == null) state.request = null
+            deliver()
         }
 
     val locked = appState.appLock.screenVisible || appState.appLock.evaluationPending
-    KeyFileExportEffects(appState, state, lifecycle, lifecycleState, locked, ::canDeliver) { uri, request ->
-        saveExport(state, scope, context, uri, request, ::canDeliver)
-    }
-    if (!locked && lifecycleState.isAtLeast(Lifecycle.State.STARTED)) {
+    KeyFileExportEffects(appState, state, lifecycle)
+    // Retry after the lifecycle or App Lock publishes a new state. The picker can return before either updates.
+    val ready = !locked && lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    if (ready && state.destination != null) SideEffect { deliver() }
+    if (ready) {
         val dismiss = { state.feedback = null }
         ProfileKeyFeedbackDialogs(
             nativeExportError = null,
@@ -115,6 +123,30 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
             state.picking = false
             state.request = null
             state.feedback = KeyFileExportFeedback.SaveFailed
+        }
+    }
+}
+
+private fun deliverKeyFile(
+    state: KeyFileExport,
+    scope: CoroutineScope,
+    context: Context,
+    owner: KeyFileExportOwner?,
+    canDeliver: (KeyFileExportOwner) -> Boolean,
+) {
+    val uri = state.destination ?: return
+    val request = state.request
+    when {
+        request == null || request.owner != owner || request.export.isExpired() -> {
+            state.request = null
+            state.destination = null
+            state.feedback = KeyFileExportFeedback.Expired
+            scope.launch { discardInterruptedCreatedDocument(context, uri) }
+        }
+        canDeliver(request.owner) -> {
+            state.request = null
+            state.destination = null
+            saveExport(state, scope, context, uri, request, canDeliver)
         }
     }
 }
@@ -144,41 +176,24 @@ private fun saveExport(
 }
 
 @Composable
-@Suppress("LongParameterList")
+@Suppress("FunctionNaming")
 private fun KeyFileExportEffects(
     appState: WhiteNoiseAppState,
     state: KeyFileExport,
     lifecycle: Lifecycle,
-    lifecycleState: Lifecycle.State,
-    locked: Boolean,
-    canDeliver: (KeyFileExportOwner) -> Boolean,
-    save: (Uri, RequestedKeyFile) -> Unit,
 ) {
     val context = LocalContext.current
     val owner = appState.keyFileExportOwner()
     LaunchedEffect(state, state.request) {
         val request = state.request ?: return@LaunchedEffect
-        delay(request.export.remainingMillis())
+        // The authorization uses real elapsed time, independently of the composition frame clock.
+        withContext(Dispatchers.Default) { delay(request.export.remainingMillis()) }
         if (state.request === request) state.request = null
     }
     LaunchedEffect(state, owner) {
         if (state.request?.owner != owner) state.request = null
         state.cancelSave()
         state.feedback = null
-    }
-    LaunchedEffect(state, lifecycleState, locked, owner, state.request, state.destination) {
-        val uri = state.destination ?: return@LaunchedEffect
-        val request = state.request
-        if (request == null || request.owner != appState.keyFileExportOwner() || request.export.isExpired()) {
-            state.request = null
-            state.destination = null
-            state.feedback = KeyFileExportFeedback.Expired
-            discardInterruptedCreatedDocument(context, uri)
-        } else if (canDeliver(request.owner)) {
-            state.request = null
-            state.destination = null
-            save(uri, request)
-        }
     }
     DisposableEffect(state, lifecycle) {
         val observer =

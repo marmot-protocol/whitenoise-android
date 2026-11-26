@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
+import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -41,10 +42,12 @@ class InboundLinkCoverageTest {
                 running = true,
                 unlinked = false,
             )
+        val row = chatRow("b".repeat(64)).copy(title = "Existing chat", groupName = "Existing chat")
         val fixture =
             NotificationBootstrapTestFixture(
                 context,
                 accounts = listOf(account),
+                chatListRows = listOf(row),
                 emitStartupNotification = false,
             )
         runBlocking { fixture.bootstrap() }
@@ -75,6 +78,7 @@ class InboundLinkCoverageTest {
             composeRule.runOnIdle { assertEquals(listOf("marmot://foo"), handled) }
             composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertDoesNotExist()
             composeRule.onNodeWithText(context.getString(R.string.toast_unsupported_link)).assertExists()
+            composeRule.onNodeWithText("Existing chat").assertExists()
 
             composeRule.runOnIdle { pending.value = "marmot://profile/not-an-npub" }
             composeRule.runOnIdle { assertEquals(listOf("marmot://foo", "marmot://profile/not-an-npub"), handled) }

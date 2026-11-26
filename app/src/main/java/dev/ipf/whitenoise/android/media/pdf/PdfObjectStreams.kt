@@ -36,20 +36,20 @@ internal fun decodeObjectStreams(
     var remainingBytes = MAX_OBJECT_STREAM_BYTES
     var remainingObjects = MAX_PACKED_OBJECTS
     val decoded = mutableListOf<PdfObjectStream>()
-    layout.streams.filter { it.dict.name("Type") == "ObjStm" }.forEach { stream ->
+    for (stream in layout.streams.filter { it.dict.name("Type") == "ObjStm" }) {
         val data = decodeStreamData(bytes, layout, stream, remainingBytes)
         val offsets = data?.let { objectOffsets(it.data, stream.dict, remainingObjects) }
         if (data == null || offsets == null) {
             plan.refuse(PdfMetadataRefusal.Unsupported)
-            return decoded
+        } else {
+            remainingBytes -= data.data.size
+            remainingObjects -= offsets.size
+            val objectStream = PdfObjectStream(data, offsets)
+            if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
+            if (containsName(objectStream.bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
+            if (plan.refusal == null) decoded += objectStream
         }
-        remainingBytes -= data.data.size
-        remainingObjects -= offsets.size
-        val objectStream = PdfObjectStream(data, offsets)
-        if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
-        if (containsName(objectStream.bytes, "PieceInfo")) plan.refuse(PdfMetadataRefusal.Unsupported)
-        if (plan.refusal != null) return decoded
-        decoded += objectStream
+        if (plan.refusal != null) break
     }
     return decoded
 }
