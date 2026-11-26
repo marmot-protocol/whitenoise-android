@@ -111,6 +111,8 @@ object DiagnosticFormatter {
             is MarmotEventFfi.InviteDeliveryChanged ->
                 // The delivery state is re-read from the runtime, never copied here.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] invite delivery changed"
+            is MarmotEventFfi.RelayHealthChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] relay health changed"
             is MarmotEventFfi.DeviceUnlinked ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] device unlinked"
         }

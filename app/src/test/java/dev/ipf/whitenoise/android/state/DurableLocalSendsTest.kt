@@ -35,7 +35,7 @@ class DurableLocalSendsTest {
                 nativeBoundary { method, _ ->
                     calls += method
                     check(method == "localSendStatus")
-                    if (admitted) LocalSendStatusFfi.Queued else null
+                    if (admitted) LocalSendStatusFfi.Queued("11".repeat(32)) else null
                 }
             // A JVM proxy wraps checked native exceptions; this override preserves the binding's real failure.
             val engine =
@@ -101,7 +101,8 @@ class DurableLocalSendsTest {
     @Test
     fun recoveredOwnershipDoesNotReadmit() =
         runTest {
-            for (status in listOf(LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned)) {
+            val messageId = "11".repeat(32)
+            for (status in listOf(LocalSendStatusFfi.Queued(messageId), LocalSendStatusFfi.EngineOwned(messageId))) {
                 val engine =
                     nativeBoundary { method, _ ->
                         check(method == "localSendStatus")
@@ -109,6 +110,7 @@ class DurableLocalSendsTest {
                     }
                 val result = engine.sendComposerTextWithToken("account", "group", null, "hello", "same-token")
                 assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, result.acceptDisposition)
+                assertEquals(listOf(messageId), result.messageIds)
             }
         }
 
@@ -166,7 +168,7 @@ class DurableLocalSendsTest {
                 nativeBoundary { method, _ ->
                     check(method == "localSendStatus")
                     statusReads += 1
-                    LocalSendStatusFfi.EngineOwned
+                    LocalSendStatusFfi.EngineOwned("11".repeat(32))
                 }
 
             val result =

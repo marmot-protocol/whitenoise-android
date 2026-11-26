@@ -18,6 +18,22 @@
         "test_ids": [
           "CON-057"
         ]
+      },
+      {
+        "surface": "R.string.agent_activity_earlier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "R.string.agent_activity_earlier",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_answered_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentItemTimelineRow.kt",
+        "anchor": "R.string.agent_answered_by",
+        "test_ids": [
+          "CON-058"
+        ]
       }
     ]
   },

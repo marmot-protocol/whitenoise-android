@@ -10,6 +10,10 @@
     <string name="agent_activity_newer">Newer</string>
     <string name="agent_activity_retry">Retry loading activity</string>
     <string name="agent_activity_page_failed">Couldn\'t load more agent activity</string>
+    <string name="agent_activity_earlier">Earlier activity</string>
+    <string name="agent_thread_title">Agent thread</string>
+    <string name="agent_thread_open">Open thread</string>
+    <string name="agent_thread_back">Back to activity</string>
     <!-- Status line while an AI agent works on a request in a chat. -->
     <string name="agent_turn_working">Working</string>
     <!-- Status line after an AI agent finished a request. %1$s is a duration such as "1m 12s". -->
@@ -55,8 +59,9 @@
     <string name="agent_approval_declined">Declined</string>
     <!-- An approval the agent no longer needs, for example because its work was stopped. -->
     <string name="agent_approval_expired">No longer needed</string>
-    <!-- Shown after an answer was sent and before the agent confirms it. %1$s is the agent's name. -->
-    <string name="agent_request_sent">Sent. Waiting for %1$s.</string>
+    <!-- Shown after the device accepted an answer and before the agent confirms it. %1$s is the agent's name. -->
+    <string name="agent_request_sent">Waiting for %1$s.</string>
+    <string name="agent_request_unconfirmed">No confirmation from the agent. You can try again.</string>
     <!-- Button that sends the selected answers to an AI agent's question. -->
     <string name="agent_question_send">Send answer</string>
     <!-- The agent asks for one choice. -->
@@ -68,9 +73,10 @@
     <!-- The agent waits for an ordinary chat message as the answer. -->
     <string name="agent_question_reply_in_chat">Reply in the chat to answer.</string>
     <!-- The answer is secret and cannot be sent through the chat. -->
-    <string name="agent_question_secret">This answer is private. Give it on the agent\'s computer.</string>
+    <string name="agent_question_secret">Answer it at the terminal.</string>
     <!-- A question that was answered. %1$s lists the answers. -->
     <string name="agent_question_answered">Answered: %1$s</string>
+    <string name="agent_answered_by">Answered by %1$s</string>
     <!-- A question the agent no longer needs answered. -->
     <string name="agent_question_closed">Question closed</string>
     <!-- Accessibility label for a plan step. %1$s is the step. -->
@@ -83,6 +89,9 @@
     <string name="agent_session_started">%1$s started a new session</string>
     <!-- Second part of the session divider. %1$s is the AI model name. -->
     <string name="agent_session_model">Model %1$s</string>
+    <string name="agent_session_controls">Session controls</string>
+    <string name="agent_session_new">New session</string>
+    <string name="agent_session_apply">Apply</string>
     <!-- The agent did not act because the sender may not do that in this chat. -->
     <string name="agent_refused_not_allowed">You can\'t do that for this agent</string>
     <!-- The agent did not act because it was busy. -->

@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.core.agent.AgentApprovalChoice
 import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineButtonColors
@@ -143,15 +144,15 @@ internal fun AgentChoiceButton(
     }
 }
 
-/** "Sending…", "Sent. Waiting for Claude." or the unconfirmed delivery note, else nothing. */
+/** Shows local admission and the wait for the agent to confirm. */
 @Composable
 internal fun AgentRequestStatusLabel(actions: AgentItemActions) {
     val text =
         when (actions.status) {
             AgentRequestStatus.Idle -> return
             AgentRequestStatus.Sending -> stringResource(R.string.sending)
-            AgentRequestStatus.Sent -> stringResource(R.string.agent_request_sent, actions.agentName)
-            AgentRequestStatus.Unconfirmed -> stringResource(R.string.delivery_not_confirmed)
+            AgentRequestStatus.AwaitingAgent -> stringResource(R.string.agent_request_sent, actions.agentName)
+            AgentRequestStatus.Unconfirmed -> stringResource(R.string.agent_request_unconfirmed)
         }
     Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

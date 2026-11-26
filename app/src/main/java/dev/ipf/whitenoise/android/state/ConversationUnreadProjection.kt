@@ -4,6 +4,7 @@ import android.util.Log
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
+import dev.ipf.whitenoise.android.core.agent.isAgentOwnThreadMessage
 import dev.ipf.whitenoise.android.core.isThreadMessage
 
 /**
@@ -146,7 +147,7 @@ private fun AppMessageRecordFfi.isUnreadEligible(): Boolean =
         kind != AgentItemReader.ITEM_KIND
 
 /** A timeline row counts as unread only when it is incoming chat from someone else, never the account's own message. */
-internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice && record.isUnreadEligible()
+internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice && record.isUnreadEligible() && projected?.isAgentOwnThreadMessage() != true
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives

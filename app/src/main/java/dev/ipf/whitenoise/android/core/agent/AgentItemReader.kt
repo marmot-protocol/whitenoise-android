@@ -19,12 +19,15 @@ internal object AgentItemReader {
     /** Kind of an answer or a control a person sends to an agent. */
     const val REQUEST_KIND: ULong = 1202uL
 
+    fun isCommentary(record: AppMessageRecordFfi): Boolean = record.kind == 9uL && record.tags.any { it.values == listOf("phase", "commentary") }
+
     /** The item on [projected], or null when the row holds none or its fields cannot be read. */
     fun read(
         record: AppMessageRecordFfi,
         projected: TimelineMessageRecordFfi?,
     ): AgentItem? {
-        val item = projected?.agentItem?.takeUnless { projected.deleted }
+        if (projected == null || projected.deleted) return null
+        val item = projected.agentItem
         val fields = item?.let { runCatching { JSONObject(it.fieldsJson) }.getOrNull() }
         if (item == null || fields == null) return null
         return AgentItem(
@@ -40,9 +43,18 @@ internal object AgentItemReader {
             body = AgentItemBodyParser.parse(fields),
             outputCutLength = record.cutValue("output"),
             diffsCut = record.cutValue("diffs")?.toInt() ?: 0,
+            firstEventMissing = projected.agentItemFirstEventMissing,
+            recordedAt = record.recordedAt,
         )
     }
 }
+
+/** Native placement supplies the thread IDs. The root's kind distinguishes agent threads. */
+internal fun TimelineMessageRecordFfi.isAgentThreadRow(): Boolean =
+    thread != null && tags.any { it.values == listOf("K", AgentItemReader.ITEM_KIND.toString()) }
+
+/** A person's thread reply still has a normal chat destination for notifications and search. */
+internal fun TimelineMessageRecordFfi.isAgentOwnThreadMessage(): Boolean = kind == 1111uL && isAgentThreadRow() && tags.any { it.values == listOf("P", sender) }
 
 /** The number a `cut` tag gives for [name]: how much the agent left out of that field. */
 private fun AppMessageRecordFfi.cutValue(name: String): Long? =

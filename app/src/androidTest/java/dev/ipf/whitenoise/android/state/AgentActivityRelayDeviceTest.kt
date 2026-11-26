@@ -25,6 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.UUID
 import kotlin.io.path.createTempDirectory
 
 /** Real Android MarmotKit, two isolated group members and a loopback relay. */
@@ -83,8 +84,19 @@ class AgentActivityRelayDeviceTest {
             assertTrue(item.state.isOpen)
 
             val request = AgentRequestEncoder.encode(item.agentPubkeyHex, item.rowId, AgentRequest.Interrupt("Stop"))
-            viewerRuntime.sendCustomEvent(viewer.label, group, request.kind, request.tags, request.content)
+            val token = UUID.randomUUID().toString()
+            val acceptance =
+                viewerRuntime.sendCustomEventWithClientToken(
+                    viewer.label,
+                    group,
+                    request.kind,
+                    request.tags,
+                    request.content,
+                    token,
+                )
             val received = awaitStop(agentRuntime, agent.label, group)
+            assertEquals(token, acceptance.clientToken)
+            assertEquals(acceptance.messageIdHex, received.messageIdHex)
             assertEquals(viewer.accountIdHex, received.sender)
             assertEquals(request.tags, received.tags.map { it.values })
         } finally {

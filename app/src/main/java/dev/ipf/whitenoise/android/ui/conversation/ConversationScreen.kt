@@ -173,6 +173,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.agent.LocalAgentRequestProgress
+import dev.ipf.whitenoise.android.ui.conversation.agent.LocalOpenAgentThread
 import dev.ipf.whitenoise.android.ui.conversation.agent.rememberConversationAgentActivity
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
@@ -3985,6 +3986,7 @@ internal fun ConversationScreen(
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,
                 LocalAgentRequestProgress provides agentActivity.requestProgress,
+                LocalOpenAgentThread provides agentActivity::showThread,
                 // Bubbles mark their own matches while search is open, so a hit is obvious on any
                 // bubble colour rather than only on the one the jump happened to land on.
                 LocalConversationSearchMarking provides

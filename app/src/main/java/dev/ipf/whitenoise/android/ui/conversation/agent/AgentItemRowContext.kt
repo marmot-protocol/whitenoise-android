@@ -8,4 +8,8 @@ internal data class AgentItemRowContext(
     val readOnly: Boolean,
     /** The last row of a sender run carries its avatar in the chat. */
     val showSenderAvatar: Boolean = false,
+    /** Only the latest loaded session for this agent offers chat-wide controls. */
+    val sessionControls: Boolean = false,
+    val threadTaskId: String? = null,
+    val answeredBy: String? = null,
 )

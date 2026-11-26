@@ -52,6 +52,7 @@ internal fun AgentActivityLine(
     modifier: Modifier = Modifier,
 ) {
     val expandable = agentActivityExpandable(item)
+    val title = agentActivityTitle(item)
     var expanded by rememberSaveable(item.rowId) { mutableStateOf(false) }
     val failed = item.state == AgentItemState.Failed || item.body is AgentItemBody.Error
     val toggleLabel =
@@ -81,8 +82,8 @@ internal fun AgentActivityLine(
                 modifier = Modifier.size(16.dp),
             )
             AgentActivityLabel(
-                title = agentActivityTitle(item),
-                subject = agentActivitySubject(item).takeIf { it != agentActivityTitle(item) }.orEmpty(),
+                title = title,
+                subject = agentActivitySubject(item).takeIf { it != title }.orEmpty(),
                 monospace = agentActivityMonospace(item),
                 titleColor = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),

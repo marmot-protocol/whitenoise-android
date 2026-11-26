@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentItemReader
+import dev.ipf.whitenoise.android.state.AgentRequestProgress
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -45,8 +48,14 @@ internal fun rememberConversationAgentActivity(controller: ConversationControlle
     if (windowHasActivity) SideEffect { hasActivity.value = true }
     val showShortcut = windowHasActivity || hasActivity.value
     val open = remember(controller) { mutableStateOf(false) }
+    val threadPath = remember(controller) { mutableStateOf(emptyList<String>()) }
     val progress = rememberAgentRequestProgress(controller)
-    return remember(controller, showShortcut) { ConversationAgentActivity(controller, showShortcut, open, progress) }
+    val projected = remember(timeline) { timeline.mapNotNull { it.projected } }
+    ObserveAgentSettlements(controller, progress, projected)
+    ObserveAgentSettlementEvents(controller, progress)
+    return remember(controller, showShortcut) {
+        ConversationAgentActivity(controller, showShortcut, open, threadPath, progress)
+    }
 }
 
 @Stable
@@ -54,12 +63,21 @@ internal class ConversationAgentActivity(
     private val controller: ConversationController,
     private val showShortcut: Boolean,
     private val open: MutableState<Boolean>,
-    val requestProgress: MutableMap<String, AgentRequestStatus>,
+    private val threadPath: MutableState<List<String>>,
+    val requestProgress: AgentRequestProgress,
 ) {
     val headerSlots: Int get() = if (showShortcut) 1 else 0
 
     /** Chat details is a stable entry point even before the viewport finds agent items. */
     fun show() {
+        threadPath.value = emptyList()
+        open.value = true
+    }
+
+    fun showThread(taskId: String) {
+        val path = threadPath.value
+        val existingIndex = path.indexOf(taskId)
+        threadPath.value = if (existingIndex < 0) path + taskId else path.take(existingIndex + 1)
         open.value = true
     }
 
@@ -80,8 +98,21 @@ internal class ConversationAgentActivity(
         readOnly: Boolean,
     ) {
         if (open.value && controller.ownsRetainedForegroundPresentation) {
-            AgentActivitySheet(onClose = { open.value = false }) {
-                AgentActivityHistory(appState, controller, readOnly || controller.group.pendingConfirmation)
+            val taskId = threadPath.value.lastOrNull()
+            AgentActivitySheet(
+                onClose = {
+                    open.value = false
+                    threadPath.value = emptyList()
+                },
+                inThread = taskId != null,
+            ) {
+                if (taskId != null) {
+                    TextButton(onClick = { threadPath.value = threadPath.value.dropLast(1) }) {
+                        val label = if (threadPath.value.size == 1) R.string.agent_thread_back else R.string.back
+                        Text(stringResource(label))
+                    }
+                }
+                AgentActivityHistory(appState, controller, readOnly || controller.group.pendingConfirmation, taskId)
             }
         }
     }
@@ -115,10 +146,12 @@ internal fun SettingsGroupScope.agentActivityDetailsRow(onOpen: () -> Unit) {
 @Composable
 internal fun AgentActivitySheet(
     onClose: () -> Unit,
+    inThread: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     WhiteNoiseModalBottomSheet(onDismissRequest = onClose, containerColor = amoledSheetContainerColor()) {
-        WhiteNoiseSheetHeader(stringResource(R.string.agent_activity), onClose = onClose)
+        val title = stringResource(if (inThread) R.string.agent_thread_title else R.string.agent_activity)
+        WhiteNoiseSheetHeader(title, onClose = onClose)
         content()
     }
 }
@@ -130,21 +163,24 @@ internal fun AgentActivityList(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     readOnly: Boolean,
-    modifier: Modifier = Modifier,
+    activeSessions: Map<String, String> = emptyMap(),
 ) {
     val latestTurn = rows.indexOfLast { it.projected?.agentItem?.itemType == "turn" }
+    val answeredBy = rememberAgentAnswerAttribution(controller, rows)
     val state = rememberLazyListState(initialFirstVisibleItemIndex = latestTurn.coerceAtLeast(0))
     WhiteNoiseLazyColumn(
         state = state,
         modifier =
-            modifier
+            Modifier
                 .fillMaxWidth()
                 .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * SHEET_LIST_HEIGHT_SHARE),
         contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.Section, vertical = WhiteNoiseSpacing.Related),
     ) {
         itemsIndexed(rows, key = { _, row -> row.presentationId }) { index, row ->
             val item = remember(row) { AgentItemReader.read(row.record, row.projected) }
-            if (item != null) {
+            if (item == null) {
+                row.projected?.let { AgentThreadMessage(it, appState.displayName(it.sender)) }
+            } else {
                 val previous = rows.getOrNull(index - 1)
                 val showSenderName =
                     item.body is AgentItemBody.Turn ||
@@ -153,7 +189,14 @@ internal fun AgentActivityList(
                     agentItem = item,
                     controller = controller,
                     appState = appState,
-                    context = AgentItemRowContext(showSenderName = showSenderName, readOnly = readOnly),
+                    context =
+                        AgentItemRowContext(
+                            showSenderName = showSenderName,
+                            readOnly = readOnly,
+                            sessionControls = row.id == activeSessions[row.record.sender],
+                            threadTaskId = item.rowId.takeIf { (item.body as? AgentItemBody.Task)?.kind == "subagent" },
+                            answeredBy = answeredBy[row.id]?.let(appState::displayName),
+                        ),
                 )
             }
         }

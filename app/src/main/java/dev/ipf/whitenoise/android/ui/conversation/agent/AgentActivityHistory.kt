@@ -11,6 +11,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,9 +20,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.ConversationOpenModeFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.agent.isAgentThreadRow
 import dev.ipf.whitenoise.android.state.CONVERSATION_WINDOW_MAX_ROWS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineSubscriptionHandle
@@ -47,28 +50,39 @@ internal fun AgentActivityHistory(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     readOnly: Boolean,
+    threadTaskId: String? = null,
 ) {
     val account = controller.conversationAccountRef ?: return
     var attempt by remember(controller) { mutableIntStateOf(0) }
     val history = remember(controller, attempt) { ActivityHistoryWindow() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(history) {
-        history.collect {
-            appState.marmotIo {
-                openTimelineWithFallback(
-                    account,
-                    controller.group.groupIdHex,
-                    CONVERSATION_WINDOW_MAX_ROWS,
-                    mode = ConversationOpenModeFfi.LATEST,
-                )
-            }
-        }
+        history.collect { openLatestAgentActivity(appState, controller, account) }
     }
 
     val page = history.page
+    ObserveAgentSettlements(controller, LocalAgentRequestProgress.current, page?.messages.orEmpty())
+    val threadParents = rememberAgentThreadParents(controller, page, threadTaskId)
     val deleted = controller.deletedMessageIds
-    val rows = remember(page, deleted) { page?.let { activityHistoryRows(it, deleted) }.orEmpty() }
-    if (rows.isNotEmpty()) AgentActivityList(rows, appState, controller, readOnly)
+    val rows =
+        remember(page, deleted, threadTaskId, threadParents) {
+            page
+                ?.let { activityHistoryRows(it, deleted, threadTaskId = threadTaskId, threadParents = threadParents) }
+                .orEmpty()
+        }
+    if (rows.isNotEmpty()) {
+        val sessions =
+            if (threadTaskId == null) activeAgentSessions(history, appState, controller, account) else emptyMap()
+        key(threadTaskId) {
+            AgentActivityList(
+                rows,
+                appState,
+                controller,
+                readOnly,
+                activeSessions = sessions,
+            )
+        }
+    }
     when {
         history.disconnected ->
             TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.agent_activity_retry)) }
@@ -90,6 +104,38 @@ internal fun AgentActivityHistory(
         }
     }
 }
+
+/** A historical viewport does not receive new sessions announced at the live end of the chat. */
+@Composable
+private fun activeAgentSessions(
+    history: ActivityHistoryWindow,
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    account: String,
+): Map<String, String> {
+    val browsingOlder = history.page?.hasMoreAfter == true
+    val latest = remember(history, browsingOlder) { ActivityHistoryWindow() }
+    LaunchedEffect(latest) {
+        if (browsingOlder) latest.collect { openLatestAgentActivity(appState, controller, account) }
+    }
+    if (browsingOlder && latest.page == null) return emptyMap()
+    val sessions = latestAgentSessions(history.latestSessions, latest.latestSessions.values.toList())
+    return sessions.mapValues { it.value.messageIdHex }
+}
+
+private suspend fun openLatestAgentActivity(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    account: String,
+): ConversationTimelineSubscriptionHandle =
+    appState.marmotIo {
+        openTimelineWithFallback(
+            account,
+            controller.group.groupIdHex,
+            CONVERSATION_WINDOW_MAX_ROWS,
+            mode = ConversationOpenModeFfi.LATEST,
+        )
+    }
 
 @Composable
 private fun AgentActivityStatus(
@@ -126,6 +172,8 @@ internal class ActivityHistoryWindow {
     var paging by mutableStateOf(false)
         private set
     var disconnected by mutableStateOf(false)
+        private set
+    var latestSessions by mutableStateOf(emptyMap<String, TimelineMessageRecordFfi>())
         private set
 
     suspend fun collect(open: suspend () -> ConversationTimelineSubscriptionHandle) {
@@ -194,19 +242,50 @@ internal class ActivityHistoryWindow {
         active: ConversationTimelineSubscriptionHandle,
         replacement: TimelinePageFfi,
     ) {
-        if (subscription === active) page = active.latestInstalledWindow()?.page ?: replacement
+        if (subscription !== active) return
+        val installed = active.latestInstalledWindow()?.page ?: replacement
+        latestSessions = latestAgentSessions(latestSessions, installed.messages)
+        page = installed
     }
 }
+
+/** Paging starts at the newest rows. The active session's first event may be on an older page. */
+internal fun latestAgentSessions(
+    known: Map<String, TimelineMessageRecordFfi>,
+    rows: List<TimelineMessageRecordFfi>,
+): Map<String, TimelineMessageRecordFfi> {
+    val latest = known.toMutableMap()
+    rows
+        .filter { it.agentItem?.itemType == "session" }
+        .forEach { row ->
+            val previous = latest[row.sender]
+            if (previous == null || SESSION_ORDER.compare(row, previous) >= 0) latest[row.sender] = row
+        }
+    return latest
+}
+
+private val SESSION_ORDER = compareBy<TimelineMessageRecordFfi>({ it.timelineAt }, { it.messageIdHex })
 
 internal fun activityHistoryRows(
     page: TimelinePageFfi,
     deletedMessageIds: Set<String>,
     nowMillis: Long = System.currentTimeMillis(),
-): List<TimelineMessage> =
-    page.messages.mapNotNull { record ->
+    threadTaskId: String? = null,
+    threadParents: Map<String, TimelineMessageRecordFfi> = emptyMap(),
+): List<TimelineMessage> {
+    val recordsById =
+        if (threadTaskId == null) emptyMap() else threadParents + page.messages.associateBy { it.messageIdHex }
+    return page.messages.mapNotNull { record ->
         val deleted = record.deleted || record.messageIdHex in deletedMessageIds
-        if (record.agentItem == null ||
+        val belongs =
+            if (threadTaskId == null) {
+                record.agentItem != null && !record.isAgentThreadRow()
+            } else {
+                record.isAgentThreadRow() && record.agentThreadTask(recordsById) == threadTaskId
+            }
+        if (!belongs ||
             deleted ||
+            record.invalidationStatus != null ||
             isRetentionExpiredForSearch(record, nowMillis)
         ) {
             null
@@ -219,3 +298,4 @@ internal fun activityHistoryRows(
             )
         }
     }
+}

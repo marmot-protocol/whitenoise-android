@@ -72,9 +72,12 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
     { token ->
         runCatchingCancellable {
             when (marmotIo { localSendStatus(accountRef, groupIdHex, token) }) {
-                is LocalSendStatusFfi.Completed, LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned ->
-                    CollectionTokenStatus.ACCEPTED
-                LocalSendStatusFfi.Rejected, null -> CollectionTokenStatus.NOT_ACCEPTED
+                is LocalSendStatusFfi.Completed,
+                is LocalSendStatusFfi.Queued,
+                is LocalSendStatusFfi.EngineOwned,
+                -> CollectionTokenStatus.ACCEPTED
+                LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers, null ->
+                    CollectionTokenStatus.NOT_ACCEPTED
             }
         }.getOrDefault(CollectionTokenStatus.UNRESOLVED)
     }

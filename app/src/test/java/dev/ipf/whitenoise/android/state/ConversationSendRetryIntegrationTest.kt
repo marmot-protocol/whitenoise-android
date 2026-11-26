@@ -250,7 +250,7 @@ class ConversationSendRetryIntegrationTest {
                         revisions += Triple(original, text, token)
                         pendingLocalSend()
                     },
-                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     originalSummary = successfulSendSummary(),
                 )
             try {
@@ -377,7 +377,7 @@ class ConversationSendRetryIntegrationTest {
                     },
                     { _, _, _ ->
                         reads += 1
-                        if (reads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued
+                        if (reads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued("11".repeat(32))
                     },
                 )
             try {
@@ -459,7 +459,7 @@ class ConversationSendRetryIntegrationTest {
                         editCalls += 1
                         pendingLocalSend()
                     },
-                    { _, _, _ -> LocalSendStatusFfi.Queued },
+                    { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     state,
                 )
             try {
@@ -604,7 +604,7 @@ class ConversationSendRetryIntegrationTest {
                     if (editPublished) {
                         publishedNativeEditStatus("edit-id")
                     } else {
-                        LocalSendStatusFfi.Queued
+                        LocalSendStatusFfi.Queued("11".repeat(32))
                     }
                 })
             try {
@@ -655,7 +655,7 @@ class ConversationSendRetryIntegrationTest {
                         editToken = token
                         pendingLocalSend(listOf("edit-id"))
                     },
-                    { _, _, _ -> LocalSendStatusFfi.EngineOwned },
+                    { _, _, _ -> LocalSendStatusFfi.EngineOwned("11".repeat(32)) },
                 )
             try {
                 controller.retryMembers()
@@ -858,7 +858,7 @@ class ConversationSendRetryIntegrationTest {
                         if (reads == 1) {
                             firstRead.complete(Unit)
                             releaseRead.await()
-                            LocalSendStatusFfi.Queued
+                            LocalSendStatusFfi.Queued("11".repeat(32))
                         } else {
                             publishedNativeEditStatus("edit-id")
                         }
@@ -937,7 +937,11 @@ class ConversationSendRetryIntegrationTest {
                     },
                     { _, _, _ ->
                         statusReads += 1
-                        if (statusReads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued
+                        if (statusReads == 1) {
+                            LocalSendStatusFfi.Rejected
+                        } else {
+                            LocalSendStatusFfi.Queued("11".repeat(32))
+                        }
                     },
                 )
             try {
@@ -1108,7 +1112,7 @@ class ConversationSendRetryIntegrationTest {
                         editReturn.await()
                         throw MarmotKitException.Runtime("old account admission failed")
                     },
-                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
                     state = state,
                 )
             try {
@@ -4195,7 +4199,7 @@ class ConversationSendRetryIntegrationTest {
     ) = nativeEditControllerWithStatus(
         originalReturn = originalReturn,
         publisher = publisher,
-        statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+        statusReader = { _, _, _ -> LocalSendStatusFfi.Queued("11".repeat(32)) },
     )
 
     private fun nativeEditControllerWithStatus(

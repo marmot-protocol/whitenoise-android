@@ -1,0 +1,76 @@
+package dev.ipf.whitenoise.android.ui.conversation.agent
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.agent.AgentItemReader
+import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h800dp-mdpi")
+class AgentSessionControlsScreenshotTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun sessionControlsLight() = record(dark = false, direction = LayoutDirection.Ltr, fontScale = 1f, suffix = "light")
+
+    @Test
+    fun sessionControlsAmoledRtlLarge() = record(dark = true, direction = LayoutDirection.Rtl, fontScale = 1.3f, suffix = "amoled_rtl_large")
+
+    private fun record(
+        dark: Boolean,
+        direction: LayoutDirection,
+        fontScale: Float,
+        suffix: String,
+    ) {
+        val row =
+            AgentRecordingFixtures.load("codex_approval_allowed").first { it.projected?.agentItem?.itemType == "session" }
+        val item = requireNotNull(AgentItemReader.read(row.record, row.projected))
+        val requests = mutableListOf<AgentRequest>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = dark, fontScale = fontScale) {
+                    Surface {
+                        Column(Modifier.width(360.dp).padding(WhiteNoiseSpacing.Related).testTag(TAG)) {
+                            AgentSessionContent(
+                                item,
+                                AgentItemActions("Codex", enabled = true, onSend = { requests += it }, sessionControls = true),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithText("Session controls").performClick()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/agent_session_controls_$suffix.png")
+        composeRule.onNodeWithText("New session").performClick()
+        assertEquals(listOf(AgentRequest.NewSession("New session")), requests)
+    }
+
+    private companion object {
+        const val TAG = "agent-session-controls"
+    }
+}

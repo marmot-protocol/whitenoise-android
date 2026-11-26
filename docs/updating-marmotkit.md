@@ -5,8 +5,9 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [25 November 2026 nightly](marmotkit-nightly-20261125.md) records Android's
-pin and consumer changes for agent items. The
+The [26 November 2026 nightly](marmotkit-nightly-20261126.md) records Android's
+current testing pin. The [25 November nightly](marmotkit-nightly-20261125.md)
+records the first adoption of agent items and its upgrade findings. The
 [official 0.19.0 adoption](marmotkit-0.19.0.md) records the populated upgrade
 baseline.
 

@@ -26,6 +26,8 @@ data class AgentItem(
     val outputCutLength: Long? = null,
     /** How many file diffs the agent left out to fit the 64 KB limit. */
     val diffsCut: Int = 0,
+    val firstEventMissing: Boolean = false,
+    val recordedAt: ULong = 0uL,
 )
 
 /** An item's state, as MDK reports it. */
@@ -103,6 +105,7 @@ sealed interface AgentItemBody {
     /** Work handed to a subagent. */
     data class Task(
         val description: String?,
+        val kind: String? = null,
     ) : AgentItemBody
 
     /** Something the agent reports, such as a retry, a warning or a refused request. */
@@ -120,6 +123,8 @@ sealed interface AgentItemBody {
     /** The start of a session, with settings such as the model. */
     data class Session(
         val settings: List<AgentSessionSetting>,
+        val actions: List<AgentSessionAction> = emptyList(),
+        val commands: List<AgentSessionCommand> = emptyList(),
     ) : AgentItemBody
 
     /** A type this app does not know yet. The row falls back to the plain rendering. */
@@ -222,4 +227,19 @@ data class AgentSessionSetting(
     val id: String,
     val label: String,
     val value: String?,
+    val options: List<String> = emptyList(),
+)
+
+@Immutable
+data class AgentSessionAction(
+    val id: String,
+    val label: String,
+    val description: String?,
+)
+
+@Immutable
+data class AgentSessionCommand(
+    val name: String,
+    val hint: String,
+    val description: String?,
 )

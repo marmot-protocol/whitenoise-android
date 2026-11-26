@@ -27,6 +27,21 @@ sealed interface AgentRequest {
     data class Interrupt(
         override val words: String,
     ) : AgentRequest
+
+    data class NewSession(
+        override val words: String,
+    ) : AgentRequest
+
+    data class Set(
+        val setting: String,
+        val value: String,
+        override val words: String,
+    ) : AgentRequest
+
+    data class Own(
+        val id: String,
+        override val words: String,
+    ) : AgentRequest
 }
 
 /** One event ready for MDK to send. */
@@ -44,14 +59,14 @@ object AgentRequestEncoder {
      */
     fun encode(
         agentPubkeyHex: String,
-        targetRowId: String,
+        targetRowId: String?,
         request: AgentRequest,
     ): AgentRequestEvent {
         val tags =
             buildList {
                 add(listOf("p", agentPubkeyHex))
                 add(listOf("details", details(request).toString()))
-                add(listOf("e", targetRowId))
+                targetRowId?.let { add(listOf("e", it)) }
             }
         return AgentRequestEvent(kind = AgentItemReader.REQUEST_KIND, content = request.words, tags = tags)
     }
@@ -72,5 +87,9 @@ object AgentRequestEncoder {
                     ),
                 )
             is AgentRequest.Interrupt -> JSONObject().put("action", "interrupt")
+            is AgentRequest.NewSession -> JSONObject().put("action", "new_session")
+            is AgentRequest.Set ->
+                JSONObject().put("action", "set").put("setting", request.setting).put("value", request.value)
+            is AgentRequest.Own -> JSONObject().put("action", "own").put("id", request.id)
         }
 }

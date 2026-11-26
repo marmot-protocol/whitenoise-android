@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.core.agent.AgentItem
 import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentItemState
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.state.AgentRequestStatus
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 
@@ -83,7 +84,6 @@ private fun AgentStopButton(actions: AgentItemActions) {
     val description = stringResource(R.string.agent_turn_stop_description, actions.agentName)
     TextButton(
         onClick = { actions.onSend(AgentRequest.Interrupt(words = stopWords)) },
-        // Stays tappable once sent, so a refused or lost Stop can be sent again.
         enabled = actions.canSend,
         modifier = Modifier.semantics { contentDescription = description },
     ) {

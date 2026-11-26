@@ -55,6 +55,30 @@
           "CON-057",
           "CON-059"
         ]
+      },
+      {
+        "surface": "R.string.agent_thread_back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "R.string.agent_thread_back",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_thread_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "R.string.agent_thread_title",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivitySheet.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "CON-057"
+        ]
       }
     ],
     "settings_controls": [

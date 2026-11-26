@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemRowContext
 import dev.ipf.whitenoise.android.ui.conversation.agent.AgentItemTimelineRow
+import dev.ipf.whitenoise.android.ui.conversation.agent.agentThreadDestination
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
@@ -233,6 +234,7 @@ internal fun TimelineRow(
                                                 deletedMessageIds = controller.deletedMessageIds,
                                             )
                                         } != true,
+                                    threadTaskId = agentThreadDestination(item.projected) { controller.timeline },
                                 ),
                         )
                         return@Column

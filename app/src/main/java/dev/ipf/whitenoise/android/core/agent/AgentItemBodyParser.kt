@@ -15,7 +15,7 @@ internal object AgentItemBodyParser {
             "approval" -> approval(body)
             "question" -> question(body)
             "plan" -> plan(body)
-            "task" -> AgentItemBody.Task(description = body.stringOrNull("description"))
+            "task" -> AgentItemBody.Task(body.stringOrNull("description"), body.stringOrNull("kind"))
             "notice" ->
                 AgentItemBody.Notice(
                     kind = AgentNoticeKind.parse(body.stringOrNull("kind")),
@@ -122,7 +122,18 @@ internal object AgentItemBodyParser {
                         id = setting.stringOrNull("id") ?: return@mapNotNull null,
                         label = setting.optString("label"),
                         value = setting.stringOrNull("value"),
+                        options = setting.optJSONArray("options").strings(),
                     )
+                },
+            actions =
+                body.optJSONArray("actions").objects().mapNotNull { action ->
+                    val id = action.stringOrNull("id") ?: return@mapNotNull null
+                    AgentSessionAction(id, action.stringOrNull("label") ?: id, action.stringOrNull("description"))
+                },
+            commands =
+                body.optJSONArray("commands").objects().mapNotNull { command ->
+                    val name = command.stringOrNull("name") ?: return@mapNotNull null
+                    AgentSessionCommand(name, command.optString("hint"), command.stringOrNull("description"))
                 },
         )
 

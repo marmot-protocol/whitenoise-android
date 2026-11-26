@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentSessionContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "fun AgentSessionContent(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentSessionControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "fun AgentSessionControls(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentSessionHelp",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "fun AgentSessionHelp(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentSessionSettingMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "fun AgentSessionSettingMenu(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "AgentSessionSettingInput",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "fun AgentSessionSettingInput(",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_session_apply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.agent_session_apply",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_session_controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.agent_session_controls",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.agent_session_new",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.agent_session_new",
+        "test_ids": [
+          "CON-057"
+        ]
+      },
+      {
+        "surface": "R.string.group_system_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentSessionContent.kt",
+        "anchor": "R.string.group_system_hide_details",
+        "test_ids": [
+          "CON-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

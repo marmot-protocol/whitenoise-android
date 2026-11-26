@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -571,7 +570,7 @@ internal suspend fun ConversationController.discardPendingEdit(
                 )
             }
         }
-        status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
+        status == null || status.isTerminalRejection -> optimisticEdits.remove(target)
         else -> optimisticEdits[target] = current.withNativeEditStatus(status)
     }
     publishTimelineFromIndexes()

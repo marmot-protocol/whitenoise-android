@@ -28,7 +28,7 @@
     <string name="agent_approval_answered">Respondido: %1$s</string>
     <string name="agent_approval_declined">Recusado</string>
     <string name="agent_approval_expired">Não é mais necessário</string>
-    <string name="agent_request_sent">Enviado. Aguardando %1$s.</string>
+    <string name="agent_request_sent">Aguardando %1$s.</string>
     <string name="agent_question_send">Enviar resposta</string>
     <string name="agent_question_single_choice">Escolha uma</string>
     <string name="agent_question_multiple_choice">Escolha quantas quiser</string>

@@ -22,8 +22,8 @@ internal class RetainedConversationStates(
     private val closeStagedUploadSource: (StagedUploadSource) -> Unit,
 ) {
     private val lock = Any()
-    private val retention = ConversationStateRetention(maxRetained, isProtected)
     private val states = mutableMapOf<String, ConversationSendState>()
+    private val retention = ConversationStateRetention(maxRetained, isProtected)
 
     // Transient view invalidation, bounded with the retained conversation state. Snapshot state so a
     // composition reading a revision outside the lock observes later cleanups.
@@ -41,6 +41,11 @@ internal class RetainedConversationStates(
         accountRef: String?,
         groupIdHex: String,
     ): MutableMap<String, () -> Unit> = retained(accountRef, groupIdHex) { durableAcceptanceCallbacks }
+
+    fun agentRequestProgress(
+        accountRef: String?,
+        groupIdHex: String,
+    ): AgentRequestProgress = retained(accountRef, groupIdHex) { agentRequests }
 
     fun projectedMessageIds(
         accountRef: String?,
@@ -200,6 +205,7 @@ internal class RetainedConversationStates(
         // navigation. Keep its one-shot acceptance cleanup beside the retained row,
         // under the same bounded conversation-state lifecycle.
         val durableAcceptanceCallbacks = unguarded { mutableMapOf<String, () -> Unit>() }
+        val agentRequests = unguarded { AgentRequestProgress() }
         val projectedMessageIds = unguarded { mutableSetOf<String>() }
         val timelineOrderOverrides = unguarded { mutableMapOf<String, ULong>() }
         val timelineTimestampOverrides = unguarded { mutableMapOf<String, ULong>() }
@@ -241,6 +247,7 @@ internal class RetainedConversationStates(
          */
         fun evict() {
             durableAcceptanceCallbacks.existing?.clear()
+            agentRequests.existing?.clear()
             retainedMediaUploads.existing?.clear()
         }
 
@@ -254,6 +261,7 @@ internal class RetainedConversationStates(
             pendingProjectionsAwaitingBridge.existing?.clear()
             optimisticMessages.existing?.clear()
             durableAcceptanceCallbacks.existing?.clear()
+            agentRequests.existing?.clear()
             projectedMessageIds.existing?.clear()
             timelineOrderOverrides.existing?.clear()
             timelineTimestampOverrides.existing?.clear()

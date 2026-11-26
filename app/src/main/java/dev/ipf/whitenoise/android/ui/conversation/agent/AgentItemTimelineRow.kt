@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.agent.AgentItem
@@ -37,12 +40,6 @@ internal fun AgentItemTimelineRow(
     context: AgentItemRowContext,
 ) {
     val agentName = appState.displayName(agentItem.agentPubkeyHex)
-    if (agentItemLayout(agentItem) == AgentItemLayout.Session) {
-        AgentSessionDivider(agentItem, agentName)
-        return
-    }
-    val groupChrome =
-        GroupProjector.shouldShowTranscriptSenderAvatar(isDm = controller.usesDirectTranscriptChrome, mine = false)
     val requests = rememberAgentRequestSender(agentItem, controller, appState)
     val actions =
         AgentItemActions(
@@ -50,7 +47,14 @@ internal fun AgentItemTimelineRow(
             enabled = !context.readOnly,
             status = requests.status,
             onSend = requests::send,
+            sessionControls = context.sessionControls,
         )
+    if (agentItemLayout(agentItem) == AgentItemLayout.Session) {
+        AgentItemContent(agentItem, actions)
+        return
+    }
+    val groupChrome =
+        GroupProjector.shouldShowTranscriptSenderAvatar(isDm = controller.usesDirectTranscriptChrome, mine = false)
     Box(Modifier.fillMaxWidth()) {
         Column(
             modifier =
@@ -68,6 +72,14 @@ internal fun AgentItemTimelineRow(
                 )
             }
             AgentItemContent(agentItem, actions, Modifier.widthIn(max = AgentContentMaxWidth))
+            context.answeredBy?.let { name ->
+                Text(
+                    text = stringResource(R.string.agent_answered_by, name),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            context.threadTaskId?.let { AgentThreadLink(it) }
         }
         if (groupChrome && context.showSenderAvatar) {
             Box(Modifier.align(Alignment.BottomStart)) {
@@ -90,9 +102,17 @@ internal fun AgentItemContent(
     actions: AgentItemActions,
     modifier: Modifier = Modifier,
 ) {
+    if (item.firstEventMissing) {
+        Text(
+            text = stringResource(R.string.agent_activity_earlier),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.padding(horizontal = 4.dp),
+        )
+    }
     when (agentItemLayout(item)) {
         AgentItemLayout.Turn -> AgentTurnLine(item, actions, modifier)
-        AgentItemLayout.Session -> AgentSessionDivider(item, actions.agentName, modifier)
+        AgentItemLayout.Session -> AgentSessionContent(item, actions, modifier)
         AgentItemLayout.ApprovalCard -> AgentApprovalCard(item, actions, modifier)
         AgentItemLayout.QuestionCard -> AgentQuestionCard(item, actions, modifier)
         AgentItemLayout.Activity -> AgentActivityLine(item, modifier)

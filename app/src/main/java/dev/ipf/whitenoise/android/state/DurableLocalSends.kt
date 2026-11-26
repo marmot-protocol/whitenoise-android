@@ -45,10 +45,15 @@ internal fun MarmotInterface.recoveredLocalSend(
 ): SendSummaryFfi? =
     when (val status = localSendStatus(account, group, token)) {
         is LocalSendStatusFfi.Completed -> status.summary
-        LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned -> pendingLocalSend()
-        LocalSendStatusFfi.Rejected -> error("local submission rejected; a new deliberate submission is required")
+        is LocalSendStatusFfi.Queued -> pendingLocalSend(listOf(status.messageIdHex))
+        is LocalSendStatusFfi.EngineOwned -> pendingLocalSend(listOf(status.messageIdHex))
+        LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers ->
+            error("local submission rejected; a new deliberate submission is required")
         null -> null
     }
+
+internal val LocalSendStatusFfi?.isTerminalRejection: Boolean
+    get() = this == LocalSendStatusFfi.Rejected || this == LocalSendStatusFfi.RefusedNewMembers
 
 /** Captures a status-probe failure without intercepting VM errors or replacing the admission failure. */
 private fun MarmotInterface.recoverLocalSendResult(

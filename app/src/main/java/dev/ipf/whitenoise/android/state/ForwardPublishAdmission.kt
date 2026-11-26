@@ -42,7 +42,7 @@ internal class ForwardPublishNotCommittedException(
 
 /** Whether MDK's engine has taken the submission, the point at which a forwarded message counts as sent. */
 private val LocalSendStatusFfi?.handedOff: Boolean
-    get() = this is LocalSendStatusFfi.Completed || this == LocalSendStatusFfi.EngineOwned
+    get() = this is LocalSendStatusFfi.Completed || this is LocalSendStatusFfi.EngineOwned
 
 /**
  * Publishes forwarded message [messageIndex] under its stable client [token] and returns only once MDK's engine owns
@@ -70,7 +70,7 @@ internal suspend fun admitForwardPublish(
         val existing = probeOrNull(probe)
         when {
             existing.handedOff -> return@withTimeoutOrNull
-            existing == LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
+            existing.isTerminalRejection -> throw ForwardPublishRejectedException(messageIndex)
         }
         if (existing == null) {
             beforeAdmit()
@@ -101,7 +101,8 @@ private suspend fun admitOrClassify(
             throw cancellation
         } catch (failure: Exception) {
             when (probeOrNull(probe)) {
-                LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
+                LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers ->
+                    throw ForwardPublishRejectedException(messageIndex)
                 null ->
                     if (isStaleMediaReferenceEpoch(failure)) {
                         throw ForwardPublishRejectedException(messageIndex)
@@ -123,7 +124,7 @@ private suspend fun awaitEngineHandoff(
     while (true) {
         val status = probeOrNull(probe)
         if (status.handedOff) return
-        if (status == LocalSendStatusFfi.Rejected) throw ForwardPublishRejectedException(messageIndex)
+        if (status.isTerminalRejection) throw ForwardPublishRejectedException(messageIndex)
         delay(pollMillis)
     }
 }

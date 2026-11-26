@@ -89,7 +89,8 @@ class ForwardDiagnosticsProductionPathTest {
                         sent = null,
                     )
                 // The engine takes every admitted message at once in this fixture.
-                "localSendStatus" -> if (arguments!![2] in admittedTokens) LocalSendStatusFfi.EngineOwned else null
+                "localSendStatus" ->
+                    if (arguments!![2] in admittedTokens) LocalSendStatusFfi.EngineOwned("11".repeat(32)) else null
                 "sendTextWithClientToken", "sendPreparedMediaWithClientToken" -> {
                     // The client token is the fourth text argument and the fifth media argument.
                     val token = arguments!![if (method.name == "sendTextWithClientToken") 3 else 4] as String

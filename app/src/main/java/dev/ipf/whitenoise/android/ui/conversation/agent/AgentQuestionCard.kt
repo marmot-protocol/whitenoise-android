@@ -72,8 +72,8 @@ internal fun AgentQuestionCard(
             )
         }
         when {
-            question.answerViaMessage -> AgentQuestionNote(stringResource(R.string.agent_question_reply_in_chat))
             question.questions.any { it.secret } -> AgentQuestionNote(stringResource(R.string.agent_question_secret))
+            question.answerViaMessage -> AgentQuestionNote(stringResource(R.string.agent_question_reply_in_chat))
         }
         AgentRequestStatusLabel(actions)
         if (answerable) {

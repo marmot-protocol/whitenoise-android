@@ -113,6 +113,7 @@ internal fun agentActivityExpandable(item: AgentItem): Boolean =
         is AgentItemBody.Reasoning -> item.text.isNotBlank()
         is AgentItemBody.Plan -> body.entries.isNotEmpty() || !body.text.isNullOrBlank()
         is AgentItemBody.Error -> item.text.isNotBlank() || body.code != null
+        is AgentItemBody.Unknown -> item.text.isNotBlank() && item.text != item.title
         else -> item.text.lines().size > 1
     }
 

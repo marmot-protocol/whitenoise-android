@@ -3,27 +3,19 @@ package dev.ipf.whitenoise.android.ui.conversation.agent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.core.agent.AgentItem
+import dev.ipf.whitenoise.android.core.agent.AgentItemBody
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
+import dev.ipf.whitenoise.android.state.AgentRequestAdmission
+import dev.ipf.whitenoise.android.state.AgentRequestProgress
+import dev.ipf.whitenoise.android.state.AgentRequestStatus
+import dev.ipf.whitenoise.android.state.AgentRequestTarget
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.retainedAgentRequestProgress
 import dev.ipf.whitenoise.android.state.sendAgentRequest
-
-/**
- * Local progress of the viewer's last answer or control for one item version.
- *
- * The agent is authoritative: its next version of the item settles the request and resets this
- * state. Until then the row shows that the request is on its way or was sent.
- */
-internal enum class AgentRequestStatus {
-    Idle,
-    Sending,
-    Sent,
-    Unconfirmed,
-}
+import java.util.UUID
 
 /** What a row needs to offer actions: who the agent is, whether acting is possible, and how. */
 @Stable
@@ -32,46 +24,42 @@ internal data class AgentItemActions(
     val enabled: Boolean,
     val status: AgentRequestStatus = AgentRequestStatus.Idle,
     val onSend: (AgentRequest) -> Unit = {},
+    val sessionControls: Boolean = false,
 ) {
-    /** Buttons stay usable after a send completes, so a refused or lost request can be retried. */
-    val canSend: Boolean get() = enabled && status != AgentRequestStatus.Sending
+    val canSend: Boolean get() = enabled && status.permitsSend
 }
 
-/**
- * Sends one item version's answers and controls. Its progress lives in the conversation's [progress]
- * map under [key], so a row that scrolls away and back mid-send keeps its in-flight guard.
- */
 @Stable
 internal class AgentRequestSender(
-    private val progress: MutableMap<String, AgentRequestStatus>,
-    private val key: String,
-    private val start: (AgentRequest, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
+    private val progress: AgentRequestProgress,
+    private val rowId: String,
+    private val agent: String,
+    private val start: (AgentRequest, String, (AgentRequestAdmission?) -> Unit) -> Unit,
 ) {
-    /** Progress of the last request sent for this item version. */
-    val status: AgentRequestStatus get() = progress[key] ?: AgentRequestStatus.Idle
+    val status: AgentRequestStatus get() = progress.status(rowId)
 
-    /** Sends [request] unless one for this item version is still on its way. */
     fun send(request: AgentRequest) {
-        if (status == AgentRequestStatus.Sending) return
-        progress[key] = AgentRequestStatus.Sending
-        start(request) { outcome -> progress[key] = outcome.requestStatus() }
+        if (!status.permitsSend) return
+        val token = UUID.randomUUID().toString()
+        progress.begin(rowId, agent)
+        start(request, token) { eventId -> progress.completeAdmission(rowId, eventId) }
     }
 }
 
+private val AgentRequestStatus.permitsSend: Boolean
+    get() = this == AgentRequestStatus.Idle || this == AgentRequestStatus.Unconfirmed
+
 /** Shared by the inline requests and the activity sheet for one conversation. */
-internal val LocalAgentRequestProgress =
-    compositionLocalOf<MutableMap<String, AgentRequestStatus>> { mutableStateMapOf() }
+internal val LocalAgentRequestProgress = compositionLocalOf { AgentRequestProgress() }
 
 @Composable
-internal fun rememberAgentRequestProgress(conversationKey: Any) =
-    remember(conversationKey) {
-        mutableStateMapOf<String, AgentRequestStatus>()
-    }
+internal fun rememberAgentRequestProgress(controller: ConversationController): AgentRequestProgress {
+    val account = controller.conversationAccountRef
+    val group = controller.group.groupIdHex
+    return remember(controller, account, group) { controller.retainedAgentRequestProgress() }
+}
 
-/**
- * Sends the row's requests to the agent that wrote [item]. Keyed by the item's version, so the
- * agent's next version, which settles the request, starts from no progress.
- */
+/** Sends the row's requests to the agent that wrote it. Item versions share the same guard. */
 @Composable
 internal fun rememberAgentRequestSender(
     item: AgentItem,
@@ -79,25 +67,18 @@ internal fun rememberAgentRequestSender(
     appState: WhiteNoiseAppState,
 ): AgentRequestSender {
     val progress = LocalAgentRequestProgress.current
-    return remember(progress, controller, item.rowId, item.version, item.agentPubkeyHex) {
-        AgentRequestSender(progress, "${item.rowId}:${item.version}") { request, onCompleted ->
+    val sessionStartedAt = item.recordedAt.takeIf { item.body is AgentItemBody.Session }
+    val target = AgentRequestTarget(item.rowId, item.agentPubkeyHex, sessionStartedAt)
+    return remember(progress, controller, target) {
+        AgentRequestSender(progress, item.rowId, item.agentPubkeyHex) { request, token, onCompleted ->
             appState.launchMutation {
-                var outcome: SendAcceptDispositionFfi? = null
+                var admission: AgentRequestAdmission? = null
                 try {
-                    outcome = controller.sendAgentRequest(item.agentPubkeyHex, item.rowId, request)
+                    admission = controller.sendAgentRequest(target, request, token)
                 } finally {
-                    onCompleted(outcome)
+                    onCompleted(admission)
                 }
             }
         }
     }
 }
-
-private fun SendAcceptDispositionFfi?.requestStatus(): AgentRequestStatus =
-    when (this) {
-        SendAcceptDispositionFfi.PUBLISHED,
-        SendAcceptDispositionFfi.ACCEPTED_PENDING,
-        -> AgentRequestStatus.Sent
-        SendAcceptDispositionFfi.COMPLETION_UNKNOWN -> AgentRequestStatus.Unconfirmed
-        null -> AgentRequestStatus.Idle
-    }
