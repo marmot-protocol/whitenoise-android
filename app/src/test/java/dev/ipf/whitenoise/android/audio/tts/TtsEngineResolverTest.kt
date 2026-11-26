@@ -365,17 +365,10 @@ class TtsEngineResolverTest {
         val applied = mutableListOf<Voice>()
 
         val resolution =
-            TtsEngineResolver.applyResolvedVoice(
-                enginePackage = "engine.a",
-                locale = Locale.US,
-                voices = setOf(current, lowerQualityEnglish, higherQualityEnglish, unrelated),
-                requestedKey = null,
-                setVoice = {
-                    applied.add(it)
-                    TextToSpeech.SUCCESS
-                },
-                currentVoice = { current },
-            )
+            applyAutomaticVoice(current, setOf(current, lowerQualityEnglish, higherQualityEnglish, unrelated)) {
+                applied.add(it)
+                TextToSpeech.SUCCESS
+            }
 
         assertSame(higherQualityEnglish, applied.single())
         assertEquals(TtsVoiceKey("engine.a", "english-high", "en-CA"), resolution.effectiveKey)
@@ -386,15 +379,7 @@ class TtsEngineResolverTest {
         val current = voice("current", Locale.US, quality = 300, networkRequired = true)
         val unrelated = voice("french", Locale.FRANCE, quality = 500)
 
-        val resolution =
-            TtsEngineResolver.applyResolvedVoice(
-                enginePackage = "engine.a",
-                locale = Locale.US,
-                voices = setOf(unrelated),
-                requestedKey = null,
-                setVoice = { error("Unexpected voice selection: $it") },
-                currentVoice = { current },
-            )
+        val resolution = applyAutomaticVoice(current, setOf(unrelated))
 
         assertNull(resolution.effectiveKey)
     }
@@ -403,15 +388,7 @@ class TtsEngineResolverTest {
     fun offlineFallbackExcludesCurrentNetworkVoiceWhenCatalogIsEmpty() {
         val current = voice("current", Locale.US, quality = 300, networkRequired = true)
 
-        val resolution =
-            TtsEngineResolver.applyResolvedVoice(
-                enginePackage = "engine.a",
-                locale = Locale.US,
-                voices = emptySet(),
-                requestedKey = null,
-                setVoice = { error("Unexpected voice selection: $it") },
-                currentVoice = { current },
-            )
+        val resolution = applyAutomaticVoice(current, emptySet())
 
         assertNull(resolution.effectiveKey)
     }
@@ -692,17 +669,10 @@ class TtsEngineResolverTest {
         val applied = mutableListOf<Voice>()
 
         val resolution =
-            TtsEngineResolver.applyResolvedVoice(
-                enginePackage = "engine.a",
-                locale = Locale.US,
-                voices = setOf(notInstalled, installed),
-                requestedKey = null,
-                setVoice = {
-                    applied.add(it)
-                    TextToSpeech.SUCCESS
-                },
-                currentVoice = { current },
-            )
+            applyAutomaticVoice(current, setOf(notInstalled, installed)) {
+                applied.add(it)
+                TextToSpeech.SUCCESS
+            }
 
         assertSame(installed, applied.single())
         assertEquals(TtsVoiceKey("engine.a", "offline-low", "en-GB"), resolution.effectiveKey)
@@ -854,3 +824,17 @@ class TtsEngineResolverTest {
         override fun setAudioAttributes(attributes: AudioAttributes?): Int = TextToSpeech.SUCCESS
     }
 }
+
+private fun applyAutomaticVoice(
+    current: Voice,
+    voices: Collection<Voice>,
+    setVoice: (Voice) -> Int = { error("Unexpected voice selection: $it") },
+): TtsVoiceResolution =
+    TtsEngineResolver.applyResolvedVoice(
+        enginePackage = "engine.a",
+        locale = Locale.US,
+        voices = voices,
+        requestedKey = null,
+        setVoice = setVoice,
+        currentVoice = { current },
+    )
