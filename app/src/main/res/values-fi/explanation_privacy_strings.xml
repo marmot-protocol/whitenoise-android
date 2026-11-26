@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Valitsee, kuinka kauan liitteet säilyvät tällä laitteella. Vanhemmat poistetaan nyt ja sitä mukaa kuin ne vanhenevat, ja jos lataat liitteen uudelleen, sen säilytysaika alkaa alusta. Viestit säilyvät.</string>
     <string name="explanation_privacy_storage_chat">Avaa tälle keskustelulle tallennetut liitteet.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Pyytää vahvistuksen ja poistaa sitten kaikki tämän keskustelun liitteet tältä laitteelta. Viestit säilyvät, ja voit ladata liitteet uudelleen niin kauan kuin lähettäjän kopio on saatavilla.</string>
-    <string name="explanation_privacy_storage_attachment">Valitsee tämän liitteen tai poistaa valinnan, jotta voit poistaa sen yhdessä muiden kanssa. Mitään ei poisteta ennen kuin valitset Poista.</string>
     <string name="explanation_privacy_storage_select_all">Valitsee kaikki tämän luettelon liitteet, jotta voit poistaa ne yhdessä. Mitään ei poisteta ennen kuin valitset Poista.</string>
     <string name="explanation_privacy_storage_select_shown">Valitsee vain tähän mennessä ladatut liitteet. Lisää latautuu vierittäessä, eikä mitään poisteta ennen kuin valitset Poista.</string>
     <string name="explanation_privacy_storage_clear_selection">Tyhjentää nykyisen valinnan poistamatta mitään.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Mykistää tämän henkilön viesti-ilmoitukset. Se koskee vain viestejä. Toimitus ja lukemattomien määrät eivät muutu.</string>
     <string name="explanation_privacy_profile_system">Avaa Androidin asetukset tämän henkilön ilmoituksille. Niissä voit määrittää mukautetun äänen ja toiminnan. Mukautetut asetukset koskevat tämän tilin kaikkia keskusteluja.</string>
     <string name="explanation_privacy_profile_vibration">Valitsee tämän henkilön ilmoitusten värinäkuvion.</string>
+    <string name="explanation_privacy_storage_attachment_open">Avaa tämän liitteen, jotta voit tarkistaa sen ennen poistamista. Valintamerkki tai rivin pitkä painallus valitsee sen poistettavaksi muiden kanssa. Mitään ei poisteta ennen kuin valitset Poista.</string>
 </resources>

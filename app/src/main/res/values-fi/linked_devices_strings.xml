@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="linked_devices">Linkitetyt laitteet</string>
+    <string name="linked_devices">Laitteet</string>
+    <string name="settings_search_alias_linked_devices">linkitetyt laitteet|linkitä laite</string>
+    <string name="group_account_devices_title">Linkitetyt laitteet</string>
     <string name="linked_devices_detail">Linkitetyltä laitteelta lähettämäsi viestit näkyvät sinun lähettäminäsi kaikilla linkitetyillä laitteillasi.</string>
     <string name="linked_devices_this_device">Tämä laite</string>
     <string name="linked_devices_other_devices">Muut laitteet</string>
@@ -109,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Laitteesi eivät voi tehdä poistoa näissä keskusteluissa. Keskustelun ylläpitäjä voi poistaa laitteen siellä.</string>
     <string name="devices_key_refresh_overdue">Tämä laite ei voinut päivittää kutsuavaimiaan. 30 päivän jälkeen muut eivät ehkä enää voi lisätä sitä uusiin keskusteluihin. Pidä sovellus auki laitteillasi, jotta ne pysyvät ajan tasalla.</string>
     <string name="devices_stalled">Tämä laite ei enää pysy muiden laitteidesi tahdissa. Korjaa sen linkitys jatkaaksesi.</string>
-    <string name="device_repair_confirm_again">Avaa Asetuksista Linkitetyt laitteet ja vahvista korjaus uudelleen ennen linkittämistä.</string>
+    <string name="device_repair_confirm_again">Avaa Asetuksista Laitteet ja vahvista korjaus uudelleen ennen linkittämistä.</string>
     <string name="device_repair_try_link_again">Linkitys nollattu. Viimeistele korjaus linkittämällä uudelleen.</string>
     <string name="devices_repair">Korjaa tämän laitteen linkitys</string>
     <string name="devices_repair_confirm">Tämä poistaa nykyisen linkityksen, jotta voit linkittää tämän laitteen uudelleen. Keskustelusi, viestisi, luonnoksesi ja asetuksesi säilyvät. Vanhaa linkitystä ei voi palauttaa, vaikka peruisit linkityksen.</string>
@@ -158,8 +160,8 @@
     <string name="link_offer_reminder">Linkitä tämä laite nähdäksesi muiden laitteidesi keskustelut.</string>
     <string name="link_request_default_label">Uusi laite</string>
     <string name="link_request_options">Vaihtoehdot</string>
-    <string name="link_request_options_detail">Valitse laitteen nimi ja se, jaetaanko keskustelut ja niiden historia.</string>
-    <string name="explanation_link_request_options">Avaa uuden laitteen nimen ja sen, mitä laite saa.</string>
+    <string name="link_request_options_detail">Valitse, jaetaanko keskustelut ja niiden historia.</string>
+    <string name="explanation_link_request_options">Avaa valinnat siitä, mitä uusi laite saa.</string>
     <string name="device_move_advanced">Lisäasetukset</string>
     <string name="setup_device_link_next">Kirjauduttuasi voit linkittää tämän laitteen, niin saat keskustelut muilta laitteiltasi.</string>
     <string name="unlinked_account_remove_for">Poista %1$s tältä laitteelta</string>

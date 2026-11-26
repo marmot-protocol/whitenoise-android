@@ -17,6 +17,9 @@
     <string name="storage_pictures">Profiili- ja ryhmäkuvat</string>
     <string name="storage_temporary">Väliaikaiset tiedostot</string>
     <string name="storage_temporary_detail">Kaikkien tämän laitteen profiilien yhteiset</string>
+    <string name="storage_highlight_share">%1$s · %2$s kokonaismäärästä %3$s</string>
+    <string name="storage_highlight_shared">%1$s · kaikkien profiilien yhteinen, ei mukana tässä summassa</string>
+    <string name="storage_share_under_one">alle %1$s</string>
     <string name="storage_load_failed">Tallennustilan käyttöä ei voitu ladata</string>
     <string name="storage_retry">Yritä uudelleen</string>
     <string name="storage_migration_moving_title">Päivitetään liitteiden tallennusta</string>
@@ -32,6 +35,7 @@
     <string name="storage_clear_cache_subtitle">Kuvat ladataan uudelleen, kun tarvitset niitä</string>
     <string name="storage_removal_help">Poistetut liitteet säilyvät viesteissään. Voit ladata ne uudelleen niin kauan kuin lähettäjän kopio on saatavilla.</string>
     <string name="storage_keep_media">Säilytä media</string>
+    <string name="storage_automatic_cleanup">Automaattinen siivous</string>
     <string name="storage_keep_media_help">Tätä vanhemmat liitteet poistetaan tältä laitteelta nyt ja sitä mukaa kuin ne vanhenevat. Jos lataat liitteen uudelleen, sen säilytysaika alkaa alusta.</string>
     <string name="storage_keep_media_failed">Ei voitu ladata</string>
     <string name="storage_keep_forever">Ikuisesti</string>
@@ -91,5 +95,9 @@
     <string name="storage_keep_media_saved">Median säilytysasetus tallennettu</string>
     <string name="storage_cache_cleared">%1$s vapautettu</string>
     <string name="storage_caches_cleared">Kuvat ja väliaikaiset tiedostot tyhjennetty</string>
+    <string name="storage_select">Valitse</string>
+    <string name="storage_deselect">Poista valinta</string>
+    <string name="storage_select_named">Valitse %1$s</string>
+    <string name="storage_open_failed">Tätä liitettä ei voitu avata</string>
     <string name="storage_action_failed">Tilaa ei voitu vapauttaa. Yritä uudelleen.</string>
 </resources>
