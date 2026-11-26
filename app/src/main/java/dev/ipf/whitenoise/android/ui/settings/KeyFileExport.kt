@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -15,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.discardInterruptedCreate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -70,6 +71,8 @@ private fun WhiteNoiseAppState.keyFileExportOwner(): KeyFileExportOwner? =
         ?.takeIf { it.localSigning && !signOutInProgress && !wipeInProgress }
         ?.let { KeyFileExportOwner(it.accountIdHex, activeAccountRef, runtimeGeneration) }
 
+private fun WhiteNoiseAppState.keyFileExportUnlocked(): Boolean = !appLock.screenVisible && !appLock.evaluationPending
+
 /** Owns the picker and its in-memory secret above the protected shell, which App Lock removes from composition. */
 @Composable
 internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportLauncher {
@@ -82,8 +85,7 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
     fun canDeliver(owner: KeyFileExportOwner): Boolean =
         appState.keyFileExportOwner() == owner &&
             lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
-            !appState.appLock.screenVisible &&
-            !appState.appLock.evaluationPending
+            appState.keyFileExportUnlocked()
 
     fun deliver() = deliverKeyFile(state, scope, context, appState.keyFileExportOwner(), ::canDeliver)
 
@@ -95,12 +97,9 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
             deliver()
         }
 
-    val locked = appState.appLock.screenVisible || appState.appLock.evaluationPending
     KeyFileExportEffects(appState, state, lifecycle)
-    // Retry after the lifecycle or App Lock publishes a new state. The picker can return before either updates.
-    val ready = !locked && lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    if (ready && state.destination != null) SideEffect { deliver() }
-    if (ready) {
+    RetryKeyFileDelivery(appState, state, lifecycle, ::deliver)
+    if (appState.keyFileExportUnlocked() && lifecycleState.isAtLeast(Lifecycle.State.STARTED)) {
         val dismiss = { state.feedback = null }
         ProfileKeyFeedbackDialogs(
             nativeExportError = null,
@@ -123,6 +122,27 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
             state.picking = false
             state.request = null
             state.feedback = KeyFileExportFeedback.SaveFailed
+        }
+    }
+}
+
+/** Observe the returned URI, Activity and App Lock from the export host's lifetime. */
+@Composable
+@Suppress("FunctionNaming")
+private fun RetryKeyFileDelivery(
+    appState: WhiteNoiseAppState,
+    state: KeyFileExport,
+    lifecycle: Lifecycle,
+    deliver: () -> Unit,
+) {
+    LaunchedEffect(appState, state, lifecycle) {
+        combine(
+            lifecycle.currentStateFlow,
+            snapshotFlow { state.destination?.takeIf { appState.keyFileExportUnlocked() } },
+        ) { lifecycleState, destination ->
+            destination?.takeIf { lifecycleState.isAtLeast(Lifecycle.State.STARTED) }
+        }.collect { destination ->
+            if (destination != null) deliver()
         }
     }
 }

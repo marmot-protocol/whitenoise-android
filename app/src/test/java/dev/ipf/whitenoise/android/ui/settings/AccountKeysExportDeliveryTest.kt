@@ -12,6 +12,7 @@ import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
@@ -149,9 +150,19 @@ class AccountKeysExportDeliveryTest {
         assertEquals(0, opens.get())
 
         composeRule.runOnIdle {
+            assertNotNull("The confirmed export must survive the stopped or locked shell", fixture.exportState.request)
+            assertEquals("The picker URI must stay queued until the shell is ready", uri, fixture.exportState.destination)
             if (lock) fixture.appState.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
             fixture.owner.resume()
         }
+        composeRule.runOnIdle {
+            assertFalse("The fixture must finish unlocking", fixture.appState.appLock.screenVisible)
+            assertFalse("The fixture must finish evaluating App Lock", fixture.appState.appLock.evaluationPending)
+        }
+        composeRule.waitUntil("The unlocked host claims the queued URI", TIMEOUT_MILLIS) {
+            fixture.exportState.destination == null
+        }
+        composeRule.runOnIdle { assertNull("The confirmed export must still be valid", fixture.exportState.feedback) }
         val expected = if (encrypted) ENCRYPTED_KEY else RAW_KEY
         composeRule.waitUntil(TIMEOUT_MILLIS) { bytes.toString(Charsets.UTF_8.name()) == expected }
         assertEquals(1, opens.get())
@@ -699,13 +710,16 @@ class AccountKeysExportDeliveryTest {
             )
         val picker = RecordingPicker()
         val owner = composeRule.runOnIdle { ScreenLifecycle().apply { resume() } }
+        val fixture = Fixture(appState, picker, owner, native)
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalActivityResultRegistryOwner provides picker,
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    CompositionLocalProvider(LocalKeyFileExportLauncher provides rememberKeyFileExport(appState)) {
+                    val fileExport = rememberKeyFileExport(appState)
+                    SideEffect { fixture.exportState = fileExport.state }
+                    CompositionLocalProvider(LocalKeyFileExportLauncher provides fileExport) {
                         if (!appState.appLock.screenVisible) {
                             AccountKeysScreen(
                                 appState = appState,
@@ -717,7 +731,7 @@ class AccountKeysExportDeliveryTest {
                 }
             }
         }
-        return Fixture(appState, picker, owner, native)
+        return fixture
     }
 
     /** Locally signed account metadata only; the synthetic key is supplied by the injected native proxy. */
@@ -737,7 +751,9 @@ class AccountKeysExportDeliveryTest {
         val picker: RecordingPicker,
         val owner: ScreenLifecycle,
         val native: NativeExports,
-    )
+    ) {
+        lateinit var exportState: KeyFileExport
+    }
 
     private enum class Teardown { SignOut, Wipe }
 

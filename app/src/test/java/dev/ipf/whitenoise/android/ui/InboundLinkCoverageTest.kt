@@ -32,24 +32,7 @@ class InboundLinkCoverageTest {
     @Test
     fun unknownAndMalformedLinksAreConsumedAndLeaveTheAppUsable() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val account =
-            AccountSummaryFfi(
-                label = "fixture",
-                accountIdHex = "a".repeat(64),
-                localSigning = true,
-                externalSigning = false,
-                signedOut = false,
-                running = true,
-                unlinked = false,
-            )
-        val row = chatRow("b".repeat(64)).copy(title = "Existing chat", groupName = "Existing chat")
-        val fixture =
-            NotificationBootstrapTestFixture(
-                context,
-                accounts = listOf(account),
-                chatListRows = listOf(row),
-                emitStartupNotification = false,
-            )
+        val fixture = readyAccountFixture(context)
         runBlocking { fixture.bootstrap() }
         val app = fixture.appState
         app.markDefaultNotificationsEnableAttempted()
@@ -91,5 +74,25 @@ class InboundLinkCoverageTest {
             composeRule.waitForIdle()
             fixture.close()
         }
+    }
+
+    private fun readyAccountFixture(context: Context): NotificationBootstrapTestFixture {
+        val account =
+            AccountSummaryFfi(
+                label = "fixture",
+                accountIdHex = "a".repeat(64),
+                localSigning = true,
+                externalSigning = false,
+                signedOut = false,
+                running = true,
+                unlinked = false,
+            )
+        val row = chatRow("b".repeat(64)).copy(title = "Existing chat", groupName = "Existing chat")
+        return NotificationBootstrapTestFixture(
+            context,
+            accounts = listOf(account),
+            chatListRows = listOf(row),
+            emitStartupNotification = false,
+        )
     }
 }
