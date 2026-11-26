@@ -101,13 +101,6 @@ internal fun headerShortcutRow(shortcut: HeaderShortcut): HeaderShortcutRow =
                 R.string.explanation_header_shortcut_read_aloud,
                 R.drawable.ic_record_voice_over,
             )
-        HeaderShortcut.DisappearingTimer ->
-            HeaderShortcutRow(
-                "disappearing",
-                R.string.disappearing_messages,
-                R.string.explanation_header_shortcut_disappearing,
-                R.drawable.ic_timer,
-            )
         HeaderShortcut.Members ->
             HeaderShortcutRow(
                 "members",

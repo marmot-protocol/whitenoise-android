@@ -111,26 +111,28 @@ private fun SetupResetRelayAction(
 }
 
 /** Dispatches only currently offered actions and proposal revision for approval. */
+@Suppress("LongParameterList") // A passed step uses its own native grant.
 @Composable
-private fun SetupOfferedAction(
+internal fun SetupOfferedAction(
     state: AccountSetupState,
     action: OnboardingActionFfi,
     primary: Boolean,
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+    step: OnboardingStepFfi? = state.currentStep?.step,
 ) {
     val snapshot = state.snapshot ?: return
-    val step = state.currentStep ?: return
+    if (step == null) return
     val recoveryEpoch = snapshot.recoveryEpoch
     val revision =
         if (action == OnboardingActionFfi.APPROVE_REPAIR) {
-            snapshot.proposal?.takeIf { it.step == step.step }?.revision ?: snapshot.revision
+            snapshot.proposal?.takeIf { it.step == step }?.revision ?: snapshot.revision
         } else {
             snapshot.revision
         }
     val canApprove =
         action != OnboardingActionFfi.APPROVE_REPAIR ||
-            snapshot.proposal?.step == step.step
+            snapshot.proposal?.step == step
     val enabled = !state.busy && canApprove
     val labelId =
         if (action == OnboardingActionFfi.CANCEL_REPAIR && state.removalReview) {
@@ -140,9 +142,9 @@ private fun SetupOfferedAction(
         }
     val onClick = {
         if (action in setupEditorActions) {
-            onEdit(step.step, action, revision)
+            onEdit(step, action, revision)
         } else {
-            onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
+            onAction(SetupRequest(revision, step, action, recoveryEpoch = recoveryEpoch))
         }
     }
     val modifier = Modifier.fillMaxWidth().testTag("setup-action-${action.name}")

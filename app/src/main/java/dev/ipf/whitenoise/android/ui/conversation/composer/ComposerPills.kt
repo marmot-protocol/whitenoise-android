@@ -354,7 +354,6 @@ internal fun ComposerPill(
     compactMeasurementWidth: Dp? = null,
     // The bar owns the automatic destination viewport after its final chrome and accessory budget.
     automaticTextHeightCeilingPx: Int? = null,
-    actionRowAccessoryHeightPx: Int = 0,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
@@ -1044,12 +1043,8 @@ internal fun ComposerPill(
                     interpolateDp(12.dp, ExpandedEditorBottomInset + extraControlsHeight, progress).roundToPx()
                 val rowHeight = ComposerActionRowHeight.roundToPx()
                 val boxHeight = maxOf(rowHeight, height + topInset + bottomInset)
-                val leadingRowTop = composerActionRowTop(boxHeight, rowHeight, progress)
-                val trailingRowTop =
-                    composerActionRowTop(boxHeight + actionRowAccessoryHeightPx, rowHeight, progress) -
-                        actionRowAccessoryHeightPx
-                val heightAboveActions =
-                    minOf(leadingRowTop, trailingRowTop) - extraControlsHeight.roundToPx() - topInset
+                val actionRowTop = composerActionRowTop(boxHeight, rowHeight, progress)
+                val heightAboveActions = actionRowTop - extraControlsHeight.roundToPx() - topInset
                 val lineHeight =
                     compactTextLayout?.let { layout ->
                         if (layout.lineCount > 0) (layout.getLineBottom(0) - layout.getLineTop(0)).roundToInt() else 1

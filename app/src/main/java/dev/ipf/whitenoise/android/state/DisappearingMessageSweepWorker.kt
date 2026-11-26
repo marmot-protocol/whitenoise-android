@@ -24,8 +24,8 @@ internal typealias PerformDisappearingMessageSweep = suspend (WhiteNoiseApplicat
 /** Test seam for the authoritative account preflight. */
 internal typealias HasRetentionSweepAccount = suspend (WhiteNoiseApplication) -> Boolean
 
-/** Only an authoritative, locally signed-in signing identity needs an expiry sweep. */
-internal fun needsRetentionSweep(rows: List<AccountSummaryFfi>): Boolean = rows.any { it.isSignedInSigningAccount() }
+/** Background account work (expiry sweeps, history backups) runs only for a locally signed-in signing identity. */
+internal fun hasSignedInAccount(rows: List<AccountSummaryFfi>): Boolean = rows.any { it.isSignedInSigningAccount() }
 
 /**
  * Reads MDK's account inventory before starting its notification and relay runtime. Reuse an
@@ -34,14 +34,14 @@ internal fun needsRetentionSweep(rows: List<AccountSummaryFfi>): Boolean = rows.
  * rechecked after waiting. A failed read propagates so WorkManager retries instead of mistaking
  * an unknown account set for an empty one.
  */
-internal suspend fun needsRetentionSweep(app: WhiteNoiseApplication): Boolean {
+internal suspend fun hasSignedInAccount(app: WhiteNoiseApplication): Boolean {
     return withContext(Dispatchers.IO) {
         MarmotClientRootGate.withLease {
             val existing = app.initializedAppState()?.retentionSweepRuntimeOrNull()
-            if (existing != null) return@withLease needsRetentionSweep(existing.listAccounts())
+            if (existing != null) return@withLease hasSignedInAccount(existing.listAccounts())
             val temporary = MarmotClient(app.applicationContext).marmot
             try {
-                needsRetentionSweep(temporary.listAccounts())
+                hasSignedInAccount(temporary.listAccounts())
             } finally {
                 withContext(NonCancellable) { temporary.shutdownAndClose() }
             }
@@ -81,7 +81,7 @@ class DisappearingMessageSweepWorker : CoroutineWorker {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         return runCatching {
             withContext(Dispatchers.Main.immediate) {
-                if ((accountOverride ?: ::needsRetentionSweep)(app)) {
+                if ((accountOverride ?: ::hasSignedInAccount)(app)) {
                     val override = sweepOverride
                     if (override != null) {
                         override(app)

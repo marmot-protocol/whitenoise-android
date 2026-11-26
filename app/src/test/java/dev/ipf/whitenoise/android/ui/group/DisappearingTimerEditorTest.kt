@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DisappearingTimerEditorTest {
-    /** Only picks that prune existing history ask first; the header and details share this rule. */
+    /** Only picks that prune existing history ask first. */
     @Test
     fun pickOutcomeConfirmsOnlyHistoryPruningChanges() {
         assertEquals(DisappearingPick.Skip, disappearingPickOutcome(currentSecs = 60L, secs = 60L))

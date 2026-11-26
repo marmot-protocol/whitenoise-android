@@ -28,8 +28,8 @@ import dev.ipf.whitenoise.android.state.QuarantineRecoveryOutcome
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsController
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.quarantineAccountEligible
 import dev.ipf.whitenoise.android.state.quarantinedGroupsAccess
+import dev.ipf.whitenoise.android.state.signedInAccountEligible
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -38,7 +38,7 @@ import kotlinx.coroutines.ensureActive
 @Composable
 internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): QuarantinedGroupsController {
     val scope = rememberCoroutineScope()
-    val eligible = appState.quarantineAccountEligible()
+    val eligible = appState.signedInAccountEligible()
     val controller =
         remember(appState.activeAccountRef, appState.runtimeGeneration, appState.developerMode, eligible) {
             QuarantinedGroupsController(appState.quarantinedGroupsAccess(), scope)
@@ -51,7 +51,7 @@ internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): 
 /** The Developer Tools subtitle performs one native read per observable owner. */
 @Composable
 internal fun rememberQuarantinedGroupsSummary(appState: WhiteNoiseAppState): String {
-    val eligible = appState.quarantineAccountEligible()
+    val eligible = appState.signedInAccountEligible()
     val state by key(appState.activeAccountRef, appState.runtimeGeneration, eligible) {
         produceState(QuarantinedGroupsUiState(loading = true)) {
             val access = appState.quarantinedGroupsAccess()
