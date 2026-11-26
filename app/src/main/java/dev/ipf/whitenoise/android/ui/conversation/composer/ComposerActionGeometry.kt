@@ -41,7 +41,8 @@ internal fun composerEditorViewportHeight(
  * animated editing progress. The progress is read during placement so nothing recomposes per frame.
  */
 internal class ComposerActionRowAlignment(
-    private val horizontal: Alignment.Horizontal,
+    /** The edge the cluster keeps: [Alignment.Start] or [Alignment.End]. */
+    val horizontal: Alignment.Horizontal,
     private val topInset: () -> Int = { 0 },
     private val editingProgress: () -> Float,
 ) : Alignment {
