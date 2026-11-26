@@ -34,7 +34,6 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -101,6 +101,7 @@ internal val disappearingGridSecs: List<Long> = disappearingPresetSecs.filter { 
 private const val DEFAULT_CHIP_COLUMNS = 3
 private const val COMPACT_FONT_SCALE = 1.3f
 private val compactWindowWidth = 340.dp
+private val timerChoiceMinHeight = 48.dp
 
 private const val PAGE_SLIDE_WIDTH_DIVISOR = 4
 
@@ -344,7 +345,7 @@ private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowS
     )
 }
 
-/** A compact, square-cornered choice; the selected one fills with the accent and gains a check. */
+/** A compact choice; the selected one fills with the accent and gains a check. */
 @Composable
 private fun DisappearingChip(
     label: String,
@@ -370,15 +371,15 @@ private fun DisappearingChip(
     Surface(
         modifier =
             modifier
-                .heightIn(min = 48.dp)
+                .heightIn(min = timerChoiceMinHeight)
                 .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
+        shape = MaterialTheme.shapes.medium,
         color = container,
         contentColor = content,
         border = BorderStroke(1.dp, border),
     ) {
         Row(
-            Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+            Modifier.padding(horizontal = Dimens.spaceXs, vertical = Dimens.spaceMd),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -393,12 +394,12 @@ private fun DisappearingChip(
                         contentDescription = null,
                         modifier = Modifier.size(12.dp),
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Dimens.spaceXs))
                 }
             }
             if (iconRes != null && !selected) {
                 Icon(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Dimens.spaceXs))
             }
             Text(
                 label,
@@ -429,12 +430,15 @@ private fun DisappearingPruneConfirm(
             .testTag(DISAPPEARING_CONFIRM_TAG),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_warning),
                 contentDescription = null,
                 tint = scheme.error,
-                modifier = Modifier.padding(top = 2.dp).size(18.dp),
+                modifier = Modifier.padding(top = Dimens.spaceXxs).size(16.dp),
             )
             Text(
                 stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
@@ -453,7 +457,7 @@ private fun DisappearingPruneConfirm(
             Button(
                 onClick = onConfirm,
                 enabled = enabled,
-                shape = RoundedCornerShape(10.dp),
+                shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
                 modifier = Modifier.testTag(DISAPPEARING_CONFIRM_ACTION_TAG),
             ) { Text(stringResource(R.string.disappearing_confirm_button)) }
@@ -553,8 +557,12 @@ private fun DisappearingCustomPage(
             Spacer(Modifier.size(WhiteNoiseSpacing.Related))
             Button(
                 onClick = { onSet(secs) },
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(DISAPPEARING_CUSTOM_SET_TAG),
+                shape = MaterialTheme.shapes.medium,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = timerChoiceMinHeight)
+                        .testTag(DISAPPEARING_CUSTOM_SET_TAG),
             ) { Text(stringResource(R.string.disappearing_set)) }
         }
     }
