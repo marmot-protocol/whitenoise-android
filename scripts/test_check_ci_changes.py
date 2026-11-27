@@ -26,7 +26,8 @@ def cli_outputs(event, mode='', labels=None, raw=None, base='a' * 40, head='b' *
         if observe:
             main()
         else:
-            with patch('scripts.check_ci_changes.complete_diff', return_value=raw) as diff:
+            with patch('scripts.check_ci_changes.checked_out_pr_merge', return_value=(base, head)), \
+                 patch('scripts.check_ci_changes.complete_diff', return_value=raw) as diff:
                 main()
                 diff.assert_called_once_with(event, base, head)
     return dict(line.split('=', 1) for line in stdout.getvalue().splitlines())
@@ -41,11 +42,11 @@ def validation_mode(event, mode, labels, raw):
 
 
 def classify(event, base, head):
-    return cli_outputs(event, base=base, head=head, observe=True)['docs_only'] == 'true'
+    return validation_selection(event, '', None, complete_diff(event, base, head))['docs_only'] == 'true'
 
 
 def supplemental_campaigns(event, base, head):
-    return cli_outputs(event, base=base, head=head, observe=True)['supplemental_campaigns'] == 'true'
+    return validation_selection(event, '', None, complete_diff(event, base, head))['supplemental_campaigns'] == 'true'
 
 
 class CiChangesTest(unittest.TestCase):
@@ -161,7 +162,43 @@ class CiChangesTest(unittest.TestCase):
             diff.assert_called_once_with('merge_group', '', 'b' * 40)
             self.assertEqual(output.read_text(), stdout.getvalue())
             self.assertEqual(set(dict(line.split('=', 1) for line in stdout.getvalue().splitlines())),
-                             {'ci_mode', 'precheck', 'full_matrix', 'docs_only', 'supplemental_campaigns', 'tooling_regressions'})
+                             {'ci_mode', 'precheck', 'full_matrix', 'docs_only', 'supplemental_campaigns',
+                              'tooling_regressions', 'pr_base', 'proof_base'})
+
+    def test_cli_uses_verified_merge_checkout_when_event_base_is_stale(self):
+        stale, base, head, merged = (c * 40 for c in 'abcd')
+        parents = subprocess.CompletedProcess([], 0, f'{merged} {base} {head}')
+        diff = subprocess.CompletedProcess([], 0, entry('README.md'))
+        with patch('scripts.check_ci_changes.subprocess.run', side_effect=[parents, diff]) as run:
+            outputs = cli_outputs('pull_request', base=stale, head=head, observe=True)
+        self.assertEqual(outputs['pr_base'], base)
+        self.assertEqual(outputs['proof_base'], base)
+        self.assertEqual(outputs['docs_only'], 'true')
+        self.assertEqual(run.call_args.args[0][-1], f'{base}...{merged}')
+
+    def test_cli_declines_a_checkout_that_does_not_merge_the_event_head(self):
+        base, head, merged, other_head = (c * 40 for c in 'abcd')
+        for commits in (f'{merged} {base} {other_head}', f'{merged} {base}'):
+            with self.subTest(commits=commits):
+                parents = subprocess.CompletedProcess([], 0, commits)
+                with patch('scripts.check_ci_changes.subprocess.run', return_value=parents) as run:
+                    outputs = cli_outputs('pull_request', mode='merge-queue', base=base,
+                                          head=head, observe=True)
+                self.assertEqual(outputs['pr_base'], '')
+                self.assertEqual(outputs['proof_base'], '')
+                self.assertEqual(outputs['docs_only'], 'false')
+                self.assertEqual(outputs['ci_mode'], 'full')
+                self.assertEqual(run.call_count, 1)
+
+    def test_failed_pr_diff_keeps_the_base_for_tooling_but_disallows_proofs(self):
+        base, head, merged = (c * 40 for c in 'abc')
+        parents = subprocess.CompletedProcess([], 0, f'{merged} {base} {head}')
+        error = subprocess.CalledProcessError(1, 'git diff')
+        with patch('scripts.check_ci_changes.subprocess.run', side_effect=[parents, error]):
+            outputs = cli_outputs('pull_request', mode='merge-queue', head=head, observe=True)
+        self.assertEqual(outputs['pr_base'], base)
+        self.assertEqual(outputs['proof_base'], '')
+        self.assertEqual(outputs['ci_mode'], 'full')
 
     def test_only_known_plain_prose_files_skip_android(self):
         self.assertTrue(docs_only_diff(entry('README.md') + entry('docs/ci.md')))

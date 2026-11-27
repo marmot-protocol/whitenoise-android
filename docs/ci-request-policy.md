@@ -178,7 +178,10 @@ Identical content is validated once, in two places. A merge group never reuses a
   same base commit and tree. The run still starts to report the
   required check name for the ready head. A PR run that completes the precheck or full
   lane uploads a seven-day proof named `android-ci-attest-master-<base>-<lane>-<tree>`.
-  The base is the checked-out merge commit's first parent and must match the event base.
+  The base is the checked-out merge commit's first parent. CI verifies the second
+  parent against the event's PR head, then uses the first parent for classification,
+  base-dependent tooling checks and the proof key. An unavailable diff disables
+  proof publication and reuse.
   The tree is the checked-out commit's tree. `scripts/ci_reuse.py` looks up that base and tree
   (a full proof also satisfies a precheck request) and verifies the producing run through
   the Actions API. It must be a completed, successful run of this workflow from a PR in

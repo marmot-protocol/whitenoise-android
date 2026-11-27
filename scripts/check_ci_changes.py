@@ -68,8 +68,23 @@ def docs_only_diff(raw):
     return True
 
 
+def checked_out_pr_merge(expected_head):
+    """Return the checked-out merge's base and commit after verifying its PR head."""
+    if not re.fullmatch(r'[0-9a-f]{40}', expected_head):
+        return '', ''
+    try:
+        completed = subprocess.run(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'],
+                                   capture_output=True, text=True, check=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return '', ''
+    commits = completed.stdout.split()
+    if len(commits) == 3 and commits[2] == expected_head:
+        return commits[1], commits[0]
+    return '', ''
+
+
 def complete_diff(event, base, head):
-    """Use the queue's tested integration, never its original PR branch."""
+    """Compare the selected checkout with its base, including queued integrations."""
     if event not in {'pull_request', 'push', 'merge_group'}:
         return None
     if not all(re.fullmatch(r'[0-9a-f]{40}', ref or '') for ref in (base, head)):
@@ -173,8 +188,13 @@ def main():
         labels = json.loads(os.environ.get('CI_CURRENT_LABELS', 'null'))
     except (ValueError, TypeError):
         labels = None
-    raw = complete_diff(args.event, args.base, args.head)
+    base, head = args.base, args.head
+    if args.event == 'pull_request':
+        base, head = checked_out_pr_merge(head)
+    raw = complete_diff(args.event, base, head)
     selection = validation_selection(args.event, os.environ.get('ANDROID_CI_MODE', ''), labels, raw)
+    selection['pr_base'] = base if args.event == 'pull_request' else ''
+    selection['proof_base'] = selection['pr_base'] if raw is not None else ''
     line = ''.join(f'{key}={value}\n' for key, value in selection.items())
     print(line, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):

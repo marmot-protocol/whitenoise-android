@@ -109,19 +109,6 @@ def current_tree():
     return completed.stdout.strip()
 
 
-def checked_out_pr_base(expected_base):
-    """Confirm that the event base matches the first parent of the checked-out PR merge."""
-    if not SHA_PATTERN.fullmatch(expected_base):
-        return ''
-    try:
-        completed = subprocess.run(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'],
-                                   capture_output=True, text=True, check=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return ''
-    parents = completed.stdout.split()
-    return parents[1] if len(parents) == 3 and parents[1] == expected_base else ''
-
-
 def trusted_blobs():
     """Return the blob hash of each trusted code path in the checkout, or {} when unreadable."""
     blobs = {}
@@ -374,7 +361,7 @@ def main():
     parser.add_argument('--docs-only', default='false')
     parser.add_argument('--head-sha', default='')
     parser.add_argument('--base-ref', default='')
-    parser.add_argument('--base-sha', default='')
+    parser.add_argument('--base-sha', default='', help='Verified PR base from classification')
     parser.add_argument('--before', default='', help='Commit the pushed branch pointed at before the push')
     parser.add_argument('--setting', default='', help='Repository variable ANDROID_CI_REUSE')
     args = parser.parse_args()
@@ -382,16 +369,12 @@ def main():
         tree = current_tree()
     except (OSError, subprocess.SubprocessError):
         tree = ''
-    base_sha = ''
-    if args.event == 'pull_request' and args.base_ref == PUSH_BRANCH:
-        base_sha = checked_out_pr_base(args.base_sha)
     api = GhApi()
     outputs, reason = decide(api, args.repo, args.event, args.action, args.mode,
                              args.docs_only, tree, args.head_sha, args.setting,
                              trusted_blobs(), lambda: cache_inputs_changed(args.before),
                              lambda: lint_inputs_since_last_writer(api, args.repo, args.head_sha),
-                             base_ref=args.base_ref, base_sha=base_sha)
-    outputs['proof_base'] = base_sha
+                             base_ref=args.base_ref, base_sha=args.base_sha)
     publish(outputs, reason)
 
 

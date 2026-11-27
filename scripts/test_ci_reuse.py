@@ -115,16 +115,6 @@ class TreeReuseTest(unittest.TestCase):
                 self.assertEqual(decide(api)[0]['reuse'], 'none')
                 self.assertEqual(api.paths, [artifact_path('full')])
 
-    def test_pr_base_requires_a_matching_checked_out_merge_parent(self):
-        """Use the checkout's first parent only when it agrees with the event base."""
-        for parents, expected in ((f'{SHA} {BASE} {HEAD}', BASE),
-                                  (f'{SHA} {BEFORE} {HEAD}', ''),
-                                  (f'{SHA} {BASE}', '')):
-            with self.subTest(parents=parents):
-                git = subprocess.CompletedProcess([], 0, stdout=parents)
-                with unittest.mock.patch('subprocess.run', return_value=git):
-                    self.assertEqual(ci_reuse.checked_out_pr_base(BASE), expected)
-
     def test_named_artifact_requires_the_official_master_only_upload(self):
         """A successful develop run may contain a same-named artifact but skips the official upload."""
         for receipt in (published_proof(receipt='skipped'), published_proof(artifact_id=112)):

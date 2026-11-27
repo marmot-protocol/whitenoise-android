@@ -530,8 +530,10 @@ class AndroidCiGateTest(unittest.TestCase):
             header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
             self.assertIn("needs.changes.outputs.reuse != 'tree'", header, name)
             self.assertNotIn("reuse == 'none'", header, name)
-        for output in ('reuse', 'reuse_run', 'tree', 'proof_base', 'lint_writer'):
+        for output in ('reuse', 'reuse_run', 'tree', 'lint_writer'):
             self.assertIn(f'      {output}: ${{{{ steps.reuse.outputs.{output} }}}}\n', self.changes)
+        self.assertIn('      pr_base: ${{ steps.classify.outputs.pr_base }}\n', self.changes)
+        self.assertIn('      proof_base: ${{ steps.classify.outputs.proof_base }}\n', self.changes)
         self.assertIn('      actions: read\n', self.changes)
         self.assertNotIn('actions: write', self.changes)
         lookup = self.named_step(self.changes, 'Look for a verified result on identical content')
@@ -539,7 +541,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/ci_reuse.py', lookup)
         self.assertIn('--before "$CI_BEFORE_SHA"', lookup)
         self.assertIn('CI_BEFORE_SHA: ${{ github.event.before }}', lookup)
-        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nproof_base=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
+        self.assertIn('CI_BASE_SHA: ${{ steps.classify.outputs.proof_base }}', lookup)
+        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
         for name in ('Write the validated tree proof', 'Retain the validated tree proof'):
             step = self.named_step(self.gate, name)
             for condition in ('success()', "github.event_name == 'pull_request'",
@@ -555,6 +558,13 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('id: proof_upload', proof)
         self.assertIn('name: Record validated tree proof ${{ steps.proof_upload.outputs.artifact-id }}', self.gate)
         self.assertIn("steps.proof_upload.outcome == 'success'", self.gate)
+
+    def test_pr_tooling_uses_the_verified_checkout_base(self):
+        manual = self.named_step(self.tooling_contracts, 'Validate manual release guide')
+        size = self.named_step(self.tooling_contracts, 'Check the source file size baseline only shrinks')
+        self.assertIn('PR_BASE_SHA: ${{ needs.changes.outputs.pr_base }}', manual)
+        self.assertIn('${PR_BASE_SHA:?', manual)
+        self.assertIn('BASE_SHA: ${{ needs.changes.outputs.pr_base || github.event.merge_group.base_sha }}', size)
 
     def test_classifier_and_lookup_run_first_and_isolated_before_other_pr_code(self):
         """Nothing PR-controlled runs before the steps that decide the lane, the tree and the reuse."""
