@@ -959,7 +959,7 @@ class LocalNotificationPresenter(
                                             )
                                             if (carried.isNullOrEmpty() &&
                                                 emojiArtifact == null &&
-                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_ROWS)
+                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_CHIPS)
                                             ) {
                                                 false
                                             } else {
@@ -977,7 +977,7 @@ class LocalNotificationPresenter(
                                                         messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
-                                                builder.extras.remove(EXTRA_QUICK_REACTION_ROWS)
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_CHIPS)
                                                 builder.extras.remove(EXTRA_QUICK_REACTION_TARGET)
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =
