@@ -406,6 +406,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "Imported-account setup: R.string.setup_finding_rate_limited",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupLabels.kt",
+        "anchor": "R.string.setup_finding_rate_limited",
+        "test_ids": [
+          "ONB-015"
+        ]
       }
     ],
     "composable_surfaces": [

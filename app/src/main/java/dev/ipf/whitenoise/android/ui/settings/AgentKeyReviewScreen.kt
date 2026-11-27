@@ -140,11 +140,20 @@ internal fun AgentKeyReviewScreen(
 /** Clipboard contents are read only when the person explicitly taps Paste. */
 @Suppress("FunctionNaming")
 @Composable
-private fun PasteAgentKey(clipboard: ClipboardManager?, onPaste: (String) -> Unit) {
+private fun PasteAgentKey(
+    clipboard: ClipboardManager?,
+    onPaste: (String) -> Unit,
+) {
     SystemPasteIconButton(
         onPaste = {
             clipboard.withPrimaryClipForPaste { clip ->
-                if (clip.itemCount > 0) clip.getItemAt(0).text?.toString()?.let(onPaste)
+                if (clip.itemCount > 0) {
+                    clip
+                        .getItemAt(0)
+                        .text
+                        ?.toString()
+                        ?.let(onPaste)
+                }
             }
         },
     ) {
@@ -153,7 +162,9 @@ private fun PasteAgentKey(clipboard: ClipboardManager?, onPaste: (String) -> Uni
 }
 
 internal sealed interface AgentKeyCheck {
-    data class Valid(val npub: String) : AgentKeyCheck
+    data class Valid(
+        val npub: String,
+    ) : AgentKeyCheck
 
     data object Invalid : AgentKeyCheck
 

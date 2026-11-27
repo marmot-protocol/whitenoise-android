@@ -476,17 +476,6 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
-                "AiAgents.review_agent_key",
-                R.string.ai_agent_review_key,
-                R.string.ai_agents,
-                SettingsDetail.AiAgents,
-                itemKey = "search.AiAgents.7",
-                rowKey = "review_agent_key",
-                accountRequired = true,
-            ),
-        )
-        add(
-            SettingsSearchEntry(
                 "AiAgents.public_key",
                 R.string.copy_public_key,
                 R.string.ai_agents,

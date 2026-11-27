@@ -252,6 +252,15 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             account = true,
         )
         control(
+            "AiAgents.review_agent_key",
+            R.string.ai_agent_review_key,
+            R.string.ai_agents,
+            SettingsDetail.AiAgents,
+            "search.AiAgents.7",
+            "review_agent_key",
+            account = true,
+        )
+        control(
             "Account.public_key",
             R.string.public_key,
             R.string.settings_profile_keys,

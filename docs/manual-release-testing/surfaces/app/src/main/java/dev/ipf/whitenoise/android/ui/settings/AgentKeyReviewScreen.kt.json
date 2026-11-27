@@ -19,6 +19,80 @@
           "SET-016"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Agent key review: R.string.ai_agent_check_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_check_key",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_key_compare",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_key_compare",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_key_intro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_key_intro",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_key_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_key_invalid",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_key_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_key_label",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_key_self",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_key_self",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_open_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_open_profile",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.ai_agent_review_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.ai_agent_review_key",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "Agent key review: R.string.paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "SET-016"
+        ]
+      }
     ]
   }
 }

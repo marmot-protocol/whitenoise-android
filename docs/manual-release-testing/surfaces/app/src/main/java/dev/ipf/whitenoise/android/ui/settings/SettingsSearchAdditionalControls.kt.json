@@ -810,6 +810,22 @@
         "test_ids": [
           "NTF-049"
         ]
+      },
+      {
+        "surface": "setting:ai_agent_review_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.ai_agent_review_key",
+        "test_ids": [
+          "SET-042"
+        ]
+      },
+      {
+        "surface": "setting:ai_agents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.ai_agents",
+        "test_ids": [
+          "SET-042"
+        ]
       }
     ],
     "composable_surfaces": [

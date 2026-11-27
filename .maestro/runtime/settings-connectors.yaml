@@ -13,6 +13,19 @@ name: settings-connectors
 - tapOn: "AI Agents"
 - assertVisible:
     id: "ai_agents.connectors"
+- scrollUntilVisible:
+    element:
+      id: "ai_agents.review_key"
+    direction: DOWN
+- tapOn:
+    id: "ai_agents.review_key"
+- assertVisible:
+    id: "ai_agents.key_input"
+- assertVisible:
+    id: "ai_agents.key_action"
+    enabled: false
+- tapOn: "Back"
+- assertVisible: "AI Agents"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

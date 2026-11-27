@@ -149,7 +149,7 @@
       "manual_ids": [
         "SET-016"
       ],
-      "assertions": "AI Agents opens its expected content; toolbar Back returns to Settings and Chats.",
+      "assertions": "AI Agents shows the connector list and opens key review with an empty input and disabled Check key action. Toolbar Back returns through AI Agents and Settings to Chats.",
       "postcondition": "none"
     },
     "settings-help": {

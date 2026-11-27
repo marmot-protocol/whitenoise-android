@@ -3525,6 +3525,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentKeyReviewScreen.kt",
+      "symbol": "AgentKeyReviewScreen",
+      "bindings": [
+        {
+          "case": "settings-connectors",
+          "selector": {
+            "id": "ai_agents.key_action",
+            "enabled": false
+          },
+          "scope": "Manual setup opens agent key review with an empty field and a disabled Check key action. Back returns to AI Agents.",
+          "opened_by": {
+            "id": "ai_agents.review_key"
+          }
+        }
+      ],
+      "remaining": "Exercise clipboard paste, malformed or own keys, canonical key comparison and the profile handoff on-device."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
       "symbol": "AgentSetupSheet",
       "bindings": [
