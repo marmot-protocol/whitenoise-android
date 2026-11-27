@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+  "legacy_sha256": null,
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Cancelled app-lock credential prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+        "anchor": "R.string.app_lock_auth_cancelled",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "Temporary or permanent app-lock credential lockout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+        "anchor": "R.string.app_lock_auth_locked",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "Timed-out app-lock credential prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+        "anchor": "R.string.app_lock_auth_timed_out",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "Unavailable app-lock credential prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+        "anchor": "R.string.app_lock_auth_unavailable",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "App-lock credential prompt failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/AppUnlockCryptoGate.kt",
+        "anchor": "R.string.app_lock_auth_failed",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
