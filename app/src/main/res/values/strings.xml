@@ -2007,7 +2007,7 @@
     <!-- %1$s is an emoji shortcode such as :fox:. -->
     <string name="emoji_sets_emoji_loading">%1$s, loading</string>
     <!-- %1$s is an emoji shortcode such as :fox:. -->
-    <string name="emoji_sets_emoji_failed">%1$s couldn’t load. Tap to retry.</string>
+    <string name="emoji_sets_emoji_failed">%1$s couldn’t load.</string>
     <!-- %1$s is an emoji shortcode such as :fox:. -->
     <string name="emoji_sets_emoji_unavailable">%1$s isn’t available on this device.</string>
     <string name="emoji_sets_install">Install set</string>

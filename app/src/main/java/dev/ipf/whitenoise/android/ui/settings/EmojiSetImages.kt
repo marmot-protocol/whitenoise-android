@@ -80,7 +80,11 @@ internal class EmojiSetImages(
     private val images = mutableStateMapOf<String, EmojiSetImage>()
     private val attempts = mutableStateMapOf<String, Int>()
     private val readyOrder = ArrayDeque<String>()
+    private val attachedTiles = mutableSetOf<String>()
     private val permits = Semaphore(MAX_PARALLEL_LOADS)
+    private var activeLoads by mutableIntStateOf(0)
+
+    val hasLoadingTiles: Boolean get() = activeLoads > 0
 
     /** The tile state for [shortcode]; null before its first load and after a failed one is retried. */
     operator fun get(shortcode: String): EmojiSetImage? = images[shortcode]
@@ -90,20 +94,35 @@ internal class EmojiSetImages(
         requested = true
     }
 
+    fun attach(shortcode: String) {
+        attachedTiles.add(shortcode)
+    }
+
+    fun detach(shortcode: String) {
+        attachedTiles.remove(shortcode)
+        trimReadyImages()
+    }
+
     /** Loads [shortcode] once, unless it is already loading or loaded. */
     suspend fun load(shortcode: String) {
         if (!requested || images[shortcode] != null) return
         images[shortcode] = EmojiSetImage.Loading
+        activeLoads++
         try {
             val image = fetch { source.emoji(set, shortcode, local) }
             images[shortcode] = image
-            if (image is EmojiSetImage.Ready) retain(shortcode)
+            if (image is EmojiSetImage.Ready) {
+                readyOrder.addLast(shortcode)
+                trimReadyImages()
+            }
         } catch (cancelled: CancellationException) {
             // A blocking native read can unwind after its tile already came back and found it Loading; the new
             // attempt restarts that tile's effect, and a tile still off screen loads when it returns.
             images.remove(shortcode)
             attempts[shortcode] = attempt(shortcode) + 1
             throw cancelled
+        } finally {
+            activeLoads--
         }
     }
 
@@ -137,17 +156,12 @@ internal class EmojiSetImages(
     fun firstReady(): EmojiArt? =
         set.emoji.firstNotNullOfOrNull { (images[it.shortcode] as? EmojiSetImage.Ready)?.art }
 
-    /**
-     * Keeps at most [MAX_READY_IMAGES] decoded images, so scrolling a very large set cannot grow memory without bound.
-     * The oldest one is dropped and its attempt bumped, so it loads again if it is still or again on screen.
-     */
-    private fun retain(shortcode: String) {
-        readyOrder.remove(shortcode)
-        readyOrder.addLast(shortcode)
+    /** Drops older offscreen images first. Tiles still in composition keep their images until they detach. */
+    private fun trimReadyImages() {
         while (readyOrder.size > MAX_READY_IMAGES) {
-            val evicted = readyOrder.removeFirst()
-            images.remove(evicted)
-            attempts[evicted] = attempt(evicted) + 1
+            val index = readyOrder.indexOfFirst { it !in attachedTiles }
+            if (index < 0) return
+            images.remove(readyOrder.removeAt(index))
         }
     }
 

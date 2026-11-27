@@ -39,6 +39,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
@@ -106,12 +107,13 @@ internal fun EmojiSetPreview(
     BoxWithConstraints {
         val columns = gridColumns(maxWidth)
         val rows = remember(set.emoji, columns) { set.emoji.chunked(columns) }
-        // The pulse runs only while the grid is on screen.
-        val pulse = if (images?.requested == true && rows.isNotEmpty()) rememberTilePulse() else StillPulse
+        val pulse = if (images?.hasLoadingTiles == true) rememberTilePulse() else StillPulse
         SettingsList {
             item(key = "set.header") { EmojiSetPreviewHeader(set, images) }
             // Install, Update and Load emoji all contact the image hosts, so the disclosure comes before each of them.
-            if (images?.local != true) item(key = "set.hosts") { EmojiSetHostDisclosure(set) }
+            if (images?.local != true || set.installed?.updateAvailable == true) {
+                item(key = "set.hosts") { EmojiSetHostDisclosure(set) }
+            }
             if (images != null && !images.requested && rows.isNotEmpty() && state.progress == null) {
                 item(key = "set.load") {
                     EmojiSetLoadAction(enabled = !state.busy, onLoad = images::request)
@@ -381,8 +383,7 @@ private fun EmojiSetTileRow(
 }
 
 /**
- * The emoji itself, a pulsing blank while it loads, or an error mark that retries on tap. The shortcode is only in
- * the accessibility label and the long-press tooltip.
+ * The emoji itself, a pulsing blank while it loads, or a retry icon. Loaded art exposes its shortcode on long press.
  */
 @Composable
 private fun EmojiSetTile(
@@ -392,6 +393,10 @@ private fun EmojiSetTile(
     modifier: Modifier,
 ) {
     val image = images[shortcode]
+    DisposableEffect(images, shortcode) {
+        images.attach(shortcode)
+        onDispose { images.detach(shortcode) }
+    }
     // Keyed on the attempt, not the tile state, which the load itself changes.
     LaunchedEffect(images, shortcode, images.requested, images.attempt(shortcode)) { images.load(shortcode) }
     val label = ":$shortcode:"
@@ -421,11 +426,7 @@ private fun EmojiSetTileContent(
     pulse: State<Float>,
     onRetry: () -> Unit,
 ) {
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = { PlainTooltip { Text(label) } },
-        state = rememberTooltipState(),
-    ) {
+    val tile: @Composable () -> Unit = {
         Box(
             modifier =
                 Modifier
@@ -452,7 +453,7 @@ private fun EmojiSetTileContent(
                     EmojiArtImage(image.art, contentDescription = null, Modifier.fillMaxSize(TILE_ART_FRACTION))
                 EmojiSetImage.Failed ->
                     Icon(
-                        painterResource(R.drawable.ic_error),
+                        painterResource(if (canRetry) R.drawable.ic_refresh else R.drawable.ic_error),
                         contentDescription = null,
                         tint =
                             if (canRetry) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -460,6 +461,16 @@ private fun EmojiSetTileContent(
                 EmojiSetImage.Loading, null -> PulsingBlank(pulse)
             }
         }
+    }
+    if (image is EmojiSetImage.Ready) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(label) } },
+            state = rememberTooltipState(),
+            content = tile,
+        )
+    } else {
+        tile()
     }
 }
 

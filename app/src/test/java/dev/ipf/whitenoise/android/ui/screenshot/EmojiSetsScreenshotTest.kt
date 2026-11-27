@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -109,13 +110,13 @@ class EmojiSetsScreenshotTest {
         failedBrowser("discovery_error_rtl_large", EmojiSetNotice.Error, rtl = true)
     }
 
-    /** A discovered set opens with blank tiles, its image hosts and Load emoji; no shortcodes or hosts per emoji. */
+    /** A discovered set opens with its image hosts and Load emoji. Tiles appear after consent. */
     @Test fun previewLight() = gallery("preview_light", requested = false)
 
     /** An installed preview with update and removal available still waits for consent to load the new version. */
     @Test fun previewDark() = gallery("preview_dark", dark = true, requested = false, installed = updateAvailable)
 
-    /** The two-button update row and the unloaded grid, mirrored with large text. */
+    /** The two-button update row and consent action, mirrored with large text. */
     @Test fun previewRtlLarge() =
         gallery("preview_rtl_large", rtl = true, requested = false, installed = updateAvailable)
 
@@ -126,7 +127,7 @@ class EmojiSetsScreenshotTest {
     @Test fun previewInstalledDark() =
         gallery("preview_installed_dark", dark = true, requested = false, installed = installedHere)
 
-    /** The loaded grid mirrored with large text, so fewer, larger tiles fit a row. */
+    /** The loaded grid mirrored with large text. */
     @Test fun previewLoadedRtlLarge() = gallery("preview_loaded_rtl_large", rtl = true, requested = true)
 
     /** Install progress replaces the actions with MDK's count and Cancel. */
@@ -147,6 +148,8 @@ class EmojiSetsScreenshotTest {
         setTheme(dark = false, rtl = false) { galleryContent(images) }
         composeRule.waitForIdle()
         assertEquals("Nothing loads before the user asks", emptyList<String>(), source.requests)
+        composeRule.onNodeWithText("cdn.emoji.example", substring = true).assertExists()
+        composeRule.onNodeWithTag(emojiSetTileTestTag("fox"), useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(EMOJI_SET_LOAD_TEST_TAG).performClick()
         composeRule.waitForIdle()
         assertTrue("The cover loads after the tap", "cover" in source.requests)
@@ -159,7 +162,9 @@ class EmojiSetsScreenshotTest {
         assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
         assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
         failures.clear()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.emoji_sets_emoji_failed, ":frog:")).performClick()
+        val retry = composeRule.onNodeWithTag(emojiSetTileTestTag("frog"))
+        retry.assertContentDescriptionEquals(context.getString(R.string.emoji_sets_emoji_failed, ":frog:"))
+        retry.performClick()
         composeRule.onNodeWithContentDescription(":frog:").assertExists()
         assertEquals("Tapping a failed tile retries it once", 2, source.requests.count { it == "frog" })
     }

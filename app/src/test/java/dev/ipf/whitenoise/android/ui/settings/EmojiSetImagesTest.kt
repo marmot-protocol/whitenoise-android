@@ -67,10 +67,12 @@ class EmojiSetImagesTest {
             val job = launch { images.load("e0") }
             runCurrent()
             assertEquals(EmojiSetImage.Loading, images["e0"])
+            assertTrue(images.hasLoadingTiles)
             job.cancel()
             runCurrent()
             assertNull("A tile that scrolled away starts over", images["e0"])
             assertEquals("Its effect restarts if it is back on screen", 1, images.attempt("e0"))
+            assertFalse(images.hasLoadingTiles)
         }
 
     @Test
@@ -117,7 +119,23 @@ class EmojiSetImagesTest {
             val ready = (0 until 200).count { images["e$it"] is EmojiSetImage.Ready }
             assertEquals(160, ready)
             assertNull("The oldest image is dropped first", images["e0"])
-            assertEquals("and loads again when its tile shows", 1, images.attempt("e0"))
+            assertEquals("Eviction does not restart an effect", 0, images.attempt("e0"))
+            images.load("e0")
+            assertTrue(images["e0"] is EmojiSetImage.Ready)
+        }
+
+    @Test
+    fun cacheKeepsAllTilesThatAreStillAttached() =
+        runTest {
+            val images = EmojiSetImages(set(161), RecordingSource(), art).apply { request() }
+            repeat(161) {
+                images.attach("e$it")
+                images.load("e$it")
+            }
+            assertEquals(161, (0 until 161).count { images["e$it"] is EmojiSetImage.Ready })
+            images.detach("e0")
+            assertNull(images["e0"])
+            assertEquals(0, images.attempt("e0"))
         }
 
     @Test
