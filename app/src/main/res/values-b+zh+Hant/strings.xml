@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">錄音已停止</string>
     <string name="voice_message_seek">播放位置</string>
     <string name="video_failed">影片載入失敗</string>
+    <string name="video_seek_failed">無法跳至這個時間點</string>
     <string name="conversation_new_message_from">來自 %1$s 的新訊息</string>
     <plurals name="conversation_new_messages">
         <item quantity="other">%1$d 則新訊息</item>

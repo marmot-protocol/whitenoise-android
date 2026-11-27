@@ -25,6 +25,21 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         with self.assertRaises(ValueError):validate('android-pr-preview-publish.yml',{
             'permissions':{},'jobs':{'other':{'permissions':{'contents':'write'}}}})
 
+    def test_preview_cleanup_write_is_limited_to_its_release_job(self):
+        workflow_name = 'android-pr-preview-cleanup.yml'
+        trigger = {'pull_request_target': {'types': ['closed']}}
+        release_write = {'contents': 'write', 'pull-requests': 'read'}
+        validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+            'prune': {'permissions': release_write}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: contents'):
+            validate(workflow_name, {'on': trigger, 'permissions': release_write, 'jobs': {'prune': {}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: contents'):
+            validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+                'other': {'permissions': release_write}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: pull-requests'):
+            validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+                'prune': {'permissions': {'contents': 'write', 'pull-requests': 'write'}}}})
+
     def test_fail_fast_watcher_alone_may_write_actions(self):
         """Only Android CI's merge-group fail-fast job may hold actions write, never statuses or checks."""
         watcher = {'permissions': {'actions': 'write'}}

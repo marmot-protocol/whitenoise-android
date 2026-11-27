@@ -136,14 +136,6 @@ class ConversationInitialPresentationTest {
         assertFalse(reveal(notificationRequest = 1L))
     }
 
-    /** Maps a seeded timeline to its real final lazy row after the single top spacer. */
-    @Test
-    fun seededTailIndexTargetsTheRealFinalRow() {
-        // The reversed transcript lays its newest row at the origin, so the
-        // seed no longer depends on how many messages the first frame carries.
-        assertEquals(0, SEEDED_CONVERSATION_TAIL_LIST_INDEX)
-    }
-
     /** Keeps an oversized seeded row hidden from paint, TalkBack, and useful-frame telemetry until corrected. */
     @Test
     fun oversizedSeededTailVisibilityWaitsForPhysicalAlignment() {

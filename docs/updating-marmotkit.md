@@ -141,6 +141,34 @@ evidence remains separate from hosted qualification; phone testing is paused.
 
 ## 1. Select and inspect the release
 
+### Manual RC sync for develop
+
+Run the following from a clean MarmotKit pin on a branch based on
+`origin/develop`:
+
+```bash
+git fetch origin develop
+git switch -c chore/marmotkit-rc origin/develop
+just sync-rc
+```
+
+This previews the proposed pin diff and prints the release impact and links to
+the signature delta and integration notes. It reads the published `rc-meta` manifest,
+checks the Android ZIP against both published SHA-256 values, validates the
+bundle, and derives the Kotlin API counts from that ZIP. If the pin already
+matches the published RC, it reports that and exits.
+
+Review the UniFFI changes and storage migrations before applying the update with
+`python3 scripts/sync_marmotkit_rc.py --apply <reviewed RC version>`. Preview the
+new version if the published RC has advanced. When the ZIP manifest has no
+feature list, verify the exact source and builder and the effective feature
+flags for every ABI using the publishing run printed by the command. Keep the
+evidence with the pin PR and add `--verified-features` to the apply command.
+Open the pin PR against `develop`, adapt Android callers as needed and get fresh
+Android CI. Production on `master` requires a Stable pin.
+
+### Inspect a release by hand
+
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,
 and MDK source SHA. Download the Android ZIP and calculate its SHA-256:
 

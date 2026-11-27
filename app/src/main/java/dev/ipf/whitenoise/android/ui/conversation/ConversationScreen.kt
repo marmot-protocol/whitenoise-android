@@ -3480,7 +3480,7 @@ internal fun ConversationScreen(
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
         batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
-    val presentedImeBottom = settingsMotion.outgoingImeBottom ?: displayedMenuImeBottom
+    val presentedImeBottom = presentedMenuImeBottom(settingsMotion.outgoingImeBottom, displayedMenuImeBottom)
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
     ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled, settingsMotion) {
         WhiteNoiseScaffold(
@@ -3491,7 +3491,7 @@ internal fun ConversationScreen(
                     .then(
                         if (presentedImeBottom != null) {
                             Modifier
-                                .padding(bottom = with(density) { presentedImeBottom.toDp() })
+                                .heldImeBottomPadding(presentedImeBottom)
                                 .consumeWindowInsets(WindowInsets.ime)
                         } else {
                             Modifier
@@ -3629,7 +3629,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }, translator) {
+                ConversationBottomBarFrame(routeMorph, density.heldImeBottomDp(presentedImeBottom), translator) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             settingsMotion.launchFromComposer(

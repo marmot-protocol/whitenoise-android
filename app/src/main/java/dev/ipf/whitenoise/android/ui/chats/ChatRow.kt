@@ -286,11 +286,7 @@ internal fun ChatRow(
                 ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
             }
             if (item.group.disappearingMessageSecs > 0uL) {
-                val seconds =
-                    item.group.disappearingMessageSecs
-                        .coerceAtMost(Long.MAX_VALUE.toULong())
-                        .toLong()
-                val duration = disappearingMessagesLabel(seconds)
+                val duration = disappearingMessagesLabel(item.group.disappearingMessageSecs)
                 ChatRowTitleStatus(R.drawable.ic_timer, "${stringResource(R.string.disappearing_messages)}: $duration")
             }
             if (!item.group.pendingConfirmation) {

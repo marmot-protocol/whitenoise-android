@@ -95,12 +95,13 @@ class DisappearingDurationTest {
         assertEquals(DisappearingLabelSpec.Days(2), disappearingLabelSpec(172_800L))
     }
 
+    /** A round count of years past the `Int` range still reads in years, since the label formats any `Long`. */
     @Test
-    fun labelSpecFallsBackBeforePluralCountOverflowsInt() {
+    fun labelSpecKeepsYearsPastTheIntRange() {
         val yearCount = Int.MAX_VALUE.toLong() + 1L
         val seconds = Math.multiplyExact(yearCount, DISAPPEARING_SECONDS_PER_YEAR)
 
-        assertEquals(DisappearingLabelSpec.Days(yearCount * 365L), disappearingLabelSpec(seconds))
+        assertEquals(DisappearingLabelSpec.Years(yearCount), disappearingLabelSpec(seconds))
     }
 
     @Test

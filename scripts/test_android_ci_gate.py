@@ -296,7 +296,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_unit_deadline_reserves_early_failure_artifact_upload(self):
         self.assertIn('timeout-minutes: 40', self.tests_job)
         anchor = self.named_step(self.tests_job, 'Reserve unit-test diagnostics and upload time')
-        self.assertIn('time.monotonic() + 32 * 60', anchor)
+        self.assertIn('time.monotonic() + 28 * 60', anchor)
         self.assertLess(self.tests_job.index('      - name: Reserve unit-test'),
                         self.tests_job.index('      - name: Checkout'))
         unit = self.named_step(self.tests_job, 'Unit tests')

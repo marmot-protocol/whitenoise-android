@@ -69,11 +69,10 @@ internal class VoiceRecorder(
     /**
      * Begin capture. Throws if the underlying `MediaRecorder` can't be
      * primed (typically a missing permission or a busy mic) — the caller
-     * surfaces a toast and skips the send.
+     * surfaces a toast and skips the send. The draft owner creates the directory before capture can start.
      */
     override fun start() {
         require(recorder == null) { "VoiceRecorder.start called twice" }
-        outputFile.parentFile?.mkdirs()
         // API 31+ has a context-aware ctor that lets the platform attribute
         // mic usage to the app for the privacy indicator. Older releases
         // get the legacy ctor.

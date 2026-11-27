@@ -3,15 +3,20 @@ package dev.ipf.whitenoise.android.state
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.VoiceDraftStore
 import dev.ipf.whitenoise.android.audio.VoiceNoteForegroundService
+import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.audio.VoiceNoteSessionOwner
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /*
  * The process-level microphone owners, dictation and voice notes, share account and chat teardown here so neither
@@ -22,18 +27,13 @@ import kotlinx.coroutines.SupervisorJob
 internal fun WhiteNoiseAppState.createVoiceNoteSessionOwner(): VoiceNoteSessionOwner {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     return VoiceNoteSessionOwner(
-        store = VoiceDraftStore(appContext.noBackupFilesDir.resolve("voice-drafts")),
+        store = voiceDraftEvictions.draftStore,
         newController = { _, hooks ->
             VoiceRecordingController(
                 context = appContext,
                 outputDirectory = hooks.outputDirectory,
                 scope = scope,
-                // A screen asks for the permission; a recorder started from elsewhere only checks the grant.
-                onPermissionRequest = {
-                    hooks.onPermissionRequest() ||
-                        ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
-                        PackageManager.PERMISSION_GRANTED
-                },
+                onPermissionRequest = hooks.onPermissionRequest,
                 onRecordingStarted = hooks.onRecordingStarted,
                 onRecordingComplete = hooks.onRecordingComplete,
                 afterHeldRelease = {
@@ -48,23 +48,73 @@ internal fun WhiteNoiseAppState.createVoiceNoteSessionOwner(): VoiceNoteSessionO
         },
         presentError = { error -> presentVoiceRecordingFailure(error) },
         presentElsewhere = { present(R.string.voice_recording_elsewhere) },
+        hasMicrophonePermission = {
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        },
         startForeground = { VoiceNoteForegroundService.start(appContext, it) },
     )
 }
 
-/** Sign-out or wipe ends both microphone owners' work for [account] and deletes its voice drafts. */
-internal fun WhiteNoiseAppState.releaseCaptureOwners(account: String) {
+/** Stops both microphone owners while the account's local data is still available. */
+internal fun WhiteNoiseAppState.stopCaptureOwners(account: String) {
     conversationDictation.onAccountUnavailable(account)
-    voiceNotes.onAccountUnavailable(account)
+    voiceNotes.stopAccountCapture(account)
 }
 
-/** The account left a chat: neither owner may keep capturing or holding a draft for it. */
+/** Sign-out stops capture and retires the account's voice drafts. */
+internal fun WhiteNoiseAppState.releaseCaptureOwners(account: String) {
+    stopCaptureOwners(account)
+    purgeCaptureDrafts(account)
+}
+
+/** Account teardown can forget eviction requests once the account's voice files are gone. */
+private fun WhiteNoiseAppState.purgeCaptureDrafts(account: String) {
+    if (voiceNotes.purgeAccountDrafts(account)) voiceDraftEvictions.completeAccount(account)
+}
+
+/** Settles the confirmed native wipe and its local voice drafts together, even if the caller cancels. */
+internal suspend fun WhiteNoiseAppState.wipeAccountAndPurgeVoiceDrafts(account: String): WipeOutcomeFfi {
+    currentCoroutineContext().ensureActive()
+    return withContext(NonCancellable) {
+        marmotIo { signOutAndWipe(account) }.also { outcome ->
+            if (outcome.localCleanup.completed) purgeCaptureDrafts(account)
+        }
+    }
+}
+
+/** Binds local removal proof to the voice capture that existed before the native mutation or absence read. */
+internal suspend fun WhiteNoiseAppState.localDeleteCaptureGuard(
+    account: String,
+    groupIdHex: String,
+): () -> Boolean =
+    withContext(Dispatchers.Main.immediate) {
+        val epoch = runtimeGeneration
+        val sameCapture = voiceNotes.captureTargetIsCurrent(VoiceNoteKey(account, groupIdHex))
+        return@withContext { epoch == runtimeGeneration && sameCapture() }
+    }
+
+/** Stops both capture owners and durably retires the removed chat's voice directory after native confirmation. */
 internal fun WhiteNoiseAppState.releaseCaptureTarget(
     account: String,
     groupIdHex: String,
-) {
+): Boolean {
+    val key = VoiceNoteKey(account, groupIdHex)
     conversationDictation.onTargetRemoved(account, groupIdHex)
-    voiceNotes.onTargetRemoved(account, groupIdHex)
+    var journaled = false
+    val purged =
+        voiceNotes.onTargetRemoved(account, groupIdHex) {
+            journaled = voiceDraftEvictions.stage(key, confirmed = true)
+        }
+    val retired =
+        if (purged) {
+            voiceDraftEvictions.complete(key)
+            true
+        } else {
+            voiceDraftEvictions.isolate(key)
+        }
+    if (!purged || voiceDraftEvictions.contains(key)) voiceDraftEvictions.resume()
+    return retired || journaled
 }
 
 /** Maps recorder failures to localized, privacy-safe user presentation. */

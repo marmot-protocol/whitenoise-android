@@ -12,12 +12,14 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceNoteKey
+import dev.ipf.whitenoise.android.audio.VoiceNoteSessionOwner
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -77,27 +79,50 @@ internal fun rememberConversationVoiceCapture(
                 scope = scope,
                 ownerIsCurrent = ownerIsCurrent,
                 send = { file, duration, canSend, onQueued ->
-                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
+                    mediaSender.sendVoiceAttachment(
+                        file,
+                        duration,
+                        canSend,
+                        retireDraft = { owner.consumeForQueue(key, file) },
+                        onQueued = onQueued,
+                    )
                 },
                 onSendFailure = { appState.present(R.string.send_failed) },
                 onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
                 deleteFile = { file -> owner.consume(key, file) },
                 onSendInterrupted = { appState.present(R.string.voice_send_interrupted) },
+                onDiscardFailure = { appState.present(R.string.toast_draft_save_failed) },
+                onAcceptedFile = {}, // The queue commits the draft before it publishes the optimistic row.
             )
         }
     DisposableEffect(voiceReview) {
         onDispose { voiceReview.detach() }
     }
     val requestPermission = rememberVoicePermissionRequest(appState, LocalContext.current)
-    val voiceRecordingController = remember(key, owner) { owner.bind(key, requestPermission) }
-    DisposableEffect(voiceRecordingController) {
-        onDispose { owner.unbind(key, voiceRecordingController) }
-    }
+    val voiceRecordingController =
+        rememberVoiceRecorderBinding(owner, key) {
+            ownerIsCurrent() && controller.canSendMessages && requestPermission()
+        }
     VoiceRecordingLifecycleEffect(voiceRecordingController)
     VoiceDraftPresentation(appState, key, voiceReview, voiceRecordingController, voiceReviewRecovery)
     return remember(voiceReview, voiceRecordingController, voiceReviewRecovery, ownerIsCurrent) {
         ConversationVoiceCapture(voiceReview, voiceRecordingController, voiceReviewRecovery, ownerIsCurrent)
     }
+}
+
+/** Tracks revocation even if removal and rejoin occur between frames in an already open chat. */
+@Composable
+internal fun rememberVoiceRecorderBinding(
+    owner: VoiceNoteSessionOwner,
+    key: VoiceNoteKey,
+    requestPermission: () -> Boolean,
+): VoiceRecordingController {
+    val currentPermission = rememberUpdatedState(requestPermission)
+    val recorder = remember(key, owner, owner.bindingVersion(key)) { owner.bind(key) { currentPermission.value() } }
+    DisposableEffect(recorder) {
+        onDispose { owner.unbind(key, recorder) }
+    }
+    return recorder
 }
 
 /**
@@ -118,7 +143,11 @@ private fun VoiceDraftPresentation(
         rememberVoiceRecordingStopNotice(voiceReview, appState, key.accountRef, key.groupIdHex)
     val draft = owner.draft(key)
     LaunchedEffect(voiceReview, draft) {
-        if (draft == null || !voiceReview.adopt(draft.file, draft.durationMs)) return@LaunchedEffect
+        if (draft == null) {
+            voiceReview.clearAdopted()
+            return@LaunchedEffect
+        }
+        if (!voiceReview.adopt(draft.file, draft.durationMs)) return@LaunchedEffect
         val completedClip = voiceReview.clip
         if (completedClip != null && owner.takeImmediateSend(key, draft.file)) voiceReview.send(completedClip)
         draft.stopReason?.let { reason ->

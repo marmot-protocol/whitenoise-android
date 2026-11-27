@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Kayıt durduruldu</string>
     <string name="voice_message_seek">Oynatma konumu</string>
     <string name="video_failed">Video yüklenemedi</string>
+    <string name="video_seek_failed">Videonun bu noktasına gidilemedi</string>
     <string name="conversation_new_message_from">%1$s kişisinden yeni mesaj</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d yeni mesaj</item>

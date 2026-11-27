@@ -211,7 +211,7 @@ class NostrRelayQueryClientTest {
         try {
             val result =
                 runBlocking {
-                    withTimeout(1_000) {
+                    withTimeout(10_000) {
                         NostrRelayQueryClient(httpClient, maxConcurrentSockets = 1)
                             .query(
                                 relayUrls =

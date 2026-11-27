@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,7 +11,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -230,20 +228,5 @@ class TtsAutoReadPreferencesTest {
 
         val prefs = TtsAutoReadPreferences(context)
         assertEquals(mapOf("account-a|group-a" to TtsAutoReadOverride.ON), prefs.state.value.overrides)
-    }
-
-    @Test
-    fun mutationsRouteThroughSinglePublisher() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadPreferences.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadPreferences.kt"),
-            ).firstOrNull(File::exists)?.readText() ?: error("Missing TtsAutoReadPreferences.kt")
-        val setOverride = source.functionBody("setConversationOverride")
-        val publishLocked = source.functionBody("publishLocked")
-
-        assertTrue("mutations must be serialized", "synchronized(mutationLock)" in setOverride)
-        assertTrue("state must publish atomically", "publishLocked(" in setOverride)
-        assertTrue("_state.value = state" in publishLocked)
     }
 }

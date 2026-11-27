@@ -55,12 +55,16 @@ internal fun conversationTabletop(
 @Composable
 internal fun ConversationBottomBarFrame(
     routeMorph: SettingsCardMorph?,
-    bottomPadding: Dp = 0.dp,
+    bottomPadding: () -> Dp = { 0.dp },
     translation: ConversationTranslationSession,
     content: @Composable () -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
-    val reserve = conversationTabletop(LocalWindowFolds.current.tabletop, windowHeight - bottomPadding)
+    val tabletop = LocalWindowFolds.current.tabletop
+    // Only a tabletop fold sizes the bar from the held keyboard inset. Other postures never read it,
+    // so the message-menu keyboard hand-back does not recompose the bottom bar.
+    val scaffoldBottom = if (tabletop == null) windowHeight else windowHeight - bottomPadding()
+    val reserve = conversationTabletop(tabletop, scaffoldBottom)
     CompositionLocalProvider(
         LocalSettingsCardMorph provides routeMorph,
         LocalConversationTranslation provides translation,
