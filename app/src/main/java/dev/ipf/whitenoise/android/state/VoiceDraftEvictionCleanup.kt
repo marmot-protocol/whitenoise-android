@@ -270,6 +270,7 @@ private suspend fun WhiteNoiseAppState.readCaptureEviction(
     // Selection may change, but this read cannot retire a newer recording or draft for the same chat.
     val runtimeIsCurrent = epoch == runtimeGeneration && marmotOrNull() === runtime
     val sameCapture = captureIsCurrent()
-    if (runtimeIsCurrent && (eviction == null || (eviction && !sameCapture))) onUnresolved()
+    val needsReadback = eviction == null || (eviction && !sameCapture)
+    if (runtimeIsCurrent && needsReadback) onUnresolved()
     return eviction?.takeIf { runtimeIsCurrent && sameCapture }
 }
