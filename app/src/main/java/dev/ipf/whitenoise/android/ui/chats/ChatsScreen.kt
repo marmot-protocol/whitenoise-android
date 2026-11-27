@@ -2442,6 +2442,9 @@ internal fun ChatsScreen(
                 key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
                     val listEmpty = visibleItems.isEmpty()
                     val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
+                    val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
+                    val failedUnreadSnapshot = unreadOnly && unreadReadFailed
+                    val activeEmptyPageScroll = emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
@@ -2451,16 +2454,14 @@ internal fun ChatsScreen(
                                 actionSheetChatId == null &&
                                 !actionMenuOwner.pointerHeld,
                         atTop = {
-                            chatListState.unreadPullArmed(unreadOnly, listEmpty, hasEarlierChats, emptyPageScroll)
+                            chatListState.unreadPullArmed(unreadOnly, listEmpty, hasEarlierChats, activeEmptyPageScroll)
                         },
                         onUnreadOnlyChange = { setUnreadOnly(it) },
                         status = {
-                            val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
-                            if (!unreadReadFailed && unreadRefreshPending && visibleItems.isNotEmpty()) {
+                            if (!failedUnreadSnapshot && unreadRefreshPending && !listEmpty) {
                                 CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                             }
-                            val failedUnreadSnapshot = unreadReadFailed && unreadOnly
-                            if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
+                            if (failedUnreadSnapshot && !listEmpty) {
                                 TextButton(onClick = { unreadRetry++ }) {
                                     Text(stringResource(R.string.pull_unread_retry))
                                 }
@@ -2562,18 +2563,14 @@ internal fun ChatsScreen(
                                         openSearchMessage(group, message, libraryChats)
                                     },
                                 )
-                            unreadOnly &&
-                                unreadReadFailed &&
-                                visibleItems.isEmpty() ->
+                            failedUnreadSnapshot && listEmpty ->
                                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                                     Text(stringResource(R.string.pull_unread_load_failed))
                                     TextButton(onClick = { unreadRetry++ }) {
                                         Text(stringResource(R.string.pull_unread_retry))
                                     }
                                 }
-                            unreadOnly &&
-                                completeUnreadSnapshot == null &&
-                                visibleItems.isEmpty() -> LoadingScreen()
+                            unreadRefreshPending && listEmpty -> LoadingScreen()
                             controller.isLoading && sourceList.isEmpty() -> {
                                 val slowCopy = stringResource(R.string.chat_list_startup_slow)
                                 LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })

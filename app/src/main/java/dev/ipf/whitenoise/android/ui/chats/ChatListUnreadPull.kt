@@ -20,7 +20,7 @@ internal fun LazyListState.unreadPullArmed(
     unreadOnly: Boolean,
     listEmpty: Boolean,
     hasEarlierChats: Boolean,
-    emptyPageScroll: ScrollState,
+    emptyPageScroll: ScrollState?,
 ): Boolean =
     chatListUnreadPullArmed(
         unreadOnly = unreadOnly,

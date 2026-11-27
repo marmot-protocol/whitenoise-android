@@ -4,12 +4,17 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -261,6 +266,43 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
     }
 
+    @Test
+    @Config(qualifiers = "en-w240dp-h300dp-mdpi")
+    fun mountedUnreadRetryAllowsPullAfterScrolledEmptyState() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.state.swipePreferences.setPullUnread(true)
+        model.row.updateAndGet { it.copy(manuallyMarkedUnread = false) }
+        model.retainedRow.updateAndGet { it.copy(manuallyMarkedUnread = false) }
+        model.controller.applyChatListRow(model.retainedRow.get())
+        settle()
+        mount(model, fontScale = 2f)
+        val surface = rule.onNodeWithTag("chats.unread_surface")
+        surface.performUnreadFilterAction(rule)
+        val title = rule.activity.getString(R.string.chat_rows_no_unread_title)
+        awaitProgress { rule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
+        val page = rule.onNode(hasScrollAction() and hasAnyDescendant(hasText(title)), useUnmergedTree = true)
+        val scrollRange = page.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        page.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scrollRange.maxValue()) }
+        rule.waitForIdle()
+        assertTrue("The unread empty page must be scrolled", scrollRange.value() > 0f)
+
+        rule.runOnIdle {
+            model.beforeSnapshotRead = { error("Synthetic unread read refusal") }
+            model.controller.applyChatListRow(model.retainedRow.updateAndGet { it.copy(activitySortAt = 2uL) })
+        }
+        val failure = rule.activity.getString(R.string.pull_unread_load_failed)
+        awaitProgress { rule.onAllNodesWithText(failure).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_retry)).assertExists()
+        val distance = with(rule.density) { 100.dp.toPx() }
+        surface.performTouchInput {
+            down(Offset(width * 0.75f, height * 0.5f))
+            moveBy(Offset(0f, distance), 120)
+            up()
+        }
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
+    }
+
     /** An unrelated read chat with no roster cannot fail an unread participant-folder request. */
     @Test fun mountedParticipantFolderDoesNotResolveUnrelatedReadRoster() {
         val member = "d8".repeat(32)
@@ -501,10 +543,11 @@ class ChatsScreenUnreadReadLifetimeTest {
         model: OffWindowActionFixture,
         folderId: String? = null,
         globalSearchState: GlobalSearchState = GlobalSearchState(),
+        fontScale: Float = 1f,
     ) {
         rule.setContent {
             if (mounted.value) {
-                WhiteNoiseTheme {
+                WhiteNoiseTheme(fontScale = fontScale) {
                     ChatsScreen(
                         model.state,
                         model.controller,
