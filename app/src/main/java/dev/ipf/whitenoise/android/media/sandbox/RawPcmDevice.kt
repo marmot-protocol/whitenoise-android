@@ -243,13 +243,11 @@ internal class RawPcmPresentationClock(
         hasTimestamp = advancing
     }
 
-    /** A new route or play start returns to timestamp warmup. */
+    /** Warm up again on this track while preserving any unresolved underrun boundary. */
     fun reset() {
         sampledTimestamp = false
         hasTimestamp = false
         nextTimestampNs = Long.MIN_VALUE
-        minimumTimestampNs = Long.MIN_VALUE
-        underrunMixerHead = null
     }
 
     private companion object {

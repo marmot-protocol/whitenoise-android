@@ -152,6 +152,11 @@ class RawPcmOutputSonicTest {
         sampleFrame = 9_200L
         assertNull(clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_440))
 
+        // Android 11 can pause and play the same track again after priming.
+        clock.reset()
+        sampleTimeNs += 50_000_000L
+        assertNull(clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_440))
+
         sampleTimeNs += 50_000_000L
         sampleFrame = 9_280L
         assertEquals(9_280L, clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_680))
