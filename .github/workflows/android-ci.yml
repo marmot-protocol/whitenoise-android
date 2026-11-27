@@ -110,7 +110,7 @@ jobs:
       - name: Classify complete PR diff
         id: classify
         env:
-          ANDROID_CI_MODE: ${{ vars.ANDROID_CI_MODE }}
+          ANDROID_CI_MODE: ${{ github.base_ref == 'develop' && 'legacy' || vars.ANDROID_CI_MODE }}
           CI_CURRENT_LABELS: ${{ steps.labels.outputs.labels }}
           CI_EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
@@ -133,6 +133,8 @@ jobs:
           CI_MODE: ${{ steps.classify.outputs.ci_mode }}
           CI_DOCS_ONLY: ${{ steps.classify.outputs.docs_only }}
           CI_HEAD_SHA: ${{ github.sha }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CI_BEFORE_SHA: ${{ github.event.before }}
           ANDROID_CI_REUSE: ${{ vars.ANDROID_CI_REUSE }}
           GIT_NO_REPLACE_OBJECTS: '1'
@@ -141,6 +143,7 @@ jobs:
           # The script bounds its own API time; this backstop keeps a hung call from using up the job.
           if ! timeout 300 python3 -I scripts/ci_reuse.py --repo "$CI_REPO" --event "$CI_EVENT" --action "$CI_ACTION" \
               --mode "$CI_MODE" --docs-only "$CI_DOCS_ONLY" --head-sha "$CI_HEAD_SHA" \
+              --base-ref "$CI_BASE_REF" --base-sha "$CI_BASE_SHA" \
               --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
             echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'
             printf 'reuse=none\nreuse_run=\ntree=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
@@ -1669,12 +1672,13 @@ jobs:
           JOB_RESULTS: ${{ toJSON(needs) }}
           CI_EVENT: ${{ github.event_name }}
           PR_DRAFT: ${{ github.event.pull_request.draft == true }}
-          ANDROID_CI_MODE: ${{ vars.ANDROID_CI_MODE }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          ANDROID_CI_MODE: ${{ github.base_ref == 'develop' && 'legacy' || vars.ANDROID_CI_MODE }}
         shell: bash
         run: |
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" --arg draft "$PR_DRAFT" --arg mode "$ANDROID_CI_MODE" '
+          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" --arg draft "$PR_DRAFT" --arg mode "$ANDROID_CI_MODE" --arg base "$CI_BASE_REF" '
             (.changes.outputs.full_matrix == "true") as $full |
             ($event == "pull_request" and $draft == "true" and ($full | not)) as $is_draft |
             (.changes.outputs.precheck == "true") as $precheck |
@@ -1696,7 +1700,7 @@ jobs:
             (.changes.outputs.lint_writer == "true" or .changes.outputs.lint_writer == "false") and
             (($reuse == "push") or (.changes.outputs.lint_writer == "false")) and
             (($reuse != "tree") or ((.changes.outputs.ci_mode == "full" or .changes.outputs.ci_mode == "precheck") and
-              ($event == "pull_request" and $draft == "false"))) and
+              ($event == "pull_request" and $draft == "false" and $base == "master"))) and
             (($reuse != "push") or ($event == "push" and $full)) and
             (($reuse != "none") or (."tooling-contracts".result == "success")) and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
@@ -1718,13 +1722,13 @@ jobs:
               else .value.result == "success" end) end)
           ' > /dev/null
 
-      # Real validation of a pull request tree becomes a proof for identical content: the
-      # queue and the ready-for-review run look this artifact up by its lane and tree
+      # Real validation of a master pull request tree becomes a proof for identical content.
+      # A ready-for-review run targeting the same base looks this artifact up by lane and tree
       # (scripts/ci_reuse.py re-verifies the producing run before trusting it). Only this
       # job's own success after real jobs ran records a proof, so reuse never chains from a skip.
       # A proof only saves time later, so a failed write or upload must never turn the required check red.
       - name: Write the validated tree proof
-        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         env:
           PROOF_LANE: ${{ needs.changes.outputs.ci_mode }}
@@ -1736,7 +1740,7 @@ jobs:
             "$PROOF_LANE" "$PROOF_TREE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
 
       - name: Retain the validated tree proof
-        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

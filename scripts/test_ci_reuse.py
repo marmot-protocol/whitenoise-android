@@ -18,6 +18,7 @@ TREE = 'a' * 40
 SHA = 'b' * 40
 HEAD = 'd' * 40
 BEFORE = 'e' * 40
+BASE = 'f' * 40
 WORKFLOW = '.github/workflows/android-ci.yml'
 BLOBS = {path: 'c' * 40 for path in ci_reuse.TRUSTED_CODE}
 
@@ -55,7 +56,8 @@ def artifact(lane, run_id=11, tree=TREE, **overrides):
 def run(event='pull_request', conclusion='success', **overrides):
     """Build one workflow run record that is trusted unless an override breaks it."""
     body = {'path': WORKFLOW, 'event': event, 'status': 'completed', 'conclusion': conclusion,
-            'head_sha': HEAD, 'head_repository': {'full_name': REPO}}
+            'head_sha': HEAD, 'head_repository': {'full_name': REPO},
+            'pull_requests': [{'base': {'ref': 'master', 'sha': BASE}}]}
     body.update(overrides)
     return body
 
@@ -67,10 +69,10 @@ def contents(sha=HEAD, blobs=BLOBS):
 
 def decide(api, event='pull_request', action='ready_for_review', mode='full', docs_only='false', tree=TREE,
            head_sha=SHA, setting='enforce', blobs=BLOBS, cache_inputs=lambda: False,
-           lint_inputs=lambda: False):
+           lint_inputs=lambda: False, base_ref='master', base_sha=BASE):
     """Run the production decision with a fake API and return its outputs and reason."""
     return ci_reuse.decide(api, REPO, event, action, mode, docs_only, tree, head_sha, setting,
-                           blobs, cache_inputs, lint_inputs)
+                           blobs, cache_inputs, lint_inputs, base_ref=base_ref, base_sha=base_sha)
 
 
 class TreeReuseTest(unittest.TestCase):
@@ -86,6 +88,15 @@ class TreeReuseTest(unittest.TestCase):
         outputs, reason = decide(self.attested('full'))
         self.assertEqual(outputs, {'reuse': 'tree', 'reuse_run': '11', 'tree': TREE, 'lint_writer': 'false'})
         self.assertIn('run 11', reason)
+
+    def test_proofs_cannot_cross_branches_or_base_commits(self):
+        """An attestation only covers validation against the same master commit."""
+        for target in ({'base_ref': 'develop'}, {'base_sha': ''}, {'base_sha': BEFORE}):
+            with self.subTest(target=target):
+                self.assertEqual(decide(self.attested('full'), **target)[0]['reuse'], 'none')
+        for sources in ([], [{'base': {'ref': 'develop', 'sha': BASE}}]):
+            with self.subTest(sources=sources):
+                self.assertEqual(decide(self.attested('full', pull_requests=sources))[0]['reuse'], 'none')
 
     def test_full_ready_run_rejects_a_precheck_result(self):
         """A full-lane run needs the complete lane, so a precheck proof never satisfies it."""

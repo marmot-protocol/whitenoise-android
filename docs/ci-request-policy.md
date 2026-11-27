@@ -76,11 +76,15 @@ See `INT-010` in the combined manual checklist.
 
 ## Queue-gated PR feedback and full integration
 
-Android pull requests into `master` and `develop` use the same CI checks.
+Android pull requests into `master` and `develop` run Android CI. The
+`develop` PR lane runs the regular checks without queue prechecks or tree reuse.
+After retargeting an existing PR, synchronize or reopen it and verify fresh CI
+against the new base before merging.
 The required Android CI workflow validates the Stable MarmotKit pin for
 `master` PRs, merge groups, and branch pushes even when it can reuse a
-result. The production build repeats the pin check before accessing signing
-secrets. A Stable pin uses a final `X.Y.Z` release and its matching Android
+result. The hosted production build checks the pin before accessing signing
+secrets, and the local release script checks it before building production APKs.
+A Stable pin uses a final `X.Y.Z` release and its matching Android
 archive. Published RC pins are eligible for validation on `develop`.
 
 The initial rollout preserves full master validation. Reduced PR work is enabled
@@ -169,14 +173,14 @@ Activation, failure recovery and rollback are specified in the
 
 Identical content is validated once, in two places. A merge group never reuses a result.
 
-- A **ready-for-review** run reuses the draft result when the head's tree is unchanged,
-  so marking a draft ready runs no checks. The run still starts, only to report the
+- A **ready-for-review** run into `master` can reuse the draft result for the
+  same base commit and tree. The run still starts to report the
   required check name for the ready head. A PR run that completes the precheck or full
   lane uploads a seven-day proof named `android-ci-attest-<lane>-<tree>`, where the tree
   is the checked-out commit's tree. `scripts/ci_reuse.py` finds a proof for the same tree
   (a full proof also satisfies a precheck request) and re-verifies it against the Actions
   API: a completed, successful run of this workflow, started by a pull request from this
-  repository, whose workflow, `scripts/ci_reuse.py` and `scripts/check_ci_changes.py` are
+  repository into the same `master` base commit, whose workflow, `scripts/ci_reuse.py` and `scripts/check_ci_changes.py` are
   byte-identical to the code now running. The classifier and this lookup run first in the
   job, in Python's isolated mode, before any step that runs other PR-controlled code. A
   fork, an expired proof, a skipped run that merely reused another result and any API or

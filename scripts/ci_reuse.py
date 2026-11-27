@@ -2,7 +2,7 @@
 
 Two situations repeat validation that has already passed on identical content:
 
-* A ready-for-review run on a head and base whose tree already passed the draft lane.
+* A ready-for-review run targeting master on the same base commit and tree.
   Only the aggregate check name differs between the two runs.
 * A master push of the exact commit that a merge group already validated, because the
   queue lands the tested commit unchanged.
@@ -10,8 +10,8 @@ Two situations repeat validation that has already passed on identical content:
 A successful pull request validation uploads an artifact named for its lane and tree
 (`android-ci-attest-<lane>-<tree>`). The ready-for-review lookup finds those artifacts and
 re-verifies every candidate against the Actions API: a completed successful run of this
-workflow, started by a pull request from this repository (never a fork), whose workflow and
-classification scripts are byte-identical to the code running now.
+workflow, started by a pull request from this repository (never a fork) into the same
+master commit, whose workflow and classification scripts match the code running now.
 
 A proof is only an artifact name, and any code that runs inside a same-repository pull
 request run, such as a build script or a test, can upload an artifact with any name. A proof
@@ -216,7 +216,7 @@ def ran_the_same_code(api, repo, sha, blobs):
                for path, blob in blobs.items())
 
 
-def attested_run(api, repo, tree, lanes, blobs):
+def attested_run(api, repo, tree, lanes, blobs, base_sha):
     """Return a (run id, note) pair for a trusted pull request run that validated this tree.
 
     The run id is None when nothing qualifies. The note names the one case that is
@@ -242,6 +242,9 @@ def attested_run(api, repo, tree, lanes, blobs):
             try:
                 run = api.get(f'repos/{repo}/actions/runs/{run_id}')
                 if not ci_run_is_trusted(run, repo, 'pull_request'):
+                    continue
+                if not any(pr['base']['ref'] == PUSH_BRANCH and pr['base']['sha'] == base_sha
+                           for pr in run.get('pull_requests', [])):
                     continue
                 if ran_the_same_code(api, repo, run.get('head_sha'), blobs):
                     return str(run_id), ''
@@ -276,11 +279,12 @@ def queue_run(api, repo, sha):
     return None
 
 
-def lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs):
+def lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs, base_ref, base_sha):
     """Find the verified run that makes this run redundant, as a (kind, run id, note) triple."""
     # A merge group never reuses a pull request proof: see the module docstring.
-    if event == 'pull_request' and action == 'ready_for_review' and SHA_PATTERN.fullmatch(tree):
-        run_id, note = attested_run(api, repo, tree, accepted_lanes(ci_mode), blobs)
+    if (event == 'pull_request' and action == 'ready_for_review' and base_ref == PUSH_BRANCH
+            and SHA_PATTERN.fullmatch(base_sha) and SHA_PATTERN.fullmatch(tree)):
+        run_id, note = attested_run(api, repo, tree, accepted_lanes(ci_mode), blobs, base_sha)
         return ('tree', run_id, '') if run_id else (NONE, '', note)
     if event == 'push' and SHA_PATTERN.fullmatch(head_sha):
         run_id = queue_run(api, repo, head_sha)
@@ -289,7 +293,7 @@ def lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs):
 
 
 def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting,
-           blobs=None, cache_inputs=lambda: True, lint_inputs=lambda: True):
+           blobs=None, cache_inputs=lambda: True, lint_inputs=lambda: True, *, base_ref='', base_sha=''):
     """Return the reuse outputs. Anything but a verified match selects full validation.
 
     `lint_writer` tells a reused push whether it must still run the Android lint jobs, which
@@ -303,7 +307,7 @@ def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting
     if docs_only == 'true':
         return outputs, 'documentation-only change'
     try:
-        kind, run_id, note = lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs or {})
+        kind, run_id, note = lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs or {}, base_ref, base_sha)
         if kind == 'push' and cache_inputs():
             return outputs, 'a cache input changed, so this push refreshes the caches'
     except LOOKUP_ERRORS as error:
@@ -340,6 +344,8 @@ def main():
     parser.add_argument('--mode', required=True, help='Lane selected by check_ci_changes.py')
     parser.add_argument('--docs-only', default='false')
     parser.add_argument('--head-sha', default='')
+    parser.add_argument('--base-ref', default='')
+    parser.add_argument('--base-sha', default='')
     parser.add_argument('--before', default='', help='Commit the pushed branch pointed at before the push')
     parser.add_argument('--setting', default='', help='Repository variable ANDROID_CI_REUSE')
     args = parser.parse_args()
@@ -351,7 +357,8 @@ def main():
     outputs, reason = decide(api, args.repo, args.event, args.action, args.mode,
                              args.docs_only, tree, args.head_sha, args.setting,
                              trusted_blobs(), lambda: cache_inputs_changed(args.before),
-                             lambda: lint_inputs_since_last_writer(api, args.repo, args.head_sha))
+                             lambda: lint_inputs_since_last_writer(api, args.repo, args.head_sha),
+                             base_ref=args.base_ref, base_sha=args.base_sha)
     publish(outputs, reason)
 
 

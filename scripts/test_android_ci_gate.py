@@ -112,11 +112,12 @@ class AndroidCiGateTest(unittest.TestCase):
         blocks = re.split(r'(?=^      - name: )', job, flags=re.MULTILINE)
         return [block for block in blocks if './gradlew' in block]
 
-    def run_gate(self, outcomes, event='pull_request', draft='false', mode=''):
+    def run_gate(self, outcomes, event='pull_request', draft='false', mode='', base='master'):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event, 'PR_DRAFT': draft, 'ANDROID_CI_MODE': mode},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event,
+                 'PR_DRAFT': draft, 'ANDROID_CI_MODE': mode, 'CI_BASE_REF': base},
             capture_output=True, text=True, check=False,
         )
 
@@ -226,7 +227,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_fuzz_trigger_policy_runs_outside_filtered_fuzz_workflow(self):
         """A missing parser path cannot skip the policy check itself."""
         events = self.workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
-        self.assertIn('  pull_request:\n    branches: [master]', events)
+        self.assertIn('  pull_request:\n    branches: [master, develop]', events)
         self.assertNotIn('paths:', events)
         self.assertNotIn('paths-ignore:', events)
         # Only a verified same-content reuse may skip this job, never a path filter.
@@ -481,6 +482,7 @@ class AndroidCiGateTest(unittest.TestCase):
         tree = self.reused_outcomes(self.successful_outcomes('merge_group'), 'tree')
         push = self.reused_outcomes(self.successful_outcomes('push'), 'push', self.PUSH_KEPT + ('compose-compiler',))
         self.assertEqual(self.run_gate(tree, 'pull_request').returncode, 0)
+        self.assertNotEqual(self.run_gate(tree, 'pull_request', base='develop').returncode, 0)
         for bad_run in ('', 'abc', '12x', None):
             for outcomes, event in ((tree, 'pull_request'), (push, 'push')):
                 changed = json.loads(json.dumps(outcomes))
@@ -555,6 +557,7 @@ class AndroidCiGateTest(unittest.TestCase):
         classify = 'Classify complete PR diff'
         lookup = 'Look for a verified result on identical content'
         self.assertEqual(steps, ['Checkout', 'Read current full-CI override', classify, lookup,
+                                 'Require Stable MarmotKit on master',
                                  'Test conservative CI classification'])
         for name, command in ((classify, 'python3 -I scripts/check_ci_changes.py'),
                               (lookup, 'python3 -I scripts/ci_reuse.py')):
@@ -1077,7 +1080,7 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn('  workflow_dispatch:', events)
             self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
             self.assertIn("'merge_group' && github.run_id || github.ref", workflow)
-            self.assertIn('  pull_request:\n    branches: [master]', events)
+            self.assertIn('  pull_request:\n    branches: [master, develop]', events)
             self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', events)
 
     def test_drafts_defer_only_heavy_lanes(self):
