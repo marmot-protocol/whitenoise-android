@@ -1702,10 +1702,12 @@ private const val MAX_CLASSIFIED_LABEL_LENGTH = 512
 internal fun shouldConfirmMarkdownLink(
     labelText: String,
     destination: String,
+): Boolean = labelText.length > MAX_CLASSIFIED_LABEL_LENGTH || labelMayMisrepresent(labelText, destination)
+
+private fun labelMayMisrepresent(
+    labelText: String,
+    destination: String,
 ): Boolean {
-    if (labelText.length > MAX_CLASSIFIED_LABEL_LENGTH) {
-        return true
-    }
     val destHost =
         runCatching { URI(destination) }
             .getOrNull()
