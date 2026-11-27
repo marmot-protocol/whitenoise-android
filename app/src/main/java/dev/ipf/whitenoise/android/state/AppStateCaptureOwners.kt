@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.VoiceDraftStore
 import dev.ipf.whitenoise.android.audio.VoiceNoteForegroundService
 import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.audio.VoiceNoteSessionOwner
@@ -28,18 +27,13 @@ import kotlinx.coroutines.withContext
 internal fun WhiteNoiseAppState.createVoiceNoteSessionOwner(): VoiceNoteSessionOwner {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     return VoiceNoteSessionOwner(
-        store = VoiceDraftStore(appContext.noBackupFilesDir.resolve("voice-drafts")),
+        store = voiceDraftEvictions.draftStore,
         newController = { _, hooks ->
             VoiceRecordingController(
                 context = appContext,
                 outputDirectory = hooks.outputDirectory,
                 scope = scope,
-                // A screen asks for the permission; a recorder started from elsewhere only checks the grant.
-                onPermissionRequest = {
-                    hooks.onPermissionRequest() ||
-                        ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
-                        PackageManager.PERMISSION_GRANTED
-                },
+                onPermissionRequest = hooks.onPermissionRequest,
                 onRecordingStarted = hooks.onRecordingStarted,
                 onRecordingComplete = hooks.onRecordingComplete,
                 afterHeldRelease = {
@@ -54,6 +48,10 @@ internal fun WhiteNoiseAppState.createVoiceNoteSessionOwner(): VoiceNoteSessionO
         },
         presentError = { error -> presentVoiceRecordingFailure(error) },
         presentElsewhere = { present(R.string.voice_recording_elsewhere) },
+        hasMicrophonePermission = {
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        },
         startForeground = { VoiceNoteForegroundService.start(appContext, it) },
     )
 }

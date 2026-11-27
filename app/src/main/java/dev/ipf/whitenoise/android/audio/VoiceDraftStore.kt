@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.audio
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceReviewRecoveryOwner
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
+import java.util.UUID
 
 /** One chat's voice-note scope; its directory name is hashed, so no account or chat id is stored in clear. */
 internal data class VoiceNoteKey(
@@ -40,6 +42,7 @@ internal sealed interface VoiceDraftRecovery {
 @Suppress("TooManyFunctions") // Keep transactions and recovery in one storage owner.
 internal class VoiceDraftStore(
     private val root: File,
+    private val evictionPending: (String) -> Boolean = { false },
 ) {
     /** The chat's private directory, named from hashes of the account and of the account and chat. */
     fun directory(key: VoiceNoteKey): File = File(accountDirectory(key.accountRef), chatName(key))
@@ -57,6 +60,7 @@ internal class VoiceDraftStore(
         durationMs: Long,
         stopReason: VoiceRecordingStopReason?,
     ): VoiceDraft? {
+        if (!canRecord(key)) return null
         val dir = recordingDirectory(key)
         if (!finishConsumption(dir)) return null
         val target = File(dir, "$TAKE_PREFIX${System.nanoTime()}.$TAKE_EXTENSION")
@@ -90,6 +94,7 @@ internal class VoiceDraftStore(
 
     /** Reads the chat's draft. An unfinished recorder file means the process died mid-take: it is deleted as lost. */
     fun recover(key: VoiceNoteKey): VoiceDraftRecovery {
+        if (!canRecord(key)) return VoiceDraftRecovery.None
         val dir = directory(key)
         val unfinished = dir.listFiles { file -> file.name.startsWith(RECORDING_PREFIX) }.orEmpty()
         unfinished.forEach { it.delete() }
@@ -149,13 +154,43 @@ internal class VoiceDraftStore(
             .orEmpty()
             .flatMap { account ->
                 account.listFiles().orEmpty().filter { dir ->
-                    consumptionMarkers(dir).none(File::isFile) &&
+                    !dir.name.startsWith(EVICTED_PREFIX) &&
+                        !evictionPending(dir.name) &&
+                        consumptionMarkers(dir).none(File::isFile) &&
                         (File(dir, METADATA).isFile || readMetadata(dir, PENDING_METADATA) != null)
                 }
             }.mapTo(HashSet()) { it.name }
 
+    /** A confirmed eviction fences the old directory until it is removed or moved out of the active path. */
+    fun canRecord(key: VoiceNoteKey): Boolean = !evictionPending(chatName(key))
+
     /** Removes the chat's whole directory, for a chat that left the account. */
-    fun purge(key: VoiceNoteKey): Boolean = directory(key).deleteRecursively()
+    fun purge(key: VoiceNoteKey): Boolean {
+        val dir = directory(key)
+        return dir.deleteRecursively() && Files.notExists(dir.toPath())
+    }
+
+    /** Atomically moves an evicted directory away from the path a rejoined chat will use. */
+    fun quarantine(key: VoiceNoteKey): Boolean {
+        val dir = directory(key)
+        val retired = File(dir.parentFile, "$EVICTED_PREFIX${UUID.randomUUID()}")
+        return dir.renameTo(retired) || Files.notExists(dir.toPath())
+    }
+
+    /** Deletes only isolated directories, even when a chat now has new drafts at its original path. */
+    fun purgeQuarantined(): Boolean {
+        val accounts = root.listFiles() ?: return Files.notExists(root.toPath())
+        var complete = true
+        accounts.filter(File::isDirectory).forEach { account ->
+            val retired = account.listFiles { file -> file.name.startsWith(EVICTED_PREFIX) }
+            if (retired == null) {
+                complete = false
+            } else {
+                retired.forEach { if (!it.deleteRecursively()) complete = false }
+            }
+        }
+        return complete
+    }
 
     /** Removes every draft of a signed-out or wiped account. */
     fun purgeAccount(accountRef: String): Boolean = accountDirectory(accountRef).deleteRecursively()
@@ -231,6 +266,7 @@ internal class VoiceDraftStore(
         private const val ACCEPTED = "take.accepted"
         private const val METADATA = "take.json"
         private const val PENDING_METADATA = "take.pending.json"
+        private const val EVICTED_PREFIX = "evicted-"
         private const val TAKE_PREFIX = "take-"
         private const val RECORDING_PREFIX = "voice-"
         private val TAKE_EXTENSION = VoiceRecorder.FILE_EXTENSION

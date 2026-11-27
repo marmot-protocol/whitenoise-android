@@ -32,6 +32,7 @@ internal class VoiceNoteSessionOwner(
     private val newController: (VoiceNoteKey, VoiceRecorderHooks) -> VoiceRecordingController,
     private val presentError: (Throwable) -> Unit,
     private val presentElsewhere: () -> Unit,
+    private val hasMicrophonePermission: () -> Boolean = { false },
     private val startForeground: (String) -> Boolean = { false },
 ) {
     private val controllers = mutableStateMapOf<VoiceNoteKey, VoiceRecordingController>()
@@ -39,6 +40,7 @@ internal class VoiceNoteSessionOwner(
     private val lost = mutableStateListOf<VoiceNoteKey>()
     private val recovered = mutableSetOf<VoiceNoteKey>()
     private val permissionRequests = mutableMapOf<VoiceNoteKey, () -> Boolean>()
+    private val bindingVersions = mutableStateMapOf<VoiceNoteKey, Int>()
     private var persisted: Set<String>? = null
     private var foregroundRequest: Pair<VoiceNoteKey, String>? = null
     private val sendOnArrival = mutableMapOf<VoiceNoteKey, File>()
@@ -56,6 +58,9 @@ internal class VoiceNoteSessionOwner(
         if (recovered.add(key) && key !in controllers) recover(key)
         return controllers.getOrPut(key) { newController(key, hooks(key)) }
     }
+
+    /** Changes when chat teardown revokes the recorder that an open conversation may still be presenting. */
+    fun bindingVersion(key: VoiceNoteKey): Int = bindingVersions[key] ?: 0
 
     /**
      * The chat closed. A locked or paused take keeps recording, a hold in progress is kept as a draft, and an idle
@@ -175,6 +180,7 @@ internal class VoiceNoteSessionOwner(
         beforePurge: () -> Unit = {},
     ): Boolean {
         val key = VoiceNoteKey(accountRef, groupIdHex)
+        if (key in permissionRequests) bindingVersions[key] = bindingVersion(key) + 1
         forget(key)
         drafts.remove(key)
         lost.remove(key)
@@ -226,8 +232,8 @@ internal class VoiceNoteSessionOwner(
 
     private fun hooks(key: VoiceNoteKey) =
         VoiceRecorderHooks(
-            outputDirectory = store.recordingDirectory(key),
-            onPermissionRequest = { permissionRequests[key]?.invoke() == true },
+            outputDirectory = store.directory(key),
+            onPermissionRequest = { prepareRecording(key) },
             onRecordingStarted = { requestForeground(key) },
             onRecordingComplete = { file, durationMs -> complete(key, file, durationMs) },
             onReleasedRecordingComplete = { file, durationMs ->
@@ -238,6 +244,12 @@ internal class VoiceNoteSessionOwner(
                 drafts[key]?.let { draft -> drafts[key] = store.withStopReason(key, draft, reason) }
             },
         )
+
+    /** Honors the visible chat's send gate before requesting permission or opening a new recording file. */
+    private fun prepareRecording(key: VoiceNoteKey): Boolean =
+        store.canRecord(key) &&
+            (permissionRequests[key]?.invoke() ?: hasMicrophonePermission()) &&
+            store.recordingDirectory(key).isDirectory
 
     private fun complete(
         key: VoiceNoteKey,

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.audio.VoiceDraftRecovery
 import dev.ipf.whitenoise.android.audio.VoiceDraftStore
 import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import kotlinx.coroutines.CompletableDeferred
@@ -19,6 +20,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /** A persisted eviction retries independently of the origin account's group and notification subscriptions. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,51 +30,61 @@ class VoiceDraftEvictionCleanupTest {
     @get:Rule val folder = TemporaryFolder()
     private val chat = VoiceNoteKey("evicted-account", "ab".repeat(32))
 
-    /** After a blocked purge, a fresh process reads the recorded target and purges it without another update. */
+    /** A rejoined chat never restores the evicted take, and cleanup after restart leaves a new take alone. */
     @Test
-    fun failedPurgeSurvivesRestartAndRetriesWithoutAnotherEvent() =
+    fun blockedEvictionSurvivesRejoinAndRestartsWithoutDeletingTheReplacement() =
         runTest {
-            val store = VoiceDraftStore(folder.newFolder("voice"))
+            val draftRoot = folder.newFolder("voice")
             val journalRoot = folder.newFolder("evictions")
             val journal = VoiceDraftEvictionJournal(journalRoot)
+            val store = VoiceDraftStore(draftRoot)
             val directory = store.recordingDirectory(chat)
-            val recording = directory.resolve("voice-evicted.m4a").apply { writeText("audio") }
-            val draft = checkNotNull(store.commit(chat, recording, 2_000L, stopReason = null))
+            val accountDirectory = checkNotNull(directory.parentFile)
+            val draft = saveTake(store, "evicted")
             val originalScope = CoroutineScope(StandardTestDispatcher(testScheduler))
-            val original = VoiceDraftEvictionCleanup(journal, originalScope, { true }, store::purge)
+            val original = VoiceDraftEvictionCleanup(journal, draftRoot, originalScope, { true }, {})
+            var retiredDirectory = directory
             assertTrue(directory.setWritable(false))
             try {
-                original.stage(chat)
+                assertTrue(accountDirectory.setWritable(false))
+                original.stage(chat, confirmed = true)
                 assertFalse(store.purge(chat))
-                original.resume()
+                original.isolate(chat)
+                assertTrue(draft.file.isFile)
+                assertEquals(mapOf(chat to true), journal.pending())
+                originalScope.cancel()
+
+                val restartedScope = CoroutineScope(StandardTestDispatcher(testScheduler))
+                val restarted = rejoinedCleanup(journalRoot, draftRoot, restartedScope)
+                assertEquals(VoiceDraftRecovery.None, restarted.draftStore.recover(chat))
+                assertTrue(restarted.draftStore.persistedDrafts().isEmpty())
+                assertFalse(restarted.draftStore.canRecord(chat))
+                assertTrue(accountDirectory.setWritable(true))
+                restarted.resume()
+                advanceTimeBy(1_000L)
                 runCurrent()
 
-                assertTrue(draft.file.isFile)
-                assertEquals(setOf(chat), journal.pending())
+                retiredDirectory = checkNotNull(accountDirectory.listFiles()).single()
+                assertTrue(retiredDirectory.resolve(draft.file.name).isFile)
+                assertEquals(VoiceDraftRecovery.None, restarted.draftStore.recover(chat))
+                assertTrue(restarted.draftStore.canRecord(chat))
+                assertTrue(journal.pending().isEmpty())
+
+                val replacement = saveTake(restarted.draftStore, "rejoined")
+                restartedScope.cancel()
+                assertTrue(retiredDirectory.setWritable(true))
+                val secondRestart = rejoinedCleanup(journalRoot, draftRoot, backgroundScope)
+                secondRestart.resume()
+                advanceTimeBy(1_000L)
+                runCurrent()
+
+                assertFalse(retiredDirectory.exists())
+                assertEquals(VoiceDraftRecovery.Ready(replacement), secondRestart.draftStore.recover(chat))
             } finally {
                 originalScope.cancel()
-                assertTrue(directory.setWritable(true))
+                accountDirectory.setWritable(true)
+                retiredDirectory.setWritable(true)
             }
-
-            val rechecks = mutableListOf<VoiceNoteKey>()
-            val restartedJournal = VoiceDraftEvictionJournal(journalRoot)
-            val restarted =
-                VoiceDraftEvictionCleanup(
-                    restartedJournal,
-                    backgroundScope,
-                    isEvicted = { key ->
-                        rechecks += key
-                        true
-                    },
-                    purge = store::purge,
-                )
-            restarted.resume()
-            advanceTimeBy(1_000L)
-            runCurrent()
-
-            assertEquals(listOf(chat), rechecks)
-            assertFalse(directory.exists())
-            assertTrue(restartedJournal.pending().isEmpty())
         }
 
     /** An old journal entry cannot purge a chat that native membership says has been rejoined. */
@@ -80,13 +92,14 @@ class VoiceDraftEvictionCleanupTest {
     fun replayClearsTheRequestWithoutPurgingARejoinedChat() =
         runTest {
             val journal = VoiceDraftEvictionJournal(folder.newFolder("evictions"))
-            assertTrue(journal.stage(chat))
+            assertTrue(journal.stage(chat, confirmed = false))
             val cleanup =
                 VoiceDraftEvictionCleanup(
                     journal,
+                    folder.newFolder("voice"),
                     backgroundScope,
                     isEvicted = { false },
-                    purge = { error("active chat must never be purged") },
+                    releaseEvictedTarget = { error("active chat must never be purged") },
                 )
 
             cleanup.resume()
@@ -104,26 +117,28 @@ class VoiceDraftEvictionCleanupTest {
             val oldRead = CompletableDeferred<Boolean>()
             var reads = 0
             var purges = 0
-            val cleanup =
+            lateinit var cleanup: VoiceDraftEvictionCleanup
+            cleanup =
                 VoiceDraftEvictionCleanup(
                     journal,
+                    folder.newFolder("voice"),
                     backgroundScope,
                     isEvicted = { if (reads++ == 0) oldRead.await() else true },
-                    purge = {
+                    releaseEvictedTarget = {
                         purges++
-                        true
+                        cleanup.complete(it)
                     },
                 )
-            cleanup.stage(chat)
+            cleanup.stage(chat, confirmed = false)
             cleanup.resume()
             advanceTimeBy(1_000L)
             runCurrent()
             assertEquals(1, reads)
 
-            cleanup.stage(chat)
+            cleanup.stage(chat, confirmed = false)
             oldRead.complete(false)
             runCurrent()
-            assertEquals(setOf(chat), journal.pending())
+            assertEquals(mapOf(chat to false), journal.pending())
             assertEquals(0, purges)
 
             advanceTimeBy(2_000L)
@@ -131,4 +146,31 @@ class VoiceDraftEvictionCleanupTest {
             assertEquals(1, purges)
             assertTrue(journal.pending().isEmpty())
         }
+
+    /** A confirmed eviction has no need to re-read membership or revoke a rejoined chat's owners. */
+    private fun rejoinedCleanup(
+        journalRoot: File,
+        draftRoot: File,
+        scope: CoroutineScope,
+    ): VoiceDraftEvictionCleanup =
+        VoiceDraftEvictionCleanup(
+            VoiceDraftEvictionJournal(journalRoot),
+            draftRoot,
+            scope,
+            isEvicted = { error("confirmed eviction does not depend on later membership") },
+            releaseEvictedTarget = { error("retry must leave the rejoined chat's capture alone") },
+        )
+
+    /** Saves a take at the same path a real recorder would use. */
+    private fun saveTake(
+        store: VoiceDraftStore,
+        name: String,
+    ) = checkNotNull(
+        store.commit(
+            chat,
+            store.recordingDirectory(chat).resolve("voice-$name.m4a").apply { writeText(name) },
+            durationMs = 2_000L,
+            stopReason = null,
+        ),
+    )
 }

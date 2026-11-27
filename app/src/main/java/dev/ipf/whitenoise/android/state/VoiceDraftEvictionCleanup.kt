@@ -5,7 +5,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
-import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.audio.VoiceDraftStore
 import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceReviewRecoveryOwner
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
 
 private const val INITIAL_VOICE_PURGE_RETRY_MS = 1_000L
 private const val MAX_VOICE_PURGE_RETRY_MS = 60_000L
@@ -26,13 +27,17 @@ internal class VoiceDraftEvictionJournal(
 ) {
     /** Commits the exact account and chat under a hashed filename before the retry can be lost. */
     @Suppress("TooGenericExceptionCaught") // Release AtomicFile's temporary output on any failed write.
-    fun stage(key: VoiceNoteKey): Boolean =
+    fun stage(
+        key: VoiceNoteKey,
+        confirmed: Boolean,
+    ): Boolean =
         runCatching {
             check(directory.isDirectory || directory.mkdirs())
             val data =
                 JSONObject()
                     .put("account", key.accountRef)
                     .put("group", key.groupIdHex)
+                    .put("confirmed", confirmed)
                     .toString()
                     .toByteArray(Charsets.UTF_8)
             val file = fileFor(key)
@@ -49,7 +54,7 @@ internal class VoiceDraftEvictionJournal(
         }.getOrDefault(false)
 
     /** Reads committed records, including records left with an AtomicFile backup. */
-    fun pending(): Set<VoiceNoteKey> =
+    fun pending(): Map<VoiceNoteKey, Boolean> =
         directory
             .list()
             .orEmpty()
@@ -57,22 +62,25 @@ internal class VoiceDraftEvictionJournal(
             .filter { it.endsWith(".json") }
             .distinct()
             .mapNotNull(::read)
-            .toSet()
+            .toMap()
 
     /** Drops a completed request only if no committed version remains on disk. */
     fun finish(key: VoiceNoteKey): Boolean =
         runCatching {
             val file = fileFor(key)
+            val backup = File(file.baseFile.path + ".bak")
             file.delete()
-            !file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()
+            Files.notExists(file.baseFile.toPath()) && Files.notExists(backup.toPath())
         }.getOrDefault(false)
 
     /** Rejects missing or damaged records and any contents that disagree with their hashed identity. */
-    private fun read(name: String): VoiceNoteKey? =
+    private fun read(name: String): Pair<VoiceNoteKey, Boolean>? =
         runCatching {
-            val value = JSONObject(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
+            val record = AtomicFile(File(directory, name))
+            val value = JSONObject(String(record.readFully(), Charsets.UTF_8))
             val key = VoiceNoteKey(value.getString("account"), value.getString("group"))
-            key.takeIf { fileFor(it).baseFile.name == name }
+            check(fileFor(key).baseFile.name == name)
+            key to value.optBoolean("confirmed")
         }.getOrNull()
 
     /** Uses the same private chat identity as voice draft paths. */
@@ -82,31 +90,52 @@ internal class VoiceDraftEvictionJournal(
     }
 }
 
-/** Retries only still-evicted targets without waiting for new group events or a profile switch. */
+/** Keeps pre-eviction directories out of recovery and retries their deletion across process restarts. */
 internal class VoiceDraftEvictionCleanup(
     private val journal: VoiceDraftEvictionJournal,
+    draftRoot: File,
     private val scope: CoroutineScope,
     private val isEvicted: suspend (VoiceNoteKey) -> Boolean?,
-    private val purge: (VoiceNoteKey) -> Boolean,
+    private val releaseEvictedTarget: (VoiceNoteKey) -> Unit,
 ) {
     /** The same request must own the key when its asynchronous membership read comes back. */
     private class Request(
+        val confirmed: Boolean,
         var persisted: Boolean,
     )
 
-    private val pending = journal.pending().associateWithTo(mutableMapOf()) { Request(persisted = true) }
+    private val pending = journal.pending().mapValuesTo(mutableMapOf()) { (_, confirmed) -> Request(confirmed, true) }
     private var worker: Job? = null
+    val draftStore = VoiceDraftStore(draftRoot, ::blocksDraft)
 
-    /** Records eviction before touching the audio and retains the request if the journal is unwritable. */
-    fun stage(key: VoiceNoteKey) {
-        val persisted = pending[key]?.persisted == true || journal.stage(key)
-        pending[key] = Request(persisted)
+    /** Fences the active path only for confirmed eviction; an obsolete readback may schedule another read. */
+    fun stage(
+        key: VoiceNoteKey,
+        confirmed: Boolean,
+    ) {
+        val previous = pending[key]
+        if (previous?.confirmed == true && !confirmed) return
+        val persisted =
+            (previous != null && previous.confirmed == confirmed && previous.persisted) ||
+                journal.stage(key, confirmed)
+        pending[key] = Request(confirmed, persisted)
     }
 
-    /** Returns whether an authoritative projection can retry this exact chat's purge. */
+    /** Includes an outstanding membership read as well as an unisolated, confirmed eviction. */
     fun contains(key: VoiceNoteKey): Boolean = key in pending
 
-    /** Removes this request after a purge or after the native runtime confirms the chat is active again. */
+    /** Blocks draft recovery and recording until the confirmed eviction's directory has been isolated. */
+    private fun blocksDraft(chatName: String): Boolean {
+        val confirmed = pending.asSequence().filter { (_, request) -> request.confirmed }
+        return confirmed.any { (key, _) -> draftStore.chatName(key) == chatName }
+    }
+
+    /** Moves the old directory away before the same chat can save any replacement drafts. */
+    fun isolate(key: VoiceNoteKey) {
+        if (draftStore.quarantine(key)) complete(key)
+    }
+
+    /** Drops the fence once the live path is clean, or clears a readback that found active membership. */
     fun complete(key: VoiceNoteKey) {
         if (key in pending && journal.finish(key)) pending.remove(key)
     }
@@ -119,26 +148,33 @@ internal class VoiceDraftEvictionCleanup(
 
     /** Starts one process-owned worker for the restored backlog or the first newly failed eviction. */
     fun resume() {
-        if (pending.isEmpty() || worker?.isActive == true) return
+        if (worker?.isActive == true) return
         worker = scope.launch { retryPending() }
     }
 
     /** Backs off repeated failures while the runtime or the filesystem is temporarily unavailable. */
     private suspend fun retryPending() {
         var pauseMillis = INITIAL_VOICE_PURGE_RETRY_MS
-        while (pending.isNotEmpty()) {
+        do {
             delay(pauseMillis)
             pending.keys.toList().forEach { retry(it) }
+            val purged = draftStore.purgeQuarantined()
             pauseMillis = (pauseMillis * 2).coerceAtMost(MAX_VOICE_PURGE_RETRY_MS)
-        }
+        } while (pending.isNotEmpty() || !purged)
     }
 
     /** Rechecks membership and request ownership after suspension before touching private audio. */
     private suspend fun retry(key: VoiceNoteKey) {
         val request = pending[key] ?: return
-        if (!request.persisted) request.persisted = journal.stage(key)
-        val evicted = isEvicted(key) ?: return
-        if (pending[key] === request && (!evicted || purge(key))) complete(key)
+        if (!request.persisted) request.persisted = journal.stage(key, request.confirmed)
+        if (request.confirmed) {
+            isolate(key)
+        } else {
+            val evicted = isEvicted(key) ?: return
+            if (pending[key] === request) {
+                if (evicted) releaseEvictedTarget(key) else complete(key)
+            }
+        }
     }
 }
 
@@ -146,9 +182,10 @@ internal class VoiceDraftEvictionCleanup(
 internal fun WhiteNoiseAppState.createVoiceDraftEvictionCleanup(): VoiceDraftEvictionCleanup =
     VoiceDraftEvictionCleanup(
         journal = VoiceDraftEvictionJournal(appContext.noBackupFilesDir.resolve("voice-draft-evictions")),
+        draftRoot = appContext.noBackupFilesDir.resolve("voice-drafts"),
         scope = mutationsScope,
-        isEvicted = { key -> marmotOrNull()?.let { readCaptureEviction(key, it, allowMissing = true) } },
-        purge = { key -> releaseCaptureTarget(key.accountRef, key.groupIdHex) },
+        isEvicted = { key -> marmotOrNull()?.let { readCaptureEviction(key, it) } },
+        releaseEvictedTarget = { key -> releaseEvictedCaptureTarget(key.accountRef, key.groupIdHex) },
     )
 
 /** Commits or journals private cleanup for the exact chat that native membership marked as evicted. */
@@ -157,20 +194,19 @@ internal fun WhiteNoiseAppState.releaseEvictedCaptureTarget(
     groupIdHex: String,
 ) {
     val key = VoiceNoteKey(account, groupIdHex)
-    releaseCaptureTarget(account, groupIdHex) { voiceDraftEvictions.stage(key) }
+    val purged = releaseCaptureTarget(account, groupIdHex) { voiceDraftEvictions.stage(key, confirmed = true) }
+    if (!purged) voiceDraftEvictions.isolate(key)
     voiceDraftEvictions.resume()
 }
 
-/** Releases capture on an authoritative eviction and retries a purge while the group still reports removal. */
+/** Releases capture when a group projection first reports an authoritative eviction. */
 internal fun WhiteNoiseAppState.releaseEvictedCapture(
     account: String?,
     previous: AppGroupRecordFfi?,
     current: AppGroupRecordFfi,
 ) {
     if (account == null || !current.selfMembership.isGroupEviction()) return
-    if (previous?.selfMembership?.isGroupEviction() != true ||
-        voiceDraftEvictions.contains(VoiceNoteKey(account, current.groupIdHex))
-    ) {
+    if (previous?.selfMembership?.isGroupEviction() != true) {
         releaseEvictedCaptureTarget(account, current.groupIdHex)
     }
 }
@@ -209,17 +245,16 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
     }
     val evicted =
         readCaptureEviction(key, runtime) {
-            voiceDraftEvictions.stage(key)
+            voiceDraftEvictions.stage(key, confirmed = false)
             voiceDraftEvictions.resume()
         }
     if (evicted == true) releaseEvictedCaptureTarget(account, group)
 }
 
-/** Only a recorded eviction can use confirmed absence of the targeted native row to authorize a purge. */
+/** Authorizes removal only from an explicit native eviction for the current capture and runtime. */
 private suspend fun WhiteNoiseAppState.readCaptureEviction(
     key: VoiceNoteKey,
     runtime: MarmotInterface,
-    allowMissing: Boolean = false,
     onNewerCapture: () -> Unit = {},
 ): Boolean? {
     if (marmotOrNull() !== runtime) return null
@@ -228,17 +263,10 @@ private suspend fun WhiteNoiseAppState.readCaptureEviction(
     val captureIsCurrent = voiceNotes.captureTargetIsCurrent(key)
     val eviction =
         runCatchingCancellable {
-            withContext(Dispatchers.IO) { runtime.chatListRow(account, group)?.selfMembership }
-        }.fold(
-            onSuccess = { membership -> membership?.isGroupEviction() ?: allowMissing },
-            onFailure = { failure ->
-                val removedAccount =
-                    failure is MarmotKitException.UnknownAccount &&
-                        accountListLoaded &&
-                        accounts.none { it.label == account }
-                true.takeIf { allowMissing && removedAccount }
-            },
-        )
+            withContext(Dispatchers.IO) {
+                runtime.chatListRow(account, group)?.selfMembership?.isGroupEviction() == true
+            }
+        }.getOrNull()
     // Selection may change, but this read cannot retire a newer recording or draft for the same chat.
     val runtimeIsCurrent = epoch == runtimeGeneration && marmotOrNull() === runtime
     val sameCapture = captureIsCurrent()

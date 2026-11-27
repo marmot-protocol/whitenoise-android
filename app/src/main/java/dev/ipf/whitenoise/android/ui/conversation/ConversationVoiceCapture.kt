@@ -12,12 +12,14 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceNoteKey
+import dev.ipf.whitenoise.android.audio.VoiceNoteSessionOwner
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -97,15 +99,30 @@ internal fun rememberConversationVoiceCapture(
         onDispose { voiceReview.detach() }
     }
     val requestPermission = rememberVoicePermissionRequest(appState, LocalContext.current)
-    val voiceRecordingController = remember(key, owner) { owner.bind(key, requestPermission) }
-    DisposableEffect(voiceRecordingController) {
-        onDispose { owner.unbind(key, voiceRecordingController) }
-    }
+    val voiceRecordingController =
+        rememberVoiceRecorderBinding(owner, key) {
+            ownerIsCurrent() && controller.canSendMessages && requestPermission()
+        }
     VoiceRecordingLifecycleEffect(voiceRecordingController)
     VoiceDraftPresentation(appState, key, voiceReview, voiceRecordingController, voiceReviewRecovery)
     return remember(voiceReview, voiceRecordingController, voiceReviewRecovery, ownerIsCurrent) {
         ConversationVoiceCapture(voiceReview, voiceRecordingController, voiceReviewRecovery, ownerIsCurrent)
     }
+}
+
+/** Tracks revocation even if removal and rejoin occur between frames in an already open chat. */
+@Composable
+internal fun rememberVoiceRecorderBinding(
+    owner: VoiceNoteSessionOwner,
+    key: VoiceNoteKey,
+    requestPermission: () -> Boolean,
+): VoiceRecordingController {
+    val currentPermission = rememberUpdatedState(requestPermission)
+    val recorder = remember(key, owner, owner.bindingVersion(key)) { owner.bind(key) { currentPermission.value() } }
+    DisposableEffect(recorder) {
+        onDispose { owner.unbind(key, recorder) }
+    }
+    return recorder
 }
 
 /**

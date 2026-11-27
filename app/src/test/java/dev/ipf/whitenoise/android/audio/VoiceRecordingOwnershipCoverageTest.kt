@@ -45,8 +45,12 @@ class VoiceRecordingOwnershipCoverageTest {
     @Test
     fun closingTheChatUnbindsAndNeverEndsTheTake() {
         val conversation = source("ui/conversation/ConversationVoiceCapture.kt")
-        assertTrue(conversation.contains("owner.bind(key, requestPermission)"))
-        assertTrue(conversation.contains("onDispose { owner.unbind(key, voiceRecordingController) }"))
+        val capture = conversation.functionBody("rememberConversationVoiceCapture")
+        assertTrue(capture.contains("rememberVoiceRecorderBinding(owner, key)"))
+        val binding = conversation.functionBody("rememberVoiceRecorderBinding")
+        assertTrue(binding.contains("remember(key, owner, owner.bindingVersion(key))"))
+        assertTrue(binding.contains("owner.bind(key)"))
+        assertTrue(binding.contains("onDispose { owner.unbind(key, recorder) }"))
         assertTrue(conversation.contains("onDispose { voiceReview.detach() }"))
         assertFalse(conversation.contains("voiceRecordingController.release()"))
         assertFalse(conversation.contains("voiceRecordingController.cancel()"))
