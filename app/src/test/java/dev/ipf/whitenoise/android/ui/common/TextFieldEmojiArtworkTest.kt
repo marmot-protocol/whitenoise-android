@@ -6,10 +6,12 @@ import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.placeCursorAtEnd
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -143,40 +145,46 @@ class TextFieldEmojiArtworkTest {
 
     @Test
     fun customAndUnicodeEmojiHaveTheSamePositionInBidirectionalText() {
-        val state = TextFieldState("אב A :party: אב")
-        val actualLayout = AtomicReference<TextLayoutResult>()
+        val custom = ":party:"
+        val unicode = "🙂"
+        val layouts =
+            mapOf(
+                custom to AtomicReference<TextLayoutResult>(),
+                unicode to AtomicReference<TextLayoutResult>(),
+            )
         composeRule.setContent {
             WhiteNoiseTheme {
                 CompositionLocalProvider(
                     LocalCustomEmoji provides localEmoji(),
                     LocalLayoutDirection provides LayoutDirection.Rtl,
                 ) {
-                    val artwork = rememberTextFieldEmojiArtwork(state, enabled = true)
-                    BasicTextField(
-                        state = state,
-                        outputTransformation = artwork.output,
-                        lineLimits = TextFieldLineLimits.SingleLine,
-                        onTextLayout = { result -> actualLayout.set(result()) },
-                    )
+                    Column {
+                        for ((emoji, layout) in layouts) {
+                            val state = rememberTextFieldState("אב A $emoji אב")
+                            val artwork = rememberTextFieldEmojiArtwork(state, enabled = true)
+                            BasicTextField(
+                                state = state,
+                                outputTransformation = artwork.output,
+                                lineLimits = TextFieldLineLimits.SingleLine,
+                                onTextLayout = { result -> layout.set(result()) },
+                            )
+                        }
+                    }
                 }
             }
         }
 
         fun isLeftOfEnglishLetter(emoji: String): Boolean {
-            val layout = requireNotNull(actualLayout.get())
+            val layout = requireNotNull(layouts.getValue(emoji).get())
             val text = layout.layoutInput.text.text
             val emojiX = layout.getBoundingBox(text.indexOf(emoji)).center.x
             val englishX = layout.getBoundingBox(text.indexOf('A')).center.x
             return emojiX < englishX
         }
-        val customLeft = isLeftOfEnglishLetter(":party:")
-        composeRule.runOnIdle { state.edit { replace(0, length, "אב A 🙂 אב") } }
-        composeRule.waitUntil(5_000) {
-            val layout = actualLayout.get()
-            layout != null && "🙂" in layout.layoutInput.text.text
+        composeRule.runOnIdle {
+            assertTrue("Unicode emoji should appear to the left of A", isLeftOfEnglishLetter(unicode))
+            assertTrue("Custom emoji should appear to the left of A", isLeftOfEnglishLetter(custom))
         }
-        assertTrue(isLeftOfEnglishLetter("🙂"))
-        assertTrue(customLeft)
     }
 
     @Test
