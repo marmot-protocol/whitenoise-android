@@ -113,7 +113,7 @@ private fun quickReactionRowsFrom(
     return notificationQuickReactionRows(context, choices, artwork) { intents[choices.indexOf(it)] }
 }
 
-internal fun notificationQuickReactionRows(
+private fun notificationQuickReactionRows(
     context: Context,
     choices: List<String>,
     artwork: Map<String, Bitmap>,
@@ -244,7 +244,8 @@ private fun decorateQuickReactionRows(
     return decorated
 }
 
-private const val LEGACY_EXTRA_QUICK_REACTION_ROWS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_ROWS"
+/** The key the earlier build kept the drawn rows under; cards it posted may still carry it. */
+internal const val LEGACY_EXTRA_QUICK_REACTION_ROWS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_ROWS"
 private const val CHIPS_CHOICES = "choices"
 private const val CHIPS_INTENTS = "intents"
 private const val CHIPS_ARTWORK = "artwork"

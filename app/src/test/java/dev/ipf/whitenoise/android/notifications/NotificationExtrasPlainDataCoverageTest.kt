@@ -15,6 +15,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -84,6 +85,8 @@ class NotificationExtrasPlainDataCoverageTest {
         val posted = manager.activeNotifications.single()
         val earlier =
             posted.notification.clone().apply {
+                // That build never wrote the plain chips extra, only the drawn rows.
+                extras.remove(EXTRA_QUICK_REACTION_CHIPS)
                 extras.putParcelable(
                     LEGACY_EXTRA_QUICK_REACTION_ROWS,
                     RemoteViews(context.packageName, R.layout.notification_quick_reaction_row),
@@ -91,24 +94,29 @@ class NotificationExtrasPlainDataCoverageTest {
             }
         manager.notify(posted.tag, posted.id, earlier)
 
-        presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:")
+        assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:"))
 
         val live = manager.activeNotifications.single().notification
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_QUICK_REACTION_ROWS))
         assertEquals(emptyList<String>(), remoteViewsKeys(live.extras))
     }
 
-    /** The extras keys, nested bundles included, whose value is a RemoteViews. */
+    /** The extras keys whose value is, or holds in a nested bundle, list or array, a RemoteViews. */
     private fun remoteViewsKeys(
         extras: Bundle,
         prefix: String = "",
+    ): List<String> = extras.keySet().flatMap { key -> remoteViewsPaths(readAlone(extras, key), prefix + key) }
+
+    private fun remoteViewsPaths(
+        value: Any?,
+        path: String,
     ): List<String> =
-        extras.keySet().flatMap { key ->
-            when (val value = readAlone(extras, key)) {
-                is RemoteViews -> listOf(prefix + key)
-                is Bundle -> remoteViewsKeys(value, "$prefix$key/")
-                else -> emptyList()
-            }
+        when (value) {
+            is RemoteViews -> listOf(path)
+            is Bundle -> remoteViewsKeys(value, "$path/")
+            is Iterable<*> -> value.flatMapIndexed { index, item -> remoteViewsPaths(item, "$path[$index]") }
+            is Array<*> -> value.flatMapIndexed { index, item -> remoteViewsPaths(item, "$path[$index]") }
+            else -> emptyList()
         }
 
     /** Reads one extras value the way Notification.lightenPayload does. */
@@ -158,6 +166,3 @@ class NotificationExtrasPlainDataCoverageTest {
             sticker = null,
         )
 }
-
-/** The extras key the earlier build kept the reaction rows under; cards it posted may still carry it. */
-private const val LEGACY_EXTRA_QUICK_REACTION_ROWS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_ROWS"
