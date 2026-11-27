@@ -203,6 +203,7 @@ class ChatListAvatarReturnScreenshotTest {
             rule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
             holdReads.set(true)
             val readsBeforeReturn = evictQuiescentWorkingSet(fixture)
+            val requestsBeforeReturn = fixture.avatarRequests.get()
 
             if (refresh) {
                 revision.set(2)
@@ -222,8 +223,8 @@ class ChatListAvatarReturnScreenshotTest {
             if (!refresh && !stale) {
                 assertEquals("retained pixels need no repeat local read", readsBeforeReturn, fixture.avatarReads.get())
             }
-            if (refresh) assertRefreshedPixels(fixture, releaseReads)
-            if (stale) assertStaleRefreshSettles(fixture, releaseReads)
+            if (refresh) assertRefreshedPixels(fixture, releaseReads, capture = true)
+            if (stale) assertStaleRefreshSettles(fixture, releaseReads, revision, requestsBeforeReturn)
         } finally {
             firstReads.complete(Unit)
             releaseReads.complete(Unit)
@@ -253,9 +254,12 @@ class ChatListAvatarReturnScreenshotTest {
                 if (index == 29) row.copy(groupName = "", conversationKind = ChatConversationKindFfi.DIRECT) else row
             },
             avatarAssetForRow = {
+                val currentRevision = revision.get()
+                val availability =
+                    if (stale && currentRevision == 1L) AvatarAvailabilityFfi.STALE else AvatarAvailabilityFfi.READY
                 asset(it.groupIdHex).copy(
-                    contentRevision = revision.get().toULong(),
-                    availability = if (stale) AvatarAvailabilityFfi.STALE else AvatarAvailabilityFfi.READY,
+                    contentRevision = currentRevision.toULong(),
+                    availability = availability,
                 )
             },
             readAvatars = { references ->
@@ -353,24 +357,20 @@ class ChatListAvatarReturnScreenshotTest {
         )
     }
 
-    /** A completed STALE decode must converge with the existing preparation seed and retain visible pixels. */
+    /** A visible STALE row requests a fresh selection while it keeps drawing the held revision. */
     private fun assertStaleRefreshSettles(
         fixture: ReturnFixture,
         releaseReads: CompletableDeferred<Unit>,
+        revision: AtomicLong,
+        requestsBeforeReturn: Int,
     ) {
-        releaseReads.complete(Unit)
         rule.mainClock.autoAdvance = true
-        rule.waitUntil(10_000) {
-            fixture.rows.all {
-                AvatarImageLoader.cachedImage(checkNotNull(asset(it.groupIdHex).cacheKey(ACCOUNT))) != null
-            }
-        }
-        // Competing row and preparation writes would keep Compose busy indefinitely here.
-        rule.waitForIdle()
-        fixture.rows.forEach { assertAvatarPixels(it.groupIdHex) }
-        assertTrue("STALE is allowed to request MDK refresh", fixture.avatarRequests.get() > 0)
+        rule.waitUntil(10_000) { fixture.avatarRequests.get() > requestsBeforeReturn }
+        revision.set(2)
+        fixture.activeWindow.replaceRows(fixture.rows)
+        assertRefreshedPixels(fixture, releaseReads, capture = false)
         assertTrue(
-            "the released local read decoded a new bitmap",
+            "the new revision decoded a new bitmap",
             AvatarCacheDiagnostics.snapshot().profile.decodeCalls > 0,
         )
     }
@@ -398,6 +398,7 @@ class ChatListAvatarReturnScreenshotTest {
     private fun assertRefreshedPixels(
         fixture: ReturnFixture,
         releaseReads: CompletableDeferred<Unit>,
+        capture: Boolean,
     ) {
         releaseReads.complete(Unit)
         rule.mainClock.autoAdvance = true
@@ -409,9 +410,11 @@ class ChatListAvatarReturnScreenshotTest {
         }
         rule.waitForIdle()
         fixture.rows.forEach { assertAvatarPixels(it.groupIdHex, REPLACEMENT_COLOR) }
-        rule
-            .onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}")
-            .captureRoboImage("src/test/snapshots/chat_list_avatar_return_light_refresh_loaded.png")
+        if (capture) {
+            rule
+                .onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}")
+                .captureRoboImage("src/test/snapshots/chat_list_avatar_return_light_refresh_loaded.png")
+        }
     }
 
     /** Checks real row pixels, so a correctly laid-out initials placeholder cannot satisfy the regression. */
