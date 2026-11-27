@@ -1990,12 +1990,15 @@
     <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
     <string name="emoji_sets_load_emoji">Load emoji</string>
-    <!-- %1$s is a web host such as nostr.build. -->
-    <string name="emoji_sets_image_host">Images come from %1$s. Loading or installing them shares your IP address with that host.</string>
-    <!-- %1$s is a web host such as nostr.build; %2$d counts the other hosts. -->
+    <!-- %1$s lists web hosts such as "nostr.build and void.cat" or "a.com, b.com, c.com and 2 more". The quantity is the total host count. -->
     <plurals name="emoji_sets_image_hosts">
-        <item quantity="one">Images come from %1$s and %2$d other host. Loading or installing them shares your IP address with those hosts.</item>
-        <item quantity="other">Images come from %1$s and %2$d other hosts. Loading or installing them shares your IP address with those hosts.</item>
+        <item quantity="one">Images come from %1$s. Loading or installing them shares your IP address with that host.</item>
+        <item quantity="other">Images come from %1$s. Loading or installing them shares your IP address with those hosts.</item>
+    </plurals>
+    <!-- The last item of a host list, as in "a.com, b.com, c.com and 2 more". -->
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Loading or installing these images shares your IP address with their hosts.</string>
     <!-- %1$s is an emoji count such as "12 emoji"; %2$s is Installed or Update available. -->
@@ -2005,6 +2008,8 @@
     <string name="emoji_sets_emoji_loading">%1$s, loading</string>
     <!-- %1$s is an emoji shortcode such as :fox:. -->
     <string name="emoji_sets_emoji_failed">%1$s couldn’t load. Tap to retry.</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_unavailable">%1$s isn’t available on this device.</string>
     <string name="emoji_sets_install">Install set</string>
     <string name="emoji_sets_update">Update set</string>
     <string name="emoji_sets_check_update">Check for update</string>

@@ -92,9 +92,9 @@
         ]
       },
       {
-        "surface": "emojiSetHostDisclosure",
+        "surface": "EmojiSetHostDisclosure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun emojiSetHostDisclosure(",
+        "anchor": "fun EmojiSetHostDisclosure(",
         "test_ids": [
           "SET-075"
         ]
@@ -103,6 +103,14 @@
         "surface": "Modifier.explain",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "fun Modifier.explain(",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "EmojiSetTileContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+        "anchor": "fun EmojiSetTileContent(",
         "test_ids": [
           "SET-075"
         ]
@@ -182,14 +190,6 @@
         ]
       },
       {
-        "surface": "setting:emoji_sets_image_host",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "R.string.emoji_sets_image_host",
-        "test_ids": [
-          "SET-075"
-        ]
-      },
-      {
         "surface": "setting:emoji_sets_image_hosts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "R.plurals.emoji_sets_image_hosts",
@@ -241,6 +241,22 @@
         "surface": "setting:emoji_sets_update_available",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "R.string.emoji_sets_update_available",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_emoji_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+        "anchor": "R.string.emoji_sets_emoji_unavailable",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_more_hosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+        "anchor": "R.plurals.emoji_sets_more_hosts",
         "test_ids": [
           "SET-075"
         ]

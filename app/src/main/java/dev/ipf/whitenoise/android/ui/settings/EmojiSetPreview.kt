@@ -3,8 +3,10 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.icu.text.ListFormatter
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -38,7 +40,6 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -83,6 +84,7 @@ private const val TILE_ART_FRACTION = 0.72f
 private const val PULSE_LOW_ALPHA = 0.35f
 private const val PULSE_MILLIS = 800
 private const val MAX_GHOST_TILES = 6
+private const val MAX_NAMED_HOSTS = 3
 
 /**
  * One set version: who it is, what installing does, and its emoji as a grid. Remote images stay blank tiles until
@@ -103,6 +105,8 @@ internal fun EmojiSetPreview(
         val columns = gridColumns(maxWidth)
         SettingsList {
             item(key = "set.header") { EmojiSetPreviewHeader(set, images) }
+            // Install, Update and Load emoji all contact the image hosts, so the disclosure comes before each of them.
+            if (images?.local != true) item(key = "set.hosts") { EmojiSetHostDisclosure(set) }
             item(key = "set.actions") { EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate) }
             item(key = "set.status") { EmojiSetStatus(state) }
             if (images == null || !images.requested) {
@@ -296,7 +300,7 @@ private fun EmojiSetInstallProgress(
     }
 }
 
-/** Blank tiles standing in for the grid, the hosts that loading would contact, and the Load emoji action. */
+/** Blank tiles standing in for the grid, and the Load emoji action. */
 @Composable
 private fun EmojiSetLoadCard(
     set: EmojiSetFfi,
@@ -323,11 +327,6 @@ private fun EmojiSetLoadCard(
                     repeat(columns - 1 - ghosts) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            Text(
-                emojiSetHostDisclosure(set),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             WhiteNoiseFilledTonalButton(
                 onClick = onLoad,
                 enabled = enabled && set.emoji.isNotEmpty(),
@@ -348,22 +347,29 @@ private fun EmojiSetLoadCard(
     }
 }
 
-/** Names the image hosts by domain, so the user knows who sees their IP address before agreeing. */
+/** Names the image hosts, so the user knows who would see their IP address before any image loads. */
 @Composable
-private fun emojiSetHostDisclosure(set: EmojiSetFfi): String {
+private fun EmojiSetHostDisclosure(set: EmojiSetFfi) {
     val hosts =
         remember(set) {
-            (listOfNotNull(set.imageUrl) + set.emoji.map { it.url })
-                .mapNotNull { Uri.parse(it).host?.removePrefix("www.") }
-                .distinct()
+            (listOfNotNull(set.imageUrl) + set.emoji.map { it.url }).mapNotNull { Uri.parse(it).host }.distinct()
         }
-    val first = hosts.firstOrNull() ?: return stringResource(R.string.emoji_sets_image_hosts_unknown)
-    val others = hosts.size - 1
-    return if (others == 0) {
-        stringResource(R.string.emoji_sets_image_host, first)
-    } else {
-        pluralStringResource(R.plurals.emoji_sets_image_hosts, others, first, others)
-    }
+    val text =
+        if (hosts.isEmpty()) {
+            stringResource(R.string.emoji_sets_image_hosts_unknown)
+        } else {
+            val shown = hosts.take(MAX_NAMED_HOSTS)
+            val more = hosts.size - shown.size
+            val names =
+                if (more > 0) shown + pluralStringResource(R.plurals.emoji_sets_more_hosts, more, more) else shown
+            pluralStringResource(R.plurals.emoji_sets_image_hosts, hosts.size, ListFormatter.getInstance().format(names))
+        }
+    Text(
+        text,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** One row of the grid; a short last row keeps tile widths by padding with empty cells. */
@@ -393,29 +399,49 @@ private fun EmojiSetTile(
     modifier: Modifier,
 ) {
     val image = images[shortcode]
-    LaunchedEffect(images, shortcode, image == null) { if (image == null) images.load(shortcode) }
+    // Keyed on the attempt, not the tile state, which the load itself changes.
+    LaunchedEffect(images, shortcode, images.requested, images.attempt(shortcode)) { images.load(shortcode) }
     val label = ":$shortcode:"
+    val canRetry = image == EmojiSetImage.Failed && images.retryable
     val description =
-        when (image) {
-            is EmojiSetImage.Ready -> label
-            EmojiSetImage.Failed -> stringResource(R.string.emoji_sets_emoji_failed, label)
-            EmojiSetImage.Loading, null -> stringResource(R.string.emoji_sets_emoji_loading, label)
+        when {
+            image is EmojiSetImage.Ready -> label
+            canRetry -> stringResource(R.string.emoji_sets_emoji_failed, label)
+            image == EmojiSetImage.Failed -> stringResource(R.string.emoji_sets_emoji_unavailable, label)
+            else -> stringResource(R.string.emoji_sets_emoji_loading, label)
         }
+    // The row's weight goes on a direct child; TooltipBox would hand it to its inner anchor.
+    Box(modifier) {
+        EmojiSetTileContent(shortcode, image, label, description, canRetry) { images.retry(shortcode) }
+    }
+}
+
+/** The tile's square and its long-press tooltip. */
+@Suppress("LongParameterList")
+@Composable
+private fun EmojiSetTileContent(
+    shortcode: String,
+    image: EmojiSetImage?,
+    label: String,
+    description: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+) {
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = { PlainTooltip { Text(label) } },
         state = rememberTooltipState(),
-        modifier = modifier,
     ) {
         Box(
             modifier =
                 Modifier
+                    .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(MaterialTheme.shapes.medium)
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .then(
-                        if (image == EmojiSetImage.Failed) {
-                            Modifier.clickable { images.retry(shortcode) }
+                        if (canRetry) {
+                            Modifier.clickable(onClick = onRetry)
                         } else {
                             Modifier
                         },

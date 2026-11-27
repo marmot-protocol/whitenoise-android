@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -42,8 +43,8 @@ import dev.ipf.whitenoise.android.ui.settings.EMOJI_SET_LOAD_TEST_TAG
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetImageSource
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetImages
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
-import dev.ipf.whitenoise.android.ui.settings.emojiSetTileTestTag
 import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
+import dev.ipf.whitenoise.android.ui.settings.emojiSetTileTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -113,8 +114,9 @@ class EmojiSetsScreenshotTest {
     /** An installed preview with update and removal available still waits for consent to load the new version. */
     @Test fun previewDark() = gallery("preview_dark", dark = true, requested = false, installed = updateAvailable)
 
-    /** The unloaded preview with a mirrored layout and large text. */
-    @Test fun previewRtlLarge() = gallery("preview_rtl_large", rtl = true, requested = false)
+    /** The two-button update row and the unloaded grid, mirrored with large text. */
+    @Test fun previewRtlLarge() =
+        gallery("preview_rtl_large", rtl = true, requested = false, installed = updateAvailable)
 
     /** After Load emoji: loaded art, pulsing blanks for tiles in flight and a retry mark for a failed one. */
     @Test fun previewLoadingLight() = gallery("preview_loading_light", requested = true, pending = setOf("owl", "bee"))
@@ -143,10 +145,16 @@ class EmojiSetsScreenshotTest {
         assertEquals("Nothing loads before the user asks", emptyList<String>(), source.requests)
         composeRule.onNodeWithTag(EMOJI_SET_LOAD_TEST_TAG).performClick()
         composeRule.waitForIdle()
-        assertTrue("Visible tiles and the cover load after the tap", "fox" in source.requests && "cover" in source.requests)
+        assertTrue("The cover loads after the tap", "cover" in source.requests)
+        composeRule.onNodeWithTag(emojiSetTileTestTag("fox")).assertContentDescriptionEquals(":fox:")
+        val fox = composeRule.onNodeWithTag(emojiSetTileTestTag("fox")).fetchSemanticsNode().size.width
+        val owl = composeRule.onNodeWithTag(emojiSetTileTestTag("owl")).fetchSemanticsNode().size.width
+        assertTrue("Tiles in a row share its width equally ($fox, $owl)", fox > 0 && fox == owl)
+        assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
+        assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
         composeRule.onNodeWithTag(emojiSetTileTestTag("frog")).performClick()
         composeRule.waitForIdle()
-        assertEquals("The failed tile retries once", 2, source.requests.count { it == "frog" })
+        assertEquals("Tapping a failed tile retries it once", 2, source.requests.count { it == "frog" })
     }
 
     /** Untitled sets with machine-made identifiers never show the hex as their name. */
@@ -387,6 +395,8 @@ class EmojiSetsScreenshotTest {
             local: Boolean,
         ): ByteArray {
             requests += shortcode
+            // Suspend like the native fetch, so a tile recomposes as Loading before its bytes arrive.
+            kotlinx.coroutines.yield()
             if (shortcode in pending) kotlinx.coroutines.awaitCancellation()
             check(shortcode !in failing) { "host refused" }
             return byteArrayOf(GalleryCodes.indexOf(shortcode).toByte())

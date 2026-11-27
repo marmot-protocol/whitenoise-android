@@ -73,6 +73,8 @@ internal class EmojiSetImages(
         private set
 
     private val images = mutableStateMapOf<String, EmojiSetImage>()
+    private val attempts = mutableStateMapOf<String, Int>()
+    private val readyOrder = ArrayDeque<String>()
     private val permits = Semaphore(MAX_PARALLEL_LOADS)
 
     /** The tile state for [shortcode]; null before its first load and after a failed one is retried. */
@@ -88,7 +90,9 @@ internal class EmojiSetImages(
         if (!requested || images[shortcode] != null) return
         images[shortcode] = EmojiSetImage.Loading
         try {
-            images[shortcode] = fetch { source.emoji(set, shortcode, local) }
+            val image = fetch { source.emoji(set, shortcode, local) }
+            images[shortcode] = image
+            if (image is EmojiSetImage.Ready) retain(shortcode)
         } catch (cancelled: CancellationException) {
             // A tile that scrolled away starts over when it returns.
             images.remove(shortcode)
@@ -108,14 +112,36 @@ internal class EmojiSetImages(
         }
     }
 
-    /** Clears a failed tile so it loads again. */
+    /** Counts retries, so a tile's load effect restarts only for a new attempt, never for its own state change. */
+    fun attempt(shortcode: String): Int = attempts[shortcode] ?: 0
+
+    /** Whether a failed tile can try again; the installed snapshot's stored bytes will not change. */
+    val retryable: Boolean get() = !local
+
+    /** Clears a failed remote tile so it loads again. */
     fun retry(shortcode: String) {
-        if (images[shortcode] == EmojiSetImage.Failed) images.remove(shortcode)
+        if (!retryable || images[shortcode] != EmojiSetImage.Failed) return
+        images.remove(shortcode)
+        attempts[shortcode] = attempt(shortcode) + 1
     }
 
     /** The first loaded emoji, which stands in for a missing or unloaded cover. */
     fun firstReady(): EmojiArt? =
         set.emoji.firstNotNullOfOrNull { (images[it.shortcode] as? EmojiSetImage.Ready)?.art }
+
+    /**
+     * Keeps at most [MAX_READY_IMAGES] decoded images, so scrolling a very large set cannot grow memory without bound.
+     * The oldest one is dropped and its attempt bumped, so it loads again if it is still or again on screen.
+     */
+    private fun retain(shortcode: String) {
+        readyOrder.remove(shortcode)
+        readyOrder.addLast(shortcode)
+        while (readyOrder.size > MAX_READY_IMAGES) {
+            val evicted = readyOrder.removeFirst()
+            images.remove(evicted)
+            attempts[evicted] = attempt(evicted) + 1
+        }
+    }
 
     @Suppress("TooGenericExceptionCaught") // Any fetch or decode failure becomes a retryable tile.
     private suspend fun fetch(read: suspend () -> ByteArray): EmojiSetImage =
@@ -129,6 +155,9 @@ internal class EmojiSetImages(
 
     private companion object {
         const val MAX_PARALLEL_LOADS = 4
+
+        // Decoded emoji are under 256 px on their longer edge, so this bounds the grid to a few tens of MB.
+        const val MAX_READY_IMAGES = 160
     }
 }
 

@@ -2,14 +2,11 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -22,9 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -43,26 +38,19 @@ import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
 import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
-import dev.ipf.whitenoise.android.ui.EmojiArt
-import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.rememberBuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** The browser's Refresh action, which repeats discovery for the current query. */
 internal const val EMOJI_SETS_REFRESH_TEST_TAG = "emoji_sets.refresh"
 
 private val EmojiSetSpacing = 8.dp
-private val EmojiSetEntrySpacing = 4.dp
-private val EmojiSetImageSize = 96.dp
 
 /** The account's NIP-51 browser and preview. Its controller is discarded when the account changes. */
 @Composable
@@ -181,9 +169,8 @@ internal fun EmojiSetsContent(
         if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
-            EmojiSetPreview(state, set, images?.takeIf { it.set.coordinate == set.coordinate }, onInstall, onCancel, onRemove) {
-                onSearch(set.coordinate)
-            }
+            val setImages = images?.takeIf { it.set.coordinate == set.coordinate }
+            EmojiSetPreview(state, set, setImages, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
     }
 }
