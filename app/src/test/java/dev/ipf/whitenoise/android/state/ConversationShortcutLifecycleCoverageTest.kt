@@ -109,6 +109,11 @@ class ConversationShortcutLifecycleCoverageTest {
             "conversationShortcuts.clearRevokedConversationShortcutsForAccount" in presenterCleanup,
         )
         assertTrue(
+            "Account cleanup must cancel each known conversation's cards, which outlive deleted channels",
+            "retirement.dismissConversationMessagesImmediately(accountRef, groupIdHex)" in presenterCleanup &&
+                "knownGroupIds.forEach" in presenterCleanup,
+        )
+        assertTrue(
             "NotificationConversationShortcuts must pass cached account shortcut ids to platform cleanup",
             "additionalShortcutIds = snapshotShortcutIds" in shortcutsHelper,
         )

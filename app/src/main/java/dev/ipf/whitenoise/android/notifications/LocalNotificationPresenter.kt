@@ -142,16 +142,24 @@ class LocalNotificationPresenter(
 
     fun hideConversationShortcutsFromDirectShare() = conversationShortcuts.hideConversationShortcutsFromDirectShare()
 
-    /** Clears shortcut presentation under the caller's acknowledged credential-revocation fence. */
+    /**
+     * Clears the departing account's cards and shortcut presentation under the caller's acknowledged
+     * credential-revocation fence. Most cards post to shared channels, so deleting the account's own
+     * channels and shortcuts leaves them in the shade; each known conversation's cards are cancelled here.
+     */
     fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
         knownGroupIds: Collection<String> = emptySet(),
-    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(
-        accountRef,
-        includeUnscopedLegacy,
-        knownGroupIds,
-    )
+    ) {
+        knownGroupIds.forEach { groupIdHex -> retirement.dismissConversationMessagesImmediately(accountRef, groupIdHex) }
+        conversationShortcuts.clearRevokedConversationShortcutsForAccount(
+            accountRef,
+            includeUnscopedLegacy,
+            knownGroupIds,
+        )
+        groupReconciliation()
+    }
 
     /** Called off the main thread in the same publication-lock section as platform removal. */
     internal fun forgetConversationShortcut(

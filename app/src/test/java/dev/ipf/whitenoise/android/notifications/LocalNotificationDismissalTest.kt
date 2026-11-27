@@ -161,6 +161,40 @@ class LocalNotificationDismissalTest {
         assertEquals(listOf(other.tag to other.id), remaining)
     }
 
+    /** Sign-out and wipe cancel the departing account's cards on shared channels and keep other accounts' cards. */
+    @Test
+    fun accountCleanupCancelsTheAccountsCardsOnly() {
+        val account = "account-a"
+        val message = LocalNotificationFormatter.conversationDismissalKey(account, "group-a")
+        val mention = LocalNotificationFormatter.mentionDismissalKey(account, "group-b")
+        manager.notify(message.tag, message.id, notification())
+        manager.notify(mention.tag, mention.id, notification())
+        manager.notify(
+            "invite-a",
+            42,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, "group-c")
+                    },
+            ),
+        )
+        val other = LocalNotificationFormatter.conversationDismissalKey("account-b", "group-a")
+        manager.notify(other.tag, other.id, notification())
+        var reconciled = false
+
+        LocalNotificationPresenter(context, groupReconciliation = { reconciled = true })
+            .clearRevokedConversationShortcutsForAccount(
+                accountRef = account,
+                includeUnscopedLegacy = false,
+                knownGroupIds = setOf("group-a", "group-b", "group-c"),
+            )
+
+        assertEquals(listOf(other.tag to other.id), manager.activeNotifications.map { it.tag to it.id })
+        assertTrue(reconciled)
+    }
+
     /** A stale first platform snapshot triggers another pass that observes successful removal. */
     @Test
     fun staleFirstSnapshotRetriesUntilTheConversationCardIsAbsent() {
