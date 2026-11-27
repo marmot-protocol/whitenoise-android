@@ -920,8 +920,12 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
         }
         check(!s.inputEnded, "media_track_drain_stalled");
-        // An unread packet can use the whole byte budget. Reserve may probe demux only with an empty queue.
-        if (reserveAudio && s.queuedPackets != 0) return longs(env, {5, 0, 0, 0, 0, 0, 0});
+        // Reclaim space using the existing video frame slot before optional PCM needs more input.
+        // An unread packet can still use the whole byte budget, so probe only after the queue drains.
+        if (reserveAudio && s.queuedPackets != 0) {
+            if (!s.video.packets.empty()) pump(s, s.video);
+            if (s.queuedPackets != 0) return longs(env, {5, 0, 0, 0, 0, 0, 0});
+        }
         queuePacket(s, packetLimit);
     }
     throw Failure("media_decode_work_budget_refused");
