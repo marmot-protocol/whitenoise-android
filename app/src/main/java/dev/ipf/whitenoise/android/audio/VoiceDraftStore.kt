@@ -98,17 +98,18 @@ internal class VoiceDraftStore(
         val dir = directory(key)
         val unfinished = dir.listFiles { file -> file.name.startsWith(RECORDING_PREFIX) }.orEmpty()
         unfinished.forEach { it.delete() }
-        if (consumptionMarkers(dir).any(File::isFile)) {
+        return if (consumptionMarkers(dir).any(File::isFile)) {
             finishConsumption(dir)
-            return VoiceDraftRecovery.None
-        }
-        val pending = readMetadata(dir, PENDING_METADATA)
-        if (pending != null) publishPending(dir, pending) else File(dir, PENDING_METADATA).delete()
-        val draft = pending ?: readMetadata(dir)
-        return when {
-            draft != null -> VoiceDraftRecovery.Ready(draft)
-            unfinished.isNotEmpty() -> VoiceDraftRecovery.Lost
-            else -> VoiceDraftRecovery.None
+            VoiceDraftRecovery.None
+        } else {
+            val pending = readMetadata(dir, PENDING_METADATA)
+            if (pending != null) publishPending(dir, pending) else File(dir, PENDING_METADATA).delete()
+            val draft = pending ?: readMetadata(dir)
+            when {
+                draft != null -> VoiceDraftRecovery.Ready(draft)
+                unfinished.isNotEmpty() -> VoiceDraftRecovery.Lost
+                else -> VoiceDraftRecovery.None
+            }
         }
     }
 
