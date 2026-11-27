@@ -302,6 +302,7 @@ internal fun ProfileSheet(
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
+    val inviteName = contactNickname ?: personName
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
@@ -472,10 +473,8 @@ internal fun ProfileSheet(
                                     appState.loadCreatedChatListItem(id)
                                 },
                                 displayName = appState::displayName,
-                                invitationRecipientName = { accountIdHex ->
-                                    appState.contactDisplayNameCachedOrNull(accountIdHex)
-                                        ?: contactNickname
-                                        ?: personName
+                                invitationRecipientName = {
+                                    appState.contactDisplayNameCachedOrNull(it) ?: inviteName
                                 },
                                 markCreateOpenStage = appState::markChatCreateOpenStage,
                                 abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
