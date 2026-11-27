@@ -185,10 +185,7 @@ internal fun inertDocumentExtension(
     extension: String,
     mediaType: String,
 ): String =
-    if (
-        extension.lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ||
-        isActiveContentMime(normalizeDocumentMime(mediaType))
-    ) {
+    if (isActiveContentExtension(extension) || isActiveContentMime(normalizeDocumentMime(mediaType))) {
         INERT_TEXT_EXTENSION
     } else {
         extension
@@ -196,6 +193,24 @@ internal fun inertDocumentExtension(
 
 @VisibleForTesting
 internal fun isActiveContentMime(mime: String): Boolean = mime in ACTIVE_CONTENT_MIMES || mime.endsWith("+xml")
+
+/**
+ * Whether opening apps see a file named with [extension] as active content: a listed extension, or one the
+ * platform types as active, such as an XML dialect (`.xsd`, `.rss`) or a saved web archive. FileProvider reports
+ * the platform type, so a short list alone misses those.
+ */
+@VisibleForTesting
+internal fun isActiveContentExtension(
+    extension: String,
+    platformMime: (String) -> String? = ::platformMimeForExtension,
+): Boolean {
+    val normalized = extension.lowercase(java.util.Locale.ROOT)
+    return normalized in ACTIVE_CONTENT_EXTENSIONS ||
+        platformMime(normalized)?.let { isActiveContentMime(normalizeDocumentMime(it)) } == true
+}
+
+private fun platformMimeForExtension(extension: String): String? =
+    runCatching { android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) }.getOrNull()
 
 /**
  * Dispatch an already materialized [source] via the app's FileProvider.
@@ -413,10 +428,7 @@ internal fun classifyAttachmentOpen(
             }
         // The cached copy is named from the sanitized name, so classify that name: an invisible character in the raw
         // name must not separate the checked extension from the one the opening app sees.
-        MediaPipeline
-            .safeDisplayName(fileName)
-            .substringAfterLast('.', "")
-            .lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ->
+        isActiveContentExtension(MediaPipeline.safeDisplayName(fileName).substringAfterLast('.', "")) ->
             AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         else -> AttachmentOpenClassification.Ready(openMime)

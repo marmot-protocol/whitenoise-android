@@ -18,6 +18,14 @@
         "test_ids": [
           "MED-049"
         ]
+      },
+      {
+        "surface": "Extensions the platform types as XML or a web archive are cached and opened as inert text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentExternalOpen.kt",
+        "anchor": "internal fun isActiveContentExtension(",
+        "test_ids": [
+          "MED-049"
+        ]
       }
     ]
   },
