@@ -318,6 +318,22 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
 
         self.assertFalse(injected.exists())
 
+    def test_symlink_in_cached_tree_is_rebuilt_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        outside = Path(tempfile.mkdtemp())
+        (outside / "Injected.kt").write_text("attacker-controlled\n", encoding="utf-8")
+        link = output / "kotlin/dev/ipf/marmotkit/linked"
+        link.symlink_to(outside, target_is_directory=True)
+        pending = output / ".native-provenance.tmp"
+        pending.symlink_to(output / "manifest.json")
+
+        self.prepare()
+
+        self.assertFalse(link.exists() or link.is_symlink())
+        self.assertFalse(pending.is_symlink())
+
     def test_mutated_api_signature_and_marker_are_rebuilt(self) -> None:
         self.write_archive()
         self.write_lock()

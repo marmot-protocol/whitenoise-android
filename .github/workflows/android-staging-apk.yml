@@ -81,20 +81,8 @@ jobs:
           python3 .github/scripts/test-generate-audit-attestation.py
           python3 .github/scripts/test-apk-size-report.py
 
-      - name: Read MarmotKit artifact pin
-        id: marmotkit
-        shell: bash
-        run: |
-          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
-          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
-          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
-
-      - name: Restore MarmotKit artifact
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
-
+      # The signing job downloads and verifies MarmotKit itself. A restored cache entry could
+      # come from a preview build of PR code on master's cache scope.
       - name: Check staging secrets
         env:
           ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}

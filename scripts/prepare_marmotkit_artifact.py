@@ -623,8 +623,12 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
     marker_files = metadata.get("files")
     if marker_files != archive_hashes:
         return False
-    # Gradle compiles every file under the prepared tree, so a cached tree with extra files is rebuilt.
-    present = {path.relative_to(output).as_posix() for path in output.rglob("*") if not path.is_dir()}
+    # Gradle compiles every file under the prepared tree and follows links, so a cached tree with
+    # extra files or any symlink is rebuilt.
+    entries = list(output.rglob("*"))
+    if output.is_symlink() or any(path.is_symlink() for path in entries):
+        return False
+    present = {path.relative_to(output).as_posix() for path in entries if not path.is_dir()}
     if not present <= set(archive_hashes) | PREPARED_METADATA_FILES:
         return False
     try:

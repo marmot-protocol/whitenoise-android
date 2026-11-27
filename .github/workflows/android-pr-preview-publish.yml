@@ -50,9 +50,17 @@ jobs:
         id: provenance
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILDER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          BUILDER_PATH: ${{ github.event.workflow_run.path }}
+          BUILDER_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
+          # Expression equality ignores case, and a tag can share the branch's name. Require the exact
+          # builder on master in bash, with its commit already on master.
+          [[ "$BUILDER_BRANCH" == master && "$BUILDER_PATH" == .github/workflows/android-pr-apk.yml ]]
+          builder_on_master=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BUILDER_SHA}...master" --jq .status)
+          [[ "$builder_on_master" == identical || "$builder_on_master" == ahead ]]
           provenance_value() {
             local file=$1 key=$2
             local value
