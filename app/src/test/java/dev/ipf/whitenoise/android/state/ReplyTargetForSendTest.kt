@@ -25,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * A text or media reply to the user's own message never publishes that send's client token as its target: MDK
@@ -131,6 +132,44 @@ class ReplyTargetForSendTest {
             val (_, staged) = recorder.calls.single { it.first == "saveMessageDraftIfRevision" }
             assertEquals(MESSAGE_ID, staged[3])
             assertEquals(MESSAGE_ID, MessageProjector.replyTargetMessageId(requireNotNull(queued).optimistic))
+        }
+
+    /** Owner revocation while native stages a reply rolls back that revision before returning refusal. */
+    @Test
+    fun mediaReplyOwnerRevokedDuringStagingRollsBackWithoutQueuing() =
+        runTest {
+            val current = AtomicBoolean(true)
+            val selected = revision()
+            val staged = revision()
+            val recorder =
+                NativeRecorder(
+                    "selectedMessageDraft",
+                    "saveMessageDraftIfRevision",
+                    "clearMessageDraftIfRevision",
+                ) { args ->
+                    if (args.size == 5) {
+                        current.set(false)
+                        SelectedMessageDraftFfi(staged, null)
+                    } else {
+                        SelectedMessageDraftFfi(selected, null)
+                    }
+                }
+            val state = appState(recorder.engine, activeAccountRef = TARGET_REF)
+            val controller = controller(state)
+            controller.replyingTo = record(MESSAGE_ID)
+
+            val queued =
+                controller.queueAttachments(
+                    listOf(PendingAttachment(byteArrayOf(1, 2), "audio/mp4", "voice.m4a")),
+                    caption = null,
+                    canQueue = current::get,
+                    beforeQueue = { error("revoked source must not retire") },
+                )
+
+            assertNull(queued)
+            val (_, rollback) = recorder.calls.single { it.first == "clearMessageDraftIfRevision" }
+            assertSame(staged, rollback[1])
+            assertTrue(controller.timeline.isEmpty())
         }
 
     /**

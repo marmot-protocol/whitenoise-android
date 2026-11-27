@@ -276,7 +276,7 @@ class AccountWideProfileGroupsTest {
             controller.foldGroupRecordForTest(offWindow)
             rejoined.storeResult("recording", complete)
             rejoined.setShown("message", true)
-            controller.installGroupRecordsSnapshot(mapOf(BEYOND to removed))
+            controller.installGroupRecordSnapshot(mapOf(BEYOND to removed))
             assertFalse(rejoined.active)
             val fresh = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
             assertNull(fresh.result("recording"))
@@ -296,7 +296,7 @@ class AccountWideProfileGroupsTest {
             assertTrue(preDeparture.active)
             val joined = adminGroup(BEYOND)
             val departed = joined.copy(selfMembership = SelfMembershipFfi.REMOVED)
-            controller.installGroupRecordsSnapshot(mapOf(BEYOND to departed))
+            controller.installGroupRecordSnapshot(mapOf(BEYOND to departed))
             controller.foldGroupRecordForTest(joined)
 
             preDeparture.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Late words"))

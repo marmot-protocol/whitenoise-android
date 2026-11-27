@@ -312,6 +312,7 @@ internal fun ConversationController.applyGroupState(incoming: AppGroupRecordFfi)
     }
     // The reconciled presentation can still show provisional LEFT while a cancellation awaits a roster read.
     if (group.selfMembership.isNonMember()) recordSelfLeft(settledDeparture = update.hasSettledDeparture())
+    appState.releaseEvictedCapture(conversationAccountRef, previousGroup, group)
     if (previousRetention != update.disappearingMessageSecs) {
         publishTimelineFromIndexes()
     }

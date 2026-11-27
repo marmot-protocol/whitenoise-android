@@ -40,7 +40,7 @@ class ConversationShortcutLifecycleCoverageTest {
                 "suspend fun signOutAndWipeActiveAccount",
                 "private fun persistHostSetting(",
             )
-        val wipeIndex = body.indexOf("signOutAndWipe(wipedRef)")
+        val wipeIndex = body.indexOf("wipeAccountAndPurgeVoiceDrafts(wipedRef)")
         val completedCleanupIndex = body.indexOf("if (!outcome.localCleanup.completed)")
         val clearIndex = body.indexOf("accountRef = wipedRef")
 

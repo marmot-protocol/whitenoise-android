@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 
+/** Folds an authoritative or locally committed group record even when no conversation is mounted. */
 internal fun ChatsController.foldGroup(
     record: AppGroupRecordFfi,
     invalidateMembers: Boolean = true,
@@ -22,6 +23,7 @@ internal fun ChatsController.foldGroup(
     // committed record is the edit itself, so it neither needs the fence nor counts as the
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
+    appState.releaseEvictedCapture(accountRef, groupRecordsById[record.groupIdHex], folded)
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
     if (fromSubscription) {
         // Local projections can combine a roster's LEFT with an older leave-request flag.
@@ -32,9 +34,13 @@ internal fun ChatsController.foldGroup(
     scheduleRecompute()
 }
 
-/** Reconnect snapshots and streaming updates both cover chats outside the retained windows. */
-internal fun ChatsController.installGroupRecordsSnapshot(records: Map<String, AppGroupRecordFfi>) {
-    groupRecordsById = records.mapValues { (_, group) -> withRetainedName(group) }
+/** Restores the account's group projection, including groups outside the retained chat windows. */
+internal fun ChatsController.installGroupRecordSnapshot(groups: Map<String, AppGroupRecordFfi>) {
+    groupRecordsById =
+        groups.mapValues { (groupId, record) ->
+            appState.releaseEvictedCapture(accountRef, groupRecordsById[groupId], record)
+            withRetainedName(record)
+        }
     groupRecordsById.values.forEach { syncVoiceTranscriptionMembership(it) }
 }
 

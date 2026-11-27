@@ -835,7 +835,7 @@ class ChatsController private constructor(
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
-                    installGroupRecordsSnapshot(initialGroups)
+                    installGroupRecordSnapshot(initialGroups)
                     groupRecordsLoaded = true
                     chatRows.forEach { settleInvitationFromMdk(it) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)

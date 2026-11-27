@@ -116,6 +116,38 @@ class VoiceReviewQueueAdmissionTest {
                 reviews.forEach { it.release() }
             }
         }
+
+    /** A refused retirement leaves the queue, timeline and retained-byte owner untouched. */
+    @Test
+    fun failedRetirementCannotSeedVoiceSend() =
+        runBlocking {
+            val appState = testAppState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
+                )
+            controller.retryMembers()
+            var attempts = 0
+            val queued =
+                controller.queueAttachments(
+                    listOf(PendingAttachment(byteArrayOf(1, 2), "audio/mp4", "blocked.m4a")),
+                    null,
+                    beforeQueue = {
+                        attempts++
+                        false
+                    },
+                )
+
+            assertEquals(1, attempts)
+            assertNull(queued)
+            assertTrue(controller.timeline.isEmpty())
+            assertTrue(appState.retainedMediaUploads(ACCOUNT_REF, GROUP_ID).keysSnapshot().isEmpty())
+            assertTrue(appState.activeUploadKeys(ACCOUNT_REF, GROUP_ID).isEmpty())
+        }
 }
 
 private const val ACCOUNT_REF = "voice-review-account"

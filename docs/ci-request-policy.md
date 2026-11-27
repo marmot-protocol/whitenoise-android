@@ -25,7 +25,7 @@ Pushing a PR does not automatically build previews. When debugging or required
 human/device testing needs the current candidate, first look for existing trusted
 artifacts for that exact head and a matching active request. One request builds
 the stable (update-compatible) channel only; add `-f include_isolated=true`
-only for an opt-in qualification that consumes the unsigned isolated artifact:
+to also publish and link a signed side-by-side APK:
 
 ```sh
 gh workflow run android-pr-apk.yml --repo marmot-protocol/whitenoise-android \

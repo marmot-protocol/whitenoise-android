@@ -7,7 +7,17 @@
         "surface": "centered custom reaction artwork in the native notification shade",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionChips.kt",
         "anchor": "internal suspend fun notificationReactionChipArtwork(",
-        "test_ids": ["NTF-034"]
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "custom reaction rows kept as plain data in the card's extras, so removing the card is safe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionChips.kt",
+        "anchor": "internal fun quickReactionChipsExtra(",
+        "test_ids": [
+          "NTF-034"
+        ]
       }
     ]
   }

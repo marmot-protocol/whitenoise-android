@@ -233,11 +233,8 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     inviteConfirmationUnresolved = false
     memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
     rosterBlockReason = null
-    // UseAfterEviction is the engine's authoritative signal that this
-    // conversation can no longer accept composer writes. Invalidate an
-    // in-flight immutable dictation target before any late provider result
-    // can reach the draft persistence path.
-    appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
+    // UseAfterEviction is authoritative: revoke capture before another result can write this chat's draft.
+    appState.releaseCaptureTarget(account, group.groupIdHex)
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
 }
 
@@ -310,6 +307,7 @@ private fun ConversationController.applyResolvedGroupRoster(
     val reconciled =
         if (restoredAfterCancel) applied.group else reconcileTerminalSelfMembership(applied.group, previousGroup)
     group = inviteConfirmationAuthority.reconcile(reconciled, establishesAcceptance = false)
+    appState.releaseEvictedCapture(account, previousGroup, group)
     if (previousRetention != group.disappearingMessageSecs) {
         publishTimelineFromIndexes()
     }

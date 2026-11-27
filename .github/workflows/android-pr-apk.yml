@@ -22,7 +22,7 @@ on:
         required: false
         type: string
       include_isolated:
-        description: Also build the unsigned isolated channel for opt-in qualification runs; never signed or linked
+        description: Also build, sign, publish and link a side-by-side isolated preview
         required: false
         type: boolean
         default: false

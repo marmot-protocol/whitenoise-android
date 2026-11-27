@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.Bundle
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -76,10 +77,43 @@ private fun centeredReactionChip(source: Bitmap): Bitmap {
 private const val CHIP_TILE_PX = 64
 private const val CHIP_TILE_CENTER_PX = CHIP_TILE_PX / 2f
 
-internal const val EXTRA_QUICK_REACTION_ROWS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_ROWS"
+internal const val EXTRA_QUICK_REACTION_CHIPS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_CHIPS"
 internal const val EXTRA_QUICK_REACTION_TARGET = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_TARGET"
 
-internal fun notificationQuickReactionRows(
+/**
+ * The rows held as plain data: the choices in order, each choice's reaction intent, and the artwork by choice. Android
+ * reads every extras value on its own when it removes a card, and a RemoteViews read that way crashed system_server
+ * (#4253), so the rows are drawn from this when the card is decorated and never kept in extras.
+ */
+internal fun quickReactionChipsExtra(
+    choices: List<String>,
+    artwork: Map<String, Bitmap>,
+    pendingIntent: (String) -> PendingIntent,
+): Bundle =
+    Bundle().apply {
+        putStringArrayList(CHIPS_CHOICES, ArrayList(choices))
+        putParcelableArrayList(CHIPS_INTENTS, ArrayList(choices.map(pendingIntent)))
+        putBundle(CHIPS_ARTWORK, Bundle().apply { artwork.forEach { (choice, image) -> putParcelable(choice, image) } })
+    }
+
+/** Draws the rows from [chips], or null when the extra is incomplete. */
+private fun quickReactionRowsFrom(
+    context: Context,
+    chips: Bundle,
+): RemoteViews? {
+    val choices = chips.getStringArrayList(CHIPS_CHOICES).orEmpty()
+    val intents = BundleCompat.getParcelableArrayList(chips, CHIPS_INTENTS, PendingIntent::class.java).orEmpty()
+    val images = chips.getBundle(CHIPS_ARTWORK) ?: Bundle.EMPTY
+    if (choices.isEmpty() || intents.size != choices.size) return null
+    val artwork =
+        choices
+            .mapNotNull { choice ->
+                BundleCompat.getParcelable(images, choice, Bitmap::class.java)?.let { choice to it }
+            }.toMap()
+    return notificationQuickReactionRows(context, choices, artwork) { intents[choices.indexOf(it)] }
+}
+
+private fun notificationQuickReactionRows(
     context: Context,
     choices: List<String>,
     artwork: Map<String, Bitmap>,
@@ -128,8 +162,10 @@ internal fun withQuickReactionRows(
     context: Context,
     notification: Notification,
 ): Notification {
+    // A card from the build that kept drawn rows in extras sheds them on its next write, unread.
+    notification.extras.remove(LEGACY_EXTRA_QUICK_REACTION_ROWS)
     val rows =
-        BundleCompat.getParcelable(notification.extras, EXTRA_QUICK_REACTION_ROWS, RemoteViews::class.java)
+        notification.extras.getBundle(EXTRA_QUICK_REACTION_CHIPS)?.let { quickReactionRowsFrom(context, it) }
             ?: return notification
     val reply =
         notification.actions.orEmpty().firstOrNull { it.semanticAction == Notification.Action.SEMANTIC_ACTION_REPLY }
@@ -146,7 +182,7 @@ internal fun withQuickReactionRows(
             .setGroupAlertBehavior(notification.groupAlertBehavior)
             .setCustomBigContentView(null)
             .apply {
-                extras.remove(EXTRA_QUICK_REACTION_ROWS)
+                extras.remove(EXTRA_QUICK_REACTION_CHIPS)
                 extras.remove(EXTRA_QUICK_REACTION_TARGET)
             }.build()
     }
@@ -208,6 +244,11 @@ private fun decorateQuickReactionRows(
     return decorated
 }
 
+/** The key the earlier build kept the drawn rows under; cards it posted may still carry it. */
+internal const val LEGACY_EXTRA_QUICK_REACTION_ROWS = "dev.ipf.whitenoise.android.notification.QUICK_REACTION_ROWS"
+private const val CHIPS_CHOICES = "choices"
+private const val CHIPS_INTENTS = "intents"
+private const val CHIPS_ARTWORK = "artwork"
 private const val MIN_CHIP_COLUMNS = 2
 private const val CHIP_STRIDE_DP = 52
 private const val REACTION_HORIZONTAL_INSET_DP = 115
