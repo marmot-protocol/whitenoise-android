@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
@@ -10,8 +11,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/** Precomposed rows can adopt prepared pixels. The viewport owns interactive avatar demand. */
+internal val LocalAvatarLoadsAllowed = compositionLocalOf { true }
 
 /**
  * Keeps a missing avatar eligible for one attempt per recovery event while visible.
@@ -31,7 +36,8 @@ internal fun rememberRecoverableAvatar(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentLoad by rememberUpdatedState(load)
     val currentAwaitCached by rememberUpdatedState(awaitCached)
-    return produceState(initialImage, lifecycle, enabled) {
+    val allowLoad = LocalAvatarLoadsAllowed.current
+    return produceState(initialImage, lifecycle, enabled, allowLoad) {
         if (!enabled || value != null) return@produceState
         // Retain completed attempts across STOP/START, but not a cancelled wait.
         var completedRevision: Long? = null
@@ -39,6 +45,7 @@ internal fun rememberRecoverableAvatar(
             if (value != null) return@repeatOnLifecycle
             val recovery =
                 launch {
+                    if (!allowLoad) awaitCancellation()
                     AvatarLoadRecovery.revision.first { revision ->
                         if (value == null && completedRevision != revision) {
                             // Adoption may have filled the slot while this load was in flight; never undo it.

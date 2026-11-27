@@ -22,6 +22,7 @@ internal fun PreparedChatListAvatarContent(
     retainedPreparation: RetainedGroupAvatarPreparation?,
     content: @Composable () -> Unit,
 ) {
+    appState.observeChatListAvatarLookahead(rows, listState, rowKey, accountRef, retainedPreparation)
     PreparedVisibleGroupAvatarContent(
         appState = appState,
         rows = rows,

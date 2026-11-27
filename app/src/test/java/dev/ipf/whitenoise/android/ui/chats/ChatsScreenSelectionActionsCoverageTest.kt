@@ -312,7 +312,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         }
         assertTrue(
             "isolated owners must retain their account/runtime/list-keyed fallback outside the editor swap",
-            "?: key(viewportOwner) { rememberLazyListState() }" in source.substring(0, handoffStart),
+            "?: key(viewportOwner) { rememberChatAvatarListState() }" in source.substring(0, handoffStart),
         )
         assertTrue(
             "global search must be shell-owned so the editor swap does not reset it",

@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
+import dev.ipf.whitenoise.android.ui.common.LocalAvatarLoadsAllowed
 import dev.ipf.whitenoise.android.ui.common.rememberRecoverableAvatar
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
@@ -115,6 +116,36 @@ class RecoverableAvatarLifecycleTest {
             AvatarLoadRecovery.onNetworkRestored()
         }
         composeRule.waitForIdle()
+        assertEquals(1, attempts.get())
+    }
+
+    @Test
+    fun precomposedAvatarsAdoptPixelsAndWaitForVisibilityBeforeLoadingMisses() {
+        val visible = mutableStateOf(false)
+        val attempts = AtomicInteger()
+        val published = CompletableDeferred<ImageBitmap?>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalAvatarLoadsAllowed provides visible.value) {
+                val cached by rememberRecoverableAvatar(null, awaitCached = { published.await() }) {
+                    attempts.incrementAndGet()
+                    null
+                }
+                val missing by rememberRecoverableAvatar(null) {
+                    attempts.incrementAndGet()
+                    ImageBitmap(2, 2)
+                }
+                Text(if (cached != null) "cached" else "cache pending")
+                Text(if (missing != null) "loaded" else "load pending")
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(0, attempts.get())
+        composeRule.runOnIdle { published.complete(ImageBitmap(2, 2)) }
+        composeRule.onNodeWithText("cached").assertExists()
+        assertEquals(0, attempts.get())
+
+        composeRule.runOnIdle { visible.value = true }
+        composeRule.onNodeWithText("loaded").assertExists()
         assertEquals(1, attempts.get())
     }
 

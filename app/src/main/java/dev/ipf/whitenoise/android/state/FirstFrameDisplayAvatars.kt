@@ -27,10 +27,10 @@ private data class RestoredDisplayAvatar(
 
 /** Disk I/O cannot extend the first-frame deadline or publish pixels after the waiter leaves. */
 internal suspend fun WhiteNoiseAppState.restoreStartupDisplayAvatars(
-    accountRef: String,
     keys: List<DisplayAvatarKey>,
     generation: DisplayAvatarGeneration,
     stillCurrent: () -> Boolean = { true },
+    readPack: Boolean = true,
     onRestored: (DisplayAvatarKey, Boolean) -> Unit = { _, _ -> },
 ) {
     val lifetime = AvatarImageLoader.currentCacheLifetime()
@@ -45,7 +45,12 @@ internal suspend fun WhiteNoiseAppState.restoreStartupDisplayAvatars(
         mutationsScope.launch(Dispatchers.IO) {
             try {
                 runCatchingCancellable {
-                    val pack = displayAvatars.readStartupPack(accountRef, missing, generation)
+                    val pack =
+                        if (readPack) {
+                            displayAvatars.readStartupPack(generation.accountRef, missing, generation)
+                        } else {
+                            emptyMap()
+                        }
                     pack.forEach { (key, pixels) ->
                         if (ready.trySend(RestoredDisplayAvatar(key, pixels, fromPointEntry = false)).isFailure) {
                             pixels.bitmap.recycle()
@@ -153,17 +158,23 @@ internal fun WhiteNoiseAppState.persistDisplayAvatar(
     key: DisplayAvatarKey,
     generation: DisplayAvatarGeneration,
     keepExisting: Boolean = false,
+    prepared: DisplayAvatarPixels? = null,
 ) {
-    val image = AvatarImageLoader.cachedImage(key.storedKey()) ?: return
-    val animated = AvatarImageLoader.cachedAnimationClassification(key.storedKey())
+    val pixels = prepared ?: cachedDisplayAvatarPixels(key) ?: return
     mutationsScope.launch(Dispatchers.IO) {
         runCatchingCancellable {
             if (!keepExisting || !displayAvatars.hasEntry(key)) {
-                displayAvatars.write(key, DisplayAvatarPixels(image.asAndroidBitmap(), animated), generation)
+                displayAvatars.write(key, pixels, generation)
                 displayAvatars.prune()
             }
         }
     }
+}
+
+private fun cachedDisplayAvatarPixels(key: DisplayAvatarKey): DisplayAvatarPixels? {
+    val image = AvatarImageLoader.cachedImage(key.storedKey()) ?: return null
+    val animated = AvatarImageLoader.cachedAnimationClassification(key.storedKey())
+    return DisplayAvatarPixels(image.asAndroidBitmap(), animated)
 }
 
 internal fun ChatListItem.displayAvatarKey(
@@ -185,7 +196,7 @@ internal fun WhiteNoiseAppState.refillForegroundDisplayAvatars() {
     val generation = displayAvatars.generation(account)
     profileScope.launch {
         withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
-            if (activeAccountRef == account) restoreStartupDisplayAvatars(account, keys, generation)
+            if (activeAccountRef == account) restoreStartupDisplayAvatars(keys, generation)
         }
     }
 }
