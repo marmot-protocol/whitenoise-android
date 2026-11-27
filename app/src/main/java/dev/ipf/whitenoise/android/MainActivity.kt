@@ -429,17 +429,14 @@ class MainActivity : AppCompatActivity() {
         val pinTarget = pinTapGate.target(this, intent)
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
-            if (!retainNotification) {
-                pinTarget ?: parseNotificationTarget(intent, retainPendingShareOnRecreation, notificationTapTokens)
-            } else {
-                null
-            }
-        val parsedShare =
-            if (retainPendingShareOnRecreation && inboundShareRequest != null) {
-                null
-            } else {
-                parseShareRequest(intent)
-            }
+            parseNotificationTarget(
+                intent,
+                retainPendingShareOnRecreation,
+                retainNotification,
+                pinTarget,
+                notificationTapTokens,
+            )
+        val parsedShare = parseShareRequest(intent.takeUnless { retainPendingShareOnRecreation && inboundShareRequest != null })
         val profileData = intent?.dataString.takeUnless { retainNotification }
         pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         applyInboundRouting(parsedTarget, parsedShare, profileData, lifecycleClass)
@@ -884,12 +881,16 @@ internal class AppUnlockPromptHostState : ViewModel() {
 private fun parseNotificationTarget(
     intent: Intent?,
     retainPendingShareOnRecreation: Boolean,
+    retainNotification: Boolean,
+    pinTarget: NotificationTarget?,
     tokens: NotificationTapTokens,
-): NotificationTarget? =
-    NotificationNavigation.parse(
+): NotificationTarget? {
+    if (retainNotification) return null
+    return pinTarget ?: NotificationNavigation.parse(
         intent,
         importReplyDraft = !retainPendingShareOnRecreation,
         isTrustedTargetSignature = tokens::isValidTarget,
     ) { notificationKey, tapToken ->
         tokens.isValid(notificationKey, tapToken)
     }
+}

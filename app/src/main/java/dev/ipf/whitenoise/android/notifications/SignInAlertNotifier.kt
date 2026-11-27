@@ -57,18 +57,18 @@ internal class SignInAlertNotifier(
     override fun postCompromise(accountRef: String): Boolean {
         if (!notificationPermissionGranted(context)) return false
         val body = context.getString(R.string.sign_in_alert_compromise_body)
+        val channel = NotificationChannelSpec.ACCOUNT_SECURITY
         return post(
             tag = COMPROMISE_TAG,
             accountRef = accountRef,
             notification =
-                builder(accountRef, COMPROMISE_ID, NotificationChannelSpec.ACCOUNT_SECURITY)
+                builder(accountRef, COMPROMISE_ID, channel)
                     .setContentTitle(context.getString(R.string.sign_in_alert_compromise_public))
                     .setContentText(body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setPublicVersion(
-                        publicVersion(R.string.sign_in_alert_compromise_public, NotificationChannelSpec.ACCOUNT_SECURITY),
-                    ).build(),
+                    .setPublicVersion(publicVersion(R.string.sign_in_alert_compromise_public, channel))
+                    .build(),
         )
     }
 

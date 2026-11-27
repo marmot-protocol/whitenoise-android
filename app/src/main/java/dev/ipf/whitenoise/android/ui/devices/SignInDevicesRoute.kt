@@ -81,7 +81,10 @@ internal fun SignInDevicesRequestEffect(
 }
 
 /** The active account's alert tier for the Devices row badge. */
-internal fun WhiteNoiseAppState.devicesRowTier(): SignInAlertTier = signInAlerts.snapshot(activeAccountRef)?.tier ?: SignInAlertTier.Passive
+internal fun WhiteNoiseAppState.devicesRowTier(): SignInAlertTier {
+    val snapshot = signInAlerts.snapshot(activeAccountRef)
+    return snapshot?.tier ?: SignInAlertTier.Passive
+}
 
 /**
  * The Devices row's end: a dot before the chevron while a sign-in waits for review (primary) or the compromise

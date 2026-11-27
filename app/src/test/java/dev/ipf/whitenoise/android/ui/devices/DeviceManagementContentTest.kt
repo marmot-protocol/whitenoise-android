@@ -463,7 +463,15 @@ class DeviceManagementContentTest {
     ): List<SignInResponseFfi> {
         val answers = mutableListOf<SignInResponseFfi>()
         compose.setContent {
-            WhiteNoiseTheme { SignInReviewDialog(signIn, { answers += it }, onClose = {}, mine = mine, onMine = onMine) }
+            WhiteNoiseTheme {
+                SignInReviewDialog(
+                    signIn,
+                    { answers += it },
+                    onClose = {},
+                    mine = mine,
+                    onMine = onMine,
+                )
+            }
         }
         return answers
     }

@@ -191,4 +191,10 @@ internal fun alertSignIn(
 )
 
 /** A rejected-sign-in warning item for [slot]. */
-internal fun alertWarning(slot: String) = CompromiseWarningItemFfi(CompromiseWarningReasonFfi.REJECTED_SIGN_IN, slot, null, 1u)
+internal fun alertWarning(slot: String) =
+    CompromiseWarningItemFfi(
+        reason = CompromiseWarningReasonFfi.REJECTED_SIGN_IN,
+        slotIdHex = slot,
+        keyPackageRefHex = null,
+        occurredAt = 1u,
+    )

@@ -200,9 +200,11 @@ internal fun signInSummary(
 ): List<String> =
     buildList {
         val claim = signInClientClaim(signIn.client)
-        add(
-            claim?.let { stringResource(R.string.sign_in_claim, it) } ?: stringResource(R.string.sign_in_unknown_client),
-        )
+        if (claim != null) {
+            add(stringResource(R.string.sign_in_claim, claim))
+        } else {
+            add(stringResource(R.string.sign_in_unknown_client))
+        }
         if (!signIn.signedIn) add(stringResource(R.string.sign_in_signed_out))
         signInStateLabel(signIn.state, mine)?.let { add(stringResource(it)) }
     }
