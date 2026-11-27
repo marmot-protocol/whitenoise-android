@@ -69,8 +69,17 @@ internal suspend fun WhiteNoiseAppState.shareAppInvite(
             }
         }
     if (pictureResult.isFailure && isCurrent()) {
-        launchInviteShare(context, message, title)
-            .onSuccess { noteNotificationMoment() }
-            .onFailure { presentOutboundShareFailure(operationCode, it) }
+        shareAppInviteText(context, invite, operationCode)
     }
+}
+
+/** Shares the localized text invite, recording the notification moment once the chooser opens. */
+internal fun WhiteNoiseAppState.shareAppInviteText(
+    context: Context,
+    invite: WhiteNoiseInvite,
+    operationCode: String,
+) {
+    launchInviteShare(context, invite.message, invite.title)
+        .onSuccess { noteNotificationMoment() }
+        .onFailure { presentOutboundShareFailure(operationCode, it) }
 }

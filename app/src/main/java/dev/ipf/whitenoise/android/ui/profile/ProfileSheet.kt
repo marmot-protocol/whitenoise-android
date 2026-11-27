@@ -40,8 +40,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.share.activeAccountInvite
-import dev.ipf.whitenoise.android.share.launchInviteShare
-import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.share.shareAppInviteText
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -752,9 +751,7 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
-                                launchInviteShare(context, invite.message, invite.title)
-                                    .onSuccess { appState.noteNotificationMoment() }
-                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
+                                appState.shareAppInviteText(context, invite, "PROFILE_INVITE_SHARE")
                             }
                         },
                         onCopy = { clipboard.copy(it) },
