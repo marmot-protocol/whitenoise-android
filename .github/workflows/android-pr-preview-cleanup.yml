@@ -25,6 +25,8 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+          sparse-checkout: .github/scripts/pr-preview-release-assets.sh
+          sparse-checkout-cone-mode: false
 
       - name: Remove closed PR previews
         env:

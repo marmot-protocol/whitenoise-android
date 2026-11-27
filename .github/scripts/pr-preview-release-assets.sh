@@ -30,17 +30,16 @@ case "$operation" in
     ;;
 esac
 
-# A missing release is expected before the first preview. Other errors must
-# stop the job, especially a rate limit or an incomplete asset inventory.
-if ! release_id=$(gh api "$repository/releases/tags/$release_tag" --jq .id 2>&1); then
-  if [[ "$release_id" == *' (HTTP 404)' ]]; then
-    exit 0
+# Read all assets in one release response. A deletion by another PR can
+# shift assets between numbered pages while a paginated list is being read.
+if ! assets=$(gh api "$repository/releases/tags/$release_tag" --jq .assets 2>&1); then
+  if [[ "$assets" == *' (HTTP 404)' ]]; then
+    exit 0 # No release exists before the first preview.
   fi
-  printf '%s\n' "$release_id" >&2
+  printf '%s\n' "$assets" >&2
   exit 1
 fi
-[[ "$release_id" =~ ^[1-9][0-9]*$ ]]
-assets=$(gh api "$repository/releases/$release_id/assets?per_page=100" --paginate --slurp | jq -c 'add // []')
+jq -e 'type == "array"' <<< "$assets" >/dev/null
 
 if [[ "$operation" == check-capacity ]]; then
   # Leave room for independent PRs that may be uploading concurrently.
