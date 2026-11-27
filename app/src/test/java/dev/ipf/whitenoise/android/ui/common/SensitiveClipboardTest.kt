@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.PersistableBundle
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -20,6 +21,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowClipboardManager
+import java.util.concurrent.atomic.AtomicInteger
 
 /** A copied secret leaves the clipboard on its own deadline without removing a clip the user copied later. */
 @RunWith(RobolectricTestRunner::class)
@@ -28,8 +30,10 @@ class SensitiveClipboardTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val clipboard = context.getSystemService(ClipboardManager::class.java)
 
+    /** Starts with an empty content-read counter and deterministic WorkManager timing. */
     @Before
     fun useTestWork() {
+        HidingClipboardShadow.contentReads.set(0)
         useTestWorkManager(context)
     }
 
@@ -59,12 +63,16 @@ class SensitiveClipboardTest {
         assertFalse(clipboard.hasPrimaryClip())
     }
 
-    /** Text the user copied after the secret belongs to them and survives the deadline. */
+    /** A replacement with the same label and sensitive flag survives without a content read. */
     @Test
     fun laterClipSurvivesTheDeadline() {
         copySensitiveToClipboard(context, "Private key", SECRET)
-        clipboard.setPrimaryClip(ClipData.newPlainText("Note", OTHER))
+        val replacement = ClipData.newPlainText("Private key", OTHER)
+        replacement.description.extras =
+            PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
+        clipboard.setPrimaryClip(replacement)
         reachDeadline()
+        assertEquals(0, HidingClipboardShadow.contentReads.get())
         assertEquals(
             OTHER,
             clipboard.primaryClip
@@ -118,10 +126,23 @@ class SensitiveClipboardTest {
     /** Models Android returning no clip to an app without input focus while a clip still exists. */
     @Implements(ClipboardManager::class)
     class HidingClipboardShadow : ShadowClipboardManager() {
+        /** Counts content reads separately from description queries, as Android does. */
         @Implementation
-        override fun getPrimaryClip(): ClipData? = if (hidden) null else super.getPrimaryClip()
+        override fun getPrimaryClip(): ClipData? {
+            contentReads.incrementAndGet()
+            return if (hidden) null else super.getPrimaryClip()
+        }
+
+        /** Models Android hiding clipboard metadata at the same time as the clip. */
+        @Implementation
+        override fun getPrimaryClipDescription(): ClipDescription? {
+            val description = super.getPrimaryClipDescription()
+            return description.takeUnless { hidden }
+        }
 
         companion object {
+            val contentReads = AtomicInteger()
+
             @Volatile
             var hidden = false
         }

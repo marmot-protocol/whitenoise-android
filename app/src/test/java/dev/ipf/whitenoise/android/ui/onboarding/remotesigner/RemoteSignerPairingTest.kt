@@ -29,6 +29,7 @@ class RemoteSignerPairingTest {
         expected: String? = null,
     ) = RemoteSignerPairing(host, backgroundScope, expected, sessionDispatcher = StandardTestDispatcher(testScheduler))
 
+    /** The first-run handoff can dispose this flow only after clipboard cleanup has run. */
     @Test
     fun bunkerLinkReviewsExactGrantsBeforePairingThenSignsIn() =
         runTest {
@@ -37,7 +38,7 @@ class RemoteSignerPairingTest {
             val flow = pairing(host)
 
             // A link already entered in the key field goes straight to the review.
-            flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
+            flow.choose(RemoteSignerMethod.BunkerLink, "  $BUNKER  ")
             runCurrent()
 
             assertEquals(BUNKER, JSONObject(host.configs.single()).getString("uri"))
@@ -51,14 +52,16 @@ class RemoteSignerPairingTest {
             assertEquals(review.permissions, session.approved)
             assertEquals(RemoteSignerStep.Connecting, flow.step)
 
+            host.onFinish = {
+                assertEquals(listOf(BUNKER), host.spentLinks)
+                flow.dispose()
+            }
             session.connectReply.complete(ACCOUNT)
             runCurrent()
             assertEquals(RemoteSignerStep.Done, flow.step)
             assertEquals(ACCOUNT, host.finished.single().second)
             assertTrue("the link leaves memory once the account owns the session", flow.link.text.isEmpty())
-            assertEquals("the host may clear exactly this link from the clipboard", BUNKER, flow.usedLink)
-            flow.dispose()
-            assertNull(flow.usedLink)
+            assertEquals(listOf(BUNKER), host.spentLinks)
             assertFalse("a handed-over session is never cancelled by the flow", session.cancelled)
         }
 
@@ -171,6 +174,7 @@ class RemoteSignerPairingTest {
             assertEquals(RemoteSignerStep.Done, flow.step)
         }
 
+    /** A verified connection spends the link even when it belongs to a different signer account. */
     @Test
     fun repairRefusesASignerForAnotherAccount() =
         runTest {
@@ -185,6 +189,7 @@ class RemoteSignerPairingTest {
             session.connectReply.complete("ffff")
             runCurrent()
             assertEquals(RemoteSignerStep.Failed(RemoteSignerFailure.WrongAccount), flow.step)
+            assertEquals(listOf(BUNKER), host.spentLinks)
             assertTrue("a mismatched signer never reaches the account", host.finished.isEmpty())
             flow.retry()
             assertEquals("a wrong account starts over instead of retrying", RemoteSignerStep.EnterLink, flow.step)
@@ -226,6 +231,7 @@ class RemoteSignerPairingTest {
             assertEquals(2, session.reviewed)
         }
 
+    /** A spent link is cleared even if the later account handoff fails. */
     @Test
     fun loginFailureIsRetryableAndKeepsTheSession() =
         runTest {
@@ -240,6 +246,7 @@ class RemoteSignerPairingTest {
             runCurrent()
 
             assertEquals(RemoteSignerStep.Failed(RemoteSignerFailure.SignInFailed), flow.step)
+            assertEquals(listOf(BUNKER), host.spentLinks)
             flow.dispose()
             assertFalse("a session that may belong to the account is never cancelled", session.cancelled)
         }

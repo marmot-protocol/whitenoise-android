@@ -22,6 +22,14 @@
           "ACC-011"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "The timed clear skips a replacement clip before reading its content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
+        "anchor": "if (description != null && !description.matchesSensitiveCopy(clipId)) return",
+        "test_ids": ["ACC-010"]
+      }
     ]
   },
   "discovery_exceptions": []

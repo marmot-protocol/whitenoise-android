@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.loginWithRemoteSigner
 import dev.ipf.whitenoise.android.state.repairRemoteSigner
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
+import dev.ipf.whitenoise.android.ui.common.plainText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -31,6 +32,9 @@ private class AppRemoteSignerHost(
     private val repairAccountHex: String?,
 ) : RemoteSignerPairingHost {
     private var runtime: MarmotInterface? = null
+
+    /** Clears a spent link using the app context while the account still owns its original UI. */
+    override fun onBunkerLinkSpent(link: String) = clearClipboardIfHolding(appState.appContext, link)
 
     override suspend fun newSession(configJson: String): Nip46SessionFfiInterface {
         val current = appState.marmot()
@@ -76,11 +80,7 @@ internal fun RemoteSignerFlow(
     DisposableEffect(pairing) { onDispose { pairing.dispose() } }
     LaunchedEffect(pairing) { if (initialLink != null) pairing.choose(RemoteSignerMethod.BunkerLink, initialLink) }
     LaunchedEffect(pairing.step) {
-        if (pairing.step == RemoteSignerStep.Done) {
-            // The link carries the pairing secret; once used it leaves the clipboard, as a submitted key does.
-            pairing.usedLink?.let { clearClipboardIfHolding(context, it) }
-            finished()
-        }
+        if (pairing.step == RemoteSignerStep.Done) finished()
     }
     RemoteSignerScreen(
         pairing = pairing,
@@ -110,11 +110,10 @@ private fun clearClipboardIfHolding(
     used: String,
 ) {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    val text =
-        clipboard.primaryClip
-            ?.takeIf { it.itemCount == 1 }
-            ?.getItemAt(0)
-            ?.text
-            ?.toString()
-    if (text?.trim() == used) clearSensitiveClipboard(context)
+    try {
+        val text = clipboard.primaryClip?.takeIf { it.itemCount == 1 }?.plainText(context)
+        if (text?.trim() == used) clearSensitiveClipboard(context)
+    } catch (_: SecurityException) {
+        // Android may revoke access between the handshake and the clipboard comparison.
+    }
 }

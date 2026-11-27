@@ -42,6 +42,16 @@ class SensitiveClipboardCoverageTest {
         assertTrue("enqueueUniqueWork(SENSITIVE_CLIP_CLEAR_WORK, ExistingWorkPolicy.REPLACE" in body)
     }
 
+    /** The signed-in UI may leave composition during handoff, so the spent-link cleanup must run before it. */
+    @Test
+    fun pairingRetiresTheBunkerLinkBeforeTheAccountHandoff() {
+        val path = "src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairing.kt"
+        val pairing = appModuleSource(path).functionBody("pair")
+        val cleanup = pairing.indexOf("submittedLink?.let(host::onBunkerLinkSpent)")
+        assertTrue(cleanup > pairing.indexOf("active.connect()"))
+        assertTrue(cleanup in 0 until pairing.indexOf("handOffToAccount("))
+    }
+
     /** Both Profile Keys secrets go through the helper; the public key stays an ordinary copy. */
     @Test
     fun profileKeysSecretsUseTheTimedHelper() {
