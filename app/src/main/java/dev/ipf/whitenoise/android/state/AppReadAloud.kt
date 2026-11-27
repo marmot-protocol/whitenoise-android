@@ -390,6 +390,7 @@ internal class AppReadAloud(
                     onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
                     requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
                     onConnectionUncertain = { retireFailedTtsConnection(handle) },
+                    voiceCatalogue = handle.voiceCatalogue,
                 ),
                 engineKey = handle.enginePackage,
             )

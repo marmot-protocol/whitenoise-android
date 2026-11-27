@@ -16,6 +16,10 @@ import java.util.concurrent.atomic.AtomicLong
  * [speak] returns at once and hands the sentence to the service on [handOff]'s thread, in call order. Each sentence's
  * installed-offline-voice check runs there, just before the sentence leaves the app, so the binder catalogue read never
  * blocks the caller. A refused sentence is reported through the queue's error callback.
+ *
+ * Android runs one call at a time per [TextToSpeech] instance, so the check reads [voiceCatalogue], a second connection
+ * to the same engine, rather than [textToSpeech]. A slow lookup then never holds up [stop] or [setLanguage] on the
+ * playback connection. Without a catalogue, the check falls back to the playback connection.
  */
 internal class AndroidTtsSpeechEngine(
     private val textToSpeech: TextToSpeech,
@@ -24,6 +28,7 @@ internal class AndroidTtsSpeechEngine(
     private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
     private val requireOfflineVoice: Boolean = false,
     private val onConnectionUncertain: () -> Unit = {},
+    private val voiceCatalogue: TtsVoiceCatalogue? = null,
     handOff: Executor = ttsHandOffThread,
 ) : TtsSpeechEngine {
     private val retired = AtomicBoolean()
@@ -37,6 +42,13 @@ internal class AndroidTtsSpeechEngine(
 
     private val handOffs = SerialHandOff(handOff)
 
+    /** The installed offline voice the last language change applied, which each sentence's check looks for. */
+    @Volatile
+    private var appliedVoice: Voice? = null
+
+    /** Advanced by each language change, so a sentence checked before one checks again. */
+    private val voiceChanges = AtomicLong()
+
     override var effectiveLocale: Locale? = null
         private set
 
@@ -46,6 +58,8 @@ internal class AndroidTtsSpeechEngine(
         handOffs.exclusive {
             // Exclusive with hand-offs, so a sentence is never checked under one voice and spoken under the next.
             if (retired.get()) return@exclusive TextToSpeech.LANG_NOT_SUPPORTED
+            voiceChanges.incrementAndGet()
+            appliedVoice = null
             val status = textToSpeech.setLanguage(locale)
             if (status == TextToSpeech.LANG_NOT_SUPPORTED) return@exclusive retire(status)
             if (status < TextToSpeech.LANG_AVAILABLE) return@exclusive status
@@ -68,6 +82,7 @@ internal class AndroidTtsSpeechEngine(
                     )
                 }
             effectiveLocale = resolution.effectiveKey?.localeTag?.let(Locale::forLanguageTag) ?: locale
+            appliedVoice = voices.withKey(resolution.effectiveKey)
             onVoiceResolved(resolution)
             if (retired.get() || (enforceOfflineVoice && resolution.effectiveKey == null)) {
                 TextToSpeech.LANG_NOT_SUPPORTED
@@ -164,26 +179,42 @@ internal class AndroidTtsSpeechEngine(
         if (retired.get()) return TextToSpeech.ERROR
         val rate = speechRate
         handOffs.submit(utteranceId) { current ->
-            val allowed =
-                !(enforceOfflineVoice || selectedVoice() != null) ||
-                    currentFrameworkVoice()?.isInstalledOffline() == true
-            when {
-                // The voice lookup can outlast a stop, and a stopped queue's sentence never leaves the app.
-                !current() -> null
-                retired.get() || !allowed -> TextToSpeech.ERROR
-                else -> {
-                    rate?.let(textToSpeech::setSpeechRate)
-                    val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
-                    if (status == TextToSpeech.SUCCESS) status else retire(status)
-                }
+            // The rate comes first, so the cancellation check below is the last step before the text leaves the app.
+            rate?.let(textToSpeech::setSpeechRate)
+            var outcome: Int? = RECHECK_VOICE
+            while (outcome == RECHECK_VOICE) {
+                val checkedVoice = voiceChanges.get()
+                // The lookup runs outside the gate, so a stop or a language change never waits for it.
+                val catalogue = voiceCatalogue
+                val allowed =
+                    !(enforceOfflineVoice || selectedVoice() != null) ||
+                        if (catalogue != null) {
+                            catalogue.voices().confirms(appliedVoice)
+                        } else {
+                            currentFrameworkVoice()?.isInstalledOffline() == true
+                        }
+                outcome =
+                    handOffs.exclusive {
+                        when {
+                            // A stopped queue's sentence never leaves the app.
+                            !current() -> null
+                            checkedVoice != voiceChanges.get() -> RECHECK_VOICE
+                            retired.get() || !allowed -> TextToSpeech.ERROR
+                            else -> {
+                                val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+                                if (status == TextToSpeech.SUCCESS) status else retire(status)
+                            }
+                        }
+                    }
             }
+            outcome
         }
         return TextToSpeech.SUCCESS
     }
 
     /**
-     * Drops sentences not yet handed off at once, then stops framework synthesis on the hand-off thread after any
-     * hand-off in flight, so a pause never waits on a voice lookup.
+     * Drops sentences not yet handed off, then stops framework synthesis at once. It waits only for a speak call in
+     * flight, never for a voice lookup, so audio stops when the queue reports it stopped.
      */
     override fun stop() {
         handOffs.stop {
@@ -192,22 +223,35 @@ internal class AndroidTtsSpeechEngine(
     }
 }
 
+/** Marks a sentence whose voice changed during its check, so it checks again against the new voice. */
+private const val RECHECK_VOICE = Int.MIN_VALUE
+
+/** The catalogue voice [key] names, if any. */
+private fun Collection<Voice>.withKey(key: TtsVoiceKey?): Voice? =
+    key?.let { firstOrNull { it.name == key.voiceName && it.locale.toLanguageTag() == key.localeTag } }
+
+/** Whether this catalogue still lists [applied] as an installed offline voice. */
+private fun Collection<Voice>?.confirms(applied: Voice?): Boolean =
+    applied != null &&
+        this?.any { it.name == applied.name && it.locale == applied.locale && it.isInstalledOffline() } == true
+
 /** One process-wide thread hands read-aloud sentences to the speech service, off the main thread. */
 private val ttsHandOffThread: Executor =
     Executors.newSingleThreadExecutor { task -> Thread(task, "tts-hand-off").apply { isDaemon = true } }
 
 /**
  * Runs hand-offs in submission order on [executor]. [stop] drops every hand-off not yet handed over, and a refused
- * hand-off drops the rest of its queue, reporting only the refused sentence to [onRefused]. A hand-off holds [lock]
- * from its voice check to its speak call, and [exclusive] waits for it, so a voice change never lands in between.
+ * hand-off drops the rest of its queue, reporting only the refused sentence to [onRefused]. [gate] is held for a
+ * hand-off's final queue check and speak call, for a stop and for a voice change, never for a voice lookup.
  */
 private class SerialHandOff(
     private val executor: Executor,
 ) {
-    private val lock = Any()
+    private val gate = Any()
     private val queue = AtomicLong()
 
-    /** Read and written only under [lock]. */
+    /** Written only on [executor]'s thread. */
+    @Volatile
     private var refusedQueue = -1L
 
     @Volatile
@@ -224,24 +268,24 @@ private class SerialHandOff(
         val submittedIn = queue.get()
         val current = { submittedIn == queue.get() }
         executor.execute {
-            val status =
-                synchronized(lock) {
-                    if (!current() || submittedIn == refusedQueue) return@synchronized null
-                    handOff(current)?.also { if (it != TextToSpeech.SUCCESS) refusedQueue = submittedIn }
-                } ?: return@execute
-            // Reported outside the lock: the callback takes the controller's lock.
-            if (status != TextToSpeech.SUCCESS) onRefused?.invoke(utteranceId, status)
+            if (!current() || submittedIn == refusedQueue) return@execute
+            val status = handOff(current) ?: return@execute
+            if (status != TextToSpeech.SUCCESS) {
+                refusedQueue = submittedIn
+                // Reported outside the gate: the callback takes the controller's lock.
+                onRefused?.invoke(utteranceId, status)
+            }
         }
     }
 
-    /** Drops every hand-off not yet handed over, then runs [halt] on [executor] after any hand-off in flight. */
+    /** Drops every hand-off not yet handed over, then runs [halt] once no speak call is in flight. */
     fun stop(halt: () -> Unit) {
         queue.incrementAndGet()
-        executor.execute { synchronized(lock, halt) }
+        synchronized(gate, halt)
     }
 
-    /** Runs [block] while no hand-off is in flight. */
-    fun <T> exclusive(block: () -> T): T = synchronized(lock, block)
+    /** Runs [block] while no hand-off is between its final queue check and its speak call. */
+    fun <T> exclusive(block: () -> T): T = synchronized(gate, block)
 }
 
 internal fun androidTtsProgressListener(
