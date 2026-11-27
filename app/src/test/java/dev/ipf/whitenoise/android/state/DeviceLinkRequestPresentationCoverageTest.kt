@@ -47,7 +47,8 @@ class DeviceLinkRequestPresentationCoverageTest {
 
         assertEquals(setOf(REQUESTS), queueOpeners)
         assertEquals(setOf(NOTICE), watcherOpeners)
-        val watcher = appModuleSource(REQUESTS).substringAfter("class DeviceLinkRequestWatcher(", missingDelimiterValue = "")
+        val watcher =
+            appModuleSource(REQUESTS).substringAfter("class DeviceLinkRequestWatcher(", missingDelimiterValue = "")
         assertTrue(watcher.functionBody("open").contains("queue = queue.open(request, blocked)"))
         val notice = appModuleSource(NOTICE).functionBody("DeviceLinkRequestNotice")
         assertTrue(notice.contains("onReview = { watcher.open(request) }"))

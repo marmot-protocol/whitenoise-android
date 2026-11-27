@@ -369,7 +369,8 @@ private fun DeviceLinkStepActions(
             WhiteNoiseButton(
                 onClick = { onAction(action) },
                 enabled = running == null && primaryEnabled,
-                loading = running != null && running != DeviceLinkCommand.Cancel && running != DeviceLinkCommand.Decline,
+                loading =
+                    running != null && running != DeviceLinkCommand.Cancel && running != DeviceLinkCommand.Decline,
                 loadingLabel = stringResource(action.label),
                 modifier = Modifier.fillMaxWidth().testTag(DEVICE_LINK_PRIMARY_TAG),
             ) { Text(stringResource(action.label)) }

@@ -143,9 +143,13 @@ class DeviceLinkRequestSafetyTest {
         compose.runOnIdle { assertEquals(1 to 1, reviews to putOff) }
 
         compose.runOnIdle { profile.value = "Work" }
-        compose.onNodeWithText(context.getString(R.string.link_request_notice_other_profile, "Work")).assertIsDisplayed()
+        compose
+            .onNodeWithText(context.getString(R.string.link_request_notice_other_profile, "Work"))
+            .assertIsDisplayed()
         compose.runOnIdle { repeated.value = true }
-        compose.onNodeWithText(context.getString(R.string.link_request_repeated_notice_other_profile, "Work")).assertIsDisplayed()
+        compose
+            .onNodeWithText(context.getString(R.string.link_request_repeated_notice_other_profile, "Work"))
+            .assertIsDisplayed()
         compose.runOnIdle { profile.value = null }
         compose.onNodeWithText(context.getString(R.string.link_request_repeated_notice)).assertIsDisplayed()
     }

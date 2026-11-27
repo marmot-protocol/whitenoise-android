@@ -86,7 +86,7 @@ internal fun DeviceLinkRequestHost(
             }
         }
     }
-    SideEffect { watcher.setBlocked(blocked) }
+    SideEffect { watcher.blocked = blocked }
     LaunchedEffect(watcher, appState.activeAccountRef) { watcher.reoffer() }
     var devicesOpen by remember(appState.activeAccountRef, runtimeGeneration) { mutableStateOf(false) }
     if (devicesOpen && !blocked) DeviceLinkDevicesWindow(appState, onClose = { devicesOpen = false })

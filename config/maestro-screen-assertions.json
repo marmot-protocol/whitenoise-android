@@ -2200,6 +2200,13 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+      "symbol": "DeviceLinkDevicesWindow",
+      "bindings": [],
+      "remaining": "Opening Devices from a repeated request requires a second installation. SET-075 covers entering Devices from the warning and returning to Chats.",
+      "second_device": ["SET-075"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
       "symbol": "ActiveProfileLinkRequest",
       "bindings": [],

@@ -38,7 +38,12 @@ class DeviceLinkRequestNoticeScreenshotTest {
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
     fun noticeOtherProfileDarkRtlLargeFont() {
-        notice("device_link_request_notice_other_profile_dark_rtl_large_font", false, "Work profile", Look(dark = true, rtl = true))
+        notice(
+            "device_link_request_notice_other_profile_dark_rtl_large_font",
+            false,
+            "Work profile",
+            Look(dark = true, rtl = true),
+        )
     }
 
     /** Repeated requests on the active profile turn the notice into a warning. */
@@ -50,7 +55,12 @@ class DeviceLinkRequestNoticeScreenshotTest {
     /** The warning for another profile on true-black surfaces. */
     @Test
     fun repeatedNoticeOtherProfileAmoled() {
-        notice("device_link_request_repeated_notice_other_profile_amoled", true, "Work profile", Look(dark = true, amoled = true))
+        notice(
+            "device_link_request_repeated_notice_other_profile_amoled",
+            true,
+            "Work profile",
+            Look(dark = true, amoled = true),
+        )
     }
 
     /** The warning in RTL at double font scale wraps its text and actions without clipping. */

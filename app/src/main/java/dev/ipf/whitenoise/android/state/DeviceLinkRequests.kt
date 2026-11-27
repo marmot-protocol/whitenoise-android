@@ -119,8 +119,8 @@ internal data class DeviceLinkRequestQueue(
         blocked: Boolean,
     ): DeviceLinkRequestQueue {
         if (blocked || presented != null) return this
-        val current = requests.firstOrNull { it.id == request.id && it.open } ?: return this
-        return copy(presented = current, dismissed = dismissed - current.id)
+        val current = requests.firstOrNull { it.id == request.id && it.open }
+        return current?.let { copy(presented = it, dismissed = dismissed - it.id) } ?: this
     }
 
     /** The queue after the user put the notice for [request] off: hidden until MDK drops it, and answered nothing. */
@@ -168,7 +168,6 @@ internal class DeviceLinkRequestWatcher(
 
     /** Whether the shell was last reported blocked, so a tap on the chat list's notice opens nothing until unlock. */
     var blocked by mutableStateOf(false)
-        private set
 
     /** Per profile, when each unanswered request was first seen, by [historyNowMs]. */
     private var unanswered = history?.read().orEmpty()
@@ -245,11 +244,6 @@ internal class DeviceLinkRequestWatcher(
         if (!owns() || snapshots[accountRef] !== beforeCommand) return
         accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
         publish(snapshots + (accountRef to snapshot))
-    }
-
-    /** The shell owns blocking. A suspended snapshot read must never restore an older value. */
-    fun setBlocked(blocked: Boolean) {
-        this.blocked = blocked
     }
 
     /** Re-evaluates settled outcomes after the active profile changes. */

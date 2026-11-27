@@ -180,14 +180,14 @@ class DeviceLinkRequestsTest {
     fun theWatcherOpensNothingWhileBlocked() =
         runTest {
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p", 1u)) })
-            watcher.setBlocked(true)
+            watcher.blocked = true
             watcher.reread("a")
             val notice = watcher.queue.notice!!
 
             watcher.open(notice)
             assertNull(watcher.queue.presented)
 
-            watcher.setBlocked(false)
+            watcher.blocked = false
             watcher.open(notice)
             assertEquals("p", watcher.queue.presented?.promptId)
         }
@@ -412,7 +412,7 @@ class DeviceLinkRequestsTest {
             watcher.open(watcher.queue.notice!!)
 
             watcher.close()
-            watcher.setBlocked(false)
+            watcher.blocked = false
 
             assertNull(watcher.queue.presented)
             assertEquals("p1", watcher.queue.notice?.promptId)

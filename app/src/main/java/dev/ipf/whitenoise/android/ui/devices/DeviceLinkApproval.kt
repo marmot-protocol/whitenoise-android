@@ -174,7 +174,11 @@ internal fun DeviceLinkRequestContent(
         onCodeVisible = { codeVisible = true },
         onAction = { action ->
             when (action) {
-                DeviceLinkAction.Link -> if (nameFits && armed) onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
+                DeviceLinkAction.Link -> {
+                    if (nameFits && armed) {
+                        onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
+                    }
+                }
                 DeviceLinkAction.NotNow, DeviceLinkAction.DontLink -> onDecline()
                 DeviceLinkAction.ReviewDevices -> onReviewDevices()
                 else -> onClose()
@@ -304,6 +308,5 @@ internal fun LinkThisDeviceContent(
         onBack = onBack,
         onAction = onAction,
         failureMessage = failureMessage,
-        onCodeVisible = { codeVisible = true },
     )
 }

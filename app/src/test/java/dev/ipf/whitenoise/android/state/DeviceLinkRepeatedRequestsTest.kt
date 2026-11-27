@@ -46,7 +46,12 @@ class DeviceLinkRepeatedRequestsTest {
     @Test
     fun aSecondRequestOnTheSameProfileIsRepeated() {
         val one = unansweredLinkRequests(emptyMap(), mapOf("a" to snapshot(prompt("p1"))), NOW)
-        val two = unansweredLinkRequests(one, mapOf("a" to snapshot(prompt("p1"), prompt("p2")), "b" to snapshot(prompt("q"))), NOW)
+        val two =
+            unansweredLinkRequests(
+                one,
+                mapOf("a" to snapshot(prompt("p1"), prompt("p2")), "b" to snapshot(prompt("q"))),
+                NOW,
+            )
 
         assertTrue(repeatedLinkRequestAccounts(one).isEmpty())
         assertEquals(setOf("a"), repeatedLinkRequestAccounts(two))
@@ -66,7 +71,8 @@ class DeviceLinkRepeatedRequestsTest {
     @Test
     fun aLinkedRequestStopsCounting() {
         val seen = unansweredLinkRequests(emptyMap(), mapOf("a" to snapshot(prompt("p1"))), NOW)
-        val linking = unansweredLinkRequests(seen, mapOf("a" to snapshot(prompt("p1", DeviceLinkPromptStateFfi.Linking))), NOW)
+        val linking =
+            unansweredLinkRequests(seen, mapOf("a" to snapshot(prompt("p1", DeviceLinkPromptStateFfi.Linking))), NOW)
         val next = unansweredLinkRequests(linking, mapOf("a" to snapshot(prompt("p2"))), NOW)
 
         assertTrue(repeatedLinkRequestAccounts(next).isEmpty())
@@ -100,7 +106,8 @@ class DeviceLinkRepeatedRequestsTest {
         runTest {
             var now = NOW
             var prompts = listOf(prompt("p1"))
-            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(*prompts.toTypedArray()) }, nowMs = { now })
+            val watcher =
+                DeviceLinkRequestWatcher(readSnapshot = { snapshot(*prompts.toTypedArray()) }, nowMs = { now })
             watcher.reread("a")
             assertFalse(watcher.queue.notice!!.repeated)
 
@@ -127,7 +134,8 @@ class DeviceLinkRepeatedRequestsTest {
     fun anOpenComparisonTurnsRepeatedWhenAnotherRequestArrives() =
         runTest {
             var prompts = listOf(prompt("p1", DeviceLinkPromptStateFfi.Comparing(emptyList())))
-            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(*prompts.toTypedArray()) }, nowMs = { NOW })
+            val watcher =
+                DeviceLinkRequestWatcher(readSnapshot = { snapshot(*prompts.toTypedArray()) }, nowMs = { NOW })
             watcher.reread("a")
             watcher.open(watcher.queue.notice!!)
             assertFalse(watcher.queue.presented!!.repeated)
