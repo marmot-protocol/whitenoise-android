@@ -163,11 +163,14 @@ internal class AndroidTtsSpeechEngine(
     ): Int {
         if (retired.get()) return TextToSpeech.ERROR
         val rate = speechRate
-        handOffs.submit(utteranceId) {
+        handOffs.submit(utteranceId) { current ->
+            val allowed =
+                !(enforceOfflineVoice || selectedVoice() != null) ||
+                    currentFrameworkVoice()?.isInstalledOffline() == true
             when {
-                retired.get() -> TextToSpeech.ERROR
-                (enforceOfflineVoice || selectedVoice() != null) &&
-                    currentFrameworkVoice()?.isInstalledOffline() != true -> TextToSpeech.ERROR
+                // The voice lookup can outlast a stop, and a stopped queue's sentence never leaves the app.
+                !current() -> null
+                retired.get() || !allowed -> TextToSpeech.ERROR
                 else -> {
                     rate?.let(textToSpeech::setSpeechRate)
                     val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
@@ -178,10 +181,14 @@ internal class AndroidTtsSpeechEngine(
         return TextToSpeech.SUCCESS
     }
 
-    /** Drops sentences not yet handed off, then stops framework synthesis for the active queue. */
+    /**
+     * Drops sentences not yet handed off at once, then stops framework synthesis on the hand-off thread after any
+     * hand-off in flight, so a pause never waits on a voice lookup.
+     */
     override fun stop() {
-        val status = handOffs.stop { if (retired.get()) TextToSpeech.SUCCESS else textToSpeech.stop() }
-        if (status != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
+        handOffs.stop {
+            if (!retired.get() && textToSpeech.stop() != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
+        }
     }
 }
 
@@ -190,9 +197,9 @@ private val ttsHandOffThread: Executor =
     Executors.newSingleThreadExecutor { task -> Thread(task, "tts-hand-off").apply { isDaemon = true } }
 
 /**
- * Runs hand-offs in submission order on [executor]. [stop] drops every hand-off not yet started, and a refused
+ * Runs hand-offs in submission order on [executor]. [stop] drops every hand-off not yet handed over, and a refused
  * hand-off drops the rest of its queue, reporting only the refused sentence to [onRefused]. A hand-off holds [lock]
- * from its voice check to its speak call, and [stop] and [exclusive] wait for it, so neither lands in between.
+ * from its voice check to its speak call, and [exclusive] waits for it, so a voice change never lands in between.
  */
 private class SerialHandOff(
     private val executor: Executor,
@@ -200,35 +207,37 @@ private class SerialHandOff(
     private val lock = Any()
     private val queue = AtomicLong()
 
-    @Volatile
+    /** Read and written only under [lock]. */
     private var refusedQueue = -1L
 
     @Volatile
     var onRefused: ((String?, Int) -> Unit)? = null
 
-    /** Queues [handOff] behind earlier submissions; it is skipped if its queue was stopped or refused first. */
+    /**
+     * Queues [handOff] behind earlier submissions; it is skipped if its queue was stopped or refused first. [handOff]
+     * gets a check that its queue is still current, to repeat just before it speaks, and returns null to drop quietly.
+     */
     fun submit(
         utteranceId: String,
-        handOff: () -> Int,
+        handOff: (current: () -> Boolean) -> Int?,
     ) {
         val submittedIn = queue.get()
+        val current = { submittedIn == queue.get() }
         executor.execute {
             val status =
                 synchronized(lock) {
-                    if (submittedIn != queue.get() || submittedIn == refusedQueue) null else handOff()
+                    if (!current() || submittedIn == refusedQueue) return@synchronized null
+                    handOff(current)?.also { if (it != TextToSpeech.SUCCESS) refusedQueue = submittedIn }
                 } ?: return@execute
-            if (status != TextToSpeech.SUCCESS) {
-                refusedQueue = submittedIn
-                // Reported outside the lock: the callback takes the controller's lock.
-                onRefused?.invoke(utteranceId, status)
-            }
+            // Reported outside the lock: the callback takes the controller's lock.
+            if (status != TextToSpeech.SUCCESS) onRefused?.invoke(utteranceId, status)
         }
     }
 
-    /** Drops every hand-off not yet started, then runs [halt] once none is in flight. */
-    fun stop(halt: () -> Int): Int {
+    /** Drops every hand-off not yet handed over, then runs [halt] on [executor] after any hand-off in flight. */
+    fun stop(halt: () -> Unit) {
         queue.incrementAndGet()
-        return synchronized(lock, halt)
+        executor.execute { synchronized(lock, halt) }
     }
 
     /** Runs [block] while no hand-off is in flight. */

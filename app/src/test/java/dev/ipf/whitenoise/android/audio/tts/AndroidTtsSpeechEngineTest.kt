@@ -17,6 +17,7 @@ import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -376,7 +377,32 @@ class AndroidTtsSpeechEngineTest {
         engine.speak("New.", "u3")
         runHandOffs()
 
-        assertEquals(listOf("u3"), tts.spokenIds)
+        assertEquals(listOf("stop", "u3"), tts.events)
+    }
+
+    /**
+     * A stop while a sentence's voice lookup is blocked returns without waiting for it, and that sentence never reaches
+     * the service once the lookup returns, for example after an account switch.
+     */
+    @Test
+    fun stopDuringAVoiceLookupNeitherWaitsForItNorSpeaks() {
+        val lookup = CountDownLatch(1)
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300), lookupGate = lookup)
+        val handOffThread = Executors.newSingleThreadExecutor()
+        try {
+            val engine = offlineEngine(tts, handOffThread)
+            engine.speak("Old account.", "u1")
+            assertTrue(tts.lookupStarted.await(5, TimeUnit.SECONDS))
+
+            engine.stop()
+            assertTrue("stop waited for the voice lookup", !tts.lookupFinished)
+            lookup.countDown()
+            handOffThread.submit {}.get(5, TimeUnit.SECONDS)
+
+            assertEquals(listOf("stop"), tts.events)
+        } finally {
+            handOffThread.shutdownNow()
+        }
     }
 
     /** Each sentence reaches the service at the rate the controller set before submitting it. */
@@ -461,9 +487,18 @@ class AndroidTtsSpeechEngineTest {
     private class CountingVoiceTextToSpeech(
         @Volatile var activeVoice: Voice,
         expectedSpeaks: Int = 0,
+        private val lookupGate: CountDownLatch? = null,
     ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
         val allSpoken = CountDownLatch(expectedSpeaks)
+        val lookupStarted = CountDownLatch(1)
+
+        @Volatile
+        var lookupFinished = false
+            private set
         val spokenIds: MutableList<String?> = Collections.synchronizedList(mutableListOf())
+
+        /** Utterance ids and framework stops, in the order the engine received them. */
+        val events: MutableList<String?> = Collections.synchronizedList(mutableListOf())
         val spokenRates = mutableListOf<Float>()
         val callingThreads: MutableSet<Thread> = Collections.synchronizedSet(mutableSetOf())
 
@@ -476,6 +511,9 @@ class AndroidTtsSpeechEngineTest {
         override fun getVoice(): Voice {
             callingThreads += Thread.currentThread()
             voiceReads++
+            lookupStarted.countDown()
+            lookupGate?.await(5, TimeUnit.SECONDS)
+            lookupFinished = true
             return activeVoice
         }
 
@@ -494,13 +532,17 @@ class AndroidTtsSpeechEngineTest {
         ): Int {
             callingThreads += Thread.currentThread()
             spokenIds += utteranceId
+            events += utteranceId
             spokenRates += rate
             allSpoken.countDown()
             return TextToSpeech.SUCCESS
         }
 
-        /** Stops without a framework connection. */
-        override fun stop(): Int = TextToSpeech.SUCCESS
+        /** Records the stop without a framework connection. */
+        override fun stop(): Int {
+            events += "stop"
+            return TextToSpeech.SUCCESS
+        }
     }
 
     private class CapturingTextToSpeech(
