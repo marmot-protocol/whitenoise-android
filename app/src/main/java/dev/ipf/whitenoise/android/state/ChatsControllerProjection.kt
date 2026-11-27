@@ -23,8 +23,11 @@ internal fun ChatsController.foldGroup(
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
-    syncVoiceTranscriptionMembership(folded)
-    if (fromSubscription) chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
+    if (fromSubscription) {
+        // Local projections can combine a roster's LEFT with an older leave-request flag.
+        syncVoiceTranscriptionMembership(folded)
+        chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
+    }
     if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
     scheduleRecompute()
 }

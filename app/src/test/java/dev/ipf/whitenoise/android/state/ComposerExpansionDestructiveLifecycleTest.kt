@@ -38,6 +38,9 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.VoiceTranscriptionScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -637,6 +640,55 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
+    fun acceptedLeavePreservesTranscriptsUntilMembershipSettles() =
+        runBlocking {
+            for (fromChats in listOf(false, true)) {
+                val fixture = fixture(leaveConfirmed = false)
+                val chats = fixture.seededChatsController()
+                fixture.appState.attachChatsController(chats)
+                val cache = fixture.appState.receivedVoiceTranscripts
+                val transcript = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words")
+                val scope = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                scope.storeResult("recording", transcript)
+                scope.setShown("message", true)
+                try {
+                    val accepted =
+                        if (fromChats) chats.leaveGroup(GROUP_ID) else fixture.conversationController.leaveGroup()
+                    assertTrue(accepted)
+                    assertEquals(1, fixture.calls.leave.get())
+                    fixture.conversationController.refreshMembers()
+                    assertTrue(fixture.conversationController.membersVerified)
+                    assertEquals(SelfMembershipFfi.LEFT, fixture.conversationController.group.selfMembership)
+                    assertTrue(scope.active)
+                    val pending =
+                        fixture.groupRecord.copy(
+                            selfMembership = SelfMembershipFfi.LEFT,
+                            leaveRequestPending = true,
+                            leaveRequestedAtMs = 1uL,
+                            leaveBlocked = true,
+                        )
+                    chats.foldGroupRecordForTest(pending)
+                    assertTrue(scope.active)
+                    chats.foldGroupRecordForTest(fixture.groupRecord)
+                    assertEquals(transcript, scope.result("recording"))
+                    assertTrue(scope.shown("message"))
+
+                    chats.foldGroupRecordForTest(
+                        pending.copy(leaveRequestPending = false, leaveRequestedAtMs = null, leaveBlocked = false),
+                    )
+                    assertFalse(scope.active)
+                    val reopened = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                    assertNull(reopened.result("recording"))
+                    assertFalse(reopened.shown("message"))
+                } finally {
+                    fixture.appState.attachChatsController(null)
+                    chats.onCleared()
+                    fixture.conversationController.onCleared()
+                }
+            }
+        }
+
+    @Test
     fun failedChatListLeaveRetainsTheConversationGeometry() =
         runBlocking {
             val fixture = fixture(failLeave = true)
@@ -1172,6 +1224,11 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
+                "groupRoster" ->
+                    conversationTimelineGroupRoster().copy(
+                        groupIdHex = groupRecord.groupIdHex,
+                        selfMembership = if (calls.leave.get() > 0) SelfMembershipFfi.LEFT else groupRecord.selfMembership,
+                    )
                 "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed", "groupManagementState" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()

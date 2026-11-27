@@ -7087,7 +7087,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Synchronously drop the active account from the cached member snapshot for
-     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
+     * [groupIdHex] after a leave request is accepted (issue #545). The snapshot seeds the
      * next [ConversationController]'s `seededSelfMember`; without this, a stale
      * positive snapshot would still place self in the group and flash the active
      * composer when the just-left conversation is re-opened. No-op when there is
@@ -7097,10 +7097,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) {
-            releaseCaptureTarget(accountRef, groupIdHex)
-            receivedVoiceTranscripts.forgetGroup(accountRef, groupIdHex)
-        }
+        accountRef?.let { releaseCaptureTarget(it, groupIdHex) }
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

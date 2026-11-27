@@ -2521,12 +2521,12 @@ class ConversationController(
                     }
                 if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
-                // Authoritative local self-leave: record it before the
+                // Latch the local read-only state before the
                 // synchronous snapshot drop so any subsequent
                 // authoritative roster round-trip that still
                 // sees the engine pre-eviction cannot re-add self and re-enable
                 // the composer / restore the full member count (issue #787).
-                recordSelfLeft()
+                recordSelfLeft(settledDeparture = false)
                 // Drop self from the cached member snapshot synchronously so
                 // re-opening the just-left group seeds a roster without self
                 // and renders the disabled notice immediately, instead of
