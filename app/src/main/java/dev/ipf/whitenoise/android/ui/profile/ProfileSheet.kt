@@ -40,7 +40,8 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.share.activeAccountInvite
-import dev.ipf.whitenoise.android.share.shareAppInvite
+import dev.ipf.whitenoise.android.share.launchInviteShare
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -471,6 +472,7 @@ internal fun ProfileSheet(
                                     appState.loadCreatedChatListItem(id)
                                 },
                                 displayName = appState::displayName,
+                                invitationRecipientName = appState::contactDisplayNameCachedOrNull,
                                 markCreateOpenStage = appState::markChatCreateOpenStage,
                                 abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                                 diagnosticAttempt = diagnosticAttempt,
@@ -747,9 +749,8 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
-                                appState.launchMutation {
-                                    appState.shareAppInvite(context, invite, "PROFILE_INVITE_SHARE", owner::canAct)
-                                }
+                                launchInviteShare(context, invite.message, invite.title)
+                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
                             }
                         },
                         onCopy = { clipboard.copy(it) },

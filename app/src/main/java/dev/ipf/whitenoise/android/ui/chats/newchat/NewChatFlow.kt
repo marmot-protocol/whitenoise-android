@@ -94,6 +94,7 @@ internal fun startChatErrorUiState(
     progressHex: String,
     error: Throwable,
     recipientName: String?,
+    invitationRecipientName: (String) -> String? = { recipientName },
     displayName: (String) -> String,
 ): StartChatErrorUiState {
     val invitation = startProfileChatFailureIsMissingSetup(error)
@@ -105,7 +106,7 @@ internal fun startChatErrorUiState(
         recipientName = recipientName,
         invitation = invitation,
         missingInbox = error is MarmotKitException.MissingMemberInboxRoute,
-        title = startProfileChatErrorTitle(error, displayName),
+        title = startProfileChatErrorTitle(error, invitationRecipientName),
     )
 }
 
@@ -127,6 +128,7 @@ internal suspend fun attemptStartProfileChat(
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
     diagnosticAttempt: DmCreationAttempt? = null,
+    invitationRecipientName: (String) -> String? = { recipientName },
 ): StartChatAttemptResult {
     val groupIdHex: String =
         try {
@@ -158,6 +160,7 @@ internal suspend fun attemptStartProfileChat(
                         progressHex = progressHex,
                         error = error,
                         recipientName = recipientName,
+                        invitationRecipientName = invitationRecipientName,
                         displayName = displayName,
                     ),
                 )
@@ -563,6 +566,7 @@ private fun NewMessageAccountScreen(
                                     session.currentValue { appState.loadCreatedChatListItem(id) }
                                 },
                                 displayName = appState::displayName,
+                                invitationRecipientName = appState::contactDisplayNameCachedOrNull,
                                 markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
                                 abandonCreateOpenTiming = {
                                     if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)

@@ -142,12 +142,12 @@ internal fun startProfileChatFailureDetail(
 /** A recipient with no KeyPackage at all is someone to invite, not a failure; every other failure keeps its title. */
 internal fun startProfileChatErrorTitle(
     throwable: Throwable,
-    displayName: (String) -> String,
+    recipientName: (String) -> String?,
 ): AppText =
     if (throwable is MissingKeyPackage && startProfileChatFailureIsMissingSetup(throwable)) {
         recipientFailureDetail(
             throwable.account,
-            displayName,
+            { recipientName(it).orEmpty() },
             R.string.start_chat_not_on_white_noise,
             R.string.start_chat_not_on_white_noise_for,
         )

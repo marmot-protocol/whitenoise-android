@@ -172,7 +172,7 @@ class NewMessageScreenshotTest {
             "ada",
             error,
             "Ada Lovelace",
-            { "Ada Lovelace" },
+            displayName = { "Ada Lovelace" },
         )
 
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */

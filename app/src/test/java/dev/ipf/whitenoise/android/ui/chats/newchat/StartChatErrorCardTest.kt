@@ -67,7 +67,7 @@ class StartChatErrorCardTest {
         assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_detail), named.detail)
         assertFalse(named.copyable)
 
-        val unnamed = startChatErrorUiState("npub1alice", "alice", missing, null) { " " }
+        val unnamed = startChatErrorUiState("npub1alice", "alice", missing, null) { "npub1ali…ce" }
         assertTrue(unnamed.invitation)
         assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise), unnamed.title)
         assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_detail), unnamed.detail)
