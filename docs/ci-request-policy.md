@@ -76,6 +76,18 @@ See `INT-010` in the combined manual checklist.
 
 ## Queue-gated PR feedback and full integration
 
+Android pull requests into `master` and `develop` run Android CI. The
+`develop` PR lane runs the regular checks without queue prechecks or tree reuse.
+Coordinate the Stable gate rollout with moving any open prerelease PRs to a
+protected `develop` that contains these workflows. After retargeting, synchronize
+or reopen each PR and verify fresh CI against the new base before merging.
+The required Android CI workflow validates the Stable MarmotKit pin for
+`master` PRs, merge groups, and branch pushes even when it can reuse a
+result. The hosted production build checks the pin before accessing signing
+secrets, and the local release script checks it before building production APKs.
+A Stable pin uses a final `X.Y.Z` release and its matching Android
+archive. Published RC pins are eligible for validation on `develop`.
+
 The initial rollout preserves full master validation. Reduced PR work is enabled
 only when `ANDROID_CI_MODE` is exactly `merge-queue`, after native queue rules,
 external integration authorization and the existing source-owner repair loop are
@@ -162,16 +174,21 @@ Activation, failure recovery and rollback are specified in the
 
 Identical content is validated once, in two places. A merge group never reuses a result.
 
-- A **ready-for-review** run reuses the draft result when the head's tree is unchanged,
-  so marking a draft ready runs no checks. The run still starts, only to report the
+- A **ready-for-review** run into `master` can reuse the draft result for the
+  same base commit and tree. The run still starts to report the
   required check name for the ready head. A PR run that completes the precheck or full
-  lane uploads a seven-day proof named `android-ci-attest-<lane>-<tree>`, where the tree
-  is the checked-out commit's tree. `scripts/ci_reuse.py` finds a proof for the same tree
-  (a full proof also satisfies a precheck request) and re-verifies it against the Actions
-  API: a completed, successful run of this workflow, started by a pull request from this
-  repository, whose workflow, `scripts/ci_reuse.py` and `scripts/check_ci_changes.py` are
-  byte-identical to the code now running. The classifier and this lookup run first in the
-  job, in Python's isolated mode, before any step that runs other PR-controlled code. A
+  lane uploads a seven-day proof named `android-ci-attest-master-<base>-<lane>-<tree>`.
+  The base is the checked-out merge commit's first parent. CI verifies the second
+  parent against the event's PR head, then uses the first parent for classification,
+  base-dependent tooling checks and the proof key. An unavailable diff disables
+  proof publication and reuse.
+  The tree is the checked-out commit's tree. `scripts/ci_reuse.py` looks up that base and tree
+  (a full proof also satisfies a precheck request) and verifies the producing run through
+  the Actions API. It must be a completed, successful run of this workflow from a PR in
+  this repository with matching workflow and classification code. The aggregate's
+  master-only upload must have returned and recorded the exact candidate artifact ID.
+  The classifier and lookup run
+  first in the job, in Python's isolated mode, before other PR-controlled code. A
   fork, an expired proof, a skipped run that merely reused another result and any API or
   parsing error select normal validation. A proof whose run executed different trusted
   CI code (the base moved the workflow or the reuse scripts since it started) is refused
@@ -192,8 +209,8 @@ Identical content is validated once, in two places. A merge group never reuses a
   push skips. This lookup uses no proof, only the merge group runs GitHub creates for the
   exact commit.
 
-A proof is only an artifact name, and any code that runs inside a same-repository PR run,
-such as a build script or a test, can upload an artifact with any name. A proof therefore
+A proof still uses an artifact name that same-repository PR code, such as a build
+script or a test, can choose. A proof therefore
 only relieves the PR's own check. The merge queue re-runs the full matrix on every group,
 and the aggregate rejects a reused PR result in a merge group even if the outputs claim
 one. Reusing a PR result in the queue would need an attestation written by a workflow whose
