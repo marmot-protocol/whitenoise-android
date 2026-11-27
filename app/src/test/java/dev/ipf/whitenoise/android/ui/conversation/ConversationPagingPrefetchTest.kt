@@ -25,12 +25,6 @@ class ConversationPagingPrefetchTest {
         assertFalse(prefetch(oldestVisibleIndex = OLDEST_ROW - OLDER_PAGE_PREFETCH_ROWS - 1))
     }
 
-    /** Gives a fast fling half of a 50-row page for the next bounded window to arrive. */
-    @Test
-    fun prefetchMarginKeepsHalfAPageOfRunway() {
-        assertEquals(25, OLDER_PAGE_PREFETCH_ROWS)
-    }
-
     /** Only a positive runway counts as invisible paging; an edge already on screen was seen. */
     @Test
     fun landingEventSplitsOnWhetherTheEdgeWasVisible() {

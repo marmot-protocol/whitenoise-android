@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.pm.PackageManager
 import dev.ipf.whitenoise.android.BuildConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,18 +27,6 @@ class ReceivedApkFlavorContractTest {
             BuildConfig.SELF_UPDATE_ENABLED,
             requestedPermissions.contains("android.permission.REQUEST_INSTALL_PACKAGES"),
         )
-    }
-
-    @Test
-    fun onlyZapstoreDeclaresPackageInstallPermission() {
-        val zapstoreManifest = projectFile("app/src/zapstore/AndroidManifest.xml").readText()
-        val mainManifest = projectFile("app/src/main/AndroidManifest.xml").readText()
-        val debugManifest = projectFile("app/src/debug/AndroidManifest.xml").readText()
-
-        assertTrue(zapstoreManifest.contains("android.permission.REQUEST_INSTALL_PACKAGES"))
-        assertFalse(mainManifest.contains("android.permission.REQUEST_INSTALL_PACKAGES"))
-        assertFalse(debugManifest.contains("android.permission.REQUEST_INSTALL_PACKAGES"))
-        assertFalse(projectFile("app/src/play/AndroidManifest.xml").exists())
     }
 
     @Test

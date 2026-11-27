@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -21,7 +22,8 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+// Drive recovery explicitly so Application.onCreate cannot consume the journal before the assertion.
+@Config(sdk = [36], application = Application::class)
 class SharedPlaintextWipeCoverageTest {
     @get:Rule
     val strategyCache = FileProviderStrategyCacheRule()

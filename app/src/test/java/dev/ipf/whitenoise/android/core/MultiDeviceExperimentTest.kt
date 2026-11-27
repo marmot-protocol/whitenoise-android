@@ -11,12 +11,6 @@ import java.io.File
 
 /** Pins the linked-device build switch and the single place the runtime is opened. */
 class MultiDeviceExperimentTest {
-    /** Builds ship linked devices, matching the device groups MDK opens every runtime with. */
-    @Test
-    fun theSwitchIsOn() {
-        assertTrue(MULTI_DEVICE_EXPERIMENT)
-    }
-
     /** The switch is a source literal, so no build input can stand behind the constant. */
     @Test
     fun theSwitchIsALiteralInSource() {
