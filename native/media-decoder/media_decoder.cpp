@@ -180,6 +180,9 @@ void check(bool condition, const char* reason) {
 
 constexpr size_t kMaxQueuedBytes = 8U * 1024 * 1024;
 constexpr size_t kMaxQueuedPackets = 512;
+constexpr size_t kMaxReserveVideoFrames = 12;
+constexpr size_t kMaxReserveVideoBytes = 40U * 1024 * 1024;
+constexpr int64_t kReserveVideoWorkMs = 40;
 
 // Charge copied packet data and referenced buffer view bytes retained by clone.
 // Allocator bookkeeping is bounded separately by the packet limit.
@@ -259,6 +262,36 @@ struct QueuedPacket {
     size_t retainedBytes;
 };
 
+struct QueuedFrame {
+    AVFrame* frame;
+    size_t retainedBytes;
+};
+
+/** Charge buffer references, including shared storage and side data, to the optional video queue. */
+bool reserveFrameBytes(const AVFrame& frame, size_t& total) {
+    if (frame.nb_extended_buf != 0 || frame.hw_frames_ctx || frame.opaque_ref || frame.metadata ||
+        frame.nb_side_data < 0 || frame.nb_side_data > 64) return false;
+
+    total = sizeof(AVFrame) + sizeof(QueuedFrame);
+    const auto charge = [&total](size_t bytes) {
+        if (bytes > kMaxReserveVideoBytes - total) return false;
+        total += bytes;
+        return true;
+    };
+    const auto chargeBuffer = [&charge](const AVBufferRef* buffer) {
+        return buffer && charge(sizeof(AVBufferRef)) && charge(buffer->size);
+    };
+    for (const auto* buffer : frame.buf) {
+        if (buffer && !chargeBuffer(buffer)) return false;
+    }
+    for (int i = 0; i < frame.nb_side_data; ++i) {
+        const auto* side = frame.side_data[i];
+        if (side->metadata || !charge(sizeof(AVFrameSideData) + sizeof(AVFrameSideData*)) ||
+            !chargeBuffer(side->buf)) return false;
+    }
+    return frame.buf[0] != nullptr;
+}
+
 struct Track {
     int index = -1;
     AVCodecContext* codec = nullptr;
@@ -267,8 +300,33 @@ struct Track {
     bool hasFrame = false;
     AVFrame* frame = nullptr;
     std::deque<QueuedPacket> packets;
+    std::deque<QueuedFrame> reserveFrames;
+    size_t reserveFrameBytes = 0;
+
+    AVFrame* pendingFrame() const {
+        if (!reserveFrames.empty()) return reserveFrames.front().frame;
+        return hasFrame ? frame : nullptr;
+    }
+
+    void consumeFrame() {
+        if (reserveFrames.empty()) {
+            av_frame_unref(frame);
+            hasFrame = false;
+        } else {
+            auto& queued = reserveFrames.front();
+            reserveFrameBytes -= queued.retainedBytes;
+            av_frame_free(&queued.frame);
+            reserveFrames.pop_front();
+        }
+    }
+
+    void clearReservedFrames() {
+        while (!reserveFrames.empty()) consumeFrame();
+    }
+
     /** Free every retained packet and its exact decoded-frame/codec owners when this track retires. */
     ~Track() {
+        clearReservedFrames();
         for (auto& queued : packets) av_packet_free(&queued.packet);
         av_frame_free(&frame);
         avcodec_free_context(&codec);
@@ -780,10 +838,12 @@ jlongArray audio(JNIEnv* env, Session& s, jobject destination, bool draining) {
  * Drive one codec through bounded receive/send steps and dequeue a retained packet only after successful
  * acceptance.
  */
-bool pump(Session& s, Track& track) {
+bool pump(Session& s, Track& track, int64_t deferAfterMs = INT64_MAX) {
     if (!track.codec || track.ended || track.hasFrame) return track.hasFrame;
     for (int step = 0; step < kMaxReadSteps; ++step) {
-        check(!interrupted(&s), "media_read_deadline");
+        const auto now = monotonicMs();
+        if (now >= deferAfterMs) return false;
+        check(now < s.deadline, "media_read_deadline");
         av_frame_unref(track.frame);
         const int result = avcodec_receive_frame(track.codec, track.frame);
         if (result >= 0) { track.hasFrame = true; return true; }
@@ -812,6 +872,28 @@ bool pump(Session& s, Track& track) {
         return false;
     }
     throw Failure("media_decode_work_budget_refused");
+}
+
+/** Convert compressed lookahead into bounded native video frames, without reading the demuxer. */
+void consumeQueuedVideoForAudio(Session& s, int64_t deferAfterMs) {
+    auto& video = s.video;
+    while (!video.packets.empty() && video.reserveFrames.size() < kMaxReserveVideoFrames &&
+           monotonicMs() < deferAfterMs) {
+        if (!pump(s, video, deferAfterMs)) break;
+        size_t bytes = 0;
+        if (!reserveFrameBytes(*video.frame, bytes) ||
+            bytes > kMaxReserveVideoBytes - video.reserveFrameBytes) break;
+        video.reserveFrames.push_back({nullptr, bytes});
+        auto& queued = video.reserveFrames.back();
+        queued.frame = av_frame_alloc();
+        if (!queued.frame) {
+            video.reserveFrames.pop_back();
+            break;
+        }
+        av_frame_move_ref(queued.frame, video.frame);
+        video.hasFrame = false;
+        video.reserveFrameBytes += bytes;
+    }
 }
 
 /** Admit a cloned packet only after the complete retained-view cost and packet-count budgets pass. */
@@ -846,8 +928,8 @@ void queuePacket(Session& s, size_t packetLimit = kMaxQueuedPackets) {
  * Defer conversion of pre-target video while compressed lookahead, time and read steps allow it.
  * Keep one deferred frame to cover the target when the next frame is later or the decoder ends.
  */
-bool skipPrerollVideo(Session& s, int step) {
-    if (timestamp(s, s.video, s.video.frame) >= s.videoSkipBeforeUs) {
+bool skipPrerollVideo(Session& s, AVFrame* frame, int step) {
+    if (timestamp(s, s.video, frame) >= s.videoSkipBeforeUs) {
         s.videoSkipBeforeUs = INT64_MIN;
         return false;
     }
@@ -856,7 +938,7 @@ bool skipPrerollVideo(Session& s, int step) {
 }
 
 // Playback may hold one video while requesting the PCM needed by its bounded raw processor.
-// The other track keeps at most its existing decoded frame; compressed queues retain their old limits.
+// Optional PCM reserve can hold a bounded queue of decoded video; compressed queues retain their old limits.
 /** Advance the requested track while preserving its separate EOF and bounded inter-track compressed lookahead. */
 jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int preferred) {
     const bool reserveAudio = preferred == 3;
@@ -879,34 +961,36 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     const bool frameThreadedVideo = preferred == 1 && s.wantAudio && selected.codec &&
         (selected.codec->active_thread_type & FF_THREAD_FRAME);
     const size_t packetLimit = kMaxQueuedPackets * (frameThreadedVideo ? s.threads : 1);
+    const auto reserveWorkDeadline = std::min(s.deadline, monotonicMs() + kReserveVideoWorkMs);
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
-        pump(s, selected);
+        if (!selected.pendingFrame()) pump(s, selected);
+        auto* frame = selected.pendingFrame();
         if (preferred == 1 && s.prerollVideo &&
-            (selected.ended || (selected.hasFrame && timestamp(s, selected, selected.frame) > s.videoSkipBeforeUs))) {
+            ((!frame && selected.ended) || (frame && timestamp(s, selected, frame) > s.videoSkipBeforeUs))) {
             auto result = video(env, s, videoOut, s.prerollVideo);
             av_frame_free(&s.prerollVideo);
             return result;
         }
-        if (selected.hasFrame) {
-            if (preferred == 1 && skipPrerollVideo(s, step)) {
+        if (frame) {
+            if (preferred == 1 && skipPrerollVideo(s, frame, step)) {
                 if (!s.prerollVideo) s.prerollVideo = av_frame_alloc();
                 check(s.prerollVideo != nullptr, "video_frame_allocation");
                 av_frame_unref(s.prerollVideo);
-                av_frame_move_ref(s.prerollVideo, selected.frame);
-                selected.hasFrame = false;
+                av_frame_move_ref(s.prerollVideo, frame);
+                selected.consumeFrame();
                 continue;
             }
             if (preferred == 1) {
                 av_frame_free(&s.prerollVideo);
-                auto result = video(env, s, videoOut, s.video.frame);
-                selected.hasFrame = false; av_frame_unref(selected.frame);
+                auto result = video(env, s, videoOut, frame);
+                selected.consumeFrame();
                 return result;
             }
-            auto padding = playbackPadding(env, s, audioOut, timestamp(s, s.audio, s.audio.frame));
+            auto padding = playbackPadding(env, s, audioOut, timestamp(s, selected, frame));
             if (padding) return padding;
             auto result = audio(env, s, audioOut, false);
-            selected.hasFrame = false; av_frame_unref(selected.frame);
+            selected.consumeFrame();
             if (result) return result;
             continue;
         }
@@ -920,11 +1004,12 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
         }
         check(!s.inputEnded, "media_track_drain_stalled");
-        // Reclaim space using the existing video frame slot before optional PCM needs more input.
-        // An unread packet can still use the whole byte budget, so probe only after the queue drains.
-        if (reserveAudio && s.queuedPackets != 0) {
-            if (!s.video.packets.empty()) pump(s, s.video);
-            if (s.queuedPackets != 0) return longs(env, {5, 0, 0, 0, 0, 0, 0});
+        // An unread packet can use the whole byte budget; optional PCM probes only after the queue drains.
+        if (reserveAudio) {
+            consumeQueuedVideoForAudio(s, reserveWorkDeadline);
+            if (s.queuedPackets != 0 || monotonicMs() >= reserveWorkDeadline) {
+                return longs(env, {5, 0, 0, 0, 0, 0, 0});
+            }
         }
         queuePacket(s, packetLimit);
     }
@@ -946,8 +1031,9 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int
     check(s.wantVideo == wantVideo && s.wantAudio == wantAudio, "output_track_selection_changed");
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
-        if (wantVideo) pump(s, s.video);
+        if (wantVideo && !s.video.pendingFrame()) pump(s, s.video);
         if (wantAudio) pump(s, s.audio);
+        auto* videoFrame = s.video.pendingFrame();
         const bool videoDone = !wantVideo || !s.video.codec || s.video.ended;
         const bool audioDone = !wantAudio || !s.audio.codec || s.audio.ended;
         if (wantAudio && audioDone && !s.resampleDrained) {
@@ -957,25 +1043,24 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int
             if (result) return result;
             s.resampleDrained = true;
         }
-        const bool videoReady = videoDone || s.video.hasFrame;
+        const bool videoReady = videoDone || videoFrame;
         const bool audioReady = audioDone || s.audio.hasFrame;
         // Read ahead compressed packets until each active track has one decoded
         // frame. MP4 chunk order cannot cause video to block discovery of audio.
         if (videoReady && audioReady) {
-            const int64_t videoPts = s.video.hasFrame ? timestamp(s, s.video, s.video.frame) : INT64_MAX;
-            if (s.video.hasFrame || s.audio.hasFrame) {
+            const int64_t videoPts = videoFrame ? timestamp(s, s.video, videoFrame) : INT64_MAX;
+            if (videoFrame || s.audio.hasFrame) {
                 const int64_t audioPts = s.audio.hasFrame ? timestamp(s, s.audio, s.audio.frame) : INT64_MAX;
                 auto padding = playbackPadding(env, s, audioOut, std::min(videoPts, audioPts));
                 if (padding) return padding;
             }
-            const bool chooseVideo = s.video.hasFrame &&
+            const bool chooseVideo = videoFrame &&
                 (!s.audio.hasFrame || videoPts <= timestamp(s, s.audio, s.audio.frame));
             if (chooseVideo) {
                 // A paused probe already has the covering pixels in videoOut.
                 if (!wantAudio && videoPts > videoEndAfterUs) return longs(env, {0, 0, 0, 0, 0, 0, 0});
-                auto result = video(env, s, videoOut, s.video.frame);
-                s.video.hasFrame = false;
-                av_frame_unref(s.video.frame);
+                auto result = video(env, s, videoOut, videoFrame);
+                s.video.consumeFrame();
                 return result;
             }
             if (s.audio.hasFrame) {
@@ -1151,6 +1236,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
         for (auto* track : {&s.video, &s.audio}) {
             if (track->codec) avcodec_flush_buffers(track->codec);
             track->flushed = false; track->ended = false; track->hasFrame = false;
+            track->clearReservedFrames();
             if (track->frame) av_frame_unref(track->frame);
             for (auto& queued : track->packets) av_packet_free(&queued.packet);
             track->packets.clear();

@@ -140,10 +140,12 @@ allocations and runtime overhead are separate, and reference frames can
 consume more in aggregate.
 
 Playback lookahead retains at most 8 MiB of compressed packets. Optional PCM
-uses queued audio and lets the video decoder consume queued packets into its
-existing pending frame. It probes the demuxer only after the compressed queue
-drains and yields when another packet could exceed the limit. Each track
-can hold one pending decoded frame, and a video seek can keep one additional
+uses queued audio and lets the video decoder consume queued packets into at most
+12 retained native frames with a 40 MiB byte cap. This queue holds references to
+decoded buffers. It probes the demuxer only after the compressed queue drains
+and yields on pressure or after 40 ms of optional work at a codec boundary.
+Playback consumes the frames in order and seek clears the queue. Each track can
+also hold one pending decoded frame, and a video seek can keep one additional
 preroll frame until the target's coverage is known. The packet cap is 512,
 scaled by the video thread count (up to 2048)
 while a frame-threaded video read holds interleaved audio packets. A read selects the earlier timestamp
