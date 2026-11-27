@@ -31,16 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkManagerStartupInitializationTest {
     @Test
-    fun applicationProvidesOnDemandWorkManagerConfiguration() {
-        assertTrue(Configuration.Provider::class.java.isAssignableFrom(WhiteNoiseApplication::class.java))
-
-        val manifest = appModuleSource("src/main/AndroidManifest.xml")
-        assertTrue(manifest.contains("androidx.startup.InitializationProvider"))
-        assertTrue(manifest.contains("androidx.work.WorkManagerInitializer"))
-        assertTrue(manifest.contains("tools:node=\"remove\""))
-    }
-
-    @Test
     fun mergedManifestDoesNotRegisterWorkManagerInitializer() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val provider =

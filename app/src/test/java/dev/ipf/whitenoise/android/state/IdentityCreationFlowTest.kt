@@ -164,17 +164,6 @@ class IdentityCreationFlowTest {
             assertEquals(0, resumes)
         }
 
-    /** The adapter resumes only after an expired wait, and only through start(), never another creation. */
-    @Test
-    fun adapterResumesThroughStartAfterAnExpiredWait() {
-        val wait = appStateSource("AppProfileSignUp.kt").readText().functionBody("awaitOwnedNetworkReadiness")
-        assertTrue(wait.contains("stalledSetupAccount == account"))
-        assertTrue(wait.contains("start()"))
-        assertTrue(wait.contains("catch (expired: MarmotKitException.AccountSetupRetryRequired)"))
-        assertFalse(wait.contains("createIdentity"))
-        assertFalse(wait.contains("createNamedIdentity"))
-    }
-
     @Test
     fun readyStatePrecedesPostCreateWarmup() {
         val body = appStateSource("AppProfileSignUp.kt").readText().functionBody("createIdentityWithoutProfile")

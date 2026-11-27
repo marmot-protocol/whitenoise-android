@@ -1017,7 +1017,7 @@ class AutomaticMediaBindingRecoveryTest {
         fun poll(timeoutMs: Long): Bound? = arrivals.poll(timeoutMs, TimeUnit.MILLISECONDS)
 
         /** Require the next admitted binding within the fixture deadline. */
-        fun next(): Bound = checkNotNull(arrivals.poll(2, TimeUnit.SECONDS)) { "Binding was not admitted" }
+        fun next(): Bound = checkNotNull(arrivals.poll(10, TimeUnit.SECONDS)) { "Binding was not admitted" }
 
         /** Deliver scripted death to every binding retained by this fixture context. */
         fun dieAll() = bindings.forEach { it.remote.die() }

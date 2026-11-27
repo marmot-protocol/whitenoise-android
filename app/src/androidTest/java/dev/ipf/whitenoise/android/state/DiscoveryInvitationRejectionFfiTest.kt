@@ -69,18 +69,24 @@ class DiscoveryInvitationRejectionFfiTest {
         withFixture { fixture ->
             fixture.advertised.hiddenKinds = emptySet()
             fixture.peer.publishNewKeyPackage(fixture.bob)
-            val before = fixture.discovery.recordedRequests().size
+            val beforeDiscovery = fixture.discovery.recordedRequests().size
+            val beforeAdvertised = fixture.advertised.recordedRequests().size
             fixture.sender.inviteMembersDetailed(fixture.alice, fixture.group, listOf(fixture.bob))
             assertEquals(2, fixture.sender.groupMembers(fixture.alice, fixture.group).size)
-            val requests = fixture.discovery.recordedRequests().drop(before)
-            // Joining a member also refreshes its profile/relay metadata in a multi-kind query.
-            // Recovery makes a dedicated package lookup and a deletion-proof lookup instead.
             assertTrue(
-                "Advertised success must not recover via discovery: $requests",
-                requests.none {
-                    it.requests(DELETION, fixture.bob) ||
-                        (it.requests(KEY_PACKAGE, fixture.bob) && it.getJSONArray("kinds").length() == 1)
-                },
+                "The advertised outbox was queried for the recipient's package",
+                fixture.advertised
+                    .recordedRequests()
+                    .drop(beforeAdvertised)
+                    .any { it.requests(KEY_PACKAGE, fixture.bob) },
+            )
+
+            // Discovery may provide profile metadata and deletion proofs for the advertised candidate.
+            // Only a dedicated discovery package query indicates that the advertised lookup fell back.
+            val requests = fixture.discovery.recordedRequests().drop(beforeDiscovery)
+            assertTrue(
+                "Advertised success must not fetch a replacement package through discovery: $requests",
+                requests.none { it.requests(KEY_PACKAGE, fixture.bob) && it.getJSONArray("kinds").length() == 1 },
             )
         }
 

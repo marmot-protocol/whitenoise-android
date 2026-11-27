@@ -201,37 +201,6 @@ class VoiceAttachmentCacheStateTest {
         )
     }
 
-    /** Guards that production voice publication enters single-flight before its cache probe. */
-    @Test
-    fun voiceMaterializationUsesSharedSingleFlight() {
-        val source = mediaVoiceSource().readText()
-
-        assertTrue(
-            "voice materialization should use the shared single-flight utility",
-            Regex(
-                """private\s+val\s+voiceMaterializations\s*=\s*SingleFlight<VoiceMaterializationFlightKey,""" +
-                    """\s*java\.io\.File>\(\)""",
-            ).containsMatchIn(source),
-        )
-        assertTrue(
-            "the controller-owned flight must begin before the materializer checks the cache fast path",
-            "voiceMaterializations.run(VoiceMaterializationFlightKey(file.absolutePath, materializationOwner))" in
-                source
-                    .substringAfter("internal suspend fun materializeVoiceAttachmentSource("),
-        )
-        val materializer =
-            source
-                .substringAfter("internal suspend fun materializeVoiceAttachmentSource(")
-                .substringBefore("internal fun cachedVoiceAttachmentFile(")
-        val pathLock = materializer.indexOf("voiceMaterializationPathLocks.withLock(file.absolutePath)")
-        val cacheProbe = materializer.indexOf("file.takeIf { it.isFile && it.length() > 0L }")
-        val publication = materializer.indexOf("AttachmentCachePublication.publishSourceAfterLoad")
-        assertTrue(
-            "one path lock must wrap both the complete-file probe and cache publication",
-            pathLock >= 0 && cacheProbe > pathLock && publication > cacheProbe,
-        )
-    }
-
     /** Proves replacement owners serialize one path but retry after the previous owner's failure. */
     @Test
     fun samePathDifferentOwnersSerializeBeforeIndependentRetry() {

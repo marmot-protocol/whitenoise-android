@@ -28,6 +28,14 @@
         "test_ids": [
           "CHL-010"
         ]
+      },
+      {
+        "surface": "Draft cleanup after a committed local reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "cleanupStep(\"native draft\")",
+        "test_ids": [
+          "GRP-033"
+        ]
       }
     ],
     "source_coverage": [
