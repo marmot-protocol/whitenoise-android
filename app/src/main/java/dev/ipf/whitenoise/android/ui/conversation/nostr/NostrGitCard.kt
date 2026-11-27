@@ -52,11 +52,15 @@ internal fun NostrEvent.gitCardMetadata(): List<String> =
             KIND_GIT_REPOSITORY -> gitRepositoryIdentifier()?.let(::add)
             KIND_GIT_REFS -> {
                 firstSafeTag("HEAD")?.let(::add)
+                // Sanitise before the blank check: a value of control characters alone would leave a dangling `·`.
                 tags
                     .asSequence()
-                    .filter { it.firstOrNull()?.startsWith("refs/") == true && !it.getOrNull(1).isNullOrBlank() }
-                    .take(MAX_GIT_REFS)
-                    .forEach { add("${it[0].safeField()} · ${it[1].safeField()}") }
+                    .filter { it.firstOrNull()?.startsWith("refs/") == true }
+                    .mapNotNull { tag ->
+                        val target = tag.getOrNull(1)?.safeField()?.takeIf(String::isNotBlank)
+                        target?.let { "${tag[0].safeField()} · $it" }
+                    }.take(MAX_GIT_REFS)
+                    .forEach(::add)
             }
             KIND_GIT_PATCH -> firstSafeTag("commit")?.let { add("commit $it") }
             KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE -> addAll(gitPullRequestMetadata())
@@ -108,51 +112,34 @@ private fun NostrEvent.gitRepositoryContext(): String? =
         }.firstOrNull()
 
 /**
- * Exact advertised URLs for the reader's Copy and confirmed Open actions.
- * Rendering never opens them or starts a Git operation.
+ * Exact advertised URLs for the reader's Copy and confirmed Open actions, taken tag by tag in priority order so a
+ * long relay list cannot push the clone and web links out, and clone mirrors leave a slot for a web link. A link is
+ * kept only when it can be copied safely or opened. Rendering never opens them or starts a Git operation.
  */
 internal fun NostrEvent.gitCardLinks(): List<String> {
-    val allowedTags =
+    val tagsByPriority =
         when (kind) {
-            KIND_GIT_REPOSITORY -> setOf("clone", "web", "relays")
-            KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE -> setOf("clone")
-            KIND_GIT_SERVICES -> setOf("g")
+            KIND_GIT_REPOSITORY -> listOf("clone", "web", "relays")
+            KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE -> listOf("clone")
+            KIND_GIT_SERVICES -> listOf("g")
             else -> return emptyList()
         }
-    return tags
-        .asSequence()
-        .filter { it.firstOrNull() in allowedTags }
-        .flatMap { it.asSequence().drop(1) }
-        .filter { it.length <= MAX_GIT_LINK_LENGTH && it == it.safeReaderBody() }
-        .filter(::isCopyableCloneAddress)
-        .distinct()
-        .take(MAX_GIT_LINKS)
-        .toList()
-}
-
-private fun isCopyableCloneAddress(value: String): Boolean {
-    val uri = runCatching { java.net.URI(value) }.getOrNull() ?: return scpCloneAddress.matches(value)
-    val scheme = uri.scheme?.lowercase()
-    val userInfo = uri.rawUserInfo
-    val userAllowed =
-        when {
-            userInfo == null -> true
-            scheme == "nostr" -> nip05LocalPart.matches(userInfo)
-            scheme == "ssh" -> sshUserName.matches(userInfo)
-            else -> false
+    val byTag =
+        tagsByPriority.map { name ->
+            tags
+                .filter { it.firstOrNull() == name }
+                .flatMap { it.drop(1) }
+                .filter { it.length <= MAX_GIT_LINK_LENGTH && it == it.safeReaderBody() }
+                .filter { isCopyableCloneAddress(it) && (isShellSafeGitLink(it) || it.isHttpsLink()) }
+                .distinct()
+                // Copyable addresses lead their tag, so open-only mirrors cannot push a usable one out.
+                .sortedBy { !isShellSafeGitLink(it) }
         }
-    return uri.host != null && scheme in gitUrlSchemes && userAllowed
+    val first = byTag.first()
+    val ordered = first.take(MAX_GIT_LINKS - 1) + byTag.drop(1).flatten() + first.drop(MAX_GIT_LINKS - 1)
+    return ordered.distinct().take(MAX_GIT_LINKS)
 }
 
-private val gitUrlSchemes = setOf("https", "http", "wss", "ws", "ssh", "git", "nostr")
-private val nip05LocalPart = Regex("[a-z0-9_.-]+")
-
-/** A username without a password, as in `ssh://git@host/path`; copy-only, never opened. */
-private val sshUserName = Regex("[A-Za-z0-9_.-]+")
-
-/** SCP-style `user@host:path` clone address; copy-only. Host and path cannot start with `-` or `/`. */
-private val scpCloneAddress =
-    Regex("[A-Za-z0-9_.-]+@[A-Za-z0-9][A-Za-z0-9.-]*:[A-Za-z0-9_.~][A-Za-z0-9_.~/+-]*")
 private val gitObjectId = Regex("[0-9a-fA-F]{40}")
 private val gitEventId = Regex("[0-9a-fA-F]{64}")
 
