@@ -196,6 +196,14 @@
         "test_ids": [
           "RDR-006"
         ]
+      },
+      {
+        "surface": "Labelled links whose text could name another host confirm their destination; labels over 512 characters confirm without a backtracking scan",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "internal fun shouldConfirmMarkdownLink(",
+        "test_ids": [
+          "MSG-002"
+        ]
       }
     ]
   },
