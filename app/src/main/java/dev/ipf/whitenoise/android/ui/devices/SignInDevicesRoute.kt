@@ -36,18 +36,31 @@ internal const val DEVICES_ROW_BADGE_TAG = "settings.account.linked_devices.badg
 @Composable
 internal fun SignInDevicesRouteEffect(
     appState: WhiteNoiseAppState,
+    navigationAccount: String?,
     onOpenAccount: () -> Unit,
 ) {
     val request = appState.signInAlerts.devicesRequest
     val active = appState.activeAccountRef
-    val unlocked = !appState.appLock.screenVisible
+    val unlocked = appState.deviceRoutingUnlocked
 
     fun eligible() = appState.accounts.any { it.label == request?.accountRef && signInAlertsApply(it) }
-    LaunchedEffect(request, active, appState.phase, unlocked) {
-        if (request == null || appState.phase != AppPhase.Ready || !unlocked) return@LaunchedEffect
+    LaunchedEffect(request, active, navigationAccount, appState.phase, unlocked) {
+        if (request == null ||
+            appState.signInAlerts.devicesRequest != request ||
+            request.accountOpened ||
+            appState.phase != AppPhase.Ready ||
+            !appState.deviceRoutingUnlocked
+        ) {
+            return@LaunchedEffect
+        }
         when {
             !eligible() -> appState.signInAlerts.devicesOpened(request)
-            active == request.accountRef -> onOpenAccount()
+            active == request.accountRef -> {
+                if (navigationAccount == active) {
+                    onOpenAccount()
+                    appState.signInAlerts.devicesAccountOpened(request)
+                }
+            }
             else ->
                 appState.launchMutation {
                     val activated =
@@ -56,10 +69,10 @@ internal fun SignInDevicesRouteEffect(
                             shouldActivate = {
                                 eligible() &&
                                     appState.signInAlerts.devicesRequest == request &&
-                                    !appState.appLock.screenVisible
+                                    appState.deviceRoutingUnlocked
                             },
                         )
-                    if (!activated && !appState.appLock.screenVisible) appState.signInAlerts.devicesOpened(request)
+                    if (!activated && appState.deviceRoutingUnlocked) appState.signInAlerts.devicesOpened(request)
                 }
         }
     }
@@ -72,13 +85,22 @@ internal fun SignInDevicesRequestEffect(
     onOpen: () -> Unit,
 ) {
     val request = appState.signInAlerts.devicesRequest
-    LaunchedEffect(request, appState.activeAccountRef, appState.appLock.screenVisible) {
-        if (request != null && !appState.appLock.screenVisible && request.accountRef == appState.activeAccountRef) {
+    LaunchedEffect(request, appState.activeAccountRef, appState.deviceRoutingUnlocked) {
+        if (
+            request?.accountOpened == true &&
+            appState.signInAlerts.devicesRequest == request &&
+            appState.deviceRoutingUnlocked &&
+            request.accountRef == appState.activeAccountRef &&
+            appState.accounts.any { it.label == request.accountRef && signInAlertsApply(it) }
+        ) {
             onOpen()
             appState.signInAlerts.devicesOpened(request)
         }
     }
 }
+
+private val WhiteNoiseAppState.deviceRoutingUnlocked: Boolean
+    get() = !appLock.screenVisible && !appLock.evaluationPending
 
 /** The active account's alert tier for the Devices row badge. */
 internal fun WhiteNoiseAppState.devicesRowTier(): SignInAlertTier {

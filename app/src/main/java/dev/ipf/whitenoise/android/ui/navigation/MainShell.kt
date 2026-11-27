@@ -654,14 +654,6 @@ internal fun MainShell(
         onAppUpdateTapHandled(tap)
     }
 
-    // A sign-in notice, alert or notification opens Settings → Account, which opens that account's devices.
-    SignInDevicesRouteEffect(appState) {
-        supersedePendingTtsDestinationNavigation()
-        closeConversationForNotificationRoute()
-        sectionName = MainSection.Settings.name
-        settingsDetailName = SettingsDetail.Account.name
-    }
-
     val openChatForShare: (List<ChatListItem>, String) -> Boolean = { allChats, groupIdHex ->
         val item = allChats.firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
         if (item == null) {
@@ -952,6 +944,14 @@ internal fun MainShell(
             updateSettingsViewport(SettingsHomeViewportEvent.ChangeAccount)
         }
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
+    }
+
+    // A sign-in notice, alert or notification opens Settings → Account, which opens that account's devices.
+    SignInDevicesRouteEffect(appState, previousActiveAccountRef) {
+        supersedePendingTtsDestinationNavigation()
+        closeConversationForNotificationRoute()
+        sectionName = MainSection.Settings.name
+        settingsDetailName = SettingsDetail.Account.name
     }
 
     // Return the UI to the active spoken passage without touching playback.

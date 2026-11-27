@@ -252,7 +252,11 @@ class MainActivity : AppCompatActivity() {
                 window.applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
+            val notificationPending = inboundNotificationTarget != null || state.signInAlerts.devicesRequest != null
+            SideEffect {
+                syncSystemBarsAndHostReadiness(darkTheme)
+                if (!notificationPending) foregroundConversationDismissal.onNotificationRouteHandled()
+            }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
@@ -408,10 +412,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
         val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
-        if (signInAlertAccount != null) {
-            pinTapGate.supersede()
-            appState.signInAlerts.requestDevices(signInAlertAccount)
-        }
+        signInAlertAccount?.let(::openSignInAlert)
         if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
             if (signInAlertAccount == null && !opensProfileChooser) {
                 pinTapGate.supersede()
@@ -436,7 +437,8 @@ class MainActivity : AppCompatActivity() {
                 pinTarget,
                 notificationTapTokens,
             )
-        val parsedShare = parseShareRequest(intent.takeUnless { retainPendingShareOnRecreation && inboundShareRequest != null })
+        val retainedShare = retainPendingShareOnRecreation && inboundShareRequest != null
+        val parsedShare = parseShareRequest(intent.takeUnless { retainedShare })
         val profileData = intent?.dataString.takeUnless { retainNotification }
         pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         applyInboundRouting(parsedTarget, parsedShare, profileData, lifecycleClass)
@@ -446,6 +448,14 @@ class MainActivity : AppCompatActivity() {
             // replay the same target after the UI has already consumed it.
             setIntent(Intent(this, MainActivity::class.java))
         }
+    }
+
+    private fun openSignInAlert(accountRef: String) {
+        pinTapGate.supersede()
+        inboundNotificationTarget = null
+        appState.conversationDictation.clearMicrophoneRecovery()
+        foregroundConversationDismissal.onNotificationRouteObserved()
+        appState.signInAlerts.requestDevices(accountRef)
     }
 
     // Merges a parsed inbound route into the pending routes; a notification target also starts its route trace. A chat
@@ -461,6 +471,7 @@ class MainActivity : AppCompatActivity() {
         if (target != null || share != null || data != null) appState.conversationDictation.clearMicrophoneRecovery()
         val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
         if (target != null) {
+            appState.signInAlerts.devicesRequest?.let(appState.signInAlerts::devicesOpened)
             foregroundConversationDismissal.onNotificationRouteObserved()
             appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, target)
         }
@@ -490,7 +501,8 @@ class MainActivity : AppCompatActivity() {
             // retained-conversation dismissal until onResume has observed
             // whether this foreground entry is actually routing elsewhere.
             foregroundConversationDismissal.onStart(
-                hasPendingNotificationRoute = inboundNotificationTarget != null,
+                hasPendingNotificationRoute =
+                    inboundNotificationTarget != null || appState.signInAlerts.devicesRequest != null,
             )
             appState.setAppInForeground(
                 foreground = true,

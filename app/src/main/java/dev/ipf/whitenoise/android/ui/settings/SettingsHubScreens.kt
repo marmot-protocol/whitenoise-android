@@ -81,8 +81,8 @@ internal fun AccountScreen(
 internal fun AccountHubGroup(
     readiness: ProfileReadiness,
     onOpenLinkedDevices: (() -> Unit)? = null,
-    onOpenDetail: (SettingsDetail?) -> Unit,
     devicesTier: SignInAlertTier = SignInAlertTier.Passive,
+    onOpenDetail: (SettingsDetail?) -> Unit,
 ) {
     SettingsGroup(
         modifier = Modifier.testTag("settings.account.group"),

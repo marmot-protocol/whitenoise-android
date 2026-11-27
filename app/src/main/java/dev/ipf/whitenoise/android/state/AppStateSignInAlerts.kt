@@ -46,7 +46,7 @@ internal suspend fun WhiteNoiseAppState.refreshSignInAlerts(accountRef: String) 
     alerts.refreshMutex.withLock {
         val account = accounts.firstOrNull { it.label == accountRef }
         if (!linkedDevicesAvailable() || account == null || !signInAlertsApply(account)) {
-            alerts.forget(accountRef)
+            if (account != null || accountListLoaded) alerts.forget(accountRef)
             return@withLock
         }
         val generation = runtimeGeneration
