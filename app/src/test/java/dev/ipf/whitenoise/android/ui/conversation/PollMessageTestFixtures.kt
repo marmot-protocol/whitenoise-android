@@ -43,7 +43,9 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 private const val POLL_INTERVAL_MS = 25L
 
 /** Real bubble/controller fixtures with a bounded fake native transport, without network work. */
-open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
+open class PollMessageTestFixtures(
+    nativeDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : MessageBubbleFileAttachmentFixtures() {
     protected val nativeCalls = mutableListOf<Pair<String, List<Any?>>>()
     protected var reactionFailure: Throwable? = null
     protected var reactionSummary =
@@ -173,10 +175,10 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                 }
             }
         } as MarmotInterface
-    protected val pollState = stateWithNativeDispatcher()
+    protected val pollState = stateWithNativeDispatcher(nativeDispatcher)
 
     /** Reuses the native fixture with a dispatcher that can deterministically complete a read inline. */
-    protected fun stateWithNativeDispatcher(dispatcher: CoroutineDispatcher = Dispatchers.IO) =
+    protected fun stateWithNativeDispatcher(dispatcher: CoroutineDispatcher) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore =

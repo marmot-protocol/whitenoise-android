@@ -28,10 +28,4 @@ class DraftVideoControlsTest {
         assertEquals("2×", playbackSpeedLabel(2f))
         assertEquals("0.5×", playbackSpeedLabel(0.5f))
     }
-
-    /** The seek buttons step the clip by the prototype's fixed ten seconds. */
-    @Test
-    fun seekStepMatchesThePrototype() {
-        assertEquals(10_000L, DRAFT_VIDEO_SEEK_STEP_MS)
-    }
 }

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -281,7 +282,12 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
         retryIdempotentRuntimeMutation {
             when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
                 is MessageDraftMutationResult.Success -> Unit
-                is MessageDraftMutationResult.Failure -> throw deletion.cause
+                is MessageDraftMutationResult.Failure ->
+                    when (val failure = deletion.cause) {
+                        // The native removal committed; a forgotten group no longer has a draft to select.
+                        is MarmotKitException.UnknownGroup -> Unit
+                        else -> throw failure
+                    }
                 else -> error("unexpected draft deletion result: $deletion")
             }
         }
