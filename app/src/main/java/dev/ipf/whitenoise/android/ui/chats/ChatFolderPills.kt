@@ -192,7 +192,10 @@ internal fun ChatFolderPill(
         longClickLabel = if (onLongClick == null) null else stringResource(R.string.edit),
         border =
             if (amoled && selected) {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = AMOLED_SELECTED_FOLDER_OUTLINE_ALPHA))
+                BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = AMOLED_SELECTED_FOLDER_OUTLINE_ALPHA),
+                )
             } else {
                 null
             },
