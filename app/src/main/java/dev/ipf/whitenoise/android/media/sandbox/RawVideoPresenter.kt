@@ -196,7 +196,9 @@ internal class RawVideoPresenter(
             try {
                 val submittedRevision =
                     synchronized(presentationLock) {
-                        if (closed || frame.seek != allowedSeek || attemptRevision != presentationRevision) return@synchronized null
+                        if (closed || frame.seek != allowedSeek || attemptRevision != presentationRevision) {
+                            return@synchronized null
+                        }
                         var submitted: Long? = null
                         owner.submitIfCurrent {
                             val revision = output.surfaceRevision
@@ -221,12 +223,22 @@ internal class RawVideoPresenter(
         frame: RawVideoFrame,
         surfaceRevision: Long,
     ): Boolean {
-        val probe = observation ?: return output.render(frame.bitmap, frame.rotation, expectedRevision = surfaceRevision)
+        val probe = observation
+        if (probe == null) return output.render(frame.bitmap, frame.rotation, expectedRevision = surfaceRevision)
         val mediaBefore = owner.mediaPositionUs()
         val before = SystemClock.elapsedRealtimeNanos()
         val submitted = output.render(frame.bitmap, frame.rotation, probe, surfaceRevision)
         val after = SystemClock.elapsedRealtimeNanos()
-        probe.submission(frame.activation, frame.seek, frame.ptsUs, mediaBefore, owner.mediaPositionUs(), before, after, submitted)
+        probe.submission(
+            frame.activation,
+            frame.seek,
+            frame.ptsUs,
+            mediaBefore,
+            owner.mediaPositionUs(),
+            before,
+            after,
+            submitted,
+        )
         return submitted
     }
 

@@ -96,7 +96,12 @@ internal class RawAvPlaybackEngine(
     private var prepareJobGeneration = -1L
     private val probeSource: () -> MediaProbe? =
         prepareProbe ?: {
-            IsolatedMediaDecoder.probeUri(this.context.contentResolver, uri, if (wantVideo) 1280 else 1, playbackColors = wantVideo)
+            IsolatedMediaDecoder.probeUri(
+                this.context.contentResolver,
+                uri,
+                if (wantVideo) 1280 else 1,
+                playbackColors = wantVideo,
+            )
         }
     private var prepareJob: Job? = null
     private var status = Status.Idle

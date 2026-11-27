@@ -92,8 +92,7 @@ class MediaAvDecodeService : Service() {
             val output = data.getParcelable<SharedMemory>("output") ?: return result
             output.use {
                 if (data.getInt("version") != MediaDecodePolicy.VERSION) return result
-                val operation = data.getInt("operation")
-                if (operation != MediaDecodePolicy.PROBE && operation != MediaDecodePolicy.WAVEFORM) return result
+                val playbackColors = playbackColorsFor(data) ?: return result
                 if (data.getLong("positionUs") !in
                     0..TimeUnit.MILLISECONDS.toMicros(MAX_MEDIA_DURATION_MS)
                 ) {
@@ -110,7 +109,6 @@ class MediaAvDecodeService : Service() {
                 if (mode != OsConstants.O_RDONLY) return result
                 result.putInt("inputWriteErrno", readOnlyErrno(input))
                 NativeMediaEngine.ensureLoaded()
-                val playbackColors = operation == MediaDecodePolicy.PROBE && data.getBoolean("playbackColors")
                 val handle = NativeMediaEngine.nativeOpen(input.fd, offset, length, edge, playbackColors)
                 if (handle <= 0L) return result
                 try {
@@ -122,6 +120,14 @@ class MediaAvDecodeService : Service() {
         }
         return result
     }
+
+    /** Admits the two automatic media operations and reads the color option for video probes. */
+    private fun playbackColorsFor(data: Bundle): Boolean? =
+        when (data.getInt("operation")) {
+            MediaDecodePolicy.PROBE -> data.getBoolean("playbackColors")
+            MediaDecodePolicy.WAVEFORM -> false
+            else -> null
+        }
 
     /** Publishes validated dimensions, duration and optional bounded raw output for the requested operation. */
     @Suppress("ReturnCount") // Distinct absent-audio, empty-waveform and poster refusal boundaries.

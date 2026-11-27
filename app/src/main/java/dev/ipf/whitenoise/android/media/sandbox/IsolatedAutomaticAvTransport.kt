@@ -426,7 +426,8 @@ internal class IsolatedAutomaticAvTransport(
         request: MediaDecodeRequest,
     ): MediaProbe? {
         val capacity = MediaDecodePolicy.outputCapacity(request.edge) ?: return null
-        return withParentResource(SharedMemory.create("media-av-pixels", if (request.option) capacity else Int.SIZE_BYTES)) { output ->
+        val bytes = if (request.option) capacity else Int.SIZE_BYTES
+        return withParentResource(SharedMemory.create("media-av-pixels", bytes)) { output ->
             val result = exchange(ticket, input, output, request) ?: return@withParentResource null
             val bitmap =
                 if (result.getBoolean("pixels")) {

@@ -88,8 +88,8 @@ internal interface RawAvRenderOwner {
     )
 }
 
-/** One persistent caller drives this finite raw-output session, with no queued decode tasks. */
-@Suppress("TooManyFunctions", "LongParameterList") // The renderer owns raw PCM and video output for one selected source.
+/** One persistent caller drives raw PCM and video output for the selected source. */
+@Suppress("TooManyFunctions", "LongParameterList")
 internal class RawAvRenderSession(
     private val context: Context,
     private val uri: Uri,

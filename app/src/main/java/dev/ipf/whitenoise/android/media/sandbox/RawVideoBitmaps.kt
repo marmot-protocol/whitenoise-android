@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import android.os.SharedMemory
 import java.io.IOException
 
-/** Allocates parent-owned pixels for one raw frame; callers own the result. */
+/** Supplies parent-owned pixels for one raw frame. */
 internal fun interface RawVideoBitmaps {
     fun obtain(
         width: Int,
