@@ -212,7 +212,7 @@ class MediaAvDecodeService : Service() {
         }
     }
 
-    /** Keeps the latest bounded frame until the requested media timestamp or global EOF. */
+    /** Preserves the covering frame's pixels when the next frame is past the requested position. */
     @Suppress("ReturnCount") // EOF, the target frame and the bounded iteration limit are distinct outcomes.
     private fun readPosterFrame(
         handle: Long,
@@ -223,9 +223,10 @@ class MediaAvDecodeService : Service() {
         var previous: NativeMediaFrame? = null
         repeat(MAX_READS) {
             source.clear()
+            val videoEndAfterUs = if (previous == null) Long.MAX_VALUE else targetUs
             val frame =
                 NativeMediaOutputPolicy.frame(
-                    checkedNativeRead(NativeMediaEngine.nativeRead(handle, source, null)),
+                    checkedNativeRead(NativeMediaEngine.nativeRead(handle, source, null, videoEndAfterUs)),
                     edge,
                 )
             if (frame.kind == 0) return previous

@@ -12,6 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
@@ -181,11 +182,9 @@ class MediaWorkerDomainTest {
     fun requestsWaitingForAWorkerHoldNoDescriptors() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val transport = domainLane(context)
-        val admitted =
-            java.util.concurrent.atomic
-                .AtomicInteger()
-        transport.admissionObserver = MediaAdmissionObserver { _, entered -> if (entered) admitted.incrementAndGet() }
         val domains = listOf(A, B, C, D, MediaTrustDomain.Local("account"))
+        val admitted = CountDownLatch(domains.size)
+        transport.admissionObserver = MediaAdmissionObserver { _, entered -> if (entered) admitted.countDown() }
         val calls = domains.mapIndexed { index, domain -> decodeIn(transport, index + 1, domain) }
         try {
             repeat(MediaWorkerPool.MAX_LIVE_GENERATIONS) {
@@ -196,8 +195,7 @@ class MediaWorkerDomainTest {
                         .await(2, TimeUnit.SECONDS),
                 )
             }
-            Thread.sleep(FENCE_OBSERVATION_MS)
-            assertEquals(domains.size, admitted.get())
+            assertTrue("every caller entered the lane", admitted.await(10, TimeUnit.SECONDS))
             assertEquals(MediaWorkerPool.MAX_LIVE_GENERATIONS, transport.descriptorHoldersForTest())
             assertTrue(calls.count { it.thread.isAlive } == domains.size)
             context.bindings.take(MediaWorkerPool.MAX_LIVE_GENERATIONS).forEach { bound ->

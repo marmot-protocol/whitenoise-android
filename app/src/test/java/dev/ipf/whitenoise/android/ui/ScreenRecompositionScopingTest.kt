@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.app.Application
 import android.content.Context
 import android.view.View
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,8 +75,11 @@ class ScreenRecompositionScopingTest {
      * cause zero ChatsScreen body recompositions.
      */
     @Test
+    @Config(application = Application::class)
     fun programmaticOffsetChangeWithinOneRowDoesNotRecomposeChatsScreen() {
         val appState = createChatsAppState()
+        // Seed the account's folders before composition starts observing the store.
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         val controller = ChatsController(appState)
         controller.items = (0 until CHAT_ROW_COUNT).map(::chatItem)
         lateinit var searchViewport: GlobalSearchViewport
@@ -95,23 +99,30 @@ class ScreenRecompositionScopingTest {
                     }
                 }
             }
-            composeRule.waitForIdle()
             composeRule.onNodeWithTag("chats.list").assertExists()
-            awaitNoRunsOf("ChatsScreen")
 
             val listState = searchViewport.listState(showArchived = false)
+            // Start inside the row so the trace measures offset changes without the transition off the list head.
+            val initialOffset = PIXEL_SCROLL_OFFSETS.first()
+            composeRule.runOnIdle { listState.requestScrollToItem(0, initialOffset) }
+            composeRule.runOnIdle {
+                assertEquals(0, listState.firstVisibleItemIndex)
+                assertEquals(initialOffset, listState.firstVisibleItemScrollOffset)
+            }
+
             val counts = mutableMapOf<String, Int>()
             val screenRuns =
                 countComposableRuns("ChatsScreen", counts) {
-                    for (offsetPx in PIXEL_SCROLL_OFFSETS) {
+                    for (offsetPx in PIXEL_SCROLL_OFFSETS.drop(1)) {
                         composeRule.runOnIdle { listState.requestScrollToItem(0, offsetPx) }
-                        composeRule.waitForIdle()
+                        composeRule.runOnIdle {
+                            assertEquals(0, listState.firstVisibleItemIndex)
+                            assertEquals(offsetPx, listState.firstVisibleItemScrollOffset)
+                        }
                     }
                 }
 
             assertEquals("Offset changes within row 0 recomposed ChatsScreen: $counts", 0, screenRuns)
-            assertEquals(0, listState.firstVisibleItemIndex)
-            assertEquals(PIXEL_SCROLL_OFFSETS.last(), listState.firstVisibleItemScrollOffset)
         } finally {
             composeRule.runOnIdle { controller.onCleared() }
             cancelAppStateScope(appState)
@@ -380,32 +391,12 @@ class ScreenRecompositionScopingTest {
         return runs
     }
 
-    /**
-     * Waits until background first-frame loads stop recomposing [targetName], so a slow host cannot land
-     * one of them inside a measured window. Gives up after [SETTLE_TIMEOUT_MS] and lets the assertion report.
-     */
-    private fun awaitNoRunsOf(targetName: String) {
-        val deadline = System.currentTimeMillis() + SETTLE_TIMEOUT_MS
-        var quietWindows = 0
-        while (quietWindows < QUIET_WINDOWS_REQUIRED && System.currentTimeMillis() < deadline) {
-            val runs =
-                countComposableRuns(targetName) {
-                    Thread.sleep(QUIET_WINDOW_MS)
-                    composeRule.waitForIdle()
-                }
-            quietWindows = if (runs == 0) quietWindows + 1 else 0
-        }
-    }
-
     private companion object {
         const val ACCOUNT_REF = "account"
         const val ACCOUNT_HEX = "a"
         const val CHAT_ROW_COUNT = 20
         const val NAV_BAR_BOTTOM_PX = 48
         const val BOOTSTRAP_SETTLE_MS = 50L
-        const val QUIET_WINDOW_MS = 50L
-        const val QUIET_WINDOWS_REQUIRED = 3
-        const val SETTLE_TIMEOUT_MS = 5_000L
         val PIXEL_SCROLL_OFFSETS = listOf(4, 12, 24, 36, 48)
         val IME_ANIMATION_FRAMES = listOf(10, 30, 48, 60, 120, 240, 420, 600, 420, 240, 120, 60, 48, 24, 0)
     }

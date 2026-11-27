@@ -31,11 +31,15 @@ internal object NativeMediaEngine {
     /** Returns fixed bounded metadata for a positive generation handle; no encoded bytes leave JNI. */
     @JvmStatic external fun nativeInfo(handle: Long): LongArray
 
-    /** Copies bounded raw output; exactly [-1] reports demuxer INVALIDDATA, all other refusals throw. */
+    /**
+     * Copies bounded raw output. A video-only read can end before a future frame, leaving the output
+     * untouched. Exactly [-1] reports demuxer INVALIDDATA; all other refusals throw.
+     */
     @JvmStatic external fun nativeRead(
         handle: Long,
         videoOut: ByteBuffer?,
         audioOut: ByteBuffer?,
+        videoEndAfterUs: Long = Long.MAX_VALUE,
     ): LongArray
 
     /** Reads one raw track with the same [-1] demuxer marker; no compressed packets leave JNI. */

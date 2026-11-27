@@ -186,7 +186,7 @@ class NotificationReactionArtworkScreenshotTest {
             )
         val images =
             values.mapNotNull { value -> notificationBuiltinEmojiBitmap(context, value)?.let { value to it } }.toMap()
-        val row = notificationQuickReactionRows(context, values, images) { pending }
+        val chips = quickReactionChipsExtra(values, images) { pending }
         val user = Person.Builder().setName("Me").build()
         val sender = Person.Builder().setName("Alex").build()
         val source =
@@ -203,7 +203,7 @@ class NotificationReactionArtworkScreenshotTest {
                         .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
                         .build(),
                 ).addAction(0, "Mark as read", pending)
-        source.extras.putParcelable(EXTRA_QUICK_REACTION_ROWS, row)
+        source.extras.putBundle(EXTRA_QUICK_REACTION_CHIPS, chips)
         return withQuickReactionRows(context, source.build())
     }
 

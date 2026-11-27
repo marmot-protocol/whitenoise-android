@@ -100,9 +100,12 @@ class RawAvControlsTest {
         engine.prepare().get(2, TimeUnit.SECONDS)
         setField(engine, "pausedUs", 2250000L)
         setField(engine, "targetUs", 2250000L)
+        val presenter = field(engine, "presenter") as RawVideoPresenter
+        val intent = engine.intent()
+        presenter.show(RawVideoFrame(bitmap, 0, intent.activation, intent.seek, 2250000L))
         engine.stop()
         engine.prepare().get(1, TimeUnit.SECONDS)
-        assertSame(bitmap, (field(engine, "presenter") as RawVideoPresenter).retainedBitmap())
+        assertSame(bitmap, presenter.retainedBitmap())
         assertFalse(bitmap.isRecycled)
         assertNull(field(engine, "pendingSeek"))
         assertEquals(1, calls.get())
@@ -427,12 +430,35 @@ class RawAvControlsTest {
         assertTrue(engine.snapshot().playWhenReady)
     }
 
+    /** The command retires device output even when the renderer cannot start the worker seek yet. */
+    @Test
+    fun acceptingASeekClosesOldAudioBeforeTheRendererTakesTheCommand() {
+        val engine = newEngine()
+        val sink = FakeSink()
+        seedActiveOutput(engine, sink)
+        val renderer = field(engine, "renderer") as RawAvRenderSession
+        val oldSeek = renderer.appliedSeek
+
+        engine.seekToAsync(3100)
+
+        assertTrue(sink.closed)
+        assertEquals(oldSeek, renderer.appliedSeek)
+        assertEquals(3100L, engine.positionMs())
+    }
+
     /** Held Seek Acknowledgement Uses Latest Accepted Speed And Gain For Its New Sink. */
     @Test
     fun heldSeekAcknowledgementUsesLatestAcceptedSpeedAndGainForItsNewSink() {
         val owner = FakeOwner()
         val sink = FakeSink()
-        val renderer = renderer(owner) { _, _, _ -> sink }
+        val frame = AvStreamFrame.Audio(ByteArray(192), 48000, 1, 1500000)
+        val initial = FakeSink()
+        var firstSink = true
+        val renderer =
+            renderer(owner) { _, _, _ ->
+                if (firstSink) initial.also { firstSink = false } else sink
+            }
+        renderer.createPcm(frame, 1500000, 7)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val executor = Executors.newSingleThreadExecutor()
@@ -445,11 +471,12 @@ class RawAvControlsTest {
             }
         try {
             assertTrue(entered.await(2, TimeUnit.SECONDS))
+            assertTrue(initial.closed)
             assertNull(renderer.speed(2f))
             assertNull(renderer.volume(0.4f))
             release.countDown()
             pending.get(2, TimeUnit.SECONDS)
-            renderer.createPcm(AvStreamFrame.Audio(ByteArray(192), 48000, 1, 1500000), 1500000, 7)
+            renderer.createPcm(frame, 1500000, 7)
             assertEquals(2f, sink.appliedSpeed, 0f)
             assertEquals(0.4f, sink.appliedVolume, 0f)
             assertEquals(2f, field(renderer, "clockSpeed") as Float, 0f)

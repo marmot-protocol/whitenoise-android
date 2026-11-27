@@ -194,7 +194,7 @@ class VoiceNoteFlowMotionCaptureTest {
                 ownerIsCurrent = { true },
                 send = { _, _, _, onQueued -> queued = onQueued },
                 playback = StillPlayback,
-                deleteFile = {},
+                deleteFile = { true },
             )
         val controller = newController(output) { file, durationMs -> review.offer(file, durationMs) }
 
@@ -204,12 +204,13 @@ class VoiceNoteFlowMotionCaptureTest {
 
         fun newController(
             directory: File,
+            onPermissionRequest: () -> Boolean = { true },
             onComplete: (File, Long) -> Unit,
         ) = VoiceRecordingController(
             context = context,
             outputDirectory = directory,
             scope = scope,
-            onPermissionRequest = { true },
+            onPermissionRequest = onPermissionRequest,
             onRecordingComplete = onComplete,
             onError = {},
             recorderFactory = { _, file, _ -> Session(file, takeMs) },
@@ -232,7 +233,9 @@ class VoiceNoteFlowMotionCaptureTest {
             val sessionOwner =
                 VoiceNoteSessionOwner(
                     store = VoiceDraftStore(output),
-                    newController = { _, hooks -> newController(hooks.outputDirectory, hooks.onRecordingComplete) },
+                    newController = { _, hooks ->
+                        newController(hooks.outputDirectory, hooks.onPermissionRequest, hooks.onRecordingComplete)
+                    },
                     presentError = {},
                     presentElsewhere = {},
                 )
@@ -329,9 +332,13 @@ class VoiceNoteFlowMotionCaptureTest {
             File(folder, "segments.txt").writeText(manifest.toString())
         }
 
+        /** Releases the recorder and removes private fixture drafts after the motion capture. */
         fun release() {
             controller.release()
-            owner?.onAccountUnavailable(FlowKey.accountRef)
+            owner?.let {
+                it.stopAccountCapture(FlowKey.accountRef)
+                it.purgeAccountDrafts(FlowKey.accountRef)
+            }
             review.release()
             scope.runCurrent()
             output.deleteRecursively()

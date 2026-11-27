@@ -48,13 +48,12 @@ internal class NotificationInteractionFactory(
         }
         val artwork = notificationReactionChipArtwork(context, quickReactions)
         if (artwork.isEmpty()) return
-        val rows =
-            notificationQuickReactionRows(context, quickReactions, artwork) { reaction ->
-                reactionPendingIntent(actionTarget, reaction)
-            }
         builder.extras.apply {
             putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
-            putParcelable(EXTRA_QUICK_REACTION_ROWS, rows)
+            putBundle(
+                EXTRA_QUICK_REACTION_CHIPS,
+                quickReactionChipsExtra(quickReactions, artwork) { reactionPendingIntent(actionTarget, it) },
+            )
         }
     }
 

@@ -49,6 +49,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 
 /** Version review and composer artwork in both themes and at enlarged RTL text. */
 @RunWith(RobolectricTestRunner::class)
@@ -254,8 +255,14 @@ class EmojiSetsScreenshotTest {
                 }
             }
         }
+        // The standard emoji load off the main thread, so wait for their Smileys tab as well as the installed set.
+        val smileys =
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.emoji_category_smileys_people)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty()
+            ShadowLooper.idleMainLooper()
+            listOf("forest fox", smileys).all {
+                composeRule.onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty()
+            }
         }
         composeRule.onNodeWithTag("emoji-set-picker").captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
     }

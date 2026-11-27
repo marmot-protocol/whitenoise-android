@@ -39,6 +39,7 @@ internal class AppLockController(
     private val resumeDeferredWork: () -> Unit,
     /** Runs after a successful unlock, once deferred work has resumed. */
     private val onUnlockSucceeded: (dismissRetainedVisibleConversation: Boolean) -> Unit,
+    private val onScreenShown: () -> Unit,
 ) {
     var required by mutableStateOf(preferences.getBoolean(REQUIRE_APP_UNLOCK_KEY, false))
         private set
@@ -238,6 +239,7 @@ internal class AppLockController(
     }
 
     private fun showScreen() {
+        if (!screenVisible) onScreenShown()
         screenVisible = true
         stopSpeaking()
     }

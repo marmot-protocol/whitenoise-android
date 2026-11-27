@@ -47,7 +47,25 @@
         "test_ids": [
           "MED-001",
           "MED-033",
+          "MED-046",
           "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoSeekWithTimes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoSeekWithTimes(",
+        "test_ids": [
+          "MED-033",
+          "MED-046"
+        ]
+      },
+      {
+        "surface": "VideoSeekRecovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoSeekRecovery(",
+        "test_ids": [
+          "MED-046"
         ]
       },
       {
@@ -68,6 +86,22 @@
         "test_ids": [
           "MED-001",
           "MED-033"
+        ]
+      },
+      {
+        "surface": "string:video_seek_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.video_seek_failed",
+        "test_ids": [
+          "MED-046"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-046"
         ]
       },
       {

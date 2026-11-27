@@ -52,6 +52,8 @@ internal class RawVideoPresenter(
     private var presentationRevision = 0L
     private val pool = ArrayDeque<Bitmap>()
     private var retained: RawVideoFrame? = null
+    private var committed: RawVideoFrame? = null
+    private var allowCommitted = false
     private var dirty = false
     private var scheduled = false
     private var drawing: Bitmap? = null
@@ -83,24 +85,28 @@ internal class RawVideoPresenter(
                 frame.bitmap.recycle()
                 return
             }
-            retained?.let { releaseLocked(it.bitmap) }
+            val replaced = retained
             retained = frame
+            replaced?.let { releaseLocked(it.bitmap) }
             dirty = true
             scheduleLocked()
         }
     }
 
-    /** Redraws the retained frame, for example after the display surface was recreated. */
-    fun redraw() {
+    /** Redraws current pixels, or the last posted frame while a paused seek is unresolved. */
+    fun redraw(allowCommitted: Boolean = false) {
         synchronized(lock) {
-            if (closed || retained == null) return
+            val frame = retained ?: committed.takeIf { allowCommitted }
+            if (closed || frame == null) return
+            this.allowCommitted = allowCommitted
             dirty = true
             scheduleLocked()
         }
     }
 
-    /** Whether a frame for [seek] is already retained for display. */
-    fun holds(seek: Long): Boolean = synchronized(lock) { retained?.seek == seek }
+    /** A preparation poster can stand in for a playback frame only at the start. */
+    fun holds(seek: Long, requireTimestamp: Boolean): Boolean =
+        synchronized(lock) { retained?.let { it.seek == seek && (!requireTimestamp || it.ptsUs >= 0) } == true }
 
     /** The retained bitmap, for tests and diagnostics only. */
     internal fun retainedBitmap(): Bitmap? = synchronized(lock) { retained?.bitmap }
@@ -124,11 +130,13 @@ internal class RawVideoPresenter(
 
     /** Drops the retained frame and pooled memory; a later frame may still be shown. */
     fun clear() {
-        synchronized(lock) {
-            retained?.let { releaseLocked(it.bitmap, pooled = false) }
-            retained = null
-            dirty = false
-            drainPoolLocked()
+        synchronized(presentationLock) {
+            synchronized(lock) {
+                presentationRevision++
+                forgetFramesLocked()
+                dirty = false
+                drainPoolLocked()
+            }
         }
     }
 
@@ -136,8 +144,10 @@ internal class RawVideoPresenter(
         synchronized(presentationLock) {
             allowedSeek = seek
             synchronized(lock) {
-                retained?.let { releaseLocked(it.bitmap) }
+                val replaced = retained
                 retained = null
+                replaced?.let { releaseLocked(it.bitmap) }
+                allowCommitted = false
                 dirty = false
             }
         }
@@ -161,8 +171,7 @@ internal class RawVideoPresenter(
             synchronized(lock) {
                 if (closed) return
                 closed = true
-                retained?.let { releaseLocked(it.bitmap, pooled = false) }
-                retained = null
+                forgetFramesLocked()
                 drainPoolLocked()
             }
             output.close()
@@ -182,7 +191,7 @@ internal class RawVideoPresenter(
             val attemptRevision: Long
             val frame =
                 synchronized(lock) {
-                    val next = retained
+                    val next = retained ?: committed.takeIf { allowCommitted }
                     if (closed || !dirty || next == null) {
                         scheduled = false
                         return
@@ -194,18 +203,7 @@ internal class RawVideoPresenter(
                 }
             var completed = false
             try {
-                val submittedRevision =
-                    synchronized(presentationLock) {
-                        if (closed || frame.seek != allowedSeek || attemptRevision != presentationRevision) {
-                            return@synchronized null
-                        }
-                        var submitted: Long? = null
-                        owner.submitIfCurrent {
-                            val revision = output.surfaceRevision
-                            if (draw(frame, revision)) submitted = revision
-                        }
-                        submitted
-                    }
+                val submittedRevision = postCurrent(frame, attemptRevision)
                 submittedRevision?.let { owner.shown(frame.seek, it, attemptRevision) }
                 completed = true
             } finally {
@@ -218,6 +216,27 @@ internal class RawVideoPresenter(
             }
         }
     }
+
+    private fun postCurrent(frame: RawVideoFrame, attemptRevision: Long): Long? =
+        synchronized(presentationLock) {
+            if (closed || attemptRevision != presentationRevision || !canDraw(frame)) return@synchronized null
+            var submitted: Long? = null
+            owner.submitIfCurrent {
+                val revision = output.surfaceRevision
+                if (draw(frame, revision)) {
+                    submitted = revision
+                    synchronized(lock) {
+                        val previous = committed
+                        committed = frame
+                        if (previous !== frame) previous?.let { releaseLocked(it.bitmap) }
+                    }
+                }
+            }
+            submitted
+        }
+
+    private fun canDraw(frame: RawVideoFrame): Boolean =
+        frame.seek == allowedSeek || synchronized(lock) { allowCommitted && frame === committed }
 
     private fun draw(
         frame: RawVideoFrame,
@@ -251,6 +270,7 @@ internal class RawVideoPresenter(
         pooled: Boolean = true,
     ) {
         when {
+            bitmap === retained?.bitmap || bitmap === committed?.bitmap -> Unit
             bitmap === drawing -> deferred = bitmap
             pooled && !closed && reusable(bitmap) -> {
                 pool.addFirst(bitmap)
@@ -258,6 +278,15 @@ internal class RawVideoPresenter(
             }
             else -> bitmap.recycle()
         }
+    }
+
+    private fun forgetFramesLocked() {
+        val latest = retained?.bitmap
+        val lastShown = committed?.bitmap
+        retained = null
+        committed = null
+        latest?.let { releaseLocked(it, pooled = false) }
+        if (lastShown !== latest) lastShown?.let { releaseLocked(it, pooled = false) }
     }
 
     private fun reusable(bitmap: Bitmap): Boolean =

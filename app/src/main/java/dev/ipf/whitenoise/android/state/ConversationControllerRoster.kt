@@ -221,10 +221,10 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     observedBlockedLeave = false
     cancelledLeaveAwaitingRoster = false
     // Engine-confirmed removal (UseAfterEviction). Record the same
-    // authoritative local-left marker the leaveGroup() success path sets so
+    // local-left marker the leaveGroup() success path sets so
     // a later authoritative roster result that races ahead of eviction can't re-add
     // self (issue #787).
-    recordSelfLeft()
+    recordSelfLeft(settledDeparture = true)
     members = selfMembership.rosterHonoringSelfLeft(members, activeAccountIdHex)
     acceptedInvitePeerAccount = null
     membersLoaded = true
@@ -233,12 +233,19 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     inviteConfirmationUnresolved = false
     memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
     rosterBlockReason = null
-    // UseAfterEviction is the engine's authoritative signal that this
-    // conversation can no longer accept composer writes. Invalidate an
-    // in-flight immutable dictation target before any late provider result
-    // can reach the draft persistence path.
-    appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
+    // UseAfterEviction is authoritative: revoke capture before another result can write this chat's draft.
+    appState.releaseCaptureTarget(account, group.groupIdHex)
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
+}
+
+/** Latches the roster's read-only state and revokes transcript scopes when the departure settles. */
+internal fun ConversationController.recordSelfLeft(settledDeparture: Boolean) {
+    selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
+    if (settledDeparture) {
+        boundAccountRef?.let { account ->
+            appState.receivedVoiceTranscripts.updateGroupMembership(account, group.groupIdHex, departed = true)
+        }
+    }
 }
 
 private fun ConversationController.applyGroupDetails(
@@ -252,6 +259,7 @@ private fun ConversationController.applyGroupDetails(
         resolution = resolution,
         returnedRowCount = details.members.size,
         returnedMembership = details.group.selfMembership,
+        settledDeparture = details.group.hasSettledDeparture(),
         freshLeaveReadback = freshLeaveReadback,
     )
 }
@@ -266,6 +274,8 @@ private fun ConversationController.applyGroupRoster(
         resolution = resolution,
         returnedRowCount = roster.members.size,
         returnedMembership = roster.selfMembership,
+        // The lightweight roster can report LEFT before the leave request settles.
+        settledDeparture = roster.selfMembership.isGroupEviction(),
     )
 }
 
@@ -275,6 +285,7 @@ private fun ConversationController.applyResolvedGroupRoster(
     resolution: GroupRosterResolution,
     returnedRowCount: Int,
     returnedMembership: SelfMembershipFfi,
+    settledDeparture: Boolean,
     freshLeaveReadback: Boolean = false,
 ): AppliedGroupDetails? {
     val previousRetention = group.disappearingMessageSecs
@@ -296,6 +307,7 @@ private fun ConversationController.applyResolvedGroupRoster(
     val reconciled =
         if (restoredAfterCancel) applied.group else reconcileTerminalSelfMembership(applied.group, previousGroup)
     group = inviteConfirmationAuthority.reconcile(reconciled, establishesAcceptance = false)
+    appState.releaseEvictedCapture(account, previousGroup, group)
     if (previousRetention != group.disappearingMessageSecs) {
         publishTimelineFromIndexes()
     }
@@ -305,7 +317,7 @@ private fun ConversationController.applyResolvedGroupRoster(
     // read-only and the roster line below drops self — no longer relying
     // solely on the UseAfterEviction string-match round-trip.
     if (group.selfMembership.isNonMember()) {
-        recordSelfLeft()
+        recordSelfLeft(settledDeparture = settledDeparture)
     }
     // Once a self-leave has been recorded locally, refuse to re-add self
     // from a details round-trip that still predates the engine eviction —

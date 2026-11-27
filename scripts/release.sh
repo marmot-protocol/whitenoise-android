@@ -193,6 +193,11 @@ case "$FLAVOR" in
     ;;
 esac
 
+if [[ "$FLAVOR" != staging ]]; then
+  python3 -B "$REPO_DIR/scripts/check_marmotkit_release_channel.py" \
+    "$REPO_DIR/app/src/main/marmotkit/MARMOT_VERSION"
+fi
+
 if [[ -n "$GRADLE_INIT_SCRIPT" ]]; then
   if [[ ! -f "$GRADLE_INIT_SCRIPT" || -L "$GRADLE_INIT_SCRIPT" ]]; then
     echo "error: Gradle init script must be a regular non-symlink file: $GRADLE_INIT_SCRIPT" >&2

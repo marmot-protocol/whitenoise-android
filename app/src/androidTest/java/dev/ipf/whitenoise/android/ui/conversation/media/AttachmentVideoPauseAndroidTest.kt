@@ -22,6 +22,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -114,6 +115,7 @@ class AttachmentVideoPauseAndroidTest {
         assertTrue(device.pressHome())
         awaitStopped(player)
         returnToViewer()
+        awaitPausedSeek(player, USER_SEEK_MS)
         assertPausedAt(player, USER_SEEK_MS)
         onMain { player.play() }
         await("explicit user play") { onMain { player.isPlaying } }
@@ -208,6 +210,7 @@ class AttachmentVideoPauseAndroidTest {
         await("landscape configuration") {
             onMain { activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
         }
+        awaitPausedSeek(player, USER_SEEK_MS)
         assertPausedAt(player, USER_SEEK_MS)
         onMain { activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         await("portrait configuration") {
@@ -295,6 +298,20 @@ class AttachmentVideoPauseAndroidTest {
         composeRule.waitForIdle()
     }
 
+    /** The position commits when the isolated decoder returns the requested paused frame. */
+    private fun awaitPausedSeek(
+        player: Player,
+        positionMs: Long,
+    ) {
+        await("paused seek to ${positionMs}ms") {
+            onMain {
+                assertNull("paused seek failed", player.playerError)
+                assertFalse("paused seek restarted playback", player.playWhenReady)
+                player.currentPosition == positionMs
+            }
+        }
+    }
+
     /** Proves the same page remains paused across several frames, with its seek position intact. */
     private fun assertPausedAt(
         player: Player,
@@ -305,7 +322,11 @@ class AttachmentVideoPauseAndroidTest {
             onMain {
                 assertFalse("foreground or route reconnect restarted playback", player.playWhenReady)
                 assertFalse(player.isPlaying)
-                assertTrue("paused position changed", abs(player.currentPosition - positionMs) <= POSITION_TOLERANCE_MS)
+                val actualMs = player.currentPosition
+                assertTrue(
+                    "paused position changed from ${positionMs}ms to ${actualMs}ms",
+                    abs(actualMs - positionMs) <= POSITION_TOLERANCE_MS,
+                )
             }
             SystemClock.sleep(POLL_MS)
         }

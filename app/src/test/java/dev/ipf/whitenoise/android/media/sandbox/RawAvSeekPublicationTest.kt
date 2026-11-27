@@ -10,9 +10,13 @@ import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +25,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
+import java.util.concurrent.ExecutionException
 
 /** Exercises the actual fenced sink path at the adoption/render boundary without worker timing races. */
 @RunWith(RobolectricTestRunner::class)
@@ -35,14 +40,19 @@ class RawAvSeekPublicationTest {
             set(engine, "playIntent", true)
             val old = bitmap()
             adopt(engine, old)
-            engine.seekToAsync(1500)
+            set(engine, "width", 2)
+            val completion = engine.seekToAsync(1500)
+            val intent = engine.intent()
+            engine.seeked(intent.activation, intent.seek)
+            assertFalse(completion.isDone)
             render(engine)
             assertEquals(0, RecordingCanvasSurface.posts)
             assertEquals(0L, engine.snapshot().renderedFrame)
             assertTrue(old.isRecycled)
             val matching = bitmap()
-            val intent = engine.intent()
             assertTrue(engine.frame(matching, 0, intent.activation, intent.seek))
+            assertTrue(completion.isDone)
+            assertEquals(1500L, engine.positionMs())
             render(engine)
             assertEquals(1, RecordingCanvasSurface.posts)
             assertEquals(1L, engine.snapshot().renderedFrame)
@@ -85,18 +95,22 @@ class RawAvSeekPublicationTest {
         }
     }
 
-    /** Surface reattachment while a paused poster is pending must not redraw the old seek's retained pixels. */
-    @Test fun pausedSeekReattachmentRejectsOldPosterAndAcceptsMatchingPoster() {
+    /** A replacement surface shows the committed frame while the current paused seek is still in flight. */
+    @Test fun pausedSeekReattachmentDrawsCommittedPosterBeforeMatchingPoster() {
         withSurface { surface ->
             withEngine { engine ->
                 val old = bitmap()
                 adopt(engine, old)
+                render(engine)
                 val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
+                assertEquals(0L, engine.positionMs())
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
                 render(engine)
-                assertEquals(0, RecordingCanvasSurface.posts)
-                assertEquals(0L, engine.snapshot().renderedFrame)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(2L, engine.snapshot().renderedFrame)
+                assertFalse(completion.isDone)
+                assertEquals(0L, engine.positionMs())
                 val intent = engine.intent()
                 val request =
                     RawAvPausedSeekRequest(
@@ -104,16 +118,114 @@ class RawAvSeekPublicationTest {
                         completion,
                     )
                 val matching = bitmap()
-                assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching)))
+                assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching), null))
                 assertTrue(completion.isDone)
+                assertEquals(1500L, engine.positionMs())
                 render(engine)
-                assertEquals(1, RecordingCanvasSurface.posts)
-                assertEquals(1L, engine.snapshot().renderedFrame)
+                assertEquals(2, RecordingCanvasSurface.posts)
+                assertEquals(3L, engine.snapshot().renderedFrame)
                 assertTrue(old.isRecycled)
                 assertFalse(matching.isRecycled)
                 engine.close()
                 assertTrue(matching.isRecycled)
             }
+        }
+    }
+
+    @Test fun pausedSeekPreservesTheQueuedRedrawOnAReplacementSurface() {
+        withSurface { replacement ->
+            withEngine { engine ->
+                val old = bitmap()
+                adopt(engine, old)
+                render(engine)
+
+                engine.attachVideo(replacement)
+                val completion = engine.seekToAsync(1500)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(2L, engine.snapshot().renderedFrame)
+                assertFalse(old.isRecycled)
+                assertFalse(completion.isDone)
+                assertEquals(0L, engine.positionMs())
+            }
+        }
+    }
+
+    @Test fun pausingBeforeTheTargetFrameKeepsTheSeekAndLetsTheUserRetry() {
+        withSurface { surface ->
+            withEngine { engine ->
+                set(engine, "playIntent", true)
+                set(engine, "width", 2)
+                set(engine, "pausedUs", 800000L)
+                val old = bitmap()
+                adopt(engine, old)
+                render(engine)
+                val completion = engine.seekToAsync(1500)
+                val playing = engine.intent()
+                engine.seeked(playing.activation, playing.seek)
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+                assertEquals(0, RecordingCanvasSurface.posts)
+                engine.setPlaying(false)
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(2L, engine.snapshot().renderedFrame)
+
+                val request = takeQueuedPoster(engine)
+                assertTrue(request.explicit)
+                assertEquals(1500L, request.target.positionMs)
+                assertSame(completion, request.completion)
+                assertFalse(completion.isDone)
+                assertFalse(engine.snapshot().playWhenReady)
+                assertEquals(800L, engine.positionMs())
+                assertFalse(engine.posterResult(request, null, null))
+                val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
+                assertSame(refusal.cause, engine.snapshot().error)
+                val failedSeek = refusal.cause as RawPausedSeekFailure
+                assertEquals(1500L, failedSeek.positionMs)
+                assertEquals(800L, engine.positionMs())
+                assertEquals(2L, engine.snapshot().renderedFrame)
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertFalse(old.isRecycled)
+
+                val retry = engine.seekToAsync(failedSeek.positionMs) as SettableFuture<Void?>
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                val current = engine.intent()
+                val generation = RawAvGeneration(current.activation, current.seek)
+                val retryTarget = RawAvPosterTarget(generation, failedSeek.positionMs)
+                val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
+                assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap()), null))
+                assertEquals(1500L, engine.positionMs())
+                assertNull(engine.snapshot().error)
+                render(engine)
+                assertEquals(2, RecordingCanvasSurface.posts)
+                assertTrue(old.isRecycled)
+            }
+        }
+    }
+
+    @Test fun exhaustionBeforeAnyUsableVideoFrameReportsTheOriginalSeek() {
+        withEngine { engine ->
+            set(engine, "playIntent", true)
+            set(engine, "width", 2)
+            set(engine, "pausedUs", 800_000L)
+            val completion = engine.seekToAsync(1500)
+            val intent = engine.intent()
+            engine.videoExhausted(intent.activation, intent.seek - 1)
+            assertFalse(completion.isDone)
+            engine.videoExhausted(intent.activation, intent.seek)
+            val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
+            assertSame(refusal.cause, engine.snapshot().error)
+            assertEquals(1500L, (refusal.cause as RawPausedSeekFailure).positionMs)
+            assertFalse(engine.snapshot().playWhenReady)
+            assertEquals(800L, engine.positionMs())
         }
     }
 
@@ -171,24 +283,37 @@ class RawAvSeekPublicationTest {
         bitmap: Bitmap,
     ) {
         engine.javaClass
-            .getDeclaredMethod("retainFrame", Bitmap::class.java, Int::class.javaPrimitiveType)
+            .getDeclaredMethod(
+                "retainFrame",
+                Bitmap::class.java,
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+            )
             .apply { isAccessible = true }
-            .invoke(engine, bitmap, 0)
+            .invoke(engine, bitmap, 0, -1L)
     }
 
     /** Runs the production display-thread draws queued so far, including the actual RawVideoOutput sink. */
     @Suppress("UnusedParameter") // Keeps call sites naming the engine whose queued draws run.
     private fun render(engine: RawAvPlaybackEngine) = display.runAll()
 
+    /** Reads the actual request published by pause with background workers stopped. */
+    @Suppress("UNCHECKED_CAST")
+    private fun takeQueuedPoster(engine: RawAvPlaybackEngine): RawAvPausedSeekRequest {
+        val poster = checkNotNull(field(engine, "pausedPoster"))
+        val requests = field(poster, "requests") as Channel<RawAvPausedSeekRequest>
+        return requests.tryReceive().getOrThrow()
+    }
+
     /** Reads fixture ownership without opening an alternate renderer or parser path. */
     private fun field(
-        engine: RawAvPlaybackEngine,
+        owner: Any,
         name: String,
     ): Any? =
-        engine.javaClass
+        owner.javaClass
             .getDeclaredField(name)
             .apply { isAccessible = true }
-            .get(engine)
+            .get(owner)
 
     /** Seeds only the controlled control state required for this interleaving. */
     private fun set(

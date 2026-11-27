@@ -57,6 +57,19 @@ class NostrGitReaderTest {
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
     }
 
+    /** An https link a shell would expand, such as a web link with a query, can be opened but is never copied. */
+    @Test
+    fun shellUnsafeHttpsLinkCanBeOpenedButNotCopied() {
+        val unsafe = "https://example.org/parser?tab=readme,files"
+        val safe = "https://example.org/parser.git"
+        val tags = listOf(listOf("d", "parser"), listOf("clone", safe), listOf("web", unsafe))
+        setReader(event(kind = 30617, tags = tags))
+
+        composeRule.onNodeWithText(string(R.string.nostr_git_open_url, unsafe)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.nostr_git_copy_url, unsafe)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.nostr_git_copy_url, safe)).assertIsDisplayed()
+    }
+
     private fun systemClipboard(): ClipboardManager {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return context.getSystemService(ClipboardManager::class.java)

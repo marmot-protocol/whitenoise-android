@@ -428,6 +428,7 @@ class WhiteNoiseAppState private constructor(
     internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
+    internal val voiceDraftEvictions by lazy { createVoiceDraftEvictionCleanup() }
     private val dictationMicrophoneOwner = Any()
     private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
@@ -1578,6 +1579,7 @@ class WhiteNoiseAppState private constructor(
             persistenceDispatcher = appLockPersistenceDispatcher,
             appInForeground = { appInForeground },
             stopSpeaking = ::stopSpeaking,
+            onScreenShown = receivedVoiceTranscripts::clear,
             presentNotice = { present(it) },
             resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
             resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
@@ -1725,6 +1727,7 @@ class WhiteNoiseAppState private constructor(
                     override val signOutInProgress get() = this@WhiteNoiseAppState.signOutInProgress
                     override val wipeInProgress get() = this@WhiteNoiseAppState.wipeInProgress
                     override val pushWakeServiceOwned get() = pushWakeRecovery.pushWakeServiceOwned
+                    override val startupAccountListPending get() = !bootstrapCompleted && !accountListLoaded
 
                     override fun nativePushAccountRefs(): List<String> =
                         accounts
@@ -2629,6 +2632,7 @@ class WhiteNoiseAppState private constructor(
         row: ChatListRowFfi,
     ) {
         val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
+        receivedVoiceTranscripts.updateGroupMembership(accountRef, row)
         controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
     }
 
@@ -3718,6 +3722,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun restoreStartupLocalState(accounts: List<AccountSummaryFfi>) =
         StartupDiagnostics.stage(StartupDiagnosticStage.LOCAL_RESTORATION) {
             schedulePendingLocalGroupDeleteCleanup()
+            voiceDraftEvictions.resume()
             prepareStartupUnreadRefresh(accounts)
             migrateLegacyDrafts()
             migrateLegacyMutePreferences()
@@ -4919,6 +4924,7 @@ class WhiteNoiseAppState private constructor(
             .resetForAccount()
         // Revoke decrypted speech before another identity can use platform Resume.
         stopSpeaking()
+        receivedVoiceTranscripts.clear()
         diagnostics.observations.invalidate()
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch { diagnostics.activity(engine, ProductAnalyticsActivityFfi.ACCOUNT_CHANGED) }
@@ -5264,14 +5270,14 @@ class WhiteNoiseAppState private constructor(
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         receivedVoiceTranscripts.forgetAccount(wipedRef)
-        releaseCaptureOwners(wipedRef)
+        stopCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
                     notificationDelivery
-                        .wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }
+                        .wipeSettlingFcmAutoInit { wipeAccountAndPurgeVoiceDrafts(wipedRef) }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
@@ -6127,6 +6133,7 @@ class WhiteNoiseAppState private constructor(
                 dismissVisibleConversationNotifications()
             }
         } else {
+            receivedVoiceTranscripts.clear()
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
             voiceNotes.onAppBackgrounded()
@@ -6183,8 +6190,8 @@ class WhiteNoiseAppState private constructor(
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
         voiceNotes.onAppBackgrounded()
-        // The app-state lifecycle is authoritative even if the TTS foreground
-        // service has not started yet or its start was rejected.
+        receivedVoiceTranscripts.clear()
+        // The app-state lifecycle also owns speech before its foreground service starts.
         stopSpeaking()
         mutationsScope.launch { draftWriter.flush() }
     }
@@ -7082,7 +7089,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Synchronously drop the active account from the cached member snapshot for
-     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
+     * [groupIdHex] after a leave request is accepted (issue #545). The snapshot seeds the
      * next [ConversationController]'s `seededSelfMember`; without this, a stale
      * positive snapshot would still place self in the group and flash the active
      * composer when the just-left conversation is re-opened. No-op when there is

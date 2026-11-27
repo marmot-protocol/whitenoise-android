@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.audio
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceReviewRecoveryOwner
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
+import java.util.UUID
 
 /** One chat's voice-note scope; its directory name is hashed, so no account or chat id is stored in clear. */
 internal data class VoiceNoteKey(
@@ -40,6 +42,7 @@ internal sealed interface VoiceDraftRecovery {
 @Suppress("TooManyFunctions") // Keep transactions and recovery in one storage owner.
 internal class VoiceDraftStore(
     private val root: File,
+    private val evictionPending: (String) -> Boolean = { false },
 ) {
     /** The chat's private directory, named from hashes of the account and of the account and chat. */
     fun directory(key: VoiceNoteKey): File = File(accountDirectory(key.accountRef), chatName(key))
@@ -57,6 +60,7 @@ internal class VoiceDraftStore(
         durationMs: Long,
         stopReason: VoiceRecordingStopReason?,
     ): VoiceDraft? {
+        if (!canRecord(key)) return null
         val dir = recordingDirectory(key)
         if (!finishConsumption(dir)) return null
         val target = File(dir, "$TAKE_PREFIX${System.nanoTime()}.$TAKE_EXTENSION")
@@ -90,35 +94,53 @@ internal class VoiceDraftStore(
 
     /** Reads the chat's draft. An unfinished recorder file means the process died mid-take: it is deleted as lost. */
     fun recover(key: VoiceNoteKey): VoiceDraftRecovery {
+        if (!canRecord(key)) return VoiceDraftRecovery.None
         val dir = directory(key)
         val unfinished = dir.listFiles { file -> file.name.startsWith(RECORDING_PREFIX) }.orEmpty()
         unfinished.forEach { it.delete() }
-        if (File(dir, CONSUMED).exists()) {
+        return if (consumptionMarkers(dir).any(File::isFile)) {
             finishConsumption(dir)
-            return VoiceDraftRecovery.None
-        }
-        val pending = readMetadata(dir, PENDING_METADATA)
-        if (pending != null) publishPending(dir, pending) else File(dir, PENDING_METADATA).delete()
-        val draft = pending ?: readMetadata(dir)
-        return when {
-            draft != null -> VoiceDraftRecovery.Ready(draft)
-            unfinished.isNotEmpty() -> VoiceDraftRecovery.Lost
-            else -> VoiceDraftRecovery.None
+            VoiceDraftRecovery.None
+        } else {
+            val pending = readMetadata(dir, PENDING_METADATA)
+            if (pending != null) publishPending(dir, pending) else File(dir, PENDING_METADATA).delete()
+            val draft = pending ?: readMetadata(dir)
+            when {
+                draft != null -> VoiceDraftRecovery.Ready(draft)
+                unfinished.isNotEmpty() -> VoiceDraftRecovery.Lost
+                else -> VoiceDraftRecovery.None
+            }
         }
     }
 
     /** Deletes exactly [file] when it is this chat's draft, so a stale owner can never delete a newer take. */
-    @Suppress("ReturnCount") // Reject stale drafts and failed consumption before cleanup.
     fun delete(
         key: VoiceNoteKey,
         file: File,
+    ): Boolean = consume(key, file, accepted = false)
+
+    /** Commits retirement for queue admission, using the take as a marker if the ordinary marker cannot be written. */
+    fun consumeAccepted(
+        key: VoiceNoteKey,
+        file: File,
+    ): Boolean = consume(key, file, accepted = true)
+
+    /** Commits consumption of the selected take before letting cleanup touch either draft index. */
+    @Suppress("ReturnCount") // Reject stale drafts and failed consumption before cleanup.
+    private fun consume(
+        key: VoiceNoteKey,
+        file: File,
+        accepted: Boolean,
     ): Boolean {
         val dir = directory(key)
         val pending = readMetadata(dir, PENDING_METADATA)?.file
         val current = pending ?: readMetadata(dir)?.file
         if (current != file) return false
         val marker = File(dir, CONSUMED)
-        if (!runCatching { marker.createNewFile() || marker.isFile }.getOrDefault(false)) return false
+        val marked = runCatching { marker.createNewFile() || marker.isFile }.getOrDefault(false)
+        if (!marked && !(accepted && runCatching { file.renameTo(File(dir, ACCEPTED)) }.getOrDefault(false))) {
+            return false
+        }
         finishConsumption(dir)
         return true
     }
@@ -133,31 +155,61 @@ internal class VoiceDraftStore(
             .orEmpty()
             .flatMap { account ->
                 account.listFiles().orEmpty().filter { dir ->
-                    !File(dir, CONSUMED).exists() &&
+                    !dir.name.startsWith(EVICTED_PREFIX) &&
+                        !evictionPending(dir.name) &&
+                        consumptionMarkers(dir).none(File::isFile) &&
                         (File(dir, METADATA).isFile || readMetadata(dir, PENDING_METADATA) != null)
                 }
             }.mapTo(HashSet()) { it.name }
 
+    /** A confirmed removal fences the old directory until it is removed or moved out of the active path. */
+    fun canRecord(key: VoiceNoteKey): Boolean = !evictionPending(chatName(key))
+
     /** Removes the chat's whole directory, for a chat that left the account. */
-    fun purge(key: VoiceNoteKey) {
-        directory(key).deleteRecursively()
+    fun purge(key: VoiceNoteKey): Boolean {
+        val dir = directory(key)
+        return dir.deleteRecursively() && Files.notExists(dir.toPath())
+    }
+
+    /** Atomically moves an evicted directory away from the path a rejoined chat will use. */
+    fun quarantine(key: VoiceNoteKey): Boolean {
+        val dir = directory(key)
+        val retired = File(dir.parentFile, "$EVICTED_PREFIX${UUID.randomUUID()}")
+        return dir.renameTo(retired) || Files.notExists(dir.toPath())
+    }
+
+    /** Deletes only isolated directories, even when a chat now has new drafts at its original path. */
+    fun purgeQuarantined(): Boolean {
+        val accounts = root.listFiles() ?: return Files.notExists(root.toPath())
+        var complete = true
+        accounts.filter(File::isDirectory).forEach { account ->
+            val retired = account.listFiles { file -> file.name.startsWith(EVICTED_PREFIX) }
+            if (retired == null) {
+                complete = false
+            } else {
+                retired.forEach { if (!it.deleteRecursively()) complete = false }
+            }
+        }
+        return complete
     }
 
     /** Removes every draft of a signed-out or wiped account. */
-    fun purgeAccount(accountRef: String) {
-        accountDirectory(accountRef).deleteRecursively()
-    }
+    fun purgeAccount(accountRef: String): Boolean = accountDirectory(accountRef).deleteRecursively()
 
-    // The marker commits consumption before cleanup touches either index. Leave it
-    // in place if cleanup fails, so the discarded indexes cannot restore a draft.
+    /** Leaves the consumption markers in place until both indexes and any listed audio have been removed. */
     private fun finishConsumption(dir: File): Boolean {
-        val marker = File(dir, CONSUMED)
-        if (!marker.exists()) return true
+        val markers = consumptionMarkers(dir)
+        if (markers.none(File::isFile)) return markers.none(File::exists)
         val indexes = listOf(File(dir, METADATA), File(dir, PENDING_METADATA))
         val files = indexes + draftFiles(dir)
         files.forEach { it.delete() }
-        return files.none { it.exists() } && marker.delete()
+        val filesRemoved = files.none(File::exists)
+        if (filesRemoved) markers.forEach { it.delete() }
+        return filesRemoved && markers.none(File::exists)
     }
+
+    /** Both markers make this directory's current and pending draft indexes ineligible for recovery. */
+    private fun consumptionMarkers(dir: File): List<File> = listOf(File(dir, CONSUMED), File(dir, ACCEPTED))
 
     private fun draftFiles(dir: File): List<File> =
         dir
@@ -212,8 +264,10 @@ internal class VoiceDraftStore(
 
     companion object {
         private const val CONSUMED = "take.consumed"
+        private const val ACCEPTED = "take.accepted"
         private const val METADATA = "take.json"
         private const val PENDING_METADATA = "take.pending.json"
+        private const val EVICTED_PREFIX = "evicted-"
         private const val TAKE_PREFIX = "take-"
         private const val RECORDING_PREFIX = "voice-"
         private val TAKE_EXTENSION = VoiceRecorder.FILE_EXTENSION

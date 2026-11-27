@@ -45,7 +45,7 @@ class RawAvPreferredRenderTest {
                 assertEquals(owner.targetUs, it)
             })
             assertTrue(owner.ended)
-            assertEquals((351..359).map { it * 40_000L }, owner.displayed)
+            assertEquals((350..359).map { it * 40_000L }, owner.displayed)
             assertTrue("Interleaved audio must be consumed during preroll", packets.audioReads > 512)
             assertTrue(packets.maximumQueued <= 512)
             assertEquals(1, packets.crossingReads)
@@ -158,6 +158,51 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    @Test fun seekIntoAudioTailDisplaysLastDecodedVideoFrameAndPlaysRemainingAudio() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 60_000L }
+            val sink = Sink()
+            val session = session(owner, sink)
+            val frames = ArrayDeque(listOf(video(0), video(40_000L)))
+            var audioReads = 0
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    frames.removeFirstOrNull() ?: AvStreamFrame.VideoEnd
+                } else if (audioReads++ == 0) {
+                    AvStreamFrame.Audio(ByteArray(960), 8000, 1, owner.targetUs)
+                } else {
+                    AvStreamFrame.AudioEnd
+                }
+            }, { assertEquals(owner.targetUs, it) })
+            assertEquals(listOf(40_000L), owner.displayed)
+            assertEquals(960, sink.accepted)
+            assertTrue(owner.ended)
+        }
+
+    @Test fun sparseSeekPublishesTheCoveringFrameBeforeStartingTargetAudio() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 70_000L }
+            val session = session(owner, Sink())
+            val positions = mutableListOf<Long>()
+            owner.onFrame = { positions.add(session.positionUs()) }
+            val frames = ArrayDeque(listOf(video(50_000L), video(100_000L)))
+            var audioReads = 0
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    frames.removeFirstOrNull() ?: AvStreamFrame.VideoEnd
+                } else if (audioReads++ == 0) {
+                    AvStreamFrame.Audio(ByteArray(800), 8000, 1, owner.targetUs)
+                } else {
+                    AvStreamFrame.AudioEnd
+                }
+            }, { assertEquals(owner.targetUs, it) })
+
+            assertEquals(listOf(50_000L, 100_000L), owner.displayed)
+            assertEquals(owner.targetUs, positions.first())
+            assertTrue(positions.last() >= 99_000L)
+            assertTrue(owner.ended)
+        }
+
     /** Large Pcm Packet Feeds In Ten Millisecond Chunks Without Dropping Ordinary Video Frames. */
     @Test fun largePcmPacketFeedsInTenMillisecondChunksWithoutDroppingOrdinaryVideoFrames() =
         runBlocking {
@@ -180,6 +225,30 @@ class RawAvPreferredRenderTest {
             assertTrue(sink.largestWrite <= 160)
             assertEquals(1920, sink.accepted)
             assertTrue(owner.ended)
+        }
+
+    @Test fun audioReserveFollowsTheMixerWhileVideoFollowsPresentation() =
+        runBlocking {
+            val owner = Owner()
+            val sink = Sink(presentationLagUs = 80_000)
+            val session = session(owner, sink)
+            val video = ArrayDeque(listOf(video(0), video(60_000)))
+            owner.onFrame = {
+                if (owner.displayed.size == 2) {
+                    assertEquals(200_000L, sink.writtenPositionUs())
+                    assertEquals(120_000L, session.positionUs())
+                    owner.alive = false
+                }
+            }
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    video.removeFirst()
+                } else {
+                    AvStreamFrame.Audio(ByteArray(3840), 8000, 1, 0)
+                }
+            }, {})
+            assertEquals(listOf(0L, 60_000L), owner.displayed)
+            assertEquals(null, session.pause())
         }
 
     /** Real Quarter Speed Coordinator Paces Every Video Across One Large Native Pcm Block. */
@@ -306,6 +375,7 @@ class RawAvPreferredRenderTest {
         var alive = true
         var activation = 7L
         var throwAfterAdoption = false
+        var onFrame: (() -> Unit)? = null
 
         override fun intent(): RawAvPlaybackIntent {
             val attributes = AudioAttributes.Builder().build()
@@ -331,6 +401,7 @@ class RawAvPreferredRenderTest {
             seek: Long,
         ): Boolean {
             displayed += (bitmap.getPixel(0, 0) and 0x00ffffff).toLong()
+            onFrame?.invoke()
             if (throwAfterAdoption) throw IOException("Owner retained this bitmap before failure")
             bitmap.recycle()
             return true
@@ -397,7 +468,7 @@ class RawAvPreferredRenderTest {
         }
     }
 
-    private class Sink : RawPcmSink {
+    private class Sink(private val presentationLagUs: Long = 0) : RawPcmSink {
         override val sampleRate = 8000
         override val channels = 1
         var accepted = 0
@@ -429,11 +500,13 @@ class RawAvPreferredRenderTest {
             return 1000
         }
 
-        override fun positionUs() = accepted.toLong() * 1_000_000 / 16000
+        override fun positionUs() = (mixerPositionUs() - presentationLagUs).coerceAtLeast(0)
 
-        override fun writtenPositionUs() = positionUs()
+        override fun mixerPositionUs() = writtenPositionUs()
 
-        override fun bufferedPositionUs() = positionUs()
+        override fun writtenPositionUs() = accepted.toLong() * 1_000_000 / 16000
+
+        override fun bufferedPositionUs() = writtenPositionUs()
 
         override fun drained() = ended
 

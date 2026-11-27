@@ -30,6 +30,9 @@ internal class RawPcmOutput(
     private var lastHead = 0L
     private var headWrap = 0L
     private var lastHardwareFrames = 0L
+    private var lastHeadAdvanceMs = 0L
+    private var presentationLag: PresentationLag? = null
+    private var presentationRouteGeneration = 0
     private var stalledSinceMs: Long? = null
     private var position = 0L
     private var buffered = 0L
@@ -123,6 +126,9 @@ internal class RawPcmOutput(
 
     @Synchronized override fun bufferedPositionUs(): Long = buffered
 
+    @Synchronized override fun mixerPositionUs(): Long =
+        (segmentSourceUs + segment.mediaDurationUs(queue.positionUs())).coerceAtMost(written)
+
     @Synchronized override fun drained(): Boolean {
         fault?.let { throw it }
         return closed || finished
@@ -212,13 +218,15 @@ internal class RawPcmOutput(
         val terminal = segmentEnding && segment.ended && !output.hasRemaining()
         val tolerance = queue.prepareForWait(terminal)
         queue.poll()
-        val playedOutputUs = framesToUs(queue.playedOutputFrames)
-        position = maxOf(position, segmentSourceUs + segment.mediaDurationUs(playedOutputUs)).coerceAtMost(written)
-        val queuedMediaUs = segmentSourceUs + segment.mediaDurationUs(queue.writtenPositionUs())
-        buffered = maxOf(position, queuedMediaUs).coerceAtMost(written)
         val physical = physicalBase + queue.acceptedDeviceFrames
         val now = SystemClock.elapsedRealtime()
         val head = physicalBase + queue.physicalHeadFrames
+        if (head > lastHardwareFrames) lastHeadAdvanceMs = now
+        val presented = presentedOutputFrames(head, now)
+        val playedOutputUs = framesToUs(presented)
+        position = maxOf(position, segmentSourceUs + segment.mediaDurationUs(playedOutputUs)).coerceAtMost(written)
+        val queuedMediaUs = segmentSourceUs + segment.mediaDurationUs(queue.writtenPositionUs())
+        buffered = maxOf(position, queuedMediaUs).coerceAtMost(written)
         val pendingDevice = output.hasRemaining() || head < physical
         if (head > lastHardwareFrames || !pendingDevice) {
             stalledSinceMs = null
@@ -231,15 +239,51 @@ internal class RawPcmOutput(
             }
         }
         lastHardwareFrames = maxOf(lastHardwareFrames, head)
-        if (terminal && queue.mediaDrained && inputEnded) {
+        val mediaPresented = terminal && presented >= queue.outputFrames
+        if (mediaPresented && inputEnded) {
             position = written
             buffered = written
             finished = true
-        } else if (terminal && queue.fullyDrained && !inputEnded) {
+        } else if (mediaPresented && queue.fullyDrained) {
             completeRateSegment()
         }
         return tolerance
     }
+
+    /** Converts the device presentation clock to this Sonic segment, excluding device-only padding. */
+    private fun presentedOutputFrames(
+        head: Long,
+        nowMs: Long,
+    ): Long {
+        // Both Android frame counters can wrap at 32 bits. Their short difference stays signed.
+        val lag = device.presentationFrames(head)?.let { (head - it).toInt().toLong() }
+        val route = device.presentationRouteGeneration
+        if (route != presentationRouteGeneration) {
+            presentationRouteGeneration = route
+            presentationLag = null
+            lastHeadAdvanceMs = nowMs
+        }
+        val remainingLag =
+            if (lag != null && lag in -sampleRate.toLong()..sampleRate.toLong()) {
+                lag.coerceAtLeast(0L).also { presentationLag = PresentationLag(head, nowMs, it) }
+            } else {
+                val last = presentationLag
+                val stationary = last?.takeIf { it.head == head }
+                // A remaining delay measured after the head stopped only decays from that sample.
+                val referenceMs = stationary?.measuredAtMs ?: lastHeadAdvanceMs
+                val elapsedMs = (nowMs - referenceMs).coerceIn(0L, 1000L)
+                val routeLag = device.fallbackPresentationLatencyMs * sampleRate / 1000L
+                val estimate = stationary?.frames ?: maxOf(routeLag, last?.frames ?: 0L)
+                (estimate - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
+            }
+        return (head - physicalBase - remainingLag).coerceIn(0L, queue.playedOutputFrames)
+    }
+
+    private data class PresentationLag(
+        val head: Long,
+        val measuredAtMs: Long,
+        val frames: Long,
+    )
 
     /**
      * Carries source and hardware frame anchors across a drained rate change without replacing the device.
