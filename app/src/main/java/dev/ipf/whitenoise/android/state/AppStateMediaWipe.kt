@@ -137,7 +137,9 @@ internal fun WhiteNoiseAppState.scheduleDisplayAvatarAccountReconciliation(
     val active = accounts.filterNot(AccountSummaryFfi::signedOut).mapTo(mutableSetOf(), AccountSummaryFfi::label)
     mutationsScope.launch(Dispatchers.IO) {
         runCatchingCancellable {
-            displayAvatars.retainAccounts(active) { retire -> accountListLifetime.runIfCurrent(accountListToken, retire) }
+            displayAvatars.retainAccounts(active) { retire ->
+                accountListLifetime.runIfCurrent(accountListToken, retire)
+            }
         }.onFailure {
             appStateDebug { "display avatar account reconciliation failed: ${it.javaClass.simpleName}" }
         }

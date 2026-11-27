@@ -229,5 +229,11 @@ class PersistentDisplayAvatarsTest {
 
     private fun cache(): PersistentDisplayAvatars = PersistentDisplayAvatars(root, keyProvider())
 
-    private fun keyProvider(): EnvelopeCacheKeyProvider = EnvelopeCacheKeyProvider(AtomicFile(keyFile), { wrappingKey }, {}, root::deleteRecursively)
+    private fun keyProvider(): EnvelopeCacheKeyProvider =
+        EnvelopeCacheKeyProvider(
+            AtomicFile(keyFile),
+            { wrappingKey },
+            {},
+            root::deleteRecursively,
+        )
 }

@@ -106,20 +106,24 @@ internal class EnvelopeCacheKeyProvider(
                     .put(iv)
                     .put(cipher.doFinal(raw))
                     .array()
-            val out = wrapped.startWrite()
-            try {
-                out.write(envelope)
-                out.fd.sync()
-                wrapped.finishWrite(out)
-            } catch (failure: IOException) {
-                wrapped.failWrite(out)
-                throw failure
-            }
-            if (!readEnvelope().contentEquals(envelope)) throw IOException("Could not commit display avatar key")
+            commitEnvelope(envelope)
             return SecretKeySpec(raw, "AES")
         } finally {
             raw.fill(0)
         }
+    }
+
+    private fun commitEnvelope(envelope: ByteArray) {
+        val out = wrapped.startWrite()
+        try {
+            out.write(envelope)
+            out.fd.sync()
+            wrapped.finishWrite(out)
+        } catch (failure: IOException) {
+            wrapped.failWrite(out)
+            throw failure
+        }
+        if (!readEnvelope().contentEquals(envelope)) throw IOException("Could not commit display avatar key")
     }
 
     private companion object {

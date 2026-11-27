@@ -260,7 +260,7 @@ internal class PersistentDisplayAvatars(
         }
     }
 
-    /** Repairs interrupted cleanup. [runIfCurrent] guards generation changes without holding the roster lock for I/O. */
+    /** Repairs interrupted cleanup. [runIfCurrent] guards generation changes, and I/O uses the cache lock. */
     fun retainAccounts(
         accountRefs: Set<String>,
         runIfCurrent: (() -> Unit) -> Boolean,
