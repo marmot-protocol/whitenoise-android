@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,9 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -37,8 +33,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.common.ProtectDialogInput
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -92,10 +86,14 @@ internal fun DeviceLinkRequestHost(
     SideEffect { watcher.blocked = blocked }
     LaunchedEffect(watcher, appState.activeAccountRef) { watcher.reoffer() }
     var devicesOpen by remember(appState.activeAccountRef, runtimeGeneration) { mutableStateOf(false) }
-    var reporting by remember(watcher) { mutableStateOf(false) }
+    val reporting = remember(watcher) { mutableStateOf(false) }
     if (devicesOpen && !blocked) DeviceLinkDevicesWindow(appState, onClose = { devicesOpen = false })
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
     val request = watcher.queue.presented ?: return
+    val showDevices = {
+        watcher.close()
+        devicesOpen = true
+    }
     DeviceLinkRequestPresentation(
         watcher = watcher,
         request = request,
@@ -116,29 +114,11 @@ internal fun DeviceLinkRequestHost(
                 watcher = watcher,
                 request = request,
                 draft = draft,
-                reporting = { reporting },
+                reporting = { reporting.value },
                 onReport = {
-                    if (!reporting) {
-                        reporting = true
-                        appState.launchMutation {
-                            try {
-                                if (reportLinkRequest(appState, watcher, request, runtimeGeneration)) {
-                                    val current = watcher.queue.presented
-                                    if (current == null || current.id == request.id) {
-                                        watcher.close()
-                                        devicesOpen = true
-                                    }
-                                }
-                            } finally {
-                                reporting = false
-                            }
-                        }
-                    }
+                    launchLinkReport(appState, watcher, request, runtimeGeneration, reporting, showDevices)
                 },
-                onReviewDevices = {
-                    watcher.close()
-                    devicesOpen = true
-                },
+                onReviewDevices = showDevices,
             )
         }
     }
@@ -258,105 +238,41 @@ private fun ActiveProfileLinkRequest(
         watcher.reread(request.accountRef)
     }
     val failureMessage = rememberLinkFailureMessage(controller)
-    val shownAt = rememberShownUptime()
 
-    fun ownsRequest(): Boolean =
-        !watcher.blocked &&
+    fun canRespond(): Boolean =
+        !reporting() &&
+            !watcher.blocked &&
             watcher.queue.presented?.id == request.id &&
             appState.activeAccountRef == request.accountRef &&
             appState.runtimeGeneration == runtimeGeneration
     val reportCurrent: () -> Unit = {
-        if (ownsRequest() && !reporting() && controller.running == null) onReport()
+        if (canRespond() && controller.running == null) onReport()
     }
-    Dialog(
-        onDismissRequest = watcher::close,
-        properties =
-            DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-                securePolicy = SecureFlagPolicy.SecureOn,
-            ),
-    ) {
-        ProtectDialogInput()
-        Box(Modifier.ignoringTouchesBefore(shownAt)) {
-            val approval: @Composable (() -> Boolean) -> Unit = { canApprove ->
-                DeviceLinkRequestContent(
-                    state = prompt.state,
-                    running = controller.running,
-                    onLink = { choices ->
-                        scope.launch {
-                            if (!canApprove() || reporting()) return@launch
-                            beforeCommand = watcher.snapshots[request.accountRef]
-                            controller.link(request.promptId, choices)
-                        }
-                    },
-                    onDecline = {
-                        beforeCommand = watcher.snapshots[request.accountRef]
-                        scope.launch {
-                            if (ownsRequest() && !reporting()) controller.decline(request.promptId)
-                        }
-                    },
-                    onClose = watcher::close,
-                    failureMessage = failureMessage,
-                    draft = draft,
-                    repeated = request.repeated,
-                    onReviewDevices = onReviewDevices,
-                    onReport = reportCurrent,
-                )
-            }
-            if (request.repeated) {
-                approval { false }
-            } else {
-                val account = appState.accounts.firstOrNull { it.label == request.accountRef }
-                val accountId = account?.accountIdHex
-                DeviceLinkConsentGate(
-                    prompt = prompt,
-                    profile =
-                        DeviceLinkConsentProfile(
-                            appState.profileName(request.accountRef),
-                            accountId ?: request.accountRef,
-                            accountId?.let(appState::avatarUrl),
-                        ),
-                    stillCurrent = {
-                        ownsRequest() &&
-                            !reporting() &&
-                            watcher.queue.presented?.repeated == false &&
-                            watcher.presentedPrompt?.state == prompt.state
-                    },
-                    onClose = watcher::close,
-                    onReport = reportCurrent,
-                    content = approval,
-                )
-            }
-        }
+    DeviceLinkConsentDialog(appState, watcher, request, prompt, ::canRespond, reportCurrent) { canApprove ->
+        DeviceLinkRequestContent(
+            state = prompt.state,
+            running = controller.running,
+            onLink = { choices ->
+                scope.launch {
+                    if (!canApprove()) return@launch
+                    beforeCommand = watcher.snapshots[request.accountRef]
+                    controller.link(request.promptId, choices)
+                }
+            },
+            onDecline = {
+                beforeCommand = watcher.snapshots[request.accountRef]
+                scope.launch {
+                    if (canRespond()) controller.decline(request.promptId)
+                }
+            },
+            onClose = watcher::close,
+            failureMessage = failureMessage,
+            draft = draft,
+            repeated = request.repeated,
+            onReviewDevices = onReviewDevices,
+            onReport = reportCurrent,
+        )
     }
-}
-
-/**
- * Declines the exact native prompt. MDK needs a prompt-scoped Reject action before Android can safely record
- * which sign-in was unrecognized, so send the user to Devices for that separate review (MDK #3684).
- */
-private suspend fun reportLinkRequest(
-    appState: WhiteNoiseAppState,
-    watcher: DeviceLinkRequestWatcher,
-    request: DeviceLinkRequest,
-    generation: Int,
-): Boolean {
-    fun ownsAccount() = appState.activeAccountRef == request.accountRef && appState.runtimeGeneration == generation
-    if (!ownsAccount() || watcher.blocked || watcher.queue.presented?.id != request.id) return false
-    val previous = watcher.snapshots[request.accountRef]
-    val result =
-        runCatchingCancellable { appState.marmotIo { declineDeviceLink(request.accountRef, request.promptId) } }
-    if (!ownsAccount() || watcher.blocked) return false
-    result.fold(
-        onSuccess = { snapshot ->
-            watcher.accept(request.accountRef, snapshot, beforeCommand = previous)
-            appState.present(R.string.link_consent_report_failed)
-        },
-        onFailure = { appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it) },
-    )
-    if (result.isSuccess) watcher.reread(request.accountRef)
-    return result.isSuccess && ownsAccount() && !watcher.blocked
 }
 
 /**

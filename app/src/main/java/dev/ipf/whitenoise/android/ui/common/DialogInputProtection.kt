@@ -40,19 +40,20 @@ private class ObscuredTouchGuard(
         if (isDown) blocked = false
         if (blocked) return true
         val obscuredFlags = MotionEvent.FLAG_WINDOW_IS_OBSCURED or MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED
-        if (event.flags and obscuredFlags == 0) {
-            return delegate.dispatchTouchEvent(event)
-        }
-        blocked = true
-        if (!isDown) {
-            val cancel = MotionEvent.obtain(event)
-            try {
-                cancel.action = MotionEvent.ACTION_CANCEL
-                delegate.dispatchTouchEvent(cancel)
-            } finally {
-                cancel.recycle()
+        return if (event.flags and obscuredFlags == 0) {
+            delegate.dispatchTouchEvent(event)
+        } else {
+            blocked = true
+            if (!isDown) {
+                val cancel = MotionEvent.obtain(event)
+                try {
+                    cancel.action = MotionEvent.ACTION_CANCEL
+                    delegate.dispatchTouchEvent(cancel)
+                } finally {
+                    cancel.recycle()
+                }
             }
+            true
         }
-        return true
     }
 }

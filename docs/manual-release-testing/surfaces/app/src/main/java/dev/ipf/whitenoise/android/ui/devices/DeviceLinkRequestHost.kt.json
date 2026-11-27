@@ -106,14 +106,6 @@
         "test_ids": [
           "SET-061"
         ]
-      },
-      {
-        "surface": "Device linking consent: R.string.link_consent_report_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
-        "anchor": "R.string.link_consent_report_failed",
-        "test_ids": [
-          "SET-078"
-        ]
       }
     ],
     "settings_controls": [

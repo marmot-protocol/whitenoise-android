@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.os.CancellationSignal
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +33,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -39,7 +44,13 @@ import dev.ipf.marmotkit.DeviceLinkPromptFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.DeviceLinkRequest
+import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.ProtectDialogInput
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
@@ -61,6 +72,55 @@ internal data class DeviceLinkConsentProfile(
     val seed: String,
     val avatarUrl: String?,
 )
+
+@Suppress("LongParameterList")
+@Composable
+internal fun DeviceLinkConsentDialog(
+    appState: WhiteNoiseAppState,
+    watcher: DeviceLinkRequestWatcher,
+    request: DeviceLinkRequest,
+    prompt: DeviceLinkPromptFfi,
+    canRespond: () -> Boolean,
+    onReport: () -> Unit,
+    content: @Composable (canApprove: () -> Boolean) -> Unit,
+) {
+    val shownAt = rememberShownUptime()
+    Dialog(
+        onDismissRequest = watcher::close,
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+                securePolicy = SecureFlagPolicy.SecureOn,
+            ),
+    ) {
+        ProtectDialogInput()
+        Box(Modifier.ignoringTouchesBefore(shownAt)) {
+            if (request.repeated) {
+                content { false }
+            } else {
+                val accountId = appState.accounts.firstOrNull { it.label == request.accountRef }?.accountIdHex
+                DeviceLinkConsentGate(
+                    prompt = prompt,
+                    profile =
+                        DeviceLinkConsentProfile(
+                            appState.profileName(request.accountRef),
+                            accountId ?: request.accountRef,
+                            accountId?.let(appState::avatarUrl),
+                        ),
+                    stillCurrent = {
+                        canRespond() &&
+                            watcher.queue.presented?.repeated == false &&
+                            watcher.presentedPrompt?.state == prompt.state
+                    },
+                    onClose = watcher::close,
+                    onReport = onReport,
+                    content = content,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 internal fun DeviceLinkConsentGate(
@@ -84,17 +144,7 @@ internal fun DeviceLinkConsentGate(
     var verified by remember(prompt.promptId, comparing.code) { mutableStateOf(false) }
     var error by remember(prompt.promptId, comparing.code) { mutableStateOf<Int?>(null) }
     val audio = context.getSystemService(AudioManager::class.java)
-    var call by remember(prompt.promptId) { mutableStateOf(linkCallWarning(audio)) }
-    LaunchedEffect(audio, lifecycle, verified, prompt.promptId) {
-        if (!verified) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                while (isActive) {
-                    call = linkCallWarning(audio, call)
-                    delay(CALL_MODE_CHECK_MS)
-                }
-            }
-        }
-    }
+    var call by rememberLinkCallWarning(audio, lifecycle, verified, prompt.promptId)
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
         device.cancel()
         verified = false
@@ -130,6 +180,80 @@ internal fun DeviceLinkConsentGate(
             onClose = onClose,
             onReport = onReport,
         )
+    }
+}
+
+@Composable
+private fun rememberLinkCallWarning(
+    audio: AudioManager?,
+    lifecycle: Lifecycle,
+    verified: Boolean,
+    promptId: String,
+): MutableState<LinkCallWarning> {
+    val call = remember(promptId) { mutableStateOf(linkCallWarning(audio)) }
+    LaunchedEffect(audio, lifecycle, verified, promptId) {
+        if (!verified) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    call.value = linkCallWarning(audio, call.value)
+                    delay(CALL_MODE_CHECK_MS)
+                }
+            }
+        }
+    }
+    return call
+}
+
+/** Keeps a report in flight across dialog recreation and opens Devices only for the same request. */
+internal fun launchLinkReport(
+    appState: WhiteNoiseAppState,
+    watcher: DeviceLinkRequestWatcher,
+    request: DeviceLinkRequest,
+    generation: Int,
+    reporting: MutableState<Boolean>,
+    onReviewed: () -> Unit,
+) {
+    if (reporting.value) return
+    reporting.value = true
+    appState.launchMutation {
+        try {
+            if (reportLinkRequest(appState, watcher, request, generation)) {
+                val current = watcher.queue.presented
+                if (current == null || current.id == request.id) onReviewed()
+            }
+        } finally {
+            reporting.value = false
+        }
+    }
+}
+
+/**
+ * Declines the exact native prompt. MDK needs a prompt-scoped Reject action before Android can safely record
+ * which sign-in was unrecognized, so send the user to Devices for that separate review (MDK #3684).
+ */
+private suspend fun reportLinkRequest(
+    appState: WhiteNoiseAppState,
+    watcher: DeviceLinkRequestWatcher,
+    request: DeviceLinkRequest,
+    generation: Int,
+): Boolean {
+    fun ownsAccount() = appState.activeAccountRef == request.accountRef && appState.runtimeGeneration == generation
+    if (!ownsAccount() || watcher.blocked || watcher.queue.presented?.id != request.id) return false
+    val previous = watcher.snapshots[request.accountRef]
+    val result =
+        runCatchingCancellable { appState.marmotIo { declineDeviceLink(request.accountRef, request.promptId) } }
+    return if (ownsAccount() && !watcher.blocked) {
+        result.fold(
+            onSuccess = { snapshot ->
+                watcher.accept(request.accountRef, snapshot, beforeCommand = previous)
+                appState.present(R.string.link_consent_report_failed)
+            },
+            onFailure = { appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it) },
+        )
+        if (result.isSuccess) watcher.reread(request.accountRef)
+        result.isSuccess && ownsAccount() && !watcher.blocked
+    } else {
+        false
     }
 }
 
