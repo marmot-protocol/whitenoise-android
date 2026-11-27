@@ -17,6 +17,7 @@ private const val KIND_GIT_SERVICES = 10_317
 internal const val KIND_GIT_COMMENT = 1_111
 private const val MAX_GIT_REFS = 8
 private const val MAX_GIT_LINKS = 8
+private const val MAX_GIT_LINK_CANDIDATES = 32
 private const val MAX_GIT_LINK_LENGTH = 512
 private const val GIT_ROOT_MARKER_INDEX = 3
 private const val GIT_COORDINATE_PARTS = 3
@@ -126,14 +127,18 @@ internal fun NostrEvent.gitCardLinks(): List<String> {
         }
     val byTag =
         tagsByPriority.map { name ->
+            // Only a tag's first values are considered, so a crafted event with thousands of them costs no more.
             tags
+                .asSequence()
                 .filter { it.firstOrNull() == name }
-                .flatMap { it.drop(1) }
+                .flatMap { it.asSequence().drop(1) }
+                .take(MAX_GIT_LINK_CANDIDATES)
                 .filter { it.length <= MAX_GIT_LINK_LENGTH && it == it.safeReaderBody() }
                 .filter { isCopyableCloneAddress(it) && (isShellSafeGitLink(it) || it.isHttpsLink()) }
                 .distinct()
                 // Copyable addresses lead their tag, so open-only mirrors cannot push a usable one out.
                 .sortedBy { !isShellSafeGitLink(it) }
+                .toList()
         }
     val first = byTag.first()
     val ordered = first.take(MAX_GIT_LINKS - 1) + byTag.drop(1).flatten() + first.drop(MAX_GIT_LINKS - 1)

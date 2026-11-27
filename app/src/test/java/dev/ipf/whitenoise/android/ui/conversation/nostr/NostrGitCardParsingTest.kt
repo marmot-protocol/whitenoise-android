@@ -64,6 +64,17 @@ class NostrGitCardParsingTest {
         assertEquals(ssh, links.first())
     }
 
+    /** Only the first 32 values of a tag are considered, so a crafted list of thousands costs a fixed amount. */
+    @Test
+    fun onlyTheFirstValuesOfATagAreConsidered() {
+        val invalid = (1..32).map { "javascript:alert($it)" }
+        val late = "https://example.org/late.git"
+        val links = event(kind = 30617, tags = listOf(listOf("clone") + invalid + late)).toCardModel().gitLinks
+        assertEquals(emptyList<String>(), links)
+        val early = event(kind = 30617, tags = listOf(listOf("clone") + invalid.drop(1) + late)).toCardModel()
+        assertEquals(listOf(late), early.gitLinks)
+    }
+
     /** A whitespace-only separator line ends the headers, so the first paragraph is the summary. */
     @Test
     fun whitespaceOnlySeparatorKeepsTheFirstParagraph() {
