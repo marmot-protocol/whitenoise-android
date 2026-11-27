@@ -2444,7 +2444,8 @@ internal fun ChatsScreen(
                     val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
                     val unreadRefreshPending = unreadOnly && completeUnreadSnapshot == null
                     val failedUnreadSnapshot = unreadOnly && unreadReadFailed
-                    val activeEmptyPageScroll = emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot }
+                    val activeEmptyPageScroll =
+                        emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
