@@ -59,9 +59,13 @@ grep -Fq '.github/scripts/update-pr-preview-links.js' "$workflow"
 grep -Fq 'stable app identity; keeps app data when switching PRs' .github/scripts/update-pr-preview-links.js
 grep -Fq 'github.event.repository.default_branch' "$workflow"
 reject 'github.event.workflow_run.repository.default_branch' "$workflow"
-# workflow_run.head_sha may gate pull_request runs, but must not override the
-# candidate-provenance HEAD_SHA in the description step used by manual backfills.
-grep -Fq 'WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}' "$workflow"
+# Only the master builder's manual dispatch reaches the preview signing key; a
+# modified builder on another branch runs that branch's copy and must be refused.
+grep -Fq "github.event.workflow_run.event == 'workflow_dispatch' &&" "$workflow"
+grep -Fq "github.event.workflow_run.head_branch == 'master' &&" "$workflow"
+grep -Fq "github.event.workflow_run.path == '.github/workflows/android-pr-apk.yml' &&" "$workflow"
+reject "github.event.workflow_run.event == 'pull_request'" "$workflow"
+# The description step used by manual backfills keeps the validated candidate HEAD_SHA.
 if grep -Eq '^[[:space:]]+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}$' "$workflow"; then
   printf 'Description step must use the validated candidate HEAD_SHA.\n' >&2
   exit 1
