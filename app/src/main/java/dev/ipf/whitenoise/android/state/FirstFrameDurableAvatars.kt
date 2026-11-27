@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
@@ -9,10 +10,15 @@ import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Matches the chat list's first-frame avatar seed window, so every seeded row can find decoded pixels. */
 internal const val FIRST_FRAME_DURABLE_AVATAR_ROWS = 24
+
+// Matches MarmotKit's per-call local read limit.
+private const val DURABLE_AVATAR_BATCH_ITEMS = 16
 
 /**
  * The longest a restored or switched-to chat list waits for local avatar decodes. MDK already holds the
@@ -119,11 +125,32 @@ private suspend fun WhiteNoiseAppState.decodeDurableAvatarsWithinBudget(
     accountRef: String,
 ) {
     if (selections.isEmpty()) return
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val misses =
+        selections.mapNotNull { (asset, domain) ->
+            val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
+            if (AvatarImageLoader.cachedImage(key) == null) Triple(key, asset, domain) else null
+        }
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
-            selections
-                .map { (asset, domain) ->
-                    async { durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true) }
+            misses
+                .chunked(DURABLE_AVATAR_BATCH_ITEMS)
+                .flatMap { batch ->
+                    val refs = batch.mapNotNull { (_, asset, _) -> asset.reference }.distinct()
+                    val readLock = Mutex()
+                    var loaded: Map<String, AvatarBytesFfi>? = null
+                    batch.map { (key, asset, domain) ->
+                        async {
+                            AvatarImageLoader.loadStored(key, lifetime, domain, abandonable = true) {
+                                // Read inside the existing decode lane so an abandoned batch does no IO.
+                                val payloads =
+                                    readLock.withLock {
+                                        loaded ?: readDurableAvatarBatch(accountRef, refs).also { loaded = it }
+                                    }
+                                payloads[asset.reference]?.takeIf { it.matchesAvatarAsset(asset) }?.bytes
+                            }
+                        }
+                    }
                 }.awaitAll()
         }
     }
@@ -192,3 +219,12 @@ internal fun AccountSwitchLocalSnapshot.installFirstFrameDurableAvatars() {
         AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource, it.animationClassification)
     }
 }
+
+/** Reads a bounded list of stored references in one native call. The consumer checks each selection's revision. */
+internal suspend fun WhiteNoiseAppState.readDurableAvatarBatch(
+    account: String,
+    references: List<String>,
+): Map<String, AvatarBytesFfi> =
+    runCatchingCancellable {
+        marmotIo { readAvatarAssets(account, references, DURABLE_AVATAR_MAX_BYTES) }
+    }.getOrNull().orEmpty().associateBy { it.reference }

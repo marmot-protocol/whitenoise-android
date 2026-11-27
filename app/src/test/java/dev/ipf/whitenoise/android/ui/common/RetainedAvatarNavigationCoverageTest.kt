@@ -133,7 +133,15 @@ class RetainedAvatarNavigationCoverageTest {
         rule.setContent {
             owner = rememberRetainedGroupAvatarPreparation(state, account, surface)
             SideEffect { ownerCommits++ }
-            ObserveRetainedAvatarPixels(owner) { shown = it.images.values.singleOrNull() }
+            ObserveRetainedAvatarPixels(owner) { pixels ->
+                val image =
+                    assets
+                        .take(2)
+                        .mapNotNull { asset ->
+                            pixels.imageFor(asset, checkNotNull(asset.cacheKey(ACCOUNT)))
+                        }.singleOrNull()
+                SideEffect { shown = image }
+            }
         }
         rule.waitForIdle()
         val initialCommits = ownerCommits
@@ -182,7 +190,7 @@ class RetainedAvatarNavigationCoverageTest {
                 .nearby
                 .map { checkNotNull(assets[it].cacheKey(ACCOUNT)) }
                 .toSet()
-        assertEquals(expected, owner.pixels.images.keys)
+        assertEquals(expected, retainedKeys(assets))
         rule.runOnIdle { mounted = false }
         rule.waitForIdle()
         evictDecodedPixels()
@@ -197,7 +205,7 @@ class RetainedAvatarNavigationCoverageTest {
         assertEquals(
             "empty layout must not replace the scrolled window with top rows",
             expected,
-            owner.pixels.images.keys,
+            retainedKeys(assets),
         )
     }
 
@@ -213,13 +221,13 @@ class RetainedAvatarNavigationCoverageTest {
 
         assertEquals(
             (rows.subList(16, 32) + rows.subList(40, 56)).map { it.cacheKey(ACCOUNT) }.toSet(),
-            owner.pixels.images.keys,
+            retainedKeys(rows),
         )
 
         select(rows.subList(56, 72), rows = rows)
         assertEquals(
             rows.subList(40, 72).map { it.cacheKey(ACCOUNT) }.toSet(),
-            owner.pixels.images.keys,
+            retainedKeys(rows),
         )
     }
 
@@ -253,12 +261,12 @@ class RetainedAvatarNavigationCoverageTest {
                 retiredPixels(assets.first(), image)
             }
             rule.waitForIdle()
-            assertTrue("a retired account callback cannot select pixels for $next", owner.pixels.images.isEmpty())
+            assertTrue("a retired account callback cannot select pixels for $next", retainedKeys(assets).isEmpty())
         }
         select(assets.take(1))
         rule.runOnIdle { surface++ }
         rule.waitForIdle()
-        assertTrue("a replacement list starts without the old list's pins", owner.pixels.images.isEmpty())
+        assertTrue("a replacement list starts without the old list's pins", retainedKeys(assets).isEmpty())
     }
 
     /** Runtime teardown and explicit cache clear retire pins even when the account label remains the same. */
@@ -275,19 +283,18 @@ class RetainedAvatarNavigationCoverageTest {
         rule.waitForIdle()
         rule.runOnIdle { updateViewport(retired, assets.take(1), assets) }
         rule.waitForIdle()
-        assertTrue(owner.pixels.images.isEmpty())
+        assertTrue(retainedKeys(assets).isEmpty())
         seed(assets.take(1))
         select(assets.take(1))
         assertSame(
             image,
-            owner.pixels.images.values
-                .single(),
+            owner.pixels.imageFor(assets.first(), checkNotNull(assets.first().cacheKey(ACCOUNT))),
         )
 
         rule.runOnIdle { AvatarImageLoader.clearStoredAvatars() }
         rule.waitForIdle()
 
-        assertTrue(owner.pixels.images.isEmpty())
+        assertTrue(retainedKeys(assets).isEmpty())
     }
 
     /** Changes the runtime owner without also changing the account label. */
@@ -421,6 +428,13 @@ class RetainedAvatarNavigationCoverageTest {
         )
     }
 
+    private fun retainedKeys(rows: List<AvatarAssetFfi>): Set<String> =
+        rows
+            .mapNotNull { asset ->
+                val key = checkNotNull(asset.cacheKey(ACCOUNT))
+                key.takeIf { owner.pixels.imageFor(asset, key) != null }
+            }.toSet()
+
     /** Warms validated synthetic assets without native reads or network acquisition. */
     private fun seed(selected: List<AvatarAssetFfi>) {
         selected.forEach { AvatarImageLoader.putCached(checkNotNull(it.cacheKey(ACCOUNT)), image) }
@@ -452,8 +466,7 @@ class RetainedAvatarNavigationCoverageTest {
 @Suppress("FunctionNaming")
 private fun ObserveRetainedAvatarPixels(
     owner: RetainedGroupAvatarPreparation,
-    onCommit: (PreparedGroupAvatarPixels) -> Unit,
+    content: @Composable (PreparedGroupAvatarPixels) -> Unit,
 ) {
-    val pixels = owner.pixels
-    SideEffect { onCommit(pixels) }
+    content(owner.pixels)
 }
