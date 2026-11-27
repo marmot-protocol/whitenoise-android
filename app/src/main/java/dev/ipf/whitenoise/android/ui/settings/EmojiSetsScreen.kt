@@ -274,14 +274,15 @@ private fun EmojiSetQuery(
 internal fun EmojiSetStatus(
     state: EmojiSetsState,
     syncing: Boolean = false,
+    showProgress: Boolean = true,
 ) {
     val progress = state.progress
-    if (progress != null && progress.totalEmoji > 0u) {
+    if (showProgress && progress != null && progress.totalEmoji > 0u) {
         LinearProgressIndicator(
             progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )
-    } else if (state.busy || syncing) {
+    } else if (showProgress && (state.busy || syncing)) {
         LinearProgressIndicator(
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )

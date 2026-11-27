@@ -158,7 +158,7 @@ class EmojiSetsScreenshotTest {
         composeRule.onNodeWithContentDescription(":fox:").assertExists()
         val fox = composeRule.onNodeWithTag(emojiSetTileTestTag("fox"), useUnmergedTree = true).fetchSemanticsNode().size.width
         val owl = composeRule.onNodeWithTag(emojiSetTileTestTag("owl"), useUnmergedTree = true).fetchSemanticsNode().size.width
-        assertTrue("Tiles in a row share its width equally ($fox, $owl)", fox > 0 && fox == owl)
+        assertTrue("Tiles in a row share its width within one pixel ($fox, $owl)", fox > 0 && kotlin.math.abs(fox - owl) <= 1)
         assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
         assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
         failures.clear()

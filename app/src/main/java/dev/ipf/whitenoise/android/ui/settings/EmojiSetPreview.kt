@@ -120,7 +120,9 @@ internal fun EmojiSetPreview(
                 }
             }
             item(key = "set.actions") { EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate) }
-            item(key = "set.status") { EmojiSetStatus(state) }
+            if (state.progress == null || state.notice != null || state.installedWithSkips != null) {
+                item(key = "set.status") { EmojiSetStatus(state, showProgress = state.progress == null) }
+            }
             if (images?.requested == true) {
                 rows.forEachIndexed { index, row ->
                     item(key = "set.row.$index") { EmojiSetTileRow(row, columns, images, pulse) }
