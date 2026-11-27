@@ -28,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 class WelcomeScreenScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Initial full-screen mark and outlined/filled actions. */
+    /** First-run mark, promise and outlined/filled actions. */
     @Test fun welcomeLight() = render("welcome_light")
 
     /** Dark theme mark tint. */
@@ -91,6 +91,14 @@ class WelcomeScreenScreenshotTest {
 
     /** Form wrapping at 200% with the optional signer action. */
     @Test fun signInRtlLargeText() = render("sign_in_rtl_200", signIn = true, amber = true, rtl = true, scale = 2f)
+
+    /** First-run promise at 200% text and RTL scrolls above the pinned actions instead of clipping. */
+    @Test fun welcomeFirstRunRtlLargeText() = render("welcome_rtl_200", rtl = true, scale = 2f)
+
+    /** First-run promise in a short landscape window. */
+    @Config(qualifiers = "en-rUS-w780dp-h360dp-mdpi")
+    @Test
+    fun welcomeLandscape() = render("welcome_landscape")
 
     private fun render(
         name: String,
