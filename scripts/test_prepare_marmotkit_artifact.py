@@ -4,29 +4,32 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import io
 import json
 import os
 import stat
 import struct
+import subprocess
 import tempfile
 import unittest
 import warnings
 import zipfile
 from argparse import Namespace
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
 
-SCRIPT = Path(__file__).with_name("prepare_marmotkit_artifact.py")
-SPEC = importlib.util.spec_from_file_location("prepare_marmotkit_artifact", SCRIPT)
-assert SPEC and SPEC.loader
-PREPARE = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(PREPARE)
+if __package__:
+    from . import prepare_marmotkit_artifact as PREPARE, sync_marmotkit_rc as SYNC
+else:
+    import prepare_marmotkit_artifact as PREPARE
+    import sync_marmotkit_rc as SYNC
 
 SOURCE_SHA = "3fc4eb83974eb64ecb298856b0db70cc3055af57"
 ROOT = "marmotkit-android-0.9.12"
+RC_META_COMMIT = "c" * 40
+RC_META_URL = f"{SYNC.MDK_RAW_URL}/{RC_META_COMMIT}/rc/latest.json"
 
 
 def fake_elf(
@@ -158,7 +161,9 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         manifest_bytes: bytes | None = None,
         elf_metadata_value: dict[str, object] | None = None,
         load_alignment_overrides: dict[str, int] | None = None,
+        archive_root: str = ROOT,
     ) -> None:
+        """Build a synthetic Android archive with independently adjustable validation inputs."""
         omitted = omitted or set()
         load_alignment_overrides = load_alignment_overrides or {}
         entries: dict[str, bytes] = {
@@ -214,17 +219,17 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         with zipfile.ZipFile(self.archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
             for relative, data in entries.items():
                 if relative not in omitted:
-                    output.writestr(f"{ROOT}/{relative}", data)
+                    output.writestr(f"{archive_root}/{relative}", data)
             if extra:
-                output.writestr(f"{ROOT}/{extra}", b"unexpected")
+                output.writestr(f"{archive_root}/{extra}", b"unexpected")
             if duplicate:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", UserWarning)
-                    output.writestr(f"{ROOT}/{duplicate}", entries[duplicate])
+                    output.writestr(f"{archive_root}/{duplicate}", entries[duplicate])
             if raw_entry:
                 output.writestr(raw_entry, b"unsafe")
             if symlink_entry:
-                info = zipfile.ZipInfo(f"{ROOT}/{symlink_entry}")
+                info = zipfile.ZipInfo(f"{archive_root}/{symlink_entry}")
                 info.external_attr = (stat.S_IFLNK | 0o777) << 16
                 output.writestr(info, b"target")
 
@@ -703,6 +708,118 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
             encoding="utf-8",
         )
         self.assert_rejected("unsupported artifact manifest schema")
+
+    def rc_publication(self, *, sidecar_digest: str | None = None) -> dict[str, bytes]:
+        """Create a published RC and an isolated checkout using an older Stable pin."""
+        version = "0.10.0-rc.2"
+        tag = f"marmotkit-v{version}"
+        bundle_root = f"marmotkit-android-{version}"
+        manifest_value = {**manifest(), "tag": tag, "version": version, "workspace_version": "0.10.0-dev"}
+        self.write_archive(manifest_value=manifest_value, archive_root=bundle_root)
+        bundle_sha = PREPARE.sha256(self.archive)
+        bundle_name = f"{bundle_root}.zip"
+        sidecar = f"{sidecar_digest or bundle_sha}  {bundle_name}\n".encode()
+        payloads = {bundle_name: self.archive.read_bytes(), f"{bundle_name}.sha256": sidecar}
+        assets = [
+            {
+                "name": name,
+                "url": f"{SYNC.MDK_URL}/releases/download/{tag}/{name}",
+                "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+            for name, data in payloads.items()
+        ]
+        metadata = {
+            "schema": 2, "channel": "rc", "version": version, "base_version": "0.10.0",
+            "source_sha": SOURCE_SHA, "impact": "minor",
+            "workflow_run": f"{SYNC.MDK_URL}/actions/runs/42",
+            "tracks": {"marmotkit": {"tag": tag, "assets": assets}},
+        }
+        self.lock = self.root / SYNC.LOCK_PATH
+        self.lock.parent.mkdir(parents=True)
+        self.write_lock(checksum="f" * 64)
+        commands = (
+            ["init", "-b", "master"],
+            ["add", str(SYNC.LOCK_PATH)],
+            ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
+             "commit", "--no-gpg-sign", "-m", "Stable pin"],
+            ["update-ref", "refs/remotes/origin/develop", "HEAD"],
+            ["switch", "-c", "rc-test"],
+        )
+        for command in commands:
+            subprocess.run(["git", *command], cwd=self.root, check=True, capture_output=True)
+        return {
+            SYNC.RC_META_REF_URL: json.dumps({"sha": RC_META_COMMIT}).encode(),
+            RC_META_URL: json.dumps(metadata).encode(),
+            **{asset["url"]: payloads[asset["name"]] for asset in assets},
+        }
+
+    def run_rc_sync(self, payloads: dict[str, bytes], *args: str) -> tuple[int, str]:
+        """Run the actual command in the fixture, substituting only published bytes."""
+        output = io.StringIO()
+
+        def download(url: str, destination: Path) -> None:
+            """Serve the three published fixture files by URL."""
+            destination.write_bytes(payloads[url])
+
+        with (
+            mock.patch.object(SYNC, "ROOT", self.root),
+            mock.patch.object(PREPARE, "download", side_effect=download),
+            mock.patch("sys.argv", ["sync_marmotkit_rc.py", *args]),
+            redirect_stdout(output),
+            redirect_stderr(output),
+        ):
+            result = SYNC.main()
+        return result, output.getvalue()
+
+    def test_rc_sync_previews_and_requires_exact_feature_confirmation_before_apply(self) -> None:
+        """A reviewed RC replaces one lock and repeating the command skips the artifacts."""
+        payloads = self.rc_publication()
+        before = self.lock.read_bytes()
+        code, output = self.run_rc_sync(payloads)
+        self.assertEqual(code, 0, output)
+        self.assertIn("+artifact-id=0.10.0-rc.2", output)
+        self.assertIn(f"/blob/{RC_META_COMMIT}/rc/signature_delta.json", output)
+        self.assertEqual(self.lock.read_bytes(), before)
+
+        metadata_only = {url: payloads[url] for url in (SYNC.RC_META_REF_URL, RC_META_URL)}
+        code, output = self.run_rc_sync(
+            metadata_only, "--apply", "0.10.0-rc.1", "--verified-features"
+        )
+        self.assertEqual(code, 1, output)
+        self.assertIn("preview that RC before applying", output)
+        self.assertEqual(self.lock.read_bytes(), before)
+
+        code, output = self.run_rc_sync(payloads, "--apply", "0.10.0-rc.2")
+        self.assertEqual(code, 1, output)
+        self.assertIn("verify builder evidence", output)
+        self.assertEqual(self.lock.read_bytes(), before)
+
+        code, output = self.run_rc_sync(payloads, "--apply", "0.10.0-rc.2", "--verified-features")
+        self.assertEqual(code, 0, output)
+        pin = PREPARE.parse_properties(self.lock)
+        self.assertEqual(pin["artifact-id"], "0.10.0-rc.2")
+        self.assertEqual(pin["artifact-sha256"], PREPARE.sha256(self.archive))
+        self.assertEqual(pin["workspace-version"], "0.10.0-dev")
+        self.assertEqual(pin["api-helper-declaration-count"], "5")
+        code, output = self.run_rc_sync(metadata_only, "--apply", "0.10.0-rc.2")
+        self.assertEqual(code, 0, output)
+        self.assertIn("coordinates already match rc-meta", output)
+
+    def test_rc_sync_rejects_disagreeing_checksums_and_master(self) -> None:
+        """A contradictory sibling checksum or production checkout leaves the pin intact."""
+        payloads = self.rc_publication(sidecar_digest="a" * 64)
+        before = self.lock.read_bytes()
+        code, output = self.run_rc_sync(payloads, "--apply", "0.10.0-rc.2")
+        self.assertEqual(code, 1, output)
+        self.assertIn("checksum disagrees with rc-meta", output)
+        self.assertEqual(self.lock.read_bytes(), before)
+
+        subprocess.run(["git", "switch", "master"], cwd=self.root, check=True, capture_output=True)
+        code, output = self.run_rc_sync({}, "--apply", "0.10.0-rc.2")
+        self.assertEqual(code, 1, output)
+        self.assertIn("run on develop or a branch based on it", output)
+        self.assertEqual(self.lock.read_bytes(), before)
 
 
 if __name__ == "__main__":
