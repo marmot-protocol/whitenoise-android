@@ -148,8 +148,14 @@ class LocalNotificationPresenter(
         includeUnscopedLegacy: Boolean,
         knownGroupIds: Collection<String> = emptySet(),
     ) {
-        knownGroupIds.forEach { groupIdHex -> retirement.dismissConversationMessages(accountRef, groupIdHex, Dispatchers.IO) }
-        conversationShortcuts.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy, knownGroupIds)
+        knownGroupIds.forEach { groupIdHex ->
+            retirement.dismissConversationMessages(accountRef, groupIdHex, Dispatchers.IO)
+        }
+        conversationShortcuts.clearRevokedConversationShortcutsForAccount(
+            accountRef,
+            includeUnscopedLegacy,
+            knownGroupIds,
+        )
         groupReconciliation()
     }
 
