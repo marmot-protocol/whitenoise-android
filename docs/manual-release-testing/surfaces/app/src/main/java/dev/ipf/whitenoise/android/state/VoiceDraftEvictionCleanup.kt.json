@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A still-evicted chat retries a failed voice draft purge across restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "voiceDraftEvictions.stage(key)",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

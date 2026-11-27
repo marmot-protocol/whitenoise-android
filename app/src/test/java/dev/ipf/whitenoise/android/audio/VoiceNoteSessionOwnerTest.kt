@@ -161,7 +161,7 @@ class VoiceNoteSessionOwnerTest {
             fixture.owner.bind(chat) { true }
             assertEquals(draft, fixture.owner.draft(chat))
 
-            fixture.owner.consumeAfterSend(chat, draft.file)
+            assertTrue(fixture.owner.consumeForQueue(chat, draft.file))
 
             assertNull(fixture.owner.draft(chat))
             assertEquals(VoiceDraftRecovery.None, VoiceDraftStore(folder.root).recover(chat))
@@ -169,31 +169,33 @@ class VoiceNoteSessionOwnerTest {
             fixture.release()
         }
 
-    /** An accepted take stays hidden and keeps its cleanup identity while the draft directory is read-only. */
+    /** A read-only draft refuses queue admission and remains reviewable by a fresh process. */
     @Test
-    fun acceptedSendRetriesAfterStorageRecovers() =
+    fun blockedQueueAdmissionKeepsTheTakeAfterRestart() =
         runTest {
             val fixture = Fixture(this)
             val store = VoiceDraftStore(folder.root)
             val directory = store.recordingDirectory(chat)
             val recording = directory.resolve("voice-accepted.m4a").apply { writeText("audio") }
             val draft = checkNotNull(store.commit(chat, recording, 2_000L, stopReason = null))
-            val recorder = fixture.owner.bind(chat) { true }
+            fixture.owner.bind(chat) { true }
             assertTrue(directory.setWritable(false))
             try {
-                fixture.owner.consumeAfterSend(chat, draft.file)
-                assertNull(fixture.owner.draft(chat))
-                assertEquals(VoiceNoteActivity.None, fixture.owner.activity(chat))
+                assertFalse(fixture.owner.consumeForQueue(chat, draft.file))
+                assertEquals(draft, fixture.owner.draft(chat))
                 assertTrue(draft.file.isFile)
-                fixture.owner.unbind(chat, recorder)
             } finally {
                 assertTrue(directory.setWritable(true))
             }
 
-            fixture.owner.bind(chat) { true }
+            val restarted = Fixture(this)
+            restarted.owner.bind(chat) { true }
 
+            assertEquals(draft, restarted.owner.draft(chat))
+            assertTrue(restarted.owner.consumeForQueue(chat, draft.file))
             assertEquals(VoiceDraftRecovery.None, VoiceDraftStore(folder.root).recover(chat))
             assertFalse(draft.file.exists())
+            restarted.release()
             fixture.release()
         }
 

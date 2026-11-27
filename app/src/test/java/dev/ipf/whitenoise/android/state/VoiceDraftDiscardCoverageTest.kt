@@ -13,7 +13,7 @@ class VoiceDraftDiscardCoverageTest {
     fun removedChatsReleaseBothCaptureOwners() {
         val owner = source("state/AppStateCaptureOwners.kt", "releaseCaptureTarget")
         assertTrue("conversationDictation.onTargetRemoved(account, groupIdHex)" in owner)
-        assertTrue("voiceNotes.onTargetRemoved(account, groupIdHex)" in owner)
+        assertTrue("voiceNotes.onTargetRemoved(account, groupIdHex, beforePurge)" in owner)
         assertTrue(
             "releaseCaptureTarget(accountRef, groupIdHex)" in
                 source("state/AppState.kt", "removeActiveAccountFromGroupMemberSnapshot"),
@@ -23,7 +23,7 @@ class VoiceDraftDiscardCoverageTest {
                 source("state/GroupLocalRemoval.kt", "finishLocalGroupDeleteCleanup"),
         )
         assertTrue(
-            "appState.releaseCaptureTarget(account, group.groupIdHex)" in
+            "appState.releaseEvictedCaptureTarget(account, group.groupIdHex)" in
                 source("state/ConversationControllerRoster.kt", "markActiveAccountRemovedFromMembers"),
         )
     }
@@ -34,9 +34,9 @@ class VoiceDraftDiscardCoverageTest {
         val projection = "state/ChatsControllerProjection.kt"
         assertTrue("appState.releaseEvictedCapture(" in source(projection, "foldGroup"))
         assertTrue("appState.releaseEvictedCapture(" in source(projection, "installGroupRecordSnapshot"))
-        val eviction = source("state/AppStateCaptureOwners.kt", "releaseEvictedCapture")
+        val eviction = source("state/VoiceDraftEvictionCleanup.kt", "releaseEvictedCapture")
         assertTrue("current.selfMembership.isGroupEviction()" in eviction)
-        assertTrue("releaseCaptureTarget(account, current.groupIdHex)" in eviction)
+        assertTrue("releaseEvictedCaptureTarget(account, current.groupIdHex)" in eviction)
     }
 
     /** The process event handler reads native state for groups whose profile has no chat subscription. */
@@ -44,7 +44,7 @@ class VoiceDraftDiscardCoverageTest {
     fun runtimeGroupEventsReachTheProcessCaptureOwner() {
         val events = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt")
         assertTrue("checkCaptureEvictionOnRuntimeEvent(event, marmot, scope = this)" in events)
-        val capture = source("state/AppStateCaptureOwners.kt", "checkCaptureEvictionOnRuntimeEvent")
+        val capture = source("state/VoiceDraftEvictionCleanup.kt", "checkCaptureEvictionOnRuntimeEvent")
         assertTrue("scope.launch(Dispatchers.Main.immediate)" in capture)
         assertTrue("reconcileCaptureEviction(key, runtime)" in capture)
     }
@@ -54,6 +54,7 @@ class VoiceDraftDiscardCoverageTest {
     fun userDiscardAndRecordAgainUseTheSameDurableGate() {
         val composer = source("ui/conversation/ConversationVoiceCapture.kt", "rememberConversationVoiceCapture")
         assertTrue("deleteFile = { file -> owner.consume(key, file) }" in composer)
+        assertTrue("retireDraft = { owner.consumeForQueue(key, file) }" in composer)
         val review = "ui/conversation/composer/VoiceRecordingReview.kt"
         val discard = source(review, "discardByUser")
         val commit = discard.indexOf("commitDiscard(expected)")
@@ -70,7 +71,9 @@ class VoiceDraftDiscardCoverageTest {
         assertTrue("stop capture before wiping", stop in 0 until wipe.indexOf("wipeAccountAndPurgeVoiceDrafts"))
         val wipeDrafts = source("state/AppStateCaptureOwners.kt", "wipeAccountAndPurgeVoiceDrafts")
         assertTrue("signOutAndWipe(account)" in wipeDrafts)
-        assertTrue("if (outcome.localCleanup.completed) voiceNotes.purgeAccountDrafts(account)" in wipeDrafts)
+        assertTrue("if (outcome.localCleanup.completed) purgeCaptureDrafts(account)" in wipeDrafts)
+        val accountDrafts = source("state/AppStateCaptureOwners.kt", "purgeCaptureDrafts")
+        assertTrue("voiceNotes.purgeAccountDrafts(account)" in accountDrafts)
     }
 
     /** Reads one named production block and fails if the source or function cannot be resolved. */

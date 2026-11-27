@@ -48,7 +48,7 @@
       {
         "surface": "Wipe cleanup retains voice drafts until the native account removal is confirmed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
-        "anchor": "if (outcome.localCleanup.completed) voiceNotes.purgeAccountDrafts(account)",
+        "anchor": "if (outcome.localCleanup.completed) purgeCaptureDrafts(account)",
         "test_ids": [
           "ACC-014"
         ]
@@ -56,15 +56,7 @@
       {
         "surface": "Confirmed chat removal stops capture and purges its draft",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
-        "anchor": "return voiceNotes.onTargetRemoved(account, groupIdHex)",
-        "test_ids": [
-          "MED-061"
-        ]
-      },
-      {
-        "surface": "A still-evicted chat retries a failed voice draft purge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
-        "anchor": "voiceNotes.hasPendingTargetPurge",
+        "anchor": "voiceNotes.onTargetRemoved(account, groupIdHex, beforePurge)",
         "test_ids": [
           "MED-061"
         ]

@@ -36,10 +36,8 @@ internal class VoiceNoteSessionOwner(
 ) {
     private val controllers = mutableStateMapOf<VoiceNoteKey, VoiceRecordingController>()
     private val drafts = mutableStateMapOf<VoiceNoteKey, VoiceDraft>()
-    private val acceptedDrafts = mutableStateMapOf<VoiceNoteKey, File>()
     private val lost = mutableStateListOf<VoiceNoteKey>()
     private val recovered = mutableSetOf<VoiceNoteKey>()
-    private val pendingTargetPurges = mutableSetOf<VoiceNoteKey>()
     private val permissionRequests = mutableMapOf<VoiceNoteKey, () -> Boolean>()
     private var persisted: Set<String>? = null
     private var foregroundRequest: Pair<VoiceNoteKey, String>? = null
@@ -54,7 +52,6 @@ internal class VoiceNoteSessionOwner(
         key: VoiceNoteKey,
         onPermissionRequest: () -> Boolean,
     ): VoiceRecordingController {
-        retryAcceptedCleanup(key)
         permissionRequests[key] = onPermissionRequest
         if (recovered.add(key) && key !in controllers) recover(key)
         return controllers.getOrPut(key) { newController(key, hooks(key)) }
@@ -82,7 +79,7 @@ internal class VoiceNoteSessionOwner(
     }
 
     /** The chat's finished, unsent take, if one is waiting. */
-    fun draft(key: VoiceNoteKey): VoiceDraft? = drafts[key]?.takeUnless { it.file == acceptedDrafts[key] }
+    fun draft(key: VoiceNoteKey): VoiceDraft? = drafts[key]
 
     fun takeImmediateSend(
         key: VoiceNoteKey,
@@ -114,15 +111,11 @@ internal class VoiceNoteSessionOwner(
         }
     }
 
-    /** Whether eviction readback could close capture, clear a take, or finish a failed purge. */
-    fun needsTargetCleanup(key: VoiceNoteKey): Boolean {
-        if (hasPendingTargetPurge(key) || key in acceptedDrafts) return true
+    /** Whether eviction readback could close capture or clear a saved take for the exact chat. */
+    fun hasCaptureOrDraft(key: VoiceNoteKey): Boolean {
         val recorder = controllers[key]
         return recorder?.isFinalizing == true || activity(key) != VoiceNoteActivity.None
     }
-
-    /** A still-evicted chat needs another purge even after its draft has been hidden. */
-    fun hasPendingTargetPurge(key: VoiceNoteKey): Boolean = key in pendingTargetPurges
 
     /** Commits Discard for exactly [file] before clearing its presentation. */
     fun consume(
@@ -131,27 +124,17 @@ internal class VoiceNoteSessionOwner(
     ): Boolean {
         if (!store.delete(key, file)) return false
         if (drafts[key]?.file == file) drafts.remove(key)
-        if (acceptedDrafts[key] == file) acceptedDrafts.remove(key)
         return true
     }
 
-    /** Retires only the accepted take, hiding it and retaining its identity if storage still refuses cleanup. */
-    fun consumeAfterSend(
+    /** The queue can take ownership only after the exact draft can no longer be recovered as unsent. */
+    fun consumeForQueue(
         key: VoiceNoteKey,
         file: File,
-    ) {
-        if (drafts[key]?.file != file) return
-        if (store.consumeAccepted(key, file)) {
-            acceptedDrafts.remove(key)
-            drafts.remove(key)
-        } else {
-            acceptedDrafts[key] = file
-        }
-    }
-
-    /** Tries a failed accepted-send cleanup again before opening the composer or replacing the take. */
-    private fun retryAcceptedCleanup(key: VoiceNoteKey) {
-        acceptedDrafts[key]?.let { consumeAfterSend(key, it) }
+    ): Boolean {
+        if (drafts[key]?.file != file || !store.consumeAccepted(key, file)) return false
+        drafts.remove(key)
+        return true
     }
 
     /** The chat explained an automatic stop; it is not shown again. */
@@ -166,30 +149,27 @@ internal class VoiceNoteSessionOwner(
     }
 
     /** Deletes only this account's saved takes after it has been removed. */
-    fun purgeAccountDrafts(accountRef: String) {
+    fun purgeAccountDrafts(accountRef: String): Boolean {
         drafts.keys.removeAll { it.accountRef == accountRef }
-        acceptedDrafts.keys.removeAll { it.accountRef == accountRef }
-        pendingTargetPurges.removeAll { it.accountRef == accountRef }
         lost.removeAll { it.accountRef == accountRef }
-        store.purgeAccount(accountRef)
         persisted = null
+        return store.purgeAccount(accountRef)
     }
 
-    /** The account left this chat: stop its recording and delete its draft. */
+    /** Revokes capture immediately and lets confirmed eviction journal its work before deleting files. */
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,
+        beforePurge: () -> Unit = {},
     ): Boolean {
         val key = VoiceNoteKey(accountRef, groupIdHex)
         forget(key)
         drafts.remove(key)
-        acceptedDrafts.remove(key)
         lost.remove(key)
         recovered.add(key)
         persisted = null
-        val purged = store.purge(key)
-        if (purged) pendingTargetPurges.remove(key) else pendingTargetPurges.add(key)
-        return purged
+        beforePurge()
+        return store.purge(key)
     }
 
     fun foregroundRecorder(token: String): VoiceRecordingController? {
@@ -253,13 +233,11 @@ internal class VoiceNoteSessionOwner(
         durationMs: Long,
         sendImmediately: Boolean = false,
     ) {
-        retryAcceptedCleanup(key)
         val draft = store.commit(key, file, durationMs, stopReason = null)
         if (draft == null) {
             file.delete()
             presentError(VoiceRecordingSaveException())
         } else {
-            acceptedDrafts.remove(key)
             if (sendImmediately && key in permissionRequests) sendOnArrival[key] = draft.file
             drafts[key] = draft
         }

@@ -113,7 +113,7 @@ internal class VoiceDraftStore(
         file: File,
     ): Boolean = consume(key, file, accepted = false)
 
-    /** Retires a queued take, using its audio as the marker if creating the discard marker fails. */
+    /** Commits retirement for queue admission, using the take as a marker if the ordinary marker cannot be written. */
     fun consumeAccepted(
         key: VoiceNoteKey,
         file: File,
@@ -158,9 +158,7 @@ internal class VoiceDraftStore(
     fun purge(key: VoiceNoteKey): Boolean = directory(key).deleteRecursively()
 
     /** Removes every draft of a signed-out or wiped account. */
-    fun purgeAccount(accountRef: String) {
-        accountDirectory(accountRef).deleteRecursively()
-    }
+    fun purgeAccount(accountRef: String): Boolean = accountDirectory(accountRef).deleteRecursively()
 
     /** Leaves the consumption markers in place until both indexes and any listed audio have been removed. */
     private fun finishConsumption(dir: File): Boolean {

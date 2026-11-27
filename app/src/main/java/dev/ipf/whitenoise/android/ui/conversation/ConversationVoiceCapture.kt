@@ -77,14 +77,20 @@ internal fun rememberConversationVoiceCapture(
                 scope = scope,
                 ownerIsCurrent = ownerIsCurrent,
                 send = { file, duration, canSend, onQueued ->
-                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
+                    mediaSender.sendVoiceAttachment(
+                        file,
+                        duration,
+                        canSend,
+                        retireDraft = { owner.consumeForQueue(key, file) },
+                        onQueued = onQueued,
+                    )
                 },
                 onSendFailure = { appState.present(R.string.send_failed) },
                 onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
                 deleteFile = { file -> owner.consume(key, file) },
                 onSendInterrupted = { appState.present(R.string.voice_send_interrupted) },
                 onDiscardFailure = { appState.present(R.string.toast_draft_save_failed) },
-                onAcceptedFile = { file -> owner.consumeAfterSend(key, file) },
+                onAcceptedFile = {}, // The queue commits the draft before it publishes the optimistic row.
             )
         }
     DisposableEffect(voiceReview) {
