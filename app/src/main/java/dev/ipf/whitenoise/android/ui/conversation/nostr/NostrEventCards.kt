@@ -413,9 +413,10 @@ private fun LoadedEventHeader(
     }
 }
 
-private fun NostrEventCardModel.previewMetadata(): List<String> =
+/** The card's metadata line: a repository named by both its context and its coordinate appears once. */
+internal fun NostrEventCardModel.previewMetadata(): List<String> =
     when (kind) {
-        NostrEventCardKind.Git -> metadata.mapNotNull(::gitPreviewField).take(2)
+        NostrEventCardKind.Git -> metadata.mapNotNull(::gitPreviewField).distinct().take(2)
         NostrEventCardKind.Video -> metadata.filter { it.matches(PREVIEW_DURATION) }.take(1)
         NostrEventCardKind.Release,
         NostrEventCardKind.File,
