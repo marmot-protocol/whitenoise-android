@@ -310,7 +310,8 @@ internal fun ConversationController.applyGroupState(incoming: AppGroupRecordFfi)
         membersVerified = false
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
     }
-    if (group.selfMembership.isNonMember()) recordSelfLeft()
+    // The reconciled presentation can still show provisional LEFT while a cancellation awaits a roster read.
+    if (group.selfMembership.isNonMember()) recordSelfLeft(settledDeparture = update.hasSettledDeparture())
     if (previousRetention != update.disappearingMessageSecs) {
         publishTimelineFromIndexes()
     }

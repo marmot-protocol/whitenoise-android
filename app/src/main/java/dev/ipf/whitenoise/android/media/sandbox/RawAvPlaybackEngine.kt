@@ -131,6 +131,7 @@ internal class RawAvPlaybackEngine(
             it.observation = observation
         }
 
+    /** Samples playback diagnostics only while an observer is attached. */
     fun observeAudio() {
         observation?.let(renderer::observeAudio)
     }
@@ -177,6 +178,7 @@ internal class RawAvPlaybackEngine(
             )
         }
 
+    /** Reports the committed position under the engine lock. */
     fun positionMs(): Long = synchronized(lock) { positionUsLocked() / 1000 }
 
     /** Requires this instance to remain registered in its original account epoch. */
@@ -321,6 +323,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /** Publishes readiness and completes the current preparation request. */
     private fun finishPreparation(completion: SettableFuture<Void?>) {
         headerReady = true
         status = if (playIntent) Status.Buffering else Status.Ready
@@ -566,6 +569,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /** Commits the seek when the matching output has been adopted. */
     private fun completePlayingSeek() {
         pendingSeek?.let {
             pausedUs = targetUs

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+/** Holds one bounded PCM write until the audio device accepts its frames and any preceding gap. */
 internal class RawAvPendingPcm(
     val frame: AvStreamFrame.Audio,
     var offset: Int,
@@ -11,6 +12,7 @@ internal class RawAvPendingPcm(
     val initialOffset = offset
 }
 
+/** Tracks decoded output owned by one render pass, including the frames around its seek target. */
 internal class RawAvRenderProgress(
     var targetUs: Long,
     var videoEnded: Boolean,
@@ -39,11 +41,13 @@ internal class RawAvRenderProgress(
         followingVideo = frame.takeIf { covering != null }
     }
 
+    /** Promotes the following frame after the covering frame is presented. */
     fun advanceVideo() {
         video = followingVideo
         followingVideo = null
     }
 
+    /** Releases every owned bitmap when the render pass advances to a new seek or ends. */
     fun clearVideo() {
         video?.bitmap?.recycle()
         followingVideo?.bitmap?.recycle()
@@ -52,5 +56,6 @@ internal class RawAvRenderProgress(
         replacePreroll(null)
     }
 
+    /** Transfers ownership of the retained covering frame to the caller. */
     fun takePreroll(): AvStreamFrame.Video? = preroll.also { preroll = null }
 }

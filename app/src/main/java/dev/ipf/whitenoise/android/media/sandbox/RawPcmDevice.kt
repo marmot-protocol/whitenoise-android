@@ -138,6 +138,7 @@ internal class AndroidRawPcmDevice(
     /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     override fun headPosition(): Int = track.playbackHeadPosition
 
+    /** Uses the device timestamp for the current route and restarts sampling when the route changes. */
     override fun presentationFrames(mixerHead: Long): Long? {
         if (routeChanged.getAndSet(false)) {
             presentationRouteGeneration++
@@ -147,6 +148,7 @@ internal class AndroidRawPcmDevice(
         return presentationClock.frames(System.nanoTime(), underruns, mixerHead)
     }
 
+    /** Reads the current hardware timestamp and resolves route information on demand. */
     private fun readTimestamp(timestamp: AudioTimestamp): Boolean {
         if (routeType == null) routeType = runCatching { track.routedDevice?.type }.getOrNull()
         return track.getTimestamp(timestamp)
@@ -207,6 +209,7 @@ internal class RawPcmPresentationClock(
     private var minimumTimestampNs = Long.MIN_VALUE
     private var underrunMixerHead: Long? = null
 
+    /** Extrapolates from the last advancing sample once it clears any active underrun fence. */
     fun frames(
         nowNs: Long,
         underruns: Int,
@@ -227,6 +230,7 @@ internal class RawPcmPresentationClock(
         }
     }
 
+    /** Rejects idle timestamps, including fresh wall-clock samples whose frame counter did not advance. */
     private fun sample(nowNs: Long) {
         val previousFrame = timestamp.framePosition
         val previousTime = timestamp.nanoTime

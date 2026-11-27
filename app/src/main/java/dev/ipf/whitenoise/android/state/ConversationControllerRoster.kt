@@ -241,12 +241,11 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
 }
 
-/** Latches authoritative departure, even when a removed device leaves its account on the roster. */
-internal fun ConversationController.recordSelfLeft() {
-    val wasLeft = selfMembership.selfLeft
+/** Latches the roster's read-only state and revokes transcript scopes when the departure settles. */
+internal fun ConversationController.recordSelfLeft(settledDeparture: Boolean = true) {
     selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
-    if (!wasLeft) {
-        boundAccountRef?.let { appState.receivedVoiceTranscripts.forgetGroup(it, group.groupIdHex) }
+    if (settledDeparture) {
+        boundAccountRef?.let { appState.receivedVoiceTranscripts.updateGroupMembership(it, group.groupIdHex, departed = true) }
     }
 }
 
@@ -314,7 +313,7 @@ private fun ConversationController.applyResolvedGroupRoster(
     // read-only and the roster line below drops self — no longer relying
     // solely on the UseAfterEviction string-match round-trip.
     if (group.selfMembership.isNonMember()) {
-        recordSelfLeft()
+        recordSelfLeft(settledDeparture = applied.group.hasSettledDeparture())
     }
     // Once a self-leave has been recorded locally, refuse to re-add self
     // from a details round-trip that still predates the engine eviction —

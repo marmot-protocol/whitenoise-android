@@ -912,7 +912,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
 }
 
 /** Return the next bounded audio/video result while retaining the global EOF contract for legacy any-track reads. */
-jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
+jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int64_t videoEndAfterUs) {
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
     check(wantVideo || wantAudio, "output_track_required");
@@ -942,15 +942,17 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
         // Read ahead compressed packets until each active track has one decoded
         // frame. MP4 chunk order cannot cause video to block discovery of audio.
         if (videoReady && audioReady) {
+            const int64_t videoPts = s.video.hasFrame ? timestamp(s, s.video, s.video.frame) : INT64_MAX;
             if (s.video.hasFrame || s.audio.hasFrame) {
-                const int64_t videoPts = s.video.hasFrame ? timestamp(s, s.video, s.video.frame) : INT64_MAX;
                 const int64_t audioPts = s.audio.hasFrame ? timestamp(s, s.audio, s.audio.frame) : INT64_MAX;
                 auto padding = playbackPadding(env, s, audioOut, std::min(videoPts, audioPts));
                 if (padding) return padding;
             }
             const bool chooseVideo = s.video.hasFrame &&
-                (!s.audio.hasFrame || timestamp(s, s.video, s.video.frame) <= timestamp(s, s.audio, s.audio.frame));
+                (!s.audio.hasFrame || videoPts <= timestamp(s, s.audio, s.audio.frame));
             if (chooseVideo) {
+                // A paused probe already has the covering pixels in videoOut.
+                if (!wantAudio && videoPts > videoEndAfterUs) return longs(env, {0, 0, 0, 0, 0, 0, 0});
                 auto result = video(env, s, videoOut, s.video.frame);
                 s.video.hasFrame = false;
                 av_frame_unref(s.video.frame);
@@ -1092,9 +1094,9 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo(JNIEn
 /** Serialize one any-track read and translate worker failures before returning a JNI payload. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead(
-    JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut) {
+    JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut, jlong videoEndAfterUs) {
     std::lock_guard<std::mutex> guard(sessionMutex);
-    try { return read(env, session(handle), videoOut, audioOut); }
+    try { return read(env, session(handle), videoOut, audioOut, videoEndAfterUs); }
     catch (const MalformedContainerRead&) { return longs(env, {-1}); }
     catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }

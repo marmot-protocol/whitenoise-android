@@ -57,13 +57,16 @@ internal class ReceivedVoiceTranscripts(
         putVoiceTranscriptEntry(shown, shownOrder, key, value, capacity)
     }
 
+    /** The account epoch invalidates scopes made before this account's cache was cleared. */
     fun accountEpoch(account: String): Int = accountEpochs[account] ?: 0
 
+    /** The group epoch invalidates scopes made before this account's chat was removed. */
     fun groupEpoch(
         account: String,
         group: String,
     ): Int = groupEpochs["$account|$group|"] ?: 0
 
+    /** Clears this account's results and visibility choices while leaving other accounts' scopes valid. */
     fun forgetAccount(account: String) {
         accountEpochs[account] = accountEpoch(account) + 1
         val prefix = "$account|"
@@ -86,6 +89,7 @@ internal class ReceivedVoiceTranscripts(
         }
     }
 
+    /** Revokes this chat's active scopes and removes its results and visibility choices. */
     fun forgetGroup(
         account: String,
         group: String,
@@ -95,6 +99,7 @@ internal class ReceivedVoiceTranscripts(
         forgetPrefix(prefix)
     }
 
+    /** Revokes every scope and clears received transcripts when the app leaves the foreground. */
     fun clear() {
         generation++
         groupEpochs.clear()
@@ -155,6 +160,7 @@ internal class VoiceTranscriptionScope(
                 recognitionAllowed()
         }
 
+    /** Resolves the user's visibility choice or uses the automatic preference while the scope is active. */
     fun shown(messageIdHex: String): Boolean {
         if (!active) return false
         return transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
@@ -166,6 +172,7 @@ internal class VoiceTranscriptionScope(
         return transcripts.shownOverride(messageKey(messageIdHex)) == true
     }
 
+    /** Updates visibility only within the captured account, chat and foreground generation. */
     fun setShown(
         messageIdHex: String,
         value: Boolean,
@@ -173,11 +180,13 @@ internal class VoiceTranscriptionScope(
         if (active) transcripts.setShown(messageKey(messageIdHex), value)
     }
 
+    /** Reads a cached result only while this scope still owns the attachment. */
     fun result(attachmentKey: String): AudioTranscriptUi? {
         if (!active) return null
         return transcripts.result(attachmentKey(attachmentKey))
     }
 
+    /** Drops late recognition results when this scope has been revoked. */
     fun storeResult(
         attachmentKey: String,
         value: AudioTranscriptUi,

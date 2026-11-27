@@ -106,6 +106,33 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Paused probes show the frame already covering an interior gap, an exact frame or the video tail. */
+    @Test
+    fun pausedProbeReturnsPixelsThatCoverTheSeekTarget() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        withFixture("sparse-color-h264.mp4") { source ->
+            val uri = android.net.Uri.fromFile(source)
+            for ((positionMs, coveringGreen) in listOf(7_000L to true, 10_000L to false, 12_000L to false)) {
+                val probe = IsolatedMediaDecoder.probeUriAt(context.contentResolver, uri, positionMs, edge = 64)
+                val poster = requireNotNull(probe?.poster) { "Missing poster at ${positionMs}ms" }
+                try {
+                    val pixel = poster.getPixel(32, 24)
+                    assertTrue("Unexpected color at ${positionMs}ms", Color.red(pixel) < 50)
+                    assertTrue(
+                        "Wrong frame at ${positionMs}ms",
+                        if (coveringGreen) {
+                            Color.green(pixel) > 200 && Color.blue(pixel) < 50
+                        } else {
+                            Color.blue(pixel) > 200 && Color.green(pixel) < 50
+                        },
+                    )
+                } finally {
+                    poster.recycle()
+                }
+            }
+        }
+    }
+
     private fun assertVideoTimestamp(
         stream: IsolatedAvStream,
         expectedUs: Long,

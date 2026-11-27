@@ -35,6 +35,7 @@ internal fun ChatsController.installGroupRecordsSnapshot(records: Map<String, Ap
     groupRecordsById.values.forEach { syncVoiceTranscriptionMembership(it) }
 }
 
+/** Updates the account-wide transcript scope even when this group is outside the visible chat list. */
 private fun ChatsController.syncVoiceTranscriptionMembership(record: AppGroupRecordFfi) {
     val account = accountRef ?: return
     val departed = record.endsVoiceTranscription()
