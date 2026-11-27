@@ -97,14 +97,12 @@ class AccountKeysExportDeliveryTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun rawExportShowsScreenLockRequirementInTheDialog() {
         val fixture = renderWithoutScreenLock()
-        beginExport(encrypted = false)
-        assertScreenLockNoticeInDialog()
+        openExportDialog(encrypted = false)
+        assertScreenLockNoticeInDialog(R.string.keep_your_private_key_safe, R.string.export_nsec)
         dialogButton(R.string.cancel).performClick()
 
-        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
-        composeRule.onNodeWithText(context.getString(R.string.toast_app_lock_screen_lock_required)).assertDoesNotExist()
-        dialogButton(R.string.share).performClick()
-        assertScreenLockNoticeInDialog()
+        openExportDialog(encrypted = false)
+        assertScreenLockNoticeInDialog(R.string.keep_your_private_key_safe, R.string.share)
         assertEquals(0, fixture.native.rawCalls.get())
         assertEquals(0, fixture.picker.launchCount)
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_raw_screen_lock.png")
@@ -114,12 +112,12 @@ class AccountKeysExportDeliveryTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun encryptedExportShowsScreenLockRequirementInTheDialog() {
         val fixture = renderWithoutScreenLock()
-        beginExport(encrypted = true)
-        assertScreenLockNoticeInDialog()
+        openExportDialog(encrypted = true)
+        assertScreenLockNoticeInDialog(R.string.encrypted_private_key, R.string.export)
         dialogButton(R.string.cancel).performClick()
 
-        beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
-        assertScreenLockNoticeInDialog()
+        openExportDialog(encrypted = true)
+        assertScreenLockNoticeInDialog(R.string.encrypted_private_key, R.string.key_export_view_backup)
         assertEquals(0, fixture.native.encryptedCalls.get())
         assertEquals(0, fixture.picker.launchCount)
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/profile_keys_backup_screen_lock.png")
@@ -132,13 +130,25 @@ class AccountKeysExportDeliveryTest {
         return render(authenticator = null)
     }
 
-    private fun assertScreenLockNoticeInDialog() {
-        composeRule
-            .onNode(
-                hasText(context.getString(R.string.toast_app_lock_screen_lock_required)) and hasAnyAncestor(isDialog()),
+    private fun assertScreenLockNoticeInDialog(
+        titleRes: Int,
+        actionRes: Int,
+    ) {
+        val title = context.getString(titleRes)
+        val notice = context.getString(R.string.toast_app_lock_screen_lock_required)
+        val region =
+            composeRule.onNode(
+                SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite) and
+                    hasAnyAncestor(isDialog()),
                 useUnmergedTree = true,
-            ).assertIsDisplayed()
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            )
+        region.assertIsDisplayed().assert(hasText(title))
+        val regionId = region.fetchSemanticsNode().id
+
+        dialogButton(actionRes).performClick()
+
+        region.assertIsDisplayed().assert(hasText("$title\n$notice"))
+        assertEquals(regionId, region.fetchSemanticsNode().id)
     }
 
     /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
@@ -725,6 +735,11 @@ class AccountKeysExportDeliveryTest {
         encrypted: Boolean,
         encryptedAction: Int = R.string.export,
     ) {
+        openExportDialog(encrypted)
+        dialogButton(if (encrypted) encryptedAction else R.string.export_nsec).performClick()
+    }
+
+    private fun openExportDialog(encrypted: Boolean) {
         if (encrypted) {
             composeRule
                 .onNodeWithText(context.getString(R.string.export_encrypted_private_key))
@@ -732,10 +747,8 @@ class AccountKeysExportDeliveryTest {
                 .performClick()
             composeRule.onNodeWithTag("profile_keys.export_password").performTextInput(PASSPHRASE)
             composeRule.onNodeWithTag("profile_keys.export_confirmation").performTextInput(PASSPHRASE)
-            dialogButton(encryptedAction).performClick()
         } else {
             composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
-            dialogButton(R.string.export_nsec).performClick()
         }
     }
 

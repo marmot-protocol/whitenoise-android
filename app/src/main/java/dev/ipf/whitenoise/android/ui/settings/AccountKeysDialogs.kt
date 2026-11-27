@@ -25,8 +25,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,12 +57,26 @@ internal fun ProfileKeysDialogs(
     cancelRawAuthentication: () -> Unit,
 ) {
     val exportTitle: @Composable (Int) -> Unit = { title ->
-        Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-            Text(stringResource(title))
+        val titleText = stringResource(title)
+        val notice =
             if (ui.exportScreenLockRequired) {
+                stringResource(R.string.toast_app_lock_screen_lock_required)
+            } else {
+                null
+            }
+        // Keep the live region present so the failed attempt updates an existing accessibility node.
+        Column(
+            modifier =
+                Modifier.clearAndSetSemantics {
+                    liveRegion = LiveRegionMode.Polite
+                    text = AnnotatedString(if (notice == null) titleText else "$titleText\n$notice")
+                },
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            Text(titleText)
+            if (notice != null) {
                 Text(
-                    stringResource(R.string.toast_app_lock_screen_lock_required),
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    notice,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
