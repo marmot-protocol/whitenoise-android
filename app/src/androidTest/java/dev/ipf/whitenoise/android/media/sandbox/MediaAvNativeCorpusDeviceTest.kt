@@ -84,6 +84,35 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Preferred reads return the final pre-target frame once when a seek lands in its display interval. */
+    @Test
+    fun preferredReadPreservesFinalFrameAfterSeek() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        withFixture("red-h264.mp4") { source ->
+            val stream = IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), wantAudio = false, edge = 64)
+            stream.use {
+                val track = AvStreamProtocol.VIDEO_TRACK
+                (stream.read(track) as AvStreamFrame.Video).bitmap.recycle()
+                stream.seek(900_000L)
+                val finalFrame = stream.read(track) as AvStreamFrame.Video
+                try {
+                    assertEquals(800_000L, finalFrame.timestampUs)
+                } finally {
+                    finalFrame.bitmap.recycle()
+                }
+                assertEquals(AvStreamFrame.VideoEnd, stream.read(track))
+                stream.seek(200_000L)
+                val earlier = stream.read(track) as AvStreamFrame.Video
+                try {
+                    assertEquals(200_000L, earlier.timestampUs)
+                } finally {
+                    earlier.bitmap.recycle()
+                }
+            }
+            assertTrue(stream.awaitRetired())
+        }
+    }
+
     /** Silent Audio Returns No Waveform From Fresh Restricted Worker. */
     @Test
     fun silentAudioReturnsNoWaveformFromFreshRestrictedWorker() {

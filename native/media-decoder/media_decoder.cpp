@@ -309,8 +309,10 @@ struct Session {
     int64_t playbackSeekTargetUs = 0;
     int64_t playbackAudioEndSample = 0;
     int64_t videoSkipBeforeUs = INT64_MIN;
+    AVFrame* prerollVideo = nullptr;
     /** Release resampling, packet, demuxer, custom-I/O and duplicated descriptor resources for this exact session. */
     ~Session() {
+        av_frame_free(&prerollVideo);
         sws_free_context(&scale);
         sws_free_context(&colors);
         swr_free(&resample);
@@ -831,10 +833,8 @@ void queuePacket(Session& s, size_t packetLimit = kMaxQueuedPackets) {
 }
 
 /**
- * Decide whether a decoded video frame before the last seek target can be dropped without conversion.
- * The parent discards such frames anyway; skipping stops while the compressed lookahead is half full,
- * so the parent's preroll audio drain keeps the queue bounded, before the conversion reserve, and
- * before half of the read step budget.
+ * Defer conversion of pre-target video while compressed lookahead, time and read steps allow it.
+ * The latest deferred frame stays available as the final picture if the decoder reaches EOF.
  */
 bool skipPrerollVideo(Session& s, int step) {
     if (timestamp(s, s.video, s.video.frame) >= s.videoSkipBeforeUs) {
@@ -869,12 +869,22 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
         pump(s, selected);
+        if (preferred == 1 && selected.ended && s.prerollVideo) {
+            av_frame_move_ref(selected.frame, s.prerollVideo);
+            selected.hasFrame = true;
+            s.videoSkipBeforeUs = INT64_MIN;
+        }
         if (selected.hasFrame) {
             if (preferred == 1 && skipPrerollVideo(s, step)) {
-                selected.hasFrame = false; av_frame_unref(selected.frame);
+                if (!s.prerollVideo) s.prerollVideo = av_frame_alloc();
+                check(s.prerollVideo != nullptr, "video_frame_allocation");
+                av_frame_unref(s.prerollVideo);
+                av_frame_move_ref(s.prerollVideo, selected.frame);
+                selected.hasFrame = false;
                 continue;
             }
             if (preferred == 1) {
+                av_frame_free(&s.prerollVideo);
                 auto result = video(env, s, videoOut);
                 selected.hasFrame = false; av_frame_unref(selected.frame);
                 return result;
@@ -1128,6 +1138,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
         swr_free(&s.resample); av_channel_layout_uninit(&s.resampleInput);
         s.resampleRate = 0; s.resampleFormat = -1; s.lastAudioPts = timeUs;
         s.playbackAudioClock = false; s.playbackSeekTargetUs = timeUs; s.playbackAudioEndSample = 0;
+        av_frame_free(&s.prerollVideo);
         s.videoSkipBeforeUs = timeUs;
     } catch (const std::exception& error) { fail(env, error.what()); }
 }

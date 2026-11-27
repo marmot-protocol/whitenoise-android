@@ -133,12 +133,11 @@ expiry, player release, account reset, a playback failure, or a run that ends
 in an exception. A paused worker can keep running code for that window, which an
 active worker of the same source could already do.
 
-After a seek, the worker drops decoded video frames before the target without
-converting them to RGBA, because the parent would discard them. It stops
-dropping while half of the compressed lookahead is queued, after 500 ms of
-its 1.5-second call deadline or after half of its read step budget, and then
-returns the frame for
-the parent's existing preroll handling.
+After a seek, the worker defers RGBA conversion of pre-target video and holds
+one reference to the most recent deferred frame. At video EOF it returns that
+frame once so playback can display the final picture. It also yields a frame
+to the parent when half of the compressed lookahead is queued, after 500 ms of
+its 1.5-second call budget or after half of its read step budget.
 
 ## MDK boundary
 

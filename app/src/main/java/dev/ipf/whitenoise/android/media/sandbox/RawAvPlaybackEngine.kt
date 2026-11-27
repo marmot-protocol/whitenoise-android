@@ -70,6 +70,7 @@ internal class RawAvPlaybackEngine(
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val signal = Channel<Unit>(Channel.CONFLATED)
+    private val redrawSignal = Channel<Unit>(Channel.CONFLATED)
     private val epoch = owners.epoch()
     private var prepared = SettableFuture.create<Void?>()
     private var preparationRequested = false
@@ -122,16 +123,15 @@ internal class RawAvPlaybackEngine(
     @Volatile private var firstFrameForOutput = false
     private val video =
         RawVideoOutput {
-            redraw = true
             firstFrameForOutput = false
-            signal.trySend(Unit)
+            requestRedraw()
         }
     private val renderer =
         RawAvRenderSession(this.context, uri, wantVideo, wantAudio, this).also {
             it.observation = observation
         }
 
-    /** Explicit background instrumentation sampling; no device reads occur when the observer is absent. */
+    /** Samples playback diagnostics when requested. */
     fun observeAudio() {
         observation?.let(renderer::observeAudio)
     }
@@ -147,7 +147,12 @@ internal class RawAvPlaybackEngine(
         )
 
     init {
-        if (owners.register(this, epoch)) scope.launch { worker() } else close()
+        if (owners.register(this, epoch)) {
+            scope.launch { for (request in redrawSignal) renderRetained() }
+            scope.launch { worker() }
+        } else {
+            close()
+        }
     }
 
     /** Converts time to milliseconds and swaps display dimensions for orthogonal rotation. */
@@ -271,6 +276,7 @@ internal class RawAvPlaybackEngine(
                 val posterCurrent = requested.matches(posterGeneration, current(), playIntent, targetUs / 1000)
                 if (wantVideo && poster != null && posterCurrent) {
                     retainFrame(checkNotNull(poster), 0)
+                    redrawSignal.trySend(Unit)
                     poster = null
                 }
                 finishPreparation(completion)
@@ -316,11 +322,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Admits prepared work and chooses Ready versus Buffering from current play intent.
-     * Explicit video can admit its raw stream before optional metadata; opened() supplies authoritative layout.
-     * Caller holds the engine lock and has checked the exact preparation promise.
-     */
+    /** Admits prepared work under the engine lock. The opened stream supplies its authoritative layout. */
     private fun finishPreparation(completion: SettableFuture<Void?>) {
         headerReady = true
         status = if (playIntent) Status.Buffering else Status.Ready
@@ -330,7 +332,6 @@ internal class RawAvPlaybackEngine(
 
     /** Requests a paused poster when the retained frame does not match the current seek. */
     private fun restorePosterLocked() {
-        redraw = true
         firstFrameForOutput = false
         val matching =
             synchronized(frameLock) {
@@ -344,7 +345,7 @@ internal class RawAvPlaybackEngine(
             explicitSeek = false
             dispatchPausedSeek(completion, explicit = false)
         }
-        signal.trySend(Unit)
+        requestRedraw()
     }
 
     /** Focus is acquired before a prior player is asked to surrender. */
@@ -532,8 +533,8 @@ internal class RawAvPlaybackEngine(
             if (!currentRequest || request.completion.isCancelled) return@synchronized false
             if (probe?.poster == null) {
                 if (missing != null || request.explicit) {
-                    redraw = missing == null
                     failPlaybackLocked(missing ?: RawPausedSeekFailure(request.target.positionMs))
+                    if (missing == null) requestRedraw() else redraw = false
                 } else {
                     pendingSeek = null
                     request.finish(false)
@@ -552,7 +553,7 @@ internal class RawAvPlaybackEngine(
             synchronized(frameLock) { lastBitmapPtsUs = request.target.positionMs * 1000L }
             request.finish(true) // Acknowledgement and frame publication share the generation lock.
             notifyChanged()
-            signal.trySend(Unit)
+            redrawSignal.trySend(Unit)
             true
         }
 
@@ -655,8 +656,7 @@ internal class RawAvPlaybackEngine(
     fun attachVideo(output: Any?) {
         firstFrameForOutput = false
         video.attach(output)
-        redraw = true
-        signal.trySend(Unit)
+        requestRedraw()
     }
 
     /** A stale target cannot detach its replacement. */
@@ -759,8 +759,8 @@ internal class RawAvPlaybackEngine(
         seek: Long,
     ) = synchronized(lock) {
         if (accepts(activation, seek) && explicitSeek && pendingSeek != null) {
-            redraw = true
             failPlaybackLocked(RawPausedSeekFailure(targetUs / 1000))
+            requestRedraw()
         }
     }
 
@@ -831,18 +831,13 @@ internal class RawAvPlaybackEngine(
         signal.trySend(Unit)
     }
 
-    /**
-     * Serializes renderer runs and retained-frame redraws through one conflated wake channel.
-     * Cancellation/closure exits the worker instead of admitting another source run.
-     */
+    /** Serializes decoder runs. Display target changes can redraw while a decoder call is outstanding. */
     private suspend fun worker() {
         try {
             while (scope.isActive) {
                 signal.receive()
-                renderRetained()
                 while (scope.isActive && intent().let { it.alive && it.playing }) {
                     renderer.run(intent().activation)
-                    renderRetained()
                 }
             }
         } catch (
@@ -887,6 +882,11 @@ internal class RawAvPlaybackEngine(
             lastBitmapPtsUs = -1L
         }
         redraw = true
+    }
+
+    private fun requestRedraw() {
+        redraw = true
+        redrawSignal.trySend(Unit)
     }
 
     /** Renders current ownership using engine → registry → frame → surface lock order. */
@@ -1033,6 +1033,7 @@ internal class RawAvPlaybackEngine(
         prepareJob?.cancel()
         scope.cancel()
         signal.close()
+        redrawSignal.close()
         synchronized(frameLock) {
             lastBitmap?.recycle()
             lastBitmap = null
