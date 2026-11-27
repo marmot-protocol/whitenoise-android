@@ -8,7 +8,12 @@ internal class RawAvAudioReserve(
     private val minimumUs = presentationTargetUs.coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
     val targetUs = maxOf(minimumUs, mixerTargetUs).coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
 
-    fun trackFor(bufferedUs: Long): Int = if (bufferedUs < minimumUs) AvStreamProtocol.AUDIO_TRACK else AvStreamProtocol.AUDIO_RESERVE_TRACK
+    fun trackFor(bufferedUs: Long): Int =
+        if (bufferedUs < minimumUs) {
+            AvStreamProtocol.AUDIO_TRACK
+        } else {
+            AvStreamProtocol.AUDIO_RESERVE_TRACK
+        }
 }
 
 /** Holds one bounded PCM write until the audio device accepts its frames and any preceding gap. */

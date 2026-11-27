@@ -108,7 +108,10 @@ internal class RawVideoPresenter(
     fun holds(
         seek: Long,
         requireTimestamp: Boolean,
-    ): Boolean = synchronized(lock) { retained?.let { it.seek == seek && (!requireTimestamp || it.ptsUs >= 0) } == true }
+    ): Boolean =
+        synchronized(lock) {
+            retained?.let { it.seek == seek && (!requireTimestamp || it.ptsUs >= 0) } == true
+        }
 
     /** The retained bitmap, for tests and diagnostics only. */
     internal fun retainedBitmap(): Bitmap? = synchronized(lock) { retained?.bitmap }
@@ -240,7 +243,10 @@ internal class RawVideoPresenter(
             submitted
         }
 
-    private fun canDraw(frame: RawVideoFrame): Boolean = frame.seek == allowedSeek || synchronized(lock) { allowCommitted && frame === committed }
+    private fun canDraw(frame: RawVideoFrame): Boolean {
+        val isCurrentSeek = frame.seek == allowedSeek
+        return isCurrentSeek || synchronized(lock) { allowCommitted && frame === committed }
+    }
 
     private fun draw(
         frame: RawVideoFrame,
