@@ -398,9 +398,11 @@ internal class ReturnFixture(
             val scripted =
                 ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
             ConversationLiveSubscriptions(
-                openTimeline = { account, groupIdHex, limit ->
-                    beforeTimelineOpen(timelineOpens.getAndIncrement())
-                    scripted.openTimeline(account, groupIdHex, limit)
+                // The nth open gets script n even when the hook holds an earlier open past a later one.
+                openTimeline = { _, _, _ ->
+                    val index = timelineOpens.getAndIncrement()
+                    beforeTimelineOpen(index)
+                    timelineScripts[index]
                 },
                 openGroupState = scripted.openGroupState,
             )

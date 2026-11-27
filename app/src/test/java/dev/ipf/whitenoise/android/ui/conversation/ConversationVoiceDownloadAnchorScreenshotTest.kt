@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
 import dev.ipf.whitenoise.android.ui.navigation.openForTest
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -237,6 +238,8 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         try {
             awaitConversationCondition { fixture.controller.timeline.size == fixture.records.size }
             val firstHolder = MainShellStateHolder(appState, savedStateHandle, processState)
+            // The route takes its account from the bound owner, as the mounted shell binds it before any open.
+            firstHolder.chatsController(fixture.controller.boundAccountRef, runtimeGeneration = 1)
             firstHolder.openForTest(fixture.chat)
             firstHolder.persistConversationRoute(fixture.controller.boundAccountRef)
             assertTrue(firstHolder.hasSavedConversationRoute)
@@ -284,6 +287,9 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
                 )
             val recreatedHolder = MainShellStateHolder(appState, recreatedSavedState, processState)
             assertTrue(recreatedHolder.hasSavedConversationRoute)
+            val retainedRoute = recreatedHolder.shellNavigator.stack.last() as ShellRoute.Conversation
+            assertEquals(fixture.controller.boundAccountRef, retainedRoute.accountRef)
+            assertEquals(fixture.chat.group.groupIdHex, retainedRoute.groupIdHex)
             val reusedController =
                 recreatedHolder.conversationController(
                     chatId = fixture.chat.group.groupIdHex,
