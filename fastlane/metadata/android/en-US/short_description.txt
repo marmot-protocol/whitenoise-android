@@ -1,1 +1,1 @@
-Private, end-to-end encrypted messaging built on Nostr and MLS
+Private chats and groups without a phone number. Encrypted, free, open source.

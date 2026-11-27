@@ -3,7 +3,7 @@ release_source: ./build/production-release/*.apk
 match: ".*arm64-v8a\\.apk$"
 
 name: "White Noise: Secure Chat"
-summary: "Private, end-to-end encrypted messaging built on Nostr and MLS"
+summary: "Private chats and groups without a phone number. Encrypted, free, open source."
 description: |
   Chat with friends and with agents running on your own machines. The keys
   stay on your device.
