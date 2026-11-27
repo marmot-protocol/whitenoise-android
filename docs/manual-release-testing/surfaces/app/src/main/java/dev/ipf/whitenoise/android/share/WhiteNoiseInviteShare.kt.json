@@ -18,7 +18,7 @@
       {
         "surface": "setting:invite_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
-        "anchor": "R.string.invite_message)",
+        "anchor": "R.string.invite_message",
         "test_ids": [
           "NCH-001",
           "NCH-002",

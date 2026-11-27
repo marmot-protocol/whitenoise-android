@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.state.startProfileChatErrorTitle
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.account.startingAccount
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -566,7 +567,10 @@ private fun NewMessageAccountScreen(
                                     session.currentValue { appState.loadCreatedChatListItem(id) }
                                 },
                                 displayName = appState::displayName,
-                                invitationRecipientName = appState::contactDisplayNameCachedOrNull,
+                                invitationRecipientName = { accountIdHex ->
+                                    appState.contactDisplayNameCachedOrNull(accountIdHex)
+                                        ?: recipientName?.takeUnless { abbreviatesPublicKey(it, npub) }
+                                },
                                 markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
                                 abandonCreateOpenTiming = {
                                     if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
