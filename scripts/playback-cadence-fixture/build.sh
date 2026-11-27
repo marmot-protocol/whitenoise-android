@@ -6,7 +6,7 @@ fixture=scripts/playback-cadence-fixture
 package=dev.ipf.whitenoise.android.smoothness.finalreserve
 output=build/playback-cadence-apks
 
-[[ $(git rev-parse HEAD^) == "$source_head" ]]
+git merge-base --is-ancestor "$source_head" HEAD
 while IFS= read -r path; do
     case "$path" in
         .github/workflows/android-instrumented.yml|"$fixture"/*) ;;

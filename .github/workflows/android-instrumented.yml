@@ -364,14 +364,15 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/4262-cadence-72aa749'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    env:
-      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: false
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           distribution: temurin
