@@ -227,6 +227,39 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** The message-menu keyboard hand-back reaches ConversationScreen as a reader that only layout calls. */
+    @Test
+    fun menuImeHandBackIsReadInLayoutNotConversationComposition() {
+        val conversation = "src/main/java/dev/ipf/whitenoise/android/ui/conversation"
+        val readers =
+            listOf(
+                "$conversation/MenuImeBackdrop.kt" to "animatedMenuImeBackdrop",
+                "$conversation/ConversationMenuImeHandoff.kt" to "conversationMenuImeBackdrop",
+            )
+        for ((path, function) in readers) {
+            assertTrue(
+                "$function must return a reader: returning the animated value recomposes its caller per frame",
+                Regex("""^\s*:\s*\(\(\)\s*->\s*Int\)\?\s*\{""").containsMatchIn(
+                    appModuleSource(path).afterParameters(function),
+                ),
+            )
+        }
+        val conversationBody = appModuleSource("$conversation/ConversationScreen.kt").functionBody("ConversationScreen")
+        assertTrue(
+            "ConversationScreen must pad the transcript through heldImeBottomPadding",
+            "heldImeBottomPadding(presentedImeBottom)" in conversationBody,
+        )
+    }
+
+    /** Returns the source text that follows the parameter list of [function]. */
+    private fun String.afterParameters(function: String): String {
+        val start =
+            Regex("""\bfun\s+${Regex.escape(function)}\s*\(""").find(this)?.range?.last
+                ?: error("Missing function $function")
+        val parameters = kotlinBlockFrom(start, "parameters for $function", opening = '(', closing = ')')
+        return substring(start + parameters.length)
+    }
+
     /** Resolves a main UI source file relative to `ui/`. */
     private fun source(relativePath: String): File =
         listOf(
