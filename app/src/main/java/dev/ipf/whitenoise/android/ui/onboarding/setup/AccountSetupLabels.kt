@@ -73,4 +73,5 @@ internal fun setupFindingTitle(value: OnboardingIssueFfi): Int =
         OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_device_found
         OnboardingIssueFfi.DISCOVERY_INCOMPLETE -> R.string.setup_finding_discovery_incomplete
         OnboardingIssueFfi.INSPECTION_COMPLETED -> R.string.setup_finding_inspection_completed
+        OnboardingIssueFfi.RATE_LIMITED -> R.string.setup_status_retryable_failure
     }
