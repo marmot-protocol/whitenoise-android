@@ -303,6 +303,15 @@
         "test_ids": [
           "ACC-010"
         ]
+      },
+      {
+        "surface": "string:toast_app_lock_screen_lock_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.toast_app_lock_screen_lock_required",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011"
+        ]
       }
     ],
     "source_coverage": [

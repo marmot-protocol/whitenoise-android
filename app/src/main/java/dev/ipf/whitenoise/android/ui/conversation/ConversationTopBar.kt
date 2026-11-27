@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteHeaderMotion
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Radii
@@ -89,7 +90,7 @@ internal fun ConversationHeaderFrame(
     header: @Composable () -> Unit,
     playbackTransport: @Composable () -> Unit,
 ) {
-    Column {
+    Column(Modifier.conversationRouteHeaderMotion()) {
         header()
         playbackTransport()
     }

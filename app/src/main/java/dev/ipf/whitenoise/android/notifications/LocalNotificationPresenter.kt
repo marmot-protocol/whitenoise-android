@@ -142,16 +142,21 @@ class LocalNotificationPresenter(
 
     fun hideConversationShortcutsFromDirectShare() = conversationShortcuts.hideConversationShortcutsFromDirectShare()
 
-    /** Clears shortcut presentation under the caller's acknowledged credential-revocation fence. */
-    fun clearRevokedConversationShortcutsForAccount(
+    suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
         knownGroupIds: Collection<String> = emptySet(),
-    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(
-        accountRef,
-        includeUnscopedLegacy,
-        knownGroupIds,
-    )
+    ) {
+        knownGroupIds.forEach { groupIdHex ->
+            retirement.dismissConversationMessages(accountRef, groupIdHex, Dispatchers.IO)
+        }
+        conversationShortcuts.clearRevokedConversationShortcutsForAccount(
+            accountRef,
+            includeUnscopedLegacy,
+            knownGroupIds,
+        )
+        groupReconciliation()
+    }
 
     /** Called off the main thread in the same publication-lock section as platform removal. */
     internal fun forgetConversationShortcut(
