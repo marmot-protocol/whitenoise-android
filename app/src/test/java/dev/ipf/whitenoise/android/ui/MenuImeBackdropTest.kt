@@ -53,7 +53,7 @@ class MenuImeBackdropTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 val held =
-                    animatedMenuImeBackdrop(frozen, returning, { live }) {
+                    animatedMenuImeBackdrop(frozen, { returning }, { live }) {
                         frozen = null
                         returning = false
                     }
@@ -93,7 +93,7 @@ class MenuImeBackdropTest {
         var compositions = 0
         frozen = null
         composeRule.setContent {
-            animatedMenuImeBackdrop(frozen, returning, { live }) {}
+            animatedMenuImeBackdrop(frozen, { returning }, { live }) {}
             SideEffect { compositions++ }
         }
         for (hold in listOf<Int?>(null, 320)) {
@@ -108,7 +108,10 @@ class MenuImeBackdropTest {
         }
     }
 
-    /** Checks that an active hand-back animates the held geometry in layout without recomposing its caller. */
+    /**
+     * Checks that a whole hand-back, from the returning flag through release, animates the held geometry in layout
+     * and recomposes its caller at most once: for the release that hands the inset back to the live keyboard.
+     */
     @Test
     fun activeReturnAnimatesGeometryWithoutRecomposingTheCaller() {
         var compositions = 0
@@ -118,11 +121,12 @@ class MenuImeBackdropTest {
             live = 180
             returning = true
         }
-        // Nine frames stay inside the 160 ms animation, so its release does not recompose the caller either.
-        val samples = List(9) { frame() }
+        val samples = List(20) { frame() }
         assertTrue("The held geometry must still animate: $samples", samples.distinct().size > 2)
+        composeRule.runOnIdle { assertNull("The hand-back must finish and release", frozen) }
+        assertEquals(180, displayed)
         assertTrue(
-            "The hand-back may recompose the caller once, for the returning flag: ${compositions - before}",
+            "The hand-back may recompose the caller once, for the release: ${compositions - before}",
             compositions - before <= 1,
         )
     }

@@ -121,7 +121,7 @@ internal fun conversationMenuImeBackdrop(
     val displayedBottom =
         animatedMenuImeBackdrop(
             frozenBottom = handoff.backdropBottom,
-            returning = handoff.backdropReturning,
+            returning = { handoff.backdropReturning },
             liveBottom = { imeInsets.getBottom(density) },
             onReleased = { handoff.releaseBackdrop() },
         )

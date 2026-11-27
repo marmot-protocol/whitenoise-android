@@ -28,37 +28,36 @@ internal fun captureMenuImeBackdrop(
 /**
  * Hold menu geometry, then hand it back only at the same live IME height. Returns a reader for the held
  * inset, or null when the live IME owns it. Read it in layout or draw: reading it in composition would
- * recompose the caller on every frame of the hand-back.
+ * recompose the caller on every frame of the hand-back. Only ownership, [frozenBottom], is read in
+ * composition; [returning] is observed in the effect, so starting the hand-back does not recompose the caller.
  */
 @Composable
 internal fun animatedMenuImeBackdrop(
     frozenBottom: Int?,
-    returning: Boolean,
+    returning: () -> Boolean,
     liveBottom: () -> Int,
     onReleased: () -> Unit,
 ): (() -> Int)? {
+    val readReturning by rememberUpdatedState(returning)
     val readLiveBottom by rememberUpdatedState(liveBottom)
     val release by rememberUpdatedState(onReleased)
     val bottom = remember(frozenBottom) { Animatable((frozenBottom ?: 0).toFloat()) }
-    LaunchedEffect(frozenBottom, returning) {
-        if (frozenBottom != null && returning) {
-            // Observe animation frames in the effect, not the conversation composition.
-            snapshotFlow { readLiveBottom() }.collectLatest { live ->
-                // A changed live inset cancels and retargets from the displayed value.
-                bottom.animateTo(live.toFloat(), tween(durationMillis = 160))
-                release()
+    LaunchedEffect(frozenBottom) {
+        if (frozenBottom == null) return@LaunchedEffect
+        // Observe the return and its animation frames in the effect, not the conversation composition.
+        // A cleared flag cancels the return where it stands: a menu reopened mid-return captures that displayed height.
+        snapshotFlow { readReturning() }.collectLatest { isReturning ->
+            if (isReturning) {
+                snapshotFlow { readLiveBottom() }.collectLatest { live ->
+                    // A changed live inset cancels and retargets from the displayed value.
+                    bottom.animateTo(live.toFloat(), tween(durationMillis = 160))
+                    release()
+                }
             }
         }
     }
-    val readHeld: () -> Int =
-        remember(bottom, frozenBottom, returning) {
-            val held = frozenBottom ?: 0
-            if (returning) {
-                { bottom.value.roundToInt() }
-            } else {
-                { held }
-            }
-        }
+    // The held inset until the return starts, then each animation frame.
+    val readHeld: () -> Int = remember(bottom) { { bottom.value.roundToInt() } }
     // Null, rather than zero, identifies ownership: zero is a valid animated
     // endpoint when restoration fails or the keyboard closes during handoff.
     return readHeld.takeIf { frozenBottom != null }
