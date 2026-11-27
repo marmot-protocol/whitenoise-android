@@ -204,12 +204,13 @@ class VoiceNoteFlowMotionCaptureTest {
 
         fun newController(
             directory: File,
+            onPermissionRequest: () -> Boolean = { true },
             onComplete: (File, Long) -> Unit,
         ) = VoiceRecordingController(
             context = context,
             outputDirectory = directory,
             scope = scope,
-            onPermissionRequest = { true },
+            onPermissionRequest = onPermissionRequest,
             onRecordingComplete = onComplete,
             onError = {},
             recorderFactory = { _, file, _ -> Session(file, takeMs) },
@@ -232,7 +233,9 @@ class VoiceNoteFlowMotionCaptureTest {
             val sessionOwner =
                 VoiceNoteSessionOwner(
                     store = VoiceDraftStore(output),
-                    newController = { _, hooks -> newController(hooks.outputDirectory, hooks.onRecordingComplete) },
+                    newController = { _, hooks ->
+                        newController(hooks.outputDirectory, hooks.onPermissionRequest, hooks.onRecordingComplete)
+                    },
                     presentError = {},
                     presentElsewhere = {},
                 )

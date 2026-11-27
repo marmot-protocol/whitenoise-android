@@ -281,7 +281,7 @@ class VoiceNoteSessionOwnerTest {
                         context = ApplicationProvider.getApplicationContext<Context>(),
                         outputDirectory = hooks.outputDirectory,
                         scope = scope,
-                        onPermissionRequest = { true },
+                        onPermissionRequest = hooks.onPermissionRequest,
                         onRecordingComplete = hooks.onRecordingComplete,
                         onError = hooks.onError,
                         microphoneCaptures = coordinator,
