@@ -364,11 +364,12 @@ private fun DeviceLinkStepActions(
     onAction: (DeviceLinkAction) -> Unit,
 ) {
     step.primary?.let { action ->
+        val enabled = running == null && primaryEnabled
         // A press that began while Link was disabled must never finish on its enabled button.
-        key(action, if (action == DeviceLinkAction.Link) primaryEnabled else true) {
+        key(action, action != DeviceLinkAction.Link || enabled) {
             WhiteNoiseButton(
                 onClick = { onAction(action) },
-                enabled = running == null && primaryEnabled,
+                enabled = enabled,
                 loading =
                     running != null && running != DeviceLinkCommand.Cancel && running != DeviceLinkCommand.Decline,
                 loadingLabel = stringResource(action.label),

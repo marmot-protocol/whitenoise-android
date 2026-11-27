@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,6 +61,28 @@ class DeviceLinkRequestSafetyTest {
         val link = compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         link.performTouchInput { down(center) }
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
+        link.assertIsEnabled().performTouchInput { up() }
+        compose.runOnIdle { assertEquals(0, links) }
+        link.performClick()
+        compose.runOnIdle { assertEquals(1, links) }
+    }
+
+    @Test
+    fun aPressDuringDeclineCannotApproveWhenTheDeclineFails() {
+        var links = 0
+        val running = mutableStateOf<DeviceLinkCommand?>(null)
+        compose.mainClock.autoAdvance = false
+        compose.setContent { WhiteNoiseTheme { DeviceLinkRequestContent(COMPARING, running.value, { links++ }, {}, {}) } }
+        compose.mainClock.advanceTimeByFrame()
+        val link = compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
+        link.assertIsEnabled()
+
+        compose.runOnIdle { running.value = DeviceLinkCommand.Decline }
+        compose.mainClock.advanceTimeByFrame()
+        link.assertIsNotEnabled().performTouchInput { down(center) }
+        compose.runOnIdle { running.value = null }
+        compose.mainClock.advanceTimeByFrame()
         link.assertIsEnabled().performTouchInput { up() }
         compose.runOnIdle { assertEquals(0, links) }
         link.performClick()

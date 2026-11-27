@@ -158,6 +158,11 @@ class DeviceLinkRepeatedRequestsTest {
             state: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing,
         ) = DeviceLinkPromptFfi(promptId = id, slotIdHex = null, requestedAt = 1u, state = state)
 
-        fun snapshot(vararg prompts: DeviceLinkPromptFfi) = DeviceLinkSnapshotFfi(newDevice = null, prompts = prompts.toList(), moves = emptyList())
+        fun snapshot(vararg prompts: DeviceLinkPromptFfi) =
+            DeviceLinkSnapshotFfi(
+                newDevice = null,
+                prompts = prompts.toList(),
+                moves = emptyList(),
+            )
     }
 }

@@ -294,7 +294,11 @@ internal class DeviceLinkRequestWatcher(
 }
 
 /** These read counts with one more successful read of each of [accounts]. */
-private fun Map<String, Long>.counted(accounts: Set<String>): Map<String, Long> = this + accounts.associateWith { (this[it] ?: 0L) + 1L }
+private fun Map<String, Long>.counted(accounts: Set<String>): Map<String, Long> =
+    this +
+        accounts.associateWith { account ->
+            (this[account] ?: 0L) + 1L
+        }
 
 /** Milliseconds from a monotonic clock, the one [DeviceLinkRequestWatcher.linkedAwaitingCount] is measured on. */
 internal fun monotonicNowMs(): Long = System.nanoTime() / NANOS_PER_MILLI
