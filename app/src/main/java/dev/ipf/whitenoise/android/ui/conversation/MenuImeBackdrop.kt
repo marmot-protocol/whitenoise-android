@@ -10,6 +10,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.offset
 import kotlinx.coroutines.flow.collectLatest
@@ -24,6 +26,28 @@ internal fun captureMenuImeBackdrop(
     displayedBottom: Int?,
     liveBottom: Int,
 ): Int? = displayedBottom ?: liveBottom.takeIf { it > 0 }
+
+/**
+ * [captureMenuImeBackdrop] for the held-inset reader, read once at the call. Call it from an event
+ * handler: a read in composition would recompose the caller on every frame of the hand-back.
+ */
+internal fun captureMenuImeBackdrop(
+    displayedReader: (() -> Int)?,
+    liveBottom: Int,
+): Int? = captureMenuImeBackdrop(displayedReader?.invoke(), liveBottom)
+
+/**
+ * The inset reader the conversation presents: a settings route's outgoing inset, which stays fixed, or
+ * else the menu hand-back's reader. A reader, not a value, because the hand-back animates it on every
+ * frame and only layout reads it.
+ */
+internal fun presentedMenuImeBottom(
+    outgoingBottom: Int?,
+    displayedBottom: (() -> Int)?,
+): (() -> Int)? = outgoingBottom?.let { held -> { held } } ?: displayedBottom
+
+/** The held inset in dp for the tabletop bottom bar, converted only when the bar reads it. */
+internal fun Density.heldImeBottomDp(bottom: (() -> Int)?): () -> Dp = { (bottom?.invoke() ?: 0).toDp() }
 
 /**
  * Hold menu geometry, then hand it back only at the same live IME height. Returns a reader for the held
