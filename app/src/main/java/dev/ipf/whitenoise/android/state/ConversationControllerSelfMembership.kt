@@ -18,6 +18,8 @@ internal fun groupStateUpdateRemovesSelf(
 /** Pending LEFT can still resolve to a joined account after cancellation. */
 internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean = selfMembership.hasSettledDeparture(leaveRequestPending)
 
+internal fun AppGroupRecordFfi.endsVoiceTranscription(): Boolean = disbanded || hasSettledDeparture()
+
 internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
     lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
 

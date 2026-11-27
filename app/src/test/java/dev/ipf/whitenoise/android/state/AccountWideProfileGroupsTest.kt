@@ -3,6 +3,10 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.VoiceTranscriptionScope
 import dev.ipf.whitenoise.android.ui.profile.PersonSharedGroups
 import dev.ipf.whitenoise.android.ui.profile.ProfileAccountWideGroupsHolder
 import dev.ipf.whitenoise.android.ui.profile.personSharedGroupsForProfile
@@ -246,6 +250,42 @@ class AccountWideProfileGroupsTest {
             assertNotNull(newer)
             assertSame(newer, holder.current().snapshot)
         }
+
+    @Test
+    fun accountWideMembershipUpdatesClearTranscriptsOutsideTheWindow() {
+        val (appState, controller) = profileController { _, _ -> roster(TARGET) }
+        try {
+            val cache = appState.receivedVoiceTranscripts
+            val complete = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words")
+            val departing = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+            departing.storeResult("recording", complete)
+            departing.setShown("message", true)
+            val offWindow = adminGroup(BEYOND)
+            assertFalse(controller.containsGroup(BEYOND))
+
+            controller.foldGroupRecordForTest(offWindow.copy(archived = true))
+            assertEquals(complete, departing.result("recording"))
+            assertTrue(departing.shown("message"))
+
+            val removed = offWindow.copy(selfMembership = SelfMembershipFfi.REMOVED)
+            controller.foldGroupRecordForTest(removed)
+            val rejoined = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+            assertNull(rejoined.result("recording"))
+            assertFalse(rejoined.shown("message"))
+
+            controller.foldGroupRecordForTest(offWindow)
+            rejoined.storeResult("recording", complete)
+            rejoined.setShown("message", true)
+            controller.installGroupRecordsSnapshot(mapOf(BEYOND to removed))
+            assertFalse(rejoined.active)
+            val fresh = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+            assertNull(fresh.result("recording"))
+            assertFalse(fresh.shown("message"))
+            assertFalse(controller.containsGroup(BEYOND))
+        } finally {
+            controller.onCleared()
+        }
+    }
 
     /** The mutation's authoritative roster must replace a resolved off-window cache without adding a native row. */
     @Test

@@ -61,8 +61,8 @@ the utterance. Decode/feed errors and unrecognized audio cannot
 produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
 Transcripts and their visibility choices are cached in memory per account and chat while the app is in the
-foreground. Backgrounding, App Lock and account replacement clear the cache. Removing a chat clears its
-entries and rejects late recognition results. Turning the Transcribe disc off hides that message's text.
+foreground. Backgrounding, App Lock and account replacement clear the cache. Removing a chat or ending membership clears its
+entries and rejects late recognition results for that chat. Turning the Transcribe disc off hides that message's text.
 This path does not add MDK persistence
 or claim isolation of the external recognition provider. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.

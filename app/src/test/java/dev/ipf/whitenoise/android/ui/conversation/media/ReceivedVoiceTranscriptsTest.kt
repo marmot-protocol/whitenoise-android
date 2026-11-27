@@ -86,6 +86,26 @@ class ReceivedVoiceTranscriptsTest {
     }
 
     @Test
+    fun evictingOneGroupLeavesOtherRecognitionInFlight() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val departing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "departing")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "playing")
+        val otherAccount = VoiceTranscriptionScope(transcripts, "bob", automatic = true, group = "departing")
+
+        transcripts.forgetGroup("alice", "departing")
+        departing.storeResult("recording", complete)
+        other.storeResult("recording", complete)
+        otherAccount.storeResult("recording", complete)
+
+        assertFalse(departing.active)
+        assertNull(departing.result("recording"))
+        assertTrue(other.active)
+        assertEquals(complete, other.result("recording"))
+        assertTrue(otherAccount.active)
+        assertEquals(complete, otherAccount.result("recording"))
+    }
+
+    @Test
     fun removedHistoryCannotRestartAutomaticTranscriptionWithAFreshScope() {
         val transcripts = ReceivedVoiceTranscripts()
         var member = true

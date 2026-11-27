@@ -67,9 +67,9 @@ class ConversationVisibleReadObserverTest {
             assertFalse(newScope.shown("message"))
             assertEquals(complete, other.result("recording"))
 
-            val afterDeparture = cache.generation
+            val afterDeparture = cache.groupEpoch(account, row.groupIdHex)
             state.publishConversationChatListRow(account, removed)
-            assertEquals(afterDeparture, cache.generation)
+            assertEquals(afterDeparture, cache.groupEpoch(account, row.groupIdHex))
         } finally {
             fixture.close()
         }

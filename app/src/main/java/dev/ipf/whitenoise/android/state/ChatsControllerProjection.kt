@@ -21,10 +21,30 @@ internal fun ChatsController.foldGroup(
     // committed record is the edit itself, so it neither needs the fence nor counts as the
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
+    val previous = groupRecordsById[record.groupIdHex]
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
+    evictDepartedVoiceTranscripts(folded, previous)
     if (fromSubscription) chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
     if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
     scheduleRecompute()
+}
+
+/** Reconnect snapshots and streaming updates both cover chats outside the retained windows. */
+internal fun ChatsController.installGroupRecordsSnapshot(records: Map<String, AppGroupRecordFfi>) {
+    val previous = groupRecordsById
+    groupRecordsById = records.mapValues { (_, group) -> withRetainedName(group) }
+    groupRecordsById.values.forEach { evictDepartedVoiceTranscripts(it, previous[it.groupIdHex]) }
+}
+
+private fun ChatsController.evictDepartedVoiceTranscripts(
+    record: AppGroupRecordFfi,
+    previous: AppGroupRecordFfi?,
+) {
+    val account = accountRef ?: return
+    if (record.endsVoiceTranscription()) {
+        val previouslyJoined = previous?.endsVoiceTranscription() == false
+        appState.receivedVoiceTranscripts.forgetGroup(account, record.groupIdHex, onlyIfCached = !previouslyJoined)
+    }
 }
 
 /**

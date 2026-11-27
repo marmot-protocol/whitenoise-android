@@ -29,7 +29,8 @@ internal class ReceivedVoiceTranscripts(
     private val resultOrder = ArrayDeque<String>()
     private val shown = mutableStateMapOf<String, Boolean>()
     private val shownOrder = ArrayDeque<String>()
-    private val accountEpochs = mutableMapOf<String, Int>()
+    private val accountEpochs = mutableStateMapOf<String, Int>()
+    private val groupEpochs = mutableStateMapOf<String, Int>()
     var generation by mutableIntStateOf(0)
         private set
 
@@ -57,9 +58,16 @@ internal class ReceivedVoiceTranscripts(
 
     fun accountEpoch(account: String): Int = accountEpochs[account] ?: 0
 
+    fun groupEpoch(
+        account: String,
+        group: String,
+    ): Int = groupEpochs["$account|$group|"] ?: 0
+
     fun forgetAccount(account: String) {
         accountEpochs[account] = accountEpoch(account) + 1
-        forgetPrefix("$account|")
+        val prefix = "$account|"
+        groupEpochs.keys.removeAll { it.startsWith(prefix) }
+        forgetPrefix(prefix)
     }
 
     fun forgetGroup(
@@ -74,12 +82,13 @@ internal class ReceivedVoiceTranscripts(
         ) {
             return
         }
-        generation++ // Reject writes already in flight, including work with no cached entry yet.
+        groupEpochs[prefix] = groupEpoch(account, group) + 1
         forgetPrefix(prefix)
     }
 
     fun clear() {
         generation++
+        groupEpochs.clear()
         results.clear()
         resultOrder.clear()
         shown.clear()
@@ -119,17 +128,20 @@ internal class VoiceTranscriptionScope(
     val transcripts: ReceivedVoiceTranscripts,
     private val account: String,
     val automatic: Boolean,
-    group: String = "",
+    private val group: String = "",
     private val recognitionAllowed: () -> Boolean = { true },
 ) {
     private val accountEpoch = transcripts.accountEpoch(account)
     private val generation = transcripts.generation
+    private val groupEpoch = transcripts.groupEpoch(account, group)
     private val keyPrefix = "$account|$group|"
 
     val active: Boolean
         get() {
             if (transcripts.generation != generation) return false
-            return transcripts.accountEpoch(account) == accountEpoch && recognitionAllowed()
+            return transcripts.accountEpoch(account) == accountEpoch &&
+                transcripts.groupEpoch(account, group) == groupEpoch &&
+                recognitionAllowed()
         }
 
     fun shown(messageIdHex: String): Boolean {
@@ -150,7 +162,10 @@ internal class VoiceTranscriptionScope(
         if (active) transcripts.setShown(messageKey(messageIdHex), value)
     }
 
-    fun result(attachmentKey: String): AudioTranscriptUi? = transcripts.result(attachmentKey(attachmentKey))
+    fun result(attachmentKey: String): AudioTranscriptUi? {
+        if (!active) return null
+        return transcripts.result(attachmentKey(attachmentKey))
+    }
 
     fun storeResult(
         attachmentKey: String,
@@ -178,14 +193,19 @@ internal fun rememberVoiceTranscription(
     val automatic = preferences.transcribeVoiceMessages
     val group = controller.group.groupIdHex
     val transcripts = appState.receivedVoiceTranscripts
-    return remember(transcripts, controller, account, group, automatic, transcripts.generation) {
+    val generation = transcripts.generation
+    val accountEpoch = transcripts.accountEpoch(account)
+    val groupEpoch = transcripts.groupEpoch(account, group)
+    return remember(transcripts, controller, account, group, automatic, generation, accountEpoch, groupEpoch) {
         VoiceTranscriptionScope(transcripts, account, automatic, group) {
             val foreground = appState.appInForeground && !appState.appLock.screenVisible
+            val groupRecord = appState.boundChats(account)?.groupRecordsById?.get(group)
             foreground &&
                 controller.isSelfMember &&
                 !controller.group.disbanded &&
                 controller.acceptsConversationActionOwner(account, group) &&
-                controller.latestChatListRow?.endsVoiceTranscription() != true
+                controller.latestChatListRow?.endsVoiceTranscription() != true &&
+                groupRecord?.endsVoiceTranscription() != true
         }
     }
 }

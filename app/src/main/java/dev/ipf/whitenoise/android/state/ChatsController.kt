@@ -503,7 +503,7 @@ class ChatsController private constructor(
     internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     internal val invitationReads = mutableMapOf<String, InvitationSettlementRead>()
-    internal var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
+    internal var groupRecordsById by mutableStateOf(mapOf<String, AppGroupRecordFfi>())
     internal var groupRecordsLoaded = false // groupRecordsById holds the bound account's snapshot
 
     // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
@@ -835,7 +835,7 @@ class ChatsController private constructor(
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
-                    groupRecordsById = initialGroups.mapValues { (_, group) -> withRetainedName(group) }
+                    installGroupRecordsSnapshot(initialGroups)
                     groupRecordsLoaded = true
                     chatRows.forEach { settleInvitationFromMdk(it) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
