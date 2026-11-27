@@ -115,6 +115,22 @@
         "test_ids": [
           "SET-076"
         ]
+      },
+      {
+        "surface": "Sign-in review: R.string.sign_in_mine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_mine",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "Sign-in review: R.string.sign_in_reject",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_reject",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ]
   }
