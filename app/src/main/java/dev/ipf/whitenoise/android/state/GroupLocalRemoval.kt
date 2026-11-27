@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -95,6 +96,8 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         onAdmitted()
         val account = request.account
         val groupIdHex = request.groupIdHex
+        val runtime = runtimeGeneration
+        val captureIsCurrent = localDeleteCaptureGuard(account, groupIdHex)
         val attempt =
             LocalGroupDeleteAttempt(
                 isCurrent = isCurrent,
@@ -128,24 +131,31 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                     preflightFallback = request.mediaPreflightFallback(),
                 ),
             )
-        onNativeCommitted()
-        if (pending != null) {
-            completeLocalGroupDeleteCleanup(pending, attempt)
-        } else {
-            true
+        withContext(NonCancellable) {
+            withContext(Dispatchers.Main.immediate) {
+                if (runtimeGeneration == runtime) receivedVoiceTranscripts.forgetGroup(account, groupIdHex)
+            }
+            onNativeCommitted()
+            if (pending != null) {
+                completeLocalGroupDeleteCleanup(pending, attempt, captureIsCurrent)
+            } else {
+                true
+            }
         }
     }
 
+/** Finishes immediate native commits under the same capture guard used by journal replay. */
 private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
     attempt: LocalGroupDeleteAttempt,
-) = withContext(NonCancellable) {
+    captureIsCurrent: () -> Boolean,
+): Boolean {
     var cleanupFailure: Throwable? = null
     val result =
         runCatching {
             attempt.phase(LocalDeletePhase.PostCommitCleanup) {
                 val complete =
-                    finishLocalGroupDeleteCleanup(pending) { failure ->
+                    finishLocalGroupDeleteCleanup(pending, captureIsCurrent) { failure ->
                         if (cleanupFailure == null) cleanupFailure = failure
                     }
                 if (!complete) throw requireNotNull(cleanupFailure)
@@ -156,7 +166,7 @@ private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
             appStateDebug(failure) { "local delete client cleanup deferred" }
             schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
         }
-    result.isSuccess
+    return result.isSuccess
 }
 
 private suspend fun WhiteNoiseAppState.prepareLocalGroupDeleteCleanup(
@@ -178,6 +188,7 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
         val runtime = runtimeGeneration
         localGroupDeleteCleanupJournal.pending().forEach { pending ->
             runCatchingCancellable {
+                val captureIsCurrent = localDeleteCaptureGuard(pending.account, pending.groupIdHex)
                 reconcilePendingLocalGroupDeleteCleanup(
                     pending = pending,
                     accountReady = {
@@ -188,10 +199,15 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
                     },
                     isGroupPresent = { nativeGroupPresent(pending.account, pending.groupIdHex) },
                     cleanup = {
-                        withContext(Dispatchers.Main.immediate) {
-                            dismissLocalDeleteFailure(it.account, it.groupIdHex)
+                        withContext(NonCancellable) {
+                            withContext(Dispatchers.Main.immediate) {
+                                if (runtimeGeneration == runtime) {
+                                    receivedVoiceTranscripts.forgetGroup(it.account, it.groupIdHex)
+                                }
+                                dismissLocalDeleteFailure(it.account, it.groupIdHex)
+                            }
+                            finishLocalGroupDeleteCleanup(it, captureIsCurrent)
                         }
-                        withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) }
                     },
                     finish = localGroupDeleteCleanupJournal::finish,
                 )
@@ -210,6 +226,7 @@ private suspend fun WhiteNoiseAppState.nativeGroupPresent(
 /** Returns false if any cleanup step failed so the durable intent can be retried later. */
 private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
+    captureIsCurrent: () -> Boolean,
     onFailure: (Throwable) -> Unit = {},
 ): Boolean {
     val account = pending.account
@@ -228,8 +245,19 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
             }
     }
 
+    val captureCleanupAdmitted =
+        withContext(Dispatchers.Main.immediate) {
+            if (!captureIsCurrent()) return@withContext false
+            cleanupStep("capture") {
+                check(releaseCaptureTarget(account, groupIdHex)) { "Could not retire voice drafts for removed chat" }
+            }
+            true
+        }
+    if (!captureCleanupAdmitted) {
+        onFailure(IllegalStateException("Local delete capture changed before cleanup"))
+        return false
+    }
     cleanupStep("launcher shortcuts") { removePinnedConversationShortcuts(account, groupIdHex) }
-    cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
     if (pending.mediaCacheKeys.isNotEmpty()) {
         cleanupStep("memory media") {
             removeMediaMemoryCacheKeys(
@@ -254,7 +282,12 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
         retryIdempotentRuntimeMutation {
             when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {
                 is MessageDraftMutationResult.Success -> Unit
-                is MessageDraftMutationResult.Failure -> throw deletion.cause
+                is MessageDraftMutationResult.Failure ->
+                    when (val failure = deletion.cause) {
+                        // The native removal committed; a forgotten group no longer has a draft to select.
+                        is MarmotKitException.UnknownGroup -> Unit
+                        else -> throw failure
+                    }
                 else -> error("unexpected draft deletion result: $deletion")
             }
         }
@@ -269,6 +302,7 @@ internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     account: String,
     groupIdHex: String,
 ) {
+    withContext(Dispatchers.Main.immediate) { receivedVoiceTranscripts.forgetGroup(account, groupIdHex) }
     val media =
         runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
             .getOrNull()

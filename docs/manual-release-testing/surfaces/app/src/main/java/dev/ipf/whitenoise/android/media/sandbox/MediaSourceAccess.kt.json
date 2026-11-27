@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-026"
         ]
+      },
+      {
+        "surface": "Local media preparation and playback bypass stalled content providers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/MediaSourceAccess.kt",
+        "anchor": "fun <T> withMediaUriInput(",
+        "test_ids": [
+          "MED-046"
+        ]
       }
     ]
   },

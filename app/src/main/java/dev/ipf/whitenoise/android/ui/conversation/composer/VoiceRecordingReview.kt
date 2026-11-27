@@ -88,9 +88,13 @@ internal class VoiceRecordingReview(
     private val onSendFailure: () -> Unit = {},
     private val onPlaybackFailure: () -> Unit = {},
     private val playback: VoiceReviewPlayback = NativeVoiceReviewPlayback,
-    private val deleteFile: (File) -> Unit = { file -> runCatching { file.delete() } },
+    private val deleteFile: (File) -> Boolean = { file ->
+        runCatching { file.delete() || !file.exists() }.getOrDefault(false)
+    },
     private val onReviewPresenceChanged: (Boolean) -> Unit = {},
     private val onSendInterrupted: () -> Unit = {},
+    private val onDiscardFailure: () -> Unit = {},
+    private val onAcceptedFile: (File) -> Unit = { deleteFile(it) },
 ) {
     var clip: VoiceReviewClip? by mutableStateOf(null)
         private set
@@ -125,7 +129,7 @@ internal class VoiceRecordingReview(
     ): Boolean {
         if (!isCurrent() || durationMs <= 0L) return false
         if (clip?.file != file) {
-            clip?.let { discard(it) }
+            clip?.let(::clearClip)
             clip = VoiceReviewClip(file, durationMs)
             onReviewPresenceChanged(true)
         }
@@ -164,25 +168,46 @@ internal class VoiceRecordingReview(
     /** Discards this exact take, leaving any replacement take untouched. */
     fun discard(expected: VoiceReviewClip): Boolean {
         if (clip !== expected) return false
-        stopPlayback(expected)
-        pendingSend = null
-        isSending = false
-        clip = null
-        // Disposal deletes private audio but retains the non-sensitive recreation warning.
-        if (!released) onReviewPresenceChanged(false)
+        clearClip(expected)
         deleteFile(expected.file)
         return true
     }
 
-    /** A user's Discard; refused while Send is preparing so the press can never revoke a send the user made. */
-    fun discardByUser(expected: VoiceReviewClip): Boolean = !isSending && discard(expected)
+    /** Revokes presentation of a take that has already left the process-level owner. */
+    fun clearAdopted() {
+        clip?.let(::clearClip)
+    }
+
+    /** Drops the visible take and revokes its pending playback and Send callbacks. */
+    private fun clearClip(expected: VoiceReviewClip) {
+        stopPlayback(expected)
+        pendingSend = null
+        isSending = false
+        clip = null
+        // Disposal retains the non-sensitive recreation warning.
+        if (!released) onReviewPresenceChanged(false)
+    }
+
+    /** A user discard clears the clip only after the exact take has been durably consumed. */
+    fun discardByUser(expected: VoiceReviewClip): Boolean {
+        val discarded = !isSending && owns(expected) && commitDiscard(expected)
+        if (discarded) clearClip(expected)
+        return discarded
+    }
+
+    /** Report a storage refusal while the user can still retry the same clip. */
+    private fun commitDiscard(expected: VoiceReviewClip): Boolean {
+        val discarded = deleteFile(expected.file)
+        if (!discarded) onDiscardFailure()
+        return discarded
+    }
 
     /** Starts a fresh native locked recording only after discarding the current review. */
     fun recordAgain(
         expected: VoiceReviewClip,
         start: () -> Unit,
     ) {
-        if (owns(expected) && !isSending && discard(expected)) start()
+        if (discardByUser(expected)) start()
     }
 
     /** Retains the take until the native queue seeds it; rejection leaves the same recording ready to retry. */
@@ -219,7 +244,7 @@ internal class VoiceRecordingReview(
         if (accepted) {
             clip = null
             onReviewPresenceChanged(false)
-            deleteFile(expected.file)
+            onAcceptedFile(expected.file)
         } else if (isCurrent()) {
             onSendFailure()
         }

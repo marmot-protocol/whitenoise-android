@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.ReceivedVoiceTranscripts
 
 /**
  * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
@@ -14,8 +17,29 @@ internal fun groupStateUpdateRemovesSelf(
 ): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
 
 /** Pending LEFT can still resolve to a joined account after cancellation. */
-internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
-    selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
+internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean = selfMembership.hasSettledDeparture(leaveRequestPending)
+
+/** Recognition and cached transcripts end when the group disbands or this device's departure settles. */
+internal fun AppGroupRecordFfi.endsVoiceTranscription(): Boolean = disbanded || hasSettledDeparture()
+
+/** The chat-list projection carries the same departure fence as a full group record. */
+internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
+    lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
+
+/** Synchronizes voice transcription scope with settled row membership. */
+internal fun ReceivedVoiceTranscripts.updateGroupMembership(
+    accountRef: String?,
+    row: ChatListRowFfi,
+) {
+    if (accountRef == null) return
+    val departed = row.endsVoiceTranscription()
+    if (departed || row.selfMembership == SelfMembershipFfi.MEMBER) {
+        updateGroupMembership(accountRef, row.groupIdHex, departed)
+    }
+}
+
+private fun SelfMembershipFfi.hasSettledDeparture(leaveRequestPending: Boolean): Boolean =
+    isNonMember() && !(this == SelfMembershipFfi.LEFT && leaveRequestPending)
 
 /** Distinguishes an actual eviction from a provisional voluntary departure. */
 internal fun SelfMembershipFfi.isGroupEviction(): Boolean =

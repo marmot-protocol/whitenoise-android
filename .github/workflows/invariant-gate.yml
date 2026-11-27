@@ -1,6 +1,6 @@
 name: Invariant gate
 
-# A pull request to master that closes a bug must change, name or exempt a
+# A pull request to master or develop that closes a bug must change, name or exempt a
 # registered invariant gate (docs/invariant-gates.md). The job reads PR metadata
 # with the default read-only token, needs no secrets and runs for fork pull
 # requests. `edited` re-runs it when the description gains or changes its
@@ -16,7 +16,7 @@ name: Invariant gate
 # that adds it), which falls back to the proposed checker with a warning.
 on:
   pull_request:
-    branches: [master]
+    branches: [master, develop]
     types: [opened, edited, reopened, synchronize]
 
 concurrency:

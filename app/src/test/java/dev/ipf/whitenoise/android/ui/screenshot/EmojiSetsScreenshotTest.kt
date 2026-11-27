@@ -52,6 +52,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 
 /** Version review and composer artwork in both themes and at enlarged RTL text. */
 @RunWith(RobolectricTestRunner::class)
@@ -258,9 +259,10 @@ class EmojiSetsScreenshotTest {
                 }
             }
         }
-        // The Unicode catalogue loads on a background thread, so its category tabs can arrive after the set's artwork.
+        // Wait for both the installed set and the background-loaded Unicode categories.
         val unicodeTab = emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople)
         composeRule.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper()
             composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty() &&
                 composeRule.onAllNodesWithTag(unicodeTab).fetchSemanticsNodes().isNotEmpty()
         }

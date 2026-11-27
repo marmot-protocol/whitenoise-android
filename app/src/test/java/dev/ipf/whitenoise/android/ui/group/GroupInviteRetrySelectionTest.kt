@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import android.os.Looper
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -44,6 +45,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -71,20 +73,20 @@ class GroupInviteRetrySelectionTest {
             selectAdmin(peerName)
             val adminLabel = context.getString(R.string.admin)
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-            composeRule.waitUntil { calls.size == 1 }
+            awaitController { calls.size == 1 }
             composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
                 .assertIsNotEnabled()
 
             composeRule.runOnIdle { reply.complete(Unit) }
-            composeRule.waitUntil { !controller.mutationInFlight }
+            awaitController { !controller.mutationInFlight }
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
                 .performClick()
             composeRule.onNodeWithContentDescription("$adminLabel, $peerName").performScrollTo().assertIsOn()
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-            composeRule.waitUntil { calls.size == 2 && !controller.mutationInFlight }
+            awaitController { calls.size == 2 && !controller.mutationInFlight }
             assertEquals(List(2) { listOf(PEER) to listOf(PEER) }, calls)
         } finally {
             reply.complete(Unit)
@@ -109,10 +111,10 @@ class GroupInviteRetrySelectionTest {
             composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().performClick()
             selectAdmin(peerName)
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-            composeRule.waitUntil { fixture.calls.size == 1 }
+            awaitController { fixture.calls.size == 1 }
             restoration.emulateSavedInstanceStateRestore()
             composeRule.runOnIdle { fixture.reply.complete(Unit) }
-            composeRule.waitUntil { !fixture.controller.mutationInFlight }
+            awaitController { !fixture.controller.mutationInFlight }
             composeRule.runOnIdle {
                 assertNull(fixture.controller.lastMutationError)
                 assertEquals(listOf(ConversationTimelineTestIds.ACCOUNT_ID, PEER), fixture.controller.group.admins)
@@ -126,6 +128,16 @@ class GroupInviteRetrySelectionTest {
             fixture.controller.onCleared()
         }
     }
+
+    /**
+     * Waits for [condition] while running the paused main looper. The controller finishes an invitation on the main
+     * thread after its background work, and `waitUntil` alone never runs that looper, so a late hop would time out.
+     */
+    private fun awaitController(condition: () -> Boolean) =
+        composeRule.waitUntil {
+            shadowOf(Looper.getMainLooper()).idle()
+            condition()
+        }
 
     /** Selects the named candidate and marks the retained invitation role as admin. */
     private fun selectAdmin(publicPeerName: String) {

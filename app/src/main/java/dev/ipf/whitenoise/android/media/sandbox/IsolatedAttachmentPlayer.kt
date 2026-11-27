@@ -107,8 +107,11 @@ internal class IsolatedAttachmentPlayer(
             .build()
     }
 
-    /** Delegates preparation to the single raw playback owner and returns its asynchronous completion. */
-    override fun handlePrepare(): ListenableFuture<*> = engine.prepare()
+    /** The engine publishes Buffering and completion independently of command submission. */
+    override fun handlePrepare(): ListenableFuture<*> {
+        engine.prepare()
+        return done()
+    }
 
     /** Updates requested playback through the engine so focus, pause and lifetime ownership stay centralized. */
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
@@ -116,12 +119,15 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
-    /** Queues the target media position through the retained raw session rather than reopening the URI. */
+    /** Acknowledge submission so Media3 keeps publishing engine state while the worker seeks. */
     override fun handleSeek(
         mediaItemIndex: Int,
         positionMs: Long,
         seekCommand: Int,
-    ): ListenableFuture<*> = engine.seekToAsync(positionMs)
+    ): ListenableFuture<*> {
+        engine.seekTo(positionMs)
+        return done()
+    }
 
     /** Applies bounded supported speed parameters through the existing raw PCM timing owner. */
     override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
@@ -197,7 +203,7 @@ internal class IsolatedAttachmentPlayer(
     fun setHandleAudioBecomingNoisy(enabled: Boolean) = engine.setHandleAudioBecomingNoisy(enabled)
 
     /** Builds presentation-only track descriptions from validated raw metadata. */
-    private fun tracks(state: RawAvPlaybackEngine.Snapshot): Tracks {
+    private fun tracks(state: RawAvPlaybackSnapshot): Tracks {
         val formats = ArrayList<Format>()
         if (state.videoWidth > 0 && state.videoHeight > 0) {
             formats +=
@@ -251,7 +257,7 @@ internal class IsolatedAttachmentPlayer(
         )
     }
 
-    /** Acknowledges synchronous presentation-only changes with an already completed Player future. */
+    /** Acknowledges a submitted command without blocking engine state publications. */
     private fun done(): ListenableFuture<Void?> = SettableFuture.create<Void?>().apply { set(null) }
 
     companion object {

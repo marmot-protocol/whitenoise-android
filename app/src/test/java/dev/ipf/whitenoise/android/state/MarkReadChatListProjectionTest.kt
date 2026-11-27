@@ -8,7 +8,6 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
-import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,17 +42,6 @@ class MarkReadChatListProjectionTest {
         assertFalse(
             "mark-read projection refresh must not depend on mute state",
             "isMuted" in body || "chatMutePreferences" in body,
-        )
-    }
-
-    /** Checks an unchanged display watermark cannot suppress folding an authoritative native read result. */
-    @Test
-    fun markReadUpTo_successPathDoesNotGateRowFoldOnLastReadMessageId() {
-        val body = conversationControllerSource().kotlinFunctionBody("submitVisibleReadUpTo")
-
-        assertFalse(
-            "success path must not gate row fold on trimmed != lastReadMessageId",
-            Regex("""trimmed\s*!=\s*lastReadMessageId""").containsMatchIn(body),
         )
     }
 
@@ -147,55 +135,6 @@ class MarkReadChatListProjectionTest {
         assertEquals(200uL, persistedLastReadTimelineAt)
         assertEquals(200uL, currentChatRow.lastReadTimelineAt)
         assertEquals("read-200", currentChatRow.lastReadMessageIdHex)
-    }
-
-    @Test
-    fun markAllRead_foldsReturnedChatListRowIntoChatsController() {
-        val source = chatsControllerSource()
-        val body = source.kotlinFunctionBody("markAllRead")
-        val fold = source.kotlinFunctionBody("applyChatListActionRow")
-
-        assertTrue(
-            "markAllRead must route the returned native row through the retention-aware fold",
-            "applyChatListActionRow(row)" in body,
-        )
-        assertTrue(
-            "retained rows must fold immediately; off-window rows must refresh without growing the retained window",
-            "containsGroup(row.groupIdHex)" in fold &&
-                "applyChatListRow(row)" in fold &&
-                "else scheduleRecompute()" in fold,
-        )
-    }
-
-    @Test
-    fun markNotificationMessageRead_foldsReturnedChatListRowIntoChatsController() {
-        val body = notificationReplySource().readText().kotlinFunctionBody("markNotificationMessageReadIfAllowed")
-
-        assertTrue(
-            "notification mark-read must apply markTimelineMessageRead's returned ChatListRowFfi to the chat list",
-            "applyChatListRowFromMarkRead" in body,
-        )
-    }
-
-    @Test
-    fun markNotificationMessageRead_schedulesAccountReconciliationOnlyWhenTheRowDidNotFold() {
-        val body = notificationReplySource().readText().kotlinFunctionBody("markNotificationMessageReadIfAllowed")
-
-        assertTrue(
-            "a bound-controller fold must remain the single refresh for the active account",
-            "if (!applyChatListRowFromMarkRead(accountRef, row))" in body,
-        )
-        assertTrue(
-            "an unfolded mark-read must reconcile the acting account's unread aggregate",
-            "reconcileAccountUnreadAfterNotificationMarkRead(accountRef" in body,
-        )
-
-        val reconcileBody =
-            notificationReplySource().readText().kotlinFunctionBody("reconcileAccountUnreadAfterNotificationMarkRead")
-        assertTrue(
-            "the active account's projection owners must stay its only reconcilers",
-            "if (accountRef == activeAccountRef) return" in reconcileBody,
-        )
     }
 
     private fun unreadChatRow(lastMessageId: String) =

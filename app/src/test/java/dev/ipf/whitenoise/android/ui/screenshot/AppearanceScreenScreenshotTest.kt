@@ -47,6 +47,10 @@ class AppearanceScreenScreenshotTest {
     val composeRule = createComposeRule()
 
     private val originalTimeZone = TimeZone.getDefault()
+    private val originalTimeFormat = DateTimeFormatState.timeFormat
+    private val originalDateFormat = DateTimeFormatState.dateFormat
+    private val originalSystem24Hour = DateTimeFormatState.system24Hour
+    private val originalDeviceRegion = DateTimeFormatState.deviceRegion
 
     /** Keeps the synthetic sample timestamps independent of the host timezone. */
     @Before
@@ -57,10 +61,14 @@ class AppearanceScreenScreenshotTest {
         DateTimeFormatState.deviceRegion = null
     }
 
-    /** Restores the host timezone for subsequent tests. */
+    /** Restores process-wide date and time inputs for subsequent tests. */
     @After
-    fun restoreTimeZone() {
+    fun restoreTimeFormatting() {
         TimeZone.setDefault(originalTimeZone)
+        DateTimeFormatState.timeFormat = originalTimeFormat
+        DateTimeFormatState.dateFormat = originalDateFormat
+        DateTimeFormatState.system24Hour = originalSystem24Hour
+        DateTimeFormatState.deviceRegion = originalDeviceRegion
     }
 
     /** Default light rendering with the System theme card selected. */
