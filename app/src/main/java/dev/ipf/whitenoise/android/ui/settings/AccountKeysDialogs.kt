@@ -26,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
@@ -64,12 +65,16 @@ internal fun ProfileKeysDialogs(
             } else {
                 null
             }
-        // Keep the live region present so the failed attempt updates an existing accessibility node.
+        // Updating the description sends an Android content-change event from this live region.
         Column(
             modifier =
                 Modifier.clearAndSetSemantics {
                     liveRegion = LiveRegionMode.Polite
-                    text = AnnotatedString(if (notice == null) titleText else "$titleText\n$notice")
+                    if (notice == null) {
+                        text = AnnotatedString(titleText)
+                    } else {
+                        contentDescription = "$titleText\n$notice"
+                    }
                 },
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {

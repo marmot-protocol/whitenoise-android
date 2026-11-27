@@ -27,7 +27,7 @@ class AccountKeysAccessibilityAndroidTest {
     @Test
     fun rawExportReportsTheScreenLockRequirementToAccessibilityServices() {
         val ui = ProfileKeysUiState().apply { openRawExport() }
-        assertPoliteTextChange(ui, R.string.keep_your_private_key_safe, R.string.export_nsec)
+        assertPoliteLiveRegionEvent(ui, R.string.keep_your_private_key_safe, R.string.export_nsec)
     }
 
     @Test
@@ -38,11 +38,11 @@ class AccountKeysAccessibilityAndroidTest {
                 password.setTextAndPlaceCursorAtEnd(TEST_PASSPHRASE)
                 confirmation.setTextAndPlaceCursorAtEnd(TEST_PASSPHRASE)
             }
-        assertPoliteTextChange(ui, R.string.encrypted_private_key, R.string.export)
+        assertPoliteLiveRegionEvent(ui, R.string.encrypted_private_key, R.string.export)
     }
 
     @Suppress("DEPRECATION") // Pre-33 accessibility events still need recycling.
-    private fun assertPoliteTextChange(
+    private fun assertPoliteLiveRegionEvent(
         ui: ProfileKeysUiState,
         @StringRes titleRes: Int,
         @StringRes actionRes: Int,
@@ -76,7 +76,7 @@ class AccountKeysAccessibilityAndroidTest {
             val event =
                 automation.executeAndWaitForEvent(
                     { composeRule.onNodeWithText(action).performClick() },
-                    { it.isPoliteTextChange("$title\n$notice") },
+                    { it.isPoliteDescriptionChange("$title\n$notice") },
                     ACCESSIBILITY_TIMEOUT_MILLIS,
                 )
             event.recycle()
@@ -85,14 +85,17 @@ class AccountKeysAccessibilityAndroidTest {
         }
     }
 
-    private fun AccessibilityEvent.isPoliteTextChange(expected: String): Boolean {
+    private fun AccessibilityEvent.isPoliteDescriptionChange(expected: String): Boolean {
         if (eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
-            contentChangeTypes and AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT == 0
+            contentChangeTypes and AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION == 0 ||
+            contentDescription?.toString() != expected
         ) {
             return false
         }
-        val node = source ?: return false
-        return node.liveRegion == View.ACCESSIBILITY_LIVE_REGION_POLITE && node.text?.toString() == expected
+        val node = source
+        return node != null &&
+            node.liveRegion == View.ACCESSIBILITY_LIVE_REGION_POLITE &&
+            node.contentDescription?.toString() == expected
     }
 
     private companion object {

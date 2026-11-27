@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -147,7 +148,7 @@ class AccountKeysExportDeliveryTest {
 
         dialogButton(actionRes).performClick()
 
-        region.assertIsDisplayed().assert(hasText("$title\n$notice"))
+        region.assertIsDisplayed().assert(hasContentDescription("$title\n$notice"))
         assertEquals(regionId, region.fetchSemanticsNode().id)
     }
 
