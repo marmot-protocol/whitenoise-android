@@ -65,6 +65,7 @@ class RemoteSignerPairingTest {
             assertFalse("a handed-over session is never cancelled by the flow", session.cancelled)
         }
 
+    /** Pairing by code starts only after approval and has no bunker link to clear. */
     @Test
     fun connectionCodeAppearsOnlyAfterApprovalAndTheListenerIsReady() =
         runTest {
@@ -91,6 +92,7 @@ class RemoteSignerPairingTest {
             session.connectReply.complete(ACCOUNT)
             runCurrent()
             assertEquals(RemoteSignerStep.Done, flow.step)
+            assertTrue(host.spentLinks.isEmpty())
         }
 
     @Test
@@ -151,11 +153,13 @@ class RemoteSignerPairingTest {
             assertTrue(session.completedAuth.isEmpty())
         }
 
+    /** A rejected connection has not spent the link and can try the same session again. */
     @Test
     fun declinedPairingCanBeRetriedOnTheSameSession() =
         runTest {
             val session = FakeRemoteSignerSession()
-            val flow = pairing(FakeRemoteSignerHost(session))
+            val host = FakeRemoteSignerHost(session)
+            val flow = pairing(host)
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
             runCurrent()
             flow.approve()
@@ -164,6 +168,7 @@ class RemoteSignerPairingTest {
             session.connectReply.completeExceptionally(Nip46ErrorFfi.Rejected())
             runCurrent()
             assertEquals(RemoteSignerStep.Failed(RemoteSignerFailure.Declined), flow.step)
+            assertTrue(host.spentLinks.isEmpty())
 
             session.connectReply = kotlinx.coroutines.CompletableDeferred()
             flow.retry()
@@ -196,6 +201,7 @@ class RemoteSignerPairingTest {
             assertTrue(session.cancelled)
         }
 
+    /** Leaving a running attempt revokes both its account handoff and its clipboard cleanup. */
     @Test
     fun cancellingDuringPairingDiscardsTheSessionAndIgnoresItsLateReply() =
         runTest {
@@ -213,6 +219,7 @@ class RemoteSignerPairingTest {
             runCurrent()
             assertEquals("a stale reply cannot revive the flow", RemoteSignerStep.EnterLink, flow.step)
             assertTrue(host.finished.isEmpty())
+            assertTrue(host.spentLinks.isEmpty())
         }
 
     @Test

@@ -4,10 +4,12 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.os.PersistableBundle
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.clearClipboardIfHolding
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -119,6 +121,29 @@ class SensitiveClipboardTest {
         assertFalse(clipboard.hasPrimaryClip())
     }
 
+    /** A URI clip pasted as bunker text is cleared, and replacing it with another clip keeps the new text. */
+    @Test
+    fun spentBunkerLinkClearsOnlyTheMatchingCoercedClip() {
+        clipboard.setPrimaryClip(ClipData.newPlainText("Note", OTHER))
+        clearClipboardIfHolding(context, BUNKER)
+        assertEquals(OTHER, clipboard.primaryClipPlainText(context))
+
+        clipboard.setPrimaryClip(ClipData.newRawUri("Remote signer", Uri.parse(BUNKER)))
+        assertEquals(BUNKER, clipboard.primaryClipPlainText(context))
+        clearClipboardIfHolding(context, BUNKER)
+        assertFalse(clipboard.hasPrimaryClip())
+    }
+
+    /** A hidden clipboard gives no evidence that it still holds the spent bunker link. */
+    @Test
+    fun spentBunkerLinkKeepsAnUnreadableClipboard() {
+        clipboard.setPrimaryClip(ClipData.newPlainText("Remote signer", BUNKER))
+        HidingClipboardShadow.hidden = true
+        clearClipboardIfHolding(context, BUNKER)
+        HidingClipboardShadow.hidden = false
+        assertEquals(BUNKER, clipboard.primaryClipPlainText(context))
+    }
+
     private fun pendingClear(): WorkInfo = pendingSensitiveClear(context)
 
     private fun reachDeadline() = reachSensitiveClipDeadline(context)
@@ -152,5 +177,6 @@ class SensitiveClipboardTest {
         const val SECRET = "nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
         const val SECOND_SECRET = "ncryptsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
         const val OTHER = "meeting notes"
+        const val BUNKER = "bunker://test?relay=wss://signer.example"
     }
 }

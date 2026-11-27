@@ -104,16 +104,14 @@ internal class RemoteSignerEntry(
     val link: String?,
 )
 
-/** Clears the clipboard only while it still holds [used]. */
-private fun clearClipboardIfHolding(
+/** Clears the spent link only while the clipboard still holds it, without interrupting sign-in. */
+internal fun clearClipboardIfHolding(
     context: Context,
     used: String,
 ) {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    try {
+    runCatching {
         val text = clipboard.primaryClip?.takeIf { it.itemCount == 1 }?.plainText(context)
         if (text?.trim() == used) clearSensitiveClipboard(context)
-    } catch (_: SecurityException) {
-        // Android may revoke access between the handshake and the clipboard comparison.
     }
 }
