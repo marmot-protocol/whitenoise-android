@@ -134,9 +134,12 @@ class RetainedAvatarNavigationCoverageTest {
             owner = rememberRetainedGroupAvatarPreparation(state, account, surface)
             SideEffect { ownerCommits++ }
             ObserveRetainedAvatarPixels(owner) { pixels ->
-                shown = assets.take(2).mapNotNull { asset ->
-                    pixels.imageFor(asset, checkNotNull(asset.cacheKey(ACCOUNT)))
-                }.singleOrNull()
+                shown =
+                    assets
+                        .take(2)
+                        .mapNotNull { asset ->
+                            pixels.imageFor(asset, checkNotNull(asset.cacheKey(ACCOUNT)))
+                        }.singleOrNull()
             }
         }
         rule.waitForIdle()
