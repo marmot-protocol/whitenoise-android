@@ -7099,7 +7099,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        accountRef?.let { releaseCaptureTarget(it, groupIdHex) }
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
