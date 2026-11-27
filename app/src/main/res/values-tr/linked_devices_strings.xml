@@ -93,6 +93,14 @@
     <string name="link_request_linked">Yeni cihaz bağlandı.</string>
     <string name="link_request_added_elsewhere">%1$s, %2$s tarafından eklendi.</string>
     <string name="link_request_added_elsewhere_unnamed">Cihaz, başka bir cihazınız tarafından eklendi.</string>
+    <string name="link_request_notice">Yeni bir cihaz hesabınıza bağlanmak istiyor.</string>
+    <string name="link_request_notice_other_profile">Yeni bir cihaz %1$s profiline bağlanmak istiyor.</string>
+    <string name="link_request_repeated_notice">Tekrarlanan bağlama istekleri: anahtarınız başkasının elinde olabilir.</string>
+    <string name="link_request_repeated_notice_other_profile">%1$s için tekrarlanan bağlama istekleri: anahtarınız başkasının elinde olabilir.</string>
+    <string name="link_request_repeated_title">Tekrarlanan bağlama istekleri</string>
+    <string name="link_request_repeated_detail">Bir saat içinde birden fazla kez cihazlar bu hesaba bağlanmak istedi. Özel anahtarınız başkasının elinde olabilir, bu yüzden bağlama sunulmuyor. Bu istekleri siz yaptıysanız daha sonra tek bir cihazdan yeniden deneyin.</string>
+    <string name="link_request_dont_link">Bağlamayın</string>
+    <string name="link_request_review_devices">Cihazları incele</string>
     <string name="device_detail_rename">Yeniden adlandır</string>
     <string name="device_detail_rename_detail">Bu cihaz için tüm cihazlarınızda gösterilen ad.</string>
     <string name="device_detail_keep">Etkin değilken tut</string>

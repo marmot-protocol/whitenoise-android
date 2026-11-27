@@ -93,6 +93,14 @@
     <string name="link_request_linked">新设备已关联。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 添加。</string>
     <string name="link_request_added_elsewhere_unnamed">该设备已由你的另一台设备添加。</string>
+    <string name="link_request_notice">有新设备请求关联到你的账户。</string>
+    <string name="link_request_notice_other_profile">有新设备请求关联到 %1$s。</string>
+    <string name="link_request_repeated_notice">重复的关联请求：可能有人掌握了你的密钥。</string>
+    <string name="link_request_repeated_notice_other_profile">%1$s 收到重复的关联请求：可能有人掌握了你的密钥。</string>
+    <string name="link_request_repeated_title">重复的关联请求</string>
+    <string name="link_request_repeated_detail">一小时内有设备多次请求关联到此账户。可能有人掌握了你的私钥，因此不提供关联。如果这些请求是你自己发出的，请稍后从一台设备重试。</string>
+    <string name="link_request_dont_link">不关联</string>
+    <string name="link_request_review_devices">检查设备</string>
     <string name="device_detail_rename">重命名</string>
     <string name="device_detail_rename_detail">此设备在你所有设备上显示的名称。</string>
     <string name="device_detail_keep">不活跃时保留</string>

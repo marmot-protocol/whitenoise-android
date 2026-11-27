@@ -93,6 +93,14 @@
     <string name="link_request_linked">新裝置已連結。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 新增。</string>
     <string name="link_request_added_elsewhere_unnamed">該裝置已由你的另一部裝置新增。</string>
+    <string name="link_request_notice">有新裝置要求連結到你的帳號。</string>
+    <string name="link_request_notice_other_profile">有新裝置要求連結到 %1$s。</string>
+    <string name="link_request_repeated_notice">重複的連結要求：可能有人持有你的金鑰。</string>
+    <string name="link_request_repeated_notice_other_profile">%1$s 收到重複的連結要求：可能有人持有你的金鑰。</string>
+    <string name="link_request_repeated_title">重複的連結要求</string>
+    <string name="link_request_repeated_detail">一小時內有裝置多次要求連結到此帳號。可能有人持有你的私密金鑰，因此不提供連結。如果這些要求是你自己發出的，請稍後從一部裝置重試。</string>
+    <string name="link_request_dont_link">不要連結</string>
+    <string name="link_request_review_devices">檢查裝置</string>
     <string name="device_detail_rename">重新命名</string>
     <string name="device_detail_rename_detail">此裝置在你所有裝置上顯示的名稱。</string>
     <string name="device_detail_keep">不活躍時保留</string>

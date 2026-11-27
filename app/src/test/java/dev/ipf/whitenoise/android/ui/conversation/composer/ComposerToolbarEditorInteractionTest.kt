@@ -48,6 +48,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -58,6 +59,8 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w420dp-h1000dp-mdpi")
 class ComposerToolbarEditorInteractionTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @get:Rule val visualErrors = ErrorCollector()
 
     @Test
     fun liftedShortcutPreservesContactAndSettlesIntoTheCommittedSlot() = assertLiftAndSettle(rtl = false)
@@ -187,15 +190,17 @@ class ComposerToolbarEditorInteractionTest {
         assertEquals("first committed drag frame", before + 16L, composeRule.mainClock.currentTime)
     }
 
-    /** Each frame is owned by its actual motion test in both distributions. */
+    /** Compares every drag frame before reporting screenshot failures. */
     private fun captureDragFrame(
         rtl: Boolean,
         frame: String,
     ) {
         val direction = if (rtl) "large_rtl" else "amoled"
-        composeRule
-            .onNodeWithTag("composer.customize")
-            .captureRoboImage("src/test/snapshots/composer_toolbar_drag_${direction}_$frame.png")
+        visualErrors.checkSucceeds {
+            composeRule
+                .onNodeWithTag("composer.customize")
+                .captureRoboImage("src/test/snapshots/composer_toolbar_drag_${direction}_$frame.png")
+        }
     }
 
     /** Icon-only shortcuts distinguish account identity, people, contacts, files and polls. */

@@ -93,6 +93,14 @@
     <string name="link_request_linked">Le nouvel appareil est associé.</string>
     <string name="link_request_added_elsewhere">%1$s a été ajouté par %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">L’appareil a été ajouté par un autre de vos appareils.</string>
+    <string name="link_request_notice">Un nouvel appareil demande à être associé à votre compte.</string>
+    <string name="link_request_notice_other_profile">Un nouvel appareil demande à être associé à %1$s.</string>
+    <string name="link_request_repeated_notice">Demandes d’association répétées : quelqu’un a peut-être votre clé.</string>
+    <string name="link_request_repeated_notice_other_profile">Demandes d’association répétées pour %1$s : quelqu’un a peut-être votre clé.</string>
+    <string name="link_request_repeated_title">Demandes d’association répétées</string>
+    <string name="link_request_repeated_detail">Des appareils ont demandé à être associés à ce compte plusieurs fois en moins d’une heure. Quelqu’un a peut-être votre clé privée, l’association n’est donc pas proposée. Si vous avez fait ces demandes vous-même, réessayez plus tard depuis un seul appareil.</string>
+    <string name="link_request_dont_link">Ne pas associer</string>
+    <string name="link_request_review_devices">Vérifier les appareils</string>
     <string name="device_detail_rename">Renommer</string>
     <string name="device_detail_rename_detail">Le nom affiché pour cet appareil sur tous vos appareils.</string>
     <string name="device_detail_keep">Conserver même s’il est inactif</string>

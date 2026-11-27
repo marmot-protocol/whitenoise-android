@@ -130,11 +130,11 @@ class GroupInviteRetrySelectionTest {
     }
 
     /**
-     * Waits for [condition] while running the paused main looper. The controller finishes an invitation on the main
-     * thread after its background work, and `waitUntil` alone never runs that looper, so a late hop would time out.
+     * Gives the invitation's background work time to complete while running the paused main looper for controller
+     * updates. `waitUntil` alone does not run that looper.
      */
     private fun awaitController(condition: () -> Boolean) =
-        composeRule.waitUntil {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
             shadowOf(Looper.getMainLooper()).idle()
             condition()
         }

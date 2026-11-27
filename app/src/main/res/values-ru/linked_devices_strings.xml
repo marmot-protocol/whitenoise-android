@@ -93,6 +93,14 @@
     <string name="link_request_linked">Новое устройство связано.</string>
     <string name="link_request_added_elsewhere">%1$s добавлено устройством %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Устройство добавлено другим вашим устройством.</string>
+    <string name="link_request_notice">Новое устройство просит связать его с вашим аккаунтом.</string>
+    <string name="link_request_notice_other_profile">Новое устройство просит связать его с профилем %1$s.</string>
+    <string name="link_request_repeated_notice">Повторные запросы на связывание: возможно, у кого-то есть ваш ключ.</string>
+    <string name="link_request_repeated_notice_other_profile">Повторные запросы на связывание для %1$s: возможно, у кого-то есть ваш ключ.</string>
+    <string name="link_request_repeated_title">Повторные запросы на связывание</string>
+    <string name="link_request_repeated_detail">Устройства просили связать их с этим аккаунтом несколько раз за час. Возможно, у кого-то есть ваш закрытый ключ, поэтому связывание не предлагается. Если эти запросы отправили вы, повторите попытку позже с одного устройства.</string>
+    <string name="link_request_dont_link">Не связывать</string>
+    <string name="link_request_review_devices">Проверить устройства</string>
     <string name="device_detail_rename">Переименовать</string>
     <string name="device_detail_rename_detail">Название этого устройства, которое видно на всех ваших устройствах.</string>
     <string name="device_detail_keep">Сохранять при неактивности</string>
