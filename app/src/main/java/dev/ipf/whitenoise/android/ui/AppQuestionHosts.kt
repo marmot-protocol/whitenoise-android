@@ -39,7 +39,7 @@ internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
         val compromiseDue = alerts.snapshot(appState.activeAccountRef)?.alertDue?.isNotEmpty() == true
         val linkBlocked = questionsBlocked || compromiseDue || alerts.devicesRequest != null
         DeviceLinkRequestHost(appState, blocked = linkBlocked)
-        DeviceLinkOfferHost(appState, blocked = linkBlocked)
+        DeviceLinkOfferHost(appState, blocked = questionsBlocked)
         UnlinkedAccountPromptHost(appState, blocked = appState.appLock.screenVisible)
         UnlinkedProfileRemovalHost(appState, blocked = appState.appLock.screenVisible)
         // Evidence that the key may be in someone else's hands interrupts once per item, after unlock.
