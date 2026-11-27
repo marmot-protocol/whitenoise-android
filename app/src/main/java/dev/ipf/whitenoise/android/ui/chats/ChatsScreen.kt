@@ -77,23 +77,19 @@ import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
-import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
-import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
 import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.hasFolderWindows
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
 import dev.ipf.whitenoise.android.state.loadMoreFolderChats
-import dev.ipf.whitenoise.android.state.localDeleteBatchRetryNotice
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
-import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
@@ -101,9 +97,6 @@ import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -113,7 +106,6 @@ import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
-import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -581,10 +573,11 @@ internal fun ChatsScreen(
     LaunchedEffect(completeSelectAllScope) { completeSelection = null }
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
-    var pendingBulkDelete by
+    val pendingBulkDeleteState =
         remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
             mutableStateOf<PendingLocalChatDelete?>(null)
         }
+    var pendingBulkDelete by pendingBulkDeleteState
     val searchFocusRequester = rememberGlobalSearchShortcut(searchOpen, selectionMode, onGlobalSearchStateChange)
     val scope = rememberCoroutineScope()
 
@@ -2721,80 +2714,14 @@ internal fun ChatsScreen(
         )
     }
 
-    pendingBulkDelete?.let { request ->
-        val isCurrent = { request.isCurrent(appState, controller) }
-        ChatDeleteConfirmationDialog(
-            ownerKey = request,
-            count = request.groupIds.size,
-            confirmEnabled = isCurrent(),
-            identity = {
-                GroupActingAccountIdentity(appState, request.actingAccountRef)
-                request.reviewItems.forEach { item ->
-                    val avatar = rememberChatListGroupAvatar(appState, item)
-                    GroupReviewDestinationIdentity(
-                        MemberReviewGroup(
-                            item.group.groupIdHex,
-                            chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                            avatar.pictureUrl,
-                            avatar.image,
-                            groupAnimation = avatar.groupAnimation,
-                        ),
-                        actionLabel = stringResource(R.string.delete_from_device),
-                    )
-                }
-            },
-            onConfirm = {
-                if (pendingBulkDelete !== request) return@ChatDeleteConfirmationDialog
-                pendingBulkDelete = null
-                if (!isCurrent()) return@ChatDeleteConfirmationDialog
-                if (request.groupIds.any { it in leavingAndDeleting }) {
-                    return@ChatDeleteConfirmationDialog
-                }
-                clearSelection()
-                appState.launchMutation {
-                    var failure: Throwable? = null
-                    var cleanupDeferred = false
-                    val observer =
-                        LocalChatDeleteObserver(
-                            onFailure = { failure = it },
-                            onCleanupDeferred = { cleanupDeferred = true },
-                        )
-                    val result =
-                        deleteLocalChatsBatch(request.groupIds, isCurrent) { groupId ->
-                            controller.deleteGroupLocalFromChatList(
-                                groupId,
-                                notify = false,
-                                observer = observer,
-                                requireNativeEligibility = request.requireNativeEligibility,
-                            )
-                        }
-                    if (isCurrent() && result.deleted < result.total) {
-                        val remaining = request.remaining(result.deleted)
-                        appState.presentStoppedLocalChatDeleteBatch(
-                            result,
-                            failure,
-                            notice =
-                                appState.localDeleteBatchRetryNotice(
-                                    controller,
-                                    remaining.groupIds,
-                                    isCurrent,
-                                    requireNativeEligibility = request.requireNativeEligibility,
-                                ),
-                        )
-                    } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
-                        appState.presentTransient(
-                            context.resources.getQuantityString(
-                                R.plurals.toast_chat_list_chats_deleted,
-                                result.deleted,
-                                result.deleted,
-                            ),
-                        )
-                    }
-                }
-            },
-            onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null },
-        )
-    }
+    ChatListLocalDeleteConfirmation(
+        appState = appState,
+        controller = controller,
+        pendingRequest = pendingBulkDeleteState,
+        busyChats = leavingAndDeleting,
+        groupTitleCopy = groupTitleCopy,
+        onAccepted = ::clearSelection,
+    )
 }
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the

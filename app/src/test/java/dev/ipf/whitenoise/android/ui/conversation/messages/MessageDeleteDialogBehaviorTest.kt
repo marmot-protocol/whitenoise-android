@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +44,7 @@ class MessageDeleteDialogBehaviorTest {
         vararg args: Any,
     ): String = app.getString(resId, *args)
 
-    private fun renderDialogContent(
+    private fun renderDialog(
         capability: MessageDeleteCapability,
         mine: Boolean,
         senderDisplayName: String = "Member",
@@ -56,24 +55,22 @@ class MessageDeleteDialogBehaviorTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                Surface {
-                    MessageDeleteDialogContent(
-                        capability = capability,
-                        mine = mine,
-                        senderDisplayName = senderDisplayName,
-                        deleteInFlight = deleteInFlight,
-                        onDeleteForEveryone = onDeleteForEveryone,
-                        onDeleteForMe = onDeleteForMe,
-                        onCancel = onCancel,
-                    )
-                }
+                MessageDeleteDialog(
+                    capability = capability,
+                    mine = mine,
+                    senderDisplayName = senderDisplayName,
+                    deleteInFlight = deleteInFlight,
+                    onDeleteForEveryone = onDeleteForEveryone,
+                    onDeleteForMe = onDeleteForMe,
+                    onDismissRequest = onCancel,
+                )
             }
         }
     }
 
     @Test
     fun bothChoicesRenderWhenBothScopesAreAuthorized() {
-        renderDialogContent(
+        renderDialog(
             capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
             mine = true,
         )
@@ -85,7 +82,7 @@ class MessageDeleteDialogBehaviorTest {
 
     @Test
     fun onlyLocalChoiceRendersWithoutRemoteAuthorization() {
-        renderDialogContent(
+        renderDialog(
             capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = false),
             mine = false,
         )
@@ -96,7 +93,7 @@ class MessageDeleteDialogBehaviorTest {
 
     @Test
     fun moderatorRemovalShowsSenderScopedCopyWithoutAdminBranding() {
-        renderDialogContent(
+        renderDialog(
             capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
             mine = false,
             senderDisplayName = "Maple Bat",
@@ -113,7 +110,7 @@ class MessageDeleteDialogBehaviorTest {
     fun deleteForMeInvokesOnlyTheLocalPath() {
         var localDeletes = 0
         var remoteDeletes = 0
-        renderDialogContent(
+        renderDialog(
             capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
             mine = true,
             onDeleteForMe = { localDeletes += 1 },
@@ -127,7 +124,7 @@ class MessageDeleteDialogBehaviorTest {
 
     @Test
     fun inFlightDeleteDisablesBothDestructiveChoices() {
-        renderDialogContent(
+        renderDialog(
             capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
             mine = true,
             deleteInFlight = true,
@@ -145,24 +142,22 @@ class MessageDeleteDialogBehaviorTest {
             // flag, which disables the option before a second tap can land.
             var inFlight by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = false) {
-                Surface {
-                    MessageDeleteDialogContent(
-                        capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
-                        mine = true,
-                        senderDisplayName = "Member",
-                        deleteInFlight = inFlight,
-                        onDeleteForEveryone = {
-                            // Same reentry guard as the production wiring: a
-                            // disabled node's semantics click action can still
-                            // fire under the test harness.
-                            if (inFlight) return@MessageDeleteDialogContent
-                            remoteDeletes += 1
-                            inFlight = true
-                        },
-                        onDeleteForMe = {},
-                        onCancel = {},
-                    )
-                }
+                MessageDeleteDialog(
+                    capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
+                    mine = true,
+                    senderDisplayName = "Member",
+                    deleteInFlight = inFlight,
+                    onDeleteForEveryone = {
+                        // Same reentry guard as the production wiring: a
+                        // disabled node's semantics click action can still
+                        // fire under the test harness.
+                        if (inFlight) return@MessageDeleteDialog
+                        remoteDeletes += 1
+                        inFlight = true
+                    },
+                    onDeleteForMe = {},
+                    onDismissRequest = {},
+                )
             }
         }
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).performClick()
@@ -181,23 +176,21 @@ class MessageDeleteDialogBehaviorTest {
             // error toast never has to explain a vanished surface.
             var inFlight by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = false) {
-                Surface {
-                    MessageDeleteDialogContent(
-                        capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
-                        mine = true,
-                        senderDisplayName = "Member",
-                        deleteInFlight = inFlight,
-                        onDeleteForEveryone = {
-                            attempts += 1
-                            inFlight = true
-                            // The publish fails: the completion path resets the
-                            // flag without dismissing.
-                            inFlight = false
-                        },
-                        onDeleteForMe = {},
-                        onCancel = {},
-                    )
-                }
+                MessageDeleteDialog(
+                    capability = MessageDeleteCapability(canDeleteForMe = true, canDeleteForEveryone = true),
+                    mine = true,
+                    senderDisplayName = "Member",
+                    deleteInFlight = inFlight,
+                    onDeleteForEveryone = {
+                        attempts += 1
+                        inFlight = true
+                        // The publish fails: the completion path resets the
+                        // flag without dismissing.
+                        inFlight = false
+                    },
+                    onDeleteForMe = {},
+                    onDismissRequest = {},
+                )
             }
         }
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).performClick()
