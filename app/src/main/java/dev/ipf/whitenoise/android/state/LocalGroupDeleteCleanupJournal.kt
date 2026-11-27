@@ -71,12 +71,18 @@ internal class LocalGroupDeleteCleanupJournal(
             .mapTo(HashSet()) { it.groupIdHex }
     }
 
-    /** Reads each journal entry in [files] once, keeping a failure for the caller to skip or propagate. */
+    /**
+     * Reads each committed journal entry in [files] once, keeping a failure for the caller to skip or propagate. An
+     * entry is committed once its base file or `.bak` backup exists; a lone `.new` file is a stage that never
+     * committed, so no native delete was admitted for it.
+     */
     private fun readEntries(files: Array<out File>): List<Result<PendingLocalGroupDeleteCleanup>> =
         files
             .mapNotNull { file ->
-                val name = file.name.removeSuffix(".bak").removeSuffix(".new")
-                name.takeIf { it.endsWith(FILE_SUFFIX) }
+                file.name
+                    .takeUnless { it.endsWith(".new") }
+                    ?.removeSuffix(".bak")
+                    ?.takeIf { it.endsWith(FILE_SUFFIX) }
             }.distinct()
             .map { name ->
                 runCatching {

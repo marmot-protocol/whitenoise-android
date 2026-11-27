@@ -147,7 +147,11 @@ class LocalGroupDeleteCleanupJournalTest {
         val incomplete = java.io.File(committed.path + ".new")
         incomplete.writeText("incomplete")
         committed.delete()
-        assertEquals(null, LocalGroupDeleteCleanupJournal(directory).find(pending.account, pending.groupIdHex))
+        val restarted = LocalGroupDeleteCleanupJournal(directory)
+        assertEquals(null, restarted.find(pending.account, pending.groupIdHex))
+        // Sign-out's strict read and replay both skip the uncommitted stage rather than failing on it.
+        assertEquals(emptySet<String>(), restarted.groupIdsForAccount(pending.account))
+        assertEquals(emptyList<PendingLocalGroupDeleteCleanup>(), restarted.pending())
     }
 
     @Test
