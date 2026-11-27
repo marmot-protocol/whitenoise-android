@@ -50,17 +50,24 @@ internal fun shellCompositionKey(route: ShellRoute): String =
         else -> shellEntryContentKey(route)
     }
 
-/** Draws the stack's latest top: [frame] outside the route's own composition, [render] inside it. */
+/** Draws one route in its own composition, see [shellCompositionKey]. */
+internal typealias ShellRouteDraw = @Composable (ShellRoute) -> Unit
+
+/**
+ * Draws the stack's latest top: [frame] outside the route's own composition, and inside it whichever route the frame
+ * asks for. A frame's motion can ask for a route other than the top, as master's Settings open keeps Chats composed
+ * beneath the arriving page until the open settles.
+ */
 private class ShellTopRenderer(
     private val latestTop: State<ShellRoute>,
-    private val frame: State<@Composable (ShellRoute, @Composable () -> Unit) -> Unit>,
-    private val render: State<@Composable (ShellRoute) -> Unit>,
+    private val frame: State<@Composable (ShellRoute, ShellRouteDraw) -> Unit>,
+    private val render: State<ShellRouteDraw>,
 ) {
-    /** Draws the latest top inside the frame, keyed by its composition. */
-    val draw: @Composable () -> Unit = {
-        val route = latestTop.value
-        frame.value(route) { key(shellCompositionKey(route)) { render.value(route) } }
-    }
+    /** Draws [route] keyed by its composition. */
+    private val drawRoute: ShellRouteDraw = { route -> key(shellCompositionKey(route)) { render.value(route) } }
+
+    /** Draws the latest top inside the frame. */
+    val draw: @Composable () -> Unit = { frame.value(latestTop.value, drawRoute) }
 }
 
 /**
@@ -113,7 +120,7 @@ private class ShellTopEntrySceneStrategy(
 internal fun ShellNavDisplay(
     stack: List<ShellRoute>,
     modifier: Modifier = Modifier,
-    frame: @Composable (ShellRoute, @Composable () -> Unit) -> Unit = { _, entry -> entry() },
+    frame: @Composable (ShellRoute, ShellRouteDraw) -> Unit = { route, draw -> draw(route) },
     content: @Composable (ShellRoute) -> Unit,
 ) {
     val render = rememberUpdatedState(content)
@@ -137,8 +144,10 @@ internal fun ShellNavDisplay(
 }
 
 /**
- * Master's list-pane motion around [content]: the top-level bubble between the chat list and Settings and the slide
- * to Diagnostics, keyed by the section [route] belongs to and owned by [ownerKey], the account and runtime.
+ * Master's list-pane motion: the top-level bubble between the chat list and Settings and the slide to Diagnostics,
+ * keyed by the section [route] belongs to and owned by [ownerKey], the account and runtime. [content] draws the route
+ * for each section the motion composes, [route] itself for its own section, so the Chats underlay of a Settings open
+ * is the live chat list.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -149,7 +158,7 @@ internal fun ShellSectionMotion(
     contentVisible: Boolean = true,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     cardMorph: Boolean = true,
-    content: @Composable () -> Unit,
+    content: @Composable (ShellRoute) -> Unit,
 ) {
     val section =
         when (route) {
@@ -171,5 +180,14 @@ internal fun ShellSectionMotion(
         animationsEnabled = animationsEnabled,
         topLevelBubble = true,
         cardMorph = cardMorph,
-    ) { content() }
+    ) { shown ->
+        content(
+            when {
+                shown == section -> route
+                shown == MainSection.Settings -> ShellRoute.Settings(null)
+                shown == MainSection.Diagnostics -> ShellRoute.Diagnostics
+                else -> ShellRoute.Chats
+            },
+        )
+    }
 }
