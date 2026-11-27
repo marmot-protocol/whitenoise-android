@@ -1,5 +1,17 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+/** One frozen reserve through the presentation horizon, with extra lead for the mixer when available. */
+internal class RawAvAudioReserve(
+    presentationTargetUs: Long,
+    mixerTargetUs: Long,
+) {
+    private val minimumUs = presentationTargetUs.coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
+    val targetUs = maxOf(minimumUs, mixerTargetUs).coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
+
+    fun trackFor(bufferedUs: Long): Int =
+        if (bufferedUs < minimumUs) AvStreamProtocol.AUDIO_TRACK else AvStreamProtocol.AUDIO_RESERVE_TRACK
+}
+
 /** Holds one bounded PCM write until the audio device accepts its frames and any preceding gap. */
 internal class RawAvPendingPcm(
     val frame: AvStreamFrame.Audio,
@@ -21,6 +33,7 @@ internal class RawAvRenderProgress(
     var lastVideoPts = -1L
     var lastVideoDelta = 33_333L
     var audioEndUs = targetUs
+    var audioReserveDeferred = false
     var prerollAudioUs = Long.MIN_VALUE
     var video: AvStreamFrame.Video? = null
     private var preroll: AvStreamFrame.Video? = null

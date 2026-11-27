@@ -48,6 +48,8 @@ internal sealed interface AvStreamFrame {
     data object VideoEnd : AvStreamFrame
 
     data object AudioEnd : AvStreamFrame
+
+    data object AudioDeferred : AvStreamFrame
 }
 
 /**
@@ -377,18 +379,15 @@ internal class IsolatedAvStream private constructor(
         bitmaps: RawVideoBitmaps = RawVideoBitmaps.Fresh,
     ): AvStreamFrame =
         call {
-            require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
-            require(preferred != AvStreamProtocol.VIDEO_TRACK || wantVideo)
-            require(preferred != AvStreamProtocol.AUDIO_TRACK || wantAudio)
+            AvStreamProtocol.requireReadTrack(preferred, wantVideo, wantAudio)
             val values = transact(AvStreamProtocol.READ, 7) { it.writeInt(preferred) }
             val output = AvStreamOutput.from(values, edge, wantVideo, wantAudio)
-            require(preferred != AvStreamProtocol.VIDEO_TRACK || output.kind in setOf(1, 3))
-            require(preferred != AvStreamProtocol.AUDIO_TRACK || output.kind in setOf(2, 4))
-            require(preferred != AvStreamProtocol.ANY_TRACK || output.kind in 0..2)
+            AvStreamProtocol.requireReadKind(preferred, output.kind)
             when (output.kind) {
                 0 -> AvStreamFrame.End
                 3 -> AvStreamFrame.VideoEnd
                 4 -> AvStreamFrame.AudioEnd
+                5 -> AvStreamFrame.AudioDeferred
                 1 ->
                     copyRawVideoFrame(checkNotNull(video).value, output, bitmaps) {
                         !lifetime.closed && admissions.isCurrent(lane, ownerEpoch, this)

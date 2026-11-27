@@ -139,7 +139,9 @@ This is not a process-wide or aggregate native-memory limit: dav1d internal
 allocations and runtime overhead are separate, and reference frames can
 consume more in aggregate.
 
-Playback lookahead retains at most 8 MiB of compressed packets. Each track
+Playback lookahead retains at most 8 MiB of compressed packets. Optional PCM
+uses queued audio and can probe the demuxer while the queue is empty. It yields
+once video is queued to leave room for the next packet. Each track
 can hold one pending decoded frame, and a video seek can keep one additional
 preroll frame until the target's coverage is known. The packet cap is 512,
 scaled by the video thread count (up to 2048)

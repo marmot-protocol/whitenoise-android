@@ -82,9 +82,11 @@ class MediaAvPlaybackService : Service() {
                                     AvStreamProtocol.READ -> {
                                         val preferred = data.readInt()
                                         require(data.dataAvail() == 0 && handle > 0L)
-                                        require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
-                                        require(preferred != AvStreamProtocol.VIDEO_TRACK || videoBuffer != null)
-                                        require(preferred != AvStreamProtocol.AUDIO_TRACK || audioBuffer != null)
+                                        AvStreamProtocol.requireReadTrack(
+                                            preferred,
+                                            videoBuffer != null,
+                                            audioBuffer != null,
+                                        )
                                         val engine = NativeMediaEngine
                                         val result =
                                             if (preferred == AvStreamProtocol.ANY_TRACK) {
@@ -93,12 +95,14 @@ class MediaAvPlaybackService : Service() {
                                                 engine.nativeReadPreferred(handle, videoBuffer, audioBuffer, preferred)
                                             }
                                         result.also {
-                                            AvStreamOutput.from(
-                                                checkedNativeRead(it),
-                                                edge,
-                                                videoBuffer != null,
-                                                audioBuffer != null,
-                                            )
+                                            val output =
+                                                AvStreamOutput.from(
+                                                    checkedNativeRead(it),
+                                                    edge,
+                                                    videoBuffer != null,
+                                                    audioBuffer != null,
+                                                )
+                                            AvStreamProtocol.requireReadKind(preferred, output.kind)
                                         }
                                     }
                                     else -> {

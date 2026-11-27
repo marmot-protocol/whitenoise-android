@@ -859,10 +859,13 @@ bool skipPrerollVideo(Session& s, int step) {
 // The other track keeps at most its existing decoded frame; compressed queues retain their old limits.
 /** Advance the requested track while preserving its separate EOF and bounded inter-track compressed lookahead. */
 jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int preferred) {
+    const bool reserveAudio = preferred == 3;
+    if (reserveAudio) preferred = 2;
     check(preferred == 1 || preferred == 2, "preferred_track_refused");
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
-    check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio), "preferred_track_not_selected");
+    check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio && (!reserveAudio || wantVideo)),
+          "preferred_track_not_selected");
     if (!s.modeChosen) {
         s.threads = workerThreads();
         if (wantVideo) openTrack(s, s.video, AVMEDIA_TYPE_VIDEO);
@@ -917,6 +920,8 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
         }
         check(!s.inputEnded, "media_track_drain_stalled");
+        // An unread packet can use the whole byte budget. Reserve may probe demux only with an empty queue.
+        if (reserveAudio && s.queuedPackets != 0) return longs(env, {5, 0, 0, 0, 0, 0, 0});
         queuePacket(s, packetLimit);
     }
     throw Failure("media_decode_work_budget_refused");

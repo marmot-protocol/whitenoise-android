@@ -23,6 +23,7 @@ internal object AvStreamProtocol {
     const val ANY_TRACK = 0
     const val VIDEO_TRACK = 1
     const val AUDIO_TRACK = 2
+    const val AUDIO_RESERVE_TRACK = 3
     const val MAX_REPLY_BYTES = 512
     const val MAX_EDGE = 4096
     const val MAX_PIXEL_BYTES = 64 * 1024 * 1024
@@ -31,6 +32,32 @@ internal object AvStreamProtocol {
     const val CALL_DEADLINE_MS = 8000L
     const val WATCHDOG_MS = 6000L
     const val MAX_DURATION_US = 24L * 60 * 60 * 1_000_000
+
+    /** Extra audio is optional only during A/V playback. */
+    fun requireReadTrack(track: Int, video: Boolean, audio: Boolean) {
+        require(
+            when (track) {
+                ANY_TRACK -> video || audio
+                VIDEO_TRACK -> video
+                AUDIO_TRACK -> audio
+                AUDIO_RESERVE_TRACK -> video && audio
+                else -> false
+            },
+        )
+    }
+
+    /** A deferred read carries no shared output and is valid only for optional PCM. */
+    fun requireReadKind(track: Int, kind: Int) {
+        require(
+            when (track) {
+                ANY_TRACK -> kind in 0..2
+                VIDEO_TRACK -> kind == 1 || kind == 3
+                AUDIO_TRACK -> kind == 2 || kind == 4
+                AUDIO_RESERVE_TRACK -> kind == 2 || kind == 4 || kind == 5
+                else -> false
+            },
+        )
+    }
 
     /** Validates the requested edge before computing the exact packed RGBA allocation bound. */
     fun pixelCapacity(edge: Int): Int {
@@ -108,11 +135,12 @@ internal data class AvStreamOutput(
         ): AvStreamOutput {
             require(values.size == 7)
             AvStreamProtocol.pixelCapacity(edge)
-            require(values[0] in 0L..4L && values[5] in -10_000_000L..AvStreamProtocol.MAX_DURATION_US)
+            require(values[0] in 0L..5L && values[5] in -10_000_000L..AvStreamProtocol.MAX_DURATION_US)
             when (values[0].toInt()) {
                 0 -> require(values.all { it == 0L })
-                3, 4 -> {
+                3, 4, 5 -> {
                     require(if (values[0] == 3L) video else audio)
+                    if (values[0] == 5L) require(video)
                     require(values.drop(1).all { it == 0L })
                 }
                 1 -> validateVideoFrame(values, edge, video)

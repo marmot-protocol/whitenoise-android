@@ -195,7 +195,8 @@ class AttachmentMediaContainmentCoverageTest {
         assertTrue("preferred == 1 && s.wantAudio && selected.codec" in preferred)
         assertTrue("(selected.codec->active_thread_type & FF_THREAD_FRAME)" in preferred)
         assertTrue("kMaxQueuedPackets * (frameThreadedVideo ? s.threads : 1)" in preferred)
-        assertTrue("queuePacket(s, packetLimit)" in preferred)
+        val reserveGuard = preferred.indexOf("if (reserveAudio && s.queuedPackets != 0)")
+        assertTrue(reserveGuard in 0 until preferred.indexOf("queuePacket(s, packetLimit)"))
         assertTrue("kMaxQueuedBytes = 8U * 1024 * 1024" in native)
         assertTrue("s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < packetLimit" in native)
     }

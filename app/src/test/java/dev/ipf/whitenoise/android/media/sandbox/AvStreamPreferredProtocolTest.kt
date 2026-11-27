@@ -56,6 +56,28 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    @Test
+    fun deferredAudioIsOnlyAcceptedForReserveReadsAndKeepsVideoLive() {
+        val deferred = longArrayOf(5, 0, 0, 0, 0, 0, 0)
+        StreamFixture().use { fixture ->
+            fixture.values = deferred
+            assertSame(AvStreamFrame.AudioDeferred, fixture.read(AvStreamProtocol.AUDIO_RESERVE_TRACK))
+            fixture.values = longArrayOf(3, 0, 0, 0, 0, 0, 0)
+            assertSame(AvStreamFrame.VideoEnd, fixture.read(AvStreamProtocol.VIDEO_TRACK))
+            assertFalse(fixture.lifetime.closed)
+        }
+        for (track in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK) {
+            StreamFixture().use { fixture ->
+                fixture.values = deferred
+                assertTrue(readFailure { fixture.read(track) } is IllegalArgumentException)
+                assertTrue(fixture.lifetime.closed)
+            }
+        }
+        assertTrue(runCatching { AvStreamOutput.from(deferred, 1, video = false, audio = true) }.isFailure)
+        assertTrue(runCatching { AvStreamOutput.from(deferred, 1, video = true, audio = false) }.isFailure)
+        assertTrue(runCatching { AvStreamOutput.from(deferred.copyOf().also { it[6] = 2 }, 1, true, true) }.isFailure)
+    }
+
     /** Any Selector Rejects Both Selected End Kinds And Selected Reads Reject Global End. */
     @Test
     fun anySelectorRejectsBothSelectedEndKindsAndSelectedReadsRejectGlobalEnd() {

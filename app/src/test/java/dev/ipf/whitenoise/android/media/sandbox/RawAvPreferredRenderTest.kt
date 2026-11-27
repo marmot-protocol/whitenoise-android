@@ -445,7 +445,8 @@ class RawAvPreferredRenderTest {
         var maximumQueued = 0
 
         fun read(track: Int): AvStreamFrame {
-            val selected = if (track == AvStreamProtocol.AUDIO_TRACK) audio else video
+            val audioRead = track == AvStreamProtocol.AUDIO_TRACK || track == AvStreamProtocol.AUDIO_RESERVE_TRACK
+            val selected = if (audioRead) audio else video
             while (selected.isEmpty() && cursor < packets.size) {
                 if (audio.size + video.size >= 512) throw IOException("compressed_lookahead_budget_refused")
                 val packet = packets[cursor++]
@@ -454,9 +455,9 @@ class RawAvPreferredRenderTest {
             }
             val time = selected.removeFirstOrNull()
             if (time == null) {
-                return if (track == AvStreamProtocol.AUDIO_TRACK) AvStreamFrame.AudioEnd else AvStreamFrame.VideoEnd
+                return if (audioRead) AvStreamFrame.AudioEnd else AvStreamFrame.VideoEnd
             }
-            return if (track == AvStreamProtocol.AUDIO_TRACK) {
+            return if (audioRead) {
                 audioReads++
                 if (time == 14_000_000L) crossingReads++
                 AvStreamFrame.Audio(ByteArray(320) { if (it % 2 == 1) 32 else 0 }, 8000, 1, time)
