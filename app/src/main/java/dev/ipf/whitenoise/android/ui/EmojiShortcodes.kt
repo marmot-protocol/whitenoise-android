@@ -106,8 +106,6 @@ internal object EmojiShortcodes {
             .single()
             .tag
 
-    private val rawCodePattern = Nip30Emoji.rawCodePattern
-
     fun isShortcode(text: String): Boolean = shortcodePattern.matches(text)
 
     /** Bundled pixel marmots, the classic marmot and the White Noise mark. */
@@ -192,7 +190,7 @@ internal object EmojiShortcodes {
         if (!matches.hasNext()) {
             return text
         }
-        val codeRanges = rawCodePattern.findAll(text.text).map { it.range }.toList()
+        val outsideCode = Nip30Emoji.outsideRanges(Nip30Emoji.rawCodeRanges(text.text))
         return buildAnnotatedString {
             append(text)
             for (match in matches) {
@@ -200,7 +198,7 @@ internal object EmojiShortcodes {
                 val end = match.range.last + 1
                 val literal =
                     when {
-                        codeRanges.any { start <= it.last && end > it.first } -> true
+                        !outsideCode(start, end) -> true
                         text.getStringAnnotations(LITERAL_TAG, start, end).isNotEmpty() -> true
                         text.getStringAnnotations(start, end).any { it.item == match.value } -> true
                         else ->

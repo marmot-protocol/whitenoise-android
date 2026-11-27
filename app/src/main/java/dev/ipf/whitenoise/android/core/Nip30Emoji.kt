@@ -21,13 +21,138 @@ object Nip30Emoji {
     /** MDK's limit on the combined length of every tag value, in UTF-8 bytes. */
     const val MAX_TAG_VALUE_BYTES = 16 * 1024
 
-    // Legacy plaintext surfaces have no AST. Keep raw code delimiters and their contents literal.
-    val rawCodePattern =
-        Regex(
-            """(?m)^ {0,3}((?>`{3,}))[^\n`]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\1`*[ \t]*\r?$|\z)|""" +
-                """^ {0,3}((?>~{3,}))[^\n]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\2~*[ \t]*\r?$|\z)|""" +
-                """(`+)[\s\S]*?\3""",
-        )
+    private const val MAX_FENCE_INDENT = 3
+    private const val MIN_FENCE_LENGTH = 3
+
+    /**
+     * Ranges of fenced blocks and inline code spans in [text], sorted and disjoint, for legacy
+     * plaintext surfaces that have no Markdown AST. A fence opens on a line indented at most three
+     * spaces with three or more backticks (no backtick after them) or tildes, and closes on a later
+     * line with at least as many of the same character, or at the end of the text. An inline span
+     * closes on the next backtick run of exactly its length; a run with no partner stays text.
+     *
+     * Received text is untrusted, so this is one linear pass: a backtracking pattern took seconds
+     * on long backtick runs.
+     */
+    fun rawCodeRanges(text: String): List<IntRange> {
+        val closers = closingBacktickRuns(text)
+        val ranges = mutableListOf<IntRange>()
+        var index = 0
+        while (index < text.length) {
+            if (index == 0 || text[index - 1] == '\n') {
+                val fenceEnd = fenceEnd(text, index)
+                if (fenceEnd != null) {
+                    ranges.add(index until fenceEnd)
+                    index = fenceEnd
+                    continue
+                }
+            }
+            if (text[index] != '`') {
+                index++
+                continue
+            }
+            val runEnd = runEnd(text, index, '`')
+            val closer = closers[index]
+            if (closer == null) {
+                index = runEnd
+            } else {
+                val spanEnd = closer + (runEnd - index)
+                ranges.add(index until spanEnd)
+                index = spanEnd
+            }
+        }
+        return ranges
+    }
+
+    /** For each backtick run's start, the start of the next run with exactly the same length. */
+    private fun closingBacktickRuns(text: String): Map<Int, Int> {
+        val runs = mutableListOf<IntRange>()
+        var index = text.indexOf('`')
+        while (index >= 0) {
+            val end = runEnd(text, index, '`')
+            runs.add(index until end)
+            index = text.indexOf('`', end)
+        }
+        val closers = HashMap<Int, Int>()
+        val nextByLength = HashMap<Int, Int>()
+        for (run in runs.asReversed()) {
+            val length = run.last - run.first + 1
+            nextByLength[length]?.let { closers[run.first] = it }
+            nextByLength[length] = run.first
+        }
+        return closers
+    }
+
+    /** End (exclusive) of the fenced block opening on the line at [lineStart], or null when no fence opens there. */
+    private fun fenceEnd(
+        text: String,
+        lineStart: Int,
+    ): Int? {
+        val markerStart = lineStart + leadingSpaces(text, lineStart)
+        val marker = text.getOrNull(markerStart)?.takeIf { it == '`' || it == '~' } ?: return null
+        val markerEnd = runEnd(text, markerStart, marker)
+        val length = markerEnd - markerStart
+        if (length < MIN_FENCE_LENGTH) {
+            return null
+        }
+        val lineEnd = lineEnd(text, markerEnd)
+        if (marker == '`' && (markerEnd until lineEnd).any { text[it] == '`' }) {
+            return null
+        }
+        var line = lineEnd + 1
+        while (line < text.length) {
+            val end = lineEnd(text, line)
+            if (closesFence(text, line, end, marker, length)) {
+                return end
+            }
+            line = end + 1
+        }
+        return text.length
+    }
+
+    private fun closesFence(
+        text: String,
+        lineStart: Int,
+        lineEnd: Int,
+        marker: Char,
+        length: Int,
+    ): Boolean {
+        val markerStart = lineStart + leadingSpaces(text, lineStart)
+        val markerEnd = runEnd(text, markerStart, marker).coerceAtMost(lineEnd)
+        if (markerEnd - markerStart < length) {
+            return false
+        }
+        val rest = text.substring(markerEnd, lineEnd).removeSuffix("\r")
+        return rest.all { it == ' ' || it == '\t' }
+    }
+
+    private fun leadingSpaces(
+        text: String,
+        lineStart: Int,
+    ): Int {
+        var count = 0
+        while (count < MAX_FENCE_INDENT && text.getOrNull(lineStart + count) == ' ') {
+            count++
+        }
+        return count
+    }
+
+    private fun lineEnd(
+        text: String,
+        from: Int,
+    ): Int = text.indexOf('\n', from).let { if (it < 0) text.length else it }
+
+    private fun runEnd(
+        text: String,
+        start: Int,
+        char: Char,
+    ): Int {
+        var end = start
+        while (end < text.length && text[end] == char) {
+            end++
+        }
+        return end
+    }
 
     /** Whether [tags] carry any emoji tag, so they are the event's own tags rather than a stripped projection. */
     fun hasEmojiTags(tags: List<MessageTagFfi>): Boolean = tags.any { it.values.firstOrNull() == TAG_NAME }
@@ -87,13 +212,29 @@ object Nip30Emoji {
      * and fenced blocks are literal text, the same as when rendered, so they never attach artwork.
      */
     fun shortcodesIn(text: String): List<String> {
-        val codeRanges = rawCodePattern.findAll(text).map { it.range }.toList()
-        return shortcodeInText
-            .findAll(text)
-            .filter { match -> codeRanges.none { match.range.first <= it.last && match.range.last >= it.first } }
+        val matches = shortcodeInText.findAll(text).toList()
+        if (matches.isEmpty()) {
+            return emptyList()
+        }
+        val outsideCode = outsideRanges(rawCodeRanges(text))
+        return matches
+            .filter { outsideCode(it.range.first, it.range.last + 1) }
             .map { it.value }
             .distinct()
-            .toList()
+    }
+
+    /**
+     * A test for whether `[start, end)` misses every one of the sorted, disjoint [ranges]. Calls
+     * must come in increasing order of [start], so a text's matches are checked in one pass.
+     */
+    fun outsideRanges(ranges: List<IntRange>): (start: Int, end: Int) -> Boolean {
+        var next = 0
+        return { start, end ->
+            while (next < ranges.size && ranges[next].last < start) {
+                next++
+            }
+            next == ranges.size || ranges[next].first >= end
+        }
     }
 
     /** The `["emoji", code, url]` row naming an attachment by its first locator, for a `:code:` shortcode. */

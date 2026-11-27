@@ -154,6 +154,28 @@ class Nip30EmojiTest {
         assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~\n:tilde:\n~~~"))
     }
 
+    /** Code spans pair runs of equal length, fences close on a longer marker, and lone runs stay text. */
+    @Test
+    fun rawCodeRangesFollowCodeSpanAndFenceRules() {
+        assertEquals(listOf(0..9), Nip30Emoji.rawCodeRanges("`:a:``:b:` :c:"))
+        assertEquals(listOf(":a:", ":c:"), Nip30Emoji.shortcodesIn("``:a: ```:b:``` :c:"))
+        assertEquals(listOf(":a:"), Nip30Emoji.shortcodesIn("   ````\n:x:\n```\n:y:\n`````  \r\n:a:"))
+        assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("```lang `x`\n:b:"))
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~ `info`\n:a:"))
+        assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("    ```\n:b:"))
+    }
+
+    /** Received text with long or many backtick runs is scanned in one pass, with or without a shortcode. */
+    @Test(timeout = 5_000)
+    fun backtickRunsDoNotBacktrack() {
+        val unmatched = "`".repeat(16_000) + "x".repeat(48_000)
+        val distinctLengths = (1..360).joinToString(" ") { "`".repeat(it) }
+        val fences = "```\n".repeat(16_000)
+        for (text in listOf(unmatched, "$unmatched :a:", distinctLengths + " :a:", fences + ":a:", ":a: `x` ".repeat(8_000))) {
+            Nip30Emoji.shortcodesIn(text)
+        }
+    }
+
     /** Only the NIP-30 alphabet MDK accepts for a sent tag, up to 62 characters, can be sent. */
     @Test
     fun sendableShortcodesUseTheStrictAlphabet() {
