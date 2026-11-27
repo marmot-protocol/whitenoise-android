@@ -8,7 +8,7 @@ package dev.ipf.whitenoise.android
  */
 internal val sourceFileSizeBaseline: Map<String, Int> =
     mapOf(
-        "dev/ipf/whitenoise/android/MainActivity.kt" to 910,
+        "dev/ipf/whitenoise/android/MainActivity.kt" to 878,
         "dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt" to 857,
         "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 672,
         "dev/ipf/whitenoise/android/audio/ConversationDictationController.kt" to 1193,

@@ -764,7 +764,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     ) {
                         appUnlockPromptHostState.clear()
-                        appState.appLock.markUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
+                        appState.appLock.markUnlockFailed(appLockAuthErrorMessage(errorCode))
                         attachedAppUnlockSessionId = null
                         attachedAppUnlockHostId = null
                         traceAppUnlock(sessionId, "prompt-terminated")
@@ -786,36 +786,6 @@ class MainActivity : AppCompatActivity() {
                 "lifecycle_class=${warmResumeLifecycleClass.name.lowercase()}",
         )
     }
-
-    private fun foregroundReturnExpiryElapsedRealtime(
-        nowElapsedRealtime: Long,
-        hostResumed: Boolean,
-    ): Long? {
-        if (hostResumed) return null
-        return nowElapsedRealtime.coerceAtMost(Long.MAX_VALUE - APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS) +
-            APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS
-    }
-
-    private fun appLockAuthErrorMessage(
-        errorCode: Int,
-        @Suppress("UNUSED_PARAMETER") errString: CharSequence,
-    ): AppText =
-        when (errorCode) {
-            BiometricPrompt.ERROR_CANCELED,
-            BiometricPrompt.ERROR_USER_CANCELED,
-            BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-            -> AppText.Resource(R.string.app_lock_auth_cancelled)
-            BiometricPrompt.ERROR_LOCKOUT,
-            BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
-            -> AppText.Resource(R.string.app_lock_auth_locked)
-            BiometricPrompt.ERROR_TIMEOUT -> AppText.Resource(R.string.app_lock_auth_timed_out)
-            BiometricPrompt.ERROR_HW_NOT_PRESENT,
-            BiometricPrompt.ERROR_HW_UNAVAILABLE,
-            BiometricPrompt.ERROR_NO_BIOMETRICS,
-            BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
-            -> AppText.Resource(R.string.app_lock_auth_unavailable)
-            else -> AppText.Resource(R.string.app_lock_auth_failed)
-        }
 
     private fun retainAppLockBackgroundSecureFlagIfNeeded() {
         if (!::appState.isInitialized || !appState.appLock.shouldSecureWindowWhileBackgrounded()) return
@@ -879,7 +849,6 @@ private val Configuration.isNightModeActive: Boolean
 internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
 private val appUnlockHostIds = AtomicLong()
-private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
 
 internal class AppUnlockPromptHostState : ViewModel() {
     var sessionId: Long? = null

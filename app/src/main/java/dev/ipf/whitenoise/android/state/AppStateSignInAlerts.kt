@@ -71,6 +71,11 @@ internal suspend fun WhiteNoiseAppState.refreshAllSignInAlerts() {
     (accounts.map { it.label } + signInAlerts.snapshots.keys).distinct().forEach { refreshSignInAlerts(it) }
 }
 
+internal suspend fun WhiteNoiseAppState.refreshSignInReviewAfterAccountLoad() {
+    refreshAllSignInAlerts()
+    refreshAllMissedDeviceLinkAttempts()
+}
+
 /**
  * Hides the open compromise warning on this device for [accountRef], then re-reads it. It revokes and secures
  * nothing; MDK reopens the warning when something new arrives.
