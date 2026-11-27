@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 private const val RETAINED_ATTEMPTS = 20
 private const val HISTORY_SECONDS = 7 * 24 * 60 * 60
 private const val MISSED_LINK_READ_RETRY_MS = 1_000L
+private const val MILLIS_PER_SECOND = 1_000L
 
 internal class DeviceLinkRequestRecords(
     context: Context,
@@ -34,7 +35,7 @@ internal data class DeviceLinkAttempt(
 @Stable
 internal class DeviceLinkAttemptHistory(
     context: Context,
-    private val nowSeconds: () -> Long = { System.currentTimeMillis() / 1_000L },
+    private val nowSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
 ) {
     private val preferences = context.getSharedPreferences("missed_device_links", Context.MODE_PRIVATE)
     private var attempts by mutableStateOf(
@@ -99,17 +100,12 @@ internal class DeviceLinkAttemptHistory(
 
 /** Records terminal snapshots even while the shell is stopped but the native worker is still running. */
 internal suspend fun WhiteNoiseAppState.refreshMissedDeviceLinkAttempts(accountRef: String) {
-    if (!linkedDevicesAvailable()) return
+    val watchedAccount = accounts.firstOrNull { it.label == accountRef && signInAlertsApply(it) }
+    if (!linkedDevicesAvailable() || watchedAccount == null) return
     val generation = runtimeGeneration
-    val account = accounts.firstOrNull { it.label == accountRef && signInAlertsApply(it) } ?: return
-    val snapshot =
-        readDeviceLinkAttempts(accountRef) ?: run {
-            delay(MISSED_LINK_READ_RETRY_MS)
-            if (generation != runtimeGeneration) return
-            readDeviceLinkAttempts(accountRef)
-        } ?: return
+    val snapshot = readDeviceLinkAttemptsWithRetry(accountRef, generation) ?: return
     val watched = accounts.filter(::signInAlertsApply)
-    val stillWatched = watched.any { it.label == accountRef && it.accountIdHex == account.accountIdHex }
+    val stillWatched = watched.any { it.label == accountRef && it.accountIdHex == watchedAccount.accountIdHex }
     if (generation == runtimeGeneration && stillWatched) {
         deviceLinkRequests.attempts?.observe(mapOf(accountRef to snapshot), watched.mapTo(mutableSetOf()) { it.label })
     }
@@ -120,12 +116,22 @@ internal suspend fun WhiteNoiseAppState.refreshAllMissedDeviceLinkAttempts() {
     accounts.filter(::signInAlertsApply).forEach { refreshMissedDeviceLinkAttempts(it.label) }
 }
 
+private suspend fun WhiteNoiseAppState.readDeviceLinkAttemptsWithRetry(
+    accountRef: String,
+    generation: Int,
+): DeviceLinkSnapshotFfi? =
+    readDeviceLinkAttempts(accountRef) ?: run {
+        delay(MISSED_LINK_READ_RETRY_MS)
+        if (generation == runtimeGeneration) readDeviceLinkAttempts(accountRef) else null
+    }
+
 private suspend fun WhiteNoiseAppState.readDeviceLinkAttempts(accountRef: String): DeviceLinkSnapshotFfi? =
     runCatchingCancellable { marmotIo { deviceLinkSnapshot(accountRef) } }.getOrNull()
 
 private fun decodeAttempt(stored: Any?): DeviceLinkAttempt? {
     val fields = (stored as? String)?.split(':', limit = 3).orEmpty()
-    val time = fields.firstOrNull()?.toLongOrNull() ?: return null
-    val reviewed = fields.getOrNull(1)?.toBooleanStrictOrNull() ?: return null
-    return fields.getOrNull(2)?.takeIf(String::isNotEmpty)?.let { DeviceLinkAttempt(it, time, reviewed) }
+    val time = fields.firstOrNull()?.toLongOrNull()
+    val reviewed = fields.getOrNull(1)?.toBooleanStrictOrNull()
+    val id = fields.getOrNull(2)?.takeIf(String::isNotEmpty)
+    return if (time != null && reviewed != null && id != null) DeviceLinkAttempt(id, time, reviewed) else null
 }
