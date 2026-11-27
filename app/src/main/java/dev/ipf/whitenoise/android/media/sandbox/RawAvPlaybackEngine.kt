@@ -489,6 +489,10 @@ internal class RawAvPlaybackEngine(
             seekRevision++
             revision++
             firstFrameForOutput = false
+            if (error is RawPausedSeekFailure) {
+                error = null
+                if (headerReady) status = Status.Ready
+            }
             if (!playIntent) dispatchPausedSeek(completion)
             if (status == Status.Ended) status = Status.Ready
             notifyChanged()
@@ -546,6 +550,7 @@ internal class RawAvPlaybackEngine(
             retainFrame(probe.poster, 0)
             synchronized(frameLock) { lastBitmapPtsUs = request.target.positionMs * 1000L }
             request.finish(true) // Acknowledgement and frame publication share the generation lock.
+            notifyChanged()
             signal.trySend(Unit)
             true
         }
@@ -565,6 +570,7 @@ internal class RawAvPlaybackEngine(
             pausedUs = targetUs
             pendingSeek = null
             it.set(null)
+            notifyChanged()
         }
     }
 
@@ -917,17 +923,13 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Posts a Main notification guarded by the captured state revision and current ownership.
-     */
+    /** Posts a Main notification for this revision and current owner. */
     private fun notifyChanged() {
         val expected = revision
         main.post { if (synchronized(lock) { current() && revision == expected }) listener.onChanged() }
     }
 
-    /**
-     * Posts completion only if the same revision still belongs to a current ended engine.
-     */
+    /** Posts completion for this revision only while its owner is ended. */
     private fun notifyCompletion() {
         val expected = revision
         main.post {
@@ -940,9 +942,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Requests focus with an engine-locked snapshot of the current platform attributes.
-     */
+    /** Requests focus with a snapshot of the current platform attributes. */
     private fun acquireFocus(): Boolean = focus.acquire(synchronized(lock) { attributes })
 
     /**

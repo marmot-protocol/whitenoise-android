@@ -107,19 +107,10 @@ internal class IsolatedAttachmentPlayer(
             .build()
     }
 
-    /** Delegates preparation to the single raw playback owner and returns its asynchronous completion. */
-    override fun handlePrepare(): ListenableFuture<*> = engine.prepare()
-
-    /** Keep Media3's paused playhead on the committed frame while a seek poster is pending. */
-    override fun getPlaceholderState(suggestedPlaceholderState: State): State {
-        if (suggestedPlaceholderState.playWhenReady) return suggestedPlaceholderState
-        val committed = engine.positionMs()
-        return suggestedPlaceholderState
-            .buildUpon()
-            .setContentPositionMs(committed)
-            .setContentBufferedPositionMs(PositionSupplier { committed })
-            .setPlayerError(suggestedPlaceholderState.playerError?.takeUnless { it.cause is RawPausedSeekFailure })
-            .build()
+    /** The engine publishes Buffering and completion independently of command submission. */
+    override fun handlePrepare(): ListenableFuture<*> {
+        engine.prepare()
+        return done()
     }
 
     /** Updates requested playback through the engine so focus, pause and lifetime ownership stay centralized. */
@@ -128,12 +119,15 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
-    /** Queues the target media position through the retained raw session rather than reopening the URI. */
+    /** Acknowledge submission so Media3 keeps publishing engine state while the worker seeks. */
     override fun handleSeek(
         mediaItemIndex: Int,
         positionMs: Long,
         seekCommand: Int,
-    ): ListenableFuture<*> = engine.seekToAsync(positionMs)
+    ): ListenableFuture<*> {
+        engine.seekTo(positionMs)
+        return done()
+    }
 
     /** Applies bounded supported speed parameters through the existing raw PCM timing owner. */
     override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
@@ -263,7 +257,7 @@ internal class IsolatedAttachmentPlayer(
         )
     }
 
-    /** Acknowledges synchronous presentation-only changes with an already completed Player future. */
+    /** Acknowledges a submitted command without blocking engine state publications. */
     private fun done(): ListenableFuture<Void?> = SettableFuture.create<Void?>().apply { set(null) }
 
     companion object {
