@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -22,11 +21,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.amoledSelectedChipBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-
-private const val AMOLED_SELECTED_CHIP_OUTLINE_ALPHA = 0.5f
 
 /**
  * A compact selectable filter or option. On AMOLED, a gray outline marks selection and leading icons stay visible.
@@ -56,14 +53,8 @@ internal fun WhiteNoiseFilterChip(
     role: Role? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
-    val amoled = isAmoledSurfaceTheme()
-    val lead = if (selected && showCheck && !amoled) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
-    val border =
-        if (amoled && selected) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = AMOLED_SELECTED_CHIP_OUTLINE_ALPHA))
-        } else {
-            null
-        }
+    val lead = if (selected && showCheck && !isAmoledSurfaceTheme()) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
+    val border = amoledSelectedChipBorder(selected)
     val overlay = onLongClick != null
     val describe =
         if (contentDescription == null && role == null) {
