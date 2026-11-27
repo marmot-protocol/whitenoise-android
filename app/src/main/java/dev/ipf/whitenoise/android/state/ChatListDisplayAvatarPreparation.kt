@@ -15,7 +15,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 private const val ENTERING_AVATARS_BUDGET_MS = 20L
-private const val IDLE_AVATAR_ROW_LIMIT = 200
+
+// Leave room in the shared bitmap cache for pictures near the viewport.
+private const val IDLE_AVATAR_ROW_LIMIT = 8
 private const val IDLE_AVATAR_YIELD_MS = 20L
 
 /** Pages and folder windows can admit disk hits before publishing the new rows. */
@@ -82,8 +84,9 @@ internal suspend fun WhiteNoiseAppState.backfillChatListDisplayAvatars(
     val accountRef = generation.accountRef
     val candidates =
         rows
-            .take(IDLE_AVATAR_ROW_LIMIT)
+            .asSequence()
             .mapNotNull { item -> item.selectedAvatarAsset?.let { item.displayAvatarKey(accountRef, it) } }
+            .take(IDLE_AVATAR_ROW_LIMIT)
             .toSet()
     attempted.retainAll(candidates)
     for (key in candidates - attempted) {

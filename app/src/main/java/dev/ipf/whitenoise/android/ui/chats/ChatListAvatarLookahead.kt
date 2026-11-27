@@ -63,11 +63,12 @@ internal fun WhiteNoiseAppState.observeChatListAvatarLookahead(
             }.collectLatest { window ->
                 if (window.first < 0 || activeAccountRef != account) return@collectLatest
                 val generation = displayAvatars.generation(account)
-                val outside = avatarLookaheadIndices(window.first, window.last, window.rows.size, window.forward)
-                hydrateChatListDisplayAvatars(account, outside.map(window.rows::get))
+                val nearby = avatarLookaheadIndices(window.first, window.last, window.rows.size, window.forward)
+                val nearbyRows = nearby.map(window.rows::get)
+                hydrateChatListDisplayAvatars(account, nearbyRows)
                 if (!window.scrolling) {
                     delay(IDLE_AVATAR_START_MS)
-                    backfillChatListDisplayAvatars(generation, window.rows, attempted, retained) {
+                    backfillChatListDisplayAvatars(generation, nearbyRows, attempted, retained) {
                         activeAccountRef == account &&
                             runtimeGeneration == runtime &&
                             AvatarImageLoader.currentCacheLifetime() == lifetime
