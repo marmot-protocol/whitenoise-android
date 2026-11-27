@@ -55,6 +55,15 @@ class NostrGitCardParsingTest {
         assertEquals(clones.drop(1).take(7) + web, links)
     }
 
+    /** Without a web link, eight clone mirrors keep every slot ahead of the relays. */
+    @Test
+    fun withoutAWebLinkClonesFillEverySlotBeforeRelays() {
+        val clones = listOf("clone") + (1..8).map { "https://mirror$it.example.org/parser.git" }
+        val relays = listOf("relays", "wss://relay.example.org")
+        val links = event(kind = 30617, tags = listOf(relays, clones)).toCardModel().gitLinks
+        assertEquals(clones.drop(1), links)
+    }
+
     /** Open-only clone mirrors cannot push a copyable clone address out of the link cap. */
     @Test
     fun copyableCloneAddressesLeadOpenOnlyMirrors() {

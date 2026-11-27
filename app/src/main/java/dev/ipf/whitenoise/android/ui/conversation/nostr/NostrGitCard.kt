@@ -140,8 +140,10 @@ internal fun NostrEvent.gitCardLinks(): List<String> {
                 .sortedBy { !isShellSafeGitLink(it) }
                 .toList()
         }
+    // The first tag leaves one slot for the second (clone mirrors for a web link); later tags only fill what is left.
     val first = byTag.first()
-    val ordered = first.take(MAX_GIT_LINKS - 1) + byTag.drop(1).flatten() + first.drop(MAX_GIT_LINKS - 1)
+    val second = byTag.getOrElse(1) { emptyList() }
+    val ordered = first.take(MAX_GIT_LINKS - 1) + second + first.drop(MAX_GIT_LINKS - 1) + byTag.drop(2).flatten()
     return ordered.distinct().take(MAX_GIT_LINKS)
 }
 
