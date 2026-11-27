@@ -155,6 +155,7 @@ internal fun ShareConnectScreen(
         onSaveToGallery = save@{
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@save
+            appState.noteNotificationMoment()
             val spec =
                 QrShareCardSpec(
                     headline = profileCardHeadline,
@@ -183,6 +184,7 @@ internal fun ShareConnectScreen(
         },
         onShareUrl = share@{
             if (!ownsScreen()) return@share
+            appState.noteNotificationMoment()
             launchOutboundShare(
                 context,
                 outboundShareIntent(link?.uri ?: npub, emptyList()),
@@ -193,6 +195,7 @@ internal fun ShareConnectScreen(
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@picture
             pictureShareInProgress = true
+            appState.noteNotificationMoment()
             appState.launchMutation {
                 runCatchingCancellable {
                     val staged =

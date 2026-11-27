@@ -394,18 +394,20 @@ internal fun WhiteNoiseApp(
         appState.diagnostics.requiresChoice,
         appState.auditUploadConsentRequired,
         appState.diagnostics.snapshot,
+        appState.notificationAskMoment.reached,
     ) {
         if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) {
             return@LaunchedEffect
         }
         if (appState.diagnostics.snapshot == null) return@LaunchedEffect
         if (appState.phase != AppPhase.Ready || appState.appLock.screenVisible) return@LaunchedEffect
+        appState.notificationAskMoment.noteReady()
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
         if (appState.shouldRequestDefaultNotificationPermission()) {
+            // The explanation comes first; the prompt stays in flight until it is answered.
             appState.markDefaultNotificationPermissionPromptLaunched()
-            notificationPermissionTicket = appState.diagnostics.observations.ticket()
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            appState.notificationAskMoment.explanationVisible = true
         } else {
             appState.enableDefaultNotificationsIfReady()
         }
@@ -784,6 +786,10 @@ internal fun WhiteNoiseApp(
             onConfirm = { dictation.acceptDisclosure(dictationState) },
             onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
+    }
+    NotificationAskHost(appState, suppressed = !protectedPhaseReady || diagnosticsPromptOpen) {
+        notificationPermissionTicket = appState.diagnostics.observations.ticket()
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 

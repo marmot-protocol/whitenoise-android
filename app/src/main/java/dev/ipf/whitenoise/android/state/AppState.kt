@@ -1377,6 +1377,7 @@ class WhiteNoiseAppState private constructor(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
     )
     private var defaultNotificationPermissionPromptInFlight by mutableStateOf(false)
+    internal val notificationAskMoment = NotificationAskMoment(preferences)
 
     // One-time onboarding hint for the conversation disappearing-timer chip (#335):
     // shown the first time the user opens a conversation whose timer is enabled.
@@ -6475,7 +6476,11 @@ class WhiteNoiseAppState private constructor(
             !defaultNotificationsEnableAttempted &&
             !defaultNotificationPermissionPromptInFlight &&
             !localNotificationPermissionGranted &&
-            backgroundConnectionEnabled
+            backgroundConnectionEnabled &&
+            notificationAskMoment.reached
+
+    /** A reply is now expected: a conversation opened, or an invite or this profile was shared (#4278). */
+    fun noteNotificationMoment() = notificationAskMoment.noteReplyExpected()
 
     fun markDefaultNotificationPermissionPromptLaunched() {
         defaultNotificationPermissionPromptInFlight = true

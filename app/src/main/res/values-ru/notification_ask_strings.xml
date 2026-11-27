@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_permission_ask_title">Узнавайте, когда вам отвечают</string>
+    <string name="notification_permission_ask_message">Включите уведомления, чтобы видеть новые сообщения и приглашения в чаты, не открывая White Noise.</string>
+    <string name="notification_permission_ask_confirm">Включить уведомления</string>
+    <string name="notification_permission_ask_not_now">Не сейчас</string>
+</resources>
