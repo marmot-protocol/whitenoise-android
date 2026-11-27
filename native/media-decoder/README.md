@@ -96,8 +96,11 @@ before loading `media_decoder`. Each process owns one session. Handles are
 generated identifiers checked under a mutex; stale handles cannot address a
 replacement session.
 
-- `nativeOpen(fd, offset, length, edge)` accepts a read-only selected range up
-  to 512 MiB and an output edge of 1 through 4096. Stream discovery denies all
+- `nativeOpen(fd, offset, length, edge, playbackColors)` accepts a read-only
+  selected range up to 512 MiB and an output edge of 1 through 4096.
+  The playback color option keeps the transfer of explicitly tagged SDR BT.709
+  for playing frames and in-player posters. Thumbnail generation and other
+  source encodings use the color-managed conversion. Stream discovery denies all
   probe decoders. Decoder contexts are created when the first read selects the
   requested tracks.
 - `nativeInfo(handle)` returns square-pixel display width and height, duration
@@ -174,7 +177,9 @@ perceptual intent. When dimensions change, the first context resizes in the
 source pixel encoding with its color properties and HDR side data retained.
 Only then does the second context map that bounded image into full-range RGBA
 with BT.709 primaries and the sRGB transfer function. Its destination carries
-no source HDR mastering metadata. Aligned native frame buffers keep conversion
+no source HDR mastering metadata. A playing frame or in-player poster with
+explicit limited-range 8-bit BT.709 encoding and no HDR or ICC side data
+retains its source transfer. Aligned native frame buffers keep conversion
 padding private; only packed RGBA row bytes enter the shared output.
 
 Unsupported matrix or transfer metadata is refused. HDR inputs require explicit

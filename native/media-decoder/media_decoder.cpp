@@ -281,6 +281,7 @@ struct Session {
     int64_t position = 0;
     int64_t deadline = 0;
     int edge = 0;
+    bool playbackColors = false;
     // Explicit playback reads raise this before opening tracks; automatic posters and probes stay single-threaded.
     int threads = 1;
     AVFormatContext* format = nullptr;
@@ -625,6 +626,16 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
     converted.rgba->colorspace = AVCOL_SPC_RGB;
     converted.rgba->color_primaries = AVCOL_PRI_BT709;
     converted.rgba->color_trc = AVCOL_TRC_IEC61966_2_1;
+    // Playing frames and player posters retain the transfer of explicitly tagged SDR BT.709.
+    // Matrix and range conversion still produce packed RGB.
+    const bool displayReferredBt709 = s.playbackColors && frame->format == AV_PIX_FMT_YUV420P &&
+        frame->color_range == AVCOL_RANGE_MPEG && frame->colorspace == AVCOL_SPC_BT709 &&
+        frame->color_primaries == AVCOL_PRI_BT709 && frame->color_trc == AVCOL_TRC_BT709 &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_ICC_PROFILE) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_DYNAMIC_HDR_PLUS) &&
+        !av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+    if (displayReferredBt709) converted.rgba->color_trc = AVCOL_TRC_BT709;
     converted.rgba->flags = frame->flags & (AV_FRAME_FLAG_INTERLACED | AV_FRAME_FLAG_TOP_FIELD_FIRST);
     check(av_frame_get_buffer(converted.rgba, kConversionAlignment) >= 0, "pixel_rgba_allocation_refused");
     check(sws_scale_frame(dynamicScaler(s.colors, s.threads), converted.rgba, colorSource) >= 0, "pixel_color_conversion_failed");
@@ -947,7 +958,7 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
  */
 extern "C" JNIEXPORT jlong JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
-    JNIEnv* env, jobject, jint fd, jlong offset, jlong length, jint edge) {
+    JNIEnv* env, jobject, jint fd, jlong offset, jlong length, jint edge, jboolean playbackColors) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     try {
         check(sandboxInstalled.load(std::memory_order_acquire), "media_process_restriction_missing");
@@ -963,6 +974,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
         s->fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
         check(s->fd >= 0, "selected_media_dup_failed");
         s->offset = offset; s->length = length; s->edge = edge;
+        s->playbackColors = playbackColors == JNI_TRUE;
         s->deadline = monotonicMs() + kCallMs;
         av_max_alloc(kMaxAllocation);
         av_log_set_level(AV_LOG_QUIET);

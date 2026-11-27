@@ -151,7 +151,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
         assertTrue(
             "The selected descriptor must enter the native decoder",
-            "NativeMediaEngine.nativeOpen(input.fd, offset, length, edge)" in service,
+            "NativeMediaEngine.nativeOpen(input.fd, offset, length, edge, playbackColors)" in service,
         )
     }
 

@@ -110,7 +110,8 @@ class MediaAvDecodeService : Service() {
                 if (mode != OsConstants.O_RDONLY) return result
                 result.putInt("inputWriteErrno", readOnlyErrno(input))
                 NativeMediaEngine.ensureLoaded()
-                val handle = NativeMediaEngine.nativeOpen(input.fd, offset, length, edge)
+                val playbackColors = operation == MediaDecodePolicy.PROBE && data.getBoolean("playbackColors")
+                val handle = NativeMediaEngine.nativeOpen(input.fd, offset, length, edge, playbackColors)
                 if (handle <= 0L) return result
                 try {
                     if (fillResult(handle, data, output, result)) result.putBoolean("success", true)

@@ -195,7 +195,8 @@ internal object IsolatedMediaDecoder {
         resolver: ContentResolver,
         uri: Uri,
         edge: Int,
-    ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge) }
+        playbackColors: Boolean = false,
+    ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge, playbackColors) }
 
     /** Blocking compressed-audio work has a separate bounded analysis lane. */
     internal fun openAudioStream(file: java.io.File): IsolatedAvStream {
@@ -220,7 +221,7 @@ internal object IsolatedMediaDecoder {
             if (positionMs !in 0..MAX_MEDIA_DURATION_MS) {
                 null
             } else {
-                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge)
+                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge, playbackColors = true)
             }
         }
 

@@ -372,7 +372,10 @@ internal class IsolatedAvStream private constructor(
 
     /** Validates raw output metadata before copying owned pixel/PCM bytes from shared memory. */
     @Suppress("CyclomaticComplexMethod") // Validate and own one exact typed shared-memory output in this call.
-    fun read(preferred: Int = AvStreamProtocol.ANY_TRACK): AvStreamFrame =
+    fun read(
+        preferred: Int = AvStreamProtocol.ANY_TRACK,
+        bitmaps: RawVideoBitmaps = RawVideoBitmaps.Fresh,
+    ): AvStreamFrame =
         call {
             require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
             require(preferred != AvStreamProtocol.VIDEO_TRACK || wantVideo)
@@ -386,27 +389,10 @@ internal class IsolatedAvStream private constructor(
                 0 -> AvStreamFrame.End
                 3 -> AvStreamFrame.VideoEnd
                 4 -> AvStreamFrame.AudioEnd
-                1 -> {
-                    val memory = checkNotNull(video).value
-                    val source = memory.mapReadOnly()
-                    try {
-                        source.limit(output.byteCount)
-                        val bitmap = Bitmap.createBitmap(output.width, output.height, Bitmap.Config.ARGB_8888)
-                        var retained = false
-                        try {
-                            check(bitmap.byteCount == output.byteCount)
-                            bitmap.copyPixelsFromBuffer(source)
-                            if (lifetime.closed || !admissions.isCurrent(lane, ownerEpoch, this)) {
-                                throw IOException("Media session retired during output copy")
-                            }
-                            AvStreamFrame.Video(bitmap, output.timestampUs).also { retained = true }
-                        } finally {
-                            if (!retained) bitmap.recycle()
-                        }
-                    } finally {
-                        SharedMemory.unmap(source)
+                1 ->
+                    copyRawVideoFrame(checkNotNull(video).value, output, bitmaps) {
+                        !lifetime.closed && admissions.isCurrent(lane, ownerEpoch, this)
                     }
-                }
                 else -> {
                     val source = checkNotNull(audio).value.mapReadOnly()
                     try {

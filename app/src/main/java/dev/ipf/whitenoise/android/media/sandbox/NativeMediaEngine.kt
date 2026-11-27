@@ -25,6 +25,7 @@ internal object NativeMediaEngine {
         offset: Long,
         length: Long,
         edge: Int,
+        playbackColors: Boolean,
     ): Long
 
     /** Returns fixed bounded metadata for a positive generation handle; no encoded bytes leave JNI. */

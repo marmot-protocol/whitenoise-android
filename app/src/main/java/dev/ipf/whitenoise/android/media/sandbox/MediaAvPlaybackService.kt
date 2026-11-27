@@ -231,7 +231,7 @@ class MediaAvPlaybackService : Service() {
         sendReady(ready, nextToken)
         edge = nextEdge
         NativeMediaEngine.ensureLoaded()
-        handle = NativeMediaEngine.nativeOpen(input.fd, 0, input.statSize, edge)
+        handle = NativeMediaEngine.nativeOpen(input.fd, 0, input.statSize, edge, playbackColors = true)
         if (handle == -1L) throw RawContainerFailure()
         check(handle > 0L)
         return NativeMediaEngine.nativeInfo(handle).also { info ->

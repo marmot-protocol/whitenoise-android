@@ -363,7 +363,7 @@ internal class IsolatedAutomaticAvTransport(
     ): MediaProbe? =
         serialized { ticket ->
             withMediaFile(ticket, file, "probe:$edge:$poster") { input ->
-                probeInput(ticket, input, edge, poster)
+                probeInput(ticket, input, MediaDecodeRequest(edge, poster, MediaDecodePolicy.PROBE))
             }
         }
 
@@ -381,7 +381,8 @@ internal class IsolatedAutomaticAvTransport(
                     .digest(bytes)
                     .joinToString("") { "%02x".format(it) }
             mediaAttempt(ticket, "probe:$edge:$poster:$digest") {
-                ticket.session.sources.withInput(bytes) { input -> probeInput(ticket, input, edge, poster) }
+                val request = MediaDecodeRequest(edge, poster, MediaDecodePolicy.PROBE)
+                ticket.session.sources.withInput(bytes) { input -> probeInput(ticket, input, request) }
             }
         }
 
@@ -390,15 +391,8 @@ internal class IsolatedAutomaticAvTransport(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
         edge: Int,
-    ): MediaProbe? {
-        val selected = session ?: return null
-        return serialized(selected) { ticket ->
-            selected.sources.withMediaUriInput(resolver, uri) { input ->
-                ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                probeInput(ticket, input, edge, true)
-            }
-        }
-    }
+        playbackColors: Boolean,
+    ): MediaProbe? = probeUriAt(resolver, uri, 0, edge, playbackColors)
 
     /** Request the bounded poster at a specific source time without replacing the selected URI capability. */
     override fun probeUriAt(
@@ -406,12 +400,21 @@ internal class IsolatedAutomaticAvTransport(
         uri: android.net.Uri,
         positionMs: Long,
         edge: Int,
+        playbackColors: Boolean,
     ): MediaProbe? {
         val selected = session?.takeIf { positionMs in 0..MAX_MEDIA_DURATION_MS } ?: return null
         return serialized(selected) { ticket ->
             selected.sources.withMediaUriInput(resolver, uri) { input ->
                 ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
+                val request =
+                    MediaDecodeRequest(
+                        edge,
+                        true,
+                        MediaDecodePolicy.PROBE,
+                        positionUs = TimeUnit.MILLISECONDS.toMicros(positionMs),
+                        playbackColors = playbackColors,
+                    )
+                probeInput(ticket, input, request)
             }
         }
     }
@@ -420,19 +423,14 @@ internal class IsolatedAutomaticAvTransport(
     private fun probeInput(
         ticket: Operation,
         input: ParcelFileDescriptor,
-        edge: Int,
-        poster: Boolean,
-        positionUs: Long = 0L,
+        request: MediaDecodeRequest,
     ): MediaProbe? {
-        val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return null
-        return withParentResource(
-            SharedMemory.create("media-av-pixels", if (poster) capacity else Int.SIZE_BYTES),
-        ) { output ->
-            val spec = MediaDecodeRequest(edge, poster, MediaDecodePolicy.PROBE, positionUs = positionUs)
-            val result = exchange(ticket, input, output, spec) ?: return@withParentResource null
+        val capacity = MediaDecodePolicy.outputCapacity(request.edge) ?: return null
+        return withParentResource(SharedMemory.create("media-av-pixels", if (request.option) capacity else Int.SIZE_BYTES)) { output ->
+            val result = exchange(ticket, input, output, request) ?: return@withParentResource null
             val bitmap =
                 if (result.getBoolean("pixels")) {
-                    copyPixels(ticket, result, output, edge) ?: return@withParentResource null
+                    copyPixels(ticket, result, output, request.edge) ?: return@withParentResource null
                 } else {
                     null
                 }
@@ -443,7 +441,7 @@ internal class IsolatedAutomaticAvTransport(
                     result.getLong("duration"),
                     bitmap,
                 ),
-                edge,
+                request.edge,
             )
         }
     }
@@ -725,6 +723,7 @@ internal class IsolatedAutomaticAvTransport(
             putInt("edge", request.edge)
             putBoolean("oriented", request.option)
             putLong("positionUs", request.positionUs)
+            putBoolean("playbackColors", request.playbackColors)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
             request.region?.let {

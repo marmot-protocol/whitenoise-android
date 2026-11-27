@@ -26,6 +26,9 @@ import org.robolectric.annotation.Implements
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36], shadows = [RecordingCanvasSurface::class])
 class RawAvSeekPublicationTest {
+    /** Display work runs only when a test renders, keeping adoption and drawing separately schedulable. */
+    private val display = QueuedExecutor()
+
     /** An adopted bitmap from seek zero cannot submit or credit first output after seek one. */
     @Test fun adoptedOldSeekCannotPublishAfterSeekAndMatchingNewFrameStillSubmits() {
         withEngine { engine ->
@@ -36,16 +39,49 @@ class RawAvSeekPublicationTest {
             render(engine)
             assertEquals(0, RecordingCanvasSurface.posts)
             assertEquals(0L, engine.snapshot().renderedFrame)
-            assertFalse(old.isRecycled)
+            assertTrue(old.isRecycled)
             val matching = bitmap()
             val intent = engine.intent()
             assertTrue(engine.frame(matching, 0, intent.activation, intent.seek))
+            render(engine)
             assertEquals(1, RecordingCanvasSurface.posts)
             assertEquals(1L, engine.snapshot().renderedFrame)
             assertTrue(old.isRecycled)
             assertFalse(matching.isRecycled)
             engine.close()
             assertTrue(matching.isRecycled)
+        }
+    }
+
+    /** Stopping invalidates the queued post while retaining the frame for an explicit redraw. */
+    @Test fun queuedFrameDoesNotPostAfterStop() {
+        withEngine { engine ->
+            val queued = bitmap()
+            adopt(engine, queued)
+            engine.stop()
+
+            render(engine)
+
+            assertEquals(0, RecordingCanvasSurface.posts)
+            assertEquals(0L, engine.snapshot().renderedFrame)
+            assertFalse(queued.isRecycled)
+        }
+    }
+
+    /** A retired account's queued frame cannot post after the attached surface is cleared. */
+    @Test fun queuedFrameCannotPostAfterAccountRetirement() {
+        withEngine { engine ->
+            val queued = bitmap()
+            adopt(engine, queued)
+            assertEquals(0, RecordingCanvasSurface.posts)
+
+            RawAvPlaybackEngine.retireAll()
+
+            assertEquals(1, RecordingCanvasSurface.posts) // The synchronous black clear.
+            render(engine)
+            assertEquals(1, RecordingCanvasSurface.posts)
+            assertEquals(0L, engine.snapshot().renderedFrame)
+            assertTrue(queued.isRecycled)
         }
     }
 
@@ -97,6 +133,7 @@ class RawAvSeekPublicationTest {
                             override fun onChanged() = Unit
                         },
                     prepareProbe = { null },
+                    displayExecutor = display,
                 )
             val worker = checkNotNull((field(engine, "scope") as CoroutineScope).coroutineContext[Job])
             runBlocking { worker.cancelAndJoin() }
@@ -139,13 +176,9 @@ class RawAvSeekPublicationTest {
             .invoke(engine, bitmap, 0)
     }
 
-    /** Invokes the production guarded render path, including the actual RawVideoOutput sink. */
-    private fun render(engine: RawAvPlaybackEngine) {
-        engine.javaClass
-            .getDeclaredMethod("renderRetained")
-            .apply { isAccessible = true }
-            .invoke(engine)
-    }
+    /** Runs the production display-thread draws queued so far, including the actual RawVideoOutput sink. */
+    @Suppress("UnusedParameter") // Keeps call sites naming the engine whose queued draws run.
+    private fun render(engine: RawAvPlaybackEngine) = display.runAll()
 
     /** Reads fixture ownership without opening an alternate renderer or parser path. */
     private fun field(
@@ -202,5 +235,18 @@ class RecordingCanvasSurface {
 
     companion object {
         var posts = 0
+    }
+}
+
+/** Collects display tasks so a test decides exactly when queued draws run. */
+private class QueuedExecutor : java.util.concurrent.Executor {
+    private val tasks = ArrayDeque<Runnable>()
+
+    override fun execute(command: Runnable) {
+        tasks.addLast(command)
+    }
+
+    fun runAll() {
+        while (tasks.isNotEmpty()) tasks.removeFirst().run()
     }
 }

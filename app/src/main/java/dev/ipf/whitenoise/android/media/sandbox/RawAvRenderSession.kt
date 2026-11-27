@@ -89,13 +89,14 @@ internal interface RawAvRenderOwner {
 }
 
 /** One persistent caller drives this finite raw-output session, with no queued decode tasks. */
-@Suppress("TooManyFunctions") // Clock, raw sinks and input ownership belong to one renderer session.
+@Suppress("TooManyFunctions", "LongParameterList") // The renderer owns raw PCM and video output for one selected source.
 internal class RawAvRenderSession(
     private val context: Context,
     private val uri: Uri,
     private val wantVideo: Boolean,
     private val wantAudio: Boolean,
     private val owner: RawAvRenderOwner,
+    private val frameBitmaps: RawVideoBitmaps = RawVideoBitmaps.Fresh,
     private val pcmFactory: (Int, Int, AudioAttributes) -> RawPcmSink = ::RawPcmOutput,
 ) {
     /** Set once by the engine before its worker starts; null leaves ordinary playback diagnostics disabled. */
@@ -277,22 +278,14 @@ internal class RawAvRenderSession(
             val info = selected.info
             synchronized(clockLock) { sourceHasAudio = wantAudio && info.hasAudio }
             owner.opened(info, activation)
-            consumeFrames(info, activation, selected::read, selected::seek)
+            consumeFrames(info, activation, { track -> selected.read(track, frameBitmaps) }, selected::seek)
             reusable = true
         } catch (failure: Exception) {
-            if (valid(
-                    activation,
-                    operationSeek,
-                )
-            ) {
+            if (valid(activation, operationSeek)) {
                 owner.failed(activation, operationSeek, rawPlaybackFailure(failure))
             }
         } catch (failure: OutOfMemoryError) {
-            if (valid(
-                    activation,
-                    operationSeek,
-                )
-            ) {
+            if (valid(activation, operationSeek)) {
                 owner.failed(activation, operationSeek, IOException("Raw playback output memory unavailable", failure))
             }
         } finally {
