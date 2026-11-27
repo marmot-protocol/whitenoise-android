@@ -817,6 +817,15 @@
     <string name="ai_agents_setup_title">Set up %1$s</string>
     <string name="ai_agents_setup_instruction">Paste this into %1$s. It shares only your public key and asks the agent to get your approval before installing. Use it only with an agent you trust.</string>
     <string name="ai_agents_copy_prompt">Copy prompt</string>
+    <string name="ai_agent_review_key">Review agent key</string>
+    <string name="ai_agent_setup_next">When your agent gives you its public key, return here to check it and open its profile.</string>
+    <string name="ai_agent_key_intro">Paste the public key or profile link shown by your connector.</string>
+    <string name="ai_agent_key_label">Agent public key</string>
+    <string name="ai_agent_check_key">Check key</string>
+    <string name="ai_agent_key_invalid">Enter a valid agent public key or profile link.</string>
+    <string name="ai_agent_key_self">This is your own public key. Use the key from your agent.</string>
+    <string name="ai_agent_key_compare">Compare this key with the one shown by your connector. If they match, open the profile to start a chat.</string>
+    <string name="ai_agent_open_profile">Open profile</string>
     <string name="ai_agents_docs_opened">Opening the connector documentation.</string>
     <string name="ai_agents_docs_failed">Couldn’t open the connector docs.</string>
     <string name="ai_agents_manual_setup_title">Manual setup</string>

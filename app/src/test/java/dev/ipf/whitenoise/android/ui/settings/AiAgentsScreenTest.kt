@@ -15,9 +15,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MemberRefFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -47,6 +49,59 @@ class AiAgentsScreenTest {
     private var documentationOpens = true
     private var documentationHandOffs = 0
     private var backCount = 0
+
+    /** A checked key must match the current input before it can open a profile. */
+    @Test
+    fun replacingCheckedAgentKeyRequiresCheckingTheNewInput() {
+        val opened = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AgentKeyReviewScreen(
+                    ownAccountId = "own",
+                    normalizeReference = { if (it == TEST_NPUB) MemberRefFfi("agent", "agent", TEST_NPUB) else null },
+                    onBack = {},
+                    onOpenProfile = { opened += it },
+                )
+            }
+        }
+        val input = composeRule.onNodeWithTag("ai_agents.key_input")
+        val action = composeRule.onNodeWithTag("ai_agents.key_action")
+        action.assertIsNotEnabled()
+        input.performTextReplacement(TEST_NPUB)
+        action.performClick()
+        composeRule.onNodeWithText(app.getString(R.string.ai_agent_open_profile)).assertExists()
+
+        input.performTextReplacement("npub1invalid")
+        action.performClick()
+        composeRule.onNodeWithText(app.getString(R.string.ai_agent_key_invalid)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.ai_agent_open_profile)).assertDoesNotExist()
+        composeRule.runOnIdle { assertTrue(opened.isEmpty()) }
+
+        input.performTextReplacement(TEST_NPUB)
+        action.performClick()
+        action.performClick()
+        composeRule.runOnIdle { assertEquals(listOf(TEST_NPUB), opened) }
+    }
+
+    /** Only a valid public reference for another account can continue to the profile. */
+    @Test
+    fun checkAgentKeyRejectsOwnAndNonPublicReferences() {
+        val hex = "1".repeat(64)
+        val normalize: (String) -> MemberRefFfi? = { input ->
+            when (input) {
+                TEST_NPUB -> MemberRefFfi("OWN", "OWN", TEST_NPUB)
+                "nprofile1agent", "marmot://profile/nprofile1agent" -> MemberRefFfi("agent", "agent", TEST_NPUB)
+                "nsec1secret", hex, "marmot://profile/$hex" -> error("Only public Bech32 references may reach the decoder")
+                else -> null
+            }
+        }
+        assertEquals(AgentKeyCheck.OwnKey, checkAgentKey(TEST_NPUB, "own", normalize))
+        assertEquals(AgentKeyCheck.Invalid, checkAgentKey("nsec1secret", "own", normalize))
+        assertEquals(AgentKeyCheck.Invalid, checkAgentKey(hex, "own", normalize))
+        assertEquals(AgentKeyCheck.Invalid, checkAgentKey("marmot://profile/$hex", "own", normalize))
+        assertEquals(AgentKeyCheck.Valid(TEST_NPUB), checkAgentKey(" NOSTR:nprofile1agent ", "own", normalize))
+        assertEquals(AgentKeyCheck.Valid(TEST_NPUB), checkAgentKey("marmot://profile/nprofile1agent", "own", normalize))
+    }
 
     /** Claude Code joins the existing connectors without changing the Codex row's position. */
     @Test
@@ -332,7 +387,7 @@ class AiAgentsScreenTest {
         }
     }
 
-    /** The screen itself puts the reviewed prompt on the system clipboard for the active account. */
+    /** The setup sheet copies the active account prompt and continues to the key review. */
     @Test
     fun screenCopiesTheReviewedPromptToTheSystemClipboard() {
         clearClipboard()
@@ -347,6 +402,8 @@ class AiAgentsScreenTest {
         composeRule.waitForIdle()
 
         assertEquals(app.getString(R.string.agent_connector_codex_prompt, TEST_NPUB), clipboardText())
+        composeRule.onNodeWithTag("ai_agents.continue_setup").performClick()
+        composeRule.onNodeWithTag("ai_agents.key_input").assertExists()
     }
 
     /** Composes the surface under test with the given fixture. */
