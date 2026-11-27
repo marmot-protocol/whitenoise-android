@@ -1698,7 +1698,6 @@
         <item quantity="other">%1$d tane daha</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Bu görselleri yüklediğinizde veya kümeyi kurduğunuzda, görsellerin barındırıldığı sunucular IP adresinizi alır.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Adsız küme</string>
     <string name="emoji_sets_emoji_loading">%1$s yükleniyor</string>
     <string name="emoji_sets_emoji_failed">%1$s yüklenemedi.</string>

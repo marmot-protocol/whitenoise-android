@@ -1675,7 +1675,6 @@
         <item quantity="other">另外 %1$d 个</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">加载或安装这些图片时，图片托管方会收到你的 IP 地址。</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">未命名的表情包</string>
     <string name="emoji_sets_emoji_loading">正在加载 %1$s</string>
     <string name="emoji_sets_emoji_failed">无法加载 %1$s。</string>

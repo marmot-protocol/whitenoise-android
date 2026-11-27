@@ -134,7 +134,8 @@ internal class EmojiSetImages(
 
     /** Loads the cover once, for a remote set that names one. */
     suspend fun loadCover() {
-        if (!requested || local || set.imageUrl == null || cover != null) return
+        if (!requested || local) return
+        if (set.imageUrl == null || cover != null) return
         cover = EmojiSetImage.Loading
         try {
             cover = fetch { source.cover(set) }

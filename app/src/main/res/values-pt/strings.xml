@@ -1702,7 +1702,6 @@
         <item quantity="other">mais %1$d</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Ao carregar ou instalar estas imagens, os servidores que as hospedam recebem seu endereço IP.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Conjunto sem nome</string>
     <string name="emoji_sets_emoji_loading">Carregando %1$s</string>
     <string name="emoji_sets_emoji_failed">Não foi possível carregar %1$s.</string>

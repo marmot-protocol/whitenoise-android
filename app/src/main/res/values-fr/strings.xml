@@ -1713,7 +1713,6 @@
         <item quantity="other">%1$d de plus</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Les hébergeurs de ces images reçoivent votre adresse IP lorsque vous les chargez ou les installez.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Jeu sans nom</string>
     <string name="emoji_sets_emoji_loading">Chargement de %1$s</string>
     <string name="emoji_sets_emoji_failed">Impossible de charger %1$s.</string>

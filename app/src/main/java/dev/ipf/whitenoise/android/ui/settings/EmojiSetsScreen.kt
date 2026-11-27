@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.EmojiSetFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.emojiSetAddress
 import dev.ipf.whitenoise.android.state.EmojiSetNotice
+import dev.ipf.whitenoise.android.state.EmojiSetsBackend
 import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -73,14 +74,7 @@ internal fun EmojiSetsScreen(
     key(appState, activeOwner, account, generation, initialAddress) {
         val backend = remember { appState.emojiSetsBackend(account, generation, activeOwner) }
         val controller = remember { EmojiSetsController(backend, appState.emojiSetLibrary::invalidate) }
-        val imageSource = remember { backend.imageSource() }
-        // A new version, or the same one after install or removal, starts with fresh image consent and tiles.
-        val images =
-            controller.state.preview?.let { set ->
-                remember(set.coordinate, set.eventIdHex, set.installed?.eventIdHex) {
-                    EmojiSetImages(set, imageSource)
-                }
-            }
+        val images = rememberEmojiSetImages(controller.state.preview, backend)
         val scope = rememberCoroutineScope()
         val back = {
             when {
@@ -124,6 +118,18 @@ internal fun EmojiSetsScreen(
         )
     }
 }
+
+/** A version, install or removal change starts with fresh image consent and tiles. */
+@Composable
+private fun rememberEmojiSetImages(
+    set: EmojiSetFfi?,
+    backend: EmojiSetsBackend,
+): EmojiSetImages? =
+    set?.let {
+        remember(backend, set.coordinate, set.eventIdHex, set.installed?.eventIdHex) {
+            EmojiSetImages(set, backend.imageSource())
+        }
+    }
 
 /** Pure presentation for the browser and preview, with only the editable query held in Compose. */
 @Suppress("LongParameterList")
@@ -276,16 +282,17 @@ internal fun EmojiSetStatus(
     syncing: Boolean = false,
     showProgress: Boolean = true,
 ) {
-    val progress = state.progress
-    if (showProgress && progress != null && progress.totalEmoji > 0u) {
-        LinearProgressIndicator(
-            progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        )
-    } else if (showProgress && (state.busy || syncing)) {
-        LinearProgressIndicator(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        )
+    if (showProgress) {
+        val progress = state.progress
+        val modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+        if (progress != null && progress.totalEmoji > 0u) {
+            LinearProgressIndicator(
+                progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
+                modifier = modifier,
+            )
+        } else if (state.busy || syncing) {
+            LinearProgressIndicator(modifier = modifier)
+        }
     }
     val notice =
         when (state.notice) {

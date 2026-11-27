@@ -1709,7 +1709,6 @@
         <item quantity="other">%1$d weitere</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Beim Laden oder Installieren dieser Bilder erhalten die Bild-Hosts deine IP-Adresse.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Unbenanntes Set</string>
     <string name="emoji_sets_emoji_loading">%1$s wird geladen</string>
     <string name="emoji_sets_emoji_failed">%1$s konnte nicht geladen werden.</string>

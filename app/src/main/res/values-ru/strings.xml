@@ -1787,7 +1787,6 @@
         <item quantity="other">ещё %1$d</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">При загрузке или установке этих изображений ваш IP-адрес будет виден серверам, на которых они хранятся.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Набор без названия</string>
     <string name="emoji_sets_emoji_loading">Загрузка %1$s</string>
     <string name="emoji_sets_emoji_failed">Не удалось загрузить %1$s.</string>

@@ -52,30 +52,6 @@
         ]
       },
       {
-        "surface": "EmojiSetTileRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun EmojiSetTileRow(",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
-        "surface": "EmojiSetTile",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun EmojiSetTile(",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
-        "surface": "PulsingBlank",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun PulsingBlank(",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
         "surface": "emojiSetSummary",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "fun emojiSetSummary(",
@@ -95,14 +71,6 @@
         "surface": "Modifier.explain",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "fun Modifier.explain(",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
-        "surface": "EmojiSetTileContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun EmojiSetTileContent(",
         "test_ids": [
           "SET-076"
         ]
@@ -206,22 +174,6 @@
         ]
       },
       {
-        "surface": "setting:emoji_sets_emoji_loading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "R.string.emoji_sets_emoji_loading",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
-        "surface": "setting:emoji_sets_emoji_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "R.string.emoji_sets_emoji_failed",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
         "surface": "setting:emoji_sets_installed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "R.string.emoji_sets_installed",
@@ -238,14 +190,6 @@
         ]
       },
       {
-        "surface": "setting:emoji_sets_emoji_unavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "R.string.emoji_sets_emoji_unavailable",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
-      {
         "surface": "setting:emoji_sets_more_hosts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "R.plurals.emoji_sets_more_hosts",
@@ -255,14 +199,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "R.string.retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "R.string.retry",
-        "test_ids": [
-          "SET-076"
-        ]
-      },
       {
         "surface": "R.string.explanation_organize_emoji_cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",

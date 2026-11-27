@@ -153,12 +153,16 @@ class EmojiSetsScreenshotTest {
         composeRule.onNodeWithTag(EMOJI_SET_LOAD_TEST_TAG).performClick()
         composeRule.waitForIdle()
         assertTrue("The cover loads after the tap", "cover" in source.requests)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.emoji_sets_emoji_loading, ":fox:")).assertExists()
+        val foxLoading = context.getString(R.string.emoji_sets_emoji_loading, ":fox:")
+        composeRule.onNodeWithContentDescription(foxLoading).assertExists()
         pendingFox.complete(Unit)
         composeRule.onNodeWithContentDescription(":fox:").assertExists()
-        val fox = composeRule.onNodeWithTag(emojiSetTileTestTag("fox"), useUnmergedTree = true).fetchSemanticsNode().size.width
-        val owl = composeRule.onNodeWithTag(emojiSetTileTestTag("owl"), useUnmergedTree = true).fetchSemanticsNode().size.width
-        assertTrue("Tiles in a row share its width within one pixel ($fox, $owl)", fox > 0 && kotlin.math.abs(fox - owl) <= 1)
+        val fox = tileWidth("fox")
+        val owl = tileWidth("owl")
+        assertTrue(
+            "Tiles in a row share its width within one pixel ($fox, $owl)",
+            fox > 0 && kotlin.math.abs(fox - owl) <= 1,
+        )
         assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
         assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
         failures.clear()
@@ -167,6 +171,11 @@ class EmojiSetsScreenshotTest {
         retry.performClick()
         composeRule.onNodeWithContentDescription(":frog:").assertExists()
         assertEquals("Tapping a failed tile retries it once", 2, source.requests.count { it == "frog" })
+    }
+
+    private fun tileWidth(shortcode: String): Int {
+        val tile = composeRule.onNodeWithTag(emojiSetTileTestTag(shortcode), useUnmergedTree = true)
+        return tile.fetchSemanticsNode().size.width
     }
 
     /** Untitled sets with machine-made identifiers never show the hex as their name. */

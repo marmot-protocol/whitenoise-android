@@ -1713,7 +1713,6 @@
         <item quantity="other">altri %1$d server</item>
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">I server che ospitano queste immagini ricevono il tuo indirizzo IP quando le carichi o le installi.</string>
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Set senza nome</string>
     <string name="emoji_sets_emoji_loading">Caricamento di %1$s</string>
     <string name="emoji_sets_emoji_failed">Impossibile caricare %1$s.</string>

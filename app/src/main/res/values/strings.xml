@@ -2002,7 +2002,7 @@
     </plurals>
     <string name="emoji_sets_image_hosts_unknown">Loading or installing these images shares your IP address with their hosts.</string>
     <!-- %1$s is an emoji count such as "12 emoji"; %2$s is Installed or Update available. -->
-    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_summary" translatable="false">%1$s · %2$s</string>
     <string name="emoji_sets_untitled">Untitled set</string>
     <!-- %1$s is an emoji shortcode such as :fox:. -->
     <string name="emoji_sets_emoji_loading">%1$s, loading</string>
