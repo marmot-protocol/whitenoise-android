@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/RawCodeRanges.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Code spans and fences that keep shortcodes literal are found in one pass, so long backtick runs in a received message never stall the chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/RawCodeRanges.kt",
+        "anchor": "internal fun rawCodeRanges(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

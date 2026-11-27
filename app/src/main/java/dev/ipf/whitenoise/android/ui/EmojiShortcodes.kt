@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.em
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.core.outsideRanges
+import dev.ipf.whitenoise.android.core.rawCodeRanges
 
 /** Artwork one `:shortcode:` renders as. */
 @Immutable
@@ -190,7 +191,7 @@ internal object EmojiShortcodes {
         if (!matches.hasNext()) {
             return text
         }
-        val outsideCode = Nip30Emoji.outsideRanges(Nip30Emoji.rawCodeRanges(text.text))
+        val outsideCode = outsideRanges(rawCodeRanges(text.text))
         return buildAnnotatedString {
             append(text)
             for (match in matches) {
