@@ -1,11 +1,15 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
@@ -19,6 +23,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -96,21 +101,21 @@ class ConversationRouteHeaderMotionTest {
         }
         rule.mainClock.advanceTimeBy(400)
         commit(route, "Alpha")
-        rule.mainClock.advanceTimeBy(48)
+        repeat(8) { rule.mainClock.advanceTimeByFrame() }
+        assertTrue("The opening chat header is visible before replacement", ink(pixels(), ::anyHeader).isNotEmpty())
         commit(route, "Bravo")
-        val frames = mutableListOf(pixels())
+        var bravoDrawn = false
         repeat(6) {
-            rule.mainClock.advanceTimeBy(16)
-            frames += pixels()
+            val frame = pixels()
+            assertTrue("The replaced chat's header never draws again", ink(frame, ::anyHeader).isEmpty())
+            bravoDrawn = bravoDrawn || ink(frame, ::anyBravoHeader).isNotEmpty()
+            rule.mainClock.advanceTimeByFrame()
         }
+        assertTrue("Fixture draws the latest chat header before Back", bravoDrawn)
         commit(route, null)
         repeat(18) {
-            rule.mainClock.advanceTimeBy(16)
-            frames += pixels()
-        }
-        assertTrue("Fixture draws the latest chat header", frames.any { ink(it, ::anyBravoHeader).size > 50 })
-        frames.forEach { frame ->
-            assertTrue("The replaced chat's header never draws again", ink(frame, ::anyHeader).isEmpty())
+            assertTrue("Back never redraws the replaced chat's header", ink(pixels(), ::anyHeader).isEmpty())
+            rule.mainClock.advanceTimeByFrame()
         }
     }
 
@@ -171,13 +176,18 @@ class ConversationRouteHeaderMotionTest {
     ) {
         rule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                ConversationRouteAnimatedContent(
-                    rememberConversationRouteTransition(route.value, false),
-                    routeForwardDirection = 1,
-                    suppressMotion = false,
-                    contentKey = { it ?: "list" },
-                    activatingBounds = { if (it == null) null else origin },
-                ) { page(it) }
+                val handoff = rememberMeasuredControlHandoff(Unit, route.value != null, morphSurface = true)
+                CompositionLocalProvider(LocalComposerFabHandoff provides handoff) {
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        ConversationRouteAnimatedContent(
+                            rememberConversationRouteTransition(route.value, false),
+                            routeForwardDirection = 1,
+                            suppressMotion = false,
+                            contentKey = { it ?: "list" },
+                            activatingBounds = { if (it == null) null else origin },
+                        ) { page(it) }
+                    }
+                }
             }
         }
     }
@@ -219,13 +229,9 @@ class ConversationRouteHeaderMotionTest {
             containerColor = Color.Black,
             topNoticeSlot = false,
             topBar = {
-                Box(Modifier.height(80.dp).conversationRouteHeaderMotion()) {
-                    Text(
-                        if (conversation) "Chat header" else "List header",
-                        color = color,
-                        fontSize = 30.sp,
-                        modifier = Modifier.padding(start = 18.dp, top = 16.dp),
-                    )
+                Box(Modifier.fillMaxWidth().height(80.dp).conversationRouteHeaderMotion()) {
+                    // A solid marker gives the same pixel bounds at rest and during a fade.
+                    Box(Modifier.padding(start = 18.dp, top = 16.dp).size(24.dp).background(color))
                 }
             },
         ) { padding ->

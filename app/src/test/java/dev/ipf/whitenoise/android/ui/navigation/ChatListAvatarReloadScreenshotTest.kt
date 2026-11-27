@@ -11,11 +11,11 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -62,7 +62,7 @@ class ChatListAvatarReloadScreenshotTest {
         val holder = MainShellStateHolder(app, SavedStateHandle())
         val controller = holder.chatsController(ACCOUNT, app.runtimeGeneration)
         val mounted = mutableStateOf(true)
-        val markRowPreviews = mutableStateOf(true)
+        val markPaint = mutableStateOf(true)
         AvatarImageLoader.clear()
         GroupAvatarImageLoader.clear()
         AvatarImageLoader.attachProfileImageFetcher { _, _ -> awaitCancellation() }
@@ -72,7 +72,7 @@ class ChatListAvatarReloadScreenshotTest {
             app.setAppInForeground(true)
             rule.setContent {
                 if (mounted.value) {
-                    RowPreviewPaintTheme(markRowPreviews.value) { MainShell(app, holder) }
+                    MarkerTheme(markPaint.value) { MainShell(app, holder) }
                 }
             }
             rule.waitUntil(10_000) {
@@ -83,6 +83,7 @@ class ChatListAvatarReloadScreenshotTest {
             assertAvatars(fixture, "before opening the chat")
             val groupRows = avatarColors(fixture).map { it.first }.filter { it.startsWith("chat.row.") }
             assertTrue("fixture preview paint markers must be visible", groupRows.all(::hasPaintedRow))
+            assertTrue("fixture search icon paint marker must be visible", hasPaintedHeader())
             rule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").performClick()
             rule.waitUntil(10_000) { holder.selectedChat.value?.id == fixture.target.groupIdHex }
             rule.mainClock.advanceTimeBy(1_000L)
@@ -92,7 +93,7 @@ class ChatListAvatarReloadScreenshotTest {
             rule.mainClock.autoAdvance = false
             rule.onNodeWithContentDescription("Back").performClick()
             val missingOnFirstFrame = missingFirstVisibleAvatars(fixture)
-            rule.runOnIdle { markRowPreviews.value = false }
+            rule.runOnIdle { markPaint.value = false }
             rule.mainClock.advanceTimeBy(1_000L)
             assertAvatars(fixture, "after Back with empty caches")
             assertTrue(
@@ -113,18 +114,18 @@ class ChatListAvatarReloadScreenshotTest {
         }
     }
 
-    /** Renders fixture previews in cyan until the test returns to the standard screenshot palette. */
+    /** Marks the search icon and fixture previews until the final screenshot. */
     @Composable
     @Suppress("FunctionNaming")
-    private fun RowPreviewPaintTheme(
-        markRowPreviews: Boolean,
+    private fun MarkerTheme(
+        markPaint: Boolean,
         content: @Composable () -> Unit,
     ) {
         WhiteNoiseTheme {
             val scheme = MaterialTheme.colorScheme
             val colors =
-                if (markRowPreviews) {
-                    scheme.copy(onSurfaceVariant = ComposeColor(ROW_PREVIEW_COLOR))
+                if (markPaint) {
+                    scheme.copy(onSurfaceVariant = ComposeColor(Color.CYAN))
                 } else {
                     scheme
                 }
@@ -182,19 +183,13 @@ class ChatListAvatarReloadScreenshotTest {
         val missing = mutableListOf<String>()
         repeat(75) {
             rule.mainClock.advanceTimeByFrame()
+            val headerPainted = hasPaintedHeader()
             val visible =
                 pending.filterKeys { tag ->
-                    if (tag.startsWith("chat.row.")) {
-                        hasPaintedRow(tag)
-                    } else {
-                        // The list header fades in with the list body on one clock; sample it on the
-                        // first frame that paints any row, so a neutral placeholder cannot be skipped.
-                        rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed() &&
-                            hasPaintedRow("chat.row.${fixture.rows.first().groupIdHex}")
-                    }
+                    if (tag.startsWith("chat.row.")) hasPaintedRow(tag) else headerPainted
                 }
             visible.forEach { (tag, color) ->
-                val contrast = FIRST_ROW_CONTRAST
+                val contrast = if (tag.startsWith("chat.row.")) FIRST_ROW_CONTRAST else FIRST_HEADER_CONTRAST
                 if (!containsAvatar(tag, color, exact = false, minContrast = contrast)) {
                     missing += "$tag ${firstFrameDiagnostic(tag, color, contrast)}"
                 }
@@ -270,22 +265,31 @@ class ChatListAvatarReloadScreenshotTest {
             "maxChannelSpan=$maxChannelSpan maxAlpha=$maxAlpha"
     }
 
-    /** Finds cyan ink from the fixture's preview even when the returning route is faint. */
-    private fun hasPaintedRow(tag: String): Boolean {
-        val target =
+    /** The independent search icon marks the first frame painted by the header band. */
+    private fun hasPaintedHeader(): Boolean =
+        hasCyanInk(rule.onNodeWithContentDescription("Search chats"), FIRST_HEADER_CONTRAST)
+
+    private fun hasPaintedRow(tag: String): Boolean =
+        hasCyanInk(
             rule.onNode(
                 hasText("No messages yet") and hasAnyAncestor(hasTestTag(tag)),
                 useUnmergedTree = true,
-            )
-        return runCatching { target.captureToImage().toPixelMap() }.getOrNull()?.let { pixels ->
+            ),
+            FIRST_ROW_CONTRAST,
+        )
+
+    private fun hasCyanInk(
+        target: SemanticsNodeInteraction,
+        minContrast: Float,
+    ): Boolean =
+        runCatching { target.captureToImage().toPixelMap() }.getOrNull()?.let { pixels ->
             (0 until pixels.height).any { y ->
                 (0 until pixels.width).any { x ->
                     val pixel = pixels[x, y]
-                    pixel.alpha > 0f && minOf(pixel.green, pixel.blue) - pixel.red > FIRST_ROW_CONTRAST
+                    pixel.alpha > 0f && minOf(pixel.green, pixel.blue) - pixel.red > minContrast
                 }
             }
         } ?: false
-    }
 
     /** All four expected identities have different synthetic colors. */
     private fun avatarColors(fixture: ReturnFixture): List<Pair<String, Int>> =
@@ -344,7 +348,7 @@ class ChatListAvatarReloadScreenshotTest {
         const val ACTIVE_URL = "https://example.invalid/active-avatar.png"
         const val OTHER_URL = "https://example.invalid/other-avatar.png"
         const val LEGACY_URL = "https://example.invalid/legacy-avatar.png"
-        const val ROW_PREVIEW_COLOR = Color.CYAN
+        const val FIRST_HEADER_CONTRAST = 1f / 255f
         const val FIRST_ROW_CONTRAST = 0.04f
     }
 }
