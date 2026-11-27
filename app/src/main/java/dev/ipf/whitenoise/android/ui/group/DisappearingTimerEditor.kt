@@ -42,13 +42,13 @@ internal fun disappearingPickOutcome(
 /**
  * The disappearing-messages sheet for chat details. A pick that prunes history asks inside the same sheet;
  * everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop the open sheet and
- * any pending confirmation on account/runtime change.
+ * any pending confirmation on account/runtime change. [currentSecs] is the group's protocol value.
  */
 @Composable
 @Suppress("LongParameterList")
 internal fun DisappearingTimerEditor(
     open: Boolean,
-    currentSecs: Long,
+    currentSecs: ULong,
     editable: Boolean,
     identity: (@Composable () -> Unit)?,
     resetKeys: Array<out Any?>,
@@ -59,18 +59,20 @@ internal fun DisappearingTimerEditor(
     val currentEditable by rememberUpdatedState(editable)
     val currentOnApply by rememberUpdatedState(onApply)
     if (open) {
+        // The raw protocol value keys a pending choice, since timers past Long.MAX_VALUE clamp to one shown value.
         key(resetKeys.toList(), currentSecs) {
+            val shownSecs = currentSecs.clampedDisappearingSecs()
             DisappearingMessagesPickerSheet(
-                currentSecs = currentSecs,
+                currentSecs = shownSecs,
                 onDismiss = onDismiss,
                 onPick = { secs ->
                     // A changed timer invalidates any choice made against the previous value.
-                    if (currentEditable && latestSecs == currentSecs && secs != currentSecs) {
+                    if (currentEditable && latestSecs == currentSecs && secs != shownSecs) {
                         currentOnApply(secs)
                     }
                 },
                 requiresConfirmation = { secs ->
-                    disappearingPickOutcome(currentSecs, secs) == DisappearingPick.Confirm
+                    disappearingPickOutcome(shownSecs, secs) == DisappearingPick.Confirm
                 },
                 confirmIdentity = identity,
                 confirmEnabled = editable,

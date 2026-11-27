@@ -93,6 +93,7 @@ internal class ProfileKeysUiState(
     var rawExportDialog by mutableStateOf(false)
     var rawKeyConsent = Any()
     var exportBusy by mutableStateOf(false)
+    var exportScreenLockRequired by mutableStateOf(false)
     var wipeSheet by mutableStateOf(false)
     var wipeConfirm by mutableStateOf(false)
     var wipeConfirmInput by mutableStateOf("")
@@ -114,6 +115,7 @@ internal class ProfileKeysUiState(
         rawKeyConsent = Any()
         exportOperation.cancel()
         exportBusy = false
+        exportScreenLockRequired = false
         clearPasswords()
     }
 
@@ -224,6 +226,7 @@ internal fun AccountKeysScreen(
             return
         }
         val passphrase = if (encrypted) ui.password.text.toString() else ""
+        ui.exportScreenLockRequired = false
         ui.clearPasswords()
         ui.exportBusy = true
         ui.exportOperation.start(

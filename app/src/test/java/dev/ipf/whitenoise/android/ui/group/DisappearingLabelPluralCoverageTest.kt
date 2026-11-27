@@ -7,7 +7,7 @@ import java.io.File
 
 /** Source-level guards that every counted disappearing-timer unit resolves through a plural resource. */
 class DisappearingLabelPluralCoverageTest {
-    /** Each counted label spec unit renders through `pluralStringResource`, never a plain `%d` string. */
+    /** Each counted label spec branch is exactly a shared plural helper call, never a plain `%d` string. */
     @Test
     fun everyCountedLabelSpecUnitResolvesThroughAPluralResource() {
         val units = countedUnits()
@@ -21,9 +21,22 @@ class DisappearingLabelPluralCoverageTest {
             val expected = "disappearing_${unit.lowercase()}_count"
             assertTrue(
                 "$unit must resolve through R.plurals.$expected, found: $branch",
-                "pluralStringResource(R.plurals.$expected, spec.count.toInt(), spec.count.toInt())" in branch,
+                branch.trim() == "disappearingCountLabel(R.plurals.$expected, spec.count)",
             )
         }
+    }
+
+    /** The shared helper formats the exact count through the plural resource, with an `Int`-safe quantity. */
+    @Test
+    fun countLabelHelperFormatsTheFullCountThroughThePluralResource() {
+        val label = groupSource("DisappearingMessages.kt").replace(Regex("""\s+"""), " ").trim()
+        val body =
+            label
+                .substringAfter("private fun disappearingCountLabel(")
+                .substringAfter("): String = ")
+                .substringBefore(" /**")
+                .substringBefore(" @")
+        assertEquals("pluralStringResource(id, disappearingPluralQuantity(count), count)", body)
     }
 
     /** No locale ships a plain-number duration string, and every locale defines each unit as a plural. */

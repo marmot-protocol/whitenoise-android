@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -113,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteHeaderMotion
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -934,7 +934,8 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             showArchived = showArchived,
         )
-    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
+    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberChatAvatarListState() }
+    val avatarVisibleKeys = rememberChatAvatarVisibleKeys(chatListState)
     // Active/archived viewports keep separate scrolling; only decorative fades share the account lifetime.
     val edgeFadeMotion = rememberScrollEdgeFadeMotion(appState.activeAccountRef to appState.runtimeGeneration)
     val folderArrival =
@@ -1021,15 +1022,7 @@ internal fun ChatsScreen(
                         rows
                     }
                 }
-            if (searchActive) {
-                rows
-            } else {
-                sortFolderChats(
-                    rows,
-                    selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT,
-                    appState.activeAccount?.accountIdHex,
-                ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
-            }
+            if (searchActive) rows else sortChatListFolderRows(rows, selectedFolder?.sort, appState, groupTitleCopy)
         }
     RecordUnreadFilterFirstResultFrame(
         active = unreadOnly,
@@ -2025,11 +2018,10 @@ internal fun ChatsScreen(
         }
 
     Scaffold(
-        // The body frame places this screen's banner slot below the playback strip instead.
         topNoticeSlot = false,
         topBar = {
             val connectivityState = rememberChatListConnectivityState(appState, controller)
-            Column {
+            Column(Modifier.conversationRouteHeaderMotion()) {
                 if (selectionMode) {
                     ChatListSelectionBar(onClose = ::clearSelection)
                 } else {
@@ -2348,17 +2340,27 @@ internal fun ChatsScreen(
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
         ) {
-            // Chats reset and folder management remain available with an empty list.
-            // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
-            // The prototype swaps the whole top column for the search bar and its mode chips, so the
-            // folder pills leave with it and come back when search closes.
-            if (appState.activeAccountRef != null && !searchOpen) {
-                key(appState.activeAccountRef, appState.runtimeGeneration) {
+            // Folder chips stay available above the empty list and yield to the search bar.
+            val folderAccount = appState.activeAccountRef
+            if (folderAccount != null && !searchOpen) {
+                key(folderAccount, appState.runtimeGeneration) {
+                    val selectFolder =
+                        rememberChatFolderAvatarSelection(appState, folderAccount, onSelectFolder) { id ->
+                            val rule = id?.let { appState.chatFolderPreferences.folderRule(folderAccount, it) }
+                            val source = chatFolderSource(rule, folderActiveItems, folderArchivedItems)
+                            val candidates = restrictToChatIds(source, id?.let { resolveFolderChatIds(it) })
+                            val sort = accountFolders.firstOrNull { it.id == id }?.sort
+                            val archived = rule?.smartFilter == null && rule?.archivedOnly == true
+                            val target =
+                                if (archived == showArchived) chatListState else searchViewport?.listState(archived)
+                            val ranked = sortChatListFolderRows(candidates, sort, appState, groupTitleCopy)
+                            folderAvatarViewport(ranked, target)
+                        }
                     ChatListFilterChips(
                         chips = folderChipModels,
                         chatsUnreadCount = appState.activeAccountMessageCount(),
                         selectedFolderId = selectedFolderId,
-                        onSelect = onSelectFolder,
+                        onSelect = selectFolder,
                         onEditFolder = { folderHandoff.editingFolderId = it },
                         onManageFolders = {
                             val sameOwner =
@@ -2528,28 +2530,25 @@ internal fun ChatsScreen(
                                                 )
                                             }
                                         }
-                                        searchSections.groups.forEachIndexed { targetIndex, item ->
-                                            this.item(
-                                                key = visibleRowId(item),
-                                                contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                            ) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRows(
+                                            searchSections.groups,
+                                            ::visibleRowId,
+                                            avatarVisibleKeys,
+                                            content = chatRowContent,
+                                        )
                                         if (messageResultsMode) {
                                             globalSearchResultItems(messageResultsContent) { result ->
                                                 messageResultReturnFocus(result)
                                             }
                                         }
                                     } else {
-                                        visibleItems.forEachIndexed { targetIndex, item ->
-                                            if (targetIndex == pinnedBoundary) {
-                                                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
-                                            }
-                                            this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRowsWithPinnedBoundary(
+                                            visibleItems,
+                                            pinnedBoundary,
+                                            rowPlacementDurationMillis,
+                                            avatarVisibleKeys,
+                                            chatRowContent,
+                                        )
                                     }
                                 }
                             }
@@ -2737,5 +2736,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
-
-private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"

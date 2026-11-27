@@ -10,6 +10,14 @@
         "test_ids": [
           "GRP-023"
         ]
+      },
+      {
+        "surface": "Depth-only bounds check for other member-authored JSON, with the same lenient-syntax rejection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemEventJson.kt",
+        "anchor": "internal fun nestingWithin(",
+        "test_ids": [
+          "GRP-023"
+        ]
       }
     ]
   },

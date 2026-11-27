@@ -47,6 +47,12 @@ REQUIRED_ELF_EXPORTS = (
     b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
 )
 PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, ELF_METADATA_FILE, "manifest.json")
+PREPARED_METADATA_FILES = {
+    ".prepared.json",
+    "marmotkit-api-signature.txt",
+    "prepared-files.sha256",
+    "native-provenance.json",
+}
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
     "schema",
@@ -616,6 +622,14 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
     marker_files = metadata.get("files")
     if marker_files != archive_hashes:
         return False
+    # Gradle compiles every file under the prepared tree and follows links, so a cached tree with
+    # extra files or any symlink is rebuilt.
+    entries = list(output.rglob("*"))
+    if output.is_symlink() or any(path.is_symlink() for path in entries):
+        return False
+    present = {path.relative_to(output).as_posix() for path in entries if not path.is_dir()}
+    if not present <= set(archive_hashes) | PREPARED_METADATA_FILES:
+        return False
     try:
         for relative, expected_sha in archive_hashes.items():
             path = output / relative
@@ -671,7 +685,9 @@ def extract_atomically(archive_path: Path, output: Path, properties: dict[str, s
             + "\n",
             encoding="utf-8",
         )
-        if output.exists():
+        if output.is_symlink():
+            output.unlink()
+        elif output.exists():
             shutil.rmtree(output)
         os.replace(temporary, output)
     finally:
@@ -754,6 +770,8 @@ def prepare(args: argparse.Namespace) -> Path:
                 raise PreparationError("prepared artifact failed its final validation")
         provenance = native_provenance(output, properties, sha256(args.lock))
         pending = output / ".native-provenance.tmp"
+        # A fresh file: an existing name could share its inode with a verified payload file.
+        pending.unlink(missing_ok=True)
         pending.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(pending, output / "native-provenance.json")
     return output

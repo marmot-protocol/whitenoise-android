@@ -697,6 +697,41 @@ class BundleSignatureTests(unittest.TestCase):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
+    def test_stable_marmotkit_gate_rejects_prerelease_or_mixed_coordinates(self):
+        """The production pin must name one formal release and its exact Android archive."""
+        current = ROOT / 'app/src/main/marmotkit/MARMOT_VERSION'
+        stable = dict(line.split('=', 1) for line in current.read_text().splitlines()
+                      if line.strip() and not line.lstrip().startswith('#'))
+        release_root = 'https://github.com/marmot-protocol/mdk/releases/download'
+        stable.update({
+            'artifact-id': '0.19.0',
+            'artifact-tag': 'marmotkit-v0.19.0',
+            'archive-root': 'marmotkit-android-0.19.0',
+            'artifact-url': release_root + '/marmotkit-v0.19.0/marmotkit-android-0.19.0.zip',
+        })
+        with tempfile.TemporaryDirectory() as directory:
+            pin = Path(directory) / 'MARMOT_VERSION'
+            for changes in (
+                {},
+                {'artifact-id': '0.20.0-rc.2', 'artifact-tag': 'marmotkit-v0.20.0-rc.2'},
+                {'artifact-id': '0.20.0+build'},
+                {'artifact-id': '0.020.0'},
+                {'artifact-tag': 'marmotkit-snapshot-' + 'a' * 40},
+                {'artifact-url': release_root + '/marmotkit-v0.20.0-rc.2/marmotkit-android-0.20.0-rc.2.zip'},
+                {'archive-root': 'marmotkit-android-0.20.0-rc.2'},
+            ):
+                with self.subTest(changes=changes):
+                    lock = {**stable, **changes}
+                    pin.write_text(''.join(f'{key}={value}\n' for key, value in lock.items()))
+                    result = subprocess.run(
+                        [sys.executable, '-B', str(ROOT / 'scripts/check_marmotkit_release_channel.py'), str(pin)],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(result.returncode == 0, not changes, result.stderr)
+                    if changes:
+                        self.assertIn('Stable MarmotKit', result.stderr)
+
     def test_release_workflows_have_only_manual_entrypoints(self):
         for name in ('android-production-release.yml', 'android-release-distribute.yml', 'android-zapstore-publish.yml'):
             text = (ROOT / '.github/workflows' / name).read_text()

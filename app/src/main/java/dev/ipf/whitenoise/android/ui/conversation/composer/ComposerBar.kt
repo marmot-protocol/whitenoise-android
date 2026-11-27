@@ -1662,7 +1662,7 @@ internal fun ComposerBar(
                                 voiceRecordingController,
                                 voicePhase,
                                 primaryTrailingActionWidth,
-                                lockedVoiceAtStart,
+                                recordingActionAlignment,
                                 expandedControlLayout,
                             ),
                         textFieldValue = textFieldValue,
