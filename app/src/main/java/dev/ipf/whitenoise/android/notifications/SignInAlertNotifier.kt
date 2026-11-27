@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import dev.ipf.whitenoise.android.ForegroundConversationDismissalCoordinator
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.clearMicrophoneRecovery
 import dev.ipf.whitenoise.android.state.SignInAlertNotifications
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.signInAlerts

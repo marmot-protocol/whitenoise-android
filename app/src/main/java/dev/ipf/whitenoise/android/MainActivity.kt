@@ -414,7 +414,13 @@ class MainActivity : AppCompatActivity() {
         val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
         val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
         signInAlertAccount?.let {
-            SignInAlertNavigation.open(it, appState, pinTapGate, notificationInboundState, foregroundConversationDismissal)
+            SignInAlertNavigation.open(
+                it,
+                appState,
+                pinTapGate,
+                notificationInboundState,
+                foregroundConversationDismissal,
+            )
         }
         if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
             if (signInAlertAccount == null && !opensProfileChooser) {
