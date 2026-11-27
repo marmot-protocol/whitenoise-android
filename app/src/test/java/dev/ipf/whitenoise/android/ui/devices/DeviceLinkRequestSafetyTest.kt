@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -82,11 +83,17 @@ class DeviceLinkRequestSafetyTest {
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         link.assertIsEnabled()
 
-        compose.runOnIdle { running.value = DeviceLinkCommand.Decline }
-        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            running.value = DeviceLinkCommand.Decline
+            Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeBy(100L)
         link.assertIsNotEnabled().performTouchInput { down(center) }
-        compose.runOnIdle { running.value = null }
-        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            running.value = null
+            Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeBy(100L)
         link.assertIsEnabled().performTouchInput { up() }
         compose.runOnIdle { assertEquals(0, links) }
         link.performClick()
@@ -101,8 +108,11 @@ class DeviceLinkRequestSafetyTest {
         compose.setContent { WhiteNoiseTheme { DeviceLinkRequestContent(state.value, null, {}, {}, {}) } }
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS * 3)
 
-        state.value = COMPARING
-        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            state.value = COMPARING
+            Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeBy(100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).assertIsEnabled()

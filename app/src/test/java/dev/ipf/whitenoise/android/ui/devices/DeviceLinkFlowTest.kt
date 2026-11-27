@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -192,15 +193,21 @@ class DeviceLinkFlowTest {
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
         compose.runOnIdle { blocked.value = true }
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).assertDoesNotExist()
-        compose.runOnIdle { blocked.value = false }
+        compose.runOnIdle {
+            blocked.value = false
+            Snapshot.sendApplyNotifications()
+        }
+        val link = compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo()
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
-        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        link.assertIsEnabled().performClick()
         compose.runOnIdle {
             assertEquals(false, linked?.bringHistory)
             request.value = request.value.copy(promptId = "second")
+            Snapshot.sendApplyNotifications()
         }
+        link.performScrollTo()
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
-        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        link.assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(true, linked?.bringHistory) }
     }
 
