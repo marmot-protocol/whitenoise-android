@@ -558,7 +558,6 @@ class LocalNotificationPresenter(
                                                     update.isDm,
                                                     conversationTitleOverride,
                                                     ConversationVibrationPattern.SYSTEM_DEFAULT,
-                                                    update.accountRef,
                                                 ),
                                             ).filter { it.channel == category }
                                     }.orEmpty() +

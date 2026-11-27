@@ -20,6 +20,11 @@ import java.util.WeakHashMap
  * (`:conv:`) channels carry plaintext nicknames, display names, or chat titles in OS Settings, so
  * deleting those owned channels prevents private labels from surviving after the account or chat is
  * removed. Other signing accounts' channels and global channels are never deleted.
+ *
+ * Known limit: a `:conv:` channel created before ownership was recorded, whose chat was already
+ * deleted and whose shortcut is gone, cannot be traced to its account (its id hashes the account
+ * with the group). While another signing account remains, it survives that account's sign-out and is
+ * removed only when the last signing account leaves.
  */
 internal const val LEGACY_SWEEP_PENDING_KEY = "legacy_conversation_sweep_pending"
 internal const val CONVERSATION_CHANNEL_OWNERS_PREFS = "whitenoise.conversation_channel_owners"
