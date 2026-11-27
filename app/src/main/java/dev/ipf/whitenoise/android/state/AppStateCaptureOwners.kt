@@ -83,6 +83,17 @@ internal suspend fun WhiteNoiseAppState.wipeAccountAndPurgeVoiceDrafts(account: 
     }
 }
 
+/** Binds local removal proof to the voice capture that existed before the native mutation or absence read. */
+internal suspend fun WhiteNoiseAppState.localDeleteCaptureGuard(
+    account: String,
+    groupIdHex: String,
+): () -> Boolean =
+    withContext(Dispatchers.Main.immediate) {
+        val epoch = runtimeGeneration
+        val sameCapture = voiceNotes.captureTargetIsCurrent(VoiceNoteKey(account, groupIdHex))
+        return@withContext { epoch == runtimeGeneration && sameCapture() }
+    }
+
 /** Stops both capture owners for a removed chat and reports whether its saved voice files were deleted. */
 internal fun WhiteNoiseAppState.releaseCaptureTarget(
     account: String,

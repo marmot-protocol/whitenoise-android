@@ -109,6 +109,38 @@ class VoiceDraftEvictionCleanupTest {
             assertTrue(journal.pending().isEmpty())
         }
 
+    /** A restored readback survives a transient lookup failure and settles without another group update. */
+    @Test
+    fun failedMembershipRecheckRetriesUntilEvictionIsConfirmed() =
+        runTest {
+            val journal = VoiceDraftEvictionJournal(folder.newFolder("evictions"))
+            assertTrue(journal.stage(chat, confirmed = false))
+            var reads = 0
+            val released = mutableListOf<VoiceNoteKey>()
+            lateinit var cleanup: VoiceDraftEvictionCleanup
+            cleanup =
+                VoiceDraftEvictionCleanup(
+                    journal,
+                    folder.newFolder("voice"),
+                    backgroundScope,
+                    isEvicted = { if (reads++ == 0) null else true },
+                    releaseEvictedTarget = {
+                        released += it
+                        cleanup.complete(it)
+                    },
+                )
+            cleanup.resume()
+            advanceTimeBy(1_000L)
+            runCurrent()
+            assertEquals(mapOf(chat to false), journal.pending())
+            assertTrue(released.isEmpty())
+
+            advanceTimeBy(2_000L)
+            runCurrent()
+            assertEquals(listOf(chat), released)
+            assertTrue(journal.pending().isEmpty())
+        }
+
     /** A read started for an earlier eviction cannot settle a newer request for the same chat. */
     @Test
     fun laterEvictionSupersedesAReadOfTheRejoinedChat() =

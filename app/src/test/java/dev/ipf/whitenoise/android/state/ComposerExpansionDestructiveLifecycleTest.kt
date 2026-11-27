@@ -791,6 +791,86 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A failed first lookup leaves the take alone and durably asks the process owner to read membership again. */
+    @Test
+    fun firstEvictionReadFailureQueuesARecheck() =
+        runBlocking {
+            val take = saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            fixture.calls.onChatListRow = { throw MarmotKitException.TransportClosed() }
+
+            appState.reconcileCaptureEviction(key, appState.marmot())
+
+            assertEquals(1, fixture.calls.chatListRow.get())
+            assertTrue(take.isFile)
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val journal = VoiceDraftEvictionJournal(context.noBackupFilesDir.resolve("voice-draft-evictions"))
+            assertEquals(mapOf(key to false), journal.pending())
+        }
+
+    /** An absence read interrupted by a new take cannot give an old local-delete journal authority over it. */
+    @Test(timeout = 10_000)
+    fun localDeleteReplayPreservesACaptureCreatedDuringAbsenceRead() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false, missingProjection = MissingProjection.JOINED)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val journal = appState.localGroupDeleteCleanupJournal
+            val intent = PendingLocalGroupDeleteCleanup(ACCOUNT_REF, GROUP_ID, emptyList(), emptySet())
+            journal.stage(intent)
+            val reading = CompletableDeferred<Unit>()
+            val finishRead = CountDownLatch(1)
+            fixture.calls.onChatListRow = {
+                reading.complete(Unit)
+                finishRead.await()
+            }
+            val readback = launch { appState.reconcilePendingLocalGroupDeleteCleanups() }
+            val replacement =
+                try {
+                    reading.await()
+                    saveVoiceDraft(GROUP_ID).also { appState.voiceNotes.bind(key) { true } }
+                } finally {
+                    finishRead.countDown()
+                }
+            readback.join()
+
+            assertEquals(1, fixture.calls.chatListRow.get())
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertEquals(intent, journal.find(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** A confirmed live delete also defers client cleanup when the capture changes before it can run. */
+    @Test
+    fun localDeleteCommitPreservesAReplacementVoiceTake() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            lateinit var replacement: File
+
+            val cleanupComplete =
+                appState.deleteChatGroupLocalWithRecovery(
+                    LocalGroupRemovalRequest(ACCOUNT_REF, GROUP_ID, forgetProtocol = false),
+                    isCurrent = { true },
+                    readinessBudget = LocalGroupDeleteReadinessBudget(),
+                    onNativeCommitted = {
+                        replacement = saveVoiceDraft(GROUP_ID)
+                        appState.voiceNotes.bind(key) { true }
+                    },
+                )
+
+            assertEquals(1, fixture.calls.delete.get())
+            assertFalse(cleanupComplete)
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertTrue(appState.localGroupDeleteCleanupJournal.hasPending())
+        }
+
     /** A detached eviction keeps its retry when the filesystem rejects both deletion and isolation. */
     @Test
     fun failedEvictionPurgeIsRetried() =

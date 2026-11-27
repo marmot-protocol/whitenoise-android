@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "A failed first membership read queues another eviction read without dropping the draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "onUnresolved()",
+        "test_ids": [
+          "MED-061"
+        ]
+      },
+      {
         "surface": "Delayed eviction readback preserves a newer voice take",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
         "anchor": "captureIsCurrent()",

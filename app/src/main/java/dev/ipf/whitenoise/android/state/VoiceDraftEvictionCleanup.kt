@@ -251,11 +251,11 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
     if (evicted == true) releaseEvictedCaptureTarget(account, group)
 }
 
-/** Authorizes removal only from an explicit native eviction for the current capture and runtime. */
+/** Authorizes removal only for the current capture and defers failed or superseded eviction reads. */
 private suspend fun WhiteNoiseAppState.readCaptureEviction(
     key: VoiceNoteKey,
     runtime: MarmotInterface,
-    onNewerCapture: () -> Unit = {},
+    onUnresolved: () -> Unit = {},
 ): Boolean? {
     if (marmotOrNull() !== runtime) return null
     val (account, group) = key
@@ -270,6 +270,6 @@ private suspend fun WhiteNoiseAppState.readCaptureEviction(
     // Selection may change, but this read cannot retire a newer recording or draft for the same chat.
     val runtimeIsCurrent = epoch == runtimeGeneration && marmotOrNull() === runtime
     val sameCapture = captureIsCurrent()
-    if (runtimeIsCurrent && eviction == true && !sameCapture) onNewerCapture()
+    if (runtimeIsCurrent && (eviction == null || (eviction && !sameCapture))) onUnresolved()
     return eviction?.takeIf { runtimeIsCurrent && sameCapture }
 }
