@@ -593,6 +593,7 @@ class AccountKeysExportDeliveryTest {
         assertEquals(RAW_KEY, clip.getItemAt(0).text.toString())
         assertTrue(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true)
         assertEquals(0, fixture.picker.launchCount)
+        composeRule.runOnIdle { assertEquals(PrivateKeyReminderStage.Pending, fixture.reminderStage()) }
     }
 
     /** The added share action follows the same generation guard as file export after cancellation. */

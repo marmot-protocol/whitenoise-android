@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -97,6 +98,19 @@ class ChatListInvitePinnedSectionScreenshotTest {
 
     /** RTL at 200% text wraps the reminder and keeps both actions on screen. */
     @Test fun privateKeyReminderLargeFontRtl() = captureReminder("large_font_rtl", rtl = true, fontScale = 2f)
+
+    /** The banner can scroll to both actions while Chats keeps its own viewport. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h320dp-mdpi")
+    fun privateKeyReminderLeavesRoomForChatsInAShortWindow() {
+        var saveRequests = 0
+        mount(dark = false, amoled = false, rtl = true, fontScale = 2f, recordSignUp = true) { saveRequests++ }
+        rule.onNodeWithTag("chat.row.$PIN_0").assertIsDisplayed()
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_SAVE_TAG).performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, saveRequests) }
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_NOT_NOW_TAG).performScrollTo().performClick()
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_TAG).assertDoesNotExist()
+    }
 
     /** Mounts the list, delivers one invite as a native row update would, and records the settled frame. */
     private fun capture(

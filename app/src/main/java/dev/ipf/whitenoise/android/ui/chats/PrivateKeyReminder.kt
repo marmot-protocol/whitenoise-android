@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -15,17 +17,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 internal const val PRIVATE_KEY_REMINDER_TAG = "chats.private_key_reminder"
 internal const val PRIVATE_KEY_REMINDER_SAVE_TAG = "chats.private_key_reminder.save"
 internal const val PRIVATE_KEY_REMINDER_NOT_NOW_TAG = "chats.private_key_reminder.not_now"
+private const val REMINDER_WINDOW_HEIGHT_FRACTION = 0.45f
 
 /**
  * Reminds the active account to save its private key once it has a conversation (#4279). Only an account created by
@@ -61,18 +66,25 @@ internal fun PrivateKeyReminderBanner(
     onNotNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val maxHeight = LocalWindowInfo.current.containerDpSize.height * REMINDER_WINDOW_HEIGHT_FRACTION
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp)
+                .heightIn(max = maxHeight)
                 .testTag(PRIVATE_KEY_REMINDER_TAG),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
         border = amoledOutlineBorder(),
     ) {
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 4.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .fadingVerticalScroll(rememberScrollState())
+                .padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 4.dp),
+        ) {
             Text(
                 stringResource(R.string.private_key_reminder_title),
                 modifier = Modifier.padding(end = 12.dp),

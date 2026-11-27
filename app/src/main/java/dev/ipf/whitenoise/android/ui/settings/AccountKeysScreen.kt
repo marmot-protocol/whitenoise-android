@@ -262,9 +262,8 @@ internal fun AccountKeysScreen(
                         }
                         KeyExportDestination.Share -> {
                             ui.hideSensitive()
-                            val shared = sharePrivateKey(context, shareTitle, content)
-                            ui.shareErrorDialog = !shared
-                            if (shared) markPrivateKeySaved()
+                            // Launching the chooser does not confirm that the key was saved anywhere.
+                            ui.shareErrorDialog = !sharePrivateKey(context, shareTitle, content)
                         }
                     }
                 }
