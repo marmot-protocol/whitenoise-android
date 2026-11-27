@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">歷史記錄備份</string>
-    <string name="explanation_organize_hub_history_backups">保存一份由復原詞解鎖的加密聊天記錄副本，以便在重新安裝後還原。</string>
+    <string name="explanation_organize_hub_history_backups">在線上儲存加密聊天記錄，並還原你在這部裝置上參與的聊天中的訊息。</string>
+    <string name="history_backups_storage">White Noise 將加密聊天記錄儲存在線上檔案伺服器（Blossom 伺服器）上。你的 Nostr 中繼站會儲存一筆加密資料，供應用程式尋找你的備份。</string>
+    <string name="history_backups_restore_scope">你只能還原目前在這部裝置上參與的聊天中的訊息。如果你無法再存取某個群組，請有邀請權限的人重新將你加入。</string>
     <string name="history_backups_status">備份</string>
     <string name="history_backups_status_loading">正在檢查…</string>
     <string name="history_backups_status_unavailable">暫不可用</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">請輸入清單中的第 %1$d 個詞和第 %2$d 個詞。如果你沒有抄寫下來，請取消並重新開始以取得新的復原詞。</string>
     <string name="history_backups_word_label">第 %1$d 個詞</string>
     <string name="history_backups_restore_words">復原詞</string>
-    <string name="history_backups_restore_words_help">輸入全部 12 個詞，以空格分隔。</string>
+    <string name="history_backups_restore_words_help">先在這部裝置上加入聊天，再輸入全部 12 個詞，以空格分隔。</string>
     <string name="history_backups_restore">還原歷史記錄</string>
     <string name="history_backups_restoring">正在開始還原</string>
     <string name="history_backups_cancel_restore">取消還原</string>
