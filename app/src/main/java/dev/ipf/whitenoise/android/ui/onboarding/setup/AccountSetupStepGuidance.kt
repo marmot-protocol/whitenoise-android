@@ -99,7 +99,8 @@ private fun relayCheckFailure(issues: Set<OnboardingIssueFfi>): Int =
         issues.any {
             it == OnboardingIssueFfi.DISCOVERY_INCOMPLETE ||
                 it == OnboardingIssueFfi.UNREACHABLE ||
-                it == OnboardingIssueFfi.TIMED_OUT
+                it == OnboardingIssueFfi.TIMED_OUT ||
+                it == OnboardingIssueFfi.RATE_LIMITED
         } -> R.string.setup_problem_check_incomplete
         else -> R.string.setup_problem_check_failed
     }
@@ -205,6 +206,7 @@ private val unansweredIssues =
         OnboardingIssueFfi.DISCOVERY_INCOMPLETE,
         OnboardingIssueFfi.UNREACHABLE,
         OnboardingIssueFfi.TIMED_OUT,
+        OnboardingIssueFfi.RATE_LIMITED,
         OnboardingIssueFfi.AUTHENTICATION_REQUIRED,
         OnboardingIssueFfi.PAYMENT_REQUIRED,
         OnboardingIssueFfi.ACCESS_RESTRICTED,

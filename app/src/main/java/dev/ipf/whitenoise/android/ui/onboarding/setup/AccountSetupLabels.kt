@@ -59,6 +59,7 @@ internal fun setupFindingTitle(value: OnboardingIssueFfi): Int =
         OnboardingIssueFfi.UNSAFE_RELAY -> R.string.setup_finding_unsafe_relay
         OnboardingIssueFfi.UNREACHABLE -> R.string.setup_finding_unreachable
         OnboardingIssueFfi.TIMED_OUT -> R.string.setup_finding_timed_out
+        OnboardingIssueFfi.RATE_LIMITED -> R.string.setup_finding_rate_limited
         OnboardingIssueFfi.AUTHENTICATION_REQUIRED -> R.string.setup_finding_authentication_required
         OnboardingIssueFfi.PAYMENT_REQUIRED -> R.string.setup_finding_payment_required
         OnboardingIssueFfi.ACCESS_RESTRICTED -> R.string.setup_finding_access_restricted
