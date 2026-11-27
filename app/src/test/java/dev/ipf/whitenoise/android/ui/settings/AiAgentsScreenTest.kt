@@ -130,11 +130,13 @@ class AiAgentsScreenTest {
         assertEquals(1, prompt.windowed(TEST_NPUB.length).count { it == TEST_NPUB })
         assertFalse(prompt.contains("<USER_NPUB>"))
         assertTrue(prompt.contains(CODEX_HARNESS_README_URL))
-        assertTrue(prompt.contains("install-codex-marmot.sh"))
-        assertTrue(prompt.contains("wn-codex --version"))
-        assertTrue(prompt.contains("wn-agent"))
+        assertTrue(prompt.contains("install/codex.sh --from-source --owner"))
+        assertTrue(prompt.contains("git rev-parse HEAD"))
+        assertTrue(prompt.contains("--cwd"))
+        assertTrue(prompt.contains("--name"))
+        assertFalse(prompt.contains("install-codex-marmot.sh"))
         assertTrue(prompt.contains("send a test message"))
-        assertTrue(prompt.contains("Do not report setup complete until wn-codex returns a reply through White Noise"))
+        assertTrue(prompt.contains("Do not report setup complete until the agent replies through White Noise"))
         assertTrue(prompt.contains("device verification required"))
     }
 
@@ -487,7 +489,7 @@ class AiAgentsScreenTest {
     companion object {
         private const val ACCOUNT_REF = "test-account"
         private const val CODEX_HARNESS_README_URL =
-            "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
+            "https://github.com/marmot-protocol/marmot-agents/blob/canary/README.md#installing-an-agent"
         private val ACCOUNT_HEX = "ab".repeat(32)
         private val TEST_NPUB = "npub1" + "a".repeat(58)
         private val ABBREVIATED_NPUB = TEST_NPUB.take(12) + "…" + TEST_NPUB.takeLast(5)

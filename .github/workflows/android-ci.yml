@@ -1528,7 +1528,9 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
+          # Use the same compiler budget as the primary PR source-set job.
           ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
+            --max-workers=1 -Pkotlin.daemon.jvmargs=-Xmx5g \
             -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Upload reports

@@ -52,6 +52,14 @@
         ]
       },
       {
+        "surface": "Codex setup uses the Marmot Agents source installer and verifies a reply",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"agent_connector_codex_prompt\"",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
         "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
         "source": "app/src/main/res/values/strings.xml",
         "anchor": "name=\"agent_connector_claude_prompt\"",
