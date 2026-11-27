@@ -48,7 +48,23 @@ internal class LocalGroupDeleteCleanupJournal(
         }
     }
 
-    fun pending(): List<PendingLocalGroupDeleteCleanup> =
+    /** Every readable intent; an unreadable entry is logged and skipped so replay can still finish the rest. */
+    fun pending(): List<PendingLocalGroupDeleteCleanup> = readEntries().mapNotNull { it.getOrNull() }
+
+    /**
+     * Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. Throws
+     * when the journal or any of its entries cannot be read, since that entry's account and group are unknown.
+     */
+    fun groupIdsForAccount(account: String): Set<String> {
+        check(directory.listFiles() != null || !directory.exists()) { "local delete journal could not be listed" }
+        return readEntries()
+            .map { it.getOrThrow() }
+            .filter { it.account == account }
+            .mapTo(HashSet()) { it.groupIdHex }
+    }
+
+    /** Reads each journal entry once, keeping a failure for the caller to skip or propagate. */
+    private fun readEntries(): List<Result<PendingLocalGroupDeleteCleanup>> =
         directory
             .listFiles()
             .orEmpty()
@@ -56,24 +72,15 @@ internal class LocalGroupDeleteCleanupJournal(
                 val name = file.name.removeSuffix(".bak").removeSuffix(".new")
                 name.takeIf { it.endsWith(FILE_SUFFIX) }
             }.distinct()
-            .mapNotNull { name ->
-                val result =
-                    runCatching {
-                        val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
-                        check(fileName(decoded.account, decoded.groupIdHex) == name) {
-                            "local delete journal identity mismatch"
-                        }
-                        decoded
+            .map { name ->
+                runCatching {
+                    val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
+                    check(fileName(decoded.account, decoded.groupIdHex) == name) {
+                        "local delete journal identity mismatch"
                     }
-                result.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
-                result.getOrNull()
+                    decoded
+                }.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
             }
-
-    /** Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. */
-    fun groupIdsForAccount(account: String): Set<String> =
-        pending()
-            .filter { it.account == account }
-            .mapTo(HashSet()) { it.groupIdHex }
 
     /** Explicit retries must fail closed on a corrupt intent rather than overwrite its cleanup keys. */
     fun find(

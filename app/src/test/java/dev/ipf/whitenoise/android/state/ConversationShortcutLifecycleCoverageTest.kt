@@ -119,19 +119,7 @@ class ConversationShortcutLifecycleCoverageTest {
                 "conversationChannelShortcutId(channel)" in channelCleanup &&
                 "deleteMatchingNotificationChannels(" in channelCleanup,
         )
-        val appState = appStateSource().readText()
-        val signOut = appState.functionBody("revokeAndFinishSignOutLocked")
-        val wipeEntry = appState.functionBody("signOutAndWipeActiveAccountLocked")
-        val wipe = appState.functionBody("finishRevokedAccountWipe")
-        assertForwardsKnownGroupIds(wipeEntry, "finishRevokedAccountWipe")
-        // Every hop from capture to channel deletion must forward the captured group ids.
-        assertForwardsKnownGroupIds(signOut, "finishRevokedAccountSignOut")
-        assertForwardsKnownGroupIds(appState.functionBody("finishRevokedAccountSignOut"), "finishOwnedSignOutLocked")
-        assertForwardsKnownGroupIds(
-            appState.functionBody("finishOwnedSignOutLocked"),
-            "clearRevokedConversationShortcutsForAccount",
-        )
-        assertForwardsKnownGroupIds(wipe, "clearRevokedConversationShortcutsForAccount")
+        assertAppStateForwardsKnownGroupIds()
         assertForwardsKnownGroupIds(
             appStateCleanup,
             "localNotificationPresenter.clearRevokedConversationShortcutsForAccount",
@@ -145,6 +133,28 @@ class ConversationShortcutLifecycleCoverageTest {
         assertTrue(
             "deleteAccountNotificationChannels must target the captured group ids",
             "groupChannelShortcutIds(accountRef, knownGroupIds" in channelCleanup,
+        )
+    }
+
+    /** Asserts every AppState hop from sign-out or wipe capture to account cleanup forwards the captured group ids. */
+    private fun assertAppStateForwardsKnownGroupIds() {
+        val appState = appStateSource().readText()
+        assertForwardsKnownGroupIds(
+            appState.functionBody("signOutAndWipeActiveAccountLocked"),
+            "finishRevokedAccountWipe",
+        )
+        assertForwardsKnownGroupIds(
+            appState.functionBody("revokeAndFinishSignOutLocked"),
+            "finishRevokedAccountSignOut",
+        )
+        assertForwardsKnownGroupIds(appState.functionBody("finishRevokedAccountSignOut"), "finishOwnedSignOutLocked")
+        assertForwardsKnownGroupIds(
+            appState.functionBody("finishOwnedSignOutLocked"),
+            "clearRevokedConversationShortcutsForAccount",
+        )
+        assertForwardsKnownGroupIds(
+            appState.functionBody("finishRevokedAccountWipe"),
+            "clearRevokedConversationShortcutsForAccount",
         )
     }
 
@@ -205,6 +215,32 @@ class ConversationShortcutLifecycleCoverageTest {
         assertTrue(
             "captureAccountKnownGroupIds must read the departing account's pending local-delete journal groups",
             "localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef)" in capture,
+        )
+        assertTrue(
+            "An unreadable journal must leave the inventory incomplete, so the unaccounted-channel check runs",
+            "journaled.isSuccess" in capture && "inventoryComplete =" in capture,
+        )
+    }
+
+    /** Both shortcut publishers in a post honour the cleanup epoch, so a stale post cannot republish a cleared one. */
+    @Test
+    fun postShortcutPublicationHonoursTheCleanupEpoch() {
+        val show =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt")
+                .functionBody("show")
+        val publish = show.substringAfter("publishShortcutBeforePost(").substringBefore("} ?:")
+        assertTrue("the message shortcut must use the channel write check", "channelWriteAllowed()" in publish)
+        assertTrue(
+            "the reaction shortcut must receive the cleanup epoch",
+            "publishReactionShortcutBeforePost(update, notificationContent, channelWriteEpoch)" in show,
+        )
+        val reaction =
+            appModuleSource(
+                "src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenterShortcuts.kt",
+            ).functionBody("publishReactionShortcutBeforePost")
+        assertTrue(
+            "the reaction shortcut must check the cleanup epoch against its own id",
+            "NotificationChannelWriteGuard.isCurrent(channelWriteEpoch, update.accountRef, id)" in reaction,
         )
     }
 

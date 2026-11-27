@@ -12,6 +12,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -54,6 +55,18 @@ class LocalGroupDeleteCleanupJournalTest {
 
         assertEquals(setOf("group-a", "group-b"), journal.groupIdsForAccount("account-a"))
         assertEquals(emptySet<String>(), journal.groupIdsForAccount("account-z"))
+    }
+
+    /** An unreadable entry fails the sign-out group read, whose account it may hide, while replay skips it. */
+    @Test
+    fun unreadableEntryFailsTheGroupReadButNotReplay() {
+        val directory = folder.newFolder("local-delete-corrupt")
+        val journal = LocalGroupDeleteCleanupJournal(directory)
+        journal.stage(pending)
+        File(directory, "corrupt.json").writeText("{not json")
+
+        assertTrue(runCatching { journal.groupIdsForAccount("account-a") }.isFailure)
+        assertEquals(listOf(pending), journal.pending())
     }
 
     @Test
