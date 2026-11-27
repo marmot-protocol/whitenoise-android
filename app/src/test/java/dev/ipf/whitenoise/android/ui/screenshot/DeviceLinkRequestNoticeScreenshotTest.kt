@@ -107,7 +107,7 @@ class DeviceLinkRequestNoticeScreenshotTest {
         look: Look = Look(),
     ) {
         val comparing = DeviceLinkPromptStateFfi.Comparing(fixtureCode())
-        show(look) { DeviceLinkRequestContent(comparing, null, {}, {}, {}, repeated = true) }
+        show(look) { DeviceLinkRequestContent(comparing, null, {}, {}, {}, repeated = true, onReport = {}) }
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

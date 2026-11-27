@@ -219,7 +219,10 @@ internal fun launchLinkReport(
         try {
             if (reportLinkRequest(appState, watcher, request, generation)) {
                 val current = watcher.queue.presented
-                if (current == null || current.id == request.id) onReviewed()
+                if (current == null || current.id == request.id) {
+                    onReviewed()
+                    appState.present(R.string.link_consent_report_failed)
+                }
             }
         } finally {
             reporting.value = false
@@ -244,11 +247,12 @@ private suspend fun reportLinkRequest(
         runCatchingCancellable { appState.marmotIo { declineDeviceLink(request.accountRef, request.promptId) } }
     return if (ownsAccount() && !watcher.blocked) {
         result.fold(
-            onSuccess = { snapshot ->
-                watcher.accept(request.accountRef, snapshot, beforeCommand = previous)
-                appState.present(R.string.link_consent_report_failed)
+            onSuccess = { snapshot -> watcher.accept(request.accountRef, snapshot, beforeCommand = previous) },
+            onFailure = {
+                if (watcher.queue.presented?.id == request.id) {
+                    appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it)
+                }
             },
-            onFailure = { appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it) },
         )
         if (result.isSuccess) watcher.reread(request.accountRef)
         result.isSuccess && ownsAccount() && !watcher.blocked
