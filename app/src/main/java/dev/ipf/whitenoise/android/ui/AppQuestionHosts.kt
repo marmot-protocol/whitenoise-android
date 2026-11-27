@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ownsGroupChange
+import dev.ipf.whitenoise.android.state.signInAlerts
 import dev.ipf.whitenoise.android.ui.devices.CompromiseAlertHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
@@ -33,12 +34,15 @@ internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
     }
     // Link requests from any signed-in profile, held back while the app is locked or a group change waits on an answer.
     if (linkedDevicesAvailable() && appState.phase == AppPhase.Ready) {
-        val linkBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
+        val questionsBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
+        val alerts = appState.signInAlerts
+        val compromiseDue = alerts.snapshot(appState.activeAccountRef)?.alertDue?.isNotEmpty() == true
+        val linkBlocked = questionsBlocked || compromiseDue || alerts.devicesRequest != null
         DeviceLinkRequestHost(appState, blocked = linkBlocked)
         DeviceLinkOfferHost(appState, blocked = linkBlocked)
         UnlinkedAccountPromptHost(appState, blocked = appState.appLock.screenVisible)
         UnlinkedProfileRemovalHost(appState, blocked = appState.appLock.screenVisible)
         // Evidence that the key may be in someone else's hands interrupts once per item, after unlock.
-        CompromiseAlertHost(appState, blocked = linkBlocked)
+        CompromiseAlertHost(appState, blocked = questionsBlocked)
     }
 }

@@ -70,6 +70,7 @@ internal fun SignInDevicesRequestEffect(
     LaunchedEffect(request, appState.activeAccountRef, appState.deviceRoutingUnlocked) {
         if (request?.accountOpened != true || request.accountRef != appState.activeAccountRef) return@LaunchedEffect
         if (!appState.canRouteDevices(request) || !appState.devicesAccountEligible(request)) return@LaunchedEffect
+        appState.deviceLinkRequests.close()
         onOpen()
         appState.signInAlerts.updateDevicesRequest(request)
     }
