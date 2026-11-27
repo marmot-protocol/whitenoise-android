@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,6 +8,15 @@ import org.junit.Test
 
 /** Pure admission tests supply no kernel identity, process death or decoded-format evidence. */
 class AvStreamPolicyTest {
+    @Test
+    fun onlyVideoPlaybackInheritsForegroundScheduling() {
+        val ordinary = Context.BIND_AUTO_CREATE
+        assertEquals(ordinary or Context.BIND_IMPORTANT, AvStreamLane.Playback.bindFlags(true))
+        assertEquals(ordinary, AvStreamLane.Playback.bindFlags(false))
+        assertEquals(ordinary, AvStreamLane.Analysis.bindFlags(true))
+        assertEquals(ordinary, AvStreamLane.Analysis.bindFlags(false))
+    }
+
     /** Uncertain Startup Or Disconnect Cannot Release Admission. */
     @Test
     fun uncertainStartupOrDisconnectCannotReleaseAdmission() {
