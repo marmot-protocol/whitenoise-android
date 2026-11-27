@@ -166,15 +166,25 @@ class Nip30EmojiTest {
         // A fence wins over an inline run that would pair across it, and CR alone ends a line.
         assertEquals(listOf(":out:", ":after:"), Nip30Emoji.shortcodesIn("`:out:\n~~~\n`x\n:in:\n~~~\n:after:"))
         assertEquals(listOf(":out:"), Nip30Emoji.shortcodesIn("~~~\r:in:\r~~~\r:out:"))
+        assertEquals(listOf(0..2), rawCodeRanges("~~~"))
     }
 
     /** Received text with long or many backtick runs is scanned in one pass, with or without a shortcode. */
     @Test(timeout = 5_000)
     fun backtickRunsDoNotBacktrack() {
-        val unmatched = "`".repeat(16_000) + "x".repeat(48_000)
+        val unmatched = "x" + "`".repeat(16_000) + "x".repeat(48_000)
         val distinctLengths = (1..360).joinToString(" ") { "`".repeat(it) }
         val fences = "```\n".repeat(16_000)
-        val texts = listOf(unmatched, "$unmatched :a:", "$distinctLengths :a:", "$fences:a:", ":a: `x` ".repeat(8_000))
+        val emptyTildeFences = "~~~\n~~~\n".repeat(8_191)
+        val texts =
+            listOf(
+                unmatched,
+                "$unmatched :a:",
+                "$distinctLengths :a:",
+                "$fences:a:",
+                "$emptyTildeFences:a:",
+                ":a: `x` ".repeat(8_000),
+            )
         texts.forEach(Nip30Emoji::shortcodesIn)
     }
 

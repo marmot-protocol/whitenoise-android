@@ -52,11 +52,12 @@ private fun addCodeSpans(
     ranges: MutableList<IntRange>,
 ) {
     val runs = mutableListOf<IntRange>()
-    var index = text.indexOf('`', start)
-    while (index in start until end) {
+    var index = start
+    // Searches stay inside the gap; searching to the end of the text from every gap would be quadratic.
+    while (index < end) {
         val runEnd = runEnd(text, index, '`')
-        runs.add(index until runEnd)
-        index = text.indexOf('`', runEnd)
+        if (runEnd > index) runs.add(index until runEnd)
+        index = maxOf(runEnd, index + 1)
     }
     val closers = arrayOfNulls<IntRange>(runs.size)
     val nextByLength = HashMap<Int, IntRange>()
@@ -123,7 +124,7 @@ private fun lineEnd(
     text: String,
     from: Int,
 ): Int {
-    var end = from
+    var end = from.coerceAtMost(text.length)
     while (end < text.length && text[end] != '\n' && text[end] != '\r') {
         end++
     }
