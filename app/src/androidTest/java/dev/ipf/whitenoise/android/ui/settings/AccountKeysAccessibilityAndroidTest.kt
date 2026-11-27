@@ -5,10 +5,14 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -51,6 +55,7 @@ class AccountKeysAccessibilityAndroidTest {
         val title = composeRule.activity.getString(titleRes)
         val action = composeRule.activity.getString(actionRes)
         val notice = composeRule.activity.getString(R.string.toast_app_lock_screen_lock_required)
+        val description = "$title\n$notice"
         composeRule.setContent {
             WhiteNoiseTheme {
                 ProfileKeysDialogs(
@@ -75,8 +80,12 @@ class AccountKeysAccessibilityAndroidTest {
             automation.waitForIdle(ACCESSIBILITY_QUIET_MILLIS, ACCESSIBILITY_TIMEOUT_MILLIS)
             val event =
                 automation.executeAndWaitForEvent(
-                    { composeRule.onNodeWithText(action).performClick() },
-                    { it.isPoliteDescriptionChange("$title\n$notice") },
+                    {
+                        composeRule.onNode(hasText(action) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+                        // Let Compose process the warning while the native event listener is active.
+                        composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
+                    },
+                    { it.isPoliteDescriptionChange(description) },
                     ACCESSIBILITY_TIMEOUT_MILLIS,
                 )
             event.recycle()
