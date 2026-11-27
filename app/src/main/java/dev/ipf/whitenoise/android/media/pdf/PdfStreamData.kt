@@ -35,6 +35,7 @@ internal fun decodeStreamData(
     bytes: PdfBytes,
     layout: PdfLayout,
     stream: PdfStream,
+    maximumDecodedBytes: Int = MAX_DECODED_STREAM,
 ): PdfStreamData? {
     val filters = stream.dict.filters() ?: return null
     val compressed =
@@ -46,8 +47,10 @@ internal fun decodeStreamData(
     if (!hasNoPrediction(stream.dict["DecodeParms"])) return null
     val end = exactStreamEnd(bytes, layout, stream) ?: return null
     if (end - stream.dataStart > MAX_DECODED_STREAM) return null
+    val limit = minOf(maximumDecodedBytes, MAX_DECODED_STREAM)
+    if (!compressed && end - stream.dataStart > limit) return null
     val raw = bytes.copy(stream.dataStart, end)
-    val data = if (compressed) PdfFlate.inflate(raw, MAX_DECODED_STREAM) ?: return null else raw
+    val data = if (compressed) PdfFlate.inflate(raw, limit) ?: return null else raw
     return PdfStreamData(stream, end, compressed, data)
 }
 

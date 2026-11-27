@@ -179,7 +179,8 @@
         "anchor": "private inner class AccountSessionActivation",
         "test_ids": [
           "INT-003",
-          "NAV-006"
+          "NAV-006",
+          "INT-012"
         ]
       },
       {
@@ -315,6 +316,14 @@
           "PRO-001",
           "NAV-007",
           "ONB-020"
+        ]
+      },
+      {
+        "surface": "Signing out or wiping the last account turns Firebase auto-init off with the cached token",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "notificationDelivery.forgetFcmTokenAfterLastAccount()",
+        "test_ids": [
+          "NTF-060"
         ]
       }
     ]

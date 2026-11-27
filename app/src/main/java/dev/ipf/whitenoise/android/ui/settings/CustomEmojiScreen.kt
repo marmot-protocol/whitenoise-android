@@ -161,6 +161,7 @@ internal fun CustomEmojiContent(
                                 SettingsAction(
                                     context = context,
                                     title = entry.shortcode,
+                                    titleCanContainEmoji = false,
                                     subtitle =
                                         stringResource(
                                             if (entry.sendable) R.string.remove else R.string.custom_emoji_unsendable,
@@ -374,6 +375,7 @@ internal fun ConfirmEmojiRemoval(
         onConfirm = onConfirm,
         onDismiss = onDismiss,
         destructive = true,
+        emojiLabels = false,
     )
 }
 

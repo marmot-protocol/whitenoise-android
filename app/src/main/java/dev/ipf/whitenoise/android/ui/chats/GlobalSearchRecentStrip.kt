@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -234,7 +235,7 @@ private fun GlobalSearchRecentTile(
 @Suppress("FunctionNaming")
 @Composable
 internal fun GlobalSearchRecentTitle(title: String) {
-    Text(
+    EmojiLabel(
         text = title,
         style = MaterialTheme.typography.labelMedium,
         textAlign = TextAlign.Center,

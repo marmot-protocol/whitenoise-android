@@ -23,11 +23,9 @@ internal suspend fun ChatsController.applyChatListWindowRows(
     val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
     // A shown row's changed picture is decoded first, so it never drops to initials while local bytes decode.
     if (valid && windows.isCurrent(frame)) {
-        appState.prepareChangedChatListAvatars(
-            accountRef,
-            frame.rows,
-            (items + archivedItems).associate { it.foldedId to it.selectedAvatarAsset },
-        )
+        val shown = (items + archivedItems).associate { it.foldedId to it.selectedAvatarAsset }
+        appState.prepareEnteringDisplayAvatars(accountRef, frame.rows, shown.keys)
+        if (windows.isCurrent(frame)) appState.prepareChangedChatListAvatars(accountRef, frame.rows, shown)
     }
     // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
     // stale too, and the change that superseded it publishes its own frame.
@@ -93,6 +91,13 @@ internal fun ChatsController.replacePresentedChatRows(
     rows: List<PresentedChatRowFfi>,
     activeWindow: ChatListWindowSnapshotFfi? = null,
 ) {
+    accountRef?.let { owner ->
+        val groupPictures =
+            selectedAvatarAssetsByGroup.filterKeys { groupId ->
+                selectedPresentationsByGroup[groupId]?.avatarSource?.isPeerSourced() != true
+            }
+        appState.retireReplacedDisplayAvatars(owner, groupPictures, rows)
+    }
     selectedPresentationsByGroup =
         rows.associate { presented ->
             chatRowKey(presented.row.groupIdHex) to
@@ -302,6 +307,7 @@ internal fun ChatsController.removeChatRow(
 internal fun ChatsController.finishRemovedChatRowClientState(groupIdHex: String) {
     val rowKey = chatRowKey(groupIdHex)
     selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+    selectedAvatarAssetsByGroup = selectedAvatarAssetsByGroup - rowKey
     selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
     selectedActionsByGroup = selectedActionsByGroup - rowKey
     cancelMemberSnapshotRetry(groupIdHex)

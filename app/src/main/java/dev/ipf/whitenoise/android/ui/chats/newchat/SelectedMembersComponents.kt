@@ -57,9 +57,11 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
+import dev.ipf.whitenoise.android.ui.theme.floatingControlFabElevation
 
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
@@ -223,6 +225,7 @@ internal fun SelectedMembersReviewScreen(
                         .then(if (busy) Modifier.semantics { disabled() } else Modifier),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                elevation = floatingControlFabElevation(),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -273,7 +276,8 @@ internal fun SelectedMembersReviewScreen(
                             ) {
                                 Icon(
                                     painterResource(R.drawable.ic_close),
-                                    contentDescription = stringResource(R.string.remove_member_named, memberName),
+                                    contentDescription =
+                                        stringResource(R.string.remove_member_named, emojiPlainText(memberName)),
                                 )
                             }
                         },
@@ -311,6 +315,7 @@ internal fun SelectedMemberRoleControl(
     onChange: (Boolean) -> Unit,
 ) {
     val adminLabel = stringResource(R.string.admin)
+    val spokenName = emojiPlainText(name)
     val explanation = chatsExplanation(R.string.admin, R.string.explanation_new_message_admin)
     Row(
         (if (compact) Modifier else Modifier.fillMaxWidth())
@@ -318,7 +323,7 @@ internal fun SelectedMemberRoleControl(
             .explainOnLongPress(explanation)
             .toggleable(value = admin, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(start = if (compact) 8.dp else inset, end = if (compact) 0.dp else inset)
-            .semantics { contentDescription = "$adminLabel, $name" },
+            .semantics { contentDescription = "$adminLabel, $spokenName" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

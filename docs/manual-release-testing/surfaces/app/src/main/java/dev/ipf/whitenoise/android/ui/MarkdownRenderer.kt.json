@@ -60,6 +60,15 @@
         ]
       },
       {
+        "surface": "Markdown disclosure chevron",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "DisclosureChevron(expanded)",
+        "test_ids": [
+          "MSG-002",
+          "RDR-001"
+        ]
+      },
+      {
         "surface": "MarkdownDetailsScaffold",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownDetailsScaffold(",
@@ -186,6 +195,14 @@
         "anchor": "fun MarkdownCodeBlockView(",
         "test_ids": [
           "RDR-006"
+        ]
+      },
+      {
+        "surface": "Labelled links whose text could name another host confirm their destination; labels over 512 characters confirm without a backtracking scan",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "internal fun shouldConfirmMarkdownLink(",
+        "test_ids": [
+          "MSG-002"
         ]
       }
     ]

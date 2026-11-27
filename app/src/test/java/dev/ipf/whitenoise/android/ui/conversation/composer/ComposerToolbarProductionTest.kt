@@ -305,7 +305,7 @@ class ComposerToolbarProductionTest {
         val twoRows = with(composeRule.density) { composerToolbarStackHeight(2).toPx() }
         assertTrue("the populated side wraps its actions", toolbars.any { it.height >= twoRows })
         val camera = composeRule.onNodeWithTag("composer.shortcut.camera").fetchSemanticsNode().boundsInRoot
-        assertTrue(camera.width >= 36f && camera.height >= 48f)
+        assertTrue(camera.width >= 48f && camera.height >= 48f)
     }
 
     @Test

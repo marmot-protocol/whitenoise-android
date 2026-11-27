@@ -107,6 +107,7 @@ import dev.ipf.whitenoise.android.state.stepDownAsAdmin
 import dev.ipf.whitenoise.android.state.transferAdmin
 import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -1640,7 +1641,7 @@ internal fun GroupDetailsScreen(
                                             followedAccount = controller.avatarAccount?.takeIf { isDm },
                                         )
                                     }
-                                    Text(
+                                    EmojiLabel(
                                         conversationTitle,
                                         modifier = Modifier.weight(1f).testTag("chat_info.header_name"),
                                         maxLines = 1,

@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,12 +59,14 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.IdentityHeader
+import dev.ipf.whitenoise.android.ui.common.IdentityMonogram
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberRecoverableAvatar
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -144,7 +147,7 @@ internal fun ProfileEditContent(
         },
         bottomBar = {
             if (editing && hasAccount) {
-                SettingsBottomAction(tonalElevation = 0.dp) {
+                SettingsBottomAction(elevated = false) {
                     ProfileSaveButton(
                         enabled = saveEnabled,
                         busy = busy,
@@ -198,12 +201,15 @@ internal fun ProfileEditContent(
                     }
                 },
                 avatar = { avatarSize ->
+                    val avatarPress = remember { MutableInteractionSource() }
                     Box(
                         Modifier
                             .size(avatarSize)
                             .then(
                                 if (pictureUrl != null) {
                                     Modifier.clickable(
+                                        interactionSource = avatarPress,
+                                        indication = null,
                                         role = Role.Button,
                                         onClick = onOpenPicture,
                                     )
@@ -219,6 +225,9 @@ internal fun ProfileEditContent(
                                 Modifier.align(Alignment.Center).testTag(PROFILE_HERO_LOADING_TAG),
                             )
                         }
+                        // The highlight is drawn over the round avatar, which clips itself, so nothing is clipped
+                        // twice.
+                        Box(Modifier.matchParentSize().shapedPressFeedback(avatarPress, CircleShape))
                     }
                 },
             ) {
@@ -405,7 +414,7 @@ internal fun ProfileAvatar(
             )
             AnimatedProfileAvatarOverlay(url, image, Modifier.fillMaxSize())
         } else {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
+            IdentityMonogram(name, style = MaterialTheme.typography.headlineMedium, blank = "?")
         }
     }
 }

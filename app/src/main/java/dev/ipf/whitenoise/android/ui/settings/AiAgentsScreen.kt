@@ -251,7 +251,7 @@ private fun AgentSetupSheet(
                 SettingsExplainer(manualSetup)
                 SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip))
             }
-            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, elevated = false) {
                 if (copied) {
                     Text(
                         text = stringResource(R.string.ai_agents_prompt_copied),

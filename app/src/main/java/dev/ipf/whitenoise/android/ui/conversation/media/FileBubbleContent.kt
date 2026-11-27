@@ -3,7 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,12 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.isTransferInProgress
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingMessageStatusIcon
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
@@ -337,6 +339,7 @@ internal fun FileTransferControl(
             } else {
                 fileTransferStateDescription(transferState, loadingDescription, presentation.iconCategory)
             }
+    val cancelPress = remember { MutableInteractionSource() }
     Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -344,9 +347,9 @@ internal fun FileTransferControl(
                 .size(FileTransferControlSize)
                 .then(
                     if (cancelAction != null) {
-                        Modifier.clickable(
+                        Modifier.shapedTouchTarget(
+                            cancelPress,
                             onClickLabel = cancelDescription,
-                            role = Role.Button,
                             onClick = cancelAction,
                         )
                     } else {
@@ -361,7 +364,7 @@ internal fun FileTransferControl(
             border = if (transferState == AttachmentTransferState.Available) amoledSurfaceBorderStroke() else null,
             modifier = Modifier.size(FileTransferControlSurfaceSize),
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(Modifier.shapedPressFeedback(cancelPress, CircleShape), contentAlignment = Alignment.Center) {
                 FileTransferIcon(
                     presentation = presentation,
                     state = transferState,

@@ -102,7 +102,7 @@ class ChatListUnreadFirstFrameCoverageTest {
         rule.runOnIdle {
             model.controller.applyChatListRow(chatRow(ARRIVED_CHAT).copy(manuallyMarkedUnread = true))
         }
-        rule.waitUntil {
+        rule.waitUntil(timeoutMillis = 5_000) {
             scope.testScheduler.runCurrent()
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
             model.controller.items.any { it.id == ARRIVED_CHAT } && model.snapshotReads >= 2

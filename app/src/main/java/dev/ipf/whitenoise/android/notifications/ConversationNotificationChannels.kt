@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
+import dev.ipf.whitenoise.android.R
 
 /**
  * Per-conversation notification channels.
@@ -129,9 +130,12 @@ object ConversationNotificationChannels {
 
     /**
      * Ensures the conversation channel for a single [parentChannelId] exists,
-     * cloning the parent's alerting settings on first creation, and returns its
-     * id. Returns null when the parent channel is missing (nothing to clone).
+     * cloning the parent's alerting settings on first creation, records account
+     * ownership under [UserEventNotificationGroup.mutationLock] when [accountRef]
+     * is supplied, and returns its id. Returns null when the parent channel is
+     * missing (nothing to clone).
      */
+    @Suppress("LongParameterList") // Optional channel metadata, owner scope, and lock-guarded write check.
     fun ensureConversationChannel(
         context: Context,
         parentChannelId: String,
@@ -139,32 +143,21 @@ object ConversationNotificationChannels {
         conversationTitle: String? = null,
         vibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
         sourceVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+        accountRef: String? = null,
+        isWriteAllowed: () -> Boolean = { true },
     ): String? {
+        val writeEpoch = NotificationChannelWriteGuard.captureEpoch()
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
         val parentSpec = NotificationChannelSpec.entries.firstOrNull { it.id == parentChannelId }
         val baseName = parentSpec?.let { NotificationChannels.baseName(context, it) }
         val usesCustomScope = parentSpec?.conversationPolicy == ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE
-        val customDisplayName =
-            if (usesCustomScope && !conversationTitle.isNullOrBlank() && baseName != null) {
-                context.getString(
-                    dev.ipf.whitenoise.android.R.string.notification_channel_custom_name,
-                    conversationTitle.trim(),
-                    baseName,
-                )
-            } else {
-                null
-            }
-        val customDescription =
-            if (usesCustomScope && !conversationTitle.isNullOrBlank() && baseName != null) {
-                context.getString(
-                    dev.ipf.whitenoise.android.R.string.notification_channel_custom_description,
-                    baseName,
-                    conversationTitle.trim(),
-                )
-            } else {
-                null
-            }
+        val displayTitle = conversationTitle?.let { context.emojiPlainText(it) }
+        val (customDisplayName, customDescription) =
+            customChannelLabels(context, usesCustomScope, displayTitle, baseName)
         return synchronized(UserEventNotificationGroup.mutationLock) {
+            val writeCurrent =
+                NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef, conversationShortcutId)
+            if (!isWriteAllowed() || !writeCurrent) return@synchronized null
             val previews = NotificationPreviewPreferences.mode(context).showsNames
             val genericName = context.getString(dev.ipf.whitenoise.android.R.string.app_name)
             val genericDescription = context.getString(dev.ipf.whitenoise.android.R.string.notification_hidden_content)
@@ -172,17 +165,24 @@ object ConversationNotificationChannels {
                 manager = manager,
                 parentChannelId = parentChannelId,
                 conversationShortcutId = conversationShortcutId,
-                conversationTitle = if (previews) conversationTitle else genericName,
+                conversationTitle = if (previews) displayTitle else genericName,
                 vibrationPattern = vibrationPattern,
                 sourceVibrationPattern = sourceVibrationPattern,
                 baseName = baseName,
                 usesCustomScope = usesCustomScope,
                 customDisplayName = if (previews) customDisplayName else baseName,
                 customDescription = if (previews) customDescription else genericDescription,
-            )
+            )?.also {
+                recordConversationChannelOwner(context, accountRef, conversationShortcutId)
+            }
         }
     }
 
+    /**
+     * Creates or refreshes the `:conv:` child of [parentChannelId] for [vibrationPattern], cloning the
+     * parent's or previous child's alerting settings on first creation, and returns its id, or null when
+     * the parent channel is missing.
+     */
     private fun ensureConversationChannel(
         manager: NotificationManager,
         parentChannelId: String,
@@ -237,8 +237,11 @@ object ConversationNotificationChannels {
         // choices therefore get one of three bounded, deterministic channel
         // versions. Clone the previously active child when available so sound,
         // importance, lights, badge, and other effective OS choices carry over;
-        // never delete the old child, because that would erase its user-owned
-        // settings and any notification still routed through it.
+        // never delete the old child during routine preference changes or
+        // resets, because that would erase its user-owned settings and any
+        // notification still routed through it. Destructive deletion of
+        // `:conv:` channels is explicitly reserved for account Sign Out /
+        // Sign Out & Wipe and local conversation deletion.
         val source =
             manager.getNotificationChannel(
                 conversationChannelId(parentChannelId, conversationShortcutId, sourceVibrationPattern),
@@ -327,6 +330,22 @@ object ConversationNotificationChannels {
             if (source.canBypassDnd()) runCatching { setBypassDnd(true) }
             lockscreenVisibility = source.lockscreenVisibility
         }
+}
+
+/**
+ * Returns the per-conversation channel name and description for a custom-scope parent with a
+ * non-blank [conversationTitle], or a pair of nulls when the channel keeps the parent's labels.
+ */
+private fun customChannelLabels(
+    context: Context,
+    usesCustomScope: Boolean,
+    conversationTitle: String?,
+    baseName: String?,
+): Pair<String?, String?> {
+    val title = conversationTitle?.trim()
+    if (!usesCustomScope || title.isNullOrEmpty() || baseName == null) return null to null
+    val name = context.getString(R.string.notification_channel_custom_name, title, baseName)
+    return name to context.getString(R.string.notification_channel_custom_description, baseName, title)
 }
 
 private fun NotificationChannel.matchesParentVibration(

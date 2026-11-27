@@ -97,6 +97,7 @@ class ScreenRecompositionScopingTest {
             }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chats.list").assertExists()
+            awaitNoRunsOf("ChatsScreen")
 
             val listState = searchViewport.listState(showArchived = false)
             val counts = mutableMapOf<String, Int>()
@@ -379,12 +380,32 @@ class ScreenRecompositionScopingTest {
         return runs
     }
 
+    /**
+     * Waits until background first-frame loads stop recomposing [targetName], so a slow host cannot land
+     * one of them inside a measured window. Gives up after [SETTLE_TIMEOUT_MS] and lets the assertion report.
+     */
+    private fun awaitNoRunsOf(targetName: String) {
+        val deadline = System.currentTimeMillis() + SETTLE_TIMEOUT_MS
+        var quietWindows = 0
+        while (quietWindows < QUIET_WINDOWS_REQUIRED && System.currentTimeMillis() < deadline) {
+            val runs =
+                countComposableRuns(targetName) {
+                    Thread.sleep(QUIET_WINDOW_MS)
+                    composeRule.waitForIdle()
+                }
+            quietWindows = if (runs == 0) quietWindows + 1 else 0
+        }
+    }
+
     private companion object {
         const val ACCOUNT_REF = "account"
         const val ACCOUNT_HEX = "a"
         const val CHAT_ROW_COUNT = 20
         const val NAV_BAR_BOTTOM_PX = 48
         const val BOOTSTRAP_SETTLE_MS = 50L
+        const val QUIET_WINDOW_MS = 50L
+        const val QUIET_WINDOWS_REQUIRED = 3
+        const val SETTLE_TIMEOUT_MS = 5_000L
         val PIXEL_SCROLL_OFFSETS = listOf(4, 12, 24, 36, 48)
         val IME_ANIMATION_FRAMES = listOf(10, 30, 48, 60, 120, 240, 420, 600, 420, 240, 120, 60, 48, 24, 0)
     }

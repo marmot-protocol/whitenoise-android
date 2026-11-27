@@ -1,7 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
@@ -31,9 +31,14 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.isUnreadMention
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
+import dev.ipf.whitenoise.android.ui.common.shapedTouchTarget
+import dev.ipf.whitenoise.android.ui.common.touchTargetOverhang
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
+import dev.ipf.whitenoise.android.ui.navigation.FloatingControlPillHeight
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 
 /** Newer pages a jump may load past the read anchor while looking for a mention outside the loaded window. */
 internal const val MENTION_RESOLUTION_MAX_NEWER_PAGES = 20
@@ -260,33 +265,42 @@ internal fun ConversationJumpToMentionButton(
     val label =
         stringResource(R.string.conversation_jump_to_mention) + ", " +
             pluralStringResource(R.plurals.unread_mentions_count, count, count)
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shadowElevation = 2.dp,
+    val press = remember { MutableInteractionSource() }
+    // The pill keeps its 34 dp place in the stack while its 48 dp touch target reaches 7 dp into the 8 dp gaps
+    // around it, overlapping a neighbouring disc's 3 dp overhang by 2 dp, where the later control in the stack
+    // wins. The highlight is drawn on the pill.
+    Box(
         modifier =
             Modifier
-                .height(34.dp)
                 .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
+                .touchTargetOverhang(slotHeight = FloatingControlPillHeight)
                 .explainOnLongPress(
                     composerExplanation(
                         R.string.conversation_jump_to_mention,
                         R.string.explanation_conversation_jump_to_mention,
                     ),
-                ).clickable(role = Role.Button, onClick = onClick)
+                ).shapedTouchTarget(press, onClick = onClick)
                 .clearAndSetSemantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.padding(horizontal = 12.dp),
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            shadowElevation = WhiteNoiseElevation.FloatingControl,
+            modifier = Modifier.height(FloatingControlPillHeight),
         ) {
-            Text("@", style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (count > MENTION_BADGE_MAX) "$MENTION_BADGE_MAX+" else count.toString(),
-                style = MaterialTheme.typography.labelLarge,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.shapedPressFeedback(press, CircleShape).padding(horizontal = 12.dp),
+            ) {
+                Text("@", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (count > MENTION_BADGE_MAX) "$MENTION_BADGE_MAX+" else count.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
         }
     }
 }

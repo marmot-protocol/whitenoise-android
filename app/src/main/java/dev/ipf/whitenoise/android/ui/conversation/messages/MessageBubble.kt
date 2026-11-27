@@ -2984,14 +2984,12 @@ internal fun MessageBubble(
                     )
                 }
                 if (surfaces.deleteDialogOpen) {
-                    MessageDeleteDialog(
+                    MessageBubbleDeleteConfirmation(
+                        surfaces = surfaces,
                         capability = deleteCapability,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        deleteInFlight = surfaces.deleteInFlight,
-                        onDeleteForEveryone = messageActions::performDeleteForEveryone,
-                        onDeleteForMe = messageActions::performDeleteForMe,
-                        onDismissRequest = { surfaces.deleteDialogOpen = false },
+                        actions = messageActions,
                     )
                 }
                 // Keep the host composed through its exit; deleted messages target an empty summary.

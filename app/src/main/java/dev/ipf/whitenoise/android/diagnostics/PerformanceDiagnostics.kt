@@ -91,6 +91,8 @@ internal enum class PerformancePhase(
     FAILED_RUNTIME_CLOSE("failed_runtime_close", ROUTINE_SPAN_THRESHOLD_MS),
     MARMOT_START("marmot_start", ROUTINE_SPAN_THRESHOLD_MS),
     CACHED_CHAT_ROWS_READY("cached_chat_rows_ready"),
+    STARTUP_AVATARS_RENDERABLE("startup_avatars_renderable"),
+    STARTUP_AVATARS_DECODED("startup_avatars_decoded"),
     MEMBER_DERIVED_LOCAL_READY("member_derived_local_ready"),
     FIRST_LOCAL_FRAME("first_local_frame"),
     ACCOUNT_SWITCH_MEMBER_DERIVED_DEFERRED("account_switch_member_derived_deferred"),
@@ -251,31 +253,6 @@ internal enum class PerformanceConnectivity(
     OFFLINE("offline"),
     ONLINE_NO_RELAY("online_no_relay"),
     ONLINE_WITH_RELAY("online_with_relay"),
-}
-
-/** Closed native attachment state; no attachment identity is serialized. */
-internal enum class PerformanceAttachmentState(
-    val wireName: String,
-) {
-    NOT_REQUESTED("not_requested"),
-    QUEUED("queued"),
-    DOWNLOADING("downloading"),
-    VERIFYING_CIPHERTEXT("verifying_ciphertext"),
-    DECRYPTING("decrypting"),
-    VERIFYING_PLAINTEXT("verifying_plaintext"),
-    RETRY_SCHEDULED("retry_scheduled"),
-    PAUSED("paused"),
-    READY("ready"),
-    UNAVAILABLE("unavailable"),
-    FAILED("failed"),
-    CANCELLED("cancelled"),
-    REMOVED("removed"),
-    POLICY_BLOCKED("policy_blocked"),
-    PREVIOUSLY_ACQUIRED_UNAVAILABLE("previously_acquired_unavailable"),
-    COMPLETED_UNRETAINED("completed_unretained"),
-    RETRY_EXHAUSTED("retry_exhausted"),
-    STORAGE_BLOCKED("storage_blocked"),
-    CLEANED_BY_SETTING("cleaned_by_setting"),
 }
 
 internal class PerformanceTrace internal constructor(

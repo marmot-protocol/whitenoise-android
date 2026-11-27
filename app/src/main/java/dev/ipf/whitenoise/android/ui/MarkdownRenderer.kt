@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
@@ -18,11 +17,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +39,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -55,7 +51,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -95,6 +90,7 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
+import dev.ipf.whitenoise.android.ui.common.DisclosureChevron
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.MAX_ROW_CUSTOM_ACTIONS
@@ -104,6 +100,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighligh
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchMatchRanges
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import java.net.IDN
@@ -973,10 +970,7 @@ private fun MarkdownRenderGroup.onlyRepeatsRepresentedEvents(represented: Set<St
         block is MarkdownBlockFfi.Paragraph &&
         block.inlines.onlyRepeatsRepresentedEvents(represented)
 
-private val DETAILS_CHEVRON_SIZE = 20.dp
-private val DETAILS_CONTENT_INDENT = 24.dp
-private const val DETAILS_CHEVRON_COLLAPSED_DEGREES = -90f
-private const val DETAILS_CHEVRON_EXPANDED_DEGREES = 0f
+private val DETAILS_CONTENT_INDENT = Dimens.spaceXl + Dimens.spaceXs
 
 /** Keeps disclosure expansion local to its content, honoring the native initial open state. */
 @Suppress("FunctionNaming")
@@ -990,10 +984,6 @@ private fun MarkdownDetailsScaffold(
     content: @Composable () -> Unit,
 ) {
     var expanded by remember(stateKey, initiallyExpanded) { mutableStateOf(initiallyExpanded) }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) DETAILS_CHEVRON_EXPANDED_DEGREES else DETAILS_CHEVRON_COLLAPSED_DEGREES,
-        label = "detailsChevron",
-    )
     val summaryText = summary?.let { markdownSafeDisplayText(it) } ?: stringResource(R.string.details)
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -1002,15 +992,8 @@ private fun MarkdownDetailsScaffold(
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                painterResource(R.drawable.ic_expand_more),
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .size(DETAILS_CHEVRON_SIZE)
-                        .rotate(chevronRotation),
-            )
-            Spacer(Modifier.width(4.dp))
+            DisclosureChevron(expanded)
+            Spacer(Modifier.width(Dimens.spaceXs))
             if (summaryLeafId != null) {
                 MarkdownBodyText(
                     leafId = summaryLeafId,
@@ -1704,6 +1687,10 @@ private val LABEL_IPV6_TOKEN =
 private val DOT_LIKE_CHARS = charArrayOf('.', '。', '．', '｡')
 private const val ASCII_MAX_CODE = 0x7F
 
+// The token patterns backtrack, so their cost grows with the square of the label. Plain-word labels
+// are far shorter; a longer label keeps the dialog without being scanned.
+private const val MAX_CLASSIFIED_LABEL_LENGTH = 512
+
 /**
  * Whether a labeled markdown link must route through the destination
  * confirmation dialog (#273): true when the visible [labelText] carries
@@ -1713,6 +1700,11 @@ private const val ASCII_MAX_CODE = 0x7F
  * address-shaped label can misrepresent those too, and they're rare.
  */
 internal fun shouldConfirmMarkdownLink(
+    labelText: String,
+    destination: String,
+): Boolean = labelText.length > MAX_CLASSIFIED_LABEL_LENGTH || labelMayMisrepresent(labelText, destination)
+
+private fun labelMayMisrepresent(
     labelText: String,
     destination: String,
 ): Boolean {

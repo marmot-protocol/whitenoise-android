@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.notifications.openPreparedConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureConversationChannelWriteGuard
 import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
@@ -112,7 +113,13 @@ internal fun ConversationNotificationSettingsScreen(
             blockedChannels =
                 withContext(Dispatchers.IO) {
                     val descriptor =
-                        NotificationConversationDescriptor(shortcut, isDm, conversationTitle, vibrationPattern)
+                        NotificationConversationDescriptor(
+                            shortcut,
+                            isDm,
+                            conversationTitle,
+                            vibrationPattern,
+                            accountRef,
+                        )
                     runCatching {
                         androidBlockedConversationCategories(
                             context,
@@ -200,13 +207,14 @@ private fun NotificationCategoriesSection(
     val accountRef = appState.activeAccountRef
     val shortcutId = remember(accountRef, groupIdHex) { accountRef?.let { conversationShortcutId(it, groupIdHex) } }
     val descriptor =
-        remember(shortcutId, isDm, conversationTitle, primaryVibrationPattern) {
+        remember(shortcutId, isDm, conversationTitle, primaryVibrationPattern, accountRef) {
             shortcutId?.let {
                 NotificationConversationDescriptor(
                     shortcutId = it,
                     isDm = isDm,
                     title = conversationTitle,
                     primaryVibrationPattern = primaryVibrationPattern,
+                    accountRef = accountRef,
                 )
             }
         }
@@ -220,6 +228,12 @@ private fun NotificationCategoriesSection(
             if (descriptor == null || accountRef == null) {
                 emptyList()
             } else {
+                val writeAllowed =
+                    appState.captureConversationChannelWriteGuard(
+                        accountRef,
+                        groupIdHex,
+                        descriptor.shortcutId,
+                    )
                 val resolved = withContext(Dispatchers.Default) { routing.settings(descriptor) }
                 val requestedParents =
                     resolved
@@ -237,6 +251,7 @@ private fun NotificationCategoriesSection(
                                 conversationAvatarUrl = conversationAvatarUrl,
                                 primaryVibrationPattern = descriptor.primaryVibrationPattern,
                                 requestedParents = requestedParents,
+                                isWriteAllowed = writeAllowed,
                             ),
                     )
                 resolved.map { setting -> setting.withPreparation(preparation) }

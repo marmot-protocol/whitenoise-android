@@ -24,6 +24,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,6 +57,37 @@ internal fun ProfileKeysDialogs(
     onExportBackup: () -> Unit,
     cancelRawAuthentication: () -> Unit,
 ) {
+    val exportTitle: @Composable (Int) -> Unit = { title ->
+        val titleText = stringResource(title)
+        val notice =
+            if (ui.exportScreenLockRequired) {
+                stringResource(R.string.toast_app_lock_screen_lock_required)
+            } else {
+                null
+            }
+        // Updating the description sends an Android content-change event from this live region.
+        Column(
+            modifier =
+                Modifier.clearAndSetSemantics {
+                    liveRegion = LiveRegionMode.Polite
+                    if (notice == null) {
+                        text = AnnotatedString(titleText)
+                    } else {
+                        contentDescription = "$titleText\n$notice"
+                    }
+                },
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            Text(titleText)
+            if (notice != null) {
+                Text(
+                    notice,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
@@ -58,7 +95,7 @@ internal fun ProfileKeysDialogs(
                 ui.cancelExportPreparation()
                 cancelRawAuthentication()
             },
-            title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
+            title = { exportTitle(R.string.keep_your_private_key_safe) },
             text = {
                 Text(
                     stringResource(R.string.export_private_key_consequence),
@@ -114,6 +151,7 @@ internal fun ProfileKeysDialogs(
     }
     if (ui.passwordDialog && canExport) {
         ExportPasswordDialog(
+            title = { exportTitle(R.string.encrypted_private_key) },
             password = ui.password,
             confirmation = ui.confirmation,
             busy = ui.exportBusy,
@@ -138,12 +176,12 @@ internal fun ProfileKeysDialogs(
     ProfileKeyFeedbackDialogs(
         nativeExportError = ui.nativeExportError,
         shareErrorDialog = ui.shareErrorDialog,
-        saveErrorDialog = ui.saveErrorDialog,
-        expiredExportDialog = ui.expiredExportDialog,
+        saveErrorDialog = false,
+        expiredExportDialog = false,
         onNativeErrorDismiss = { ui.nativeExportError = null },
         onShareErrorDismiss = { ui.shareErrorDialog = false },
-        onSaveErrorDismiss = { ui.saveErrorDialog = false },
-        onExpiryDismiss = { ui.expiredExportDialog = false },
+        onSaveErrorDismiss = {},
+        onExpiryDismiss = {},
     )
 }
 
@@ -229,6 +267,7 @@ internal fun ProfileKeyFeedbackDialogs(
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 private fun ExportPasswordDialog(
+    title: @Composable () -> Unit,
     password: TextFieldState,
     confirmation: TextFieldState,
     busy: Boolean,
@@ -243,7 +282,7 @@ private fun ExportPasswordDialog(
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         onDismissStart = onDismissStart,
-        title = { Text(stringResource(R.string.encrypted_private_key)) },
+        title = title,
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),

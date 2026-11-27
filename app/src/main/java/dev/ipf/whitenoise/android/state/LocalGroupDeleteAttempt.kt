@@ -174,9 +174,8 @@ internal suspend fun stageAndDeleteLocalGroup(
 }
 
 /**
- * Lists the media whose cache keys the journal will clear. A local delete stops when the listing fails, while a
- * removal with a [LocalGroupDeleteOperations.preflightFallback] — the forget behind abandonment (#3310) — proceeds
- * without those keys, so a listing failure never blocks the escape path.
+ * Lists the media whose cache keys the journal will clear. Abandonment and live local removal can proceed without
+ * those keys through [LocalGroupDeleteOperations.preflightFallback]. Every path still stages its group first.
  */
 private suspend fun preflightLocalGroupDelete(
     attempt: LocalGroupDeleteAttempt,

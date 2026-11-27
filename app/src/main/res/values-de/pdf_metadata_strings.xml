@@ -4,6 +4,10 @@
         <item quantity="one">PDF · %d Seite</item>
         <item quantity="other">PDF · %d Seiten</item>
     </plurals>
+    <string name="composer_pdf_metadata_options">PDF-Metadatenoptionen</string>
+    <string name="composer_pdf_keep_metadata">Metadaten beibehalten</string>
+    <string name="composer_pdf_remove_metadata">Metadaten entfernen</string>
+    <string name="composer_pdf_metadata_options_body">Empfänger können im Original von %1$s den Autor, Datumsangaben und andere Eigenschaften sehen.</string>
     <string name="composer_pdf_metadata_removed">Metadaten entfernt</string>
     <string name="composer_pdf_metadata_removed_on_send">Metadaten werden beim Senden entfernt</string>
     <string name="composer_pdf_metadata_signed">Signiert: Metadaten bleiben</string>

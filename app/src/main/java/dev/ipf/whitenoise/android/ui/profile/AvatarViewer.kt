@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -328,7 +329,7 @@ private fun BoxScope.AvatarViewerImageContent(
                 image = state.image,
                 bitmapWidth = state.image.width,
                 bitmapHeight = state.image.height,
-                contentDescription = title,
+                contentDescription = emojiPlainText(title),
                 scale = scale,
                 offset = offset,
                 onScaleChange = onScaleChange,
@@ -343,7 +344,7 @@ private fun BoxScope.AvatarViewerImageContent(
                 animatedSource = animatedSource,
                 bitmapWidth = state.bitmap.width,
                 bitmapHeight = state.bitmap.height,
-                contentDescription = title,
+                contentDescription = emojiPlainText(title),
                 scale = scale,
                 offset = offset,
                 onScaleChange = onScaleChange,

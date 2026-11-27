@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Geçmiş yedekleri</string>
-    <string name="explanation_organize_hub_history_backups">Sohbet geçmişinin kurtarma kelimeleriyle açılan şifreli bir kopyasını sakla, böylece yeni bir kurulumda geri yükleyebilirsin.</string>
+    <string name="explanation_organize_hub_history_backups">Şifreli sohbet geçmişini çevrimiçi sakla ve bu cihazda üyesi olduğun sohbetlerin mesajlarını geri yükle.</string>
+    <string name="history_backups_storage">White Noise, şifreli sohbet geçmişini çevrimiçi dosya sunucularına (Blossom sunucularına) kaydeder. Nostr aktarıcıların, uygulamanın yedeklerini bulmak için kullandığı şifreli bir kayıt saklar.</string>
+    <string name="history_backups_restore_scope">Yalnızca bu cihazda hâlâ üyesi olduğun sohbetlerdeki mesajları geri yükleyebilirsin. Bir gruba erişimini kaybedersen seni davet edebilen birinden seni yeniden eklemesini iste.</string>
     <string name="history_backups_status">Yedekler</string>
     <string name="history_backups_status_loading">Denetleniyor…</string>
     <string name="history_backups_status_unavailable">Henüz kullanılamıyor</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Listendeki %1$d. ve %2$d. kelimeyi yaz. Not almadıysan iptal edip yeni kelimeler için baştan başla.</string>
     <string name="history_backups_word_label">%1$d. kelime</string>
     <string name="history_backups_restore_words">Kurtarma kelimeleri</string>
-    <string name="history_backups_restore_words_help">12 kelimenin tamamını boşlukla ayırarak gir.</string>
+    <string name="history_backups_restore_words_help">Önce bu cihazda sohbetlere katıl. Ardından 12 kelimenin tamamını boşlukla ayırarak gir.</string>
     <string name="history_backups_restore">Geçmişi geri yükle</string>
     <string name="history_backups_restoring">Geri yükleme başlatılıyor</string>
     <string name="history_backups_cancel_restore">Geri yüklemeyi iptal et</string>

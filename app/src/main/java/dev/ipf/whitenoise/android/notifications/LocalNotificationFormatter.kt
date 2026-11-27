@@ -276,22 +276,24 @@ object LocalNotificationFormatter {
         conversationTitleOverride: String? = null,
         // The stored chat row can identify a DM whose notification payload reports it as a group.
         useDirectLayout: Boolean = false,
+        emojiLabel: (String) -> String = context.notificationEmojiLabelFormatter(),
         // AppState owns hex→npub conversion through Marmot; requiring its
         // shortener here keeps this pure formatter from duplicating bech32.
         shortNpub: (String) -> String,
     ): LocalNotificationContent? {
         val kind = contentKind(update) ?: return null
         val isGroupConversation = !update.isDm && !useDirectLayout
-        val senderName = senderName(update.sender, senderNameOverride, shortNpub)
+        val senderName = emojiLabel(senderName(update.sender, senderNameOverride, shortNpub))
+        val payloadGroup = clean(update.groupName)?.let(emojiLabel)
         val conversationTitle =
             if (isGroupConversation) {
-                clean(conversationTitleOverride) ?: clean(update.groupName)
+                clean(conversationTitleOverride)?.let(emojiLabel) ?: payloadGroup
             } else {
                 null
             }
         val title =
             when (kind) {
-                ContentKind.MESSAGE -> messageTitle(update, context, senderName, isGroupConversation)
+                ContentKind.MESSAGE -> messageTitle(payloadGroup, context, senderName, isGroupConversation)
                 ContentKind.INVITE -> inviteTitle(context)
                 ContentKind.REMOVED_FROM_GROUP -> removedFromGroupTitle(context, conversationTitle)
                 ContentKind.MADE_ADMIN -> adminRoleTitle(context, conversationTitle, madeAdmin = true)
@@ -305,6 +307,7 @@ object LocalNotificationFormatter {
                 previewTextOverride,
                 reactedToPreviewOverride,
                 mediaKind,
+                payloadGroup,
             )
         val reactionArtworkBody =
             if (kind == ContentKind.MESSAGE) {
@@ -326,7 +329,7 @@ object LocalNotificationFormatter {
             body = body,
             senderName = senderName,
             senderKey = update.sender.accountIdHex,
-            selfName = displayName(update.receiver, shortNpub),
+            selfName = emojiLabel(displayName(update.receiver, shortNpub)),
             selfKey = update.receiver.accountIdHex,
             isGroupConversation = isGroupConversation,
             conversationTitle = conversationTitle,
@@ -361,12 +364,13 @@ object LocalNotificationFormatter {
         previewTextOverride: String?,
         reactedToPreviewOverride: String?,
         mediaKind: ReplyMediaKind,
+        payloadGroup: String?,
     ): String =
         boundedNotificationMessageText(
             when (kind) {
                 ContentKind.MESSAGE ->
                     messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                ContentKind.INVITE -> inviteBody(update, context)
+                ContentKind.INVITE -> inviteBody(payloadGroup, context)
                 ContentKind.REMOVED_FROM_GROUP -> ""
                 ContentKind.MADE_ADMIN ->
                     clean(previewTextOverride)
@@ -442,18 +446,16 @@ object LocalNotificationFormatter {
 
     /** The sender's name, or "Sender in Group" for a group message. */
     private fun messageTitle(
-        update: NotificationUpdateFfi,
+        group: String?,
         context: Context?,
         sender: String,
         isGroupConversation: Boolean,
-    ): String {
-        val group = clean(update.groupName)
-        return when {
+    ): String =
+        when {
             group != null && isGroupConversation ->
                 text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
             else -> sender
         }
-    }
 
     /** A reaction reads as its readable reaction sentence; other messages use their resolved preview text. */
     private fun messageBody(
@@ -519,16 +521,14 @@ object LocalNotificationFormatter {
      * reaches the lock screen, and without a group name it asks the user to open the app.
      */
     private fun inviteBody(
-        update: NotificationUpdateFfi,
+        group: String?,
         context: Context?,
-    ): String {
-        val group = clean(update.groupName)
-        return if (group == null) {
+    ): String =
+        if (group == null) {
             text(context, R.string.notification_open_to_view_invite, "Open White Noise to view the invite")
         } else {
             text(context, R.string.notification_invitation_to_group, "Invitation to %1\$s", group)
         }
-    }
 
     // Sender-name priority for an incoming notification:
     //   1. caller-resolved override (profile / contact name, else npub),

@@ -70,19 +70,37 @@ class ComposerPdfAttachmentScreenshotTest {
         val uri = Uri.parse("content://fixture/signed")
         choices.record(uri, ComposerPdfState(SIGNED, PdfMetadataResult.Refused(PdfMetadataRefusal.Signed)))
         var sent = 0
+        var approved = emptySet<Uri>()
         var cancelled = 0
         composeRule.setContent { WhiteNoiseTheme { ComposerPdfMetadataDialog(choices) } }
 
-        choices.confirmThen(listOf(uri), { cancelled++ }) { sent++ }
+        choices.confirmThen(listOf(uri), { cancelled++ }) {
+            approved = it
+            sent++
+        }
         composeRule.onNodeWithText("Cancel").performClick()
         composeRule.waitForIdle()
         assertEquals(0 to 1, sent to cancelled)
 
-        choices.confirmThen(listOf(uri), { cancelled++ }) { sent++ }
+        choices.confirmThen(listOf(uri), { cancelled++ }) {
+            approved = it
+            sent++
+        }
         composeRule.onNodeWithTag(COMPOSER_PDF_METADATA_SEND_TAG).performClick()
         composeRule.waitForIdle()
         assertEquals(1 to 1, sent to cancelled)
-        assertEquals(true, choices.keepsOriginal(uri))
+        assertEquals(setOf(uri), approved)
+    }
+
+    /** Per-file metadata choice after opening the card options. */
+    @Test
+    fun keepMetadataOptions() {
+        composeRule.setContent {
+            Themed(dark = true, large = false) {
+                ComposerPdfMetadataOptions("Invoice.pdf", keepsMetadata = false, onChange = {}, onDismiss = {})
+            }
+        }
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/composer_pdf_metadata_options.png")
     }
 
     private fun captureCards(
@@ -98,7 +116,7 @@ class ComposerPdfAttachmentScreenshotTest {
                         Card("Quarterly report final.pdf", 12, page, ComposerPdfPrivacy.Removed)
                         Card(SIGNED, 3, page, ComposerPdfPrivacy.Signed)
                         Card(SIGNED, 3, page, ComposerPdfPrivacy.SendingAsIs)
-                        Card("Draft notes.pdf", 2, page, ComposerPdfPrivacy.RemovedOnSend)
+                        Card("Draft notes.pdf", 2, page, ComposerPdfPrivacy.RemovedOnSend, onMetadataOptions = {})
                         Card("Bank statement.pdf", null, null, ComposerPdfPrivacy.Encrypted)
                         Card("Form export.pdf", 1, null, ComposerPdfPrivacy.Unsupported)
                         Card("Scan 2024-03.pdf", null, null, null)
@@ -115,7 +133,15 @@ class ComposerPdfAttachmentScreenshotTest {
         large: Boolean,
         names: List<String>,
     ) {
-        val decision = ComposerPdfDecision(names, setOf(PdfMetadataRefusal.Signed), emptyList(), {}, {})
+        val decision =
+            ComposerPdfDecision(
+                names,
+                setOf(PdfMetadataRefusal.Signed),
+                uris = emptyList(),
+                sendUris = emptyList(),
+                send = {},
+                cancel = {},
+            )
         composeRule.setContent {
             Themed(dark, large) { ComposerPdfMetadataDialogContent(decision, onConfirm = {}, onCancel = {}) }
         }
@@ -142,8 +168,17 @@ class ComposerPdfAttachmentScreenshotTest {
         pages: Int?,
         page: ImageBitmap?,
         privacy: ComposerPdfPrivacy?,
+        onMetadataOptions: (() -> Unit)? = null,
     ) {
-        ComposerPdfAttachmentCard(label, pages, page, privacy, onPreview = {}, onRemove = {})
+        ComposerPdfAttachmentCard(
+            label,
+            pages,
+            page,
+            privacy,
+            onPreview = {},
+            onRemove = {},
+            onMetadataOptions = onMetadataOptions,
+        )
     }
 
     /** A plain document page: a heading bar and lines of text, as a first-page render would show. */

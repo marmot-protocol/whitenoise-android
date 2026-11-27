@@ -128,7 +128,7 @@ internal fun <T> rememberConversationRouteTransition(
     return transition
 }
 
-/** Retains live route owners while painting fixed native chrome and exclusive native bodies. */
+/** Retains live route owners; headers and bodies fade through on one clock while other chrome stays fixed. */
 @Composable
 // Keep one retained-slot owner and one reversible clock; activation is optional route metadata.
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
@@ -169,6 +169,7 @@ internal fun <T> ConversationRouteAnimatedContent(
     val separatedChrome = LocalComposerFabHandoff.current?.morphSurface == true
     val nativePresentation = separatedChrome || containerMorph
     val travelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_LAYER_TRAVEL.toPx() }
+    val headerTravelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_HEADER_TRAVEL.toPx() }
     // One intrinsic progress value (list = 0, conversation = 1) is stable under
     // interruption. A Back during enter reverses from the exact rendered float
     // instead of creating a new target-relative 0 -> 1 animation that jumps.
@@ -207,6 +208,10 @@ internal fun <T> ConversationRouteAnimatedContent(
         // Keep each composition key stable, resolve the requested key to its latest payload,
         // and put the requested chat above outgoing chats even for A -> B -> A.
         val targetKey = contentKey(transition.targetState)
+        // Exactly one chat owns the conversation header, including on Back after a chat replaced another.
+        var lastConversationKey by remember(transition) { mutableStateOf<Any?>(null) }
+        val headerOwnerKey = if (transition.targetState != null) targetKey else lastConversationKey
+        SideEffect { if (transition.targetState != null) lastConversationKey = targetKey }
         val routes =
             if (suppressMotion) {
                 listOf(transition.targetState)
@@ -237,6 +242,17 @@ internal fun <T> ConversationRouteAnimatedContent(
                                     chrome = contentKey(route) == targetKey,
                                     bodyPresence = nativePageBodyPresence(conversationVisibility.value, route != null),
                                     bodyLimit = targetBody,
+                                    header =
+                                        conversationRouteHeaderMotion(
+                                            header = nativeBody.header?.translate(-hostBounds.topLeft),
+                                            body = body,
+                                            visibility = conversationVisibility.value,
+                                            conversationRoute = route != null,
+                                            current = contentKey(route) == targetKey,
+                                            owner = route == null || contentKey(route) == headerOwnerKey,
+                                            direct = suppressMotion,
+                                            travelPx = headerTravelPx,
+                                        ),
                                 )
                             }
                         }.graphicsLayer {

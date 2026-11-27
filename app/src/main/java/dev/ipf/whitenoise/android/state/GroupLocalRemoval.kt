@@ -33,25 +33,27 @@ internal fun WhiteNoiseAppState.schedulePendingLocalGroupDeleteCleanup(retryTran
 }
 
 /**
- * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
- * The engine drops its own rows/secrets, but Android owns decrypted media caches
- * and tray notifications, so clear those before the group references disappear.
+ * Group Details Delete and sole-member Leave share the pre-delete journal used by chat-list Delete.
+ * A successful native removal can return even when Android cleanup needs startup replay.
  */
 internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     account: String,
     groupIdHex: String,
 ) {
-    conversationDictation.onTargetRemoved(account, groupIdHex)
-    evictGroupMediaCaches(account, groupIdHex)
-    deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    withRevokedPinnedTarget(
-        accountRef = account,
-        groupIdHex = groupIdHex,
-    ) {
-        marmotIo { deleteGroupLocal(account, groupIdHex) }
-        removeRevokedPinnedConversationShortcuts(account, groupIdHex)
-        removeComposerExpansionForGroup(account, groupIdHex)
-        dismissConversationNotifications(account, groupIdHex)
+    val runtime = runtimeGeneration
+    var committed = false
+    try {
+        deleteChatGroupLocalWithRecovery(
+            LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol = false, allowMissingMedia = true),
+            isCurrent = {
+                activeAccountRef == account && runtimeGeneration == runtime && !signOutInProgress && !wipeInProgress
+            },
+            readinessBudget = LocalGroupDeleteReadinessBudget(),
+            onNativeCommitted = { committed = true },
+        )
+        check(committed) { "local deletion owner changed" }
+    } finally {
+        schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
     }
 }
 
@@ -60,16 +62,17 @@ internal data class LocalGroupRemovalRequest(
     val account: String,
     val groupIdHex: String,
     val forgetProtocol: Boolean,
+    val allowMissingMedia: Boolean = forgetProtocol,
     val onForgetResult: (Boolean) -> Unit = {},
 ) {
     /**
-     * A forget, like the reset it replaced, proceeds without media keys when its media listing fails, so a listing
-     * never blocks the escape path (#3310). A local delete has no fallback and keeps its strict preflight.
+     * Abandonment and the live local removal path can proceed without media keys when the listing fails.
+     * The journal still carries the group id for channel and shortcut cleanup.
      */
     fun mediaPreflightFallback(): ((Throwable) -> PendingLocalGroupDeleteCleanup)? =
-        if (forgetProtocol) {
+        if (allowMissingMedia) {
             { failure ->
-                appStateDebug(failure) { "local forget media listing failed, continuing without media keys" }
+                appStateDebug(failure) { "local removal media listing failed, continuing without media keys" }
                 PendingLocalGroupDeleteCleanup(account, groupIdHex, emptyList(), emptySet())
             }
         } else {
@@ -114,6 +117,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                             accountRef = account,
                             groupIdHex = groupIdHex,
                         ) {
+                            attempt.checkCurrent()
                             if (request.forgetProtocol) {
                                 request.onForgetResult(marmotIo { forgetGroupLocal(account, groupIdHex) })
                             } else {
@@ -242,6 +246,9 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
                 if (pending.ciphertextTags.isNotEmpty()) removeMediaDiskCacheTags(pending.ciphertextTags)
             }
         }
+    }
+    cleanupStep("display avatar") {
+        withContext(Dispatchers.IO) { check(displayAvatars.evictGroup(account, groupIdHex)) }
     }
     cleanupStep("native draft") {
         retryIdempotentRuntimeMutation {

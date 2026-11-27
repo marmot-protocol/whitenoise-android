@@ -39,6 +39,7 @@ internal class StartupPerformanceDiagnostics(
         phase: PerformancePhase,
         durationMs: Long = 0L,
         result: PerformanceResult = PerformanceResult.SUCCESS,
+        count: Int? = null,
     ) {
         PerformanceDiagnostics.record(
             trace = trace,
@@ -47,6 +48,7 @@ internal class StartupPerformanceDiagnostics(
             durationMs = durationMs,
             result = result,
             layer = startupLayer(phase),
+            count = count,
         )
     }
 

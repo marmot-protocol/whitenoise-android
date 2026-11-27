@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /** Presentation order over one complete native projection; recent mode preserves its draft-aware order. */
 internal fun sortFolderChats(
@@ -27,3 +30,13 @@ internal fun sortFolderChats(
         }
     return priority + ordered
 }
+
+internal fun sortChatListFolderRows(
+    rows: List<ChatListItem>,
+    sort: ChatFolderSort?,
+    appState: WhiteNoiseAppState,
+    titleCopy: GroupTitleCopy,
+): List<ChatListItem> =
+    sortFolderChats(rows, sort ?: ChatFolderSort.RECENT, appState.activeAccount?.accountIdHex) {
+        chatListItemDisplayTitle(it, appState, titleCopy)
+    }

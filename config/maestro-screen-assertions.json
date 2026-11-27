@@ -1190,6 +1190,26 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+      "symbol": "TtsMessageMenu",
+      "bindings": [
+        {
+          "case": "presentation-selection-transport-rate",
+          "selector": {
+            "text": "Next message"
+          },
+          "scope": "Paused transport fixture opens More options, dismisses with Back, and dispatches both message callbacks on selection.",
+          "entry_assertion": {
+            "text": "Previous message"
+          },
+          "opened_by": {
+            "text": "More options"
+          }
+        }
+      ],
+      "remaining": "Native speech queue movement, disabled navigation while loading, and device accessibility require separate execution."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
       "symbol": "TtsTransportRatePicker",
       "bindings": [
@@ -1908,14 +1928,33 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "BatchMessageDeleteDialogContent",
+      "symbol": "MessageDeleteConfirmationDialog",
       "bindings": [
         {
           "case": "actions-batch-delete-cancel",
           "selector": {
             "text": "Delete 1 message\\?"
           },
-          "scope": "bulk confirmation body rendered by its app dialog."
+          "scope": "bulk confirmation body rendered by its app dialog.",
+          "entry_assertion": {
+            "text": "Delete 1 message\\?"
+          },
+          "opened_by": {
+            "text": "Delete selected messages"
+          }
+        },
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete for me"
+          },
+          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation.",
+          "entry_assertion": {
+            "text": "Delete message\\?"
+          },
+          "opened_by": {
+            "text": "Delete"
+          }
         }
       ]
     },
@@ -1935,19 +1974,6 @@
           "opened_by": {
             "text": "Delete"
           }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
-      "symbol": "MessageDeleteDialogContent",
-      "bindings": [
-        {
-          "case": "actions-delete-cancel",
-          "selector": {
-            "text": "Delete for me"
-          },
-          "scope": "content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation."
         }
       ]
     },
@@ -7297,6 +7323,26 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataOptions",
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Keep metadata"
+          },
+          "scope": "The production options dialog defaults to removing metadata, then offers Remove metadata after Keep metadata is chosen for the fixture invoice.",
+          "entry_assertion": {
+            "text": "PDF metadata options"
+          },
+          "opened_by": {
+            "text": "Open fixture PDF options"
+          }
+        }
+      ],
+      "remaining": "Send a real PDF with this setting and verify the recipient gets the original bytes (MED-064)."
     }
   ]
 }

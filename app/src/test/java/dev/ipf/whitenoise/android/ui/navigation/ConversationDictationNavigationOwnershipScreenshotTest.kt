@@ -700,6 +700,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
 
     /** Every rendered frame retains chrome; optional exports are not physical-device measurements. */
     @Test
+    @Config(qualifiers = "w480dp-h780dp-mdpi")
     fun activeDictationControlsKeepArtworkOnEveryFrame() {
         val fixture = render(dark = true, amoled = true, withComposerMorph = true)
         val initialTarget = composeRule.runOnIdle { requireNotNull(fixture.handoff?.targetBounds) }

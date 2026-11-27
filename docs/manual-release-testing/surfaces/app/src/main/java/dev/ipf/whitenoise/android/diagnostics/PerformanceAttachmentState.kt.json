@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceAttachmentState.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Closed attachment diagnostic vocabulary includes cleaned_by_setting without content or identifiers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceAttachmentState.kt",
+        "anchor": "CLEANED_BY_SETTING(\"cleaned_by_setting\")",
+        "test_ids": [
+          "MED-019",
+          "SET-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

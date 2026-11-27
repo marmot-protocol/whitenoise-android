@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -99,7 +100,7 @@ internal fun ReportMessageSheet(
     form: ReportFormState = ReportFormState(sending),
 ) {
     var reason by remember { mutableStateOf(REPORT_REASONS.first()) }
-    var explanation by remember { mutableStateOf("") }
+    val explanation = remember { TextFieldState() }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
     var closingAudience by remember(terminal) { mutableStateOf<ReportAudience?>(null) }
@@ -118,7 +119,6 @@ internal fun ReportMessageSheet(
             reason,
             { reason = it },
             explanation,
-            { explanation = it },
             form.sending || !terminal.acceptsInput,
             { acceptedReason, acceptedExplanation ->
                 onSubmit(acceptedReason, acceptedExplanation, close)
@@ -184,8 +184,7 @@ private fun ReportMessageDragHandle() {
 internal fun ReportMessageForm(
     reason: ReportReasonFfi,
     onReasonChange: (ReportReasonFfi) -> Unit,
-    explanation: String,
-    onExplanationChange: (String) -> Unit,
+    explanation: TextFieldState,
     sending: Boolean,
     onSubmit: (ReportReasonFfi, String) -> Unit,
     team: ReportTeamChoice = ReportTeamChoice(),
@@ -204,14 +203,13 @@ internal fun ReportMessageForm(
                 reason,
                 onReasonChange,
                 explanation,
-                onExplanationChange,
                 Modifier.weight(1f, fill = false),
                 enabled = !sending && !form.locked,
                 team = team,
                 error = form.error,
             )
             WhiteNoiseButton(
-                onClick = { onSubmit(reason, boundedExplanation(explanation)) },
+                onClick = { onSubmit(reason, boundedExplanation(explanation.text.toString())) },
                 enabled = !sending && (team.reachesGroup || team.reachesTeam),
                 modifier =
                     Modifier
@@ -234,8 +232,7 @@ internal fun ReportMessageForm(
 private fun ReportMessageBody(
     reason: ReportReasonFfi,
     onReasonChange: (ReportReasonFfi) -> Unit,
-    explanation: String,
-    onExplanationChange: (String) -> Unit,
+    explanation: TextFieldState,
     modifier: Modifier,
     enabled: Boolean,
     team: ReportTeamChoice,
@@ -267,10 +264,9 @@ private fun ReportMessageBody(
                 }
             }
             ProseTextField(
-                value = explanation,
+                state = explanation,
                 enabled = enabled,
-                emojiMaxLength = REPORT_EXPLANATION_LIMIT,
-                onValueChange = { onExplanationChange(it.take(REPORT_EXPLANATION_LIMIT)) },
+                maxLength = REPORT_EXPLANATION_LIMIT,
                 label = {
                     val hint =
                         if (teamOnly) {

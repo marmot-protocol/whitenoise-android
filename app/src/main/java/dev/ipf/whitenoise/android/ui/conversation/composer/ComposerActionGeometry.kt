@@ -41,7 +41,8 @@ internal fun composerEditorViewportHeight(
  * animated editing progress. The progress is read during placement so nothing recomposes per frame.
  */
 internal class ComposerActionRowAlignment(
-    private val horizontal: Alignment.Horizontal,
+    /** The edge the cluster keeps: [Alignment.Start] or [Alignment.End]. */
+    val horizontal: Alignment.Horizontal,
     private val topInset: () -> Int = { 0 },
     private val editingProgress: () -> Float,
 ) : Alignment {
@@ -52,10 +53,15 @@ internal class ComposerActionRowAlignment(
         layoutDirection: LayoutDirection,
     ): IntOffset {
         val x = horizontal.align(size.width, space.width, layoutDirection)
-        // The parent can include an accessory above the actual editor and its inline actions.
-        val inset = topInset().coerceIn(0, (space.height - size.height).coerceAtLeast(0))
+        val inset = accessoryInset(space.height, size.height)
         return IntOffset(x, inset + composerActionRowTop(space.height - inset, size.height, editingProgress()))
     }
+
+    /** The height of the accessory above the editor, such as a reply preview, that the cluster stays below. */
+    fun accessoryInset(
+        spaceHeight: Int,
+        rowHeight: Int,
+    ): Int = topInset().coerceIn(0, (spaceHeight - rowHeight).coerceAtLeast(0))
 }
 
 /** A configured slot already owns its horizontal clearance; ordinary trailing controls retain their end gutter. */
@@ -72,4 +78,5 @@ internal fun Modifier.expandedComposerActionRow(reserveEndInset: Boolean = true)
         }
     }
 
-internal val ComposerToolbarSlotWidth = 40.dp
+/** Default action slot width, matching the minimum height of the action row. */
+internal val ComposerToolbarSlotWidth = ComposerActionRowHeight

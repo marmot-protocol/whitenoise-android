@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteEndpoint
 import dev.ipf.whitenoise.android.ui.settings.drawRouteContour
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseElevation
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import androidx.compose.ui.graphics.lerp as lerpColor
 
@@ -185,7 +186,7 @@ internal fun AnimatedAlertDialog(
         iconContentColor = iconContentColor,
         titleContentColor = titleContentColor,
         textContentColor = textContentColor,
-        tonalElevation = if (morphing) Dp(0f) else tonalElevation,
+        tonalElevation = if (morphing) WhiteNoiseElevation.None else tonalElevation,
         properties = properties,
     )
 }

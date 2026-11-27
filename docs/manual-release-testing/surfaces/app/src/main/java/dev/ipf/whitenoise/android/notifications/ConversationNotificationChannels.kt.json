@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+  "legacy_sha256": "f5f46cc1395890353fea4de3346a3ed03d6f28d2398ab9d88e7cc6fb51b4f778",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Generic new conversation channel title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Generic new conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Per-conversation channel name with chat title and parent category",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_channel_custom_name",
+        "test_ids": [
+          "NTF-031",
+          "NTF-059"
+        ]
+      },
+      {
+        "surface": "Per-conversation channel description with parent category and chat title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_channel_custom_description",
+        "test_ids": [
+          "NTF-031",
+          "NTF-059"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

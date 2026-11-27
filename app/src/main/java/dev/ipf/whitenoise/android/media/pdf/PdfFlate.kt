@@ -33,7 +33,7 @@ internal object PdfFlate {
             val buffer = ByteArray(CHUNK)
             while (!inflater.finished()) {
                 val count = inflater.inflate(buffer)
-                if (count == 0 && (inflater.needsInput() || inflater.needsDictionary())) return null
+                if (count == 0 && !inflater.finished()) return null
                 if (output.size() + count > limit) return null
                 output.write(buffer, 0, count)
             }

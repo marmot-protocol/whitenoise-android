@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import stat
 import struct
 import tempfile
@@ -306,6 +307,58 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.prepare()
 
         self.assertIn("FixtureApi", binding.read_text(encoding="utf-8"))
+
+    def test_extra_file_in_cached_tree_is_rebuilt_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        injected = output / "kotlin/dev/ipf/marmotkit/Injected.kt"
+        injected.write_text("attacker-controlled\n", encoding="utf-8")
+
+        self.prepare()
+
+        self.assertFalse(injected.exists())
+
+    def test_symlink_in_cached_tree_is_rebuilt_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        outside = Path(tempfile.mkdtemp())
+        (outside / "Injected.kt").write_text("attacker-controlled\n", encoding="utf-8")
+        link = output / "kotlin/dev/ipf/marmotkit/linked"
+        link.symlink_to(outside, target_is_directory=True)
+        pending = output / ".native-provenance.tmp"
+        pending.symlink_to(output / "manifest.json")
+
+        self.prepare()
+
+        self.assertFalse(link.exists() or link.is_symlink())
+        self.assertFalse(pending.is_symlink())
+
+    def test_symlinked_prepared_root_is_replaced_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        elsewhere = output.parent / "elsewhere"
+        output.rename(elsewhere)
+        output.symlink_to(elsewhere, target_is_directory=True)
+
+        self.prepare()
+
+        self.assertFalse(output.is_symlink())
+        self.assertTrue((output / "manifest.json").is_file())
+
+    def test_hard_linked_pending_provenance_cannot_rewrite_a_payload(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        manifest = output / "manifest.json"
+        before = manifest.read_bytes()
+        os.link(manifest, output / ".native-provenance.tmp")
+
+        self.prepare()
+
+        self.assertEqual(before, manifest.read_bytes())
 
     def test_mutated_api_signature_and_marker_are_rebuilt(self) -> None:
         self.write_archive()

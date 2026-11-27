@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
@@ -103,6 +104,15 @@ class AppStateSendLockCoverageTest {
         }
     }
 
+    /** The dictation notification's Send consults the same gate; past it the transcript is pasted instead. */
+    @Test
+    fun dictationNotificationSendChecksAppLock() {
+        val service =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt")
+        assertTrue("get() = appState.appLock.notificationActionsAllowed" in service)
+        assertTrue("ACTION_SEND -> if (host?.notificationSendAllowed == true) controller.send()" in service)
+    }
+
     @Test
     fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
         val body = appStateFunctionBody("sendNotificationReply", notificationReplySource())
@@ -174,7 +184,7 @@ class AppStateSendLockCoverageTest {
         val revokedBody = entry.kotlinBlockFrom(entry.indexOf('{', revocation), "launcher revocation")
         assertTrue(
             "the public wipe must delegate completion inside the durable launcher-revocation bracket",
-            "finishRevokedAccountWipe(wipedRef, wipedShareAccount)" in revokedBody,
+            "finishRevokedAccountWipe(wipedRef, wipedShareAccount, knownGroupIds)" in revokedBody,
         )
         val body = appStateFunctionBody("finishRevokedAccountWipe")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
@@ -236,13 +246,19 @@ class AppStateSendLockCoverageTest {
                 0 until rotationBody.indexOf("if (!notificationDeliveryModeBusy)"),
         )
         assertTrue(
-            "the latest delivery transaction must drain token work after clearing busy state under its mutex",
+            "the latest delivery transaction clears busy state under its mutex",
             finishBody.indexOf("notificationDeliveryModeMutex.withLock") in
-                0 until finishBody.indexOf("notificationDeliveryModeBusy = false") &&
-                finishBody.indexOf("notificationDeliveryModeBusy = false") in
-                0 until finishBody.indexOf("nativePushRegistrationSyncPending()") &&
-                finishBody.indexOf("nativePushRegistrationSyncPending()") in
-                0 until finishBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+                0 until finishBody.indexOf("notificationDeliveryModeBusy = false"),
+        )
+        assertFalse(
+            "finish never syncs: a stalled token task there would hold both locks without a bound",
+            "syncNativePushRegistrationIfEnabled()" in finishBody,
+        )
+        val drainBody = notificationDeliveryFunctionBody("drainDeferredRegistrationSync")
+        assertTrue(
+            "the last change's end drains token work left pending, through the bounded retry",
+            drainBody.indexOf("nativePushRegistrationSyncPending()") in
+                0 until drainBody.indexOf("syncNativePushRegistrationIfEnabled()"),
         )
         modeEntryBodies.forEach { body ->
             assertTrue(

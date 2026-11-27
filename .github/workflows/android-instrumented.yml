@@ -152,6 +152,10 @@ on:
       - 'scripts/select_instrumented_lanes.py'
       - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
+      # Avatar loaders feed cached profile and cold-start direct-chat presentation.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/GroupAvatarImageLoader.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/core/PrivateContactAvatarLoader.kt'
       - 'app/src/androidTest/AndroidManifest.xml'
       # Every @PullRequestDeviceSmoke test starts this run when it changes (scripts/test_select_instrumented_lanes.py).
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/audio/AttachmentPcmDecoderDeviceTest.kt'
@@ -172,6 +176,7 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReplyConstraintSafetyAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/medialibrary/AccountAttachmentLibraryFfiIntegrationTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsImeTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysAccessibilityAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyWipeConfirmationAndroidTest.kt'
       # The wipe confirmation's 200% RTL keyboard geometry depends on its own layout, its action labels and the
       # shared dialog width and renderers; Robolectric gives dialog windows the full screen, so only the emulator

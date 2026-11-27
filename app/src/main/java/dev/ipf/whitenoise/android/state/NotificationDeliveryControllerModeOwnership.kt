@@ -4,11 +4,15 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Resolves the device mode from authoritative account settings and identifies any incomplete invariant. */
 internal suspend fun NotificationDeliveryController.notificationDeliveryActivationPlan(
@@ -58,14 +62,18 @@ private suspend fun NotificationDeliveryController.readNotificationDeliverySetti
     return settingsByAccount
 }
 
-/** Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch. */
+/**
+ * Reuses safe capability sync for restoration and reserves device-wide cutover for a real account switch.
+ * Adopts the caller's open delivery-mode change and ends it after its finish. It starts atomically, so even a
+ * job cancelled before it runs reaches that `finally`.
+ */
 internal fun NotificationDeliveryController.launchNotificationDeliveryModeReconciliation(
     owner: NotificationDeliveryModeOwner,
     mode: NotificationDeliveryMode,
     applyDeviceWideMode: Boolean,
 ) {
     notificationDeliveryModeBusy = true
-    notificationScope.launch {
+    notificationScope.launch(start = CoroutineStart.ATOMIC) {
         try {
             notificationDeliveryModeMutex.withLock {
                 if (!ownsNotificationDeliveryMode(owner)) return@withLock
@@ -80,20 +88,77 @@ internal fun NotificationDeliveryController.launchNotificationDeliveryModeReconc
                 }
             }
         } finally {
-            finishNotificationDeliveryModeTransaction(owner.intentGeneration)
+            try {
+                finishNotificationDeliveryModeTransaction(owner.intentGeneration)
+            } finally {
+                endDeliveryModeTransaction()
+            }
         }
     }
 }
 
-/** Clears the latest cutover and drains token work that arrived while it owned the mode lock. */
+/**
+ * Opens a device-wide delivery-mode change: counts it in
+ * [NotificationDeliveryController.activeDeliveryModeTransactions], then advances the delivery intent. It never
+ * waits for a lock, so a newer choice supersedes an older change that holds the sync lock at once. Returns the
+ * change's intent generation.
+ */
+internal fun NotificationDeliveryController.beginDeliveryModeTransaction(): Long {
+    // Taken with an on write's admission check, so that write either lands first or sees this change.
+    synchronized(fcmAutoInitAdmission) {
+        activeDeliveryModeTransactions.incrementAndGet()
+        return notificationDeliveryModeIntent.advance()
+    }
+}
+
+/**
+ * Ends a change opened by [beginDeliveryModeTransaction], after its finish has cleared the busy flag. The count
+ * drops at once, without waiting for any lock, so ending never blocks on a registration sync another caller holds.
+ * The last open change then drains a registration sync left pending meanwhile, because a sync or enable that saw an
+ * open change left auto-init to it, through [drainDeferredRegistrationSync], which is cancellable and bounded. A
+ * caller already cancelled, ending its change in a `finally`, schedules that retry instead.
+ */
+internal suspend fun NotificationDeliveryController.endDeliveryModeTransaction() {
+    if (activeDeliveryModeTransactions.decrementAndGet() != 0) return
+    if (currentCoroutineContext().isActive) {
+        drainDeferredRegistrationSync()
+    } else {
+        notificationScope.launch { drainDeferredRegistrationSync() }
+    }
+}
+
+/**
+ * Runs the registration sync a delivery-mode change deferred, cancellably and for at most
+ * [NotificationDeliveryController.deferredRegistrationDrainTimeoutMs], waiting for the native sync lock included,
+ * so a stalled Firebase token task cannot keep it from sign-out or wipe. The marker is read under that lock, where
+ * a deferral records it: a sync that read the count before it dropped and deferred has recorded its marker by the
+ * time this holds the lock, and one that read it after did not defer. A failed, cancelled or timed-out retry keeps
+ * its durable marker for the next sync and never replaces the change's own result.
+ */
+private suspend fun NotificationDeliveryController.drainDeferredRegistrationSync() {
+    withTimeoutOrNull(deferredRegistrationDrainTimeoutMs) {
+        runCatchingCancellable {
+            val pending =
+                nativePushSyncMutex.withLock {
+                    withContext(pushWakeStorageDispatcher) {
+                        runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                    }
+                }
+            if (pending) syncNativePushRegistrationIfEnabled()
+        }
+    }
+}
+
+/**
+ * Clears the busy flag of the latest cutover. Token work that arrived while it owned the mode lock left its durable
+ * marker, which the last change's [endDeliveryModeTransaction] drains, cancellably and bounded, so a stalled Firebase
+ * task can never hold the mode and native sync locks here.
+ */
 internal suspend fun NotificationDeliveryController.finishNotificationDeliveryModeTransaction(epoch: Long) =
     withContext(NonCancellable) {
         if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
         notificationDeliveryModeMutex.withLock {
-            val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-            val pending =
-                latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
-            if (pending) syncNativePushRegistrationIfEnabled()
+            notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
         }
     }
 

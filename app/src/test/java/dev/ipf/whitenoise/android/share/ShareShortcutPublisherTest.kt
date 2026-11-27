@@ -249,12 +249,13 @@ class ShareShortcutPublisherTest {
 
         publisher.publish(
             accountRef = "acct",
-            chats = listOf(chat("g1", pending = false), chat("g2", pending = false)),
+            chats = listOf(chat("g1", pending = false), chat("g2", pending = false, name = "Chat :wn:")),
             displayTitle = { item -> item.group.name },
         )
 
         val republished = published.single { it.id == shortcutId }
         assertEquals(1, republished.rank)
+        assertEquals("Chat ${context.getString(R.string.white_noise)}", republished.longLabel)
         assertEquals(rich.locusId, republished.locusId)
         assertEquals(rich.intent, republished.intent)
         assertEquals(

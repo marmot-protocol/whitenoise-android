@@ -97,7 +97,9 @@ jobs:
       # Activate the task-output cache restored by setup-gradle.
       - name: Lint, compile, and replay fuzz regression corpus
         if: steps.scope.outputs.should_fuzz == 'true'
-        run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --build-cache --profile --no-daemon
+        run: |
+          ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --max-workers=1 \
+            --build-cache --profile --no-daemon -Pkotlin.daemon.jvmargs=-Xmx5g
 
       # Keep task timings on successful runs too; wall-clock timeouts alone do
       # not show whether compilation, tests, or analysis is doing extra work.

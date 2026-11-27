@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -18,6 +19,33 @@ private fun WhiteNoiseAppState.ensureAccountSwitchRequestIsCurrent(generation: L
     if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
 }
 
+/** Prepares both independent local reads before the coordinator's fenced publication. */
+internal suspend fun WhiteNoiseAppState.projectActivation(
+    request: AccountSessionActivationRequest,
+    generation: Long,
+    switchingAccounts: Boolean,
+    restored: PreparedAccountSessionActivation,
+): PreparedAccountSessionActivation =
+    coroutineScope {
+        val target = accounts.firstOrNull { it.label == request.label }
+        val wanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
+        val plan = accountSwitchPreloadPlan(switchingAccounts, wanted, request.preloadPolicy)
+        val snapshot =
+            if (plan.loadLocalRows) {
+                async { loadAccountSwitchLocalSnapshot(request.label, generation, plan) }
+            } else {
+                null
+            }
+        val profile =
+            preloadStartupSelfProfile(
+                policy = request.preloadPolicy,
+                accountIdHex = target?.accountIdHex,
+                activationWanted = wanted,
+                loadProfile = ::loadAccountSwitchProfileSeed,
+            )
+        restored.copy(profilePresentation = profile, snapshot = snapshot?.await())
+    }
+
 /**
  * Reads the target account's local chat rows, and decodes their stored first-frame
  * avatars, before publishing the new active account. The first target composition gets
@@ -30,17 +58,15 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
     plan: AccountSwitchPreloadPlan,
 ): AccountSwitchLocalSnapshot? =
     try {
+        val prefetched =
+            if (plan.startupRestoration) awaitStartupChatListPrefetch(accountRef) else null
         val presentedRows =
-            marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+            prefetched ?: marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                 presentedChatList(accountRef, includeArchived = true)
             }.rows
+        ensureAccountSwitchRequestIsCurrent(generation)
         val rows = presentedRows.map { it.row }
-        val firstFrameAvatars =
-            prewarmFirstFrameDurableAvatars(
-                accountRef,
-                presentedRows,
-                awaitColdWorkers = plan.awaitColdAvatarWorkers,
-            )
+        val firstFrameAvatars = prewarmSwitchAvatars(accountRef, presentedRows, generation, plan, prefetched == null)
         ensureAccountSwitchRequestIsCurrent(generation)
         recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
         val presentation =
@@ -74,6 +100,33 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
         }
         null
     }
+
+private suspend fun WhiteNoiseAppState.prewarmSwitchAvatars(
+    accountRef: String,
+    rows: List<PresentedChatRowFfi>,
+    generation: Long,
+    plan: AccountSwitchPreloadPlan,
+    decode: Boolean,
+): List<FirstFrameDurableAvatar> =
+    prewarmFirstFrameDurableAvatars(
+        accountRef,
+        rows,
+        preparation =
+            FirstFrameAvatarPreparation(
+                awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                decode = decode,
+                stillCurrent = { accountSwitchHandoff.isCurrent(generation) },
+            ),
+        onPrepared =
+            if (plan.startupRestoration) {
+                { renderable, decoded ->
+                    ensureAccountSwitchRequestIsCurrent(generation)
+                    recordStartupAvatarPreparation(renderable, decoded)
+                }
+            } else {
+                null
+            },
+    )
 
 private suspend fun WhiteNoiseAppState.loadAccountSwitchPresentationSeeds(
     accountRef: String,

@@ -44,7 +44,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -543,7 +542,7 @@ internal fun GroupEditScreen(
             },
             bottomBar = {
                 if (canEdit) {
-                    SettingsBottomAction(tonalElevation = 0.dp) {
+                    SettingsBottomAction(elevated = false) {
                         WhiteNoiseButton(
                             onClick = { saveGroupProfile() },
                             enabled = saveEnabled,

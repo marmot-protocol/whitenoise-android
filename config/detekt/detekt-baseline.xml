@@ -157,7 +157,6 @@
     <ID>FunctionNaming:MediaControls.kt:@Composable internal fun MediaCircleAction</ID>
     <ID>FunctionNaming:MediaControls.kt:@Composable private fun MediaBubbleAction</ID>
     <ID>FunctionNaming:MediaFileBubble.kt:@Composable internal fun MediaFileBubble</ID>
-    <ID>FunctionNaming:MediaFileBubble.kt:@Composable internal fun PendingFilePill</ID>
     <ID>FunctionNaming:MediaImageBubbles.kt:@Composable internal fun MediaImageBubble</ID>
     <ID>FunctionNaming:MediaImageBubbles.kt:@Composable internal fun MediaImageGridTile</ID>
     <ID>FunctionNaming:MediaImageBubbles.kt:@Composable internal fun MediaVisualGridBubble</ID>
@@ -182,8 +181,6 @@
     <ID>FunctionNaming:MessageBubbleSelection.kt:@Composable internal fun BoxScope.MessageBubbleSelectionTapTarget</ID>
     <ID>FunctionNaming:MessageBubbleSelection.kt:@Composable internal fun MessageBubbleSelectionGutter</ID>
     <ID>FunctionNaming:MessageBubbleStatus.kt:@Composable internal fun OutgoingMessageStatusIcon</ID>
-    <ID>FunctionNaming:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
-    <ID>FunctionNaming:MessageDeleteDialog.kt:@Composable internal fun MessageDeleteDialogContent</ID>
     <ID>FunctionNaming:MessageDeleteDialog.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun BatchMessageDeleteDialog</ID>
     <ID>FunctionNaming:MessageDeleteDialog.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun MessageDeleteDialog</ID>
     <ID>FunctionNaming:MessageSelectionBar.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun MessageSelectionBar</ID>
@@ -275,8 +272,6 @@
     <ID>LongMethod:MediaViewerPage.kt:@Composable internal fun ViewerPage</ID>
     <ID>LongMethod:MediaVoice.kt:@Composable internal fun MediaVoiceBubble</ID>
     <ID>LongMethod:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
-    <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
-    <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun MessageDeleteDialogContent</ID>
     <ID>LongMethod:NotificationPushWakeDrainCoverageTest.kt:NotificationPushWakeDrainCoverageTest$private fun String.kotlinBlockFrom: String</ID>
     <ID>LongMethod:NotificationReplyWorker.kt:NotificationReplyWorker$override suspend fun doWork: Result</ID>
     <ID>LongMethod:NotificationStreamForegroundService.kt:NotificationStreamForegroundService$override fun onStartCommand: Int</ID>
@@ -427,8 +422,6 @@
     <ID>MagicNumber:MarkdownRenderer.kt:3</ID>
     <ID>MagicNumber:MarkdownRenderer.kt:4</ID>
     <ID>MagicNumber:MarkdownRenderer.kt:5</ID>
-    <ID>MagicNumber:MediaFileBubble.kt:1024.0</ID>
-    <ID>MagicNumber:MediaFileBubble.kt:1024L</ID>
     <ID>MagicNumber:MediaLibrary.kt:100</ID>
     <ID>MagicNumber:MediaPipeline.kt:MediaPipeline$0xd0</ID>
     <ID>MagicNumber:MediaPipeline.kt:MediaPipeline$0xd7</ID>
@@ -989,7 +982,6 @@
     <ID>ReturnCount:MarkdownRenderer.kt:private fun canonicalPortSuffix: String?</ID>
     <ID>ReturnCount:MarkdownRenderer.kt:private fun parsedHttpMarkdownLink: ParsedOpenableMarkdownLink?</ID>
     <ID>ReturnCount:MediaAutoDownloadMatrix.kt:MediaAutoDownloadMatrix$fun withToggle: MediaAutoDownloadMatrix</ID>
-    <ID>ReturnCount:MediaFileBubble.kt:private fun formatFileSize: String</ID>
     <ID>ReturnCount:MediaInventory.kt:MediaInventory$private fun cachedRecordUrls: List&lt;UrlEntry&gt;</ID>
     <ID>ReturnCount:MediaInventory.kt:MediaInventory$private fun isLoadableImageUrl: Boolean</ID>
     <ID>ReturnCount:MediaPipeline.kt:MediaPipeline$fun canSeedStaticThumbnailFromMediaType: Boolean</ID>

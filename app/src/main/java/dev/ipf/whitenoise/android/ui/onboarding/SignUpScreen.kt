@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.IdentityMonogram
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -349,7 +350,7 @@ internal fun SignUpAvatar(
         Image(photo, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
+            IdentityMonogram(name, style = MaterialTheme.typography.headlineMedium, blank = "?")
         }
     }
 }

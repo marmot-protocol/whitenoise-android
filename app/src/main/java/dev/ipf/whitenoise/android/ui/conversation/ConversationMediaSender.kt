@@ -74,6 +74,7 @@ internal class ConversationMediaSender(
 
     /** The composer's PDFs that keep their metadata and which of them the person chose to send as they are. */
     internal val pdfChoices = ComposerPdfMetadataChoices()
+    internal val collectionResumePdfChoices = ComposerPdfMetadataChoices()
 
     init {
         bindCollectionSender(this)
@@ -192,10 +193,9 @@ internal class ConversationMediaSender(
         onRejected: () -> Unit = {},
         onSettled: () -> Unit = {},
         onAfterSend: () -> Unit = {},
+        keepPdfMetadata: Set<android.net.Uri> = emptySet(),
     ) {
         val completion = StagedMediaSendCompletion(onAccepted, onRejected, onSettled)
-        // The person's choice to send PDFs with their metadata covers this send only, every chunk of it.
-        val keepPdfMetadata = pdfChoices.takeConsent()
         val replyTarget = controller.replyingTo?.messageIdHex
         val replyVersion = controller.replySelectionVersion
         // A reply is one message read wholly into memory, so it keeps the one-message limit; the shelf stays.
@@ -382,7 +382,9 @@ internal class ConversationMediaSender(
             } else {
                 readStagedDocuments(
                     documentUris,
-                    withContext(Dispatchers.IO) { removePreparedDocumentMetadata(preparedDocumentAttachments) },
+                    withContext(Dispatchers.IO) {
+                        removePreparedDocumentMetadata(preparedDocumentAttachments, keepPdfMetadata)
+                    },
                     documentBudget,
                     allowFileBacked,
                     staging,
@@ -448,7 +450,17 @@ internal class ConversationMediaSender(
             }
             val staged = preparedDocuments.ready[uri]
             val firstOfUri = attachments.size
-            if (uri in preparedDocuments.refused) {
+            val keeps = uri in keepPdfMetadata
+            val storedPdf =
+                staged?.let {
+                    appState.prepareStoredPdfForSend(controller, it, allowFileBacked, keeps) {
+                        attachmentReader.fileBackedBudget(staging)
+                    }
+                }
+            if (storedPdf != null) {
+                attachments += storedPdf.attachments.map { it.copy(outgoingDomain = domain) }
+                failures += storedPdf.failures
+            } else if (uri in preparedDocuments.refused) {
                 failures += DocumentReadFailure.VIDEO_METADATA
             } else if (staged != null && staged.plaintextBytes.size.toLong() <= remaining) {
                 attachments += staged.copy(outgoingDomain = domain)
@@ -472,13 +484,13 @@ internal class ConversationMediaSender(
                         staging,
                         pickKey,
                         ownedMime,
+                        keepPdfMetadata,
                     )
                 attachments += read.attachments.map { it.copy(outgoingDomain = domain) }
                 totalBytes += read.totalBytes
                 failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
             }
-            val keeps = uri in keepPdfMetadata
             totalBytes -=
                 withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, failures, keeps) }
         }

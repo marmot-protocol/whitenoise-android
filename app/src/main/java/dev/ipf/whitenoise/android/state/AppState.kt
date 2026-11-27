@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
 import dev.ipf.whitenoise.android.share.ShareInboundStager
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
@@ -691,6 +692,7 @@ class WhiteNoiseAppState private constructor(
     /** Encrypted retained originals, separate from the bounded display derivatives. */
     internal val diskMediaCache = createOriginalMediaCache(appContext, ::bumpMediaCacheRevision)
     internal val displayThumbnails = createDisplayThumbnailCache(appContext)
+    internal val displayAvatars = createDisplayAvatarCache(appContext)
 
     /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
     internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
@@ -2916,7 +2918,7 @@ class WhiteNoiseAppState private constructor(
             mutationsScope.launch {
                 runCatchingCancellable {
                     withContext(Dispatchers.IO) {
-                        shareShortcutPublisher.publish(
+                        shareShortcutPublisher.publishWithEmojiLabels(
                             accountRef,
                             chats,
                             {
@@ -3038,6 +3040,7 @@ class WhiteNoiseAppState private constructor(
         val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
         if (available && canRefreshApprovedPin(account, runtime)) {
             val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+            appContext.prepareEmojiLabels(listOf(title))
             val presentation = pinnedConversationPresentation(account, item, title)
             withContext(Dispatchers.IO) {
                 val tokens = PinnedConversationTokens.create(appContext)
@@ -3084,6 +3087,7 @@ class WhiteNoiseAppState private constructor(
                 item.group.groupIdHex.lowercase(Locale.ROOT) to
                     pinnedConversationPresentation(accountRef, item, chatListItemDisplayTitle(item, this, titleCopy))
             }
+        appContext.prepareEmojiLabels(presentations.values.map { it.title })
         withContext(Dispatchers.IO) {
             shortcuts.refresh(accountRef, presentations) {
                 isActive &&
@@ -3681,14 +3685,12 @@ class WhiteNoiseAppState private constructor(
             bootstrapCompleted = true
             scheduleDisplayThumbnailReconciliation()
         } catch (error: Throwable) {
-            if (error is CancellationException) {
-                // The process-owned listener keeps retrying independently, but
-                // a cancelled UI bootstrap must not strand the splash forever.
-                phase = AppPhase.Failed(bootstrapFailure(error))
-                throw error
-            }
-            appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            if (error !is CancellationException) appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
+            // A cancelled bootstrap must release the splash before cancellation reaches its caller.
             phase = AppPhase.Failed(bootstrapFailure(error))
+            if (error is CancellationException) throw error
+        } finally {
+            abandonStartupChatListPrefetch()
         }
     }
 
@@ -3802,10 +3804,12 @@ class WhiteNoiseAppState private constructor(
                 }
             },
             start = { runtime ->
+                beginStartupChatListPrefetch(runtime.marmot)
                 startMarmotWithNotificationListener(runtime)
                 appStateDebug { "marmot started" }
             },
             closeAfterFailure = { runtime ->
+                abandonStartupChatListPrefetch()
                 startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
                     notificationDelivery.notificationDeliveryModeMutex.withLock {
                         notificationDelivery.nativePushSyncMutex.withLock {
@@ -4344,6 +4348,7 @@ class WhiteNoiseAppState private constructor(
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
+                scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }
@@ -4547,18 +4552,7 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
             restored: PreparedAccountSessionActivation,
-        ): PreparedAccountSessionActivation {
-            val target = accounts.firstOrNull { it.label == request.label }
-            val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
-            val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
-            val profile =
-                preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
-                    loadAccountSwitchProfileSeed(it)
-                }
-            val snapshot =
-                if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
-            return restored.copy(profilePresentation = profile, snapshot = snapshot)
-        }
+        ): PreparedAccountSessionActivation = projectActivation(request, generation, switchingAccounts, restored)
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
         override fun canPublish(
@@ -4683,6 +4677,15 @@ class WhiteNoiseAppState private constructor(
             startupPerformance.record(PerformancePhase.CACHED_CHAT_ROWS_READY)
         }
         recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
+    }
+
+    /** Records how many stored chat images are available and decoded at activation. */
+    internal fun recordStartupAvatarPreparation(
+        renderableAssets: Int,
+        decodedAssets: Int,
+    ) {
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_RENDERABLE, count = renderableAssets)
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_DECODED, count = decodedAssets)
     }
 
     /** Records the point where every cached row has a local member projection. */
@@ -4889,13 +4892,18 @@ class WhiteNoiseAppState private constructor(
     private suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
+        knownGroupIds: Collection<String> = emptySet(),
     ) {
         withContext(Dispatchers.IO) {
             val cleared = runCatching { profileNotificationOverrides.clearAccount(accountRef) }.getOrDefault(false)
             if (!cleared) {
                 appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
             }
-            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(
+                accountRef,
+                includeUnscopedLegacy,
+                knownGroupIds,
+            )
         }
     }
 
@@ -5020,23 +5028,20 @@ class WhiteNoiseAppState private constructor(
         val deleteKeyPackages: Boolean,
     )
 
+    /** Captures the account's group ids, then revokes pinned targets and finishes the owned sign-out once. */
     private suspend fun revokeAndFinishSignOutLocked(
         request: SignOutRequest,
         completed: (OwnedSignOutCompletion) -> Unit,
     ): OwnedSignOutCompletion {
         val draftsSaved = draftWriter.flushAccount(request.requested)
+        val knownGroupIds =
+            captureAccountKnownGroupIds(request.requested)
+                ?: return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(request.requested) {
                 admitted = true
-                finishRevokedAccountSignOut(
-                    request.requested,
-                    request.runtime,
-                    request.runtimeEpoch,
-                    request.selectionEpoch,
-                    request.deleteKeyPackages,
-                    draftsSaved,
-                ).also(completed)
+                finishRevokedAccountSignOut(request, draftsSaved, knownGroupIds).also(completed)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5045,25 +5050,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun rethrowSignOutCancellation(
-        native: CancellationException?,
-        boundary: CancellationException?,
-    ) {
-        val cancellation = native ?: boundary
-        if (cancellation != null) throw cancellation
-        currentCoroutineContext().ensureActive()
-    }
-
     /** Lifetime is already owned; acquire both push locks cancellably before admitting any cleanup intent. */
     @Suppress("LongMethod", "ReturnCount")
     private suspend fun finishRevokedAccountSignOut(
-        account: String,
-        runtime: AppMarmotRuntime?,
-        runtimeEpoch: Int,
-        selectionEpoch: Long,
-        deleteKeyPackages: Boolean,
+        request: SignOutRequest,
         draftsSaved: Boolean,
+        knownGroupIds: Set<String>,
     ): OwnedSignOutCompletion {
+        val (account, runtime, selectionEpoch) = Triple(request.requested, request.runtime, request.selectionEpoch)
         notificationDelivery.notificationDeliveryModeMutex.lock()
         var pushOwned = false
         var deliveryOwned = true
@@ -5072,10 +5066,8 @@ class WhiteNoiseAppState private constructor(
             pushOwned = true
             currentCoroutineContext().ensureActive()
             val ownerCurrent =
-                activeAccountRef == account && marmotRuntime === runtime && runtimeGeneration == runtimeEpoch
-            if (!ownerCurrent ||
-                !accountSwitchHandoff.isCurrent(selectionEpoch)
-            ) {
+                activeAccountRef == account && marmotRuntime === runtime && runtimeGeneration == request.runtimeEpoch
+            if (!ownerCurrent || !accountSwitchHandoff.isCurrent(selectionEpoch)) {
                 return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
             }
             // After this point the explicit logout owns its cleanup intent, including failed disk acknowledgement.
@@ -5085,7 +5077,7 @@ class WhiteNoiseAppState private constructor(
             return withContext(NonCancellable) {
                 val attempt =
                     try {
-                        admittedNativeSignOutLocked(account, runtime, deleteKeyPackages)
+                        admittedNativeSignOutLocked(account, runtime, request.deleteKeyPackages)
                     } finally {
                         notificationDelivery.nativePushSyncMutex.unlock()
                         pushOwned = false
@@ -5093,7 +5085,7 @@ class WhiteNoiseAppState private constructor(
                         deliveryOwned = false
                     }
                 // Shared and account-keyed cleanup finishes while lifetime is still owned, before any successor.
-                finishOwnedSignOutLocked(account, runtime, attempt, selectionGeneration, draftsSaved)
+                finishOwnedSignOutLocked(account, runtime, attempt, selectionGeneration, draftsSaved, knownGroupIds)
             }
         } finally {
             if (pushOwned) notificationDelivery.nativePushSyncMutex.unlock()
@@ -5137,7 +5129,7 @@ class WhiteNoiseAppState private constructor(
         }
         notificationDelivery.localNotificationSettings = settings
         // The native SQLite transaction committed false plus durable registration removals before returning.
-        withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
+        notificationDelivery.settleFcmAutoInitAfterSignOutNativeDisable(account)
         val result =
             runCatching {
                 withContext(marmotIoDispatcher) { runtime.marmot.signOut(account, deleteKeyPackages) }
@@ -5146,13 +5138,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** A partial or lost native reply requires durable status before the host can retire its session. */
-    @Suppress("LongMethod", "ReturnCount")
+    @Suppress("LongMethod", "LongParameterList", "ReturnCount")
     private suspend fun finishOwnedSignOutLocked(
         account: String,
         runtime: AppMarmotRuntime?,
         attempt: NativeSignOutAttempt,
         selectionGeneration: Long,
         draftsSaved: Boolean,
+        knownGroupIds: Set<String>,
     ): OwnedSignOutCompletion {
         val result =
             attempt.result ?: return OwnedSignOutCompletion(
@@ -5188,6 +5181,7 @@ class WhiteNoiseAppState private constructor(
         clearRevokedConversationShortcutsForAccount(
             accountRef = account,
             includeUnscopedLegacy = accounts.none { it.label != account && it.isSignedInSigningAccount() },
+            knownGroupIds = knownGroupIds,
         )
         clearContactPrivateDetailsForAccount(account)
         val refreshed = accountsAfterSignOut(account, knownSignedOut)
@@ -5197,8 +5191,8 @@ class WhiteNoiseAppState private constructor(
         preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
-        wipeDecryptedMediaFromDisk()
-        if (next == null && refreshed.isEmpty()) runCatching { pushTokenStore.clear() }
+        wipeSignedOutMedia(account)
+        notificationDelivery.settleFcmAfterSignOut(next, refreshed)
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return OwnedSignOutCompletion(
@@ -5244,11 +5238,12 @@ class WhiteNoiseAppState private constructor(
         wipedRef: String,
         wipedShareAccount: String? = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex,
     ): AccountWipeCompletion? {
+        val knownGroupIds = captureAccountKnownGroupIds(wipedRef) ?: return null
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
                 admitted = true
-                finishRevokedAccountWipe(wipedRef, wipedShareAccount)
+                finishRevokedAccountWipe(wipedRef, wipedShareAccount, knownGroupIds)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5262,6 +5257,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun finishRevokedAccountWipe(
         wipedRef: String,
         wipedShareAccount: String?,
+        knownGroupIds: Set<String>,
     ): AccountWipeCompletion? {
         val inView = activeAccountRef
         val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
@@ -5274,7 +5270,8 @@ class WhiteNoiseAppState private constructor(
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
-                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+                    notificationDelivery
+                        .wipeSettlingFcmAutoInit { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
@@ -5283,11 +5280,8 @@ class WhiteNoiseAppState private constructor(
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
-                                val survivingSigner =
-                                    accounts.any { it.label != wipedRef && it.isSignedInSigningAccount() }
-                                if (retireSession && !survivingSigner) {
-                                    runCatching { pushTokenStore.clear() }
-                                }
+                                val lastSigner = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() }
+                                if (retireSession && lastSigner) notificationDelivery.forgetFcmTokenAfterLastAccount()
                             }
                         }
                 }
@@ -5326,6 +5320,7 @@ class WhiteNoiseAppState private constructor(
             clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = retireSession && accounts.none { it.isSignedInSigningAccount() },
+                knownGroupIds = knownGroupIds,
             )
             if (retireSession) {
                 AvatarImageLoader.clear()
@@ -6142,6 +6137,7 @@ class WhiteNoiseAppState private constructor(
             refreshLocalNotificationPermission()
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
+            refillForegroundDisplayAvatars()
             notificationScope.launch { catchUpAfterForegroundActivation() }
             scheduleForegroundDisplayThumbnailReconciliation()
         }

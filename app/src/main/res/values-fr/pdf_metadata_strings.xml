@@ -4,6 +4,10 @@
         <item quantity="one">PDF · %d page</item>
         <item quantity="other">PDF · %d pages</item>
     </plurals>
+    <string name="composer_pdf_metadata_options">Options de métadonnées du PDF</string>
+    <string name="composer_pdf_keep_metadata">Conserver les métadonnées</string>
+    <string name="composer_pdf_remove_metadata">Supprimer les métadonnées</string>
+    <string name="composer_pdf_metadata_options_body">Les destinataires peuvent voir l’auteur, les dates et d’autres propriétés dans la copie originale de %1$s.</string>
     <string name="composer_pdf_metadata_removed">Métadonnées supprimées</string>
     <string name="composer_pdf_metadata_removed_on_send">Métadonnées supprimées à l\'envoi</string>
     <string name="composer_pdf_metadata_signed">Signé : métadonnées conservées</string>

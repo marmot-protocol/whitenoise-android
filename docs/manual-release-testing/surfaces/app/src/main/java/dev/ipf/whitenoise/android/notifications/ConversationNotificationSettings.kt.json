@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationSettings.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Conversation shortcut label in Android notification settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationSettings.kt",
+        "anchor": "fun conversationSettingsShortcut(",
+        "test_ids": [
+          "FLD-011"
+        ]
+      },
+      {
+        "surface": "App name fallback for a conversation shortcut with no name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationSettings.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "FLD-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
