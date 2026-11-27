@@ -24,10 +24,10 @@ data class AgentOperationPresentation(
 }
 
 // Tool arguments nest a few levels. Keep recursive JSON parsing within the UI thread's stack budget.
-private const val MaxPayloadDepth = 64
+private const val MAX_AGENT_OPERATION_JSON_DEPTH = 64
 
 internal fun formatAgentOperationArguments(argumentsJson: String): String {
-    if (!GroupSystemEventJson.nestingWithin(argumentsJson, MaxPayloadDepth)) return argumentsJson
+    if (!GroupSystemEventJson.nestingWithin(argumentsJson, MAX_AGENT_OPERATION_JSON_DEPTH)) return argumentsJson
     return runCatching {
         when (argumentsJson.firstOrNull { !it.isWhitespace() }) {
             '{' -> JSONObject(argumentsJson).toString(2)
@@ -47,7 +47,7 @@ object AgentOperationProjector {
 
         val payload =
             record.plaintext
-                .takeIf { GroupSystemEventJson.nestingWithin(it, MaxPayloadDepth) }
+                .takeIf { GroupSystemEventJson.nestingWithin(it, MAX_AGENT_OPERATION_JSON_DEPTH) }
                 ?.let { runCatching { JSONObject(it) }.getOrNull() }
         val eventType = payload.stringOrNull("event_type") ?: record.tagValue(OperationTypeTag)
         val name = payload.stringOrNull("name") ?: record.tagValue(OperationNameTag)
