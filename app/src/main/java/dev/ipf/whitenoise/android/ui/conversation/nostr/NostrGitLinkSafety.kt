@@ -34,8 +34,12 @@ internal fun isCopyableCloneAddress(value: String): Boolean {
     val pathAllowed =
         scheme !in plainPathSchemes ||
             (uri.rawQuery == null && uri.rawFragment == null && plainGitPath.matches(uri.rawPath.orEmpty()))
-    return uri.host != null && scheme in gitUrlSchemes && userAllowed && pathAllowed
+    // java.net.URI accepts any digits as a port, so an out-of-range one is refused here.
+    val portAllowed = uri.port <= MAX_PORT
+    return uri.host != null && scheme in gitUrlSchemes && userAllowed && pathAllowed && portAllowed
 }
+
+private const val MAX_PORT = 65_535
 
 private val gitUrlSchemes = setOf("https", "http", "wss", "ws", "ssh", "git", "nostr")
 private val plainPathSchemes = setOf("ssh", "git", "nostr")

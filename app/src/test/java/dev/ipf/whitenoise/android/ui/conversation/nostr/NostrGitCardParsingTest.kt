@@ -67,6 +67,18 @@ class NostrGitCardParsingTest {
         assertEquals(clones.drop(1) + web, links)
     }
 
+    /** A shell-safe link on a port outside 0..65535 is neither copied nor ranked ahead of a usable web link. */
+    @Test
+    fun outOfRangePortCannotTakeTheWebSlot() {
+        val clones = listOf("clone") + (1..7).map { "https://mirror$it.example.org/parser.git" }
+        val web = "https://example.org/parser?tab=readme"
+        val tags = listOf(clones, listOf("web", web, "https://example.org:70000/parser"))
+        val links = event(kind = 30617, tags = tags).toCardModel().gitLinks
+        assertEquals(clones.drop(1) + web, links)
+        val sshOnBadPort = listOf(listOf("clone", "ssh://git@example.org:99999/x.git"))
+        assertEquals(emptyList<String>(), event(kind = 30617, tags = sshOnBadPort).toCardModel().gitLinks)
+    }
+
     /** Without a web link, eight clone mirrors keep every slot ahead of the relays. */
     @Test
     fun withoutAWebLinkClonesFillEverySlotBeforeRelays() {
