@@ -52,7 +52,6 @@ PREPARED_METADATA_FILES = {
     "marmotkit-api-signature.txt",
     "prepared-files.sha256",
     "native-provenance.json",
-    ".native-provenance.tmp",
 }
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
@@ -686,7 +685,9 @@ def extract_atomically(archive_path: Path, output: Path, properties: dict[str, s
             + "\n",
             encoding="utf-8",
         )
-        if output.exists():
+        if output.is_symlink():
+            output.unlink()
+        elif output.exists():
             shutil.rmtree(output)
         os.replace(temporary, output)
     finally:
@@ -769,6 +770,8 @@ def prepare(args: argparse.Namespace) -> Path:
                 raise PreparationError("prepared artifact failed its final validation")
         provenance = native_provenance(output, properties, sha256(args.lock))
         pending = output / ".native-provenance.tmp"
+        # A fresh file: an existing name could share its inode with a verified payload file.
+        pending.unlink(missing_ok=True)
         pending.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(pending, output / "native-provenance.json")
     return output

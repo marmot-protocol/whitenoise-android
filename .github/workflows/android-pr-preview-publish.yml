@@ -59,7 +59,8 @@ jobs:
           # Expression equality ignores case, and a tag can share the branch's name. Require the exact
           # builder on master in bash, with its commit already on master.
           [[ "$BUILDER_BRANCH" == master && "$BUILDER_PATH" == .github/workflows/android-pr-apk.yml ]]
-          builder_on_master=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BUILDER_SHA}...master" --jq .status)
+          master_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)
+          builder_on_master=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BUILDER_SHA}...${master_sha}" --jq .status)
           [[ "$builder_on_master" == identical || "$builder_on_master" == ahead ]]
           provenance_value() {
             local file=$1 key=$2

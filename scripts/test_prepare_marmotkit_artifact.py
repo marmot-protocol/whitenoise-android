@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import stat
 import struct
 import tempfile
@@ -333,6 +334,31 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
 
         self.assertFalse(link.exists() or link.is_symlink())
         self.assertFalse(pending.is_symlink())
+
+    def test_symlinked_prepared_root_is_replaced_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        elsewhere = output.parent / "elsewhere"
+        output.rename(elsewhere)
+        output.symlink_to(elsewhere, target_is_directory=True)
+
+        self.prepare()
+
+        self.assertFalse(output.is_symlink())
+        self.assertTrue((output / "manifest.json").is_file())
+
+    def test_hard_linked_pending_provenance_cannot_rewrite_a_payload(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        manifest = output / "manifest.json"
+        before = manifest.read_bytes()
+        os.link(manifest, output / ".native-provenance.tmp")
+
+        self.prepare()
+
+        self.assertEqual(before, manifest.read_bytes())
 
     def test_mutated_api_signature_and_marker_are_rebuilt(self) -> None:
         self.write_archive()

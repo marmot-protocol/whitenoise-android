@@ -66,7 +66,8 @@ grep -Fq "github.event.workflow_run.head_branch == 'master' &&" "$workflow"
 grep -Fq "github.event.workflow_run.path == '.github/workflows/android-pr-apk.yml' &&" "$workflow"
 reject "github.event.workflow_run.event == 'pull_request'" "$workflow"
 grep -Fq '[[ "$BUILDER_BRANCH" == master && "$BUILDER_PATH" == .github/workflows/android-pr-apk.yml ]]' "$workflow"
-grep -Fq 'compare/${BUILDER_SHA}...master' "$workflow"
+grep -Fq '/git/ref/heads/master' "$workflow"
+grep -Fq 'compare/${BUILDER_SHA}...${master_sha}' "$workflow"
 # The description step used by manual backfills keeps the validated candidate HEAD_SHA.
 if grep -Eq '^[[:space:]]+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}$' "$workflow"; then
   printf 'Description step must use the validated candidate HEAD_SHA.\n' >&2
