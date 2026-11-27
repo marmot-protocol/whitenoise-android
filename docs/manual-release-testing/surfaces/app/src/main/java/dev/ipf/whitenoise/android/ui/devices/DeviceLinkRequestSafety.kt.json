@@ -1,0 +1,34 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestSafety.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.link_request_repeated_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestSafety.kt",
+        "anchor": "R.string.link_request_repeated_title",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_repeated_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestSafety.kt",
+        "anchor": "R.string.link_request_repeated_detail",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
+        "surface": "Link device arming",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestSafety.kt",
+        "anchor": "DEVICE_LINK_ARM_DELAY_MS = ",
+        "test_ids": [
+          "SET-061",
+          "SET-075"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

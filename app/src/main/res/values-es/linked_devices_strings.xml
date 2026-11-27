@@ -93,6 +93,14 @@
     <string name="link_request_linked">El dispositivo nuevo está vinculado.</string>
     <string name="link_request_added_elsewhere">%2$s añadió %1$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Otro de tus dispositivos añadió el dispositivo.</string>
+    <string name="link_request_notice">Un dispositivo nuevo pide vincularse a tu cuenta.</string>
+    <string name="link_request_notice_other_profile">Un dispositivo nuevo pide vincularse a %1$s.</string>
+    <string name="link_request_repeated_notice">Solicitudes de vinculación repetidas: alguien podría tener tu clave.</string>
+    <string name="link_request_repeated_notice_other_profile">Solicitudes de vinculación repetidas para %1$s: alguien podría tener tu clave.</string>
+    <string name="link_request_repeated_title">Solicitudes de vinculación repetidas</string>
+    <string name="link_request_repeated_detail">Varios dispositivos pidieron vincularse a esta cuenta más de una vez en una hora. Alguien podría tener tu clave privada, así que no se ofrece vincular. Si hiciste tú estas solicitudes, vuelve a intentarlo más tarde desde un solo dispositivo.</string>
+    <string name="link_request_dont_link">No vincular</string>
+    <string name="link_request_review_devices">Revisar dispositivos</string>
     <string name="device_detail_rename">Cambiar nombre</string>
     <string name="device_detail_rename_detail">El nombre que se muestra para este dispositivo en todos tus dispositivos.</string>
     <string name="device_detail_keep">Conservar aunque esté inactivo</string>
