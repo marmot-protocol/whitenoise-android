@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationAskHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "fun NotificationAskHost(",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "NotificationAskDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "fun NotificationAskDialog(",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "R.string.notification_permission_ask_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "R.string.notification_permission_ask_title",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "R.string.notification_permission_ask_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "R.string.notification_permission_ask_message",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "R.string.notification_permission_ask_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "R.string.notification_permission_ask_confirm",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "R.string.notification_permission_ask_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+        "anchor": "R.string.notification_permission_ask_not_now",
+        "test_ids": [
+          "NTF-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

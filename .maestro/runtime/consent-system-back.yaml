@@ -6,6 +6,8 @@ name: consent-system-back
 - assertVisible: "Share usage"
 - assertVisible: "Share diagnostic logs"
 - back
+- assertVisible: "Know when someone replies"
+- tapOn: "Turn on notifications"
 - assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
 - tapOn:
     id: "com.android.permissioncontroller:id/permission_deny_button"
