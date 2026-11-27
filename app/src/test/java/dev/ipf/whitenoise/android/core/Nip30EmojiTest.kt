@@ -163,6 +163,9 @@ class Nip30EmojiTest {
         assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("```lang `x`\n:b:"))
         assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~ `info`\n:a:"))
         assertEquals(listOf(":b:"), Nip30Emoji.shortcodesIn("    ```\n:b:"))
+        // A fence wins over an inline run that would pair across it, and CR alone ends a line.
+        assertEquals(listOf(":out:", ":after:"), Nip30Emoji.shortcodesIn("`:out:\n~~~\n`x\n:in:\n~~~\n:after:"))
+        assertEquals(listOf(":out:"), Nip30Emoji.shortcodesIn("~~~\r:in:\r~~~\r:out:"))
     }
 
     /** Received text with long or many backtick runs is scanned in one pass, with or without a shortcode. */

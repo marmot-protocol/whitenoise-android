@@ -137,6 +137,15 @@ class EmojiShortcodesTest {
         assertTrue(EmojiShortcodes.annotate(AnnotatedString("```\n:wn:")).getStringAnnotations(0, 8).isEmpty())
     }
 
+    /** A fence keeps its shortcodes literal even when an earlier backtick could pair with one inside it. */
+    @Test
+    fun fencesTakePrecedenceOverInlineRuns() {
+        val source = "`:wn:\n~~~\n`x\n:wn:\n~~~\n:wn:"
+        val rendered = EmojiShortcodes.annotate(AnnotatedString(source))
+        val starts = rendered.getStringAnnotations(0, source.length).map { it.start }
+        assertEquals(listOf(1, source.length - 4), starts)
+    }
+
     /** Annotating received text stays linear in its backtick runs and shortcodes. */
     @Test(timeout = 5_000)
     fun annotateDoesNotBacktrackOnBacktickRuns() {

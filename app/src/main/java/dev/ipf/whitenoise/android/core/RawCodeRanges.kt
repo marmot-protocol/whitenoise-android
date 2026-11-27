@@ -7,28 +7,26 @@ private const val MIN_FENCE_LENGTH = 3
  * Ranges of fenced blocks and inline code spans in [text], sorted and disjoint, for plaintext
  * surfaces that have no Markdown AST. A fence opens on a line indented at most three spaces with
  * three or more backticks (no backtick after them) or tildes, and closes on a later line with at
- * least as many of the same character, or at the end of the text. An inline span closes on the
- * next backtick run of exactly its length; an unpaired run stays text.
+ * least as many of the same character, or at the end of the text. Between fences, an inline span
+ * closes on the next backtick run of exactly its length; an unpaired run stays text.
  *
  * Received text is untrusted, so this is one linear pass: a backtracking pattern took seconds on
  * long backtick runs.
  */
 internal fun rawCodeRanges(text: String): List<IntRange> {
-    val closers = closingBacktickRuns(text)
     val ranges = mutableListOf<IntRange>()
-    var index = 0
-    while (index < text.length) {
-        val fenceEnd = if (index == 0 || text[index - 1] == '\n') fenceEnd(text, index) else null
-        val closer = if (text[index] == '`') closers[index] else null
-        val end =
-            when {
-                fenceEnd != null -> fenceEnd
-                closer != null -> closer + runEnd(text, index, '`') - index
-                else -> null
-            }
-        end?.let { ranges.add(index until it) }
-        index = end ?: if (text[index] == '`') runEnd(text, index, '`') else index + 1
+    var gapStart = 0
+    var line = 0
+    while (line < text.length) {
+        val fenceEnd = fenceEnd(text, line)
+        if (fenceEnd != null) {
+            addCodeSpans(text, gapStart, line, ranges)
+            ranges.add(line until fenceEnd)
+            gapStart = fenceEnd
+        }
+        line = nextLineStart(text, fenceEnd ?: line)
     }
+    addCodeSpans(text, gapStart, text.length, ranges)
     return ranges
 }
 
@@ -46,26 +44,39 @@ internal fun outsideRanges(ranges: List<IntRange>): (start: Int, end: Int) -> Bo
     }
 }
 
-/** For each backtick run's start, the start of the next run with exactly the same length. */
-private fun closingBacktickRuns(text: String): Map<Int, Int> {
+/** Adds the inline code spans of `text[start, end)`, pairing each backtick run with the next run of the same length. */
+private fun addCodeSpans(
+    text: String,
+    start: Int,
+    end: Int,
+    ranges: MutableList<IntRange>,
+) {
     val runs = mutableListOf<IntRange>()
-    var index = text.indexOf('`')
-    while (index >= 0) {
-        val end = runEnd(text, index, '`')
-        runs.add(index until end)
-        index = text.indexOf('`', end)
+    var index = text.indexOf('`', start)
+    while (index in start until end) {
+        val runEnd = runEnd(text, index, '`')
+        runs.add(index until runEnd)
+        index = text.indexOf('`', runEnd)
     }
-    val closers = HashMap<Int, Int>()
-    val nextByLength = HashMap<Int, Int>()
-    for (run in runs.asReversed()) {
+    val closers = arrayOfNulls<IntRange>(runs.size)
+    val nextByLength = HashMap<Int, IntRange>()
+    for (position in runs.indices.reversed()) {
+        val run = runs[position]
         val length = run.last - run.first + 1
-        nextByLength[length]?.let { closers[run.first] = it }
-        nextByLength[length] = run.first
+        closers[position] = nextByLength[length]
+        nextByLength[length] = run
     }
-    return closers
+    var openAfter = start
+    for ((position, run) in runs.withIndex()) {
+        val closer = closers[position]
+        if (run.first >= openAfter && closer != null) {
+            ranges.add(run.first..closer.last)
+            openAfter = closer.last + 1
+        }
+    }
 }
 
-/** End (exclusive) of the fenced block opening on the line at [lineStart], or null when no fence opens there. */
+/** End (exclusive, before its line break) of the fenced block opening on the line at [lineStart], or null. */
 private fun fenceEnd(
     text: String,
     lineStart: Int,
@@ -77,9 +88,9 @@ private fun fenceEnd(
     val opens =
         length >= MIN_FENCE_LENGTH &&
             (marker == '~' || (markerEnd until lineEnd(text, markerEnd)).none { text[it] == '`' })
-    var line = lineEnd(text, markerEnd) + 1
+    var line = nextLineStart(text, markerEnd)
     while (opens && line < text.length && !closesFence(text, line, marker, length)) {
-        line = lineEnd(text, line) + 1
+        line = nextLineStart(text, line)
     }
     return if (opens) lineEnd(text, line) else null
 }
@@ -90,11 +101,10 @@ private fun closesFence(
     marker: Char,
     length: Int,
 ): Boolean {
-    val lineEnd = lineEnd(text, lineStart)
     val markerStart = lineStart + leadingSpaces(text, lineStart)
     val markerEnd = runEnd(text, markerStart, marker)
     return markerEnd - markerStart >= length &&
-        text.substring(markerEnd, lineEnd).removeSuffix("\r").all { it == ' ' || it == '\t' }
+        (markerEnd until lineEnd(text, markerEnd)).all { text[it] == ' ' || text[it] == '\t' }
 }
 
 private fun leadingSpaces(
@@ -108,10 +118,26 @@ private fun leadingSpaces(
     return count
 }
 
+/** Index of the line break (LF, CR or CRLF) ending the line that contains [from], or the text length. */
 private fun lineEnd(
     text: String,
     from: Int,
-): Int = text.indexOf('\n', from).let { if (it < 0) text.length else it }
+): Int {
+    var end = from
+    while (end < text.length && text[end] != '\n' && text[end] != '\r') {
+        end++
+    }
+    return end
+}
+
+/** Start of the line after the one containing [from]. */
+private fun nextLineStart(
+    text: String,
+    from: Int,
+): Int {
+    val end = lineEnd(text, from)
+    return if (text.startsWith("\r\n", end)) end + 2 else end + 1
+}
 
 private fun runEnd(
     text: String,
