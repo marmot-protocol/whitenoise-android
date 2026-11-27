@@ -361,6 +361,7 @@ private fun NewMessageAccountScreen(
         val flowBusy = creatingHex != null || scannerSession != null || agentSettingsOpen || inviteShareInProgress
         if (!session.isCurrent() || flowBusy) return
         inviteShareInProgress = true
+        appState.noteNotificationMoment()
         appState.launchMutation {
             val pictureResult =
                 runCatchingCancellable {

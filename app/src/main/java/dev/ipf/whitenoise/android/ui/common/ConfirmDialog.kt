@@ -42,9 +42,11 @@ internal fun ConfirmDialog(
     confirmTag: String = "confirmation.confirm",
     cancelTag: String = "confirmation.cancel",
     emojiLabels: Boolean = true,
+    onDismissStart: () -> Unit = {},
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        onDismissStart = onDismissStart,
         ownerKey = ownerKey,
         modifier = modifier,
         icon = icon,
