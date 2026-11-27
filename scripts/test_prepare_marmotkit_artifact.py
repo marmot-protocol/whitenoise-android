@@ -821,6 +821,19 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.assertIn("run on develop or a branch based on it", output)
         self.assertEqual(self.lock.read_bytes(), before)
 
+    def test_rc_sync_exports_unverified_features_for_draft_review(self) -> None:
+        """A draft proposal records missing evidence and leaves the checkout pin alone."""
+        payloads = self.rc_publication()
+        before = self.lock.read_bytes()
+        proposal = self.root / "proposal"
+        code, output = self.run_rc_sync(payloads, "--proposal-dir", str(proposal))
+        self.assertEqual(code, 0, output)
+        metadata = json.loads((proposal / "proposal.json").read_bytes())
+        self.assertEqual(metadata["metadata_commit"], RC_META_COMMIT)
+        self.assertIs(metadata["manifest_features_verified"], False)
+        self.assertEqual(PREPARE.parse_properties(proposal / "MARMOT_VERSION")["artifact-id"], "0.10.0-rc.2")
+        self.assertEqual(self.lock.read_bytes(), before)
+
 
 if __name__ == "__main__":
     unittest.main()

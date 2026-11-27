@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import json
 import os
 import re
 import subprocess
@@ -209,8 +210,25 @@ def update_lock(root: Path, branch: str, original: bytes, candidate: str) -> Non
             os.replace(pending, lock)
 
 
-def sync(root: Path, *, apply_version: str | None, verified_features: bool) -> None:
-    """Print a verified RC candidate, or write it after explicit confirmation."""
+def write_proposal(
+    directory: Path, rc: AndroidRc, metadata_commit: str, candidate: str, feature_evidence: bool,
+) -> None:
+    """Export a verified candidate for a draft PR without changing the checkout."""
+    directory.mkdir()
+    (directory / LOCK_PATH.name).write_text(candidate, encoding="utf-8")
+    (directory / "proposal.json").write_text(json.dumps({
+        "version": rc.version,
+        "impact": rc.impact,
+        "metadata_commit": metadata_commit,
+        "workflow_run": rc.workflow_run,
+        "manifest_features_verified": feature_evidence,
+    }) + "\n", encoding="utf-8")
+
+
+def sync(
+    root: Path, *, apply_version: str | None, verified_features: bool, proposal_dir: Path | None,
+) -> None:
+    """Preview, export, or apply a verified RC candidate."""
     branch = checked_branch(root)
     lock = root / LOCK_PATH
     original = lock.read_bytes()
@@ -248,6 +266,8 @@ def sync(root: Path, *, apply_version: str | None, verified_features: bool) -> N
     if apply_version is not None:
         update_lock(root, branch, original, candidate)
         print(f"Updated {LOCK_PATH}. Review the impact and run Android CI in the pin PR.")
+    elif proposal_dir is not None:
+        write_proposal(proposal_dir, rc, metadata_commit, candidate, has_feature_evidence)
     else:
         print("".join(difflib.unified_diff(
             original.decode("utf-8").splitlines(keepends=True), candidate.splitlines(keepends=True),
@@ -258,11 +278,13 @@ def sync(root: Path, *, apply_version: str | None, verified_features: bool) -> N
 def main() -> int:
     """Run manual sync and report rejected candidates without a traceback."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apply", metavar="VERSION", help="write the pin for this exact reviewed RC")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--apply", metavar="VERSION", help="write the pin for this exact reviewed RC")
+    mode.add_argument("--proposal-dir", type=Path, help="export a candidate and metadata for a draft bump PR")
     parser.add_argument("--verified-features", action="store_true", help="confirm you verified the Android build feature flags")
     args = parser.parse_args()
     try:
-        sync(ROOT, apply_version=args.apply, verified_features=args.verified_features)
+        sync(ROOT, apply_version=args.apply, verified_features=args.verified_features, proposal_dir=args.proposal_dir)
     except (artifact.PreparationError, OSError, ValueError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         print(f"error: MarmotKit RC sync failed: {error}", file=sys.stderr)
         return 1
