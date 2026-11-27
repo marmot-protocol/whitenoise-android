@@ -40,6 +40,7 @@ internal data class NotificationFirstPost(
     val shouldPost: Boolean,
     val content: NotificationFirstPostContent?,
     val presentation: NotificationContentPresentation,
+    val emojiLabel: (String) -> String = { it },
     val avatars: PreWarmedNotificationAvatars = PreWarmedNotificationAvatars(null, null),
     val lateCorrectionPermit: NotificationLateCorrectionPermit = NotificationLateCorrectionPermit(),
     val contentRemovalVersion: Long = 0L,

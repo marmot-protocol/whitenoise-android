@@ -1,22 +1,22 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialogContent
+import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
+import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -24,8 +24,7 @@ import org.robolectric.annotation.GraphicsMode
  * Pixel baselines for the unified delete dialog: both scopes offered, the
  * compact delete-for-me-only variant, the moderator copy for removing another
  * member's group message, all three themes, a doubled font scale, and RTL
- * with a long sender name. The dialog content is captured directly (the dialog
- * wrapper renders in its own window, which this harness can't capture).
+ * with a long sender name. Captures the actual Material dialog window.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -43,21 +42,20 @@ class MessageDeleteDialogScreenshotTest {
         mine: Boolean,
         senderDisplayName: String = "Member",
     ) {
-        Surface {
-            MessageDeleteDialogContent(
-                capability = capability,
-                mine = mine,
-                senderDisplayName = senderDisplayName,
-                deleteInFlight = false,
-                onDeleteForEveryone = {},
-                onDeleteForMe = {},
-                onCancel = {},
-            )
-        }
+        MessageDeleteDialog(
+            capability = capability,
+            mine = mine,
+            senderDisplayName = senderDisplayName,
+            deleteInFlight = false,
+            onDeleteForEveryone = {},
+            onDeleteForMe = {},
+            onDismissRequest = {},
+        )
     }
 
     private fun capture(name: String) {
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
     }
 
     @Test
@@ -108,17 +106,15 @@ class MessageDeleteDialogScreenshotTest {
 
     @Test
     fun largeFontScaleKeepsChoicesReadable() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                val base = LocalDensity.current
-                CompositionLocalProvider(
-                    LocalDensity provides Density(base.density, fontScale = 2f),
-                ) {
-                    DialogVariant(capability = bothScopes, mine = true)
-                }
+        RuntimeEnvironment.setFontScale(2f)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) { DialogVariant(capability = bothScopes, mine = true) }
             }
+            capture("message_delete_dialog_font_scale_2x_light")
+        } finally {
+            RuntimeEnvironment.setFontScale(1f)
         }
-        capture("message_delete_dialog_font_scale_2x_light")
     }
 
     @Test
@@ -135,5 +131,22 @@ class MessageDeleteDialogScreenshotTest {
             }
         }
         capture("message_delete_dialog_rtl_long_name_light")
+    }
+
+    @Test
+    fun batchMixedLight() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                BatchMessageDeleteDialog(
+                    selectedCount = 3,
+                    breakdown = BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 1),
+                    deleteInFlight = false,
+                    onDeleteForEveryone = {},
+                    onDeleteForMe = {},
+                    onDismissRequest = {},
+                )
+            }
+        }
+        capture("message_delete_dialog_batch_mixed_light")
     }
 }

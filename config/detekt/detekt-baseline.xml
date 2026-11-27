@@ -181,8 +181,6 @@
     <ID>FunctionNaming:MessageBubbleSelection.kt:@Composable internal fun BoxScope.MessageBubbleSelectionTapTarget</ID>
     <ID>FunctionNaming:MessageBubbleSelection.kt:@Composable internal fun MessageBubbleSelectionGutter</ID>
     <ID>FunctionNaming:MessageBubbleStatus.kt:@Composable internal fun OutgoingMessageStatusIcon</ID>
-    <ID>FunctionNaming:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
-    <ID>FunctionNaming:MessageDeleteDialog.kt:@Composable internal fun MessageDeleteDialogContent</ID>
     <ID>FunctionNaming:MessageDeleteDialog.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun BatchMessageDeleteDialog</ID>
     <ID>FunctionNaming:MessageDeleteDialog.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun MessageDeleteDialog</ID>
     <ID>FunctionNaming:MessageSelectionBar.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun MessageSelectionBar</ID>
@@ -274,8 +272,6 @@
     <ID>LongMethod:MediaViewerPage.kt:@Composable internal fun ViewerPage</ID>
     <ID>LongMethod:MediaVoice.kt:@Composable internal fun MediaVoiceBubble</ID>
     <ID>LongMethod:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
-    <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
-    <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun MessageDeleteDialogContent</ID>
     <ID>LongMethod:NotificationPushWakeDrainCoverageTest.kt:NotificationPushWakeDrainCoverageTest$private fun String.kotlinBlockFrom: String</ID>
     <ID>LongMethod:NotificationReplyWorker.kt:NotificationReplyWorker$override suspend fun doWork: Result</ID>
     <ID>LongMethod:NotificationStreamForegroundService.kt:NotificationStreamForegroundService$override fun onStartCommand: Int</ID>

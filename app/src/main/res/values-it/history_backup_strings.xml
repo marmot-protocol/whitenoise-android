@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Backup della cronologia</string>
-    <string name="explanation_organize_hub_history_backups">Conserva una copia crittografata della cronologia delle chat, sbloccata dalle parole di recupero, per ripristinarla su una nuova installazione.</string>
+    <string name="explanation_organize_hub_history_backups">Salva online la cronologia crittografata e ripristina i messaggi delle chat in cui sei presente su questo dispositivo.</string>
+    <string name="history_backups_storage">White Noise salva la cronologia crittografata delle chat su server di file online (server Blossom). I tuoi relay Nostr conservano un record crittografato che l’app usa per trovare i tuoi backup.</string>
+    <string name="history_backups_restore_scope">Puoi ripristinare i messaggi solo nelle chat in cui sei ancora presente su questo dispositivo. Se perdi l’accesso a un gruppo, chiedi a chi può invitarti di aggiungerti di nuovo.</string>
     <string name="history_backups_status">Backup</string>
     <string name="history_backups_status_loading">Verifica in corso…</string>
     <string name="history_backups_status_unavailable">Non ancora disponibile</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Digita la parola %1$d e la parola %2$d dal tuo elenco. Se non le hai annotate, annulla e ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_word_label">Parola %1$d</string>
     <string name="history_backups_restore_words">Parole di recupero</string>
-    <string name="history_backups_restore_words_help">Inserisci tutte le 12 parole, separate da spazi.</string>
+    <string name="history_backups_restore_words_help">Prima entra nelle chat su questo dispositivo. Poi inserisci tutte le 12 parole, separate da spazi.</string>
     <string name="history_backups_restore">Ripristina cronologia</string>
     <string name="history_backups_restoring">Avvio del ripristino</string>
     <string name="history_backups_cancel_restore">Annulla ripristino</string>

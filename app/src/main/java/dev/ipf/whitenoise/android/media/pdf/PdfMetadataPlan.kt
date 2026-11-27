@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.media.pdf
 
+private const val MAX_PDF_EDIT_BYTES = 32 * 1024 * 1024
+
 /** Kinds of identifying metadata a PDF can carry, as people would describe them. */
 internal enum class PdfMetadataField {
     /** `/Author`. */
@@ -44,6 +46,7 @@ internal class PdfEdit(
 
 /** The edits that remove one PDF's metadata, what they remove, or why it must stay. */
 internal class PdfMetadataPlan {
+    private var editBytes = 0
     val edits = mutableListOf<PdfEdit>()
     val fields = mutableSetOf<PdfMetadataField>()
     var refusal: PdfMetadataRefusal? = null
@@ -57,6 +60,8 @@ internal class PdfMetadataPlan {
         position: Int,
         bytes: ByteArray,
     ) {
+        if (bytes.size > MAX_PDF_EDIT_BYTES - editBytes) throw PdfLimitException()
+        editBytes += bytes.size
         edits += PdfEdit(position, bytes)
     }
 

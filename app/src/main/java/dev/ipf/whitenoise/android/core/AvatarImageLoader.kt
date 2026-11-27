@@ -734,10 +734,7 @@ object AvatarImageLoader {
     ): android.graphics.Bitmap? {
         if (variant == ProfileImageVariant.AVATAR) AvatarCacheDiagnostics.decode(AvatarCacheKind.PROFILE)
         return dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope.within(domain) {
-            val info =
-                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                    .inspect(bytes) ?: return@within null
-            val target = boundedDecodeDimension(info.width, info.height, maxDimension)
+            val target = profileImageDecodeTarget(bytes, maxDimension) ?: return@within null
             dev.ipf.whitenoise.android.media.MediaPipeline
                 .decodeSampledBitmap(bytes, target)
         }

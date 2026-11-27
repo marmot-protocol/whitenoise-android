@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.state.FfiChatListWindowHandle
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CancellationException
@@ -147,7 +148,10 @@ internal object ConversationWidgets {
                     DEFAULT_WIDGET_HEIGHT_DP,
                 )
             val rows = selectConversationWidgetRows(choice, accounts, true, result, height / WIDGET_ROW_HEIGHT_DP)
-            refresh.manager.updateAppWidget(id, conversationWidgetViews(context, id, rows, choice))
+            context.prepareEmojiLabels(rows.map { it.title })
+            if (refreshCurrent(id, choice, refresh)) {
+                refresh.manager.updateAppWidget(id, conversationWidgetViews(context, id, rows, choice))
+            }
         }
     }
 

@@ -69,3 +69,21 @@ private fun composerPdfDecisionReason(decision: ComposerPdfDecision): String {
         else -> stringResource(R.string.composer_pdf_metadata_dialog_unsupported, name)
     }
 }
+
+/** Per-attachment choice for a PDF that can be prepared. */
+@Composable
+internal fun ComposerPdfMetadataOptions(
+    label: String,
+    keepsMetadata: Boolean,
+    onChange: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val action = if (keepsMetadata) R.string.composer_pdf_remove_metadata else R.string.composer_pdf_keep_metadata
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.composer_pdf_metadata_options)) },
+        text = { Text(stringResource(R.string.composer_pdf_metadata_options_body, label)) },
+        confirmButton = { TextButton(onClick = onChange) { Text(stringResource(action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}

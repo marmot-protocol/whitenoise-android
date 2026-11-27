@@ -2890,4 +2890,5 @@
     <string name="remote_signer_switcher_attention">Signier-App benötigt deine Aufmerksamkeit</string>
     <string name="dictation_transcribe_voice_messages_title">Sprachnachrichten automatisch transkribieren</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Zeigt Transkripte heruntergeladener Sprachnachrichten beim Lesen des Chats an. Offline Speech to Text ist erforderlich.</string>
+    <string name="toast_unsupported_link">Dieser Link wird nicht unterstützt.</string>
 </resources>

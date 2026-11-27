@@ -2878,4 +2878,5 @@
     <string name="remote_signer_switcher_attention">L’app di firma remota richiede attenzione</string>
     <string name="dictation_transcribe_voice_messages_title">Trascrivi automaticamente i messaggi vocali</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Mostra nella conversazione le trascrizioni dei messaggi vocali scaricati. Richiede Offline Speech to Text.</string>
+    <string name="toast_unsupported_link">Questo link non è supportato.</string>
 </resources>

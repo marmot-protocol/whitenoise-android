@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,10 +26,9 @@ import org.junit.Test
  * surfaced that first failure as a hard, user-visible "send failed" instead of
  * giving the pool a brief window to (re)connect and retrying.
  *
- * Foreground conversation sends stay pending and retry with capped backoff;
- * bounded background operations use [SEND_RETRY_ATTEMPTS]. Both policies apply
- * ONLY to failures [isTransientRelaySendError] classifies as *connect-phase*
- * connectivity — the cases that prove the event never reached a relay.
+ * Foreground conversation sends stay pending and retry with capped backoff.
+ * By default [isTransientRelaySendError] admits only connect-phase failures
+ * that prove the event never reached a relay.
  *
  * IDEMPOTENCY CONTRACT (adversarial review of PR #299): the retry re-enters the
  * high-level FFI send (`sendText`/`replyToMessage`), and the Marmot runtime
@@ -42,67 +40,6 @@ import org.junit.Test
  * are not.
  */
 class TransientRelaySendErrorTest {
-    @Test
-    fun sharedSendPolicyRetriesAConnectGapThenReturnsSuccess() =
-        runTest {
-            var attempts = 0
-
-            val result =
-                retryTransientRelaySend { attempt ->
-                    attempts = attempt
-                    if (attempt == 1) throw MarmotKitException.Publish("connect relay failed")
-                    "sent"
-                }
-
-            assertEquals("sent", result)
-            assertEquals(2, attempts)
-        }
-
-    @Test
-    fun sharedSendPolicyExhaustsTheBoundedConnectRetryBudget() =
-        runTest {
-            var attempts = 0
-
-            val failure =
-                runCatching {
-                    retryTransientRelaySend { attempt ->
-                        attempts = attempt
-                        throw MarmotKitException.Publish("connection refused")
-                    }
-                }.exceptionOrNull()
-
-            assertTrue(failure is MarmotKitException.Publish)
-            assertEquals(SEND_RETRY_ATTEMPTS, attempts)
-        }
-
-    @Test
-    fun sharedSendPolicyNeverRetriesAmbiguousOrCancelledSends() =
-        runTest {
-            var ambiguousAttempts = 0
-            val ambiguous =
-                runCatching {
-                    retryTransientRelaySend {
-                        ambiguousAttempts += 1
-                        throw MarmotKitException.Publish("send event timed out")
-                    }
-                }.exceptionOrNull()
-
-            assertTrue(ambiguous is MarmotKitException.Publish)
-            assertEquals(1, ambiguousAttempts)
-
-            var cancelledAttempts = 0
-            val cancellation =
-                runCatching {
-                    retryTransientRelaySend {
-                        cancelledAttempts += 1
-                        throw CancellationException("conversation closed")
-                    }
-                }.exceptionOrNull()
-
-            assertTrue(cancellation is CancellationException)
-            assertEquals(1, cancelledAttempts)
-        }
-
     // ---- Retryable: connect-phase, event provably never sent -------------
 
     @Test
@@ -279,10 +216,7 @@ class TransientRelaySendErrorTest {
     }
 
     @Test
-    fun retryBudgetIsBoundedAndPositive() {
-        // A misconfigured budget would either never retry (defeats the fix) or
-        // retry unboundedly (hangs the send coroutine). Pin the invariant.
-        assertTrue(SEND_RETRY_ATTEMPTS in 2..6)
+    fun pendingSendStartsWithAShortPositiveBackoff() {
         assertTrue(SEND_RETRY_BACKOFF_MS in 100L..3_000L)
     }
 

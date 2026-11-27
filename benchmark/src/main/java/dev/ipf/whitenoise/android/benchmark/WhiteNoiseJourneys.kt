@@ -73,8 +73,7 @@ internal class WhiteNoiseJourneys {
      * has already validated the fixture outside the measured trace.
      *
      * Macrobenchmark's cold-start wrapper force-stops the target between setup
-     * and measurement. Waiting for a test selector here would make that
-     * selector part of the measured journey and can outlive the startup metric.
+     * and measurement. The caller separately checks the useful local surface.
      */
     fun MacrobenchmarkScope.launchForStartupMeasurement() {
         startActivityAndWait()
@@ -195,9 +194,16 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.OPEN_GROUP_DETAILS)
     }
 
-    /** Requires a known persisted row on the useful list, excluding loading, recovery and false-empty checkpoints. */
+    /** Observes the measured launch without restarting an interrupted target. */
+    fun requireStartupChatList() {
+        checkNotNull(findVisibleTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)) {
+            "The chat list did not become visible after the measured launch."
+        }
+    }
+
+    /** Requires a known persisted row on the useful list, excluding loading and false-empty checkpoints. */
     fun requirePopulatedLocalList(groupName: String) {
-        waitForUsefulSurface(BenchmarkUsefulSurface.ChatList)
+        requireStartupChatList()
         checkNotNull(
             device.onElementOrNull(timeoutMs = STARTUP_TIMEOUT_MS) {
                 textAsString() == groupName && isVisibleOnDisplay()

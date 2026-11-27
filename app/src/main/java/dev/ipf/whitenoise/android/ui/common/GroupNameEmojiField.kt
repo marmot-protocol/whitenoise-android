@@ -30,6 +30,7 @@ internal fun GroupNameEmojiField(
         lineLimits = TextFieldLineLimits.SingleLine,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         enabled = enabled,
+        emojiArtwork = true,
         leadingIcon = {
             TextEntryEmojiAction(
                 pickerOpen = emojiPickerOpen,

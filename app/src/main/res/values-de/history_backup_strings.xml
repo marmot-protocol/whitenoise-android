@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Verlaufssicherungen</string>
-    <string name="explanation_organize_hub_history_backups">Bewahre eine verschlüsselte Kopie deines Chatverlaufs auf, die mit Wiederherstellungswörtern entsperrt wird, damit du ihn bei einer Neuinstallation wiederherstellen kannst.</string>
+    <string name="explanation_organize_hub_history_backups">Speichere deinen Chatverlauf verschlüsselt online und stelle Nachrichten aus Chats wieder her, in denen du auf diesem Gerät Mitglied bist.</string>
+    <string name="history_backups_storage">White Noise speichert deinen Chatverlauf verschlüsselt auf Online-Dateiservern (Blossom-Servern). Auf deinen Nostr-Relays liegt ein verschlüsselter Eintrag, mit dem die App deine Sicherungen findet.</string>
+    <string name="history_backups_restore_scope">Du kannst Nachrichten nur in Chats wiederherstellen, in denen du auf diesem Gerät aktuell Mitglied bist. Wenn du den Zugang zu einer Gruppe verlierst, bitte jemanden mit Einladungsrechten, dich erneut hinzuzufügen.</string>
     <string name="history_backups_status">Sicherungen</string>
     <string name="history_backups_status_loading">Wird geprüft…</string>
     <string name="history_backups_status_unavailable">Noch nicht verfügbar</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Gib Wort %1$d und Wort %2$d aus deiner Liste ein. Falls du sie nicht aufgeschrieben hast, brich ab und beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_word_label">Wort %1$d</string>
     <string name="history_backups_restore_words">Wiederherstellungswörter</string>
-    <string name="history_backups_restore_words_help">Gib alle 12 Wörter durch Leerzeichen getrennt ein.</string>
+    <string name="history_backups_restore_words_help">Tritt den Chats zuerst auf diesem Gerät bei. Gib dann alle 12 Wörter durch Leerzeichen getrennt ein.</string>
     <string name="history_backups_restore">Verlauf wiederherstellen</string>
     <string name="history_backups_restoring">Wiederherstellung startet</string>
     <string name="history_backups_cancel_restore">Wiederherstellung abbrechen</string>

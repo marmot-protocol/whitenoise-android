@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -128,13 +129,11 @@ class PollScreenshotTest {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
                     PollCreateForm(
-                        question = "Where should we meet?",
-                        options = listOf("Coffee shop", "Library"),
+                        question = TextFieldState("Where should we meet?"),
+                        options = listOf("Coffee shop", "Library").map { TextFieldState(it) },
                         multiple = false,
                         deadlineSelection = PollDeadlineSelection(presetSeconds = POLL_FIVE_MINUTES_SECONDS),
                         enabled = true,
-                        onQuestionChange = {},
-                        onOptionChange = { _, _ -> },
                         onRemoveOption = {},
                         onAddOption = {},
                         onMultipleChange = {},
@@ -220,14 +219,12 @@ class PollScreenshotTest {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
                     PollCreateForm(
-                        question = "Where should we meet?",
-                        options = listOf("Cafe", "café"),
+                        question = TextFieldState("Where should we meet?"),
+                        options = listOf("Cafe", "café").map { TextFieldState(it) },
                         multiple = false,
                         deadlineSelection = PollDeadlineSelection(),
                         enabled = true,
                         issue = PollDraftIssue.DUPLICATE_OPTION,
-                        onQuestionChange = {},
-                        onOptionChange = { _, _ -> },
                         onRemoveOption = {},
                         onAddOption = {},
                         onMultipleChange = {},
@@ -251,13 +248,11 @@ class PollScreenshotTest {
                 ) {
                     Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
                         PollCreateForm(
-                            question = "Where should we meet?",
-                            options = listOf("Coffee shop", "Library"),
+                            question = TextFieldState("Where should we meet?"),
+                            options = listOf("Coffee shop", "Library").map { TextFieldState(it) },
                             multiple = true,
                             deadlineSelection = PollDeadlineSelection(),
                             enabled = true,
-                            onQuestionChange = {},
-                            onOptionChange = { _, _ -> },
                             onRemoveOption = {},
                             onAddOption = {},
                             onMultipleChange = {},
@@ -282,8 +277,8 @@ class PollScreenshotTest {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
                     PollCreateForm(
-                        question = "Where should we meet?",
-                        options = listOf("Coffee shop", "Library"),
+                        question = TextFieldState("Where should we meet?"),
+                        options = listOf("Coffee shop", "Library").map { TextFieldState(it) },
                         multiple = false,
                         deadlineSelection =
                             PollDeadlineSelection(
@@ -292,8 +287,6 @@ class PollScreenshotTest {
                                 customUnit = PollDurationUnit.HOURS,
                             ),
                         enabled = true,
-                        onQuestionChange = {},
-                        onOptionChange = { _, _ -> },
                         onRemoveOption = {},
                         onAddOption = {},
                         onMultipleChange = {},
@@ -316,8 +309,8 @@ class PollScreenshotTest {
                 ) {
                     Surface(Modifier.width(320.dp).testTag("poll-create-form")) {
                         PollCreateForm(
-                            question = "Where should we meet?",
-                            options = listOf("Coffee shop", "Library"),
+                            question = TextFieldState("Where should we meet?"),
+                            options = listOf("Coffee shop", "Library").map { TextFieldState(it) },
                             multiple = false,
                             deadlineSelection =
                                 PollDeadlineSelection(
@@ -327,8 +320,6 @@ class PollScreenshotTest {
                                 ),
                             enabled = true,
                             deadlineIssue = PollDeadlineIssue.TOO_LONG,
-                            onQuestionChange = {},
-                            onOptionChange = { _, _ -> },
                             onRemoveOption = {},
                             onAddOption = {},
                             onMultipleChange = {},

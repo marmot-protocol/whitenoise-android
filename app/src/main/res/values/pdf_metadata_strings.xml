@@ -6,6 +6,10 @@
         <item quantity="other">PDF · %d pages</item>
     </plurals>
     <!-- Composer card states for the PDF's hidden document details: author, apps, dates and similar. -->
+    <string name="composer_pdf_metadata_options">PDF metadata options</string>
+    <string name="composer_pdf_keep_metadata">Keep metadata</string>
+    <string name="composer_pdf_remove_metadata">Remove metadata</string>
+    <string name="composer_pdf_metadata_options_body">Recipients can read the author, dates, and other properties in the original copy of %1$s.</string>
     <string name="composer_pdf_metadata_removed">Metadata removed</string>
     <string name="composer_pdf_metadata_removed_on_send">Metadata removed on send</string>
     <string name="composer_pdf_metadata_signed">Signed: metadata stays</string>

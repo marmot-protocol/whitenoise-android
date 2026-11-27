@@ -517,6 +517,15 @@ ANDROID_SERIAL=<device-serial> \
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
+For startup scoring, set `STARTUP_GROUP_NAME` to a fixture group visible without
+scrolling after a fresh launcher start. The cold Macrobenchmarks record both the platform's
+first draw and the launch-to-visible-row checkpoint
+(`startupLocalCheckpointMs`). The checkpoint includes accessibility observation
+overhead and validates the named row. Without that startup-specific argument the cold
+benchmark only checks that the chat-list action is visible. Inspect Perfetto for
+work that overlaps, including the first local chat-list and profile reads.
+Overlapping phase durations cannot be added to estimate startup time.
+
 The script builds the normal dev and release-like APKs, replaces the dev app in
 place, invokes only the startup and group-open before/after methods, and pulls
 JSON plus Perfetto output into `benchmark/build/outputs/manual/`. Its exit trap
@@ -584,6 +593,42 @@ attribution: the operating system and radio transition are part of the sample.
 Compare repeated runs on the same device, build, fixture, brightness, battery,
 network, and thermal state. Do not compare absolute values across devices, and
 do not set a fleet-wide threshold until representative baselines exist.
+
+#### Local-first responsiveness comparison
+
+Use one physical device, one synthetic account and the same fixture for both
+revisions. Keep the Android build variant, compilation mode, theme, window
+size, font scale, refresh rate and network state fixed. Put a DM and an
+encrypted group with distinct, previously downloaded pictures at the top of
+the list. Give each a recognizable title and last message. Include an
+image-free chat and a genuinely missing picture to exercise valid fallbacks.
+Repeat with a large account and use the same target group in every run.
+
+Compare force-stop cold startup, ordinary process death, warm resume and opening
+a visible conversation. Use the populated offline test above to verify that a
+retained row opens before a relay is reachable. Repeat online with pending
+catch-up so that contention is represented. Keep single-pane and expanded
+layouts in separate measurements. Alternate baseline and candidate in blocks
+of ten launches and retain raw samples, p50 and p90. Use the same compilation
+mode for each comparison and record the APK digest, MDK revision and device
+build. Treat package replacement as a distinct journey.
+
+Inspect frames in a separate visual pass. Use a fixed camera or screen
+recording at the highest available frame rate, with the settled offline
+screen as a reference. Inspect the first app surface after the system splash
+and the first frame containing the fixture rows. Record intermediate startup
+or recovery screens, the visible titles and previews, and whether each of the
+two locally stored pictures is already present. Check the same properties
+on first conversation entry, after Back, and after account switch. Use an
+account with different pictures to detect stale pixels crossing accounts.
+Accessibility timing and the startup log cannot prove which pixels were drawn.
+
+Accept a change only when the useful screen keeps the right local data and
+pictures, or uses the expected fallback for absent data, and the measured gain
+repeats across blocks. Track startup surfaces and avatar misses per journey
+alongside the latency distributions. Use frame overrun and transcript-open
+latency to detect work shifted into the user's first interaction. Preserve
+app-lock, onboarding and startup error coverage as separate fixture cases.
 
 ### Idle background-delivery baselines and push-burst power
 

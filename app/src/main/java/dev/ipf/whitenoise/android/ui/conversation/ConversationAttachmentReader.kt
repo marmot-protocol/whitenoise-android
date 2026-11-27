@@ -35,21 +35,6 @@ import kotlinx.coroutines.withContext
 private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 private const val VIDEO_FALLBACK_NAME = "video.mp4"
 
-internal data class DocumentReadOutcome(
-    val attachments: List<PendingAttachment>,
-    val failures: Set<DocumentReadFailure>,
-    val albumOverflowed: Boolean,
-    val totalBytes: Long,
-)
-
-/** The visual album read for one send. [videoMetadataRefused] reports a video refused for its private metadata. */
-internal data class VisualReadOutcome(
-    val attachments: List<PendingAttachment>,
-    val albumOverflowed: Boolean,
-    val storageUnavailable: Boolean = false,
-    val videoMetadataRefused: Boolean = false,
-)
-
 /**
  * Reads picks for a send. [fileBackedLimits] and [usableSpace] are the native file-upload bounds and the
  * free space of a staging directory, both replaceable so tests can script them.
@@ -217,19 +202,6 @@ internal class ConversationAttachmentReader(
     //
     // Any reject surfaces a single user-visible toast; the rest of the album
     // continues. If NOTHING survives the gates we bail without an empty send.
-    // Decoded outcome of the document read pass, surfaced so the unified
-    // sendStagedAttachments path can blend its results with the image decode.
-    private data class DocumentReadAccumulator(
-        val attachments: MutableList<PendingAttachment> = mutableListOf(),
-        val failures: MutableSet<DocumentReadFailure> = mutableSetOf(),
-        var albumOverflowed: Boolean = false,
-        var totalBytes: Long = 0L,
-        val checkCancellation: () -> Unit = {},
-        val staging: FileBackedSendStaging = FileBackedSendStaging(),
-    ) {
-        /** Freezes this pass into the result callers blend with the image decode. */
-        fun outcome(): DocumentReadOutcome = DocumentReadOutcome(attachments, failures, albumOverflowed, totalBytes)
-    }
 
     /**
      * Reads document picks against the in-memory [bytesBudget]. With [allowFileBacked], a non-image
@@ -246,6 +218,7 @@ internal class ConversationAttachmentReader(
         staging: FileBackedSendStaging = FileBackedSendStaging(),
         pickKey: (String) -> String = { it },
         ownedMime: Map<android.net.Uri, String> = emptyMap(),
+        keepPdfMetadata: Set<android.net.Uri> = emptySet(),
     ): DocumentReadOutcome =
         withContext(Dispatchers.IO) {
             val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, staging = staging)
@@ -254,7 +227,15 @@ internal class ConversationAttachmentReader(
                     state.albumOverflowed = true
                     break
                 }
-                readPickedDocument(uri, bytesBudget, state, allowFileBacked, pickKey(uri.toString()), ownedMime[uri])
+                readPickedDocument(
+                    uri,
+                    bytesBudget,
+                    state,
+                    allowFileBacked,
+                    pickKey(uri.toString()),
+                    ownedMime[uri],
+                    uri in keepPdfMetadata,
+                )
             }
             state.outcome()
         }
@@ -268,6 +249,7 @@ internal class ConversationAttachmentReader(
         allowFileBacked: Boolean,
         pick: String,
         ownedMime: String?,
+        keepPdfMetadata: Boolean,
     ) {
         val resolvedMime = normalizeDocumentMime(ownedMime ?: safeGetType(context.contentResolver, uri))
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
@@ -275,7 +257,7 @@ internal class ConversationAttachmentReader(
         if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
             readSanitizedImageDocument(uri, remainingBytes, state, pick)
         } else {
-            readRawDocument(uri, resolvedMime, remainingBytes, state, allowFileBacked)
+            readRawDocument(uri, resolvedMime, remainingBytes, state, allowFileBacked, keepPdfMetadata)
         }
     }
 
@@ -312,11 +294,12 @@ internal class ConversationAttachmentReader(
         remainingBytes: Long,
         state: DocumentReadAccumulator,
         allowFileBacked: Boolean,
+        keepPdfMetadata: Boolean,
     ) {
         val declaredSize = queryContentSize(context.contentResolver, uri)
         val inMemoryCap = minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingBytes)
         if (allowFileBacked && (inMemoryCap <= 0L || declaredSize > inMemoryCap)) {
-            readFileBackedDocument(uri, mediaType, declaredSize, state)
+            readFileBackedDocument(uri, mediaType, declaredSize, state, keepPdfMetadata)
         } else if (declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
             state.failures += DocumentReadFailure.TOO_LARGE
         } else {
@@ -327,7 +310,7 @@ internal class ConversationAttachmentReader(
             when (val read = readBoundedDocument(perFileCap) { context.contentResolver.openInputStream(uri) }) {
                 BoundedDocumentRead.TooLarge -> {
                     if (allowFileBacked) {
-                        readFileBackedDocument(uri, mediaType, declaredSize = -1L, state)
+                        readFileBackedDocument(uri, mediaType, declaredSize = -1L, state, keepPdfMetadata)
                     } else if (remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES) {
                         state.albumOverflowed = true
                     } else {
@@ -339,7 +322,7 @@ internal class ConversationAttachmentReader(
                 // Content decides: a video container or a PDF loses its private metadata in place first, an
                 // uncleanable video reported as video is refused, and every other document stays byte-for-byte.
                 is BoundedDocumentRead.Success ->
-                    if (!removeDocumentMetadataInPlace(mediaType, read.bytes)) {
+                    if (!removeDocumentMetadataInPlace(mediaType, read.bytes, keepPdfMetadata)) {
                         state.failures += DocumentReadFailure.VIDEO_METADATA
                     } else {
                         state.totalBytes += read.bytes.size
@@ -365,6 +348,7 @@ internal class ConversationAttachmentReader(
         mediaType: String,
         declaredSize: Long,
         state: DocumentReadAccumulator,
+        keepPdfMetadata: Boolean,
     ) {
         val budget = fileBackedBudget(state.staging)
         var metadataRemoved = true
@@ -372,7 +356,9 @@ internal class ConversationAttachmentReader(
             budget?.stage(
                 declaredSize,
                 state.checkCancellation,
-                accept = { source -> source.removeDocumentMetadata(mediaType).also { metadataRemoved = it } },
+                accept = { source ->
+                    source.removeDocumentMetadata(mediaType, keepPdfMetadata).also { metadataRemoved = it }
+                },
             ) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {
@@ -466,7 +452,10 @@ internal class ConversationAttachmentReader(
         toFile: Boolean = false,
     ): PendingAttachment? =
         ownedDraftRead { staging ->
-            readPickedDocuments(listOf(uri), allowFileBacked = toFile, staging = staging).attachments.singleOrNull()
+            // Preserve the source for the per-file choice; the sender applies the PDF policy at upload.
+            readPickedDocuments(listOf(uri), allowFileBacked = toFile, staging = staging, keepPdfMetadata = setOf(uri))
+                .attachments
+                .singleOrNull()
         }
 
     /** Reads one image or video pick; only a video may be staged to a file, and only with [fileBacked]. */

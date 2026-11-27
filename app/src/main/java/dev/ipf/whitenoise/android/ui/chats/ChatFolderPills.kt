@@ -32,9 +32,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private const val FOLDER_HEADER_SCROLLED_THRESHOLD = 0.01f
@@ -162,11 +164,12 @@ internal fun ChatFolderPill(
     labelMaxWidth: Dp? = null,
 ) {
     val resources = LocalContext.current.resources
+    val spokenLabel = emojiPlainText(label)
     val description =
         if (unreadMessageCount != null) {
-            chatsPillAccessibleDescription(resources, label, unreadMessageCount)
+            chatsPillAccessibleDescription(resources, spokenLabel, unreadMessageCount)
         } else {
-            chatFolderChipAccessibleDescription(label, trailingCount)
+            chatFolderChipAccessibleDescription(spokenLabel, trailingCount)
         }
     val visibleCount =
         unreadMessageCount?.let(::chatsPillVisibleCount)
@@ -183,14 +186,17 @@ internal fun ChatFolderPill(
     )
 }
 
-/** Keeps destination filter labels in one bounded line while semantics expose their complete name. */
+/**
+ * Keeps destination filter labels in one bounded line while semantics expose their complete name. Custom emoji in the
+ * name draw as artwork, like Unicode emoji do.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun FolderPillLabel(
     label: String,
     maxWidth: Dp?,
 ) {
-    Text(
+    EmojiLabel(
         label,
         modifier = if (maxWidth == null) Modifier else Modifier.widthIn(max = maxWidth),
         maxLines = if (maxWidth == null) Int.MAX_VALUE else 1,

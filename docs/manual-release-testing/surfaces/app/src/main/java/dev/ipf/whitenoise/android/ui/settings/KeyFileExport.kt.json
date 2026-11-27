@@ -1,0 +1,44 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Key file export picker across App Lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+        "anchor": "fun rememberKeyFileExport(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "KeyFileExportEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+        "anchor": "fun KeyFileExportEffects(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "RetryKeyFileDelivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+        "anchor": "fun RetryKeyFileDelivery(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Key export file save runs off the main thread and keeps export locked until it ends",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyFileExport.kt",
+        "anchor": "fun saveExport(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

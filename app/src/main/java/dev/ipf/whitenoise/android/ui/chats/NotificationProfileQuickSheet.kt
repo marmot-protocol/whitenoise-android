@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationProfileDuration
 import dev.ipf.whitenoise.android.notifications.notificationProfileManualUntilMs
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
@@ -155,7 +156,7 @@ private fun ActiveProfileSummary(
             ).padding(top = WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        Text(notificationProfileActiveLabel(active, zone), style = MaterialTheme.typography.titleMedium)
+        EmojiLabel(notificationProfileActiveLabel(active, zone), style = MaterialTheme.typography.titleMedium)
         Text(
             notificationProfileActiveDetail(active.profile),
             style = MaterialTheme.typography.bodyMedium,
@@ -169,7 +170,7 @@ private fun ActiveProfileSummary(
                     .padding(
                         top = WhiteNoiseSpacing.Related,
                     ).testTag("notificationProfile.turnOff"),
-        ) { Text(stringResource(R.string.notification_profile_turn_off_named, active.profile.label)) }
+        ) { EmojiLabel(stringResource(R.string.notification_profile_turn_off_named, active.profile.label)) }
     }
 }
 

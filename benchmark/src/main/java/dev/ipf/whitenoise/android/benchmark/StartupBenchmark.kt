@@ -35,17 +35,28 @@ class StartupBenchmark {
 
     private fun measureStartup(compilationMode: CompilationMode) {
         val journeys = WhiteNoiseJourneys()
+        val groupName = BenchmarkConfig.startupGroupName
         benchmarkRule.measureRepeated(
             packageName = BenchmarkConfig.TARGET_PACKAGE,
-            metrics = startupMetrics(),
+            metrics = populatedStartupMetrics(),
             compilationMode = compilationMode,
             startupMode = StartupMode.COLD,
             iterations = 10,
             setupBlock = {
                 journeys.run { resumeToChatList() }
+                groupName?.let(journeys::requirePopulatedLocalList)
                 pressHome()
             },
-            measureBlock = { journeys.run { launchForStartupMeasurement() } },
+            measureBlock = {
+                tracedJourney(STARTUP_LOCAL_CHECKPOINT_TRACE) {
+                    journeys.run { launchForStartupMeasurement() }
+                    if (groupName == null) {
+                        journeys.requireStartupChatList()
+                    } else {
+                        journeys.requirePopulatedLocalList(groupName)
+                    }
+                }
+            },
         )
     }
 

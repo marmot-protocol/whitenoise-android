@@ -2,13 +2,13 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -205,7 +205,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoiceTranscripti
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
-import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
+import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteConfirmation
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlay
@@ -3056,6 +3056,7 @@ internal fun ConversationScreen(
         caption: String,
         onResult: (Boolean) -> Unit,
         onCaptionSettled: () -> Unit = {},
+        keepPdfMetadata: Set<Uri>,
     ) {
         attachmentSendClaim.send(
             onResult = onResult,
@@ -3086,6 +3087,7 @@ internal fun ConversationScreen(
                 caption,
                 preparedImageAttachments = mediaDraftState.preparedAttachments(),
                 preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
+                keepPdfMetadata = keepPdfMetadata,
                 onSettled = {
                     onCaptionSettled()
                     if (canSettle() && pendingMediaSlots == sendingMedia && pendingDocumentUris == sendingDocuments) {
@@ -3108,10 +3110,25 @@ internal fun ConversationScreen(
             )
         }
     }
+
     // Dictation's Send never sees the composer's staged attachments, so it asks the controller for this
     // same send. The updated reference keeps the registered sender on the newest media owner.
+    fun confirmAndSendStagedAttachments(
+        caption: String,
+        onResult: (Boolean) -> Unit,
+        onCaptionSettled: () -> Unit = {},
+    ) {
+        val documents = pendingDocumentUris
+        mediaSender.pdfChoices.confirmThen(documents, { onResult(false) }) { consent ->
+            if (pendingDocumentUris != documents) {
+                onResult(false)
+            } else {
+                sendStagedAttachmentsWithCaption(caption, onResult, onCaptionSettled, consent)
+            }
+        }
+    }
     val stagedAttachmentDispatch by rememberUpdatedState<(String, (Boolean) -> Unit) -> Unit> { caption, onResult ->
-        sendStagedAttachmentsWithCaption(caption, onResult)
+        confirmAndSendStagedAttachments(caption, onResult)
     }
     DisposableEffect(controller) {
         val sender =
@@ -3829,14 +3846,11 @@ internal fun ConversationScreen(
                                 null
                             },
                         onSendAttachments = { caption, onResult ->
-                            // PDFs whose metadata cannot be removed are sent as they are only once chosen (#3377).
-                            mediaSender.pdfChoices.confirmThen(pendingDocumentUris, { onResult(false) }) {
-                                sendStagedAttachmentsWithCaption(
-                                    caption,
-                                    onResult,
-                                    composerTextState.captureCaptionSettlement(),
-                                )
-                            }
+                            confirmAndSendStagedAttachments(
+                                caption,
+                                onResult,
+                                composerTextState.captureCaptionSettlement(),
+                            )
                         },
                         onAfterSend = {
                             acceptedSendRevealedTranscript = true
@@ -4057,11 +4071,11 @@ internal fun ConversationScreen(
                             )
                         renderedTimeline.isEmpty() &&
                             controller.conversationGroupRecoveryRowVisible() ->
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            EmptyConversationRecoveryContent(
+                                state = conversationEmptyState(controller.group.disappearingMessageSecs),
+                                modifier = Modifier.fillMaxSize().padding(bottom = overlayPadding),
+                            ) {
                                 ConversationGroupRecoveryCard(controller, appState)
-                                ConversationEmptyMessage(
-                                    conversationEmptyState(controller.group.disappearingMessageSecs),
-                                )
                             }
                         renderedTimeline.isEmpty() &&
                             controller.pendingMembershipActivity == null &&
@@ -4685,24 +4699,18 @@ internal fun ConversationScreen(
             )
         }
 
-        if (showBatchDeleteConfirm && batchSelectionUi.actionItems.isNotEmpty()) {
-            BatchMessageDeleteDialog(
+        if (showBatchDeleteConfirm) {
+            BatchMessageDeleteConfirmation(
                 selectedCount = batchSelectionUi.actionItems.size,
                 breakdown = batchSelectionUi.deleteBreakdown,
                 deleteInFlight = batchDeleteInFlight,
-                onDeleteForEveryone = {
+                onDelete = { scope ->
                     startBatchDelete(
-                        attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.EVERYONE),
+                        attempts = batchDeleteAttempts(batchSelectionUi.selections, scope),
                         priorRetryState = null,
                     )
                 },
-                onDeleteForMe = {
-                    startBatchDelete(
-                        attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.LOCAL_ONLY),
-                        priorRetryState = null,
-                    )
-                },
-                onDismissRequest = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
+                onDismiss = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
             )
         }
 

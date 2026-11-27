@@ -1405,7 +1405,8 @@ jobs:
       # app/build.gradle.kts, then publish the HTML/XML report. DevZapstoreDebug only; the
       # aggregate kover tasks pull in release variants, whose packaging trips the
       # unsigned-release guard (no signing in CI). Compilation and tests are excluded:
-      # the restored classes and shard reports are the inputs.
+      # the restored classes and shard reports are the inputs. --continue still writes
+      # both reports when a floor fails, so a failing run has a report to upload.
       - name: Coverage gate and report (Kover)
         if: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: >-
@@ -1414,7 +1415,7 @@ jobs:
           -x :app:testDevZapstoreDebugUnitTest -x :app:compileDevZapstoreDebugKotlin
           -x :app:compileDevZapstoreDebugJavaWithJavac
           -Pwhitenoise.koverShardReportsDir="$PWD/build/kover-shard-reports"
-          -Proborazzi.test.verify=true --profile --no-daemon --stacktrace
+          -Proborazzi.test.verify=true --continue --profile --no-daemon --stacktrace
 
       # Reuse the merged report; no extra Gradle invocation or tests.
       # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.

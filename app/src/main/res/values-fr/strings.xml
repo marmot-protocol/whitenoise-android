@@ -2878,4 +2878,5 @@
     <string name="remote_signer_switcher_attention">L’application de signature demande votre attention</string>
     <string name="dictation_transcribe_voice_messages_title">Transcrire automatiquement les messages vocaux</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Affiche les transcriptions des messages vocaux téléchargés dans la conversation. Nécessite Offline Speech to Text.</string>
+    <string name="toast_unsupported_link">Ce lien n’est pas pris en charge.</string>
 </resources>
