@@ -81,7 +81,9 @@ class AccountKeysAccessibilityAndroidTest {
             val event =
                 automation.executeAndWaitForEvent(
                     {
-                        composeRule.onNode(hasText(action) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+                        composeRule
+                            .onNode(hasText(action) and hasClickAction())
+                            .performSemanticsAction(SemanticsActions.OnClick)
                         // Let Compose process the warning while the native event listener is active.
                         composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
                     },
