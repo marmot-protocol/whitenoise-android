@@ -1,20 +1,20 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
+import dev.ipf.whitenoise.android.media.DisplayAvatarKey
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.durableAvatar
 import dev.ipf.whitenoise.android.state.isRenderable
+import dev.ipf.whitenoise.android.state.requestAvatars
 import dev.ipf.whitenoise.android.state.wantsAcquisition
-import kotlinx.coroutines.flow.first
 
 /**
  * The bytes MarmotKit already stores for [asset], decoded once and held in the shared avatar cache. The
@@ -28,48 +28,50 @@ import kotlinx.coroutines.flow.first
  * The decode runs in [domain]'s worker, or the domain the chat list names for this asset when null.
  */
 @Composable
+@Suppress("LongParameterList") // Presentation and cache ownership are explicit at this boundary.
 internal fun rememberDurableAvatar(
     appState: WhiteNoiseAppState,
     asset: AvatarAssetFfi?,
     accountRef: String? = appState.activeAccountRef,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
     seededImage: ImageBitmap? = null,
+    displayKey: DisplayAvatarKey? = null,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val cacheKey = accountRef?.let { ownedAsset?.takeIf { it.isRenderable() }?.cacheKey(it) }
-    val pins =
-        LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
-        }
+    val pins = ownedPreparedGroupAvatarPixels(appState, accountRef, lifetime)
+    val prepared = pins?.imageFor(ownedAsset, cacheKey)
     val displayed = remember(appState) { DisplayedAvatarPixels() }
     val owner = displayedAvatarOwner(ownedAsset, accountRef, appState.runtimeGeneration, lifetime)
     // The availability rides in the key so a `MISSING` asset with the same reference still re-runs the
     // acquisition request once the engine reports it.
     val loaded =
         key(appState, appState.runtimeGeneration, accountRef, lifetime, cacheKey, ownedAsset?.availability) {
-            produceState<ImageBitmap?>(
-                initialValue =
-                    cacheKey?.let { pins?.images?.get(it) ?: AvatarImageLoader.cachedImage(it) ?: seededImage },
-                ownedAsset?.target,
-                ownedAsset?.acquisition,
-            ) {
-                if (ownedAsset == null || (value != null && !ownedAsset.wantsAcquisition())) return@produceState
-                var completedRevision: Long? = null
-                AvatarLoadRecovery.revision.first { revision ->
-                    if (completedRevision != revision) {
-                        // A row that leaves the screen before its decode starts lets the decode be skipped.
-                        appState
-                            .durableAvatar(ownedAsset, accountRef, domain = domain, abandonable = true)
-                            ?.let { value = it }
-                        // A recovery during the read remains available for the next attempt.
-                        completedRevision = revision
-                    }
-                    value != null
+            val initial = prepared ?: cacheKey?.let { AvatarImageLoader.cachedImage(it) ?: seededImage }
+            val missing = ownedAsset?.takeIf { initial != null && it.wantsAcquisition() }
+            if (missing != null) {
+                LaunchedEffect(missing.target, missing.acquisition) {
+                    appState.requestAvatars(listOf(missing.target), accountRef)
                 }
-            }.value
+            }
+            key(ownedAsset?.target, ownedAsset?.acquisition) {
+                rememberRecoverableAvatar(
+                    initialImage = initial,
+                    enabled = ownedAsset != null,
+                    awaitCached = cacheKey?.let { candidate -> { AvatarImageLoader.awaitCached(candidate, lifetime) } },
+                ) {
+                    appState.durableAvatar(
+                        ownedAsset,
+                        accountRef,
+                        domain = domain,
+                        abandonable = true,
+                        displayKey = displayKey,
+                    )
+                }.value
+            }
         }
-    val exact = loaded ?: seededImage
+    val exact = loaded ?: prepared ?: seededImage
     val shown = exact ?: displayed.retainedFor(owner) ?: pins?.retainedFor(ownedAsset)
     SideEffect {
         displayed.owner = owner
@@ -78,6 +80,15 @@ internal fun rememberDurableAvatar(
         pins?.recordCompleted(ownedAsset, exact)
     }
     return shown
+}
+
+@Composable
+private fun ownedPreparedGroupAvatarPixels(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    lifetime: Long,
+) = LocalPreparedGroupAvatarPixels.current?.takeIf {
+    it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
 }
 
 /** Pixels a [rememberDurableAvatar] call site last committed, and the selection they were drawn for. */

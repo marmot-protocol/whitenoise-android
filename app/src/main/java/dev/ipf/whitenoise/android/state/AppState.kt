@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
 import dev.ipf.whitenoise.android.share.ShareInboundStager
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
@@ -691,6 +692,7 @@ class WhiteNoiseAppState private constructor(
     /** Encrypted retained originals, separate from the bounded display derivatives. */
     internal val diskMediaCache = createOriginalMediaCache(appContext, ::bumpMediaCacheRevision)
     internal val displayThumbnails = createDisplayThumbnailCache(appContext)
+    internal val displayAvatars = createDisplayAvatarCache(appContext)
 
     /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
     internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
@@ -2916,7 +2918,7 @@ class WhiteNoiseAppState private constructor(
             mutationsScope.launch {
                 runCatchingCancellable {
                     withContext(Dispatchers.IO) {
-                        shareShortcutPublisher.publish(
+                        shareShortcutPublisher.publishWithEmojiLabels(
                             accountRef,
                             chats,
                             {
@@ -3038,6 +3040,7 @@ class WhiteNoiseAppState private constructor(
         val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
         if (available && canRefreshApprovedPin(account, runtime)) {
             val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+            appContext.prepareEmojiLabels(listOf(title))
             val presentation = pinnedConversationPresentation(account, item, title)
             withContext(Dispatchers.IO) {
                 val tokens = PinnedConversationTokens.create(appContext)
@@ -3084,6 +3087,7 @@ class WhiteNoiseAppState private constructor(
                 item.group.groupIdHex.lowercase(Locale.ROOT) to
                     pinnedConversationPresentation(accountRef, item, chatListItemDisplayTitle(item, this, titleCopy))
             }
+        appContext.prepareEmojiLabels(presentations.values.map { it.title })
         withContext(Dispatchers.IO) {
             shortcuts.refresh(accountRef, presentations) {
                 isActive &&
@@ -4344,6 +4348,7 @@ class WhiteNoiseAppState private constructor(
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
+                scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }
@@ -5186,7 +5191,7 @@ class WhiteNoiseAppState private constructor(
         preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
-        wipeDecryptedMediaFromDisk()
+        wipeSignedOutMedia(account)
         notificationDelivery.settleFcmAfterSignOut(next, refreshed)
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
@@ -6132,6 +6137,7 @@ class WhiteNoiseAppState private constructor(
             refreshLocalNotificationPermission()
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
+            refillForegroundDisplayAvatars()
             notificationScope.launch { catchUpAfterForegroundActivation() }
             scheduleForegroundDisplayThumbnailReconciliation()
         }

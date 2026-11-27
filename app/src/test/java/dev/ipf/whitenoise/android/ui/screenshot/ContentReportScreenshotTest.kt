@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.View
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -91,7 +92,7 @@ class ContentReportScreenshotTest {
     fun reportFooterCompactLargeRtl() {
         val height = mutableStateOf(240.dp)
         val reason = mutableStateOf(ReportReasonFfi.SPAM)
-        val explanation = mutableStateOf("Evidence " + "long explanation ".repeat(30))
+        val explanation = TextFieldState("Evidence " + "long explanation ".repeat(30))
         val sending = mutableStateOf(false)
         val submitted = mutableListOf<Pair<ReportReasonFfi, String>>()
         composeRule.setContent {
@@ -101,8 +102,7 @@ class ContentReportScreenshotTest {
                         ReportMessageForm(
                             reason = reason.value,
                             onReasonChange = { reason.value = it },
-                            explanation = explanation.value,
-                            onExplanationChange = { explanation.value = it },
+                            explanation = explanation,
                             sending = sending.value,
                             onSubmit = { value, text -> submitted += value to text },
                         )
@@ -116,7 +116,7 @@ class ContentReportScreenshotTest {
             .onNodeWithTag("report.viewport")
             .captureRoboImage("src/test/snapshots/message_report_compact_dark_large_rtl.png")
         composeRule.onNodeWithTag("message.report.send").performClick()
-        assertEquals(listOf(ReportReasonFfi.SPAM to explanation.value.trim()), submitted)
+        assertEquals(listOf(ReportReasonFfi.SPAM to explanation.text.toString().trim()), submitted)
         composeRule.runOnIdle { sending.value = true }
         composeRule.onNodeWithTag("message.report.send").assertIsNotEnabled()
         composeRule.runOnIdle { height.value = 480.dp }
@@ -141,7 +141,7 @@ class ContentReportScreenshotTest {
             .onNodeWithTag("report.viewport")
             .captureRoboImage("src/test/snapshots/message_report_landscape_keyboard_large_rtl.png")
         composeRule.onNodeWithTag("message.report.send").performClick()
-        assertEquals(REPORT_REASONS.last() to explanation.value.trim(), submitted.last())
+        assertEquals(REPORT_REASONS.last() to explanation.text.toString().trim(), submitted.last())
     }
 
     /** Footer and scroll-body bounds are sampled from the production form after every viewport change. */

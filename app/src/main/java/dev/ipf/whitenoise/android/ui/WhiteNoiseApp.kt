@@ -94,9 +94,11 @@ import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.settings.DictationProviderChooser
+import dev.ipf.whitenoise.android.ui.settings.LocalKeyFileExportLauncher
 import dev.ipf.whitenoise.android.ui.settings.StartupUsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
+import dev.ipf.whitenoise.android.ui.settings.rememberKeyFileExport
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -444,29 +446,14 @@ internal fun WhiteNoiseApp(
                 chatTitle = { groupIdHex -> appState.activeAccountRef?.let { appState.chatTitle(it, groupIdHex) } },
             )
         }
-    LaunchedEffect(
+    InboundLinkEffect(
         inboundProfilePayload,
-        appState.phase,
-        appState.appLock.screenVisible,
-        appState.appLock.evaluationPending,
-    ) {
-        val payload = inboundProfilePayload ?: return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready) return@LaunchedEffect
-        val chatLink = ChatLink.parse(payload)
-        if (chatLink != ChatLinkParse.NotChatLink) {
-            // A chat link reads which accounts hold the chat and may say so; neither happens under app lock (#3658).
-            // A key change cancels this read, so a late result cannot act on a newer link or a locked app.
-            if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@LaunchedEffect
-            val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@LaunchedEffect
-            showChatLinkOutcome(outcome)
-            onProfilePayloadHandled(payload)
-            return@LaunchedEffect onChatLinkResolved(payload, (outcome as? ChatLinkOutcome.Open)?.target)
-        }
-        if (appState.presentProfilePayload(payload)) {
-            appState.recordProductObservation(ProductObservation.PROFILE_ENTRY, profileEntryTicket)
-            onProfilePayloadHandled(payload)
-        }
-    }
+        appState,
+        profileEntryTicket,
+        onProfilePayloadHandled,
+        onChatLinkResolved,
+        showChatLinkOutcome,
+    )
     chatLinkChoice?.takeUnless { appState.appLock.screenVisible }?.let { choice ->
         ChatLinkAccountChooserDialog(
             choice = choice,
@@ -537,6 +524,7 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
+            LocalKeyFileExportLauncher provides rememberKeyFileExport(appState),
             LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
             LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,

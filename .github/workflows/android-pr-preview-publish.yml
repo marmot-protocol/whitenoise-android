@@ -18,7 +18,9 @@ jobs:
       pull-requests: read
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'workflow_dispatch') &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.path == '.github/workflows/android-pr-apk.yml' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     outputs:
@@ -48,11 +50,18 @@ jobs:
         id: provenance
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
-          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BUILDER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          BUILDER_PATH: ${{ github.event.workflow_run.path }}
+          BUILDER_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
+          # Expression equality ignores case, and a tag can share the branch's name. Require the exact
+          # builder on master in bash, with its commit already on master.
+          [[ "$BUILDER_BRANCH" == master && "$BUILDER_PATH" == .github/workflows/android-pr-apk.yml ]]
+          master_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)
+          builder_on_master=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BUILDER_SHA}...${master_sha}" --jq .status)
+          [[ "$builder_on_master" == identical || "$builder_on_master" == ahead ]]
           provenance_value() {
             local file=$1 key=$2
             local value
@@ -72,9 +81,6 @@ jobs:
           fi
           [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
           [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
-          if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
-            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
-          fi
           current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
             --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
           expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")
@@ -137,8 +143,6 @@ jobs:
       - name: Verify candidate provenance and current PR
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
-          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -161,9 +165,6 @@ jobs:
           fi
           [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
           [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
-          if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
-            [[ "$stable_sha" == "$WORKFLOW_HEAD_SHA" ]]
-          fi
           current=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stable_pr}" \
             --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')
           expected=$(printf 'open\t%s\t%s' "$stable_sha" "$GITHUB_REPOSITORY")

@@ -890,9 +890,9 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # Four heavy Kotlin test compilations previously shared one compiler JVM.
-      # Each runner now owns one flavor and one active compiler task, using the
-      # existing configured heaps. Test execution remains in the full suites,
-      # where shard 0 still compiles androidTest sources.
+      # Each runner owns one flavor and one active compiler task. Give the Kotlin
+      # daemon room for test bytecode generation. Shard 0 still compiles
+      # androidTest sources when running the full suites.
       - name: Compile main and test source sets
         timeout-minutes: 25
         env:
@@ -911,7 +911,8 @@ jobs:
             )
           fi
           touch "$RUNNER_TEMP/compile-started"
-          ./gradlew "${tasks[@]}" --max-workers=1 --build-cache --profile --no-daemon --stacktrace
+          ./gradlew "${tasks[@]}" --max-workers=1 --build-cache --profile --no-daemon --stacktrace \
+            -Pkotlin.daemon.jvmargs=-Xmx5g
 
       # Only entries written by this compilation; the shards already restore the master cache.
       - name: Package new build-cache entries

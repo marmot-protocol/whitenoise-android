@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -86,14 +88,13 @@ internal fun composerPdfPrivacy(
     when (metadata) {
         null, PdfMetadataResult.NotPdf -> null
         PdfMetadataResult.Clean, is PdfMetadataResult.Scrubbed -> ComposerPdfPrivacy.Removed
-        // A draft saved before PDFs were cleaned still carries its metadata; the send cleans it first.
-        is PdfMetadataResult.Removable -> ComposerPdfPrivacy.RemovedOnSend
+        is PdfMetadataResult.Removable ->
+            if (keepsOriginal) ComposerPdfPrivacy.SendingAsIs else ComposerPdfPrivacy.RemovedOnSend
         is PdfMetadataResult.Refused ->
-            when {
-                keepsOriginal -> ComposerPdfPrivacy.SendingAsIs
-                metadata.reason == PdfMetadataRefusal.Signed -> ComposerPdfPrivacy.Signed
-                metadata.reason == PdfMetadataRefusal.Encrypted -> ComposerPdfPrivacy.Encrypted
-                else -> ComposerPdfPrivacy.Unsupported
+            when (metadata.reason) {
+                PdfMetadataRefusal.Signed -> ComposerPdfPrivacy.Signed
+                PdfMetadataRefusal.Encrypted -> ComposerPdfPrivacy.Encrypted
+                PdfMetadataRefusal.Unsupported -> ComposerPdfPrivacy.Unsupported
             }
     }
 
@@ -102,7 +103,7 @@ internal fun composerPdfPrivacy(
  * presentation; [ComposerPdfShelfItem] reads the PDF.
  */
 @Composable
-@Suppress("LongParameterList")
+@Suppress("LongMethod", "LongParameterList") // The card keeps its preview, status and two independent touch targets.
 internal fun ComposerPdfAttachmentCard(
     label: String,
     pages: Int?,
@@ -112,9 +113,12 @@ internal fun ComposerPdfAttachmentCard(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    onMetadataOptions: (() -> Unit)? = null,
 ) {
     val summary = composerPdfSummary(pages)
     val privacyText = privacy?.let { stringResource(it.labelRes) }
+    val compact = composerTextScale() >= COMPACT_FONT_SCALE
+    val optionsInset = if (onMetadataOptions == null) 0.dp else 48.dp
     val previewLabel = stringResource(R.string.composer_preview_attachment)
     val press = remember { MutableInteractionSource() }
     Surface(
@@ -130,21 +134,27 @@ internal fun ComposerPdfAttachmentCard(
     ) {
         Box(Modifier.pressFeedbackInsideClip(press)) {
             Row(
-                Modifier.fillMaxSize().padding(start = 10.dp, top = 8.dp, bottom = 8.dp, end = 40.dp),
+                Modifier.fillMaxSize().padding(
+                    start = 10.dp,
+                    top = 8.dp,
+                    bottom = 8.dp,
+                    end = if (compact) 40.dp + optionsInset else 40.dp,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ComposerPdfFirstPage(firstPage)
                 Spacer(Modifier.width(10.dp))
-                if (composerTextScale() >= COMPACT_FONT_SCALE) {
+                if (compact) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (privacy != null) ComposerPdfPrivacyIcon(privacy, Modifier.padding(end = 6.dp).size(20.dp))
                         ComposerPdfFilename(label)
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        ComposerPdfFilename(label)
+                        ComposerPdfFilename(label, Modifier.padding(end = optionsInset))
                         Text(
                             summary,
+                            modifier = Modifier.padding(end = optionsInset),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -153,6 +163,9 @@ internal fun ComposerPdfAttachmentCard(
                     }
                 }
             }
+            onMetadataOptions?.let { open ->
+                ComposerPdfOptionsButton(enabled, open, Modifier.align(Alignment.TopEnd).padding(end = 48.dp))
+            }
             ComposerAccessoryRemoveButton(
                 onClick = onRemove,
                 enabled = enabled,
@@ -160,6 +173,20 @@ internal fun ComposerPdfAttachmentCard(
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
+    }
+}
+
+@Composable
+private fun ComposerPdfOptionsButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+        Icon(
+            painterResource(R.drawable.ic_more_vert),
+            stringResource(R.string.composer_pdf_metadata_options),
+        )
     }
 }
 
@@ -196,10 +223,13 @@ private fun ComposerPdfFirstPage(firstPage: ImageBitmap?) {
 
 /** Filename direction remains LTR even in RTL chats so its extension stays at the physical suffix. */
 @Composable
-private fun ComposerPdfFilename(label: String) {
+private fun ComposerPdfFilename(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
     val (leading, suffix) = remember(label) { composerFilenameParts(label) }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Row {
+        Row(modifier) {
             if (leading.isNotEmpty()) {
                 Text(
                     leading,

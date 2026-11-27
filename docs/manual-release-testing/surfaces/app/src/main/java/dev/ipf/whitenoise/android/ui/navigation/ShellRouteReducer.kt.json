@@ -9,7 +9,7 @@
         "anchor": "private fun ownerReplacementKeepsRoute(",
         "test_ids": [
           "NTF-038",
-          "NAV-015"
+          "NAV-016"
         ]
       }
     ]

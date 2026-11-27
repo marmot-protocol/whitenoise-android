@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +32,10 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.core.formatIdentityMonogram
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.theme.AvatarPalette
 
@@ -147,14 +151,34 @@ private fun AvatarMonogram(
     val fontScale = LocalDensity.current.fontScale
     val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
     val fittedFontSize = minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale
-    Text(
-        IdentityFormatter.initials(title),
+    IdentityMonogram(
+        title,
+        style =
+            avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize)
+                .merge(TextStyle(fontSize = fittedFontSize, fontWeight = FontWeight.SemiBold)),
         color = Color.White,
-        fontWeight = FontWeight.SemiBold,
-        style = avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize),
-        fontSize = fittedFontSize,
-        maxLines = 1,
     )
+}
+
+/**
+ * The one-glyph monogram for [title] (see [IdentityFormatter.initials]). A custom emoji the device can draw is
+ * picked like a Unicode emoji and drawn as artwork; a blank title shows [blank] when one is given.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun IdentityMonogram(
+    title: String,
+    style: TextStyle,
+    color: Color = Color.Unspecified,
+    blank: String? = null,
+) {
+    val custom = LocalCustomEmoji.current
+    val monogram =
+        remember(title, custom, blank) {
+            blank?.takeIf { title.isBlank() }
+                ?: formatIdentityMonogram(title) { code -> EmojiShortcodes.art(code, custom, emptyMap()) != null }
+        }
+    EmojiLabel(monogram, color = color, style = style, maxLines = 1)
 }
 
 /**

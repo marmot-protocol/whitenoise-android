@@ -93,6 +93,13 @@ internal fun ChatsController.replacePresentedChatRows(
     rows: List<PresentedChatRowFfi>,
     activeWindow: ChatListWindowSnapshotFfi? = null,
 ) {
+    accountRef?.let { owner ->
+        val groupPictures =
+            selectedAvatarAssetsByGroup.filterKeys { groupId ->
+                selectedPresentationsByGroup[groupId]?.avatarSource?.isPeerSourced() != true
+            }
+        appState.retireReplacedDisplayAvatars(owner, groupPictures, rows)
+    }
     selectedPresentationsByGroup =
         rows.associate { presented ->
             chatRowKey(presented.row.groupIdHex) to
@@ -302,6 +309,7 @@ internal fun ChatsController.removeChatRow(
 internal fun ChatsController.finishRemovedChatRowClientState(groupIdHex: String) {
     val rowKey = chatRowKey(groupIdHex)
     selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+    selectedAvatarAssetsByGroup = selectedAvatarAssetsByGroup - rowKey
     selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
     selectedActionsByGroup = selectedActionsByGroup - rowKey
     cancelMemberSnapshotRetry(groupIdHex)

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media.pdf
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
+import java.io.UncheckedIOException
 import java.nio.channels.FileChannel
 
 /**
@@ -26,18 +27,6 @@ internal object PdfMetadataScrubber {
 
     /** What removing metadata from [file] would do, without changing it. */
     fun inspect(file: File): PdfMetadataResult = withMapped(file, writable = false, ::inspect)
-
-    /** What removing metadata from [length] bytes at [offset] of the file open on [channel] would do. */
-    fun inspect(
-        channel: FileChannel,
-        offset: Long,
-        length: Long,
-    ): PdfMetadataResult =
-        try {
-            mapped(channel, offset, length, ::inspect)
-        } catch (_: IOException) {
-            PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
-        }
 
     /** Removes metadata from [bytes] in place. A refused PDF keeps its bytes. */
     fun scrub(bytes: ByteArray): PdfMetadataResult = scrub(ArrayPdfBytes(bytes))
@@ -134,6 +123,8 @@ internal object PdfMetadataScrubber {
                 mapped(access.channel, 0L, access.length(), block, mode)
             }
         } catch (_: IOException) {
+            PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
+        } catch (_: UncheckedIOException) {
             PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
         }
 

@@ -2,17 +2,25 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.DisplayAvatarGeneration
+import dev.ipf.whitenoise.android.media.DisplayAvatarKey
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Matches the chat list's first-frame avatar seed window, so every seeded row can find decoded pixels. */
 internal const val FIRST_FRAME_DURABLE_AVATAR_ROWS = 24
+
+// Matches MarmotKit's per-call local read limit.
+private const val DURABLE_AVATAR_BATCH_ITEMS = 16
 
 /**
  * The longest a restored or switched-to chat list waits for local avatar decodes. MDK already holds the
@@ -30,14 +38,20 @@ internal const val FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS = 250L
 internal fun firstFrameDurableAvatarAssets(
     rows: List<PresentedChatRowFfi>,
     draftedAtSeconds: (groupIdHex: String) -> ULong? = { null },
-): List<AvatarAssetFfi> = firstFrameDurableAvatarSelections(rows, null, draftedAtSeconds).map { it.first }
+): List<AvatarAssetFfi> = firstFrameDurableAvatarSelections(rows, null, draftedAtSeconds).map { it.asset }
 
-/** [firstFrameDurableAvatarAssets] with each asset's worker domain, from the row that selects it. */
+internal data class FirstFrameAvatarSelection(
+    val asset: AvatarAssetFfi,
+    val domain: MediaTrustDomain,
+    val displayKey: DisplayAvatarKey?,
+)
+
+/** [firstFrameDurableAvatarAssets] with each asset's worker domain and display key, from the selecting row. */
 internal fun firstFrameDurableAvatarSelections(
     rows: List<PresentedChatRowFfi>,
     accountRef: String?,
     draftedAtSeconds: (groupIdHex: String) -> ULong? = { null },
-): List<Pair<AvatarAssetFfi, dev.ipf.whitenoise.android.media.MediaTrustDomain>> =
+): List<FirstFrameAvatarSelection> =
     sortChatListItems(
         rows.map { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) },
     ) { item -> draftedAtSeconds(item.group.groupIdHex) }
@@ -47,7 +61,13 @@ internal fun firstFrameDurableAvatarSelections(
         .mapNotNull { item ->
             item.selectedAvatarAsset
                 ?.takeIf(AvatarAssetFfi::isRenderable)
-                ?.let { it to chatListAvatarDomain(item, accountRef) }
+                ?.let { asset ->
+                    FirstFrameAvatarSelection(
+                        asset,
+                        chatListAvatarDomain(item, accountRef),
+                        item.displayAvatarKey(accountRef, asset),
+                    )
+                }
         }.distinctBy { (asset, _) -> asset.reference to asset.contentRevision }
         .toList()
 
@@ -60,41 +80,42 @@ internal class FirstFrameDurableAvatar(
     val image: ImageBitmap,
     val animatedSource: ByteArray?,
     val animationClassification: Boolean? = null,
+    val publishIfCurrent: (() -> Unit) -> Unit = { it() },
+)
+
+internal class FirstFrameAvatarPreparation(
+    val awaitColdWorkers: Boolean = true,
+    val decode: Boolean = true,
+    val stillCurrent: () -> Boolean = { true },
 )
 
 /**
  * Decodes MDK's stored avatar bytes for the first visible rows before their snapshot is published (#2149).
  * Without it, the first chat-list frame drew generated initials until the asynchronous byte read finished.
- * The decodes go through the in-memory pixel cache, and the decoded pixels are also returned so
- * [installFirstFrameDurableAvatars] can put them back after an interactive account switch evicts that
- * cache. No acquisition is started and nothing is written to an Android store. The wait is bounded by
+ * The authenticated display cache is tried before decoding. The pixels are returned so
+ * [installFirstFrameDurableAvatars] can restore them after an interactive account switch evicts the memory cache.
+ * No acquisition is started. The wait is bounded by
  * [FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS]; avatars not decoded by then keep the ordinary lazy path.
  *
- * Startup can set [decode] false when its speculative read already spent the decode budget.
- * Unless [awaitColdWorkers], only avatars already decoded or whose domain has a worker ready are awaited. A quick
- * account switch sets it false: the switch resets the decoder workers, so each group picture needs a new isolated
- * worker, which can take longer than the whole budget to start (#3496). Waiting for one would delay the switch
- * and still draw the generated initials.
+ * Startup can set [FirstFrameAvatarPreparation.decode] false when its speculative read already spent the decode budget.
+ * With [FirstFrameAvatarPreparation.awaitColdWorkers] disabled, only cached avatars or ready workers are awaited.
+ * Switching accounts resets decoder workers. Starting a fresh isolated worker can exceed the budget (#3496).
  */
 internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
-    awaitColdWorkers: Boolean = true,
-    decode: Boolean = true,
+    preparation: FirstFrameAvatarPreparation = FirstFrameAvatarPreparation(),
     onPrepared: ((renderableAssets: Int, decodedAssets: Int) -> Unit)? = null,
 ): List<FirstFrameDurableAvatar> {
     val selections =
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
         }
-    if (decode) {
-        decodeDurableAvatarsWithinBudget(
-            if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
-            accountRef,
-        )
-    }
+    val diskGeneration = displayAvatars.generation(accountRef)
+    val publishIfCurrent: (() -> Unit) -> Unit = { displayAvatars.publishIfCurrent(diskGeneration, it) }
+    if (preparation.decode) prepareFirstFrameAvatarPixels(accountRef, selections, diskGeneration, preparation)
     val decoded =
-        selections.map { it.first }.mapNotNull { asset ->
+        selections.map { it.asset }.mapNotNull { asset ->
             val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
             AvatarImageLoader.cachedImage(key)?.let { image ->
                 FirstFrameDurableAvatar(
@@ -102,11 +123,43 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
                     image,
                     AvatarImageLoader.peekAnimatedSource(key),
                     AvatarImageLoader.cachedAnimationClassification(key),
+                    publishIfCurrent,
                 )
             }
         }
     onPrepared?.invoke(selections.size, decoded.size)
     return decoded
+}
+
+private suspend fun WhiteNoiseAppState.prepareFirstFrameAvatarPixels(
+    accountRef: String,
+    selections: List<FirstFrameAvatarSelection>,
+    diskGeneration: DisplayAvatarGeneration,
+    preparation: FirstFrameAvatarPreparation,
+) {
+    val displayKeys = selections.mapNotNull(FirstFrameAvatarSelection::displayKey)
+    val restored = mutableSetOf<DisplayAvatarKey>()
+    var rebuildPack = false
+    withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
+        restoreStartupDisplayAvatars(
+            accountRef,
+            displayKeys,
+            diskGeneration,
+            preparation.stillCurrent,
+        ) { key, fromPoint ->
+            restored.add(key)
+            rebuildPack = rebuildPack || fromPoint
+        }
+        if (!preparation.stillCurrent()) return@withTimeoutOrNull
+        val workers = selections.map { it.asset to it.domain }
+        decodeDurableAvatarsWithinBudget(
+            if (preparation.awaitColdWorkers) workers else selectionsServableNow(workers, accountRef),
+            accountRef,
+        )
+    }
+    if (preparation.stillCurrent()) {
+        refreshStartupDisplayAvatars(accountRef, selections, restored, diskGeneration, rebuildPack)
+    }
 }
 
 /**
@@ -119,11 +172,32 @@ private suspend fun WhiteNoiseAppState.decodeDurableAvatarsWithinBudget(
     accountRef: String,
 ) {
     if (selections.isEmpty()) return
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val misses =
+        selections.mapNotNull { (asset, domain) ->
+            val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
+            if (AvatarImageLoader.cachedImage(key) == null) Triple(key, asset, domain) else null
+        }
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
-            selections
-                .map { (asset, domain) ->
-                    async { durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true) }
+            misses
+                .chunked(DURABLE_AVATAR_BATCH_ITEMS)
+                .flatMap { batch ->
+                    val refs = batch.mapNotNull { (_, asset, _) -> asset.reference }.distinct()
+                    val readLock = Mutex()
+                    var loaded: Map<String, AvatarBytesFfi>? = null
+                    batch.map { (key, asset, domain) ->
+                        async {
+                            AvatarImageLoader.loadStored(key, lifetime, domain, abandonable = true) {
+                                // Read inside the existing decode lane so an abandoned batch does no IO.
+                                val payloads =
+                                    readLock.withLock {
+                                        loaded ?: readDurableAvatarBatch(accountRef, refs).also { loaded = it }
+                                    }
+                                payloads[asset.reference]?.takeIf { it.matchesAvatarAsset(asset) }?.bytes
+                            }
+                        }
+                    }
                 }.awaitAll()
         }
     }
@@ -189,6 +263,17 @@ private fun selectionsServableNow(
  */
 internal fun AccountSwitchLocalSnapshot.installFirstFrameDurableAvatars() {
     firstFrameAvatars.forEach {
-        AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource, it.animationClassification)
+        it.publishIfCurrent {
+            AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource, it.animationClassification)
+        }
     }
 }
+
+/** Reads a bounded list of stored references in one native call. The consumer checks each selection's revision. */
+internal suspend fun WhiteNoiseAppState.readDurableAvatarBatch(
+    account: String,
+    references: List<String>,
+): Map<String, AvatarBytesFfi> =
+    runCatchingCancellable {
+        marmotIo { readAvatarAssets(account, references, DURABLE_AVATAR_MAX_BYTES) }
+    }.getOrNull().orEmpty().associateBy { it.reference }

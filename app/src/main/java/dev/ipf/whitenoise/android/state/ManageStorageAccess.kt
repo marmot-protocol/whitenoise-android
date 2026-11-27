@@ -214,7 +214,13 @@ internal class NativeManageStorageAccess(
     override suspend fun clearCaches() {
         admitted {
             native { clearAvatarCache(account) }
-            appState.clearDecryptedAttachmentCopies()
+            val displayClear = runCatching { appState.clearDisplayAvatarAccount(account) }
+            val attachmentClear = runCatching { appState.clearDecryptedAttachmentCopies() }
+            displayClear
+                .onFailure { failure ->
+                    attachmentClear.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
+                }.getOrThrow()
+            attachmentClear.getOrThrow()
         }
     }
 

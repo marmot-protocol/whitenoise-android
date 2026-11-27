@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.media.pdf
 // Bounds how far a property element's own attributes may run before its value.
 private const val MAX_ELEMENT_ATTRIBUTES = 256
 
-/** Matches [property] holding one [value] character, as an attribute or as an element with optional attributes. */
+/** Matches [property] holding a [value], as an attribute or as an element with optional attributes. */
 private fun identification(
     property: String,
     value: String,
@@ -14,16 +14,14 @@ private fun identification(
 }
 
 private val PDFA_PART = identification("pdfaid:part", "[1-4]")
-private val PDFA_CONFORMANCE = identification("pdfaid:conformance", "[ABUFabuf]")
-private val PDFUA_PART = identification("pdfuaid:part", "[1-2]")
+private val PDFA_CONFORMANCE = identification("pdfaid:conformance", "[ABUEFabuef]")
+private val PDFA_REVISION = identification("pdfaid:rev", "[0-9]{4}")
 private const val PDFA_NAMESPACE = "http://www.aiim.org/pdfa/ns/id/"
-private const val PDFUA_NAMESPACE = "http://www.aiim.org/pdfua/ns/id/"
 private const val PACKET_TAIL = "<?xpacket end=\"w\"?>"
 
 /**
- * The XMP packet that replaces a document's metadata: no properties beyond the PDF/A and PDF/UA identification the
- * original declared, which conforming readers need to keep treating the file as PDF/A or PDF/UA. Only those small,
- * validated values are carried over.
+ * The XMP packet that replaces a document's metadata. Carries the original PDF/A identification.
+ * PDF/UA identification is dropped because its required document title is also removed.
  */
 internal class PdfXmpPacket private constructor(
     val head: ByteArray,
@@ -36,7 +34,7 @@ internal class PdfXmpPacket private constructor(
     }
 
     companion object {
-        /** The replacement for [original], keeping only its PDF/A and PDF/UA identification. */
+        /** The replacement for [original], keeping only its PDF/A identification. */
         fun replacing(original: ByteArray): PdfXmpPacket {
             val text = String(original, Charsets.ISO_8859_1)
             val identification =
@@ -44,13 +42,12 @@ internal class PdfXmpPacket private constructor(
                     PDFA_PART.find(text)?.let { part ->
                         append(attribute("xmlns:pdfaid", PDFA_NAMESPACE))
                         append(attribute("pdfaid:part", part.groupValues[1]))
+                        if (part.groupValues[1] == "4") {
+                            PDFA_REVISION.find(text)?.let { append(attribute("pdfaid:rev", it.groupValues[1])) }
+                        }
                         PDFA_CONFORMANCE.find(text)?.let {
                             append(attribute("pdfaid:conformance", it.groupValues[1].uppercase()))
                         }
-                    }
-                    PDFUA_PART.find(text)?.let {
-                        append(attribute("xmlns:pdfuaid", PDFUA_NAMESPACE))
-                        append(attribute("pdfuaid:part", it.groupValues[1]))
                     }
                 }
             val description =

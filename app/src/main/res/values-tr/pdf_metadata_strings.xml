@@ -4,6 +4,10 @@
         <item quantity="one">PDF · %d sayfa</item>
         <item quantity="other">PDF · %d sayfa</item>
     </plurals>
+    <string name="composer_pdf_metadata_options">PDF üst veri seçenekleri</string>
+    <string name="composer_pdf_keep_metadata">Üst verileri koru</string>
+    <string name="composer_pdf_remove_metadata">Üst verileri kaldır</string>
+    <string name="composer_pdf_metadata_options_body">Alıcılar %1$s dosyasının özgün kopyasında yazarı, tarihleri ve diğer özellikleri görebilir.</string>
     <string name="composer_pdf_metadata_removed">Meta veriler kaldırıldı</string>
     <string name="composer_pdf_metadata_removed_on_send">Meta veriler gönderirken kaldırılır</string>
     <string name="composer_pdf_metadata_signed">İmzalı: meta veriler kalır</string>

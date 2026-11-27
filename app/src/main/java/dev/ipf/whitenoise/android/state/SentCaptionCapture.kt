@@ -59,7 +59,7 @@ internal val RetainedMediaUpload.tracksDraftAcceptance: Boolean
                 isDraftStored ||
                     (
                         draftHandling == RetainedDraftHandling.COMPOSER_SELECTION &&
-                            attachments.any { it.nativeDraftAttachmentId != null }
+                            attachments.any { it.nativeDraftAttachmentId != null || it.nativeDraftFileBody != null }
                     )
             )
 

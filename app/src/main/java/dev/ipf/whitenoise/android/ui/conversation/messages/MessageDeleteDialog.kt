@@ -1,14 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
@@ -25,8 +21,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
-import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogSurface
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 
 /**
@@ -59,20 +55,9 @@ internal fun messageDeleteSupportingCopy(
     }
 
 /**
- * The one adaptive confirmation dialog behind the single "Delete" message
- * action. It renders only the scopes [capability] permits — the same
- * capability the controller re-validates on the mutation path — as plain
- * dialog text buttons (error-tinted for the destructive choices, matching
- * [dev.ipf.whitenoise.android.ui.common.ConfirmDialog]'s destructive
- * affordance), so it holds up in light, dark, and AMOLED themes alike.
- * With both scopes the actions stack end-aligned; with one they sit in a
- * single end-aligned row with Cancel leading.
- *
- * While a delete-for-everyone publish is running both destructive options are
- * disabled; the dialog stays dismissible (Cancel/back/outside) because the
- * mutation survives dismissal. Success closes it, and on failure the caller
- * keeps it open — when still shown — so the error toast never has to compete
- * with a silently vanished dialog.
+ * Shows the scopes permitted by [capability]. The caller rechecks them when
+ * submitting. A publish disables both destructive choices while leaving the
+ * dialog dismissible, since the mutation survives dismissal.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -85,129 +70,31 @@ internal fun MessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest) {
-        WhiteNoiseDialogSurface {
-            MessageDeleteDialogContent(
-                capability = capability,
-                mine = mine,
-                senderDisplayName = senderDisplayName,
-                deleteInFlight = deleteInFlight,
-                onDeleteForEveryone = onDeleteForEveryone,
-                onDeleteForMe = onDeleteForMe,
-                onCancel = dismiss,
-            )
-        }
-    }
-}
-
-/**
- * The dialog body, separated from the [AnimatedBasicAlertDialog] wrapper so behavior
- * and screenshot tests can compose it directly (a dialog renders in its own
- * window, which the JVM screenshot harness can't capture).
- */
-@Composable
-internal fun MessageDeleteDialogContent(
-    capability: MessageDeleteCapability,
-    mine: Boolean,
-    senderDisplayName: String,
-    deleteInFlight: Boolean,
-    onDeleteForEveryone: () -> Unit,
-    onDeleteForMe: () -> Unit,
-    onCancel: () -> Unit,
-) {
     val supportingCopy = messageDeleteSupportingCopy(capability, mine)
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text =
-                if (supportingCopy == MessageDeleteSupportingCopy.MODERATOR_REMOVAL) {
-                    stringResource(R.string.confirm_delete_member_message_title, senderDisplayName)
-                } else {
-                    stringResource(R.string.delete_message_title)
-                },
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text =
-                when (supportingCopy) {
-                    MessageDeleteSupportingCopy.MODERATOR_REMOVAL ->
-                        stringResource(R.string.confirm_delete_member_message_message)
-                    MessageDeleteSupportingCopy.SCOPE_CHOICE ->
-                        stringResource(R.string.delete_message_scope_choice)
-                    MessageDeleteSupportingCopy.LOCAL_ONLY ->
-                        stringResource(R.string.delete_message_local_only)
-                },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(16.dp))
-        val destructiveColors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-        val deleteForEveryone: @Composable () -> Unit = {
-            TextButton(
-                onClick = onDeleteForEveryone,
-                enabled = !deleteInFlight,
-                colors = destructiveColors,
-            ) {
-                if (deleteInFlight) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(stringResource(R.string.delete_for_everyone))
-            }
-        }
-        val deleteForMe: @Composable () -> Unit = {
-            TextButton(
-                onClick = onDeleteForMe,
-                enabled = !deleteInFlight,
-                colors = destructiveColors,
-            ) {
-                Text(stringResource(R.string.delete_for_me))
-            }
-        }
-        val cancel: @Composable () -> Unit = {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-        if (capability.canDeleteForEveryone && capability.canDeleteForMe) {
-            Column(
-                modifier = Modifier.align(Alignment.End),
-                horizontalAlignment = Alignment.End,
-            ) {
-                deleteForEveryone()
-                deleteForMe()
-                cancel()
-            }
-        } else {
-            Row(
-                modifier = Modifier.align(Alignment.End),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                cancel()
-                if (capability.canDeleteForEveryone) deleteForEveryone() else deleteForMe()
-            }
-        }
-    }
+    MessageDeleteConfirmationDialog(
+        title =
+            if (supportingCopy == MessageDeleteSupportingCopy.MODERATOR_REMOVAL) {
+                stringResource(R.string.confirm_delete_member_message_title, senderDisplayName)
+            } else {
+                stringResource(R.string.delete_message_title)
+            },
+        message =
+            when (supportingCopy) {
+                MessageDeleteSupportingCopy.MODERATOR_REMOVAL ->
+                    stringResource(R.string.confirm_delete_member_message_message)
+                MessageDeleteSupportingCopy.SCOPE_CHOICE ->
+                    stringResource(R.string.delete_message_scope_choice)
+                MessageDeleteSupportingCopy.LOCAL_ONLY ->
+                    stringResource(R.string.delete_message_local_only)
+            },
+        deleteInFlight = deleteInFlight,
+        onDeleteForEveryone = onDeleteForEveryone.takeIf { capability.canDeleteForEveryone },
+        onDeleteForMe = onDeleteForMe.takeIf { capability.canDeleteForMe || !capability.canDeleteForEveryone },
+        onDismissRequest = onDismissRequest,
+    )
 }
 
-/**
- * Confirmation for multi-select message deletion, styled to match the
- * single-message [MessageDeleteDialogContent]. When at least one selected
- * message can be removed for the whole group ([BatchDeleteBreakdown.canOfferDeleteForEveryone])
- * the user chooses between removing for everyone (each message where they are
- * allowed, the rest hidden locally) and hiding all on this device; otherwise
- * only the local-hide action is offered.
- */
+/** Bulk deletion shares the message scopes but blocks dismissal during a submitted delete. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun BatchMessageDeleteDialog(
@@ -218,103 +105,81 @@ internal fun BatchMessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
-        WhiteNoiseDialogSurface {
-            BatchMessageDeleteDialogContent(
-                selectedCount = selectedCount,
-                breakdown = breakdown,
-                deleteInFlight = deleteInFlight,
-                onDeleteForEveryone = onDeleteForEveryone,
-                onDeleteForMe = onDeleteForMe,
-                onCancel = dismiss,
-            )
-        }
-    }
+    MessageDeleteConfirmationDialog(
+        title = pluralStringResource(R.plurals.batch_delete_title, selectedCount, selectedCount),
+        message =
+            if (breakdown.canOfferDeleteForEveryone) {
+                stringResource(R.string.batch_delete_scope_choice)
+            } else {
+                pluralStringResource(R.plurals.batch_delete_local_only, selectedCount, selectedCount)
+            },
+        deleteInFlight = deleteInFlight,
+        onDeleteForEveryone = onDeleteForEveryone.takeIf { breakdown.canOfferDeleteForEveryone },
+        onDeleteForMe = onDeleteForMe,
+        onDismissRequest = onDismissRequest,
+        dismissEnabled = { !deleteInFlight },
+    )
 }
 
-/** Body of [BatchMessageDeleteDialog], split out for direct test composition. */
+/** One scope uses the standard Cancel/confirm row. Two scopes stack without squeezing translated labels. */
 @Composable
-internal fun BatchMessageDeleteDialogContent(
-    selectedCount: Int,
-    breakdown: BatchDeleteBreakdown,
+@Suppress("FunctionNaming", "LongParameterList")
+private fun MessageDeleteConfirmationDialog(
+    title: String,
+    message: String,
     deleteInFlight: Boolean,
-    onDeleteForEveryone: () -> Unit,
-    onDeleteForMe: () -> Unit,
-    onCancel: () -> Unit,
+    onDeleteForEveryone: (() -> Unit)?,
+    onDeleteForMe: (() -> Unit)?,
+    onDismissRequest: () -> Unit,
+    dismissEnabled: () -> Boolean = { true },
 ) {
-    val offerEveryone = breakdown.canOfferDeleteForEveryone
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = pluralStringResource(R.plurals.batch_delete_title, selectedCount, selectedCount),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text =
-                if (offerEveryone) {
-                    stringResource(R.string.batch_delete_scope_choice)
-                } else {
-                    pluralStringResource(R.plurals.batch_delete_local_only, selectedCount, selectedCount)
-                },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(16.dp))
-        val destructiveColors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-        val deleteForEveryone: @Composable () -> Unit = {
-            TextButton(
-                onClick = onDeleteForEveryone,
-                enabled = !deleteInFlight,
-                colors = destructiveColors,
-            ) {
-                if (deleteInFlight) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(8.dp))
+    val stacked = onDeleteForEveryone != null && onDeleteForMe != null
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismissRequest,
+        dismissEnabled = dismissEnabled,
+        title = { Text(title, Modifier.semantics { heading() }) },
+        text = { Text(message, Modifier.fadingVerticalScroll(rememberScrollState())) },
+        dismissButton =
+            if (stacked) {
+                null
+            } else {
+                { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } }
+            },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                onDeleteForEveryone?.let {
+                    DeleteScopeButton(R.string.delete_for_everyone, deleteInFlight, it, showProgress = deleteInFlight)
                 }
-                Text(stringResource(R.string.delete_for_everyone))
+                onDeleteForMe?.let { DeleteScopeButton(R.string.delete_for_me, deleteInFlight, it) }
+                if (stacked) {
+                    TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
+                }
             }
+        },
+    )
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun DeleteScopeButton(
+    labelRes: Int,
+    deleteInFlight: Boolean,
+    onDelete: () -> Unit,
+    showProgress: Boolean = false,
+) {
+    TextButton(
+        onClick = onDelete,
+        enabled = !deleteInFlight,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
         }
-        val deleteForMe: @Composable () -> Unit = {
-            TextButton(
-                onClick = onDeleteForMe,
-                enabled = !deleteInFlight,
-                colors = destructiveColors,
-            ) {
-                Text(stringResource(R.string.delete_for_me))
-            }
-        }
-        val cancel: @Composable () -> Unit = {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-        if (offerEveryone) {
-            Column(
-                modifier = Modifier.align(Alignment.End),
-                horizontalAlignment = Alignment.End,
-            ) {
-                deleteForEveryone()
-                deleteForMe()
-                cancel()
-            }
-        } else {
-            Row(
-                modifier = Modifier.align(Alignment.End),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                cancel()
-                deleteForMe()
-            }
-        }
+        Text(stringResource(labelRes))
     }
 }

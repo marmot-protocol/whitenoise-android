@@ -208,7 +208,7 @@ private suspend fun LocalNotificationPresenter.postEnrichedMessagingNotification
         val identity =
             content.identityImage(
                 seed = messaging.shortcutId ?: content.notificationTag,
-                titleOverride = messaging.conversationTitleOverride,
+                titleOverride = null,
                 conversationAvatar = conversationAvatarBitmap,
                 senderAvatar = senderAvatarBitmap,
                 contact = messaging.identityContact,

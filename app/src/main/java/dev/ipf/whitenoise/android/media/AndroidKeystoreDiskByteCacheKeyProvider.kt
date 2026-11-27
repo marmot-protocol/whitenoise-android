@@ -21,6 +21,15 @@ internal class AndroidKeystoreDiskByteCacheKeyProvider(
         }
     }
 
+    /** Retires this cache alias and any process-held handle. */
+    fun delete() {
+        synchronized(this) {
+            cached = null
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            keyStore.deleteEntry(alias)
+        }
+    }
+
     private fun loadOrGenerate(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         if (keyStore.containsAlias(alias)) {

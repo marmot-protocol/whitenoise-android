@@ -16,6 +16,8 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS
+import dev.ipf.whitenoise.android.notifications.notificationEmojiLabelFormatter
+import dev.ipf.whitenoise.android.notifications.prepareNotificationEmojiLabels
 import dev.ipf.whitenoise.android.ui.markdownDocumentProfileReferenceBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
 import kotlinx.coroutines.CancellationException
@@ -115,6 +117,7 @@ internal fun notificationContentPresentation(
     context: Context,
     update: NotificationUpdateFfi,
     content: NotificationFirstPostContent?,
+    emojiLabel: (String) -> String = context.notificationEmojiLabelFormatter(),
     shortNpub: (String) -> String,
 ): NotificationContentPresentation =
     NotificationContentPresentation(
@@ -128,9 +131,10 @@ internal fun notificationContentPresentation(
                 reactedToPreviewOverride = content?.reactedToPreview,
                 mediaKind = content?.mediaKind ?: ReplyMediaKind.None,
                 useDirectLayout = content?.isDirectConversation == true,
+                emojiLabel = emojiLabel,
                 shortNpub = shortNpub,
             ),
-        recipientAccountSubtext = content?.recipientAccountSubtext,
+        recipientAccountSubtext = content?.recipientAccountSubtext?.let(emojiLabel),
     )
 
 /** Resolves and sanitizes a post-deadline sender avatar URL from local profile or payload. */
@@ -425,6 +429,7 @@ internal fun notificationGroupTitleCopy(context: Context) =
 
 /** Builds one complete notification content projection under the caller's deadline. */
 internal class NotificationFirstPostResolver(
+    private val context: Context,
     private val identity: NotificationIdentityResolver,
     private val systemText: NotificationGroupSystemTextResolver,
     private val conversationTitle: NotificationConversationTitleResolver,
@@ -491,13 +496,15 @@ internal class NotificationFirstPostResolver(
             } else {
                 ReplyMediaKind.None
             }
+        val recipient = recipientAccountSubtext(update, localOnly)
+        context.prepareNotificationEmojiLabels(update, title, senderName, recipient)
         return NotificationFirstPostContent(
             conversationTitle = title,
             senderName = senderName,
             previewText = preview,
             reactedToPreview = reactedTo,
             mediaKind = resolvedMediaKind,
-            recipientAccountSubtext = recipientAccountSubtext(update, localOnly),
+            recipientAccountSubtext = recipient,
             isDirectConversation = isDirectConversation,
         )
     }
@@ -513,7 +520,7 @@ internal fun createNotificationContentResolutionServices(
     val conversationTitle = NotificationConversationTitleResolver(context, source, identity)
     return NotificationContentResolutionServices(
         identity = identity,
-        firstPost = NotificationFirstPostResolver(identity, systemText, conversationTitle, source),
+        firstPost = NotificationFirstPostResolver(context, identity, systemText, conversationTitle, source),
     )
 }
 

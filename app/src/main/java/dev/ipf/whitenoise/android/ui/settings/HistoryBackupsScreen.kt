@@ -128,13 +128,19 @@ internal fun HistoryBackupsContent(
         if (restoreOperation != null) restoreWords.clearText()
     }
     DisposableEffect(restoreWords) { onDispose { restoreWords.clearText() } }
+    val showBackupActions =
+        state.status != HistoryBackupStatus.Unavailable && state.status != HistoryBackupStatus.Loading
     SettingsScaffold(title = stringResource(R.string.history_backups), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag("history_backups.list")) {
             item(key = "search.HistoryBackups.2") {
+                if (showBackupActions) {
+                    SettingsExplainer(stringResource(R.string.history_backups_storage))
+                    SettingsExplainer(stringResource(R.string.history_backups_restore_scope))
+                }
                 HistoryBackupsStatusGroup(state, actions, onTurnOff = { confirmTurnOff = true })
             }
             historyBackupsCallouts(state)
-            if (state.status != HistoryBackupStatus.Unavailable && state.status != HistoryBackupStatus.Loading) {
+            if (showBackupActions) {
                 item(key = "search.HistoryBackups.4") {
                     if (restoreOpen || state.restore != null) {
                         HistoryRestoreGroup(state, restoreWords, actions)

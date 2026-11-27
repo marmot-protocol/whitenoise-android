@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.util.AtomicFile
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.DiskByteCache
+import dev.ipf.whitenoise.android.media.EnvelopeCacheKeyProvider
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.PersistentDisplayAvatars
 import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import java.io.File
 
@@ -35,3 +38,17 @@ internal fun createDisplayThumbnailCache(context: Context): PersistentDisplayThu
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_thumbnails.aes_gcm.v1"),
         ),
     )
+
+internal fun createDisplayAvatarCache(context: Context): PersistentDisplayAvatars {
+    val root = File(context.cacheDir, MediaCacheDirs.DISPLAY_AVATARS)
+    val wrappingKey = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_avatars.kek.aes_gcm.v1")
+    return PersistentDisplayAvatars(
+        root,
+        EnvelopeCacheKeyProvider(
+            AtomicFile(File(context.noBackupFilesDir, "display_avatars_dek_v1.bin")),
+            wrappingKey,
+            wrappingKey::delete,
+            root::deleteRecursively,
+        ),
+    )
+}

@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.STORED_AVATAR_KEY_PREFIX
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -19,6 +21,7 @@ internal suspend fun WhiteNoiseAppState.temporaryAttachmentCopyBytes(): Long =
     withContext(Dispatchers.IO) {
         val disk = runCatchingCancellable { diskMediaCache.residentBytes() }.getOrDefault(0L)
         disk + runCatchingCancellable { displayThumbnails.residentBytes() }.getOrDefault(0L) +
+            runCatchingCancellable { displayAvatars.residentBytes() }.getOrDefault(0L) +
             TemporaryAttachmentDirectories.sumOf { directoryBytes(File(appContext.cacheDir, it)) }
     }
 
@@ -65,4 +68,13 @@ internal suspend fun WhiteNoiseAppState.evictAttachmentCopies(
 private fun directoryBytes(directory: File): Long {
     val files = directory.listFiles() ?: return 0L
     return files.filter(File::isFile).sumOf { it.length() }
+}
+
+/** Clears one account without deleting the cache of another signed-in profile. */
+internal suspend fun WhiteNoiseAppState.clearDisplayAvatarAccount(account: String) {
+    displayAvatars.retirePending(account)
+    withContext(Dispatchers.IO) {
+        check(displayAvatars.clearAccount(account)) { "Could not clear display avatar files" }
+    }
+    AvatarImageLoader.clearStoredAvatarsWithPrefix("$STORED_AVATAR_KEY_PREFIX$account:")
 }

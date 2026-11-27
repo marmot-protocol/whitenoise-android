@@ -678,7 +678,8 @@ class AndroidCiGateTest(unittest.TestCase):
 
         Each writer adds a few hundred MB per master push. Matrix duplicates and
         master-only jobs read whichever entry is newest instead, so two pushes
-        fit in the repository cache quota.
+        fit in the repository cache quota. Jobs that decode a signing keystore
+        restore nothing, because preview builds run PR code on master's cache scope.
         """
         master_only = "github.ref != 'refs/heads/master' }}"
         expected = {
@@ -688,9 +689,9 @@ class AndroidCiGateTest(unittest.TestCase):
                 '${{ ' + master_only,
                 'true',
             ],
-            'android-production-release.yml': ['true'],
+            'android-production-release.yml': ['disabled'],
             'android-release-runtime.yml': ['true', 'true'],
-            'android-staging-apk.yml': ['true', 'true', 'true'],
+            'android-staging-apk.yml': ['disabled', 'true', 'true'],
             'codeql.yml': ['true'],
             'dependency-submission.yml': ['true'],
             'fuzz-scheduled.yml': ['true'],
@@ -703,7 +704,9 @@ class AndroidCiGateTest(unittest.TestCase):
                     workflow,
                 )
                 found = [
-                    match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
+                    'disabled'
+                    if 'cache-disabled: true\n' in step
+                    else match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
                     for step in steps
                 ]
                 self.assertEqual(found, values)
@@ -1277,6 +1280,7 @@ class AndroidCiGateTest(unittest.TestCase):
                 tasks = [line for line in result.stdout.splitlines() if line.startswith(':app:')]
                 self.assertEqual(len(tasks), 6 if android_test else 4, precheck)
                 self.assertEqual(any('AndroidTest' in task for task in tasks), android_test, precheck)
+                self.assertIn('-Pkotlin.daemon.jvmargs=-Xmx5g', result.stdout.splitlines())
         upload = self.named_step(self.compile_tests, 'Share compiled outputs with the unit shards')
         shared = "(needs.changes.outputs.precheck != 'true' || matrix.flavor == 'Zapstore')"
         self.assertIn(shared, upload)
@@ -1299,7 +1303,6 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('--max-workers=1', step)
         self.assertIn('--no-daemon', step)
         self.assertNotIn('assemble', step)
-        self.assertNotIn('Xmx', step)
         self.assertIn('timeout-minutes: 25', step)
         self.assertIn('timeout-minutes: 35', self.compile_tests)
         tooling = self.named_step(self.build_contracts, 'Compile (Kotlin)')

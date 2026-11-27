@@ -85,7 +85,7 @@ Merge admission requires separate live proof of queue enforcement and authorizat
 In activated mode, ordinary code PRs run tooling, dependency/security contracts,
 the loopback ZSP v2 publisher, ktlint/detekt and Kotlin/Java compilation of Zapstore and
 Play main, unit-test and Android-test sources. Separate per-flavor runners use
-one active Gradle worker and the existing configured heaps. Tooling owns benchmark
+one active Gradle worker and a 5 GiB Kotlin daemon heap. Tooling owns benchmark
 source compilation in prechecks and benchmark assembly in full runs.
 In prechecks, including drafts, the isolated compile matrix compiles all three
 source sets. In full and legacy runs it compiles main and unit-test sources only.

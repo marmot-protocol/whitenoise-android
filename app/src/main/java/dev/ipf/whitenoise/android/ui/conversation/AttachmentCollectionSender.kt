@@ -500,6 +500,7 @@ internal suspend fun ConversationMediaSender.driveResumedCollection(
     sessionEpoch: Long,
     lease: PrivateShareSendLease?,
     original: ConversationMediaSender,
+    keepPdfMetadata: Set<Uri>,
 ) {
     val run =
         CollectionRun(
@@ -509,6 +510,7 @@ internal suspend fun ConversationMediaSender.driveResumedCollection(
             sessionEpoch,
             caption = null,
             pickScope = operation.id,
+            keepPdfMetadata = keepPdfMetadata,
         )
     val picks = operation.items.map { run.pickKey(if (it.kind == CollectionItemKind.MEDIA) it.id else it.uri) }
     val send = controller.beginOutgoingSend(picks, ownDraft = true)
