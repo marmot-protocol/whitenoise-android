@@ -93,6 +93,14 @@
     <string name="link_request_linked">Il nuovo dispositivo è collegato.</string>
     <string name="link_request_added_elsewhere">%1$s è stato aggiunto da %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Il dispositivo è stato aggiunto da un altro dei tuoi dispositivi.</string>
+    <string name="link_request_notice">Un nuovo dispositivo chiede di essere collegato al tuo account.</string>
+    <string name="link_request_notice_other_profile">Un nuovo dispositivo chiede di essere collegato a %1$s.</string>
+    <string name="link_request_repeated_notice">Richieste di collegamento ripetute: qualcuno potrebbe avere la tua chiave.</string>
+    <string name="link_request_repeated_notice_other_profile">Richieste di collegamento ripetute per %1$s: qualcuno potrebbe avere la tua chiave.</string>
+    <string name="link_request_repeated_title">Richieste di collegamento ripetute</string>
+    <string name="link_request_repeated_detail">Alcuni dispositivi hanno chiesto di collegarsi a questo account più di una volta in un\'ora. Qualcuno potrebbe avere la tua chiave privata, quindi il collegamento non è disponibile. Se hai fatto tu queste richieste, riprova più tardi da un solo dispositivo.</string>
+    <string name="link_request_dont_link">Non collegare</string>
+    <string name="link_request_review_devices">Controlla i dispositivi</string>
     <string name="device_detail_rename">Rinomina</string>
     <string name="device_detail_rename_detail">Il nome mostrato per questo dispositivo su tutti i tuoi dispositivi.</string>
     <string name="device_detail_keep">Mantieni anche se inattivo</string>
