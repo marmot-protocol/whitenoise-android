@@ -105,6 +105,13 @@ class AgentOperationPresentationTest {
     }
 
     @Test
+    fun argumentsOverTheNestingLimitAreShownWithoutFormatting() {
+        val nested = "[".repeat(65) + "0" + "]".repeat(65)
+
+        assertEquals(nested, formatAgentOperationArguments(nested))
+    }
+
+    @Test
     fun nonAgentOperationDoesNotMapToToolCallPresentation() {
         assertEquals(null, AgentOperationProjector.project(agentOperation("hello").copy(kind = 9uL)))
         assertFalse(MessageProjector.isAgentOperation(agentOperation("hello").copy(kind = 9uL)))

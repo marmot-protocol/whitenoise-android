@@ -23,22 +23,24 @@ data class AgentOperationPresentation(
         get() = text.isNotBlank() || preview != null || argumentsJson != null || ok != null || durationMs != null
 }
 
-internal fun formatAgentOperationArguments(argumentsJson: String): String =
-    runCatching {
+// Tool arguments nest a few levels. Keep recursive JSON parsing within the UI thread's stack budget.
+private const val MaxPayloadDepth = 64
+
+internal fun formatAgentOperationArguments(argumentsJson: String): String {
+    if (!GroupSystemEventJson.nestingWithin(argumentsJson, MaxPayloadDepth)) return argumentsJson
+    return runCatching {
         when (argumentsJson.firstOrNull { !it.isWhitespace() }) {
             '{' -> JSONObject(argumentsJson).toString(2)
             '[' -> JSONArray(argumentsJson).toString(2)
             else -> argumentsJson
         }
     }.getOrDefault(argumentsJson)
+}
 
 object AgentOperationProjector {
     private const val OperationNameTag = "operation-name"
     private const val OperationStatusTag = "operation-status"
     private const val OperationTypeTag = "operation"
-
-    // Tool arguments nest a few levels; this keeps org.json's recursion far from the UI thread's stack limit.
-    private const val MaxPayloadDepth = 64
 
     fun project(record: AppMessageRecordFfi): AgentOperationPresentation? {
         if (!MessageProjector.isAgentOperation(record)) return null
