@@ -77,7 +77,7 @@
     <string name="link_request_review">Рассмотреть</string>
     <string name="link_request_not_now">Не сейчас</string>
     <string name="link_request_preparing">Проверка нового устройства…</string>
-    <string name="link_request_compare_detail">Убедитесь, что на обоих устройствах показаны одинаковые эмодзи в одинаковом порядке. Если они различаются, нажмите «Не сейчас».</string>
+    <string name="link_request_compare_detail">Убедитесь, что устройство у вас в руках показывает те же эмодзи в том же порядке. Не зачитывайте их никому и не отправляйте снимок экрана.</string>
     <string name="link_request_label">Название устройства</string>
     <string name="link_request_label_too_long">Это название слишком длинное.</string>
     <string name="link_request_add_to_chats">Добавить во все мои чаты</string>
@@ -187,4 +187,15 @@
     <string name="unlinked_remove_sign_in_detail">Это устройство было отвязано. Удалить чаты и данные этого профиля с устройства и войти с введённым ключом? На других ваших устройствах данные сохранятся.</string>
     <string name="invite_decline_wait_for_sync">Дождитесь синхронизации чата и снова нажмите «Отклонить».</string>
     <string name="invite_decline_check_delivery">Последнее изменение группы поступило не на все ретрансляторы. Перед новой попыткой проверьте, есть ли в чате предупреждение о доставке.</string>
+    <string name="link_consent_requested_at">Запрос в %1$s</string>
+    <string name="link_consent_access">Связанное устройство сможет читать ваши чаты, получать их историю и отправлять сообщения от вашего имени.</string>
+    <string name="link_consent_have_device">Продолжайте, только если вы сами начали настраивать White Noise на устройстве, которое сейчас перед вами.</string>
+    <string name="link_consent_scam">White Noise никогда не свяжется с вами с просьбой связать устройство или проверить эмодзи. Если кто-то попросил об этом, это мошенничество.</string>
+    <string name="link_consent_on_call">Вы разговариваете по телефону. Мошенники часто подсказывают жертвам по телефону, как связать устройство.</string>
+    <string name="link_consent_with_me">Новое устройство у меня</string>
+    <string name="link_consent_did_not_start">Я не отправлял этот запрос</string>
+    <string name="link_consent_someone_asked">Меня попросили это сделать</string>
+    <string name="link_consent_unlock">Разблокируйте этот телефон, чтобы сравнить эмодзи</string>
+    <string name="link_consent_lock_required">Чтобы связать устройство, настройте блокировку экрана на этом телефоне.</string>
+    <string name="link_consent_report_failed">Не удалось пометить вход как неизвестный. Проверьте его в разделе «Устройства».</string>
 </resources>

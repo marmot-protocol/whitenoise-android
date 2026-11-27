@@ -77,7 +77,7 @@
     <string name="link_request_review">檢視</string>
     <string name="link_request_not_now">暫時不要</string>
     <string name="link_request_preparing">正在檢查新裝置…</string>
-    <string name="link_request_compare_detail">確認兩部裝置顯示相同的表情符號，而且順序一致。如果不同，請點選「暫時不要」。</string>
+    <string name="link_request_compare_detail">確認手邊的裝置以相同順序顯示相同的表情符號。不要念給任何人聽，也不要傳送螢幕截圖。</string>
     <string name="link_request_label">裝置名稱</string>
     <string name="link_request_label_too_long">名稱過長。</string>
     <string name="link_request_add_to_chats">加入我的所有聊天</string>
@@ -187,4 +187,15 @@
     <string name="unlinked_remove_sign_in_detail">這部裝置已解除連結。要從這部裝置刪除此個人檔案的聊天和資料，再用剛輸入的金鑰登入嗎？其他裝置的資料會保留。</string>
     <string name="invite_decline_wait_for_sync">等候此聊天同步後，再次點選「拒絕」。</string>
     <string name="invite_decline_check_delivery">你上次對群組的變更尚未送達所有中繼站。請先查看聊天中是否有傳送警告，再重試。</string>
+    <string name="link_consent_requested_at">要求時間：%1$s</string>
+    <string name="link_consent_access">已連結的裝置可以讀取你的聊天、取得聊天記錄，也能以你的名義傳送訊息。</string>
+    <string name="link_consent_have_device">只有你親自在眼前的裝置上開始設定 White Noise，才繼續操作。</string>
+    <string name="link_consent_scam">White Noise 不會聯絡你要求連結裝置或核對表情符號。如果有人要求你這麼做，那是詐騙。</string>
+    <string name="link_consent_on_call">你正在通話。詐騙者常在電話中指導受害者連結裝置。</string>
+    <string name="link_consent_with_me">新裝置就在我手邊</string>
+    <string name="link_consent_did_not_start">這不是我發起的</string>
+    <string name="link_consent_someone_asked">有人要求我這麼做</string>
+    <string name="link_consent_unlock">解鎖這部手機以核對表情符號</string>
+    <string name="link_consent_lock_required">請先在這部手機上設定螢幕鎖定，再連結裝置。</string>
+    <string name="link_consent_report_failed">無法將此登入標記為陌生登入。請前往「裝置」查看。</string>
 </resources>

@@ -188,15 +188,6 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.explanation_link_request_options",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.explanation_link_request_options",
-        "test_ids": [
-          "ACC-025",
-          "SET-061"
-        ]
-      },
-      {
         "surface": "Linked devices: R.string.link_request_default_label",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
         "anchor": "R.string.link_request_default_label",
@@ -206,30 +197,11 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.link_request_options",
+        "surface": "Device linking consent: R.string.link_consent_did_not_start",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.link_request_options",
+        "anchor": "R.string.link_consent_did_not_start",
         "test_ids": [
-          "ACC-025",
-          "SET-061"
-        ]
-      },
-      {
-        "surface": "Linked devices: R.string.link_request_options_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "R.string.link_request_options_detail",
-        "test_ids": [
-          "ACC-025",
-          "SET-061"
-        ]
-      },
-      {
-        "surface": "DeviceLinkOptionsRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
-        "anchor": "fun DeviceLinkOptionsRow(",
-        "test_ids": [
-          "ACC-025",
-          "SET-061"
+          "SET-078"
         ]
       }
     ]

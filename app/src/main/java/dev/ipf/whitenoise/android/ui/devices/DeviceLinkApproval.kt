@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -25,7 +26,6 @@ import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.deviceLabelFits
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
-import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
@@ -34,7 +34,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal const val DEVICE_LINK_LABEL_TAG = "device_link.label"
 internal const val DEVICE_LINK_ADD_TO_CHATS_TAG = "device_link.add_to_chats"
 internal const val DEVICE_LINK_BRING_HISTORY_TAG = "device_link.bring_history"
-internal const val DEVICE_LINK_OPTIONS_TAG = "device_link.options"
 
 /**
  * The step for a link request on a device already signed in. Link device and Not now are offered only while MDK
@@ -55,7 +54,7 @@ internal fun deviceLinkRequestStep(
                 detail = R.string.link_request_compare_detail,
                 code = state.code,
                 primary = DeviceLinkAction.Link,
-                secondary = DeviceLinkAction.NotNow,
+                secondary = DeviceLinkAction.DontLink,
             )
         DeviceLinkPromptStateFfi.CompetingRequests ->
             DeviceLinkStep(title, R.string.link_request_competing, secondary = DeviceLinkAction.Close)
@@ -95,25 +94,22 @@ private fun addedElsewhereStep(state: DeviceLinkPromptStateFfi.AddedElsewhere): 
 @Stable
 internal class DeviceLinkApprovalDraft(
     name: String = "",
-    expanded: Boolean = false,
     add: Boolean = true,
     history: Boolean = true,
 ) {
     val label = TextFieldState(name)
-    var optionsOpen by mutableStateOf(expanded)
     var addToAllChats by mutableStateOf(add)
     var bringHistory by mutableStateOf(history)
 
     companion object {
         val Saver =
             listSaver<DeviceLinkApprovalDraft, Any>(
-                save = { listOf(it.label.text.toString(), it.optionsOpen, it.addToAllChats, it.bringHistory) },
+                save = { listOf(it.label.text.toString(), it.addToAllChats, it.bringHistory) },
                 restore = { values ->
                     DeviceLinkApprovalDraft(
                         name = values[0] as String,
-                        expanded = values[1] as Boolean,
-                        add = values[2] as Boolean,
-                        history = values[3] as Boolean,
+                        add = values[values.lastIndex - 1] as Boolean,
+                        history = values.last() as Boolean,
                     )
                 },
             )
@@ -150,6 +146,7 @@ internal fun DeviceLinkRequestContent(
     draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
     repeated: Boolean = false,
     onReviewDevices: () -> Unit = onClose,
+    onReport: (() -> Unit)? = null,
 ) {
     val label = draft.label
     // MDK requires a name. The approving device supplies the default, shown in the empty field.
@@ -192,34 +189,18 @@ internal fun DeviceLinkRequestContent(
                 tooLong = stringResource(R.string.link_request_label_too_long).takeUnless { nameFits },
                 enabled = running == null,
             )
-            DeviceLinkOptionsRow(onToggle = { draft.optionsOpen = !draft.optionsOpen })
-            if (draft.optionsOpen) {
-                DeviceLinkSharingChoices(
-                    addToAllChats = draft.addToAllChats,
-                    bringHistory = draft.bringHistory,
-                    enabled = running == null,
-                    onAddToAllChats = { draft.addToAllChats = it },
-                    onBringHistory = { draft.bringHistory = it },
-                )
-            }
-        }
-    }
-}
-
-/** The row that opens and closes the two sharing choices, saying what they cover while they stay closed. */
-@Composable
-private fun DeviceLinkOptionsRow(onToggle: () -> Unit) {
-    SettingsGroup {
-        row("options") { context ->
-            SettingsAction(
-                context = context,
-                title = stringResource(R.string.link_request_options),
-                subtitle = stringResource(R.string.link_request_options_detail),
-                onClick = onToggle,
-                modifier = Modifier.testTag(DEVICE_LINK_OPTIONS_TAG),
-                explanation = stringResource(R.string.explanation_link_request_options),
-                leading = { SettingsLeadingIcon(R.drawable.ic_expand_more) },
+            DeviceLinkSharingChoices(
+                addToAllChats = draft.addToAllChats,
+                bringHistory = draft.bringHistory,
+                enabled = running == null,
+                onAddToAllChats = { draft.addToAllChats = it },
+                onBringHistory = { draft.bringHistory = it },
             )
+        }
+        if (warning != null && onReport != null) {
+            TextButton(onClick = onReport, enabled = running == null) {
+                Text(stringResource(R.string.link_consent_did_not_start))
+            }
         }
     }
 }
