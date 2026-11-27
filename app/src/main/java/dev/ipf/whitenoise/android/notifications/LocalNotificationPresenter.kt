@@ -142,7 +142,6 @@ class LocalNotificationPresenter(
 
     fun hideConversationShortcutsFromDirectShare() = conversationShortcuts.hideConversationShortcutsFromDirectShare()
 
-    /** Dismisses cards on shared channels and revokes shortcuts for the departing account. */
     suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
