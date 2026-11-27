@@ -424,6 +424,7 @@ class WhiteNoiseAppState private constructor(
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
+    internal val privateKeyReminders = PrivateKeyReminders(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
@@ -5214,6 +5215,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        accounts.firstOrNull { it.label == account }?.let { privateKeyReminders.forget(it.accountIdHex) }
         receivedVoiceTranscripts.forgetAccount(account)
         attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)

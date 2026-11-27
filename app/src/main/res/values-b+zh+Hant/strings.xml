@@ -2832,4 +2832,8 @@
     <string name="dictation_transcribe_voice_messages_title">自動轉錄語音訊息</string>
     <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天時顯示已下載語音訊息的轉錄文字。 需要 Offline Speech to Text。</string>
     <string name="toast_unsupported_link">不支援此連結。</string>
+    <string name="private_key_reminder_title">儲存您的私密金鑰</string>
+    <string name="private_key_reminder_body">如果您遺失這部手機，只有使用私密金鑰才能保留您的身分和聯絡人。</string>
+    <string name="private_key_reminder_save">儲存金鑰</string>
+    <string name="private_key_reminder_not_now">暫不</string>
 </resources>

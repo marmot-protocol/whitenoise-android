@@ -2883,4 +2883,8 @@
     <string name="dictation_transcribe_voice_messages_title">Trascrivi automaticamente i messaggi vocali</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Mostra nella conversazione le trascrizioni dei messaggi vocali scaricati. Richiede Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Questo link non è supportato.</string>
+    <string name="private_key_reminder_title">Salva la tua chiave privata</string>
+    <string name="private_key_reminder_body">Se perdi questo telefono, la tua chiave è l’unico modo per conservare la tua identità e i tuoi contatti.</string>
+    <string name="private_key_reminder_save">Salva chiave</string>
+    <string name="private_key_reminder_not_now">Non ora</string>
 </resources>

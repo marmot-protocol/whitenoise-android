@@ -2883,4 +2883,8 @@
     <string name="dictation_transcribe_voice_messages_title">Transcrever mensagens de voz automaticamente</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Mostra na conversa as transcrições das mensagens de voz baixadas. Requer o Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Este link não é compatível.</string>
+    <string name="private_key_reminder_title">Guarde sua chave privada</string>
+    <string name="private_key_reminder_body">Se você perder este celular, só poderá manter sua identidade e seus contatos com a sua chave.</string>
+    <string name="private_key_reminder_save">Salvar chave</string>
+    <string name="private_key_reminder_not_now">Agora não</string>
 </resources>

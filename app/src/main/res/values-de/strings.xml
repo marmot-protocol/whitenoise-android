@@ -2895,4 +2895,8 @@
     <string name="dictation_transcribe_voice_messages_title">Sprachnachrichten automatisch transkribieren</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Zeigt Transkripte heruntergeladener Sprachnachrichten beim Lesen des Chats an. Offline Speech to Text ist erforderlich.</string>
     <string name="toast_unsupported_link">Dieser Link wird nicht unterstützt.</string>
+    <string name="private_key_reminder_title">Speichere deinen privaten Schlüssel</string>
+    <string name="private_key_reminder_body">Wenn du dieses Handy verlierst, kannst du deine Identität und deine Kontakte nur mit deinem Schlüssel behalten.</string>
+    <string name="private_key_reminder_save">Schlüssel speichern</string>
+    <string name="private_key_reminder_not_now">Nicht jetzt</string>
 </resources>

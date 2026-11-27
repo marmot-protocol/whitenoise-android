@@ -1844,6 +1844,11 @@ internal fun MainShell(
                                     settingsDetailName = root.name
                                     firstRunHelpRoot = root
                                 },
+                                onSavePrivateKey = {
+                                    sectionName = MainSection.Settings.name
+                                    settingsDetailName = SettingsDetail.AccountKeys.name
+                                    firstRunHelpRoot = SettingsDetail.AccountKeys
+                                },
                                 onOpenSettings = {
                                     firstRunHelpRoot = null
                                     pendingConversationOpen = null

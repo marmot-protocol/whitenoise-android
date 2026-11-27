@@ -2876,4 +2876,8 @@
     <string name="dictation_transcribe_voice_messages_title">Sesli mesajları otomatik olarak yazıya dök</string>
     <string name="dictation_transcribe_voice_messages_subtitle">İndirilen sesli mesajların dökümünü sohbeti görüntülerken gösterir. Offline Speech to Text gereklidir.</string>
     <string name="toast_unsupported_link">Bu bağlantı desteklenmiyor.</string>
+    <string name="private_key_reminder_title">Özel anahtarınızı kaydedin</string>
+    <string name="private_key_reminder_body">Bu telefonu kaybederseniz kimliğinizi ve kişilerinizi korumanın tek yolu anahtarınızı kullanmaktır.</string>
+    <string name="private_key_reminder_save">Anahtarı kaydet</string>
+    <string name="private_key_reminder_not_now">Şimdi değil</string>
 </resources>
