@@ -43,6 +43,14 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
                     self.assertTrue(matches(relative, TRIGGERS))
                     self.assertTrue(select('pull_request', [relative], TRIGGERS)['connected'])
 
+    def test_avatar_loader_changes_run_connected_smoke_only(self):
+        for name in ('AvatarImageLoader.kt', 'GroupAvatarImageLoader.kt', 'PrivateContactAvatarLoader.kt'):
+            with self.subTest(name=name):
+                path = 'app/src/main/java/dev/ipf/whitenoise/android/core/' + name
+                self.assertTrue(matches(path, TRIGGERS))
+                self.assertEqual(select('pull_request', [path], TRIGGERS),
+                                 {'attachment_fixture': False, 'attachment_fixture_scope': '', 'connected': True})
+
     def test_fixture_only_inputs_are_not_pull_request_smoke_tests(self):
         """A fixture-only test input never carries the annotation the connected PR run selects."""
         for pattern in FIXTURE_ONLY + VIDEO_METADATA_FIXTURE_ONLY:
