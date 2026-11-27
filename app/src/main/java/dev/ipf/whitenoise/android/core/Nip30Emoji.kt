@@ -21,14 +21,6 @@ object Nip30Emoji {
     /** MDK's limit on the combined length of every tag value, in UTF-8 bytes. */
     const val MAX_TAG_VALUE_BYTES = 16 * 1024
 
-    // Legacy plaintext surfaces have no AST. Keep raw code delimiters and their contents literal.
-    val rawCodePattern =
-        Regex(
-            """(?m)^ {0,3}((?>`{3,}))[^\n`]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\1`*[ \t]*\r?$|\z)|""" +
-                """^ {0,3}((?>~{3,}))[^\n]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\2~*[ \t]*\r?$|\z)|""" +
-                """(`+)[\s\S]*?\3""",
-        )
-
     /** Whether [tags] carry any emoji tag, so they are the event's own tags rather than a stripped projection. */
     fun hasEmojiTags(tags: List<MessageTagFfi>): Boolean = tags.any { it.values.firstOrNull() == TAG_NAME }
 
@@ -87,13 +79,15 @@ object Nip30Emoji {
      * and fenced blocks are literal text, the same as when rendered, so they never attach artwork.
      */
     fun shortcodesIn(text: String): List<String> {
-        val codeRanges = rawCodePattern.findAll(text).map { it.range }.toList()
-        return shortcodeInText
-            .findAll(text)
-            .filter { match -> codeRanges.none { match.range.first <= it.last && match.range.last >= it.first } }
+        val matches = shortcodeInText.findAll(text).toList()
+        if (matches.isEmpty()) {
+            return emptyList()
+        }
+        val outsideCode = outsideRanges(rawCodeRanges(text))
+        return matches
+            .filter { outsideCode(it.range.first, it.range.last + 1) }
             .map { it.value }
             .distinct()
-            .toList()
     }
 
     /** The `["emoji", code, url]` row naming an attachment by its first locator, for a `:code:` shortcode. */

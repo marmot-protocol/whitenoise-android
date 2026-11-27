@@ -174,6 +174,32 @@ class FirstFrameDurableAvatarsTest {
         assertNull(item.memberSnapshot)
     }
 
+    @Test
+    fun restoredRowsShareOneNativeReadAndKeepOnlyMatchingRevisions() {
+        val otherGroup = "d2".repeat(16)
+        val staleGroup = "d3".repeat(16)
+        val fixture =
+            NativeAvatars {
+                listOf(
+                    payload(),
+                    payload().copy(reference = "stored-$otherGroup"),
+                    payload().copy(reference = "stored-$staleGroup", contentRevision = 2uL),
+                )
+            }
+        val rows = listOf(GROUP, otherGroup, staleGroup).map { presented(row(it), asset(it)) }
+
+        withAvatarClock {
+            val handoff = fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, rows)
+            assertEquals(
+                setOf(asset(GROUP).cacheKey(ACCOUNT), asset(otherGroup).cacheKey(ACCOUNT)),
+                handoff.map { it.key }.toSet(),
+            )
+        }
+
+        assertEquals(1, fixture.reads.get())
+        assertEquals(0, fixture.requests.get())
+    }
+
     /** A read that never answers cannot hold the restored frame past the budget. */
     @Test
     fun slowStoredReadGivesUpWithinTheBudget() {

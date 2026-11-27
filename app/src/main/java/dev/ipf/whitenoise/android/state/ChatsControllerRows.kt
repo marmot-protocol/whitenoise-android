@@ -302,6 +302,7 @@ internal fun ChatsController.removeChatRow(
 internal fun ChatsController.finishRemovedChatRowClientState(groupIdHex: String) {
     val rowKey = chatRowKey(groupIdHex)
     selectedPresentationsByGroup = selectedPresentationsByGroup - rowKey
+    selectedAvatarAssetsByGroup = selectedAvatarAssetsByGroup - rowKey
     selectedPreviewsByGroup = selectedPreviewsByGroup - rowKey
     selectedActionsByGroup = selectedActionsByGroup - rowKey
     cancelMemberSnapshotRetry(groupIdHex)

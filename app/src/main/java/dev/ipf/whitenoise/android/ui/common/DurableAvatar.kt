@@ -38,10 +38,8 @@ internal fun rememberDurableAvatar(
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val cacheKey = accountRef?.let { ownedAsset?.takeIf { it.isRenderable() }?.cacheKey(it) }
-    val pins =
-        LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
-        }
+    val pins = ownedPreparedGroupAvatarPixels(appState, accountRef, lifetime)
+    val prepared = pins?.imageFor(ownedAsset, cacheKey)
     val displayed = remember(appState) { DisplayedAvatarPixels() }
     val owner = displayedAvatarOwner(ownedAsset, accountRef, appState.runtimeGeneration, lifetime)
     // The availability rides in the key so a `MISSING` asset with the same reference still re-runs the
@@ -50,7 +48,7 @@ internal fun rememberDurableAvatar(
         key(appState, appState.runtimeGeneration, accountRef, lifetime, cacheKey, ownedAsset?.availability) {
             produceState<ImageBitmap?>(
                 initialValue =
-                    cacheKey?.let { pins?.images?.get(it) ?: AvatarImageLoader.cachedImage(it) ?: seededImage },
+                    prepared ?: cacheKey?.let { AvatarImageLoader.cachedImage(it) ?: seededImage },
                 ownedAsset?.target,
                 ownedAsset?.acquisition,
             ) {
@@ -69,7 +67,7 @@ internal fun rememberDurableAvatar(
                 }
             }.value
         }
-    val exact = loaded ?: seededImage
+    val exact = loaded ?: prepared ?: seededImage
     val shown = exact ?: displayed.retainedFor(owner) ?: pins?.retainedFor(ownedAsset)
     SideEffect {
         displayed.owner = owner
@@ -78,6 +76,15 @@ internal fun rememberDurableAvatar(
         pins?.recordCompleted(ownedAsset, exact)
     }
     return shown
+}
+
+@Composable
+private fun ownedPreparedGroupAvatarPixels(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    lifetime: Long,
+) = LocalPreparedGroupAvatarPixels.current?.takeIf {
+    it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
 }
 
 /** Pixels a [rememberDurableAvatar] call site last committed, and the selection they were drawn for. */

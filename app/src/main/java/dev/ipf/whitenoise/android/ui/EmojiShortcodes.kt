@@ -31,7 +31,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.em
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.core.outsideRanges
+import dev.ipf.whitenoise.android.core.rawCodeRanges
 
 /** Artwork one `:shortcode:` renders as. */
 @Immutable
@@ -106,8 +107,6 @@ internal object EmojiShortcodes {
             .getStringAnnotations(0, 3)
             .single()
             .tag
-
-    private val rawCodePattern = Nip30Emoji.rawCodePattern
 
     fun isShortcode(text: String): Boolean = shortcodePattern.matches(text)
 
@@ -223,7 +222,7 @@ internal object EmojiShortcodes {
         if (!matches.hasNext()) {
             return text
         }
-        val codeRanges = rawCodePattern.findAll(text.text).map { it.range }.toList()
+        val outsideCode = outsideRanges(rawCodeRanges(text.text))
         return buildAnnotatedString {
             append(text)
             for (match in matches) {
@@ -231,7 +230,7 @@ internal object EmojiShortcodes {
                 val end = match.range.last + 1
                 val literal =
                     when {
-                        codeRanges.any { start <= it.last && end > it.first } -> true
+                        !outsideCode(start, end) -> true
                         text.getStringAnnotations(LITERAL_TAG, start, end).isNotEmpty() -> true
                         text.getStringAnnotations(start, end).any { it.item == match.value } -> true
                         else ->

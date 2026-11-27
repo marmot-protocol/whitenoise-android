@@ -220,6 +220,26 @@ class AttachmentPresentationTest {
         }
     }
 
+    /** Extensions the platform types as XML or a web archive open as text, like the listed active ones. */
+    @Test
+    fun platformTypedActiveExtensionsAreInert() {
+        val platform =
+            mapOf(
+                "feed" to "application/example+xml",
+                "archive" to "message/rfc822",
+                "pdf" to "application/pdf",
+            )
+        listOf("FEED", "archive").forEach { extension ->
+            assertTrue(extension, isActiveContentExtension(extension, platform::get))
+        }
+        listOf("xsd", "RSS", "atom", "eml").forEach { extension ->
+            assertTrue(extension, isActiveContentExtension(extension) { null })
+        }
+        assertFalse(isActiveContentExtension("pdf", platform::get))
+        assertFalse(isActiveContentExtension("bin", platform::get))
+        assertTrue(isActiveContentExtension("html") { null })
+    }
+
     /** FileProvider types the cached copy by extension, so active extensions are cached as text. */
     @Test
     fun activeDocumentExtensionsAreCachedAsText() {
