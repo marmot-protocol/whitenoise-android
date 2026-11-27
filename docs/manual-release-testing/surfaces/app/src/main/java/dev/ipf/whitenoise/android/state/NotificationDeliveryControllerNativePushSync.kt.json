@@ -18,6 +18,14 @@
         "test_ids": [
           "NTF-060"
         ]
+      },
+      {
+        "surface": "Native push sync leaves the account list alone until startup has loaded it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerNativePushSync.kt",
+        "anchor": "if (marmotRuntime == null || host.startupAccountListPending) return false",
+        "test_ids": [
+          "NTF-061"
+        ]
       }
     ]
   },

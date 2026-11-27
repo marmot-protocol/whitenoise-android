@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -165,6 +167,7 @@ private fun ColumnScope.ExplanationContent(
  * trusted-system Paste menu. [beforeShow] lets a transient surface, such as a menu, close first.
  * [additionalActions] stay available to accessibility services whether or not holding is enabled.
  * [holdToExplain] = false keeps the Explain action but leaves the hold gesture to the element.
+ * [holdClaim] leaves a hold to the child that claimed it with [claimsHold], such as a tooltip anchor.
  */
 @Composable
 internal fun Modifier.explainOnLongPress(
@@ -173,6 +176,7 @@ internal fun Modifier.explainOnLongPress(
     holdToExplain: Boolean = true,
     beforeShow: () -> Unit = {},
     additionalActions: List<CustomAccessibilityAction> = emptyList(),
+    holdClaim: HoldClaim? = null,
 ): Modifier {
     val host = LocalExplanationHost.current
     val bottomEdge = LocalExplanationBottomEdge.current
@@ -197,17 +201,23 @@ internal fun Modifier.explainOnLongPress(
         semantics {
             customActions = listOf(CustomAccessibilityAction(explainLabel) { show().let { true } }) + additionalActions
         }
-    return if (holdToExplain) described.explainOnHold(haptics, show) else described
+    return if (holdToExplain) described.explainOnHold(haptics, show, holdClaim) else described
 }
 
-/** Observes the hold at Initial so the explanation replaces the child's click or long press. */
+/**
+ * Observes the hold at Initial so the explanation replaces the child's click or long press, unless a child
+ * claimed this press through [holdClaim].
+ */
 private fun Modifier.explainOnHold(
     haptics: HapticFeedback,
     show: () -> Unit,
+    holdClaim: HoldClaim?,
 ): Modifier =
-    pointerInput(Unit) {
+    pointerInput(holdClaim) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // This parent sees the press before its children, so a claim left by an earlier press never carries over.
+            holdClaim?.clear()
             val released =
                 withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     var finished = false
@@ -220,7 +230,8 @@ private fun Modifier.explainOnHold(
                     }
                     true
                 }
-            if (released == null) {
+            // Children see the press after this Initial-pass observer, so the claim is read once the hold is long.
+            if (released == null && holdClaim?.isClaimed(down.id) != true) {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 show()
                 do {
@@ -228,5 +239,39 @@ private fun Modifier.explainOnHold(
                     event.changes.forEach { it.consume() }
                 } while (event.changes.any { it.pressed })
             }
+        }
+    }
+
+/**
+ * Records which press a child's own long press owns, so a hold-to-explain parent can leave it alone. Compose's hit
+ * test decides which presses reach the child, widened touch targets included, so the parent never guesses geometry.
+ */
+@Stable
+internal class HoldClaim {
+    private var claimed: PointerId? = null
+
+    /** Marks [id] as the child's press. */
+    fun claim(id: PointerId) {
+        claimed = id
+    }
+
+    /** Forgets any earlier claim, since a stylus that stays in range can keep its pointer id across presses. */
+    fun clear() {
+        claimed = null
+    }
+
+    /** Whether the child received the press [id]. */
+    fun isClaimed(id: PointerId): Boolean = claimed == id
+}
+
+/**
+ * Claims, through [claim], each touch or stylus press Compose delivers to this element, without consuming it. Those
+ * are the presses a Material tooltip opens on, so a mouse hold still explains.
+ */
+internal fun Modifier.claimsHold(claim: HoldClaim): Modifier =
+    pointerInput(claim) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.type == PointerType.Touch || down.type == PointerType.Stylus) claim.claim(down.id)
         }
     }

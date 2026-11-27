@@ -46,6 +46,9 @@ internal interface NotificationDeliveryHost {
     val wipeInProgress: Boolean
     val pushWakeServiceOwned: Boolean
 
+    /** True until startup publishes its first account list, while an empty list is not yet authoritative. */
+    val startupAccountListPending: Boolean
+
     /** Signed-in signing accounts whose setup is eligible for native push registration. */
     fun nativePushAccountRefs(): List<String>
 

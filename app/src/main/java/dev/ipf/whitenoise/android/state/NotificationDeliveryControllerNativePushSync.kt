@@ -71,9 +71,12 @@ private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfE
     if (accountRefs.isEmpty()) {
         // Only clear the durable #755 retry flag when the account list is
         // authoritative. setAppInForeground() can trigger this before
-        // bootstrap/refreshAccounts() has loaded accounts; clearing then
-        // would strand a signed-in device on a stale push token.
-        if (marmotRuntime == null) return false
+        // bootstrap/refreshAccounts() has loaded accounts, and clearing then
+        // would strand a signed-in device on a stale push token. Refreshing
+        // while startup is still reading the list would also supersede that
+        // read, so startup would see no accounts and open onboarding for a
+        // signed-in profile. A foreground startup reconciles delivery after activation.
+        if (marmotRuntime == null || host.startupAccountListPending) return false
         host.refreshAccounts()
         accountRefs = host.nativePushAccountRefs()
         if (accountRefs.isEmpty()) return completeSyncWithoutNativePush(accountRefs, operationIsCurrent)

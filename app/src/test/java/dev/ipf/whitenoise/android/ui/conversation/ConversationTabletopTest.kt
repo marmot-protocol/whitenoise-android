@@ -79,7 +79,7 @@ class ConversationTabletopTest {
                     Box(Modifier.weight(1f).fillMaxWidth().testTag(MESSAGES))
                     ConversationBottomBarFrame(
                         routeMorph = null,
-                        bottomPadding = frozenIme.value,
+                        bottomPadding = { frozenIme.value },
                         translation = translation,
                     ) {
                         val identity = remember { Any() }

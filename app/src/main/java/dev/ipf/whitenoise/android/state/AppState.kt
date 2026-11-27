@@ -1725,6 +1725,7 @@ class WhiteNoiseAppState private constructor(
                     override val signOutInProgress get() = this@WhiteNoiseAppState.signOutInProgress
                     override val wipeInProgress get() = this@WhiteNoiseAppState.wipeInProgress
                     override val pushWakeServiceOwned get() = pushWakeRecovery.pushWakeServiceOwned
+                    override val startupAccountListPending get() = !bootstrapCompleted && !accountListLoaded
 
                     override fun nativePushAccountRefs(): List<String> =
                         accounts
