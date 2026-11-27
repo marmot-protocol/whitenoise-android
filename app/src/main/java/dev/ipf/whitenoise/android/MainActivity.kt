@@ -225,7 +225,11 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
-    private fun syncSystemBarsAndHostReadiness(darkTheme: Boolean) {
+    private fun syncSystemBarsAndHostReadiness(
+        darkTheme: Boolean,
+        notificationPending: Boolean,
+    ) {
+        if (!notificationPending) foregroundConversationDismissal.onNotificationRouteHandled()
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = !darkTheme
         controller.isAppearanceLightNavigationBars = !darkTheme
@@ -253,10 +257,7 @@ class MainActivity : AppCompatActivity() {
                 onDispose { }
             }
             val notificationPending = inboundNotificationTarget != null || state.signInAlerts.devicesRequest != null
-            SideEffect {
-                syncSystemBarsAndHostReadiness(darkTheme)
-                if (!notificationPending) foregroundConversationDismissal.onNotificationRouteHandled()
-            }
+            SideEffect { syncSystemBarsAndHostReadiness(darkTheme, notificationPending) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
@@ -412,7 +413,9 @@ class MainActivity : AppCompatActivity() {
     ) {
         val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
         val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
-        signInAlertAccount?.let(::openSignInAlert)
+        signInAlertAccount?.let {
+            openSignInAlert(it, appState, pinTapGate, notificationInboundState, foregroundConversationDismissal)
+        }
         if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
             if (signInAlertAccount == null && !opensProfileChooser) {
                 pinTapGate.supersede()
@@ -450,14 +453,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun openSignInAlert(accountRef: String) {
-        pinTapGate.supersede()
-        inboundNotificationTarget = null
-        appState.conversationDictation.clearMicrophoneRecovery()
-        foregroundConversationDismissal.onNotificationRouteObserved()
-        appState.signInAlerts.requestDevices(accountRef)
-    }
-
     // Merges a parsed inbound route into the pending routes; a notification target also starts its route trace. A chat
     // link (#3658) opens through here as a notification target, sharing account switching, app lock and cold/warm
     // handling; its stored intent is replaced first so activity recreation cannot resolve the link again.
@@ -471,7 +466,7 @@ class MainActivity : AppCompatActivity() {
         if (target != null || share != null || data != null) appState.conversationDictation.clearMicrophoneRecovery()
         val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
         if (target != null) {
-            appState.signInAlerts.devicesRequest?.let(appState.signInAlerts::devicesOpened)
+            appState.signInAlerts.devicesRequest?.let { appState.signInAlerts.updateDevicesRequest(it) }
             foregroundConversationDismissal.onNotificationRouteObserved()
             appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, target)
         }
@@ -848,6 +843,20 @@ class MainActivity : AppCompatActivity() {
             recentsPreferenceSecureFlagRetained = false
         }
     }
+}
+
+private fun openSignInAlert(
+    accountRef: String,
+    appState: WhiteNoiseAppState,
+    pinTapGate: PinnedShortcutTapGate,
+    inbound: NotificationInboundState,
+    foreground: ForegroundConversationDismissalCoordinator,
+) {
+    pinTapGate.supersede()
+    inbound.target = null
+    appState.conversationDictation.clearMicrophoneRecovery()
+    foreground.onNotificationRouteObserved()
+    appState.signInAlerts.requestDevices(accountRef)
 }
 
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 300L

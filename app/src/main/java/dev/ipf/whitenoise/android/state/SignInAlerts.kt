@@ -158,14 +158,12 @@ internal class SignInAlerts(
             devicesRequest = SignInDevicesRequest(accountRef, ++requests)
         }
 
-    /** Lets the Account screen consume the request after shell navigation is ready. */
-    fun devicesAccountOpened(request: SignInDevicesRequest) {
-        if (devicesRequest == request) devicesRequest = request.copy(accountOpened = true)
-    }
-
-    /** Ends [request] once its Devices screen is open; a newer request stays. */
-    fun devicesOpened(request: SignInDevicesRequest) {
-        if (devicesRequest == request) devicesRequest = null
+    /** Advances or clears only the matching Devices request. */
+    fun updateDevicesRequest(
+        expected: SignInDevicesRequest,
+        next: SignInDevicesRequest? = null,
+    ) {
+        if (devicesRequest == expected) devicesRequest = next
     }
 
     private fun announce(

@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.SignInAlertTier
+import dev.ipf.whitenoise.android.state.SignInDevicesRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.signInAlerts
 import dev.ipf.whitenoise.android.state.signInAlertsApply
@@ -43,37 +44,18 @@ internal fun SignInDevicesRouteEffect(
     val active = appState.activeAccountRef
     val unlocked = appState.deviceRoutingUnlocked
 
-    fun eligible() = appState.accounts.any { it.label == request?.accountRef && signInAlertsApply(it) }
     LaunchedEffect(request, active, navigationAccount, appState.phase, unlocked) {
-        if (request == null ||
-            appState.signInAlerts.devicesRequest != request ||
-            request.accountOpened ||
-            appState.phase != AppPhase.Ready ||
-            !appState.deviceRoutingUnlocked
-        ) {
-            return@LaunchedEffect
-        }
+        if (request == null || request.accountOpened || appState.phase != AppPhase.Ready) return@LaunchedEffect
+        if (!appState.canRouteDevices(request)) return@LaunchedEffect
         when {
-            !eligible() -> appState.signInAlerts.devicesOpened(request)
-            active == request.accountRef -> {
-                if (navigationAccount == active) {
+            !appState.devicesAccountEligible(request) -> appState.signInAlerts.updateDevicesRequest(request)
+            appState.activeAccountRef == request.accountRef -> {
+                if (navigationAccount == request.accountRef) {
                     onOpenAccount()
-                    appState.signInAlerts.devicesAccountOpened(request)
+                    appState.signInAlerts.updateDevicesRequest(request, request.copy(accountOpened = true))
                 }
             }
-            else ->
-                appState.launchMutation {
-                    val activated =
-                        appState.setActiveAccount(
-                            request.accountRef,
-                            shouldActivate = {
-                                eligible() &&
-                                    appState.signInAlerts.devicesRequest == request &&
-                                    appState.deviceRoutingUnlocked
-                            },
-                        )
-                    if (!activated && appState.deviceRoutingUnlocked) appState.signInAlerts.devicesOpened(request)
-                }
+            else -> appState.activateDevicesAccount(request)
         }
     }
 }
@@ -86,21 +68,34 @@ internal fun SignInDevicesRequestEffect(
 ) {
     val request = appState.signInAlerts.devicesRequest
     LaunchedEffect(request, appState.activeAccountRef, appState.deviceRoutingUnlocked) {
-        if (
-            request?.accountOpened == true &&
-            appState.signInAlerts.devicesRequest == request &&
-            appState.deviceRoutingUnlocked &&
-            request.accountRef == appState.activeAccountRef &&
-            appState.accounts.any { it.label == request.accountRef && signInAlertsApply(it) }
-        ) {
-            onOpen()
-            appState.signInAlerts.devicesOpened(request)
-        }
+        if (request?.accountOpened != true || request.accountRef != appState.activeAccountRef) return@LaunchedEffect
+        if (!appState.canRouteDevices(request) || !appState.devicesAccountEligible(request)) return@LaunchedEffect
+        onOpen()
+        appState.signInAlerts.updateDevicesRequest(request)
     }
 }
 
 private val WhiteNoiseAppState.deviceRoutingUnlocked: Boolean
     get() = !appLock.screenVisible && !appLock.evaluationPending
+
+private fun WhiteNoiseAppState.canRouteDevices(request: SignInDevicesRequest): Boolean {
+    val current = signInAlerts.devicesRequest
+    return deviceRoutingUnlocked && current == request
+}
+
+private fun WhiteNoiseAppState.devicesAccountEligible(request: SignInDevicesRequest): Boolean =
+    accounts.any { it.label == request.accountRef && signInAlertsApply(it) }
+
+private fun WhiteNoiseAppState.activateDevicesAccount(request: SignInDevicesRequest) {
+    launchMutation {
+        val activated =
+            setActiveAccount(
+                request.accountRef,
+                shouldActivate = { canRouteDevices(request) && devicesAccountEligible(request) },
+            )
+        if (!activated && deviceRoutingUnlocked) signInAlerts.updateDevicesRequest(request)
+    }
+}
 
 /** The active account's alert tier for the Devices row badge. */
 internal fun WhiteNoiseAppState.devicesRowTier(): SignInAlertTier {

@@ -196,16 +196,16 @@ class SignInAlertsTest {
         alerts.requestDevices(ACCOUNT)
         val second = alerts.devicesRequest!!
 
-        alerts.devicesAccountOpened(first)
+        alerts.updateDevicesRequest(first, first.copy(accountOpened = true))
         assertEquals(second, alerts.devicesRequest)
 
-        alerts.devicesAccountOpened(second)
+        alerts.updateDevicesRequest(second, second.copy(accountOpened = true))
         val opened = alerts.devicesRequest!!
         assertTrue(opened.accountOpened)
-        alerts.devicesOpened(first)
+        alerts.updateDevicesRequest(first)
         assertEquals(opened, alerts.devicesRequest)
 
-        alerts.devicesOpened(opened)
+        alerts.updateDevicesRequest(opened)
         assertNull(alerts.devicesRequest)
     }
 
