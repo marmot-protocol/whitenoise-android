@@ -133,6 +133,9 @@ class EmojiSetImagesTest {
                 images.load("e$it")
             }
             assertEquals(161, (0 until 161).count { images["e$it"] is EmojiSetImage.Ready })
+            images.attach("e0")
+            images.detach("e0")
+            assertTrue("A tile that moved rows stays ready", images["e0"] is EmojiSetImage.Ready)
             images.detach("e0")
             assertNull(images["e0"])
             assertEquals(0, images.attempt("e0"))

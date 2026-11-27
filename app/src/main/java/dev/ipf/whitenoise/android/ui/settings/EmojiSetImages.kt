@@ -80,7 +80,7 @@ internal class EmojiSetImages(
     private val images = mutableStateMapOf<String, EmojiSetImage>()
     private val attempts = mutableStateMapOf<String, Int>()
     private val readyOrder = ArrayDeque<String>()
-    private val attachedTiles = mutableSetOf<String>()
+    private val attachedTiles = mutableMapOf<String, Int>()
     private val permits = Semaphore(MAX_PARALLEL_LOADS)
     private var activeLoads by mutableIntStateOf(0)
 
@@ -95,10 +95,16 @@ internal class EmojiSetImages(
     }
 
     fun attach(shortcode: String) {
-        attachedTiles.add(shortcode)
+        attachedTiles[shortcode] = attachedTiles.getOrDefault(shortcode, 0) + 1
     }
 
     fun detach(shortcode: String) {
+        // When the column count changes, the new row can attach before the old row detaches.
+        val remaining = attachedTiles.getValue(shortcode) - 1
+        if (remaining > 0) {
+            attachedTiles[shortcode] = remaining
+            return
+        }
         attachedTiles.remove(shortcode)
         trimReadyImages()
     }
