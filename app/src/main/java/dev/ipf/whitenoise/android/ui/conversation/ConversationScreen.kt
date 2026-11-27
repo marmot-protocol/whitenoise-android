@@ -205,7 +205,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoiceTranscripti
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
-import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
+import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteConfirmation
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlay
@@ -4699,24 +4699,18 @@ internal fun ConversationScreen(
             )
         }
 
-        if (showBatchDeleteConfirm && batchSelectionUi.actionItems.isNotEmpty()) {
-            BatchMessageDeleteDialog(
+        if (showBatchDeleteConfirm) {
+            BatchMessageDeleteConfirmation(
                 selectedCount = batchSelectionUi.actionItems.size,
                 breakdown = batchSelectionUi.deleteBreakdown,
                 deleteInFlight = batchDeleteInFlight,
-                onDeleteForEveryone = {
+                onDelete = { scope ->
                     startBatchDelete(
-                        attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.EVERYONE),
+                        attempts = batchDeleteAttempts(batchSelectionUi.selections, scope),
                         priorRetryState = null,
                     )
                 },
-                onDeleteForMe = {
-                    startBatchDelete(
-                        attempts = batchDeleteAttempts(batchSelectionUi.selections, BatchDeleteScope.LOCAL_ONLY),
-                        priorRetryState = null,
-                    )
-                },
-                onDismissRequest = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
+                onDismiss = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
             )
         }
 

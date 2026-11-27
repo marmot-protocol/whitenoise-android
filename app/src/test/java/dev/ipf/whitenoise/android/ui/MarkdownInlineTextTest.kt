@@ -197,6 +197,15 @@ class MarkdownInlineTextTest {
         assertEquals("https://myblog.example/post", (link.item as LinkAnnotation.Url).url)
     }
 
+    /** Long received labels confirm without a backtracking scan, so one message cannot stall the chat. */
+    @Test(timeout = 5_000)
+    fun longLinkLabelsConfirmWithoutScanning() {
+        for (label in listOf(":".repeat(60_000), "a-".repeat(30_000), "word ".repeat(12_000))) {
+            assertTrue(shouldConfirmMarkdownLink(label, "https://example.com"))
+        }
+        assertFalse(shouldConfirmMarkdownLink("a-".repeat(256), "https://example.com"))
+    }
+
     @Test
     fun spoofPredicateCoversTheLabelShapes() {
         // Plain words and non-host punctuation skip the dialog.

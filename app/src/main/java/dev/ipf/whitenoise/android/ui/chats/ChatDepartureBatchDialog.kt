@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.LocalRemovalWording
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
@@ -394,7 +395,7 @@ internal fun ChatDepartureResultContent(
         Text(stringResource(R.string.chat_departure_result, result.completed, result.outstanding.size, result.skipped))
         targets.filter { it.groupId in result.outstanding }.forEach { target ->
             val detail = departureOutcomeDetail(target, stages[target.groupId], abandon)
-            Text("${target.title}: ${stringResource(detail)}")
+            EmojiLabel(target.title, suffix = ": ${stringResource(detail)}")
         }
     }
 }

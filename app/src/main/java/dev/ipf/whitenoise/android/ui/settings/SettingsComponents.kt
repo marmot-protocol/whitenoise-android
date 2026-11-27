@@ -319,6 +319,7 @@ internal fun SettingsAction(
     opensRoute: Boolean = false,
     leading: (@Composable () -> Unit)?,
     routeKey: Any? = null,
+    titleCanContainEmoji: Boolean = true,
     supportingContent: (@Composable () -> Unit)? = null,
 ) {
     val (origin, navigate) = rememberSettingsRouteClick(context, routeKey, onClick)
@@ -339,7 +340,7 @@ internal fun SettingsAction(
         leadingContent = settingsLeadingSlot(leading, enabled, destructive),
         supportingContent = supportingContent ?: subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
         colors = settingsRowColors(context),
-        content = { SettingsRowTitle(title, enabled, destructive) },
+        content = { SettingsRowTitle(title, enabled, destructive, titleCanContainEmoji) },
     )
 }
 

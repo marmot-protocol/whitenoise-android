@@ -780,6 +780,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "Scroll the warning while the delete actions and Cancel remain reachable at large text sizes.",
+      "test_ids": [
+        "MSG-008",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1

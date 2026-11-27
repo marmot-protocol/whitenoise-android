@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -163,7 +164,7 @@ class TeamReportSheetScreenshotTest {
         val largeRtl = theme == Theme.LARGE_RTL
         composeRule.setContent {
             var reason by remember { mutableStateOf(ReportReasonFfi.SPAM) }
-            var explanation by remember { mutableStateOf("") }
+            val explanation = remember { TextFieldState() }
             var sendToTeam by remember { mutableStateOf(true) }
             val team = ReportTeamChoice(audience, sendToTeam) { sendToTeam = it }
             onChoice(team)
@@ -180,7 +181,6 @@ class TeamReportSheetScreenshotTest {
                             reason,
                             { reason = it },
                             explanation,
-                            { explanation = it },
                             form.sending,
                             onSubmit,
                             team,

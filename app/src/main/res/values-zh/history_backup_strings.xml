@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">历史记录备份</string>
-    <string name="explanation_organize_hub_history_backups">保存一份由恢复词解锁的加密聊天记录副本，以便在重新安装后恢复。</string>
+    <string name="explanation_organize_hub_history_backups">在线保存加密聊天记录，并恢复你在此设备上参与的聊天中的消息。</string>
+    <string name="history_backups_storage">White Noise 将加密聊天记录保存在在线文件服务器（Blossom 服务器）上。你的 Nostr 中继保存一条加密记录，应用会用它来查找你的备份。</string>
+    <string name="history_backups_restore_scope">你只能恢复目前在此设备上参与的聊天中的消息。如果你无法再访问某个群组，请有邀请权限的人重新添加你。</string>
     <string name="history_backups_status">备份</string>
     <string name="history_backups_status_loading">正在检查…</string>
     <string name="history_backups_status_unavailable">暂不可用</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">请输入列表中的第 %1$d 个词和第 %2$d 个词。如果你没有抄写下来，请取消并重新开始以获取新的恢复词。</string>
     <string name="history_backups_word_label">第 %1$d 个词</string>
     <string name="history_backups_restore_words">恢复词</string>
-    <string name="history_backups_restore_words_help">输入全部 12 个词，用空格分隔。</string>
+    <string name="history_backups_restore_words_help">先在此设备上加入聊天，然后输入全部 12 个词，用空格分隔。</string>
     <string name="history_backups_restore">恢复历史记录</string>
     <string name="history_backups_restoring">正在开始恢复</string>
     <string name="history_backups_cancel_restore">取消恢复</string>

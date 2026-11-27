@@ -109,6 +109,20 @@ class IdentityFormatterTest {
     }
 
     @Test
+    fun initialsTreatDrawableShortcodesLikeUnicodeEmoji() {
+        val drawable: (String) -> Boolean = { it == ":marmot:" || it == ":party:" }
+
+        assertEquals("A", formatIdentityMonogram(":marmot: Alice", drawable))
+        assertEquals("A", formatIdentityMonogram("Alice :marmot:", drawable))
+        assertEquals(":marmot:", formatIdentityMonogram(":marmot:", drawable))
+        assertEquals(":marmot:", formatIdentityMonogram(":marmot::party:", drawable))
+        assertEquals("A", formatIdentityMonogram(":marmot:Alice", drawable))
+        // A code without artwork is ordinary text, exactly as before.
+        assertEquals("M", IdentityFormatter.initials(":marmot:"))
+        assertEquals("U", formatIdentityMonogram(":unknown:", drawable))
+    }
+
+    @Test
     fun relativeTimeDoesNotCrashOnOutOfRangeTimestamps() {
         // #468: untrusted epoch values must not throw DateTimeException into the
         // render path. ULong.MAX_VALUE wraps to -1L and a high-bit value wraps to

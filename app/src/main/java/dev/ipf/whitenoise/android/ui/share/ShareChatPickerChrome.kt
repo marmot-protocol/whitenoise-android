@@ -162,7 +162,7 @@ internal fun ShareChatPickerAccountIdentity(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
+            EmojiLabel(
                 accountTitle,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
