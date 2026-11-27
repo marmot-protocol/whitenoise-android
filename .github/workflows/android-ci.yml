@@ -77,6 +77,7 @@ jobs:
       reuse: ${{ steps.reuse.outputs.reuse }}
       reuse_run: ${{ steps.reuse.outputs.reuse_run }}
       tree: ${{ steps.reuse.outputs.tree }}
+      proof_base: ${{ steps.reuse.outputs.proof_base }}
       lint_writer: ${{ steps.reuse.outputs.lint_writer }}
     steps:
       - name: Checkout
@@ -146,7 +147,7 @@ jobs:
               --base-ref "$CI_BASE_REF" --base-sha "$CI_BASE_SHA" \
               --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
             echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'
-            printf 'reuse=none\nreuse_run=\ntree=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
+            printf 'reuse=none\nreuse_run=\ntree=\nproof_base=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
           fi
 
       # Other PR-controlled code runs only now, after the classifier and the lookup have written
@@ -1723,28 +1724,34 @@ jobs:
           ' > /dev/null
 
       # Real validation of a master pull request tree becomes a proof for identical content.
-      # A ready-for-review run targeting the same base looks this artifact up by lane and tree
+      # A ready-for-review run looks this artifact up by checked-out base, lane and tree
       # (scripts/ci_reuse.py re-verifies the producing run before trusting it). Only this
       # job's own success after real jobs ran records a proof, so reuse never chains from a skip.
       # A proof only saves time later, so a failed write or upload must never turn the required check red.
       - name: Write the validated tree proof
-        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.proof_base != '' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         env:
           PROOF_LANE: ${{ needs.changes.outputs.ci_mode }}
           PROOF_TREE: ${{ needs.changes.outputs.tree }}
+          PROOF_BASE: ${{ needs.changes.outputs.proof_base }}
           PROOF_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p build/validated-tree
-          printf '{"lane":"%s","tree":"%s","head":"%s","run":"%s"}\n' \
-            "$PROOF_LANE" "$PROOF_TREE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
+          printf '{"lane":"%s","tree":"%s","base":"%s","head":"%s","run":"%s"}\n' \
+            "$PROOF_LANE" "$PROOF_TREE" "$PROOF_BASE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
 
       - name: Retain the validated tree proof
-        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        id: proof_upload
+        if: success() && github.event_name == 'pull_request' && github.base_ref == 'master' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.proof_base != '' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}
+          name: android-ci-attest-master-${{ needs.changes.outputs.proof_base }}-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}
           path: build/validated-tree/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Record validated tree proof ${{ steps.proof_upload.outputs.artifact-id }}
+        if: steps.proof_upload.outcome == 'success' && steps.proof_upload.outputs.artifact-id != ''
+        run: ':'

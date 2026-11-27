@@ -530,7 +530,7 @@ class AndroidCiGateTest(unittest.TestCase):
             header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
             self.assertIn("needs.changes.outputs.reuse != 'tree'", header, name)
             self.assertNotIn("reuse == 'none'", header, name)
-        for output in ('reuse', 'reuse_run', 'tree', 'lint_writer'):
+        for output in ('reuse', 'reuse_run', 'tree', 'proof_base', 'lint_writer'):
             self.assertIn(f'      {output}: ${{{{ steps.reuse.outputs.{output} }}}}\n', self.changes)
         self.assertIn('      actions: read\n', self.changes)
         self.assertNotIn('actions: write', self.changes)
@@ -539,17 +539,22 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/ci_reuse.py', lookup)
         self.assertIn('--before "$CI_BEFORE_SHA"', lookup)
         self.assertIn('CI_BEFORE_SHA: ${{ github.event.before }}', lookup)
-        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
+        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nproof_base=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
         for name in ('Write the validated tree proof', 'Retain the validated tree proof'):
             step = self.named_step(self.gate, name)
             for condition in ('success()', "github.event_name == 'pull_request'",
+                              "github.base_ref == 'master'", "needs.changes.outputs.proof_base != ''",
                               "needs.changes.outputs.reuse == 'none'", "needs.changes.outputs.docs_only == 'false'"):
                 self.assertIn(condition, step, (name, condition))
             # A proof is an optimisation, so an artifact-service error must not fail the required check.
             self.assertIn('continue-on-error: true', step, name)
         proof = self.named_step(self.gate, 'Retain the validated tree proof')
-        self.assertIn('name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
+        self.assertIn('name: android-ci-attest-master-${{ needs.changes.outputs.proof_base }}-'
+                      '${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
         self.assertIn('retention-days: 7', proof)
+        self.assertIn('id: proof_upload', proof)
+        self.assertIn('name: Record validated tree proof ${{ steps.proof_upload.outputs.artifact-id }}', self.gate)
+        self.assertIn("steps.proof_upload.outcome == 'success'", self.gate)
 
     def test_classifier_and_lookup_run_first_and_isolated_before_other_pr_code(self):
         """Nothing PR-controlled runs before the steps that decide the lane, the tree and the reuse."""
