@@ -105,9 +105,10 @@ internal class NotificationCardContent(
     fun renamedSenderNotification(
         notification: Notification,
         senderAccountIdHex: String,
-        senderName: String,
-    ): Notification? =
-        if (
+        rawSenderName: String,
+    ): Notification? {
+        val senderName = context.emojiPlainText(rawSenderName)
+        return if (
             notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
             notification.shortcutId?.let(::isReactionShortcutId) == true
         ) {
@@ -118,6 +119,7 @@ internal class NotificationCardContent(
                 ?.let { renamedMessagingNotification(notification, it, senderAccountIdHex, senderName) }
                 ?: renamedExpandedSingleNotification(notification, senderAccountIdHex, senderName)
         }
+    }
 
     /** Rebuilds MessagingStyle history only when at least one stable sender key matches. */
     private fun renamedMessagingNotification(
@@ -243,7 +245,6 @@ internal class NotificationCardContent(
      */
     fun messagingStyle(
         content: LocalNotificationContent,
-        conversationTitleOverride: String?,
         historyCap: Int,
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
@@ -284,10 +285,8 @@ internal class NotificationCardContent(
                 )
             }
         style.isGroupConversation = content.isGroupConversation
-        // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
-        // people" for unnamed groups) over the often-empty payload group name.
         if (content.isGroupConversation) {
-            style.conversationTitle = conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle
+            style.conversationTitle = content.conversationTitle
         }
         newMessages.forEach(style::addMessage)
         return style

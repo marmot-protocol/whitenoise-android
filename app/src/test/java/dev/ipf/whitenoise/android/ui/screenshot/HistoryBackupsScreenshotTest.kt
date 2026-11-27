@@ -165,6 +165,7 @@ class HistoryBackupsScreenshotTest {
     @Test fun restoreWordsAreClearedAndNeverRestoredFromSavedState() {
         val restored = mutableListOf<String>()
         val state = mutableStateOf(HistoryBackupsState(status = HistoryBackupStatus.Off))
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val tester = StateRestorationTester(compose)
         tester.setContent {
             WhiteNoiseTheme {
@@ -178,6 +179,8 @@ class HistoryBackupsScreenshotTest {
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.open_restore"))
         compose.onNodeWithTag("history_backups.open_restore").performClick()
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
+        compose.onNodeWithText(context.getString(R.string.history_backups_restore_words_help)).assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/test/snapshots/history_backups_restore_entry_light.png")
         val button = compose.onNodeWithTag("history_backups.restore")
         button.assertIsNotEnabled()
         compose.onNodeWithTag("history_backups.restore_words").performTextInput("alpha beta")
@@ -190,10 +193,7 @@ class HistoryBackupsScreenshotTest {
         button.performClick()
         assertEquals(listOf(fixture), restored)
         compose.runOnIdle { state.value = state.value.copy(problem = HistoryBackupProblem.InvalidRestoreWords) }
-        val error =
-            ApplicationProvider
-                .getApplicationContext<android.app.Application>()
-                .getString(R.string.history_backups_problem_restore_words)
+        val error = context.getString(R.string.history_backups_problem_restore_words)
         compose.onNodeWithText(error).assertIsDisplayed()
         assertTrue(restoreFieldContains("orbit"))
         button.performClick()

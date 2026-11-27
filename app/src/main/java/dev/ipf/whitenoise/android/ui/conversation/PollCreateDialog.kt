@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,9 +27,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -68,8 +73,16 @@ internal fun PollCreateDialog(
     onSubmit: (String, List<String>, PollTypeFfi, Long?, (Boolean) -> Unit) -> Unit,
     viewportInsets: WindowInsets? = null,
 ) {
-    var question by rememberSaveable { mutableStateOf("") }
-    var options by rememberSaveable { mutableStateOf(listOf("", "")) }
+    val question = rememberTextFieldState()
+    var options by rememberSaveable(
+        stateSaver =
+            listSaver(
+                save = { fields -> fields.map { it.text.toString() } },
+                restore = { values -> values.map { TextFieldState(it) } },
+            ),
+    ) {
+        mutableStateOf(listOf(TextFieldState(), TextFieldState()))
+    }
     var multiple by rememberSaveable { mutableStateOf(false) }
     var presetDurationSeconds by rememberSaveable { mutableStateOf<Long?>(null) }
     var customSelected by rememberSaveable { mutableStateOf(false) }
@@ -84,6 +97,9 @@ internal fun PollCreateDialog(
         )
     var submitting by remember { mutableStateOf(false) }
     var issue by remember { mutableStateOf<PollDraftIssue?>(null) }
+    val questionText = question.text.toString()
+    val optionTexts = options.map { it.text.toString() }
+    LaunchedEffect(questionText, optionTexts) { issue = null }
     var deadlineAttempted by remember { mutableStateOf(false) }
     WhiteNoiseAlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
@@ -110,20 +126,12 @@ internal fun PollCreateDialog(
                     } else {
                         null
                     },
-                onQuestionChange = {
-                    question = it
-                    issue = null
-                },
-                onOptionChange = { index, value ->
-                    options = options.toMutableList().also { it[index] = value }
-                    issue = null
-                },
                 onRemoveOption = { index ->
                     options = options.filterIndexed { i, _ -> i != index }
                     issue = null
                 },
                 onAddOption = {
-                    options = options + ""
+                    options = options + TextFieldState()
                     issue = null
                 },
                 onMultipleChange = { multiple = it },
@@ -139,7 +147,7 @@ internal fun PollCreateDialog(
             Button(
                 enabled = !submitting,
                 onClick = {
-                    val draft = validatePollDraft(question, options)
+                    val draft = validatePollDraft(question.text.toString(), options.map { it.text.toString() })
                     val deadline = validatePollDeadlineSelection(deadlineSelection)
                     issue = draft.issue
                     deadlineAttempted = true
@@ -168,15 +176,13 @@ internal fun PollCreateDialog(
 @OptIn(ExperimentalLayoutApi::class)
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod") // Form keeps all draft fields in one scrollable panel.
 internal fun PollCreateForm(
-    question: String,
-    options: List<String>,
+    question: TextFieldState,
+    options: List<TextFieldState>,
     multiple: Boolean,
     deadlineSelection: PollDeadlineSelection,
     enabled: Boolean,
     issue: PollDraftIssue? = null,
     deadlineIssue: PollDeadlineIssue? = null,
-    onQuestionChange: (String) -> Unit,
-    onOptionChange: (Int, String) -> Unit,
     onRemoveOption: (Int) -> Unit,
     onAddOption: () -> Unit,
     onMultipleChange: (Boolean) -> Unit,
@@ -186,45 +192,44 @@ internal fun PollCreateForm(
         Modifier.testTag("poll.create.form").fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val questionIssue =
+            when (issue) {
+                PollDraftIssue.MISSING_QUESTION -> stringResource(R.string.poll_enter_question)
+                PollDraftIssue.QUESTION_TOO_LONG -> stringResource(R.string.poll_question_too_long)
+                else -> null
+            }
         ProseTextField(
-            value = question,
-            onValueChange = onQuestionChange,
+            state = question,
             label = { Text(stringResource(R.string.poll_question)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = enabled,
-            isError = issue == PollDraftIssue.MISSING_QUESTION || issue == PollDraftIssue.QUESTION_TOO_LONG,
+            errorMessage = questionIssue,
         )
-        val questionIssue =
-            when (issue) {
-                PollDraftIssue.MISSING_QUESTION -> R.string.poll_enter_question
-                PollDraftIssue.QUESTION_TOO_LONG -> R.string.poll_question_too_long
-                else -> null
-            }
         if (questionIssue != null) {
             Text(
-                stringResource(questionIssue),
+                questionIssue,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        options.forEachIndexed { index, value ->
-            Row {
-                ProseTextField(
-                    value = value,
-                    emojiOwner = options.toList(),
-                    onValueChange = { onOptionChange(index, it) },
-                    label = { Text(stringResource(R.string.poll_option, index + 1)) },
-                    containerModifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = enabled,
-                )
-                if (index >= 2) {
-                    IconButton(onClick = { onRemoveOption(index) }, enabled = enabled) {
-                        Icon(
-                            painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(R.string.poll_remove_option, index + 1),
-                        )
+        options.forEachIndexed { index, field ->
+            key(field) {
+                Row {
+                    ProseTextField(
+                        state = field,
+                        label = { Text(stringResource(R.string.poll_option, index + 1)) },
+                        containerModifier = Modifier.weight(1f),
+                        singleLine = true,
+                        enabled = enabled,
+                    )
+                    if (index >= 2) {
+                        IconButton(onClick = { onRemoveOption(index) }, enabled = enabled) {
+                            Icon(
+                                painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.poll_remove_option, index + 1),
+                            )
+                        }
                     }
                 }
             }

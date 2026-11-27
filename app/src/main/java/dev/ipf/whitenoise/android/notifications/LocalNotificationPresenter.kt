@@ -361,6 +361,7 @@ class LocalNotificationPresenter(
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
         isPostStillAllowed: () -> Boolean = { true },
+        emojiLabel: (String) -> String = context.notificationEmojiLabelFormatter(),
         shortNpub: (String) -> String,
     ): Boolean {
         val channelWriteEpoch = NotificationChannelWriteGuard.captureEpoch()
@@ -377,6 +378,7 @@ class LocalNotificationPresenter(
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
                 useDirectLayout = useDirectLayout,
+                emojiLabel = emojiLabel,
                 shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
@@ -661,7 +663,7 @@ class LocalNotificationPresenter(
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     // Name the recipient identity in the header when multi-account (#836).
                     if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
-                        builder.setSubText(recipientAccountSubtext)
+                        builder.setSubText(emojiLabel(recipientAccountSubtext))
                     }
                     if (
                         decision.style == NotificationStyleChoice.Plain ||
@@ -735,7 +737,7 @@ class LocalNotificationPresenter(
                                 builder.setConversationIdentityImage(
                                     notificationContent.identityImage(
                                         seed = messagingShortcutId ?: notificationContent.notificationTag,
-                                        titleOverride = conversationTitleOverride,
+                                        titleOverride = null,
                                         conversationAvatar = resolvedConversationAvatarBitmap,
                                         senderAvatar = resolvedSenderAvatarBitmap,
                                         contact = identityContact,
@@ -775,7 +777,6 @@ class LocalNotificationPresenter(
                             messagingPost =
                                 MessagingPostContext(
                                     sender = sender,
-                                    conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
@@ -895,7 +896,6 @@ class LocalNotificationPresenter(
                                         builder.setStyle(
                                             cardContent.messagingStyle(
                                                 notificationContent,
-                                                messaging.conversationTitleOverride,
                                                 decision.historyCap,
                                                 carried,
                                                 messaging.sender,
@@ -964,7 +964,6 @@ class LocalNotificationPresenter(
                                                 builder.setStyle(
                                                     cardContent.messagingStyle(
                                                         notificationContent,
-                                                        messaging.conversationTitleOverride,
                                                         decision.historyCap,
                                                         carriedHistory = null,
                                                         sender = messaging.sender,
@@ -1394,7 +1393,6 @@ class LocalNotificationPresenter(
 
 internal data class MessagingPostContext(
     val sender: Person,
-    val conversationTitleOverride: String?,
     val shortcutId: String?,
     val conversationAvatarUrl: String?,
     val conversationAvatarBitmap: Bitmap?,

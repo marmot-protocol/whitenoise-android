@@ -300,6 +300,7 @@ internal class ConversationNotificationSettingsPreparer(
             val operationId = trace.beginPreparation()
             val preparationStartedAt = trace.now()
             try {
+                context.prepareEmojiLabels(listOf(request.conversationTitle))
                 val shortcut = prepareShortcut(context, request, operationId)
                 val targets = prepareChannels(context, request, shortcut, operationId)
                 trace.finishPreparation(

@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.IdentityHeader
+import dev.ipf.whitenoise.android.ui.common.IdentityMonogram
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -413,7 +414,7 @@ internal fun ProfileAvatar(
             )
             AnimatedProfileAvatarOverlay(url, image, Modifier.fillMaxSize())
         } else {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium)
+            IdentityMonogram(name, style = MaterialTheme.typography.headlineMedium, blank = "?")
         }
     }
 }

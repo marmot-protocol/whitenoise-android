@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ownsGroupChange
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
@@ -52,7 +53,7 @@ internal fun GroupChangeConfirmationDialog(
         identity = {
             Column(Modifier.testTag(GROUP_CHANGE_TARGET_TAG)) {
                 if (appState == null) {
-                    chat?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+                    chat?.let { EmojiLabel(it, style = MaterialTheme.typography.titleMedium) }
                 } else {
                     val target = question.target
                     val group = MemberReviewGroup(target.groupIdHex, chat.orEmpty())
