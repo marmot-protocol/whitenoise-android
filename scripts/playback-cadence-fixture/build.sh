@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source_head=6d7cfb6144c9def699d0e2a4ef2985a89133f61f
+source_head=86f8fd2244d1c0fecab41c791fc5cb06fb838353
 fixture=scripts/playback-cadence-fixture
 package=dev.ipf.whitenoise.android.smoothness.finalreserve
 output=build/playback-cadence-apks
