@@ -80,11 +80,12 @@ class RawAvAudioReserveTest {
     /** Native lookahead pressure yields to video while the stream and subsequent PCM stay live. */
     @Test fun deferredReserveReadDoesNotHoldDueVideoOrSignalEof() =
         runTest {
-            val fixture = Fixture(testScheduler).apply {
-                deferReserve = true
-                chunkBytes = 160
-                sink.mixerLeadUs = 60_000
-            }
+            val fixture =
+                Fixture(testScheduler).apply {
+                    deferReserve = true
+                    chunkBytes = 160
+                    sink.mixerLeadUs = 60_000
+                }
             fixture.owner.onFrame = {
                 if (fixture.deferReserve && fixture.deferredReads > 0) {
                     assertEquals(1, fixture.deferredReads)
@@ -241,7 +242,7 @@ class RawAvAudioReserveTest {
 
         override fun writtenPositionUs(): Long = writtenFrames.toLong() * 1_000_000 / sampleRate
 
-        override fun mixerPositionUs(): Long = minOf(positionUs() + mixerLeadUs, writtenPositionUs())
+        override val mixerPositionUs: Long get() = minOf(positionUs() + mixerLeadUs, writtenPositionUs())
 
         /** Requires declared input exhaustion and actual elapsed-time consumption of every accepted frame. */
         override fun drained(): Boolean {

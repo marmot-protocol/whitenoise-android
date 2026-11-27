@@ -469,7 +469,9 @@ class RawAvPreferredRenderTest {
         }
     }
 
-    private class Sink(private val presentationLagUs: Long = 0) : RawPcmSink {
+    private class Sink(
+        private val presentationLagUs: Long = 0,
+    ) : RawPcmSink {
         override val sampleRate = 8000
         override val channels = 1
         var accepted = 0
@@ -501,9 +503,9 @@ class RawAvPreferredRenderTest {
             return 1000
         }
 
-        override fun positionUs() = (mixerPositionUs() - presentationLagUs).coerceAtLeast(0)
+        override fun positionUs() = (mixerPositionUs - presentationLagUs).coerceAtLeast(0)
 
-        override fun mixerPositionUs() = writtenPositionUs()
+        override val mixerPositionUs: Long get() = writtenPositionUs()
 
         override fun writtenPositionUs() = accepted.toLong() * 1_000_000 / 16000
 

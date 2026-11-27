@@ -143,9 +143,11 @@ class AvStreamPreferredProtocolTest {
     fun invalidOrUnrequestedSelectorNeverReachesTheBinder() {
         for ((video, audio, selector) in listOf(
             Triple(true, true, -1),
-            Triple(true, true, 3),
+            Triple(true, true, AvStreamProtocol.AUDIO_RESERVE_TRACK + 1),
             Triple(false, true, 1),
             Triple(true, false, 2),
+            Triple(false, true, AvStreamProtocol.AUDIO_RESERVE_TRACK),
+            Triple(true, false, AvStreamProtocol.AUDIO_RESERVE_TRACK),
         )) {
             StreamFixture(video, audio).use { fixture ->
                 assertTrue(readFailure { fixture.read(selector) } is IllegalArgumentException)

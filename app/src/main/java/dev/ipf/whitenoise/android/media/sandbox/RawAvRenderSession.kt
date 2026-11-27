@@ -468,7 +468,7 @@ internal class RawAvRenderSession(
         synchronized(clockLock) {
             val reserveUs = ceil(AUDIO_RESERVE_US * clockSpeed.toDouble()).toLong()
             val presentedUs = positionUs()
-            val mixerUs = pcm?.let { audioAnchorUs + it.mixerPositionUs() } ?: presentedUs
+            val mixerUs = pcm?.let { audioAnchorUs + it.mixerPositionUs } ?: presentedUs
             val baselineUs = maxOf(timestampUs, presentedUs) + reserveUs
             RawAvAudioReserve(baselineUs, mixerUs + reserveUs)
         }
@@ -488,7 +488,7 @@ internal class RawAvRenderSession(
                     val sink = pcm
                     audioAnchorUs + maxOf(sink?.bufferedPositionUs() ?: 0, sink?.writtenPositionUs() ?: 0)
                 }
-            if (bufferedUs >= reserve.targetUs) return
+            if (bufferedUs >= reserve.targetUs) break
             val track = reserve.trackFor(bufferedUs)
             if (!feedAudioStep(progress, activation, read, waitOnBackpressure = false, track = track)) return
         }
@@ -498,7 +498,7 @@ internal class RawAvRenderSession(
      * Writes one bounded quantum or less, keeping separate offsets for gap silence and media bytes.
      * Returns whether input credit advanced. Optional reserve reads and writes can defer.
      */
-    @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Partial source credits and both EOF guards commit together.
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount", "ReturnCount") // Invalid or deferred reads exit before PCM.
     private suspend fun feedAudioStep(
         progress: RawAvRenderProgress,
         activation: Long,

@@ -38,7 +38,7 @@ internal interface RawPcmSink : AutoCloseable {
     fun bufferedPositionUs(): Long = writtenPositionUs()
 
     /** Returns source media already consumed by the mixer for scheduling further PCM writes. */
-    fun mixerPositionUs(): Long = positionUs()
+    val mixerPositionUs: Long get() = positionUs()
 
     /** Resumes the existing sink; it must not replace the selected compressed source. */
     fun play()

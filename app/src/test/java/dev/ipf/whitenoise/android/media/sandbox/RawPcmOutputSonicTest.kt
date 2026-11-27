@@ -112,7 +112,7 @@ class RawPcmOutputSonicTest {
             assertEquals(160, output.write(ByteArray(160), 0))
             output.prepareForWait(true)
             assertTrue(device.head >= 80)
-            assertEquals(10_000L, output.mixerPositionUs())
+            assertEquals(10_000L, output.mixerPositionUs)
             assertEquals(0L, output.positionUs())
             assertFalse(output.drained())
 
