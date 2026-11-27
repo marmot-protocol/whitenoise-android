@@ -4352,6 +4352,7 @@ class WhiteNoiseAppState private constructor(
                 }
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
+                launchMutation { refreshAllSignInAlerts() }
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
                 scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
@@ -5178,6 +5179,7 @@ class WhiteNoiseAppState private constructor(
         if (knownSignedOut) {
             accountListLifetime.advance {
                 accounts = reconcileCachedAccountsAfterSignOut(accounts, account)
+                signInAlerts.forget(account)
             }
         }
         clearSignedOutAccountMemory(account)
@@ -5283,6 +5285,7 @@ class WhiteNoiseAppState private constructor(
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
+                                signInAlerts.wipe(wipedRef, wipedAccountId)
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)

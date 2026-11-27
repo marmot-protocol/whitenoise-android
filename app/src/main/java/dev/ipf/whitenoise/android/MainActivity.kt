@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapState
+import dev.ipf.whitenoise.android.notifications.SignInAlertNavigation
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.notificationTapLifecycle
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
@@ -58,6 +59,7 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.actionColorArgb
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
+import dev.ipf.whitenoise.android.state.signInAlerts
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
@@ -404,6 +406,12 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
+        SignInAlertNavigation.accountRef(intent, notificationTapTokens)?.let { account ->
+            pinTapGate.supersede()
+            appState.signInAlerts.requestDevices(account)
+            setIntent(Intent(this, MainActivity::class.java))
+            return
+        }
         val opensProfileChooser = notificationProfileTileRoute.accept(intent)
         if (opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
             if (!opensProfileChooser) {

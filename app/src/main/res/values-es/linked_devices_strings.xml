@@ -125,8 +125,8 @@
     <string name="sign_in_signed_out">Ya no tiene sesión iniciada</string>
     <string name="sign_in_question_new">¿Fuiste tú?</string>
     <string name="sign_in_question_before">¿Aún tienes este dispositivo?</string>
-    <string name="sign_in_detail_new">Alguien ha iniciado sesión en otro dispositivo. Si fuiste tú, puedes vincularlo. Si no, toca «No fui yo».</string>
-    <string name="sign_in_detail_before">Este dispositivo tenía sesión iniciada en la cuenta antes que este. Si aún lo tienes, vincula este dispositivo desde él. Si no, puedes empezar de cero.</string>
+    <string name="sign_in_detail_new">Alguien ha iniciado sesión en otro dispositivo. Si fuiste tú, puedes vincularlo. Si es una app tuya que no quieres vincular, toca «Es mía, no vincular». Si no fuiste tú, toca «No fui yo».</string>
+    <string name="sign_in_detail_before">Este dispositivo tenía sesión iniciada en la cuenta antes que este. Si aún lo tienes, vincula este dispositivo desde él o empieza de cero. Si no lo reconoces, toca «No lo reconozco».</string>
     <string name="sign_in_previously_linked">Un dispositivo vinculado aquí anteriormente no aparece en la lista actual de este dispositivo. Abre ambos dispositivos para comprobar el vínculo.</string>
     <string name="sign_in_reject">No fui yo</string>
     <string name="sign_in_reject_confirm">Se marcará en todos tus dispositivos que este inicio de sesión no fue tuyo y se mostrará una alerta de seguridad. El dispositivo seguirá conectado a la cuenta y tu clave seguirá siendo la misma.</string>
@@ -138,10 +138,10 @@
     <string name="start_fresh_title">No, empezar de cero</string>
     <string name="start_fresh_detail">Usa este dispositivo por separado de momento. Aún puedes vincularlo desde un dispositivo donde hayas iniciado sesión antes.</string>
     <string name="started_fresh_note">Este dispositivo empezó de cero. Aquí solo aparecen los chats a los que te inviten a partir de ahora.</string>
-    <string name="compromise_warning_title">Advertencia de seguridad</string>
-    <string name="compromise_warning_rejected">Un inicio de sesión en esta cuenta se marcó como ajeno. Otra persona podría tener la clave de esta cuenta o una sesión con su firmante.</string>
-    <string name="compromise_warning_foreign_key">Este dispositivo encontró en su propio espacio claves de invitación que no creó y las reemplazó. Otra persona podría tener la clave de esta cuenta o una sesión con su firmante.</string>
-    <string name="compromise_warning_dismiss">Marcar como visto</string>
+    <string name="compromise_warning_title">Puede que otra persona tenga tu clave secreta</string>
+    <string name="compromise_warning_rejected">Un inicio de sesión en esta cuenta se marcó como no tuyo.</string>
+    <string name="compromise_warning_foreign_key">Este dispositivo encontró en su propia ranura claves de invitación que no creó.</string>
+    <string name="compromise_warning_dismiss">Ocultar en este dispositivo</string>
     <string name="compromise_warning_dismiss_detail">Oculta esta advertencia solo en este dispositivo. No elimina un dispositivo, no rechaza un inicio de sesión ni protege tu clave.</string>
     <string name="device_move_section">Traslado de este dispositivo</string>
     <string name="device_move_waiting">Esperando a que los otros dispositivos lo añadan</string>
@@ -179,4 +179,28 @@
     <string name="unlinked_remove_sign_in_detail">Este dispositivo se ha desvinculado. ¿Quieres borrar de este dispositivo los chats y datos de este perfil e iniciar sesión con la clave que introdujiste? Tus otros dispositivos conservarán sus datos.</string>
     <string name="invite_decline_wait_for_sync">Espera a que se sincronice el chat y vuelve a tocar «Rechazar».</string>
     <string name="invite_decline_check_delivery">Tu último cambio en el grupo no ha llegado a todos los relés. Antes de intentarlo de nuevo, comprueba si hay un aviso de entrega en el chat.</string>
+    <string name="sign_in_claim">Dice ser: %1$s</string>
+    <string name="sign_in_mine">Es mía, no vincular</string>
+    <string name="sign_in_mine_state">Tuya, sin vincular</string>
+    <string name="sign_in_dont_recognize">No lo reconozco</string>
+    <string name="compromise_warning_explainer">Tu clave puede iniciar sesión en cualquier lugar y no se puede cambiar ni anular. White Noise mantiene los dispositivos desconocidos fuera de tus dispositivos vinculados, pero no puede bloquearles el acceso.</string>
+    <string name="compromise_warning_steps_title">Qué hacer</string>
+    <string name="compromise_warning_step_remove">1. Quita cualquier dispositivo que no reconozcas.</string>
+    <string name="compromise_warning_step_signer">2. Si usas una app de firma, quita allí las apps que no reconozcas.</string>
+    <string name="compromise_warning_step_move">3. Pásate a una cuenta nueva. Tus contactos tendrán que añadirla.</string>
+    <string name="compromise_alert_review">Revisar dispositivos</string>
+    <string name="compromise_warning_hide_failed">No se pudo ocultar la advertencia. Inténtalo de nuevo.</string>
+    <string name="sign_in_alert_review_banner">Un dispositivo que no has vinculado inició sesión en tu cuenta. Comprueba si es tuyo.</string>
+    <string name="sign_in_alert_review_action">Revisar</string>
+    <string name="sign_in_alert_badge_review">Inicio de sesión por revisar</string>
+    <string name="sign_in_alert_badge_compromise">Advertencia de seguridad</string>
+    <string name="sign_in_alert_review_body">Un dispositivo que no has vinculado inició sesión en tu cuenta. Abre White Noise para comprobar si es tuyo.</string>
+    <string name="sign_in_alert_review_public">Inicio de sesión por revisar</string>
+    <string name="sign_in_alert_compromise_body">Abre White Noise para ver qué pasó y qué hacer.</string>
+    <string name="sign_in_alert_compromise_public">Se necesita una comprobación de seguridad</string>
+    <string name="device_detail_remove_stolen">Si este dispositivo se perdió o lo robaron, quien lo tenga puede tener todavía tu clave.</string>
+    <plurals name="sign_in_alert_review_title">
+        <item quantity="one">Nuevo inicio de sesión por revisar</item>
+        <item quantity="other">%d nuevos inicios de sesión por revisar</item>
+    </plurals>
 </resources>

@@ -88,6 +88,24 @@
         "test_ids": [
           "GRP-042"
         ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.notification_channel_account_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_channel_account_security",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_badge_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.sign_in_alert_badge_review",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
       }
     ]
   },

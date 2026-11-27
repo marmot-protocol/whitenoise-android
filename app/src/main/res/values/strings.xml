@@ -1970,6 +1970,9 @@
     <string name="notification_channel_app_updates">App updates</string>
     <string name="notification_channel_app_updates_global">App updates · App-wide</string>
     <string name="notification_channel_app_updates_global_description">Android alert behavior for White Noise app updates</string>
+    <string name="notification_channel_account_security">Account security</string>
+    <string name="notification_channel_account_security_global">Account security · App-wide</string>
+    <string name="notification_channel_account_security_global_description">Android alert behavior for unknown sign-ins and security warnings</string>
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
     <string name="custom_emoji">Custom emoji</string>

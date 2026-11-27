@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ownsGroupChange
+import dev.ipf.whitenoise.android.ui.devices.CompromiseAlertHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
 import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPromptHost
@@ -37,5 +38,7 @@ internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
         DeviceLinkOfferHost(appState, blocked = linkBlocked)
         UnlinkedAccountPromptHost(appState, blocked = appState.appLock.screenVisible)
         UnlinkedProfileRemovalHost(appState, blocked = appState.appLock.screenVisible)
+        // Evidence that the key may be in someone else's hands interrupts once per item, after unlock.
+        CompromiseAlertHost(appState, blocked = linkBlocked)
     }
 }

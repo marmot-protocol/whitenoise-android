@@ -1,0 +1,72 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Sign-in alerts: R.plurals.sign_in_alert_review_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.plurals.sign_in_alert_review_title",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.app_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_compromise_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.sign_in_alert_compromise_body",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_compromise_public",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.sign_in_alert_compromise_public",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_compromise_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.sign_in_alert_compromise_title",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_review_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.sign_in_alert_review_body",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.sign_in_alert_review_public",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
+        "anchor": "R.string.sign_in_alert_review_public",
+        "test_ids": [
+          "SET-076",
+          "SET-077"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

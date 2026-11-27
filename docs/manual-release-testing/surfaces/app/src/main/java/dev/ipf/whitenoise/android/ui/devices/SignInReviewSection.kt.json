@@ -250,6 +250,56 @@
         "test_ids": [
           "SET-065"
         ]
+      },
+      {
+        "surface": "NotNowButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "fun NotNowButton(",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "RejectButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "fun RejectButton(",
+        "test_ids": [
+          "SET-065",
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_mine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_mine",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_mine_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_mine_state",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_dont_recognize",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_dont_recognize",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_claim",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_claim",
+        "test_ids": [
+          "SET-065",
+          "SET-076"
+        ]
       }
     ]
   },

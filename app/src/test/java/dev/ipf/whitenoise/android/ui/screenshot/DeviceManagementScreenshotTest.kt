@@ -122,14 +122,14 @@ class DeviceManagementScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_health_dark_rtl_large_font.png")
     }
 
-    /** Reviewing a new sign-in: Not now and This wasn't me. */
+    /** Reviewing a new sign-in: Not now, Mine, don't link and This wasn't me. */
     @Test
     fun signInReviewNewLight() {
         show(Look()) { SignInReviewDialog(signIn("a"), onAnswer = {}, onClose = {}) }
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/sign_in_review_new_light.png")
     }
 
-    /** Reviewing a sign-in from before this device, with the missing-link note. */
+    /** Reviewing a sign-in from before this device, with the missing-link note and I don't recognize this. */
     @Test
     fun signInReviewBeforeDark() {
         val before = signIn("a", beforeThisDevice = true).copy(previouslyLinkedHere = true)
@@ -161,16 +161,20 @@ class DeviceManagementScreenshotTest {
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/linked_devices_repair_light.png")
     }
 
-    /** Every standing notice at once: warning, stalled, overdue, both counts, a failed check and two sign-ins. */
+    /**
+     * Every standing notice at once: warning, stalled, overdue, both counts, a failed check and three sign-ins, one of
+     * them marked Mine, don't link.
+     */
     private fun everything(): LinkedDevicesHealth {
         val warning = CompromiseWarningItemFfi(CompromiseWarningReasonFfi.REJECTED_SIGN_IN, "slot", null, 1u)
         val notNow = signIn("b", beforeThisDevice = true).copy(state = UnrecognizedSignInStateFfi.NOT_NOW)
-        val list = SignInListState(listOf(signIn("a"), notNow), loaded = true, checkFailed = true)
+        val mine = signIn("c").copy(client = "Desktop bot", state = UnrecognizedSignInStateFfi.NOT_NOW)
+        val list = SignInListState(listOf(signIn("a"), notNow, mine), loaded = true, checkFailed = true)
         return LinkedDevicesHealth(
             counts = LinkedDeviceChatCounts(closedToLinkedDevices = 3, holdingRemovedDevice = 1),
             keyPackageRefreshOverdue = true,
             stalled = true,
-            review = SignInReviewState(list = list, warning = listOf(warning), startedFresh = true),
+            review = SignInReviewState(list = list, warning = listOf(warning), startedFresh = true, mine = setOf("c")),
         )
     }
 

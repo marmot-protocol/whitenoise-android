@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.devices.SignInDevicesRouteEffect
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
@@ -571,6 +572,15 @@ internal fun MainShell(
         previousPendingProfileNpub = current
     }
 
+    fun closeConversationForNotificationRoute() {
+        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+        supersedePendingGroupCreateOpen()
+        selectedChat = null
+        selectedChatOpenContext = ConversationOpenContext()
+        selectedChatJustCreated = false
+        selectedChatOpenedAsDmHint = false
+    }
+
     NotificationOpenRouteEffect(
         router =
             NotificationOpenRouter(
@@ -589,19 +599,7 @@ internal fun MainShell(
                             shellNavState = armShellNotificationRequest(shellNavState, profileGroupForegroundState)
                         }
 
-                        /** Closes the selected conversation and its open-time state before an account switch. */
-                        override fun closeConversationForAccountSwitch() {
-                            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                            supersedePendingGroupCreateOpen()
-                            selectedChat = null
-                            // Notification routing never opens a just-created conversation, so
-                            // clear any leftover open-time state from a prior New Chat / Create
-                            // Group flow, otherwise a stale justCreated flag would auto-raise
-                            // the IME on the next opened conversation (issue #321 guard).
-                            selectedChatOpenContext = ConversationOpenContext()
-                            selectedChatJustCreated = false
-                            selectedChatOpenedAsDmHint = false
-                        }
+                        override fun closeConversationForAccountSwitch() = closeConversationForNotificationRoute()
 
                         /** Revokes any selected conversation and open-time input state before returning to Chats. */
                         override fun fallBackToChatList() {
@@ -649,14 +647,19 @@ internal fun MainShell(
         supersedePendingTtsDestinationNavigation()
         sectionName = MainSection.Chats.name
         settingsDetailName = null
-        supersedePendingGroupCreateOpen()
-        selectedChat = null
-        selectedChatOpenContext = ConversationOpenContext()
-        selectedChatJustCreated = false
+        closeConversationForNotificationRoute()
         notificationRoute.routing = false
         routingAppUpdate = false
         appState.showAppUpdateBannerFromNotification()
         onAppUpdateTapHandled(tap)
+    }
+
+    // A sign-in notice, alert or notification opens Settings → Account, which opens that account's devices.
+    SignInDevicesRouteEffect(appState) {
+        supersedePendingTtsDestinationNavigation()
+        closeConversationForNotificationRoute()
+        sectionName = MainSection.Settings.name
+        settingsDetailName = SettingsDetail.Account.name
     }
 
     val openChatForShare: (List<ChatListItem>, String) -> Boolean = { allChats, groupIdHex ->

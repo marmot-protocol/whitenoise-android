@@ -1669,6 +1669,9 @@
     <string name="notification_channel_app_updates">Uygulama güncellemeleri</string>
     <string name="notification_channel_app_updates_global">Uygulama güncellemeleri · Uygulama genelinde</string>
     <string name="notification_channel_app_updates_global_description">White Noise uygulama güncellemeleri için Android uyarı davranışı</string>
+    <string name="notification_channel_account_security">Hesap güvenliği</string>
+    <string name="notification_channel_account_security_global">Hesap güvenliği · Uygulama genelinde</string>
+    <string name="notification_channel_account_security_global_description">Bilinmeyen oturum açmalar ve güvenlik uyarıları için Android uyarı davranışı</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
     <string name="custom_emoji">Özel emoji</string>
