@@ -193,8 +193,7 @@ internal class RetainedGroupAvatarPreparation(
         }
     }
 
-    fun hasExactRevision(asset: AvatarAssetFfi): Boolean =
-        retained[asset.selectionKey()]?.value?.asset?.contentRevision == asset.contentRevision
+    fun hasExactRevision(asset: AvatarAssetFfi): Boolean = retained[asset.selectionKey()]?.value?.asset?.contentRevision == asset.contentRevision
 
     /** Target and reference identify a drawable picture independently of a content refresh. */
     private fun AvatarAssetFfi.selectionKey(): Pair<String, String?> = target to reference

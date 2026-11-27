@@ -133,23 +133,25 @@ private suspend fun WhiteNoiseAppState.decodeDurableAvatarsWithinBudget(
         }
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
-            misses.chunked(DURABLE_AVATAR_BATCH_ITEMS).flatMap { batch ->
-                val refs = batch.mapNotNull { (_, asset, _) -> asset.reference }.distinct()
-                val readLock = Mutex()
-                var loaded: Map<String, AvatarBytesFfi>? = null
-                batch.map { (key, asset, domain) ->
-                    async {
-                        AvatarImageLoader.loadStored(key, lifetime, domain, abandonable = true) {
-                            // Read inside the existing decode lane so an abandoned batch does no IO.
-                            val payloads =
-                                readLock.withLock {
-                                    loaded ?: readDurableAvatarBatch(accountRef, refs).also { loaded = it }
-                                }
-                            payloads[asset.reference]?.takeIf { it.matchesAvatarAsset(asset) }?.bytes
+            misses
+                .chunked(DURABLE_AVATAR_BATCH_ITEMS)
+                .flatMap { batch ->
+                    val refs = batch.mapNotNull { (_, asset, _) -> asset.reference }.distinct()
+                    val readLock = Mutex()
+                    var loaded: Map<String, AvatarBytesFfi>? = null
+                    batch.map { (key, asset, domain) ->
+                        async {
+                            AvatarImageLoader.loadStored(key, lifetime, domain, abandonable = true) {
+                                // Read inside the existing decode lane so an abandoned batch does no IO.
+                                val payloads =
+                                    readLock.withLock {
+                                        loaded ?: readDurableAvatarBatch(accountRef, refs).also { loaded = it }
+                                    }
+                                payloads[asset.reference]?.takeIf { it.matchesAvatarAsset(asset) }?.bytes
+                            }
                         }
                     }
-                }
-            }.awaitAll()
+                }.awaitAll()
         }
     }
 }
