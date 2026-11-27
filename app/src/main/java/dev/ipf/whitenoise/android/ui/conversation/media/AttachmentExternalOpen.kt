@@ -210,7 +210,11 @@ internal fun isActiveContentExtension(
 }
 
 private fun platformMimeForExtension(extension: String): String? =
-    runCatching { android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) }.getOrNull()
+    runCatching {
+        android.webkit.MimeTypeMap
+            .getSingleton()
+            .getMimeTypeFromExtension(extension)
+    }.getOrNull()
 
 /**
  * Dispatch an already materialized [source] via the app's FileProvider.
