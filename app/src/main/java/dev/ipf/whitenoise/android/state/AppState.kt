@@ -4353,7 +4353,10 @@ class WhiteNoiseAppState private constructor(
                 }
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
-                launchMutation { refreshAllSignInAlerts() }
+                launchMutation {
+                    refreshAllSignInAlerts()
+                    refreshAllMissedDeviceLinkAttempts()
+                }
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
                 scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }

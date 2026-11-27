@@ -9,9 +9,12 @@ import androidx.core.content.edit
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
+import kotlinx.coroutines.delay
 
 private const val RETAINED_ATTEMPTS = 20
 private const val HISTORY_SECONDS = 7 * 24 * 60 * 60
+private const val MISSED_LINK_READ_RETRY_MS = 1_000L
 
 internal class DeviceLinkRequestRecords(
     context: Context,
@@ -94,15 +97,29 @@ internal class DeviceLinkAttemptHistory(
 
 /** Records terminal snapshots even while the shell is stopped but the native worker is still running. */
 internal suspend fun WhiteNoiseAppState.refreshMissedDeviceLinkAttempts(accountRef: String) {
+    if (!linkedDevicesAvailable()) return
     val generation = runtimeGeneration
     val account = accounts.firstOrNull { it.label == accountRef && signInAlertsApply(it) } ?: return
-    val snapshot = runCatchingCancellable { marmotIo { deviceLinkSnapshot(accountRef) } }.getOrNull() ?: return
+    val snapshot =
+        readDeviceLinkAttempts(accountRef) ?: run {
+            delay(MISSED_LINK_READ_RETRY_MS)
+            if (generation != runtimeGeneration) return
+            readDeviceLinkAttempts(accountRef)
+        } ?: return
     val watched = accounts.filter(::signInAlertsApply)
     val stillWatched = watched.any { it.label == accountRef && it.accountIdHex == account.accountIdHex }
     if (generation == runtimeGeneration && stillWatched) {
         deviceLinkRequests.attempts?.observe(mapOf(accountRef to snapshot), watched.mapTo(mutableSetOf()) { it.label })
     }
 }
+
+/** Recovers terminal prompts still retained by MDK after account loading or reconnecting the event stream. */
+internal suspend fun WhiteNoiseAppState.refreshAllMissedDeviceLinkAttempts() {
+    accounts.filter(::signInAlertsApply).forEach { refreshMissedDeviceLinkAttempts(it.label) }
+}
+
+private suspend fun WhiteNoiseAppState.readDeviceLinkAttempts(accountRef: String): DeviceLinkSnapshotFfi? =
+    runCatchingCancellable { marmotIo { deviceLinkSnapshot(accountRef) } }.getOrNull()
 
 private fun decodeAttempt(stored: Any?): DeviceLinkAttempt? {
     val fields = (stored as? String)?.split(':', limit = 3).orEmpty()
