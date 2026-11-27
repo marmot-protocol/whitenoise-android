@@ -44,7 +44,7 @@ internal class ReceivedVoiceTranscripts(
         key: String,
         value: AudioTranscriptUi,
     ) {
-        put(results, resultOrder, key, value)
+        putVoiceTranscriptEntry(results, resultOrder, key, value, capacity)
     }
 
     /** The person's explicit show or hide for one message, or null to follow the automatic setting. */
@@ -54,7 +54,7 @@ internal class ReceivedVoiceTranscripts(
         key: String,
         value: Boolean,
     ) {
-        put(shown, shownOrder, key, value)
+        putVoiceTranscriptEntry(shown, shownOrder, key, value, capacity)
     }
 
     fun accountEpoch(account: String): Int = accountEpochs[account] ?: 0
@@ -112,21 +112,22 @@ internal class ReceivedVoiceTranscripts(
         shownOrder.removeAll { it.startsWith(prefix) }
     }
 
-    private fun <T> put(
-        map: MutableMap<String, T>,
-        order: ArrayDeque<String>,
-        key: String,
-        value: T,
-    ) {
-        order.remove(key)
-        order.addLast(key)
-        map[key] = value
-        while (order.size > capacity) map.remove(order.removeFirst())
-    }
-
     private companion object {
         const val DEFAULT_CAPACITY = 256
     }
+}
+
+private fun <T> putVoiceTranscriptEntry(
+    map: MutableMap<String, T>,
+    order: ArrayDeque<String>,
+    key: String,
+    value: T,
+    capacity: Int,
+) {
+    order.remove(key)
+    order.addLast(key)
+    map[key] = value
+    while (order.size > capacity) map.remove(order.removeFirst())
 }
 
 /**
