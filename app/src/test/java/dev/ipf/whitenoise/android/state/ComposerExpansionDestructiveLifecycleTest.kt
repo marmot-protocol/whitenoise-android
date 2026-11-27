@@ -791,12 +791,13 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
-    /** A detached eviction retries a rejected filesystem purge on the next authoritative readback. */
+    /** A detached eviction keeps its retry when the filesystem rejects both deletion and isolation. */
     @Test
     fun failedEvictionPurgeIsRetried() =
         runBlocking {
             val take = saveVoiceDraft(GROUP_ID)
             val directory = checkNotNull(take.parentFile)
+            val accountDirectory = checkNotNull(directory.parentFile)
             val fixture =
                 fixture(
                     attachConversationController = false,
@@ -807,16 +808,21 @@ class ComposerExpansionDestructiveLifecycleTest {
             val runtime = appState.marmot()
             assertTrue(directory.setWritable(false))
             try {
+                assertTrue(accountDirectory.setWritable(false))
                 appState.reconcileCaptureEviction(key, runtime)
                 assertTrue(take.isFile)
                 assertNull(appState.voiceNotes.draft(key))
+                assertTrue(appState.voiceDraftEvictions.contains(key))
             } finally {
-                assertTrue(directory.setWritable(true))
+                val accountRestored = accountDirectory.setWritable(true)
+                val chatRestored = directory.setWritable(true)
+                assertTrue(accountRestored && chatRestored)
             }
 
             appState.reconcileCaptureEviction(key, runtime)
 
             assertFalse(directory.exists())
+            assertFalse(appState.voiceDraftEvictions.contains(key))
         }
 
     /** A take saved after a native eviction read begins cannot be removed by that older result. */
