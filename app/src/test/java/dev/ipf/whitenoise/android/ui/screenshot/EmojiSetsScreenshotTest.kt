@@ -14,10 +14,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
 import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
 import dev.ipf.whitenoise.android.ui.settings.emojiSetTileTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -138,7 +139,10 @@ class EmojiSetsScreenshotTest {
 
     /** Loading starts only from Load emoji, and a failed tile retries on tap. */
     @Test fun loadEmojiAsksFirstAndRetriesFailures() {
-        val source = GallerySource(failing = setOf("frog"))
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val pendingFox = CompletableDeferred<Unit>()
+        val failures = mutableSetOf("frog")
+        val source = GallerySource(failing = failures, blocked = mapOf("fox" to pendingFox))
         val images = EmojiSetImages(galleryFixture(), source) { GalleryArt[it.first().toInt()] }
         setTheme(dark = false, rtl = false) { galleryContent(images) }
         composeRule.waitForIdle()
@@ -146,14 +150,17 @@ class EmojiSetsScreenshotTest {
         composeRule.onNodeWithTag(EMOJI_SET_LOAD_TEST_TAG).performClick()
         composeRule.waitForIdle()
         assertTrue("The cover loads after the tap", "cover" in source.requests)
-        composeRule.onNodeWithTag(emojiSetTileTestTag("fox")).assertContentDescriptionEquals(":fox:")
-        val fox = composeRule.onNodeWithTag(emojiSetTileTestTag("fox")).fetchSemanticsNode().size.width
-        val owl = composeRule.onNodeWithTag(emojiSetTileTestTag("owl")).fetchSemanticsNode().size.width
+        composeRule.onNodeWithContentDescription(context.getString(R.string.emoji_sets_emoji_loading, ":fox:")).assertExists()
+        pendingFox.complete(Unit)
+        composeRule.onNodeWithContentDescription(":fox:").assertExists()
+        val fox = composeRule.onNodeWithTag(emojiSetTileTestTag("fox"), useUnmergedTree = true).fetchSemanticsNode().size.width
+        val owl = composeRule.onNodeWithTag(emojiSetTileTestTag("owl"), useUnmergedTree = true).fetchSemanticsNode().size.width
         assertTrue("Tiles in a row share its width equally ($fox, $owl)", fox > 0 && fox == owl)
         assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
         assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
-        composeRule.onNodeWithTag(emojiSetTileTestTag("frog")).performClick()
-        composeRule.waitForIdle()
+        failures.clear()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.emoji_sets_emoji_failed, ":frog:")).performClick()
+        composeRule.onNodeWithContentDescription(":frog:").assertExists()
         assertEquals("Tapping a failed tile retries it once", 2, source.requests.count { it == "frog" })
     }
 
@@ -381,6 +388,7 @@ class EmojiSetsScreenshotTest {
     private class GallerySource(
         val failing: Set<String> = emptySet(),
         val pending: Set<String> = emptySet(),
+        val blocked: Map<String, CompletableDeferred<Unit>> = emptyMap(),
     ) : EmojiSetImageSource {
         val requests = mutableListOf<String>()
 
@@ -397,6 +405,7 @@ class EmojiSetsScreenshotTest {
             requests += shortcode
             // Suspend like the native fetch, so a tile recomposes as Loading before its bytes arrive.
             kotlinx.coroutines.yield()
+            blocked[shortcode]?.await()
             if (shortcode in pending) kotlinx.coroutines.awaitCancellation()
             check(shortcode !in failing) { "host refused" }
             return byteArrayOf(GalleryCodes.indexOf(shortcode).toByte())
@@ -452,7 +461,7 @@ private fun galleryFixture() =
         identifier = "gallery-friends",
         eventIdHex = "gallery",
         title = "Garden friends",
-        description = "Twelve hand-drawn critters for reactions and replies.",
+        description = "Twelve colorful faces for reactions and replies.",
         imageUrl = "https://cdn.emoji.example/cover.png",
         emoji = GalleryCodes.map { dev.ipf.marmotkit.EmojiSetEmojiFfi(it, "https://cdn.emoji.example/$it.png") },
     )

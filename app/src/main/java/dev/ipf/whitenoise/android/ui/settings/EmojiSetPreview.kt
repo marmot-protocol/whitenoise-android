@@ -45,7 +45,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -84,16 +83,14 @@ private val CoverSize = 72.dp
 private val CoverArtSize = 56.dp
 private val TileMinSize = 56.dp
 private val TileGap = 8.dp
-private val GhostRowAlpha = 0.6f
 private const val TILE_ART_FRACTION = 0.72f
 private const val PULSE_LOW_ALPHA = 0.35f
 private const val PULSE_MILLIS = 800
-private const val MAX_GHOST_TILES = 6
 private const val MAX_NAMED_HOSTS = 3
 
 /**
- * One set version: who it is, what installing does, and its emoji as a grid. Remote images stay blank tiles until
- * the user loads them; an installed snapshot of this version renders from the device at once.
+ * One set version: who it is, what installing does, and its emoji as a grid. Remote previews require the user
+ * to load them; an installed snapshot of this version renders from the device at once.
  */
 @Suppress("LongParameterList")
 @Composable
@@ -115,15 +112,14 @@ internal fun EmojiSetPreview(
             item(key = "set.header") { EmojiSetPreviewHeader(set, images) }
             // Install, Update and Load emoji all contact the image hosts, so the disclosure comes before each of them.
             if (images?.local != true) item(key = "set.hosts") { EmojiSetHostDisclosure(set) }
+            if (images != null && !images.requested && rows.isNotEmpty() && state.progress == null) {
+                item(key = "set.load") {
+                    EmojiSetLoadAction(enabled = !state.busy, onLoad = images::request)
+                }
+            }
             item(key = "set.actions") { EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate) }
             item(key = "set.status") { EmojiSetStatus(state) }
-            if (images == null || !images.requested) {
-                if (rows.isNotEmpty()) {
-                    item(key = "set.load") {
-                        EmojiSetLoadCard(set, columns, enabled = images != null && !state.busy) { images?.request() }
-                    }
-                }
-            } else {
+            if (images?.requested == true) {
                 rows.forEachIndexed { index, row ->
                     item(key = "set.row.$index") { EmojiSetTileRow(row, columns, images, pulse) }
                 }
@@ -315,50 +311,28 @@ private fun EmojiSetInstallProgress(
     }
 }
 
-/** Blank tiles standing in for the grid, and the Load emoji action. */
 @Composable
-private fun EmojiSetLoadCard(
-    set: EmojiSetFfi,
-    columns: Int,
+private fun EmojiSetLoadAction(
     enabled: Boolean,
     onLoad: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    WhiteNoiseFilledTonalButton(
+        onClick = onLoad,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .testTag(EMOJI_SET_LOAD_TEST_TAG)
+                .explain(R.string.emoji_sets_load_emoji, R.string.explanation_organize_emoji_load_emoji),
     ) {
-        Column(
-            modifier = Modifier.padding(WhiteNoiseSpacing.FormField),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-        ) {
-            val ghosts = minOf(set.emoji.size, columns - 1, MAX_GHOST_TILES)
-            if (ghosts > 0) {
-                Row(
-                    modifier = Modifier.alpha(GhostRowAlpha),
-                    horizontalArrangement = Arrangement.spacedBy(TileGap),
-                ) {
-                    repeat(ghosts) { BlankTile(Modifier.weight(1f)) }
-                    repeat(columns - 1 - ghosts) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-            WhiteNoiseFilledTonalButton(
-                onClick = onLoad,
-                enabled = enabled,
-                modifier =
-                    Modifier
-                        .testTag(EMOJI_SET_LOAD_TEST_TAG)
-                        .explain(R.string.emoji_sets_load_emoji, R.string.explanation_organize_emoji_load_emoji),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_download),
-                    contentDescription = null,
-                    modifier = Modifier.size(ButtonDefaults.IconSize),
-                )
-                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                Text(stringResource(R.string.emoji_sets_load_emoji))
-            }
-        }
+        Icon(
+            painterResource(R.drawable.ic_download),
+            contentDescription = null,
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+        )
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(stringResource(R.string.emoji_sets_load_emoji))
     }
 }
 
@@ -383,7 +357,7 @@ private fun EmojiSetHostDisclosure(set: EmojiSetFfi) {
         }
     Text(
         text,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -487,18 +461,6 @@ private fun EmojiSetTileContent(
             }
         }
     }
-}
-
-/** A blank tile for the load card's preview row. */
-@Composable
-private fun BlankTile(modifier: Modifier) {
-    Box(
-        modifier =
-            modifier
-                .aspectRatio(1f)
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-    )
 }
 
 /** One pulse shared by every loading tile, so they breathe together; it holds still when animations are off. */

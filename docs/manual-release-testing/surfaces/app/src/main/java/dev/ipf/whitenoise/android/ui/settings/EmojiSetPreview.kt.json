@@ -44,9 +44,9 @@
         ]
       },
       {
-        "surface": "EmojiSetLoadCard",
+        "surface": "EmojiSetLoadAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun EmojiSetLoadCard(",
+        "anchor": "fun EmojiSetLoadAction(",
         "test_ids": [
           "SET-075"
         ]
@@ -63,14 +63,6 @@
         "surface": "EmojiSetTile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "fun EmojiSetTile(",
-        "test_ids": [
-          "SET-075"
-        ]
-      },
-      {
-        "surface": "BlankTile",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
-        "anchor": "fun BlankTile(",
         "test_ids": [
           "SET-075"
         ]
