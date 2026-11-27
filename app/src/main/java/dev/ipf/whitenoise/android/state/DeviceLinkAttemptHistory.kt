@@ -43,6 +43,8 @@ internal class DeviceLinkAttemptHistory(
 
     fun missed(accountRef: String): List<DeviceLinkAttempt> = recent(attempts[accountRef].orEmpty()).filterNot { it.reviewed }
 
+    fun forget(accountRef: String) = update(attempts - accountRef)
+
     fun reviewed(request: DeviceLinkRequest) {
         val entry = DeviceLinkAttempt(request.promptId, request.requestedAtSeconds, reviewed = true)
         val previous = attempts[request.accountRef].orEmpty()

@@ -5290,6 +5290,7 @@ class WhiteNoiseAppState private constructor(
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 signInAlerts.wipe(wipedRef, wipedAccountId)
+                                deviceLinkRequests.forgetAccount(wipedRef)
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)

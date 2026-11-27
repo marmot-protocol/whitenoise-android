@@ -34,6 +34,16 @@ class DeviceLinkAttemptHistoryTest {
         assertTrue(DeviceLinkAttemptHistory(context, nowSeconds = { NOW }).missed("alice").isEmpty())
     }
 
+    @Test
+    fun forgettingTheOnlyProfileRemovesItsPersistedAttempts() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val history = DeviceLinkAttemptHistory(context, nowSeconds = { NOW })
+        history.observe(mapOf("alice" to snapshot(expired("old"))), watchedAccounts = setOf("alice"))
+        history.forget("alice")
+
+        assertTrue(DeviceLinkAttemptHistory(context, nowSeconds = { NOW }).missed("alice").isEmpty())
+    }
+
     companion object {
         private const val NOW = 1_800_000_000L
 

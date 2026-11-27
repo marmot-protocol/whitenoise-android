@@ -209,13 +209,15 @@ internal class DeviceLinkRequestWatcher(
         }
     }
 
-    /** Re-reads the one profile [event] concerns, when it is a link change for a watched profile. */
-    suspend fun onEvent(
-        event: MarmotEventFfi,
-        accounts: List<String>,
-    ) {
-        val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
-        reread(account)
+    /** Removes the wiped profile and retires reads started before the wipe. */
+    fun forgetAccount(accountRef: String) {
+        attempts?.forget(accountRef)
+        unanswered = unanswered - accountRef
+        records?.unanswered?.write(unanswered)
+        accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
+        watchedAccounts = watchedAccounts?.minus(accountRef)
+        successfulReads = successfulReads - accountRef
+        publish(snapshots - accountRef)
     }
 
     /**
@@ -298,6 +300,15 @@ internal class DeviceLinkRequestWatcher(
         } catch (_: Throwable) {
             null
         }
+}
+
+/** Re-reads the one profile [event] concerns, when it is a link change for a watched profile. */
+internal suspend fun DeviceLinkRequestWatcher.onEvent(
+    event: MarmotEventFfi,
+    accounts: List<String>,
+) {
+    val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
+    reread(account)
 }
 
 /** These read counts with one more successful read of each of [accounts]. */
