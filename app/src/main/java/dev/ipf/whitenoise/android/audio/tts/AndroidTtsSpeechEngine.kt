@@ -1,16 +1,22 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import java.util.Locale
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-/** Thin adapter that keeps Android framework calls out of the queue state machine. */
+/**
+ * Thin adapter that keeps Android framework calls out of the queue state machine.
+ *
+ * [speak] returns at once and hands the sentence to the service on [handOff]'s thread, in call order. Each sentence's
+ * installed-offline-voice check runs there, just before the sentence leaves the app, so the binder catalogue read never
+ * blocks the caller. A refused sentence is reported through the queue's error callback.
+ */
 internal class AndroidTtsSpeechEngine(
     private val textToSpeech: TextToSpeech,
     private val enginePackage: String = "",
@@ -18,54 +24,60 @@ internal class AndroidTtsSpeechEngine(
     private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
     private val requireOfflineVoice: Boolean = false,
     private val onConnectionUncertain: () -> Unit = {},
+    handOff: Executor = ttsHandOffThread,
 ) : TtsSpeechEngine {
     private val retired = AtomicBoolean()
+
+    @Volatile
     private var enforceOfflineVoice = requireOfflineVoice
 
-    /** One binder voice check per submission batch: a main-thread task or one framework callback. */
-    private val offlineVoice = TaskScopedConfirmation()
+    /** The rate the controller set for the next sentence, applied when that sentence is handed off. */
+    @Volatile
+    private var speechRate: Float? = null
+
+    private val handOffs = SerialHandOff(handOff)
 
     override var effectiveLocale: Locale? = null
         private set
 
     /** Applies voice policy without reusing a framework object which may have silently reconnected. */
     @Suppress("ReturnCount")
-    override fun setLanguage(locale: Locale): Int {
-        if (retired.get()) return TextToSpeech.LANG_NOT_SUPPORTED
-        offlineVoice.clear()
-        val status = textToSpeech.setLanguage(locale)
-        if (status == TextToSpeech.LANG_NOT_SUPPORTED) return retire(status)
-        if (status < TextToSpeech.LANG_AVAILABLE) return status
-        effectiveLocale = locale
-        if (enginePackage.isEmpty()) return status
-        val voices = textToSpeech.voices ?: return retire(TextToSpeech.LANG_NOT_SUPPORTED)
-        val requested = selectedVoice()
-        enforceOfflineVoice = requireOfflineVoice || requested != null || voices.isNotEmpty()
-        val resolution =
-            if (voices.isEmpty()) {
-                TtsEngineResolver.resolveVoiceSelection(enginePackage, locale, voices, requested)
+    override fun setLanguage(locale: Locale): Int =
+        handOffs.exclusive {
+            // Exclusive with hand-offs, so a sentence is never checked under one voice and spoken under the next.
+            if (retired.get()) return@exclusive TextToSpeech.LANG_NOT_SUPPORTED
+            val status = textToSpeech.setLanguage(locale)
+            if (status == TextToSpeech.LANG_NOT_SUPPORTED) return@exclusive retire(status)
+            if (status < TextToSpeech.LANG_AVAILABLE) return@exclusive status
+            effectiveLocale = locale
+            if (enginePackage.isEmpty()) return@exclusive status
+            val voices = textToSpeech.voices ?: return@exclusive retire(TextToSpeech.LANG_NOT_SUPPORTED)
+            val requested = selectedVoice()
+            enforceOfflineVoice = requireOfflineVoice || requested != null || voices.isNotEmpty()
+            val resolution =
+                if (voices.isEmpty()) {
+                    TtsEngineResolver.resolveVoiceSelection(enginePackage, locale, voices, requested)
+                } else {
+                    TtsEngineResolver.applyResolvedVoice(
+                        enginePackage = enginePackage,
+                        locale = locale,
+                        voices = voices,
+                        requestedKey = requested,
+                        setVoice = ::selectFrameworkVoice,
+                        currentVoice = ::currentFrameworkVoice,
+                    )
+                }
+            effectiveLocale = resolution.effectiveKey?.localeTag?.let(Locale::forLanguageTag) ?: locale
+            onVoiceResolved(resolution)
+            if (retired.get() || (enforceOfflineVoice && resolution.effectiveKey == null)) {
+                TextToSpeech.LANG_NOT_SUPPORTED
             } else {
-                TtsEngineResolver.applyResolvedVoice(
-                    enginePackage = enginePackage,
-                    locale = locale,
-                    voices = voices,
-                    requestedKey = requested,
-                    setVoice = ::selectFrameworkVoice,
-                    currentVoice = ::currentFrameworkVoice,
-                )
+                status
             }
-        effectiveLocale = resolution.effectiveKey?.localeTag?.let(Locale::forLanguageTag) ?: locale
-        onVoiceResolved(resolution)
-        return if (retired.get() || (enforceOfflineVoice && resolution.effectiveKey == null)) {
-            TextToSpeech.LANG_NOT_SUPPORTED
-        } else {
-            status
         }
-    }
 
     /** Treats an ambiguous framework failure as the end of the consented connection. */
     private fun retire(status: Int): Int {
-        offlineVoice.clear()
         if (retired.compareAndSet(false, true)) onConnectionUncertain()
         return status
     }
@@ -86,9 +98,9 @@ internal class AndroidTtsSpeechEngine(
         }
     }
 
-    /** Applies the controller's bounded speech-rate preference to the framework engine. */
+    /** Records the controller's bounded speech rate for the sentences submitted after it. */
     override fun setSpeechRate(rate: Float) {
-        textToSpeech.setSpeechRate(rate)
+        speechRate = rate
     }
 
     /** Installs one listener that forwards every queue lifecycle callback. */
@@ -99,25 +111,24 @@ internal class AndroidTtsSpeechEngine(
         onRangeStart: (String?, Int, Int, Int) -> Unit,
         onStop: (String?, Boolean) -> Unit,
     ) {
-        // Each callback is one submission batch, so a queue resubmitted from it checks the voice once.
+        handOffs.onRefused = onError
         textToSpeech.setOnUtteranceProgressListener(
             androidTtsProgressListener(
-                { id -> offlineVoice.duringCallback { onStart(id) } },
-                { id -> offlineVoice.duringCallback { onDone(id) } },
+                onStart,
+                onDone,
                 { id, error ->
-                    offlineVoice.duringCallback {
-                        if (error == TextToSpeech.ERROR_SERVICE || error == TextToSpeech.ERROR) retire(error)
-                        onError(id, error)
-                    }
+                    if (error == TextToSpeech.ERROR_SERVICE || error == TextToSpeech.ERROR) retire(error)
+                    onError(id, error)
                 },
-                { id, start, end, frame -> offlineVoice.duringCallback { onRangeStart(id, start, end, frame) } },
-                { id, interrupted -> offlineVoice.duringCallback { onStop(id, interrupted) } },
+                onRangeStart,
+                onStop,
             ),
         )
     }
 
     /** Detaches the queue listener before an engine is replaced or released. */
     override fun clearCallbacks() {
+        handOffs.onRefused = null
         textToSpeech.setOnUtteranceProgressListener(null)
     }
 
@@ -141,81 +152,88 @@ internal class AndroidTtsSpeechEngine(
             },
         )
 
-    /** Submits an utterance only while the installed-voice restriction still holds. */
+    /**
+     * Queues an utterance for hand-off. It reaches the service only if the installed-voice restriction still holds
+     * when its turn comes; otherwise it and the rest of its queue are refused.
+     */
     private fun enqueue(
         text: String,
         utteranceId: String,
         params: Bundle?,
-    ): Int =
-        when {
-            retired.get() -> TextToSpeech.ERROR
-            (enforceOfflineVoice || selectedVoice() != null) &&
-                !offlineVoice.confirm { currentFrameworkVoice()?.isInstalledOffline() == true } ->
-                TextToSpeech.ERROR
-            else -> {
-                val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
-                if (status == TextToSpeech.SUCCESS) status else retire(status)
+    ): Int {
+        if (retired.get()) return TextToSpeech.ERROR
+        val rate = speechRate
+        handOffs.submit(utteranceId) {
+            when {
+                retired.get() -> TextToSpeech.ERROR
+                (enforceOfflineVoice || selectedVoice() != null) &&
+                    currentFrameworkVoice()?.isInstalledOffline() != true -> TextToSpeech.ERROR
+                else -> {
+                    rate?.let(textToSpeech::setSpeechRate)
+                    val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+                    if (status == TextToSpeech.SUCCESS) status else retire(status)
+                }
             }
         }
+        return TextToSpeech.SUCCESS
+    }
 
-    /** Stops framework synthesis for the active queue. */
+    /** Drops sentences not yet handed off, then stops framework synthesis for the active queue. */
     override fun stop() {
-        offlineVoice.clear()
-        if (!retired.get() && textToSpeech.stop() != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
+        val status = handOffs.stop { if (retired.get()) TextToSpeech.SUCCESS else textToSpeech.stop() }
+        if (status != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
     }
 }
+
+/** One process-wide thread hands read-aloud sentences to the speech service, off the main thread. */
+private val ttsHandOffThread: Executor =
+    Executors.newSingleThreadExecutor { task -> Thread(task, "tts-hand-off").apply { isDaemon = true } }
 
 /**
- * Reuses a positive check for the rest of one submission batch, so a batch of sentences reads the framework voice
- * once. On a looper the batch is the current task: a message at the front of that looper's queue clears it, ahead of
- * any later message such as a framework reconnection callback. On a callback thread without a looper, such as a Binder
- * thread requeueing after a rate change, the batch is the framework callback [duringCallback] wraps. Anywhere else
- * every call checks again. [clear] cancels a confirmation on every thread.
+ * Runs hand-offs in submission order on [executor]. [stop] drops every hand-off not yet started, and a refused
+ * hand-off drops the rest of its queue, reporting only the refused sentence to [onRefused]. A hand-off holds [lock]
+ * from its voice check to its speak call, and [stop] and [exclusive] wait for it, so neither lands in between.
  */
-private class TaskScopedConfirmation {
+private class SerialHandOff(
+    private val executor: Executor,
+) {
+    private val lock = Any()
+    private val queue = AtomicLong()
+
     @Volatile
-    private var confirmedOn: Looper? = null
-    private val changes = AtomicLong()
+    private var refusedQueue = -1L
 
-    /** The [changes] count a callback on this thread confirmed at, [UNCONFIRMED] before it does, null outside one. */
-    private val callbackConfirmedAt = ThreadLocal<Long?>()
+    @Volatile
+    var onRefused: ((String?, Int) -> Unit)? = null
 
-    /** Forgets every confirmation at once, for example when the voice or language may have changed. */
-    fun clear() {
-        confirmedOn = null
-        changes.incrementAndGet()
-    }
-
-    /** Runs a framework callback as one batch: speech it submits on a thread without a looper shares one check. */
-    fun duringCallback(block: () -> Unit) {
-        val outer = callbackConfirmedAt.get()
-        callbackConfirmedAt.set(UNCONFIRMED)
-        try {
-            block()
-        } finally {
-            if (outer == null) callbackConfirmedAt.remove() else callbackConfirmedAt.set(outer)
+    /** Queues [handOff] behind earlier submissions; it is skipped if its queue was stopped or refused first. */
+    fun submit(
+        utteranceId: String,
+        handOff: () -> Int,
+    ) {
+        val submittedIn = queue.get()
+        executor.execute {
+            val status =
+                synchronized(lock) {
+                    if (submittedIn != queue.get() || submittedIn == refusedQueue) null else handOff()
+                } ?: return@execute
+            if (status != TextToSpeech.SUCCESS) {
+                refusedQueue = submittedIn
+                // Reported outside the lock: the callback takes the controller's lock.
+                onRefused?.invoke(utteranceId, status)
+            }
         }
     }
 
-    /** Returns true when this batch already confirmed, or when [check] confirms now. */
-    fun confirm(check: () -> Boolean): Boolean {
-        val looper = Looper.myLooper()
-        val at = changes.get()
-        if ((looper != null && confirmedOn === looper) || callbackConfirmedAt.get() == at) return true
-        val confirmed = check()
-        if (confirmed && looper != null) {
-            // Keep the confirmation only when its clear is queued; a quitting looper refuses the post.
-            val clearQueued = Handler(looper).postAtFrontOfQueue { if (confirmedOn === looper) confirmedOn = null }
-            if (clearQueued && changes.get() == at) confirmedOn = looper
-        } else if (confirmed && callbackConfirmedAt.get() != null) {
-            callbackConfirmedAt.set(at)
-        }
-        return confirmed
+    /** Drops every hand-off not yet started, then runs [halt] once none is in flight. */
+    fun stop(halt: () -> Int): Int {
+        queue.incrementAndGet()
+        return synchronized(lock, halt)
     }
+
+    /** Runs [block] while no hand-off is in flight. */
+    fun <T> exclusive(block: () -> T): T = synchronized(lock, block)
 }
-
-/** Marks a callback batch that has not confirmed the voice yet; [AtomicLong] change counts are never negative. */
-private const val UNCONFIRMED = -1L
 
 internal fun androidTtsProgressListener(
     onStart: (String?) -> Unit,

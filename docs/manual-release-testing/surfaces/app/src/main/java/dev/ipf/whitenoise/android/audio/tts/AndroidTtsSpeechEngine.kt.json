@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Installed offline voice checked once per submitted batch",
+        "surface": "Installed offline voice checked before each sentence, off the main thread",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/AndroidTtsSpeechEngine.kt",
-        "anchor": "private class TaskScopedConfirmation",
+        "anchor": "private class SerialHandOff",
         "test_ids": [
           "TTS-002"
         ]

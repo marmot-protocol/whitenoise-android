@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
@@ -15,11 +13,41 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.Shadows.shadowOf
+import java.util.Collections
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 class AndroidTtsSpeechEngineTest {
+    /** Runs each hand-off inside [AndroidTtsSpeechEngine.speak], so a test observes it at once. */
+    private val inline = Executor(Runnable::run)
+
+    /** Holds hand-offs until [runHandOffs], so a test can act between submission and hand-off. */
+    private val held = ArrayDeque<Runnable>()
+
+    /** Queues a hand-off into [held]. */
+    private val holdHandOffs = Executor { held.add(it) }
+
+    /** Runs every held hand-off in submission order. */
+    private fun runHandOffs() {
+        while (held.isNotEmpty()) held.removeFirst().run()
+    }
+
+    /** An engine that requires an installed offline voice, as a saved or discovered one does. */
+    private fun offlineEngine(
+        tts: TextToSpeech,
+        handOff: Executor = inline,
+    ) = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true, handOff = handOff)
+
+    /** Records refused sentences the way the queue's error callback receives them. */
+    private fun AndroidTtsSpeechEngine.recordRefusals(): MutableList<String> {
+        val refused = mutableListOf<String>()
+        setCallbacks({}, {}, { id, code -> refused += "$id:$code" }, { _, _, _, _ -> }, { _, _ -> })
+        return refused
+    }
+
     /** Verifies the framework listener forwards every callback with its payload intact. */
     @Test
     fun progressListenerForwardsRangesStopsCompletionAndDetailedErrors() {
@@ -108,7 +136,7 @@ class AndroidTtsSpeechEngineTest {
     @Test
     fun mediaMixSpeechUsesBoundedFrameworkVolumeWhileOrdinarySpeechUsesNoBundle() {
         val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
-        val engine = AndroidTtsSpeechEngine(tts)
+        val engine = AndroidTtsSpeechEngine(tts, handOff = inline)
 
         engine.speak("ordinary", "u1")
         assertNull(tts.lastParams)
@@ -217,16 +245,22 @@ class AndroidTtsSpeechEngineTest {
     /** A required installed voice must still be available after language selection. */
     @Test
     fun offlinePlaybackRejectsAnEmptyCatalogAfterLanguageSelection() {
+        val tts = EmptyCatalogTextToSpeech()
         val engine =
             AndroidTtsSpeechEngine(
-                textToSpeech = EmptyCatalogTextToSpeech(),
+                textToSpeech = tts,
                 enginePackage = "engine.a",
                 requireOfflineVoice = true,
+                handOff = inline,
             )
+        val refused = engine.recordRefusals()
 
         assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.FRANCE))
-        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "start"))
-        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "mix", volume = 0.5f))
+        engine.speak("Private text", "start")
+        engine.speak("Private text", "mix", volume = 0.5f)
+
+        assertEquals(listOf("start:${TextToSpeech.ERROR}"), refused)
+        assertEquals(0, tts.spoken)
     }
 
     /** A failed framework call retires authorization for all later chunks on that adapter. */
@@ -234,28 +268,35 @@ class AndroidTtsSpeechEngineTest {
     fun frameworkFailureRetiresTheConnectionEvenWhenTheSameObjectRecovers() {
         val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
         var retirements = 0
-        val engine = AndroidTtsSpeechEngine(tts, onConnectionUncertain = { retirements++ })
+        val engine = AndroidTtsSpeechEngine(tts, onConnectionUncertain = { retirements++ }, handOff = inline)
+        val refused = engine.recordRefusals()
         tts.speakResult = TextToSpeech.ERROR
-        assertEquals(TextToSpeech.ERROR, engine.speak("First chunk", "first"))
+        engine.speak("First chunk", "first")
 
         tts.speakResult = TextToSpeech.SUCCESS
         assertEquals(TextToSpeech.ERROR, engine.speak("Later chunk", "later"))
         assertEquals("first", tts.lastUtteranceId)
+        assertEquals(listOf("first:${TextToSpeech.ERROR}"), refused)
         assertEquals(1, retirements)
     }
 
     /** A saved offline preference still applies when an engine stops exposing a voice catalog. */
     @Test
     fun savedOfflinePreferenceCannotBeLostWithAnEmptyCatalog() {
+        val tts = EmptyCatalogTextToSpeech()
         val engine =
             AndroidTtsSpeechEngine(
-                textToSpeech = EmptyCatalogTextToSpeech(),
+                textToSpeech = tts,
                 enginePackage = "engine.a",
                 selectedVoice = { TtsVoiceKey("engine.a", "Saved", "en-US") },
+                handOff = inline,
             )
+        val refused = engine.recordRefusals()
 
         assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.US))
-        assertEquals(TextToSpeech.ERROR, engine.speak("Fixture text", "saved"))
+        engine.speak("Fixture text", "saved")
+        assertEquals(listOf("saved:${TextToSpeech.ERROR}"), refused)
+        assertEquals(0, tts.spoken)
     }
 
     /** The installed requirement also applies when Android advertises a non-network voice that is downloading. */
@@ -270,86 +311,87 @@ class AndroidTtsSpeechEngineTest {
                 false,
                 setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED),
             )
-        val tts = VoiceSelectingTextToSpeech(voice, setOf(voice))
-        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+        val tts = CountingVoiceTextToSpeech(voice)
+        val engine = offlineEngine(tts)
+        val refused = engine.recordRefusals()
 
-        assertEquals(TextToSpeech.ERROR, engine.speak("Fixture text", "unavailable"))
+        engine.speak("Fixture text", "unavailable")
+        assertEquals(listOf("unavailable:${TextToSpeech.ERROR}"), refused)
+        assertEquals(emptyList<String>(), tts.spokenIds)
     }
 
-    /** A batch submitted in one main-thread task checks the framework voice once, not once per sentence. */
+    /**
+     * Every sentence is checked and handed to the service on the hand-off thread, never on the caller's thread, so a
+     * long message neither blocks the caller on the voice catalogue nor skips a sentence's check.
+     */
     @Test
-    fun oneBatchChecksTheFrameworkVoiceOnce() {
-        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+    fun everySentenceIsCheckedOffTheCallingThread() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300), expectedSpeaks = 50)
+        // The production hand-off thread, not a test executor.
         val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
-        engine.setLanguage(Locale.US)
-        shadowOf(Looper.getMainLooper()).idle()
-        tts.voiceReads = 0
 
         repeat(50) { assertEquals(TextToSpeech.SUCCESS, engine.speak("Sentence $it.", "u$it")) }
 
-        assertEquals(1, tts.voiceReads)
-        assertEquals(50, tts.spoken)
+        assertTrue(tts.allSpoken.await(5, TimeUnit.SECONDS))
+        assertEquals((0 until 50).map { "u$it" }, tts.spokenIds)
+        assertEquals(50, tts.voiceReads)
+        assertTrue(Thread.currentThread() !in tts.callingThreads)
     }
 
-    /** Work already queued on the looper runs after the clear, so it cannot reuse the earlier task's confirmation. */
+    /** A voice withdrawn after one sentence is handed off keeps the next one, and the rest of its queue, in the app. */
     @Test
-    fun alreadyQueuedWorkChecksTheVoiceAgain() {
-        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
-        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
-        engine.setLanguage(Locale.US)
-        shadowOf(Looper.getMainLooper()).idle()
-        var queuedResult: Int? = null
-        Handler(Looper.getMainLooper()).post {
-            tts.activeVoice = voice("Network", Locale.US, 300, networkRequired = true)
-            queuedResult = engine.speak("Queued batch.", "u2")
-        }
+    fun voiceWithdrawnBetweenHandOffsKeepsLaterSentencesInTheApp() {
+        val offline = voice("Offline", Locale.US, 300)
+        val tts = CountingVoiceTextToSpeech(offline)
+        val engine = offlineEngine(tts, holdHandOffs)
+        val refused = engine.recordRefusals()
+        engine.speak("First.", "u1")
+        engine.speak("Second.", "u2")
+        engine.speak("Third.", "u3")
 
-        assertEquals(TextToSpeech.SUCCESS, engine.speak("First batch.", "u1"))
-        shadowOf(Looper.getMainLooper()).idle()
+        held.removeFirst().run()
+        tts.activeVoice = voice("Network", Locale.US, 300, networkRequired = true)
+        runHandOffs()
 
-        assertEquals(TextToSpeech.ERROR, queuedResult)
-        assertEquals(1, tts.spoken)
-    }
+        assertEquals(listOf("u1"), tts.spokenIds)
+        assertEquals(listOf("u2:${TextToSpeech.ERROR}"), refused)
 
-    /** A queue resubmitted from a framework callback on a thread without a looper checks the voice once per call. */
-    @Test
-    fun callbackThreadResubmissionChecksTheVoiceOncePerCallback() {
-        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
-        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
-        engine.setLanguage(Locale.US)
-        tts.voiceReads = 0
-        engine.setCallbacks(
-            onStart = {},
-            onDone = { id -> repeat(10) { engine.speak("Tail $it.", "$id-$it") } },
-            onError = { _, _ -> },
-            onRangeStart = { _, _, _, _ -> },
-            onStop = { _, _ -> },
-        )
-        val listener = requireNotNull(tts.listener)
-
-        repeat(2) { callback ->
-            val binder = Thread { listener.onDone("u$callback") }
-            binder.start()
-            binder.join()
-        }
-
-        assertEquals(2, tts.voiceReads)
-        assertEquals(20, tts.spoken)
-    }
-
-    /** A stop inside the task drops the confirmation, so speech queued after it checks the voice again. */
-    @Test
-    fun stopDropsTheConfirmedVoiceWithinTheTask() {
-        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
-        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
-        engine.setLanguage(Locale.US)
-        tts.voiceReads = 0
-
-        engine.speak("Before stop.", "u1")
+        // The queue's stop starts a new queue, which checks the voice afresh.
         engine.stop()
-        engine.speak("After stop.", "u2")
+        tts.activeVoice = offline
+        engine.speak("Again.", "u4")
+        runHandOffs()
+        assertEquals(listOf("u1", "u4"), tts.spokenIds)
+    }
 
-        assertEquals(2, tts.voiceReads)
+    /** Sentences submitted before a stop are dropped, not handed to the service after it. */
+    @Test
+    fun stopDropsSentencesNotYetHandedOff() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = offlineEngine(tts, holdHandOffs)
+        engine.speak("Old first.", "u1")
+        engine.speak("Old second.", "u2")
+
+        engine.stop()
+        engine.speak("New.", "u3")
+        runHandOffs()
+
+        assertEquals(listOf("u3"), tts.spokenIds)
+    }
+
+    /** Each sentence reaches the service at the rate the controller set before submitting it. */
+    @Test
+    fun eachSentenceKeepsTheRateSetBeforeIt() {
+        val tts = CountingVoiceTextToSpeech(voice("Offline", Locale.US, 300))
+        val engine = offlineEngine(tts, holdHandOffs)
+        engine.setSpeechRate(1.5f)
+        engine.speak("Slow.", "u1")
+        engine.setSpeechRate(2f)
+        engine.speak("Fast.", "u2")
+
+        runHandOffs()
+
+        assertEquals(listOf(1.5f, 2f), tts.spokenRates)
     }
 
     /** Builds a listener that records each lifecycle callback in order. */
@@ -394,41 +436,16 @@ class AndroidTtsSpeechEngineTest {
         }
     }
 
-    /** Counts framework voice reads and accepted utterances for an engine with one active voice. */
-    private class CountingVoiceTextToSpeech(
-        var activeVoice: Voice,
-    ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
-        var voiceReads = 0
+    /** Models a usable engine that relies on its default voice and exposes no catalog. */
+    private class EmptyCatalogTextToSpeech : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
         var spoken = 0
             private set
-        var listener: UtteranceProgressListener? = null
-            private set
 
-        /** Captures the listener so a test can deliver callbacks from any thread. */
-        override fun setOnUtteranceProgressListener(listener: UtteranceProgressListener?): Int {
-            this.listener = listener
-            return TextToSpeech.SUCCESS
-        }
+        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_COUNTRY_AVAILABLE
 
-        /** Models an engine that accepts the requested locale. */
-        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_AVAILABLE
+        override fun getVoices(): MutableSet<Voice> = mutableSetOf()
 
-        /** Offers only the active voice. */
-        override fun getVoices(): MutableSet<Voice> = mutableSetOf(activeVoice)
-
-        /** Counts each binder-backed voice read. */
-        override fun getVoice(): Voice {
-            voiceReads++
-            return activeVoice
-        }
-
-        /** Accepts the offered voice. */
-        override fun setVoice(voice: Voice?): Int {
-            val accepted = voice == activeVoice
-            return if (accepted) TextToSpeech.SUCCESS else TextToSpeech.ERROR
-        }
-
-        /** Accepts every utterance without synthesizing audio. */
+        /** Counts utterances that reach the engine. */
         override fun speak(
             text: CharSequence?,
             queueMode: Int,
@@ -438,16 +455,52 @@ class AndroidTtsSpeechEngineTest {
             spoken++
             return TextToSpeech.SUCCESS
         }
+    }
+
+    /** Counts voice reads and records each utterance, its rate and the thread that handed it off. */
+    private class CountingVoiceTextToSpeech(
+        @Volatile var activeVoice: Voice,
+        expectedSpeaks: Int = 0,
+    ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
+        val allSpoken = CountDownLatch(expectedSpeaks)
+        val spokenIds: MutableList<String?> = Collections.synchronizedList(mutableListOf())
+        val spokenRates = mutableListOf<Float>()
+        val callingThreads: MutableSet<Thread> = Collections.synchronizedSet(mutableSetOf())
+
+        @Volatile
+        var voiceReads = 0
+            private set
+        private var rate = 1f
+
+        /** Counts each binder-backed voice read and the thread making it. */
+        override fun getVoice(): Voice {
+            callingThreads += Thread.currentThread()
+            voiceReads++
+            return activeVoice
+        }
+
+        /** Records the rate the next utterance uses. */
+        override fun setSpeechRate(speechRate: Float): Int {
+            rate = speechRate
+            return TextToSpeech.SUCCESS
+        }
+
+        /** Accepts every utterance without synthesizing audio. */
+        override fun speak(
+            text: CharSequence?,
+            queueMode: Int,
+            params: Bundle?,
+            utteranceId: String?,
+        ): Int {
+            callingThreads += Thread.currentThread()
+            spokenIds += utteranceId
+            spokenRates += rate
+            allSpoken.countDown()
+            return TextToSpeech.SUCCESS
+        }
 
         /** Stops without a framework connection. */
         override fun stop(): Int = TextToSpeech.SUCCESS
-    }
-
-    /** Models a usable engine that relies on its default voice and exposes no catalog. */
-    private class EmptyCatalogTextToSpeech : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
-        override fun setLanguage(locale: Locale?): Int = TextToSpeech.LANG_COUNTRY_AVAILABLE
-
-        override fun getVoices(): MutableSet<Voice> = mutableSetOf()
     }
 
     private class CapturingTextToSpeech(
