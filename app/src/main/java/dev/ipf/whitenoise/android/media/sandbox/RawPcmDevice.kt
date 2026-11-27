@@ -35,7 +35,7 @@ internal interface RawPcmDevice : AutoCloseable {
     fun headPosition(): Int
 
     /** Estimates the current speaker presentation frame on the same device counter, when available. */
-    fun presentationFrames(): Long? = null
+    fun presentationFrames(mixerHead: Long): Long? = null
 
     /** Estimated output delay until this route provides a usable hardware timestamp. */
     val fallbackPresentationLatencyMs: Long get() = 0L
@@ -138,13 +138,13 @@ internal class AndroidRawPcmDevice(
     /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     override fun headPosition(): Int = track.playbackHeadPosition
 
-    override fun presentationFrames(): Long? {
+    override fun presentationFrames(mixerHead: Long): Long? {
         if (routeChanged.getAndSet(false)) {
             presentationRouteGeneration++
             routeType = null
             presentationClock.reset()
         }
-        return presentationClock.frames(System.nanoTime(), underruns)
+        return presentationClock.frames(System.nanoTime(), underruns, mixerHead)
     }
 
     private fun readTimestamp(timestamp: AudioTimestamp): Boolean {
@@ -205,14 +205,17 @@ internal class RawPcmPresentationClock(
     private var sampledTimestamp = false
     private var previousUnderruns = 0
     private var minimumTimestampNs = Long.MIN_VALUE
+    private var underrunMixerHead: Long? = null
 
     fun frames(
         nowNs: Long,
         underruns: Int,
+        mixerHead: Long,
     ): Long? {
         if (underruns != previousUnderruns) {
             previousUnderruns = underruns
             minimumTimestampNs = nowNs
+            underrunMixerHead = mixerHead
             hasTimestamp = false
             nextTimestampNs = nowNs
         }
@@ -228,9 +231,13 @@ internal class RawPcmPresentationClock(
         val previousFrame = timestamp.framePosition
         val previousTime = timestamp.nanoTime
         val available = runCatching { readTimestamp(timestamp) }.getOrDefault(false)
-        val moved = timestamp.framePosition != previousFrame && timestamp.nanoTime > previousTime
-        val advancing = available && timestamp.nanoTime >= minimumTimestampNs && (!sampledTimestamp || moved)
+        // The 32-bit frame counter can wrap. An idle timestamp can refresh time while keeping the last frame.
+        val moved = (timestamp.framePosition - previousFrame).toInt() > 0 && timestamp.nanoTime > previousTime
+        val afterUnderrun = underrunMixerHead?.let { (timestamp.framePosition - it).toInt() > 0 } ?: true
+        val fresh = available && timestamp.nanoTime >= minimumTimestampNs && afterUnderrun
+        val advancing = fresh && (!sampledTimestamp || moved)
         val interval = if (sampledTimestamp && advancing) TIMESTAMP_STABLE_NS else TIMESTAMP_WARMUP_NS
+        if (advancing) underrunMixerHead = null
         nextTimestampNs = nowNs + interval
         sampledTimestamp = sampledTimestamp || available
         hasTimestamp = advancing
@@ -242,6 +249,7 @@ internal class RawPcmPresentationClock(
         hasTimestamp = false
         nextTimestampNs = Long.MIN_VALUE
         minimumTimestampNs = Long.MIN_VALUE
+        underrunMixerHead = null
     }
 
     private companion object {

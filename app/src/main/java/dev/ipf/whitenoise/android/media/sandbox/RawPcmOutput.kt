@@ -253,7 +253,7 @@ internal class RawPcmOutput(
         nowMs: Long,
     ): Long {
         // Both Android frame counters can wrap at 32 bits. Their short difference stays signed.
-        val lag = device.presentationFrames()?.let { (head - it).toInt().toLong() }
+        val lag = device.presentationFrames(head)?.let { (head - it).toInt().toLong() }
         val route = device.presentationRouteGeneration
         if (route != presentationRouteGeneration) {
             presentationRouteGeneration = route

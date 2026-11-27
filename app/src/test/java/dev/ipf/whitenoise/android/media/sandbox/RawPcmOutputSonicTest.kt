@@ -136,22 +136,25 @@ class RawPcmOutputSonicTest {
                 timestamp.framePosition = sampleFrame
                 true
             }
-        assertEquals(8_000L, clock.frames(sampleTimeNs, underruns = 0))
+        assertEquals(8_000L, clock.frames(sampleTimeNs, underruns = 0, mixerHead = 8_400))
         sampleTimeNs += 50_000_000L
         sampleFrame += 400
-        assertEquals(8_400L, clock.frames(sampleTimeNs, underruns = 0))
+        assertEquals(8_400L, clock.frames(sampleTimeNs, underruns = 0, mixerHead = 8_800))
 
-        // Stable polling would otherwise extrapolate the old sample for another ten seconds.
         val stalledAtNs = sampleTimeNs + 1_000_000_000L
-        assertEquals(16_400L, clock.frames(stalledAtNs, underruns = 0))
+        assertEquals(16_400L, clock.frames(stalledAtNs, underruns = 0, mixerHead = 9_200))
         sampleTimeNs += 100_000_000L
-        sampleFrame += 800
-        assertNull(clock.frames(stalledAtNs, underruns = 1))
-        assertNull(clock.frames(stalledAtNs + 50_000_000L, underruns = 1))
+        sampleFrame = 9_000L
+        assertNull(clock.frames(stalledAtNs, underruns = 1, mixerHead = 9_200))
 
-        sampleTimeNs = stalledAtNs + 100_000_000L
-        sampleFrame += 80
-        assertEquals(9_280L, clock.frames(sampleTimeNs, underruns = 1))
+        // Android can report the final old frame with a new timestamp while the audio pipeline is idle.
+        sampleTimeNs = stalledAtNs + 50_000_000L
+        sampleFrame = 9_200L
+        assertNull(clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_440))
+
+        sampleTimeNs += 50_000_000L
+        sampleFrame = 9_280L
+        assertEquals(9_280L, clock.frames(sampleTimeNs, underruns = 1, mixerHead = 9_680))
     }
 
     @Test fun endOfStreamWaitsForRouteLatencyBeforeTheFirstTimestamp() {
@@ -335,7 +338,7 @@ class RawPcmOutputSonicTest {
             return head
         }
 
-        override fun presentationFrames(): Long? = presented
+        override fun presentationFrames(mixerHead: Long): Long? = presented
 
         override fun write(
             buffer: ByteBuffer,
