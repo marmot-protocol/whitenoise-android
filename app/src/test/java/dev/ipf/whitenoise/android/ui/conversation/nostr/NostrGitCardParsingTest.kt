@@ -67,6 +67,16 @@ class NostrGitCardParsingTest {
         assertEquals(clones.drop(1) + web, links)
     }
 
+    /** A web page the reader can open leads its tag, so a copy-only fallback never takes its slot. */
+    @Test
+    fun openableWebPageLeadsACopyOnlyFallback() {
+        val clones = listOf("clone") + (1..7).map { "ssh://git@mirror$it.example.org/parser.git" }
+        val page = "https://example.org/parser?tab=readme"
+        val tags = listOf(clones, listOf("web", page, "http://example.org/parser"))
+        val links = event(kind = 30617, tags = tags).toCardModel().gitLinks
+        assertEquals(clones.drop(1) + page, links)
+    }
+
     /** A shell-safe link on a port outside 0..65535 is neither copied nor ranked ahead of a usable web link. */
     @Test
     fun outOfRangePortCannotTakeTheWebSlot() {
