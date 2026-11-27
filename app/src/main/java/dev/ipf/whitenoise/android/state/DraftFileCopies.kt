@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
+import dev.ipf.whitenoise.android.media.pdf.ArrayPdfBytes
+import dev.ipf.whitenoise.android.media.pdf.looksLikePdf
 import dev.ipf.whitenoise.android.ui.conversation.DRAFT_FILE_READ_CHUNK_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.prepareStagingDirectory
@@ -88,6 +90,12 @@ internal class DraftFileCopy(
     private val stored: DraftStoredFile,
 ) {
     private var revision: MessageDraftRevisionFfi? = null
+
+    /** Sniffs the native body under the selected revision, independent of MIME and name. */
+    suspend fun isPdf(): Boolean {
+        revision = heldRevision() ?: return false
+        return readChunk(0L)?.let { looksLikePdf(ArrayPdfBytes(it)) } == true
+    }
 
     /** Writes the whole file to [target] through a partial file; reports whether [target] now holds all of it. */
     suspend fun into(target: File): Boolean {

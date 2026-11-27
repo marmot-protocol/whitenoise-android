@@ -57,6 +57,68 @@ class PdfMetadataEdgeCaseTest {
         assertFalse(bytes.text().contains("Alice Example"))
     }
 
+    @Test
+    fun commentsInsideObjectHeaderDoNotHideInformation() {
+        val bytes =
+            pdf(
+                "1 0 obj << /Type /Catalog >> endobj",
+                "3 % comment before generation\n0 % comment before keyword\nobj << /Author (Alice Example) >> endobj",
+                trailer = "<< /Root 1 0 R /Info 3 0 R >>",
+            )
+
+        assertTrue(PdfMetadataScrubber.scrub(bytes) is PdfMetadataResult.Scrubbed)
+        assertFalse(bytes.text().contains("Alice Example"))
+    }
+
+    @Test
+    fun referenceTextInsideAParsedStringDoesNotClaimTheReferencedValue() {
+        val bytes =
+            pdf(
+                "1 0 obj << /Type /Catalog >> endobj",
+                "3 0 obj << /Author 5 0 R >> endobj",
+                "4 0 obj (The literal words 5 0 R stay here.) endobj",
+                "5 0 obj (Alice Example) endobj",
+                trailer = "<< /Root 1 0 R /Info 3 0 R >>",
+            )
+
+        assertTrue(PdfMetadataScrubber.scrub(bytes) is PdfMetadataResult.Scrubbed)
+        assertTrue(bytes.text().contains("literal words 5 0 R"))
+        assertFalse(bytes.text().contains("Alice Example"))
+    }
+
+    @Test
+    fun applicationPrivateMetadataRequiresAnExplicitOriginalChoice() {
+        val bytes =
+            pdf(
+                "1 0 obj << /Type /Catalog /PieceInfo << /Editor << /Private (Private value) >> >> >> endobj",
+                trailer = "<< /Root 1 0 R >>",
+            )
+        val original = bytes.copyOf()
+
+        assertEquals(PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported), PdfMetadataScrubber.scrub(bytes))
+        assertArrayEquals(original, bytes)
+    }
+
+    @Test
+    fun archivalRevisionSurvivesButAccessibilityClaimLeavesWithItsTitle() {
+        val source =
+            """
+            <rdf:Description>
+                <pdfaid:part>4</pdfaid:part>
+                <pdfaid:rev>2020</pdfaid:rev>
+                <pdfuaid:part>2</pdfuaid:part>
+                <dc:title>Original title</dc:title>
+            </rdf:Description>
+            """.trimIndent()
+        val replacement = PdfXmpPacket.replacing(source.latin1()).head.text()
+
+        assertTrue(replacement.contains("""pdfaid:part="4""""))
+        assertTrue(replacement.contains("""pdfaid:rev="2020""""))
+        assertFalse(replacement.contains("pdfaid:conformance"))
+        assertFalse(replacement.contains("pdfuaid"))
+        assertFalse(replacement.contains("Original title"))
+    }
+
     /** Information dictionaries nobody points to any more, and pdfTeX's copies of included files' ones, are emptied. */
     @Test
     fun leftoverInformationCopiesAreEmptied() {
@@ -97,6 +159,26 @@ class PdfMetadataEdgeCaseTest {
         assertTrue(PdfMetadataScrubber.scrub(bytes) is PdfMetadataResult.Scrubbed)
         assertFalse(bytes.text().contains("GPS 52.5N"))
         assertTrue("the image data stays", bytes.text().contains("\u0012ÿ\u00004"))
+    }
+
+    @Test
+    fun appendedJpegLosesItsMetadataAndOpaqueTailRequiresConfirmation() {
+        val soi = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
+        val eoi = byteArrayOf(0xFF.toByte(), 0xD9.toByte())
+        val image = soi + segment(0xE1, "Exif Sample".latin1()) + eoi
+
+        fun document(jpeg: ByteArray): ByteArray =
+            "%PDF-1.7\n5 0 obj << /Type /XObject /Subtype /Image /Filter /DCTDecode /Length ${jpeg.size} >> stream\n"
+                .latin1() + jpeg + "\nendstream endobj\ntrailer << >>\n%%EOF\n".latin1()
+
+        val both = document(image + image)
+        assertTrue(PdfMetadataScrubber.scrub(both) is PdfMetadataResult.Scrubbed)
+        assertFalse(both.text().contains("Exif Sample"))
+
+        val opaque = document(image + "opaque data".latin1())
+        val original = opaque.copyOf()
+        assertEquals(PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported), PdfMetadataScrubber.scrub(opaque))
+        assertArrayEquals(original, opaque)
     }
 
     /** Thousands of streams without an end finish quickly instead of searching the rest of the file each time. */

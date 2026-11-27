@@ -5,7 +5,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateEditor
 import dev.ipf.whitenoise.android.ui.settings.isTtsCustomRate
 import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 
+/** Picks a playback rate and exposes its current value on the shared speed button. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun TtsTransportRatePicker(
@@ -43,17 +43,15 @@ internal fun TtsTransportRatePicker(
     val controlDescription = stringResource(R.string.tts_bar_rate_control, rateLabel)
 
     Box {
-        TextButton(
+        PlaybackSpeedChip(
+            label = rateLabel,
             onClick = { menuOpen = true },
             modifier =
                 Modifier.semantics {
                     contentDescription = controlDescription
-                    role = Role.Button
                     stateDescription = rateLabel
                 },
-        ) {
-            Text(rateLabel)
-        }
+        )
         val menuScrollState = rememberScrollState()
         AnimatedDropdownMenu(
             scrollState = menuScrollState,

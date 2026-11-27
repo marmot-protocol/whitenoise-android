@@ -3,6 +3,10 @@
     <plurals name="composer_pdf_pages">
         <item quantity="other">PDF · %d 頁</item>
     </plurals>
+    <string name="composer_pdf_metadata_options">PDF 中繼資料選項</string>
+    <string name="composer_pdf_keep_metadata">保留中繼資料</string>
+    <string name="composer_pdf_remove_metadata">移除中繼資料</string>
+    <string name="composer_pdf_metadata_options_body">收件者可以查看 %1$s 原始檔案中的作者、日期和其他屬性。</string>
     <string name="composer_pdf_metadata_removed">已移除中繼資料</string>
     <string name="composer_pdf_metadata_removed_on_send">傳送時移除中繼資料</string>
     <string name="composer_pdf_metadata_signed">已簽署：保留中繼資料</string>

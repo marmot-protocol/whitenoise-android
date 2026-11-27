@@ -5,15 +5,14 @@ private const val LF = 10
 private const val CR = 13
 
 /**
- * Walks every `N G obj` and `trailer` in [source] in file order, which covers every revision an incremental update
+ * Walks every `N G obj` and `trailer` in [bytes] in file order, which covers every revision an incremental update
  * left behind. Comments between objects are skipped. Stream data is skipped by its direct `/Length` when that is
  * exact, and by its `endstream` otherwise, so binary data is not read as syntax. An object that does not parse is
  * passed over but remembered, so the plan can refuse when it needed that object. All reads share one work budget.
  */
 internal class PdfObjectWalk(
-    source: PdfBytes,
+    private val bytes: PdfBytes,
 ) {
-    private val bytes = BudgetedPdfBytes(source)
     private val parser = PdfValueParser(bytes)
     private val index = PdfObjectIndex()
     private val trailers = mutableListOf<PdfDict>()
@@ -22,6 +21,7 @@ internal class PdfObjectWalk(
     private val unreadable = mutableSetOf<Int>()
     private val infoLike = mutableListOf<Pair<Int, Int>>()
     private val embeddedInfo = mutableListOf<PdfValue>()
+    private val strings = mutableListOf<IntRange>()
     private val guessed = mutableListOf<PdfGuessedStream>()
 
     // Once one stream has no `endstream` after it, no later stream can have one, so later searches stop at once.
@@ -34,12 +34,12 @@ internal class PdfObjectWalk(
             position =
                 when {
                     byte == PERCENT -> endOfLine(position)
-                    byte == 'o'.code && bytes.isKeywordAt(position, OBJ) -> visitObject(position)
+                    isPdfDigit(byte) && (position == 0 || !isPdfRegular(bytes[position - 1])) -> visitObject(position)
                     byte == 't'.code && bytes.isKeywordAt(position, TRAILER) -> visitTrailer(position)
                     else -> position + 1
                 }
         }
-        return PdfLayout(index, trailers, streams, plainStreams, unreadable, infoLike, embeddedInfo, guessed)
+        return PdfLayout(index, trailers, streams, plainStreams, unreadable, infoLike, embeddedInfo, guessed, strings)
     }
 
     private fun endOfLine(from: Int): Int {
@@ -51,16 +51,25 @@ internal class PdfObjectWalk(
     private fun visitTrailer(keyword: Int): Int =
         try {
             val dict = parser.parse(keyword + TRAILER.size) as? PdfDict ?: return keyword + TRAILER.size
+            dict.collectStringRanges(strings)
             trailers += dict
             dict.end
         } catch (_: PdfSyntaxException) {
             keyword + TRAILER.size
         }
 
-    @Suppress("ReturnCount") // Not an object, unreadable, a plain value, a dictionary, or a stream.)
-    private fun visitObject(keyword: Int): Int {
+    @Suppress("ReturnCount") // A number outside an object header is skipped without parsing a value.
+    private fun visitObject(start: Int): Int {
+        val numberEnd = digitEnd(start)
+        val generationStart = bytes.skipSpace(numberEnd)
+        if (generationStart == numberEnd) return numberEnd
+        val generationEnd = digitEnd(generationStart)
+        if (generationEnd == generationStart) return numberEnd
+        val keyword = bytes.skipSpace(generationEnd)
+        if (keyword == generationEnd || !bytes.isKeywordAt(keyword, OBJ)) return numberEnd
+        val number = headerInt(start, numberEnd) ?: return numberEnd
+        val generation = headerInt(generationStart, generationEnd) ?: return numberEnd
         val next = keyword + OBJ.size
-        val (number, generation) = objectHeaderBefore(keyword) ?: return next
         val value =
             try {
                 parser.parse(next)
@@ -68,6 +77,7 @@ internal class PdfObjectWalk(
                 unreadable += number
                 return next
             }
+        value.collectStringRanges(strings)
         index.add(number, generation, value.start)
         if (value !is PdfDict) return value.end
         value.entries.forEach { (key, entry) -> if (key.startsWith("PTEX.")) embeddedInfo += entry }
@@ -117,24 +127,19 @@ internal class PdfObjectWalk(
             (dict.name("Subtype") == "Image" && dict.filters()?.any { it == "DCTDecode" || it == "DCT" } != false)
     }
 
-    /** Reads `N G` back from the `obj` keyword at [keyword], or null when the keyword does not open an object. */
-    @Suppress("ReturnCount", "CyclomaticComplexMethod") // Reads two tokens backwards; each check exits at once.)
-    private fun objectHeaderBefore(keyword: Int): Pair<Int, Int>? {
-        var position = keyword - 1
-        if (position < 0 || !isPdfWhitespace(bytes[position])) return null
-        while (position >= 0 && isPdfWhitespace(bytes[position])) position--
-        val generationEnd = position + 1
-        while (position >= 0 && isPdfDigit(bytes[position])) position--
-        val generationStart = position + 1
-        if (generationStart == generationEnd || position < 0 || !isPdfWhitespace(bytes[position])) return null
-        while (position >= 0 && isPdfWhitespace(bytes[position])) position--
-        val numberEnd = position + 1
-        while (position >= 0 && isPdfDigit(bytes[position])) position--
-        val numberStart = position + 1
-        if (numberStart == numberEnd || (position >= 0 && isPdfRegular(bytes[position]))) return null
-        val number = String(bytes.copy(numberStart, numberEnd), Charsets.ISO_8859_1).toIntOrNull() ?: return null
-        val generation =
-            String(bytes.copy(generationStart, generationEnd), Charsets.ISO_8859_1).toIntOrNull() ?: return null
-        return number to generation
+    private fun digitEnd(start: Int): Int {
+        var end = start
+        while (end < bytes.size && isPdfDigit(bytes[end])) end++
+        return end
     }
+
+    private fun headerInt(
+        start: Int,
+        end: Int,
+    ): Int? =
+        if (end - start > Int.MAX_VALUE.toString().length) {
+            null
+        } else {
+            String(bytes.copy(start, end), Charsets.ISO_8859_1).toIntOrNull()
+        }
 }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -190,6 +191,41 @@ internal class FileBackedPickBudget(
         }
     }
 
+    /** Stages a native draft body that is only available through its bounded, suspendable copy API. */
+    suspend fun stageStored(
+        byteCount: Long,
+        copy: suspend (File) -> Boolean,
+        accept: (StagedUploadSource) -> Boolean,
+    ): FileBackedPick =
+        when {
+            byteCount !in 1..nextPickMaxBytes() -> refused(FileBackedPickFailure.TOO_LARGE)
+            !hasStorageFor(byteCount, uploadWriteBytes + nativeCopies(byteCount)) ->
+                refused(FileBackedPickFailure.STORAGE)
+            !prepareStagingDirectory(directory) -> refused(FileBackedPickFailure.STORAGE)
+            else -> copyStored(byteCount, copy, accept)
+        }
+
+    private suspend fun copyStored(
+        byteCount: Long,
+        copy: suspend (File) -> Boolean,
+        accept: (StagedUploadSource) -> Boolean,
+    ): FileBackedPick {
+        val target =
+            runCatching { Files.createTempFile(directory.toPath(), "draft-upload-", ".part").toFile() }
+                .getOrElse { return refused(FileBackedPickFailure.STORAGE) }
+        val source = StagedUploadSource(target, byteCount)
+        var adopted = false
+        return try {
+            if (!copy(target) || target.length() != byteCount) {
+                refused(FileBackedPickFailure.UNREADABLE)
+            } else {
+                acceptSnapshot(source, accept).also { adopted = it.source != null }
+            }
+        } finally {
+            if (!adopted) source.closeQuietly()
+        }
+    }
+
     /**
      * Runs the bounded copy, lets [accept] inspect it, then confirms this message's upload still fits beside
      * the finished snapshot. The first snapshot makes the whole message upload from files, so the copies its
@@ -202,23 +238,7 @@ internal class FileBackedPickBudget(
         open: () -> InputStream?,
     ): FileBackedPick =
         when (val read = readStagedDocument(directory, maxBytes, checkCancellation, open)) {
-            is StagedDocumentRead.Success -> {
-                // The snapshot is on disk now, MDK's staged copy of it is still to come.
-                val writeAfter = uploadWriteBytes + nativeCopies(read.source.byteCount)
-                if (!accept(read.source)) {
-                    read.source.closeQuietly()
-                    refused(FileBackedPickFailure.UNREADABLE)
-                } else if (hasStorageFor(0L, writeAfter)) {
-                    uploadWriteBytes = writeAfter
-                    uploadsFromFiles = true
-                    staging.reserve(uploadWriteBytes)
-                    staging.staged(read.source)
-                    FileBackedPick(read.source, null)
-                } else {
-                    read.source.closeQuietly()
-                    refused(FileBackedPickFailure.STORAGE)
-                }
-            }
+            is StagedDocumentRead.Success -> acceptSnapshot(read.source, accept)
             StagedDocumentRead.TooLarge -> refused(FileBackedPickFailure.TOO_LARGE)
             StagedDocumentRead.Empty -> refused(FileBackedPickFailure.EMPTY)
             // The partial copy is already deleted, so only a disk still inside the app's reserve reads as storage.
@@ -231,6 +251,28 @@ internal class FileBackedPickBudget(
                     },
                 )
         }
+
+    private fun acceptSnapshot(
+        source: StagedUploadSource,
+        accept: (StagedUploadSource) -> Boolean,
+    ): FileBackedPick {
+        val writeAfter = uploadWriteBytes + nativeCopies(source.byteCount)
+        val failure =
+            when {
+                !accept(source) -> FileBackedPickFailure.UNREADABLE
+                !hasStorageFor(0L, writeAfter) -> FileBackedPickFailure.STORAGE
+                else -> null
+            }
+        if (failure != null) {
+            source.closeQuietly()
+            return refused(failure)
+        }
+        uploadWriteBytes = writeAfter
+        uploadsFromFiles = true
+        staging.reserve(uploadWriteBytes)
+        staging.staged(source)
+        return FileBackedPick(source, null)
+    }
 
     /** The copies MDK writes for a staged item of [byteCount] bytes: its one staged file. */
     private fun nativeCopies(byteCount: Long): Long = byteCount * (FILE_BACKED_DISK_COPIES - 1)
