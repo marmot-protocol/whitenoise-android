@@ -25,7 +25,7 @@ class AccountWideLocalRemovalTest {
     @After fun closeControllers() = controllers.forEach(ChatsController::onCleared)
 
     @Test fun offWindowDeleteKeepsNewReadsBehindNativeCommit() =
-        runTest {
+        runLocalGroupDeleteTest {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             var reads = 0
@@ -66,7 +66,7 @@ class AccountWideLocalRemovalTest {
         }
 
     @Test fun failedNativeDeleteReleasesReaderAndRestoresRetainedRow() =
-        runTest {
+        runLocalGroupDeleteTest {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val fixture = heldRemovalFixture(entered, release, beforeCommit = { error("delete rejected") })
@@ -90,7 +90,7 @@ class AccountWideLocalRemovalTest {
         }
 
     @Test fun cancelledNativeDeleteRollsBackAndReleasesSnapshotAdmission() =
-        runTest {
+        runLocalGroupDeleteTest {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val fixture = heldRemovalFixture(entered, release)
@@ -112,7 +112,7 @@ class AccountWideLocalRemovalTest {
         }
 
     @Test fun deletionDuringAnInFlightFullReadInvalidatesItsPreDeleteRows() =
-        runTest {
+        runLocalGroupDeleteTest {
             val readEntered = CompletableDeferred<Unit>()
             val releaseRead = CompletableDeferred<Unit>()
             val nativeEntered = CompletableDeferred<Unit>()
@@ -211,7 +211,7 @@ class AccountWideLocalRemovalTest {
      * fresh read.
      */
     @Test fun aChatRestoredAfterAFailedLocalDeletionNeedsAFreshRead() =
-        runTest {
+        runLocalGroupDeleteTest {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val fixture = heldRemovalFixture(entered, release, beforeCommit = { error("delete rejected") })

@@ -1817,16 +1817,14 @@ class ConversationController(
     )
 
     /**
-     * Synchronous half of a media send: validates the album, allocates a
-     * temp id, retains the bytes for retry, inserts the optimistic bubble,
-     * and republishes the timeline so the bubble appears immediately.
-     * Returns null when the send can't proceed (no account, can't send,
-     * empty, oversize, or a reply with no event id yet). Caller pairs each non-null result with a
-     * matching [uploadQueued] call to drive the FFI work. [canQueue] rechecks a caller's
-     * presentation owner after Markdown preparation, before publishing any optimistic state.
+     * Validates the album, retains the bytes for retry, and publishes the optimistic row.
+     * A non-null result must be passed to [uploadQueued] to drive the FFI work.
+     * [canQueue] rechecks the caller's live owner after each suspension.
+     * [beforeQueue] commits any required source retirement at the last synchronous admission point.
      */
     @Suppress(
         "LongMethod",
+        "LongParameterList",
         "ReturnCount",
         "TooGenericExceptionCaught",
     ) // Admission guards precede the single optimistic publication and cancel timing on any preparation failure.
@@ -1837,6 +1835,7 @@ class ConversationController(
         outboundVisibleStartedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
         replyTarget: String? = replyingTo?.messageIdHex,
         replyVersion: Long = replySelectionVersion,
+        beforeQueue: () -> Boolean = { true },
     ): QueuedAttachmentSend? {
         if (!canQueue()) return null
         val account =
@@ -1889,9 +1888,9 @@ class ConversationController(
             outboundVisibleAttempt.cancel()
             return null
         }
-        val replyRevision = target?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
-        val replyStagingFailed = target != null && replyRevision == null
-        if (replyStagingFailed || !canQueueMediaForAccount(account, canQueue)) {
+        val reply = target?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
+        val replyStagingFailed = target != null && reply == null
+        if (replyStagingFailed || !commitQueuedMediaSource(account, reply, canQueue, beforeQueue)) {
             outboundVisibleAttempt.cancel()
             if (replyStagingFailed) appState.present(R.string.media_reply_draft_conflict)
             return null
@@ -1900,7 +1899,7 @@ class ConversationController(
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(
             key,
-            RetainedMediaUpload(attachments, trimmedCaption, target, replyRevision, replyVersion),
+            RetainedMediaUpload(attachments, trimmedCaption, target, reply?.revision, replyVersion),
         )
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots

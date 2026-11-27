@@ -209,7 +209,7 @@ class LocalGroupDeleteControllerTest {
 
     @Test
     fun successfulRetryRetiresItsWarningAndKeepsTheSafePresenceCheck() =
-        runTest {
+        runLocalGroupDeleteTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
             assertNotNull(

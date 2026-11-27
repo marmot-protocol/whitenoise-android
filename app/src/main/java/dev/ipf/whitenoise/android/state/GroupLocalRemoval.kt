@@ -95,6 +95,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         onAdmitted()
         val account = request.account
         val groupIdHex = request.groupIdHex
+        val captureIsCurrent = localDeleteCaptureGuard(account, groupIdHex)
         val attempt =
             LocalGroupDeleteAttempt(
                 isCurrent = isCurrent,
@@ -130,22 +131,24 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
             )
         onNativeCommitted()
         if (pending != null) {
-            completeLocalGroupDeleteCleanup(pending, attempt)
+            completeLocalGroupDeleteCleanup(pending, attempt, captureIsCurrent)
         } else {
             true
         }
     }
 
+/** Finishes immediate native commits under the same capture guard used by journal replay. */
 private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
     attempt: LocalGroupDeleteAttempt,
+    captureIsCurrent: () -> Boolean,
 ) = withContext(NonCancellable) {
     var cleanupFailure: Throwable? = null
     val result =
         runCatching {
             attempt.phase(LocalDeletePhase.PostCommitCleanup) {
                 val complete =
-                    finishLocalGroupDeleteCleanup(pending) { failure ->
+                    finishLocalGroupDeleteCleanup(pending, captureIsCurrent) { failure ->
                         if (cleanupFailure == null) cleanupFailure = failure
                     }
                 if (!complete) throw requireNotNull(cleanupFailure)
@@ -178,6 +181,7 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
         val runtime = runtimeGeneration
         localGroupDeleteCleanupJournal.pending().forEach { pending ->
             runCatchingCancellable {
+                val captureIsCurrent = localDeleteCaptureGuard(pending.account, pending.groupIdHex)
                 reconcilePendingLocalGroupDeleteCleanup(
                     pending = pending,
                     accountReady = {
@@ -191,7 +195,7 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
                         withContext(Dispatchers.Main.immediate) {
                             dismissLocalDeleteFailure(it.account, it.groupIdHex)
                         }
-                        withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) }
+                        withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it, captureIsCurrent) }
                     },
                     finish = localGroupDeleteCleanupJournal::finish,
                 )
@@ -210,6 +214,7 @@ private suspend fun WhiteNoiseAppState.nativeGroupPresent(
 /** Returns false if any cleanup step failed so the durable intent can be retried later. */
 private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
+    captureIsCurrent: () -> Boolean,
     onFailure: (Throwable) -> Unit = {},
 ): Boolean {
     val account = pending.account
@@ -228,8 +233,19 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
             }
     }
 
+    val captureCleanupAdmitted =
+        withContext(Dispatchers.Main.immediate) {
+            if (!captureIsCurrent()) return@withContext false
+            cleanupStep("capture") {
+                check(releaseCaptureTarget(account, groupIdHex)) { "Could not retire voice drafts for removed chat" }
+            }
+            true
+        }
+    if (!captureCleanupAdmitted) {
+        onFailure(IllegalStateException("Local delete capture changed before cleanup"))
+        return false
+    }
     cleanupStep("launcher shortcuts") { removePinnedConversationShortcuts(account, groupIdHex) }
-    cleanupStep("dictation") { conversationDictation.onTargetRemoved(account, groupIdHex) }
     if (pending.mediaCacheKeys.isNotEmpty()) {
         cleanupStep("memory media") {
             removeMediaMemoryCacheKeys(

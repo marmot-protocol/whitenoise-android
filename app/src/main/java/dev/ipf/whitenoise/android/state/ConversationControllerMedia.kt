@@ -56,17 +56,6 @@ internal fun ConversationController.canQueueMediaForAccount(
             appState.mediaUploadSessionEpoch(),
         )
 
-/** A refused native draft write leaves the caller's unsent media and reply selection available. */
-internal suspend fun ConversationController.prepareQueuedMediaReply(
-    account: String,
-    target: String,
-    caption: String?,
-    attachments: List<PendingAttachment>,
-): dev.ipf.marmotkit.MessageDraftRevisionFfi? =
-    runCatchingCancellable {
-        appState.marmotIo { stageMediaReply(account, group.groupIdHex, target, caption, attachments) }
-    }.getOrNull()
-
 /** Builds the optimistic pending record that carries staged attachments until the send confirms. */
 internal suspend fun ConversationController.pendingAttachmentRecord(
     tempId: String,

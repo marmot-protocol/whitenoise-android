@@ -311,6 +311,7 @@ internal fun ConversationController.applyGroupState(incoming: AppGroupRecordFfi)
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
     }
     if (group.selfMembership.isNonMember()) recordSelfLeft()
+    appState.releaseEvictedCapture(conversationAccountRef, previousGroup, group)
     if (previousRetention != update.disappearingMessageSecs) {
         publishTimelineFromIndexes()
     }
