@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -38,10 +39,12 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilterChip
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 private const val FOLDER_HEADER_SCROLLED_THRESHOLD = 0.01f
 private val FOLDER_MANAGER_ICON_SIZE = 18.dp
 private const val FOLDER_PILL_MAX_VISIBLE_COUNT = 99
+private const val AMOLED_SELECTED_FOLDER_OUTLINE_ALPHA = 0.5f
 
 /** Native folder order/rules/counts remain input facts; this row only presents and reveals the selected destination. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,8 +154,7 @@ internal fun ChatFolderPills(
 }
 
 /**
- * One folder destination filter; the shared chip owns the pill shape, selected fill and long-press semantics.
- * Folder rows stay borderless in every theme, AMOLED included, so a row of pills reads as one strip.
+ * One folder destination filter. On AMOLED the active pill uses a gray outline as its selection cue.
  */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
@@ -177,16 +179,23 @@ internal fun ChatFolderPill(
     val visibleCount =
         unreadMessageCount?.let(::chatsPillVisibleCount)
             ?: trailingCount.takeIf { it > 0 }?.let { if (it > FOLDER_PILL_MAX_VISIBLE_COUNT) "99+" else it.toString() }
+    val amoled = isAmoledSurfaceTheme()
     WhiteNoiseFilterChip(
         selected = selected,
         onClick = onClick,
         label = { FolderPillLabel(label, labelMaxWidth) },
         modifier = Modifier.testTag(tag),
         trailingIcon = visibleCount?.let { count -> { Text(count, style = MaterialTheme.typography.labelSmall) } },
+        showCheck = !amoled,
         contentDescription = description,
         onLongClick = onLongClick,
         longClickLabel = if (onLongClick == null) null else stringResource(R.string.edit),
-        border = null,
+        border =
+            if (amoled && selected) {
+                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = AMOLED_SELECTED_FOLDER_OUTLINE_ALPHA))
+            } else {
+                null
+            },
     )
 }
 
