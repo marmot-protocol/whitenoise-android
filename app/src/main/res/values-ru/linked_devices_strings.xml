@@ -213,4 +213,5 @@
         <item quantity="many">%d новых входов нужно проверить</item>
         <item quantity="other">%d нового входа нужно проверить</item>
     </plurals>
+    <string name="link_request_expired_attempt">Устройство пыталось привязаться: %1$s.</string>
 </resources>

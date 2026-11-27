@@ -211,4 +211,5 @@
         <item quantity="one">İncelenecek yeni oturum açma</item>
         <item quantity="other">İncelenecek %d yeni oturum açma</item>
     </plurals>
+    <string name="link_request_expired_attempt">Bir cihaz %1$s tarihinde bağlanmayı denedi.</string>
 </resources>

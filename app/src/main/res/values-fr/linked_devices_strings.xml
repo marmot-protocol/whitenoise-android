@@ -212,4 +212,5 @@
         <item quantity="many">%d nouvelles connexions à vérifier</item>
         <item quantity="other">%d nouvelles connexions à vérifier</item>
     </plurals>
+    <string name="link_request_expired_attempt">Un appareil a tenté de se lier le %1$s.</string>
 </resources>

@@ -150,7 +150,7 @@ internal class DeviceLinkRequestWatcher(
     private val canPresentOutcome: (String) -> Boolean = { true },
     private val nowMs: () -> Long = ::monotonicNowMs,
     private val historyNowMs: () -> Long = nowMs,
-    private val history: DeviceLinkRequestHistory? = null,
+    private val records: DeviceLinkRequestRecords? = null,
 ) {
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
         private set
@@ -170,7 +170,9 @@ internal class DeviceLinkRequestWatcher(
     var blocked by mutableStateOf(false)
 
     /** Per profile, when each unanswered request was first seen, by [historyNowMs]. */
-    private var unanswered = history?.read().orEmpty()
+    private var unanswered = records?.unanswered?.read().orEmpty()
+
+    val attempts: DeviceLinkAttemptHistory? get() = records?.attempts
 
     private var watchedAccounts: Set<String>? = null
 
@@ -251,12 +253,16 @@ internal class DeviceLinkRequestWatcher(
 
     /** Presents [request] because the user tapped its notice. Nothing opens while the shell is blocked. */
     fun open(request: DeviceLinkRequest) {
-        queue = queue.open(request, blocked)
+        val next = queue.open(request, blocked)
+        if (queue.presented == null) next.presented?.let { attempts?.reviewed(it) }
+        queue = next
     }
 
     /** Puts the notice for [request] off until MDK drops it, without answering it. */
     fun dismiss(request: DeviceLinkRequest) {
-        queue = queue.dismiss(request)
+        val next = queue.dismiss(request)
+        if (queue.requests.any { it.id == request.id && it.open }) attempts?.reviewed(request)
+        queue = next
     }
 
     /** Closes the presented request without answering it; the chat list announces it again. */
@@ -275,7 +281,8 @@ internal class DeviceLinkRequestWatcher(
                 .mapValues { (_, prompts) ->
                     prompts.filterValues { historyTime - it in 0 until REPEATED_LINK_REQUEST_WINDOW_MS }
                 }.filterValues { it.isNotEmpty() }
-        if (unanswered != previous) history?.write(unanswered)
+        if (unanswered != previous) records?.unanswered?.write(unanswered)
+        watchedAccounts?.let { accounts -> attempts?.observe(next, accounts) }
         snapshots = next
         val repeated = repeatedLinkRequestAccounts(unanswered)
         val visible = deviceLinkRequests(next, repeated).filter { it.open || canPresentOutcome(it.accountRef) }
@@ -337,6 +344,6 @@ internal fun WhiteNoiseAppState.runtimeLinkRequests() =
             owns = { runtimeGeneration == epoch },
             canPresentOutcome = { account -> activeAccountRef == account },
             historyNowMs = System::currentTimeMillis,
-            history = DeviceLinkRequestHistory(appContext),
+            records = DeviceLinkRequestRecords(appContext),
         )
     }

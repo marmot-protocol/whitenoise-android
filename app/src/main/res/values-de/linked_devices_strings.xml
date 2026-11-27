@@ -211,4 +211,5 @@
         <item quantity="one">Neue Anmeldung zu prüfen</item>
         <item quantity="other">%d neue Anmeldungen zu prüfen</item>
     </plurals>
+    <string name="link_request_expired_attempt">Ein Gerät hat um %1$s versucht, sich zu verknüpfen.</string>
 </resources>

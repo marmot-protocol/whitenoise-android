@@ -212,4 +212,5 @@
         <item quantity="many">%d novas entradas para revisar</item>
         <item quantity="other">%d novas entradas para revisar</item>
     </plurals>
+    <string name="link_request_expired_attempt">Um dispositivo tentou vincular-se em %1$s.</string>
 </resources>

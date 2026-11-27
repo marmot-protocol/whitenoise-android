@@ -99,7 +99,14 @@ private fun LinkedDevicesPages(
                         reviewingSlot = page.reviewingSlot
                         repairing = page.repairing
                     },
-                health = linkedDevicesHealth(controller, management, appState.signInsMarkedMine(controller.accountRef)),
+                health =
+                    linkedDevicesHealth(controller, management, appState.signInsMarkedMine(controller.accountRef))
+                        .copy(
+                            missedLinks =
+                                appState.deviceLinkRequests.attempts
+                                    ?.missed(controller.accountRef)
+                                    .orEmpty(),
+                        ),
             )
     }
     LinkedDevicesDialogs(

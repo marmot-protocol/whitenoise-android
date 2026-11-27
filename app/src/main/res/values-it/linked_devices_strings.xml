@@ -212,4 +212,5 @@
         <item quantity="many">%d nuovi accessi da controllare</item>
         <item quantity="other">%d nuovi accessi da controllare</item>
     </plurals>
+    <string name="link_request_expired_attempt">Un dispositivo ha tentato di collegarsi il %1$s.</string>
 </resources>

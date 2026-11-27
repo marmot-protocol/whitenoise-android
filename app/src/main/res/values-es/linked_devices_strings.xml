@@ -211,4 +211,5 @@
         <item quantity="one">Nuevo inicio de sesión por revisar</item>
         <item quantity="other">%d nuevos inicios de sesión por revisar</item>
     </plurals>
+    <string name="link_request_expired_attempt">Un dispositivo intentó vincularse el %1$s.</string>
 </resources>

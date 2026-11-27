@@ -210,4 +210,5 @@
     <plurals name="sign_in_alert_review_title">
         <item quantity="other">%d 个新登录待查看</item>
     </plurals>
+    <string name="link_request_expired_attempt">%1$s 有设备尝试关联。</string>
 </resources>

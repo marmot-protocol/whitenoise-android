@@ -211,4 +211,5 @@
     <string name="sign_in_alert_compromise_body">Open White Noise to see what happened and what to do.</string>
     <string name="sign_in_alert_compromise_public">Security check needed</string>
     <string name="device_detail_remove_stolen">If this device was lost or stolen, whoever has it may still have your key.</string>
+    <string name="link_request_expired_attempt">A device tried to link at %1$s.</string>
 </resources>
