@@ -215,7 +215,7 @@ class VoiceRecordingController internal constructor(
         isRecording = true
         onRecordingStarted()
         resetRecordingUiState()
-        return nextStartGeneration()
+        return startRequests.advance()
     }
 
     /** Clears restart bookkeeping and releases the microphone lease after a stopped restart. */
@@ -327,8 +327,8 @@ class VoiceRecordingController internal constructor(
         }
     }
 
-    /** Accepts a new recorder-start request and returns its token. */
-    private fun nextStartGeneration(): Long = startRequests.advance()
+    /** Identifies this recorder's current start request across an eviction readback. */
+    internal val captureGeneration: Long get() = startRequests.capture()
 
     /** Makes any recorder still preparing in the background ineligible to publish. */
     private fun invalidatePendingStart() {

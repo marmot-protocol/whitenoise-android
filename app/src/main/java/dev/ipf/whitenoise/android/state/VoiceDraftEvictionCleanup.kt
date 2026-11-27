@@ -207,7 +207,12 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
     ) {
         return
     }
-    if (readCaptureEviction(key, runtime) == true) releaseEvictedCaptureTarget(account, group)
+    val evicted =
+        readCaptureEviction(key, runtime) {
+            voiceDraftEvictions.stage(key)
+            voiceDraftEvictions.resume()
+        }
+    if (evicted == true) releaseEvictedCaptureTarget(account, group)
 }
 
 /** Only a recorded eviction can use confirmed absence of the targeted native row to authorize a purge. */
@@ -215,10 +220,12 @@ private suspend fun WhiteNoiseAppState.readCaptureEviction(
     key: VoiceNoteKey,
     runtime: MarmotInterface,
     allowMissing: Boolean = false,
+    onNewerCapture: () -> Unit = {},
 ): Boolean? {
     if (marmotOrNull() !== runtime) return null
     val (account, group) = key
     val epoch = runtimeGeneration
+    val captureIsCurrent = voiceNotes.captureTargetIsCurrent(key)
     val eviction =
         runCatchingCancellable {
             withContext(Dispatchers.IO) { runtime.chatListRow(account, group)?.selfMembership }
@@ -232,6 +239,9 @@ private suspend fun WhiteNoiseAppState.readCaptureEviction(
                 true.takeIf { allowMissing && removedAccount }
             },
         )
-    // Native membership belongs to this account and chat even if another profile was selected during readback.
-    return eviction?.takeIf { epoch == runtimeGeneration && marmotOrNull() === runtime }
+    // Selection may change, but this read cannot retire a newer recording or draft for the same chat.
+    val runtimeIsCurrent = epoch == runtimeGeneration && marmotOrNull() === runtime
+    val sameCapture = captureIsCurrent()
+    if (runtimeIsCurrent && eviction == true && !sameCapture) onNewerCapture()
+    return eviction?.takeIf { runtimeIsCurrent && sameCapture }
 }

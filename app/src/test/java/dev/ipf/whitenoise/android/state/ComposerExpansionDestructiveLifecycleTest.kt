@@ -42,7 +42,9 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +58,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.lang.reflect.Proxy
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -814,6 +817,39 @@ class ComposerExpansionDestructiveLifecycleTest {
             appState.reconcileCaptureEviction(key, runtime)
 
             assertFalse(directory.exists())
+        }
+
+    /** A take saved after a native eviction read begins cannot be removed by that older result. */
+    @Test(timeout = 10_000)
+    fun evictionReadbackPreservesANewerVoiceDraft() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture =
+                fixture(
+                    attachConversationController = false,
+                    groupRecord = group().copy(selfMembership = SelfMembershipFfi.REMOVED),
+                )
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val reading = CompletableDeferred<Unit>()
+            val finishRead = CountDownLatch(1)
+            fixture.calls.onChatListRow = {
+                reading.complete(Unit)
+                finishRead.await()
+            }
+            val readback = launch { appState.reconcileCaptureEviction(key, appState.marmot()) }
+            val replacement =
+                try {
+                    reading.await()
+                    saveVoiceDraft(GROUP_ID).also { appState.voiceNotes.bind(key) { true } }
+                } finally {
+                    finishRead.countDown()
+                }
+            readback.join()
+
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertTrue(appState.voiceDraftEvictions.contains(key))
         }
 
     /** Seeds a finished take using the actual private voice draft format. */

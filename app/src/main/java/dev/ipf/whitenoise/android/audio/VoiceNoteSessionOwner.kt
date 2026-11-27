@@ -117,6 +117,18 @@ internal class VoiceNoteSessionOwner(
         return recorder?.isFinalizing == true || activity(key) != VoiceNoteActivity.None
     }
 
+    /** Captures the current recorder, start request and saved take so a delayed eviction cannot retire a newer one. */
+    fun captureTargetIsCurrent(key: VoiceNoteKey): () -> Boolean {
+        val recorder = controllers[key]
+        val generation = recorder?.captureGeneration
+        val file = drafts[key]?.file
+        return {
+            controllers[key] === recorder &&
+                recorder?.captureGeneration == generation &&
+                drafts[key]?.file == file
+        }
+    }
+
     /** Commits Discard for exactly [file] before clearing its presentation. */
     fun consume(
         key: VoiceNoteKey,

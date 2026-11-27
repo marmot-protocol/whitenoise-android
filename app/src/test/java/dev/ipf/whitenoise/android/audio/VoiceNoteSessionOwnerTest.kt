@@ -250,6 +250,20 @@ class VoiceNoteSessionOwnerTest {
             fixture.release()
         }
 
+    /** A start on the same bound recorder invalidates a membership read started while it was idle. */
+    @Test
+    fun startingOnTheSameRecorderRevokesAnEarlierEvictionRead() =
+        runTest {
+            val fixture = Fixture(this)
+            val recorder = fixture.owner.bind(chat) { true }
+            val captureIsCurrent = fixture.owner.captureTargetIsCurrent(chat)
+
+            assertTrue(captureIsCurrent())
+            assertTrue(recorder.start())
+            assertFalse(captureIsCurrent())
+            fixture.release()
+        }
+
     private inner class Fixture(
         scope: TestScope,
         root: File = folder.root,

@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-061"
         ]
+      },
+      {
+        "surface": "Delayed eviction readback preserves a newer voice take",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
+        "anchor": "captureIsCurrent()",
+        "test_ids": [
+          "MED-061"
+        ]
       }
     ]
   },
