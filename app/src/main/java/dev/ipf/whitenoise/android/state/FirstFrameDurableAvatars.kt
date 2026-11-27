@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.media.DisplayAvatarGeneration
 import dev.ipf.whitenoise.android.media.DisplayAvatarKey
@@ -140,15 +142,12 @@ private suspend fun WhiteNoiseAppState.prepareFirstFrameAvatarPixels(
     val displayKeys = selections.mapNotNull(FirstFrameAvatarSelection::displayKey)
     val restored = mutableSetOf<DisplayAvatarKey>()
     var rebuildPack = false
+    var packHit = false
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
-        restoreStartupDisplayAvatars(
-            accountRef,
-            displayKeys,
-            diskGeneration,
-            preparation.stillCurrent,
-        ) { key, fromPoint ->
+        restoreStartupDisplayAvatars(displayKeys, diskGeneration, preparation.stillCurrent) { key, fromPoint ->
             restored.add(key)
             rebuildPack = rebuildPack || fromPoint
+            packHit = packHit || !fromPoint
         }
         if (!preparation.stillCurrent()) return@withTimeoutOrNull
         val workers = selections.map { it.asset to it.domain }
@@ -156,6 +155,9 @@ private suspend fun WhiteNoiseAppState.prepareFirstFrameAvatarPixels(
             if (preparation.awaitColdWorkers) workers else selectionsServableNow(workers, accountRef),
             accountRef,
         )
+    }
+    if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS && packHit) {
+        Log.i("WNStartupAvatars", "group pixels restored from startup pack")
     }
     if (preparation.stillCurrent()) {
         refreshStartupDisplayAvatars(accountRef, selections, restored, diskGeneration, rebuildPack)
