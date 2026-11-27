@@ -414,7 +414,7 @@ class MainActivity : AppCompatActivity() {
         val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
         val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
         signInAlertAccount?.let {
-            openSignInAlert(it, appState, pinTapGate, notificationInboundState, foregroundConversationDismissal)
+            SignInAlertNavigation.open(it, appState, pinTapGate, notificationInboundState, foregroundConversationDismissal)
         }
         if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
             if (signInAlertAccount == null && !opensProfileChooser) {
@@ -843,20 +843,6 @@ class MainActivity : AppCompatActivity() {
             recentsPreferenceSecureFlagRetained = false
         }
     }
-}
-
-private fun openSignInAlert(
-    accountRef: String,
-    appState: WhiteNoiseAppState,
-    pinTapGate: PinnedShortcutTapGate,
-    inbound: NotificationInboundState,
-    foreground: ForegroundConversationDismissalCoordinator,
-) {
-    pinTapGate.supersede()
-    inbound.target = null
-    appState.conversationDictation.clearMicrophoneRecovery()
-    foreground.onNotificationRouteObserved()
-    appState.signInAlerts.requestDevices(accountRef)
 }
 
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 300L

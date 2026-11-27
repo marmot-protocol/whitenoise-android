@@ -8,9 +8,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import dev.ipf.whitenoise.android.ForegroundConversationDismissalCoordinator
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SignInAlertNotifications
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.signInAlerts
 
 /**
  * Android notifications for unknown sign-ins and the compromise warning, on the account security channel. The text
@@ -140,6 +143,21 @@ internal object SignInAlertNavigation {
     private const val URI_HOST = "devices"
     private const val EXTRA_ID = "dev.ipf.whitenoise.android.extra.SIGN_IN_ALERT_ID"
     private const val EXTRA_ACCOUNT_REF = "dev.ipf.whitenoise.android.extra.SIGN_IN_ALERT_ACCOUNT"
+
+    /** Lets an accepted security tap replace any pending conversation navigation. */
+    fun open(
+        accountRef: String,
+        appState: WhiteNoiseAppState,
+        pinTapGate: PinnedShortcutTapGate,
+        inbound: NotificationInboundState,
+        foreground: ForegroundConversationDismissalCoordinator,
+    ) {
+        pinTapGate.supersede()
+        inbound.target = null
+        appState.conversationDictation.clearMicrophoneRecovery()
+        foreground.onNotificationRouteObserved()
+        appState.signInAlerts.requestDevices(accountRef)
+    }
 
     /** The intent that opens [accountRef]'s Devices screen. The data URI only keeps accounts' intents apart. */
     fun intent(
