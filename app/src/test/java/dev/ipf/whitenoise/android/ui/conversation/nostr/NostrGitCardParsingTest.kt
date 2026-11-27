@@ -55,6 +55,18 @@ class NostrGitCardParsingTest {
         assertEquals(clones.drop(1).take(7) + web, links)
     }
 
+    /** A web link the reader can neither copy nor open never takes the slot a usable web link needs. */
+    @Test
+    fun unactionableWebLinkCannotTakeTheWebSlot() {
+        val clones = listOf("clone") + (1..7).map { "https://mirror$it.example.org/parser.git" }
+        // A query rules out Copy, and the out-of-range port rules out Open.
+        val unactionable = "https://example.org:70000/parser?tab=readme"
+        val web = "https://example.org/parser?tab=readme"
+        val tags = listOf(clones, listOf("web", unactionable, web))
+        val links = event(kind = 30617, tags = tags).toCardModel().gitLinks
+        assertEquals(clones.drop(1) + web, links)
+    }
+
     /** Without a web link, eight clone mirrors keep every slot ahead of the relays. */
     @Test
     fun withoutAWebLinkClonesFillEverySlotBeforeRelays() {

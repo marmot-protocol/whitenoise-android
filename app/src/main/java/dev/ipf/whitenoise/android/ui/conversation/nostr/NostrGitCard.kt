@@ -134,7 +134,8 @@ internal fun NostrEvent.gitCardLinks(): List<String> {
                 .flatMap { it.asSequence().drop(1) }
                 .take(MAX_GIT_LINK_CANDIDATES)
                 .filter { it.length <= MAX_GIT_LINK_LENGTH && it == it.safeReaderBody() }
-                .filter { isCopyableCloneAddress(it) && (isShellSafeGitLink(it) || it.isHttpsLink()) }
+                // Only links the reader can act on take a slot: Copy needs a shell-safe one, Open one it can open.
+                .filter { isCopyableCloneAddress(it) && (isShellSafeGitLink(it) || isOpenableGitLink(it)) }
                 .distinct()
                 // Copyable addresses lead their tag, so open-only mirrors cannot push a usable one out.
                 .sortedBy { !isShellSafeGitLink(it) }

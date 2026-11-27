@@ -42,7 +42,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
-import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
@@ -302,7 +301,7 @@ private fun NostrEventReaderContext(
                         Text(stringResource(R.string.nostr_git_copy_url, link))
                     }
                 }
-                if (Uri.parse(link).scheme.equals("https", ignoreCase = true) && isOpenableMarkdownLink(link)) {
+                if (isOpenableGitLink(link)) {
                     TextButton(onClick = { pendingOpenLink = link }) {
                         Text(stringResource(R.string.nostr_git_open_url, link))
                     }

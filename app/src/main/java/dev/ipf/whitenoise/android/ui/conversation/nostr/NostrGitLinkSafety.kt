@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
+
 /**
  * Whether the reader may offer [link] for Copy: it uses only plain URL characters, so pasting it unquoted into a
  * shell cannot expand, glob or end anything. Links that fail this can still be opened behind a confirmation when
@@ -7,8 +9,11 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
  */
 internal fun isShellSafeGitLink(link: String): Boolean = shellPlainLink.matches(link)
 
-/** Whether [this] is an https link, which the reader can open behind a confirmation. */
-internal fun String.isHttpsLink(): Boolean = startsWith("https://", ignoreCase = true)
+/** Whether the reader may offer [link] for Open behind a confirmation: an https link the link opener accepts. */
+internal fun isOpenableGitLink(link: String): Boolean {
+    val https = link.startsWith("https://", ignoreCase = true)
+    return https && isOpenableMarkdownLink(link)
+}
 
 /**
  * Accepts a git address whose user name cannot be read as an option and whose ssh, git or nostr path is plain. Shell
