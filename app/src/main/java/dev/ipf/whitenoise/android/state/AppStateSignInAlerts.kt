@@ -44,9 +44,10 @@ internal fun signInAlertAccount(event: MarmotEventFfi): String? =
 internal suspend fun WhiteNoiseAppState.refreshSignInAlerts(accountRef: String) {
     val alerts = signInAlerts
     alerts.refreshMutex.withLock {
+        if (!accountListLoaded) return@withLock
         val account = accounts.firstOrNull { it.label == accountRef }
         if (!linkedDevicesAvailable() || account == null || !signInAlertsApply(account)) {
-            if (account != null || accountListLoaded) alerts.forget(accountRef)
+            alerts.forget(accountRef)
             return@withLock
         }
         val generation = runtimeGeneration
