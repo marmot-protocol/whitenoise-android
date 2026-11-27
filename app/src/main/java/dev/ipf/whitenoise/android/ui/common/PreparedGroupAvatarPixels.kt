@@ -42,8 +42,8 @@ internal data class PreparedGroupAvatarPixels(
 
     fun imageFor(
         asset: AvatarAssetFfi?,
-        key: String,
-    ): ImageBitmap? = images[key] ?: exactFrame(asset)?.image
+        key: String?,
+    ): ImageBitmap? = key?.let { images[it] ?: exactFrame(asset)?.image }
 
     /** Classification is reusable only for the exact selected revision, never fallback pixels. */
     fun animationClassificationFor(asset: AvatarAssetFfi?): Boolean? = exactFrame(asset)?.animationClassification

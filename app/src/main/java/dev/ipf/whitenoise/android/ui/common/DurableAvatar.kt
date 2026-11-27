@@ -39,7 +39,7 @@ internal fun rememberDurableAvatar(
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val cacheKey = accountRef?.let { ownedAsset?.takeIf { it.isRenderable() }?.cacheKey(it) }
     val pins = ownedPreparedGroupAvatarPixels(appState, accountRef, lifetime)
-    val prepared = cacheKey?.let { pins?.imageFor(ownedAsset, it) }
+    val prepared = pins?.imageFor(ownedAsset, cacheKey)
     val displayed = remember(appState) { DisplayedAvatarPixels() }
     val owner = displayedAvatarOwner(ownedAsset, accountRef, appState.runtimeGeneration, lifetime)
     // The availability rides in the key so a `MISSING` asset with the same reference still re-runs the
