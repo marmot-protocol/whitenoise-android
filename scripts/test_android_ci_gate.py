@@ -560,6 +560,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("steps.proof_upload.outcome == 'success'", self.gate)
 
     def test_pr_tooling_uses_the_verified_checkout_base(self):
+        """Guide and source-size checks use the same verified base as PR classification."""
         manual = self.named_step(self.tooling_contracts, 'Validate manual release guide')
         size = self.named_step(self.tooling_contracts, 'Check the source file size baseline only shrinks')
         self.assertIn('PR_BASE_SHA: ${{ needs.changes.outputs.pr_base }}', manual)

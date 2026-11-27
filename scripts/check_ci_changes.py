@@ -179,6 +179,7 @@ def validation_selection(event, configured_mode, labels, raw):
 
 
 def main():
+    """Classify the tested checkout and emit the validation lane and verified PR bases."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--event', required=True)
     parser.add_argument('--base', default='')

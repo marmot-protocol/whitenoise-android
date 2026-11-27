@@ -42,10 +42,12 @@ def validation_mode(event, mode, labels, raw):
 
 
 def classify(event, base, head):
+    """Check whether the real Git diff qualifies for docs-only validation."""
     return validation_selection(event, '', None, complete_diff(event, base, head))['docs_only'] == 'true'
 
 
 def supplemental_campaigns(event, base, head):
+    """Check whether the real Git diff requires supplemental campaigns."""
     return validation_selection(event, '', None, complete_diff(event, base, head))['supplemental_campaigns'] == 'true'
 
 
@@ -166,6 +168,7 @@ class CiChangesTest(unittest.TestCase):
                               'tooling_regressions', 'pr_base', 'proof_base'})
 
     def test_cli_uses_verified_merge_checkout_when_event_base_is_stale(self):
+        """A stale event base cannot change the diff or proof key for the tested merge."""
         stale, base, head, merged = (c * 40 for c in 'abcd')
         parents = subprocess.CompletedProcess([], 0, f'{merged} {base} {head}')
         diff = subprocess.CompletedProcess([], 0, entry('README.md'))
@@ -177,6 +180,7 @@ class CiChangesTest(unittest.TestCase):
         self.assertEqual(run.call_args.args[0][-1], f'{base}...{merged}')
 
     def test_cli_declines_a_checkout_that_does_not_merge_the_event_head(self):
+        """A mismatched head or single-parent checkout cannot qualify for CI shortcuts."""
         base, head, merged, other_head = (c * 40 for c in 'abcd')
         for commits in (f'{merged} {base} {other_head}', f'{merged} {base}'):
             with self.subTest(commits=commits):
@@ -191,6 +195,7 @@ class CiChangesTest(unittest.TestCase):
                 self.assertEqual(run.call_count, 1)
 
     def test_failed_pr_diff_keeps_the_base_for_tooling_but_disallows_proofs(self):
+        """A failed diff preserves the base for validators and disables proof reuse."""
         base, head, merged = (c * 40 for c in 'abc')
         parents = subprocess.CompletedProcess([], 0, f'{merged} {base} {head}')
         error = subprocess.CalledProcessError(1, 'git diff')
