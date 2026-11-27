@@ -158,6 +158,27 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    @Test fun seekIntoAudioTailDisplaysLastDecodedVideoFrameAndPlaysRemainingAudio() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 60_000L }
+            val sink = Sink()
+            val session = session(owner, sink)
+            val frames = ArrayDeque(listOf(video(0), video(40_000L)))
+            var audioReads = 0
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    frames.removeFirstOrNull() ?: AvStreamFrame.VideoEnd
+                } else if (audioReads++ == 0) {
+                    AvStreamFrame.Audio(ByteArray(960), 8000, 1, owner.targetUs)
+                } else {
+                    AvStreamFrame.AudioEnd
+                }
+            }, { assertEquals(owner.targetUs, it) })
+            assertEquals(listOf(40_000L), owner.displayed)
+            assertEquals(960, sink.accepted)
+            assertTrue(owner.ended)
+        }
+
     /** Large Pcm Packet Feeds In Ten Millisecond Chunks Without Dropping Ordinary Video Frames. */
     @Test fun largePcmPacketFeedsInTenMillisecondChunksWithoutDroppingOrdinaryVideoFrames() =
         runBlocking {

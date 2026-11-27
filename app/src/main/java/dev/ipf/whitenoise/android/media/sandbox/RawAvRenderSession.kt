@@ -28,22 +28,16 @@ internal interface RawAvRenderOwner {
      */
     fun intent(): RawAvPlaybackIntent
 
-    /**
-     * Waits for admitted preparation before the renderer may open its streaming source.
-     */
+    /** Waits for admitted preparation before opening a streaming source. */
     fun awaitPrepared()
 
-    /**
-     * Offers stream metadata for one activation; the owner must reject retired activations.
-     */
+    /** Offers stream metadata for one activation. */
     fun opened(
         info: AvStreamInfo,
         activation: Long,
     )
 
-    /**
-     * Acknowledges the exact activation/seek pair after its stream seek and clock reset.
-     */
+    /** Acknowledges the stream seek and clock reset for this generation. */
     fun seeked(
         activation: Long,
         seek: Long,
@@ -69,9 +63,13 @@ internal interface RawAvRenderOwner {
         timestampUs: Long,
     ): Boolean = frame(bitmap, rotation, activation, seek)
 
-    /**
-     * Offers terminal position in microseconds for the exact activation/seek pair.
-     */
+    /** No frame could satisfy this generation before the selected video track ended. */
+    fun videoExhausted(
+        activation: Long,
+        seek: Long,
+    ) = Unit
+
+    /** Offers terminal position in microseconds for this generation. */
     fun ended(
         activation: Long,
         seek: Long,
@@ -340,6 +338,7 @@ internal class RawAvRenderSession(
                 if (appliedSeek != intent.seek) {
                     progress.video?.bitmap?.recycle()
                     progress.video = null
+                    progress.replacePreroll(null)
                     progress.audio = null
                     progress.targetUs = intent.positionUs
                     applySeek(intent, seek)
@@ -357,13 +356,18 @@ internal class RawAvRenderSession(
                             if (!valid(activation, appliedSeek)) {
                                 frame.bitmap.recycle()
                             } else if (frame.timestampUs < progress.targetUs) {
-                                frame.bitmap.recycle()
+                                progress.replacePreroll(frame)
                                 drainPrerollAudio(progress, frame.timestampUs, activation, read)
                             } else {
+                                progress.replacePreroll(null)
                                 progress.video = frame
                             }
                         }
-                        AvStreamFrame.VideoEnd -> progress.videoEnded = true
+                        AvStreamFrame.VideoEnd -> {
+                            progress.videoEnded = true
+                            progress.video = progress.takePreroll()
+                            if (progress.video == null) owner.videoExhausted(activation, appliedSeek)
+                        }
                         else -> throw IOException("Unexpected output from preferred video read")
                     }
                     if (progress.video == null && !progress.videoEnded) continue
@@ -412,6 +416,7 @@ internal class RawAvRenderSession(
         } finally {
             progress.video?.bitmap?.recycle()
             progress.video = null
+            progress.replacePreroll(null)
             progress.audio = null
         }
     }
@@ -613,10 +618,7 @@ internal class RawAvRenderSession(
             tolerance
         }
 
-    /**
-     * Waits for device drain and terminal media time before notifying a still-current owner.
-     * Uses declared positive duration or observed audio/video end when metadata has no duration.
-     */
+    /** Waits for device drain and the declared or observed media end. */
     private suspend fun finishFrames(
         info: AvStreamInfo,
         activation: Long,
@@ -634,10 +636,7 @@ internal class RawAvRenderSession(
         if (valid(activation, appliedSeek)) owner.ended(activation, appliedSeek, endUs)
     }
 
-    /**
-     * Seeks the owned stream to a microsecond target, closes old PCM and resets both clock anchors.
-     * Already accepted speed/gain controls survive a blocked seek; only then is the seek acknowledged.
-     */
+    /** Resets both clock anchors and old PCM while preserving current speed and gain. */
     internal fun applySeek(
         intent: RawAvPlaybackIntent,
         seek: (Long) -> Unit,

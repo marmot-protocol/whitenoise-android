@@ -547,6 +547,7 @@ internal class RawAvPlaybackEngine(
             width = probe.width
             height = probe.height
             rotation = 0 // Automatic poster dimensions and pixels are already display-oriented.
+            firstFrameForOutput = false
             retainFrame(probe.poster, 0)
             synchronized(frameLock) { lastBitmapPtsUs = request.target.positionMs * 1000L }
             request.finish(true) // Acknowledgement and frame publication share the generation lock.
@@ -569,6 +570,7 @@ internal class RawAvPlaybackEngine(
         pendingSeek?.let {
             pausedUs = targetUs
             pendingSeek = null
+            firstFrameForOutput = false
             it.set(null)
             notifyChanged()
         }
@@ -649,18 +651,15 @@ internal class RawAvPlaybackEngine(
      */
     fun setHandleAudioBecomingNoisy(value: Boolean) = focus.noisy(value, synchronized(lock) { playIntent })
 
-    /**
-     * Replaces the parent display target and requests redraw of any retained raw frame.
-     */
+    /** Redraws retained pixels on the replacement display target. */
     fun attachVideo(output: Any?) {
+        firstFrameForOutput = false
         video.attach(output)
         redraw = true
         signal.trySend(Unit)
     }
 
-    /**
-     * Clears a matching display target; a stale target cannot detach its replacement.
-     */
+    /** A stale target cannot detach its replacement. */
     fun clearVideo(output: Any?) = video.clear(output)
 
     /**
@@ -684,9 +683,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Snapshots source lifetime, generations and raw renderer settings under the engine lock.
-     */
+    /** Snapshots the renderer's source, generations and controls under the lock. */
     override fun intent(): RawAvPlaybackIntent =
         synchronized(lock) {
             RawAvPlaybackIntent(
@@ -757,9 +754,17 @@ internal class RawAvPlaybackEngine(
         return accepted
     }
 
-    /**
-     * Handles EOS only for a matching run: advances a repeat seek or records terminal position and completion.
-     */
+    override fun videoExhausted(
+        activation: Long,
+        seek: Long,
+    ) = synchronized(lock) {
+        if (accepts(activation, seek) && explicitSeek && pendingSeek != null) {
+            redraw = true
+            failPlaybackLocked(RawPausedSeekFailure(targetUs / 1000))
+        }
+    }
+
+    /** Completes a matching run or wraps playback to the start when repeating. */
     override fun ended(
         activation: Long,
         seek: Long,
@@ -786,9 +791,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Rejects late failures from replaced activations or known superseded seeks before changing state.
-     */
+    /** Rejects failures from an old activation or seek. */
     override fun failed(
         activation: Long,
         seek: Long?,
@@ -859,9 +862,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Checks live playing ownership and both activation/seek generations before accepting a callback.
-     */
+    /** Fences playing callbacks by source, activation and seek. */
     private fun accepts(
         activation: Long,
         seek: Long,
@@ -888,10 +889,7 @@ internal class RawAvPlaybackEngine(
         redraw = true
     }
 
-    /**
-     * Renders only current registered ownership using engine → registry → frame → surface lock order.
-     * Account reset closes owners outside the registry monitor.
-     */
+    /** Renders current ownership using engine → registry → frame → surface lock order. */
     private fun renderRetained() {
         synchronized(lock) {
             if (!current() || !redraw) return
@@ -900,9 +898,9 @@ internal class RawAvPlaybackEngine(
                 redraw = false
                 val rendered =
                     synchronized(frameLock) {
-                        // A settled refusal leaves the previous frame committed, including on a new surface.
-                        val settledRefusal = error is RawPausedSeekFailure && pendingSeek == null && !playIntent
-                        lastBitmap?.takeIf { lastBitmapSeek == seekRevision || settledRefusal }?.let {
+                        // A pending or refused paused seek leaves the previous frame committed on a new surface.
+                        val keepCommittedFrame = !playIntent && (pendingSeek != null || error is RawPausedSeekFailure)
+                        lastBitmap?.takeIf { lastBitmapSeek == seekRevision || keepCommittedFrame }?.let {
                             val probe = observation
                             if (probe == null) {
                                 video.render(it, lastBitmapRotation)

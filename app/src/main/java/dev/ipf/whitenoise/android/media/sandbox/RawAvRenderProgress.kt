@@ -21,5 +21,14 @@ internal class RawAvRenderProgress(
     var audioEndUs = targetUs
     var prerollAudioUs = Long.MIN_VALUE
     var video: AvStreamFrame.Video? = null
+    private var preroll: AvStreamFrame.Video? = null
     var audio: RawAvPendingPcm? = null
+
+    /** Keep the nearest preceding frame until a matching frame or true video EOF. */
+    fun replacePreroll(frame: AvStreamFrame.Video?) {
+        preroll?.bitmap?.recycle()
+        preroll = frame
+    }
+
+    fun takePreroll(): AvStreamFrame.Video? = preroll.also { preroll = null }
 }
