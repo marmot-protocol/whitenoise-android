@@ -1,0 +1,33 @@
+name: Clean up closed Android PR previews
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  prune:
+    # The builder only publishes previews for same-repository PRs. Use PR
+    # metadata and base code so no head code runs with the release token.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: android-pr-preview-publish-pr-${{ github.event.number }}
+      queue: max
+    steps:
+      - name: Checkout trusted cleanup script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Remove closed PR previews
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: .github/scripts/pr-preview-release-assets.sh prune

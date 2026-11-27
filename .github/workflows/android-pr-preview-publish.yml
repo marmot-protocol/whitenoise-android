@@ -102,6 +102,7 @@ jobs:
       # Let the active publisher finish its ownership reconciliation before a
       # newer head proceeds, so the newest serialized run is the final writer.
       cancel-in-progress: false
+      queue: max
     env:
       BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
       BUILD_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
@@ -251,8 +252,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for channel in stable isolated; do
-            [[ -d "signed/$channel" ]] || continue
+          channels=(stable)
+          if [[ -d signed/isolated ]]; then
+            channels+=(isolated)
+          fi
+          .github/scripts/pr-preview-release-assets.sh check-capacity "${channels[@]}"
+          for channel in "${channels[@]}"; do
             apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
             url=$(APK_PATH="$apk" PREVIEW_CHANNEL="$channel" \
               .github/scripts/publish-pr-apk-to-github-release.sh)
