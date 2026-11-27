@@ -60,7 +60,6 @@ class NotificationGroupSenderImagesTest {
         val style =
             NotificationCardContent(context) { _, _ -> false to null }.messagingStyle(
                 content = groupContent(),
-                conversationTitleOverride = null,
                 historyCap = HISTORY_CAP,
                 carriedHistory = carried,
                 sender = carol,

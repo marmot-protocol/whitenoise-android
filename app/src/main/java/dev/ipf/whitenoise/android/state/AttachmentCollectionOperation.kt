@@ -65,7 +65,7 @@ internal data class CollectionStoredDraft(
  * row is named by the body the draft holds, not by bytes send preparation cleaned or moved to a file. Call off Main.
  */
 internal fun PendingAttachment.captureDraftSource(): CollectionStoredDraft? {
-    val file = draftFile
+    val file = draftFile ?: nativeDraftFileBody
     val id = file?.attachmentId ?: nativeDraftAttachmentId ?: return null
     val inline = nativeInlineBody()
     return CollectionStoredDraft(

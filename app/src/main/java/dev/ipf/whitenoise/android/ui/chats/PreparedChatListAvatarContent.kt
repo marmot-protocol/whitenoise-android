@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatListAvatarDomain
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.chatRowCompatibilityAvatarSelection
@@ -21,6 +22,7 @@ internal fun PreparedChatListAvatarContent(
     retainedPreparation: RetainedGroupAvatarPreparation?,
     content: @Composable () -> Unit,
 ) {
+    appState.observeChatListAvatarLookahead(rows, listState, rowKey, accountRef, retainedPreparation)
     PreparedVisibleGroupAvatarContent(
         appState = appState,
         rows = rows,
@@ -31,6 +33,7 @@ internal fun PreparedChatListAvatarContent(
         surfaceIdentity = surfaceIdentity,
         retainedPreparation = retainedPreparation,
         compatibilityForRow = { chatRowCompatibilityAvatarSelection(it, accountRef, appState::avatarUrl) },
+        domainForRow = { chatListAvatarDomain(it, accountRef) },
         content = content,
     )
 }

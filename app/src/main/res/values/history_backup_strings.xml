@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">History backups</string>
-    <string name="explanation_organize_hub_history_backups">Keep an encrypted copy of your chat history, unlocked by recovery words, so you can restore it on a new install.</string>
+    <string name="explanation_organize_hub_history_backups">Save encrypted chat history online and restore messages for chats you’re in on this device.</string>
+    <string name="history_backups_storage">White Noise saves encrypted chat history to online file storage (Blossom servers). Your Nostr relays hold an encrypted record the app uses to find your backups.</string>
+    <string name="history_backups_restore_scope">You can restore messages only in chats this device is currently in. If you lose access to a group, ask someone who can invite you to add you again.</string>
     <string name="history_backups_status">Backups</string>
     <string name="history_backups_status_loading">Checking…</string>
     <string name="history_backups_status_unavailable">Not available yet</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Type word %1$d and word %2$d from your list. If you didn’t write them down, cancel and start again for new words.</string>
     <string name="history_backups_word_label">Word %1$d</string>
     <string name="history_backups_restore_words">Recovery words</string>
-    <string name="history_backups_restore_words_help">Enter all 12 words, separated by spaces.</string>
+    <string name="history_backups_restore_words_help">Join the chats on this device first. Then enter all 12 words, separated by spaces.</string>
     <string name="history_backups_restore">Restore history</string>
     <string name="history_backups_restoring">Starting restore</string>
     <string name="history_backups_cancel_restore">Cancel restore</string>

@@ -2878,4 +2878,5 @@
     <string name="remote_signer_switcher_attention">La aplicación de firma remota requiere tu atención</string>
     <string name="dictation_transcribe_voice_messages_title">Transcribir mensajes de voz automáticamente</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Muestra las transcripciones de los mensajes de voz descargados al abrir el chat. Requiere Offline Speech to Text.</string>
+    <string name="toast_unsupported_link">Este enlace no es compatible.</string>
 </resources>

@@ -9,7 +9,7 @@ name: Android Release Runtime Verify
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, develop]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/android-release-runtime.yml'

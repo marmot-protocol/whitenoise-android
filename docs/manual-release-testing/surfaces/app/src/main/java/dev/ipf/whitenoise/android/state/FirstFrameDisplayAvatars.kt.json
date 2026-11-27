@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDisplayAvatars.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Startup reads exact cached group-picture revisions for the account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDisplayAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.restoreStartupDisplayAvatars(",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Foreground resume refills group pictures after a decoded-cache trim",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDisplayAvatars.kt",
+        "anchor": "internal fun WhiteNoiseAppState.refillForegroundDisplayAvatars(",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "An authoritative replacement or removal evicts the previous stored picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDisplayAvatars.kt",
+        "anchor": "internal fun WhiteNoiseAppState.retireReplacedDisplayAvatars(",
+        "test_ids": [
+          "CHL-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

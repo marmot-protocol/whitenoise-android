@@ -103,7 +103,6 @@ class DialogSurfaceCoverageTest {
             mapOf(
                 RAW_DIALOGS_SOURCE to 0,
                 SHARED_DIALOGS_SOURCE to 0,
-                "ui/conversation/messages/MessageDeleteDialog.kt" to 2,
                 "ui/settings/TtsRatePicker.kt" to 1,
                 "ui/settings/UsageDiagnosticsUi.kt" to 1,
             )

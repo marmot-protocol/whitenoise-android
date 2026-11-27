@@ -46,6 +46,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Notification Send past the App Lock boundary keeps the transcript in the draft instead of sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "val notificationSendAllowed: Boolean",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

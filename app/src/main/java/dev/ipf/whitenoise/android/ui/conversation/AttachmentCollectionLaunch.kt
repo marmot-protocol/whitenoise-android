@@ -140,7 +140,11 @@ internal fun ConversationMediaSender.startCollectionSend(
                     request.preparedDocuments.withoutStoredFiles(),
                     request.draftClear,
                     onAfterSend,
-                    keepPdfMetadata = request.keepPdfMetadata,
+                    keepPdfMetadata =
+                        request.documentUris
+                            .zip(operation.items.drop(request.imageSlots.size))
+                            .filter { (originalUri, _) -> originalUri in request.keepPdfMetadata }
+                            .mapTo(mutableSetOf()) { (_, item) -> Uri.parse(item.uri) },
                 )
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)
@@ -290,8 +294,10 @@ private suspend fun WhiteNoiseAppState.restoreCollectionOperation(
  * Continues a paused operation with the same stable ids: MDK is asked about recorded tokens again, unreadable
  * items are skipped and named, and the remaining chunks are sent in order from their URIs.
  */
+@Suppress("LongMethod") // The claim spans token reconciliation, consent and journal admission.
 internal fun ConversationMediaSender.resumeCollection(
     operationId: String,
+    canAskForPdfConsent: () -> Boolean = { false },
     tokenStatus: (suspend (String) -> CollectionTokenStatus?)? = null,
 ) {
     val registry = appState.attachmentCollections
@@ -302,6 +308,7 @@ internal fun ConversationMediaSender.resumeCollection(
     val original = this
     appState.launchMutation {
         var skipped = 0
+        var keepPdfMetadata = emptySet<Uri>()
         val updated =
             try {
                 val optimistic = appState.optimisticMessages(paused.accountRef, paused.groupIdHex)
@@ -316,7 +323,8 @@ internal fun ConversationMediaSender.resumeCollection(
                     appState.present(R.string.error_try_again)
                     return@launchMutation
                 }
-                if (paused.withTokenStatuses(statuses, registry.now()).ownedByComposerDraft) {
+                val reconciled = paused.withTokenStatuses(statuses, registry.now())
+                if (reconciled.ownedByComposerDraft) {
                     // As on restore: with nothing accepted, the composer's draft still owns the selection, the
                     // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
                     registry.update(operationId) { it.withTokenStatuses(statuses, registry.now()) }
@@ -325,6 +333,17 @@ internal fun ConversationMediaSender.resumeCollection(
                         paused.accountRef,
                         paused.groupIdHex,
                     )
+                    return@launchMutation
+                }
+                keepPdfMetadata = confirmResumedPdfMetadata(reconciled, canAskForPdfConsent) ?: return@launchMutation
+                if (!shouldAcceptMediaUploadForAccount(
+                        paused.accountRef,
+                        sessionEpoch,
+                        appState.activeAccountRef,
+                        appState.mediaUploadSessionEpoch(),
+                    ) ||
+                    registry.operations.value[operationId] != paused
+                ) {
                     return@launchMutation
                 }
                 withContext(Dispatchers.IO) {
@@ -349,7 +368,7 @@ internal fun ConversationMediaSender.resumeCollection(
                 return@launchMutation appState.present(R.string.share_import_storage)
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
-        driveResumedCollection(resumed, sessionEpoch, lease, original)
+        driveResumedCollection(resumed, sessionEpoch, lease, original, keepPdfMetadata)
     }
 }
 

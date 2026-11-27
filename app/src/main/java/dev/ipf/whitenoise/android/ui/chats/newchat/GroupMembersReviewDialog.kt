@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSizes
@@ -270,6 +271,7 @@ private fun GroupReviewActingAvatar(
 ) {
     val account = appState.accounts.firstOrNull { it.label == actingAccount } ?: return
     val name = appState.accountDisplayNameCached(account.accountIdHex)
+    val spokenName = emojiPlainText(name)
     val role = stringResource(R.string.group_action_acting_account)
     val npub = appState.npubForDisplay(account.accountIdHex)
     if (npub.isBlank()) {
@@ -278,7 +280,7 @@ private fun GroupReviewActingAvatar(
                 .offset(x = GroupReviewActorTargetInset)
                 .size(48.dp)
                 .testTag("group.action.acting_account")
-                .semantics { contentDescription = "$role, $name" },
+                .semantics { contentDescription = "$role, $spokenName" },
             contentAlignment = Alignment.Center,
         ) {
             Avatar(

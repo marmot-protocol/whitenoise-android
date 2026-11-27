@@ -1240,7 +1240,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """A terminal Screen/Sheet match must not hide menus or named dialog and picker content."""
         catalog = {screen['symbol']: screen for screen in inventory()['screen_catalog']}
         for name in ('ChatContextMenu', 'GlobalSearchFilterMenu', 'ComposerAttachmentMenu',
-                     'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteDialogContent',
+                     'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteConfirmationDialog',
                      'AddAccountSheetContent', 'ForwardMessagePickerContent', 'QrScannerSheetContent',
                      'ShareChatPickerFullScreenContent', 'SmartFolderRulePanel', 'KeyPackagesScreenForAccount'):
             with self.subTest(surface=name):

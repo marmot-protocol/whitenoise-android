@@ -41,7 +41,14 @@ internal object PdfJpegMetadata {
             val marker = bytes[position + 1]
             when {
                 marker == MARKER -> position++
-                marker == EOI -> return true
+                marker == EOI -> {
+                    position += 2
+                    if (position == end) return true
+                    // MPF and gain-map JPEGs can store another complete image here. Unrecognized tails
+                    // (for example motion-photo video) cannot be safely rewritten as a JPEG.
+                    if (position + 2 > end || bytes[position] != MARKER || bytes[position + 1] != SOI) return false
+                    position += 2
+                }
                 marker == TEM || marker in RST0..RST7 -> position += 2
                 position + SEGMENT_HEADER > end -> return false
                 else -> {

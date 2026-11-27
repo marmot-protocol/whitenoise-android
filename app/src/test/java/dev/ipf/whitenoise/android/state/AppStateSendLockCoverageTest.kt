@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
@@ -100,6 +101,15 @@ class AppStateSendLockCoverageTest {
             assertTrue(ioBridge in 0 until gate)
             assertTrue(gate in 0 until body.indexOf(nativeCall))
         }
+    }
+
+    /** The dictation notification's Send consults the same gate; past it the transcript is pasted instead. */
+    @Test
+    fun dictationNotificationSendChecksAppLock() {
+        val service =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt")
+        assertTrue("get() = appState.appLock.notificationActionsAllowed" in service)
+        assertTrue("ACTION_SEND -> if (host?.notificationSendAllowed == true) controller.send()" in service)
     }
 
     @Test

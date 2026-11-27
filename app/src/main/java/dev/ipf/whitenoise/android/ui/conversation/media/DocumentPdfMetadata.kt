@@ -21,12 +21,19 @@ private const val SNAPSHOT_SCRUBBING = "rw-------"
 internal fun removeDocumentMetadataInPlace(
     mediaType: String,
     bytes: ByteArray,
-): Boolean = removeDocumentVideoMetadataInPlace(mediaType, bytes).also { if (it) PdfMetadataScrubber.scrub(bytes) }
+    keepPdfMetadata: Boolean,
+): Boolean =
+    removeDocumentVideoMetadataInPlace(mediaType, bytes).also {
+        if (it && !keepPdfMetadata) PdfMetadataScrubber.scrub(bytes)
+    }
 
 /** Removes private metadata from this staged Files snapshot in place, as [removeDocumentMetadataInPlace] does. */
-internal fun StagedUploadSource.removeDocumentMetadata(mediaType: String): Boolean {
+internal fun StagedUploadSource.removeDocumentMetadata(
+    mediaType: String,
+    keepPdfMetadata: Boolean,
+): Boolean {
     val accepted = removeDocumentVideoMetadata(mediaType)
-    if (accepted) scrubPdfMetadata()
+    if (accepted && !keepPdfMetadata) scrubPdfMetadata()
     return accepted
 }
 
@@ -34,7 +41,7 @@ internal fun StagedUploadSource.removeDocumentMetadata(mediaType: String): Boole
  * Removes PDF metadata from this staged snapshot in place. The size is unchanged, so the budget that admitted the
  * snapshot stays exact, and the snapshot is always returned to owner-read-only.
  */
-private fun StagedUploadSource.scrubPdfMetadata() {
+internal fun StagedUploadSource.scrubPdfMetadata() {
     val path = file.toPath()
     try {
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(SNAPSHOT_SCRUBBING))
@@ -51,9 +58,17 @@ private fun StagedUploadSource.scrubPdfMetadata() {
  * does, then PDFs, including drafts an older app version saved before PDFs were cleaned. A draft's bytes are
  * shared with its native draft, so a PDF is cleaned on a copy. Call off Main.
  */
-internal fun <K> removePreparedDocumentMetadata(prepared: Map<K, PendingAttachment>): PreparedVideoCheck<K> {
+internal fun <K> removePreparedDocumentMetadata(
+    prepared: Map<K, PendingAttachment>,
+    keepPdfMetadata: Set<K> = emptySet(),
+): PreparedVideoCheck<K> {
     val checked = removePreparedDocumentVideoMetadata(prepared)
-    return checked.copy(ready = checked.ready.mapValues { (_, attachment) -> attachment.withoutPdfMetadata() })
+    return checked.copy(
+        ready =
+            checked.ready.mapValues { (key, attachment) ->
+                if (key in keepPdfMetadata) attachment else attachment.withoutPdfMetadata()
+            },
+    )
 }
 
 /** This attachment with PDF metadata removed on a copy, remembering the body its native draft still holds. */
@@ -84,8 +99,7 @@ internal fun MutableList<PendingAttachment>.dropUnconfirmedPdfMetadata(
     while (iterator.hasNext()) {
         val attachment = iterator.next()
         val metadata = attachment.pdfMetadata()
-        val unconfirmed = metadata is PdfMetadataResult.Refused && !keepsMetadata
-        if (metadata is PdfMetadataResult.Removable || unconfirmed) {
+        if (!keepsMetadata && (metadata is PdfMetadataResult.Removable || metadata is PdfMetadataResult.Refused)) {
             iterator.remove()
             failures += DocumentReadFailure.PDF_METADATA
             dropped += attachment.inMemoryBytes?.size ?: 0

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
  * chip has no long press; [modifier] then lands on that overlay, not on the chip's layout. [role] overrides the
  * chip's checkbox role, for example with a radio button in a single-choice group.
  * [contentDescription] names the chip for TalkBack when the visible label is truncated or carries a count.
+ * [border] defaults to the AMOLED surface outline; pass null for chip rows that should stay borderless everywhere.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -52,6 +54,7 @@ internal fun WhiteNoiseFilterChip(
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
     role: Role? = null,
+    border: BorderStroke? = amoledSurfaceBorderStroke(),
 ) {
     val interactions = remember { MutableInteractionSource() }
     val lead = if (selected && showCheck) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
@@ -76,7 +79,7 @@ internal fun WhiteNoiseFilterChip(
             trailingIcon = trailingIcon,
             shape = CircleShape,
             colors = whiteNoiseFilterChipColors(),
-            border = amoledSurfaceBorderStroke(),
+            border = border,
             interactionSource = interactions,
         )
     }

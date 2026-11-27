@@ -398,6 +398,28 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
             }
         }
 
+    /** Past the App Lock boundary, notification Send keeps the transcript in the draft and sends nothing. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun appLockTurnsNotificationSendIntoPaste() =
+        runTest {
+            val harness = DictationForegroundTestHost(this)
+            harness.notificationSendAllowed = false
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+
+            val send = actionCommand(service, harness, ConversationDictationForegroundService.ACTION_SEND)
+            service.onStartCommand(send, 0, 2)
+            harness.platform.listener.onResult("spoken while locked")
+            runCurrent()
+
+            assertEquals(emptyList<String>(), harness.sent)
+            assertEquals("spoken while locked", harness.draft.text)
+            lifecycle.destroy()
+        }
+
     /** Hiding the drawer card is presentation only: explicit in-app completion still owns the session. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

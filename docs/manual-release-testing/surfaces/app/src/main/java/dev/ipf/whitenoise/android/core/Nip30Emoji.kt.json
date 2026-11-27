@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/Nip30Emoji.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Shortcodes inside code spans and fences stay literal, checked in one walk over the code ranges",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/Nip30Emoji.kt",
+        "anchor": "fun shortcodesIn(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

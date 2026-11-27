@@ -263,6 +263,9 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
             }
         }
     }
+    cleanupStep("display avatar") {
+        withContext(Dispatchers.IO) { check(displayAvatars.evictGroup(account, groupIdHex)) }
+    }
     cleanupStep("native draft") {
         retryIdempotentRuntimeMutation {
             when (val deletion = deleteDraftBeforeGroupRemoval(account, groupIdHex)) {

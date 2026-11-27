@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Sauvegardes de l’historique</string>
-    <string name="explanation_organize_hub_history_backups">Conservez une copie chiffrée de l’historique de vos discussions, déverrouillée par des mots de récupération, pour la restaurer sur une nouvelle installation.</string>
+    <string name="explanation_organize_hub_history_backups">Enregistrez votre historique de discussions chiffré en ligne et restaurez les messages des discussions auxquelles vous participez sur cet appareil.</string>
+    <string name="history_backups_storage">White Noise enregistre l’historique chiffré sur des serveurs de fichiers en ligne (serveurs Blossom). Vos relais Nostr conservent un enregistrement chiffré qui permet à l’application de retrouver vos sauvegardes.</string>
+    <string name="history_backups_restore_scope">Vous pouvez restaurer les messages uniquement dans les discussions auxquelles vous participez actuellement sur cet appareil. Si vous perdez l’accès à un groupe, demandez à une personne autorisée à envoyer des invitations de vous y ajouter à nouveau.</string>
     <string name="history_backups_status">Sauvegardes</string>
     <string name="history_backups_status_loading">Vérification…</string>
     <string name="history_backups_status_unavailable">Pas encore disponible</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Saisissez le mot %1$d et le mot %2$d de votre liste. Si vous ne les avez pas notés, annulez et recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_word_label">Mot %1$d</string>
     <string name="history_backups_restore_words">Mots de récupération</string>
-    <string name="history_backups_restore_words_help">Saisissez les 12 mots, séparés par des espaces.</string>
+    <string name="history_backups_restore_words_help">Rejoignez d’abord les discussions sur cet appareil. Saisissez ensuite les 12 mots, séparés par des espaces.</string>
     <string name="history_backups_restore">Restaurer l’historique</string>
     <string name="history_backups_restoring">Démarrage de la restauration</string>
     <string name="history_backups_cancel_restore">Annuler la restauration</string>

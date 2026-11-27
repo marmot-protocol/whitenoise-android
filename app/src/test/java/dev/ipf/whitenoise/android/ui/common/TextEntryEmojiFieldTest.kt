@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -51,82 +52,68 @@ class TextEntryEmojiFieldTest {
     }
 
     @Test
-    fun stringModelPickerReplacesTheSelectionInsteadOfAppending() {
-        var text by mutableStateOf("ABCD")
-        composeRule.setContent { WhiteNoiseTheme { ProseTextField(text, { text = it }, Modifier.testTag("field")) } }
+    fun prosePickerReplacesTheSelectionInsteadOfAppending() {
+        val state = TextFieldState("ABCD")
+        composeRule.setContent { WhiteNoiseTheme { ProseTextField(state, Modifier.testTag("field")) } }
         composeRule.onNodeWithTag("field").performTextInputSelection(TextRange(1, 3))
         openPicker()
         pickGrin()
         composeRule.waitForIdle()
-        assertEquals("A😀D", text)
+        assertEquals("A😀D", state.text.toString())
     }
 
     @Test
     fun externalEditCannotReceiveThePickerResultFromItsPreviousValue() {
-        var text by mutableStateOf("old")
-        composeRule.setContent { WhiteNoiseTheme { ProseTextField(text, { text = it }, Modifier.testTag("field")) } }
+        val state = TextFieldState("old")
+        composeRule.setContent { WhiteNoiseTheme { ProseTextField(state, Modifier.testTag("field")) } }
         openPicker()
-        composeRule.runOnIdle { text = "new" }
+        composeRule.runOnIdle { state.setTextAndPlaceCursorAtEnd("new") }
         pickGrin()
-        assertEquals("new", text)
+        assertEquals("new", state.text.toString())
         composeRule.onNodeWithTag("field").performTextReplacement("still editable")
-        assertEquals("still editable", text)
-    }
-
-    @Test
-    fun changedOwnerClosesThePickerBeforeItCanEditAReorderedPollOption() {
-        var owner by mutableStateOf("first option")
-        var text by mutableStateOf("same text")
-        composeRule.setContent { WhiteNoiseTheme { ProseTextField(text, { text = it }, emojiOwner = owner) } }
-        openPicker()
-        composeRule.runOnIdle { owner = "replacement option" }
-        composeRule.waitForIdle()
-        assertTrue(composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().isEmpty())
-        assertEquals("same text", text)
+        assertEquals("still editable", state.text.toString())
     }
 
     @Test
     fun becomingDisabledClosesThePickerWithoutChangingText() {
         var enabled by mutableStateOf(true)
-        var text by mutableStateOf("draft")
-        composeRule.setContent { WhiteNoiseTheme { ProseTextField(text, { text = it }, enabled = enabled) } }
+        val state = TextFieldState("draft")
+        composeRule.setContent { WhiteNoiseTheme { ProseTextField(state, enabled = enabled) } }
         openPicker()
         composeRule.runOnIdle { enabled = false }
         composeRule.waitForIdle()
         assertTrue(composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().isEmpty())
-        assertEquals("draft", text)
+        assertEquals("draft", state.text.toString())
     }
 
     @Test
     fun rejectedOverLimitEmojiLeavesTextAndRecentsUnchanged() {
-        var text by mutableStateOf("1234")
+        val state = TextFieldState("1234")
         val recents = (context.applicationContext as WhiteNoiseApplication).recentEmojiRecentsOwner
         val before = recents.recents.toList()
-        composeRule.setContent { WhiteNoiseTheme { ProseTextField(text, { text = it }, emojiMaxLength = 4) } }
+        composeRule.setContent { WhiteNoiseTheme { ProseTextField(state, maxLength = 4) } }
         openPicker()
         pickGrin()
-        assertEquals("1234", text)
+        assertEquals("1234", state.text.toString())
         assertEquals(before, recents.recents)
     }
 
     @Test
-    fun changingTheDestinationCallbackClosesAnIdenticallyWordedReplacementEditor() {
-        var first by mutableStateOf("same")
-        var second by mutableStateOf("same")
+    fun replacingTheEditorClosesItsPickerEvenWhenTheTextIsIdentical() {
+        val first = TextFieldState("same")
+        val second = TextFieldState("same")
         var showFirst by mutableStateOf(true)
-        val writeFirst: (String) -> Unit = { first = it }
-        val writeSecond: (String) -> Unit = { second = it }
         composeRule.setContent {
             WhiteNoiseTheme {
-                ProseTextField(if (showFirst) first else second, if (showFirst) writeFirst else writeSecond)
+                ProseTextField(if (showFirst) first else second)
             }
         }
         openPicker()
         composeRule.runOnIdle { showFirst = false }
         composeRule.waitForIdle()
         assertTrue(composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().isEmpty())
-        assertEquals("same", first)
-        assertEquals("same", second)
+        assertEquals("same", first.text.toString())
+        assertEquals("same", second.text.toString())
     }
 
     private fun openPicker() {

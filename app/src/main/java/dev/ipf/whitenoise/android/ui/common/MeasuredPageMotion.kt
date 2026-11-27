@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -98,24 +99,37 @@ internal fun DrawScope.drawMeasuredPage(
     clipPath(path) { drawRect(backplate, topLeft = bounds.topLeft, size = bounds.size) }
 }
 
-/** Disjoint native passes: requested chrome, then one exclusive body at its native coordinates. */
+/** A measured header painted on its own fade and vertical offset instead of with the fixed chrome. */
+internal class NativePageHeaderMotion(
+    val bounds: Rect,
+    val presence: Float,
+    val offsetY: Float,
+)
+
+/** Disjoint native passes: requested chrome, an optional moving header, then one exclusive body. */
 internal fun ContentDrawScope.drawNativePage(
     body: Rect?,
     chrome: Boolean,
     bodyPresence: Float,
     bodyLimit: Rect? = null,
+    header: NativePageHeaderMotion? = null,
 ) {
-    if (body == null || body.isEmpty) {
-        // Unmeasured content is never replayed as an outgoing full-screen opaque sibling.
-        if (chrome) drawContent()
-        return
-    }
-    if (chrome) {
-        clipRect(body.left, body.top, body.right, body.bottom, clipOp = ClipOp.Difference) {
-            this@drawNativePage.drawContent()
+    // A settled current header stays in the fixed chrome pass, so rest frames are unchanged.
+    val moving = header?.takeUnless { it.bounds.isEmpty || (chrome && it.presence >= 1f && it.offsetY == 0f) }
+    val measuredBody = body?.takeUnless { it.isEmpty }
+    if (chrome) drawContentOutside(listOfNotNull(measuredBody, moving?.bounds))
+    if (moving != null && moving.presence > 0f) {
+        // The band keeps its slot; content settles upward into it while fading in.
+        val slot = moving.bounds
+        clipRect(slot.left, slot.top, slot.right, slot.bottom) {
+            val canvas = drawContext.canvas
+            canvas.saveLayer(slot, Paint().apply { alpha = moving.presence.coerceIn(0f, 1f) })
+            translate(top = moving.offsetY) { this@drawNativePage.drawContent() }
+            canvas.restore()
         }
     }
-    val visible = bodyLimit?.let { body.intersect(it) } ?: body
+    if (measuredBody == null) return
+    val visible = bodyLimit?.let { measuredBody.intersect(it) } ?: measuredBody
     if (!visible.isEmpty && bodyPresence > 0f) {
         clipRect(visible.left, visible.top, visible.right, visible.bottom) {
             val canvas = drawContext.canvas
@@ -123,6 +137,13 @@ internal fun ContentDrawScope.drawNativePage(
             this@drawNativePage.drawContent()
             canvas.restore()
         }
+    }
+}
+
+private fun ContentDrawScope.drawContentOutside(excluded: List<Rect>) {
+    val first = excluded.firstOrNull() ?: return drawContent()
+    clipRect(first.left, first.top, first.right, first.bottom, clipOp = ClipOp.Difference) {
+        this@drawContentOutside.drawContentOutside(excluded.drop(1))
     }
 }
 

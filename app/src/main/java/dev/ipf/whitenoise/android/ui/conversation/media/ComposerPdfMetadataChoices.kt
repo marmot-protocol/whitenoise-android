@@ -20,7 +20,8 @@ internal class ComposerPdfDecision(
     val names: List<String>,
     val reasons: Set<PdfMetadataRefusal>,
     internal val uris: List<Uri>,
-    internal val send: () -> Unit,
+    internal val sendUris: List<Uri>,
+    internal val send: (Set<Uri>) -> Unit,
     internal val cancel: () -> Unit,
 )
 
@@ -28,20 +29,19 @@ internal class ComposerPdfDecision(
 private class ComposerPdfPendingSend(
     val uris: List<Uri>,
     val onCancel: () -> Unit,
-    val send: () -> Unit,
+    val send: (Set<Uri>) -> Unit,
 )
 
 /**
  * The composer's staged PDFs whose metadata cannot be removed, and the person's choice to send them as they are
- * (#3377). The shelf reads every prepared PDF into [record], whether or not its card is on screen. A choice covers
- * one send: the sender takes it with [takeConsent] when the send starts and keeps it for that send's chunks. It is
- * never saved with a draft.
+ * (#3377). The shelf reads each prepared PDF whether or not its card is on screen. Only the explicit per-file
+ * toggle remains on the shelf. A confirmation for an uncleanable PDF is handed directly to one send.
  */
 @Stable
 internal class ComposerPdfMetadataChoices {
     private val states = mutableStateMapOf<Uri, ComposerPdfState>()
     private val reading = mutableStateMapOf<Uri, Unit>()
-    private var keepOriginal by mutableStateOf(emptySet<Uri>())
+    private var keepMetadata by mutableStateOf(emptySet<Uri>())
     private var pendingSend: ComposerPdfPendingSend? = null
 
     /** The send waiting for a choice, shown as a dialog until it is confirmed or cancelled. */
@@ -52,7 +52,9 @@ internal class ComposerPdfMetadataChoices {
 
     /** Marks [uri] as being read, so a send waits for its result. */
     fun reading(uri: Uri) {
+        keepMetadata -= uri
         reading[uri] = Unit
+        if (decision?.sendUris?.contains(uri) == true) cancel()
     }
 
     fun record(
@@ -71,52 +73,60 @@ internal class ComposerPdfMetadataChoices {
 
     private fun resumeWaitingSend() {
         val waiting = pendingSend
-        if (waiting != null && waiting.uris.none { it in reading }) {
+        if (waiting != null && waiting.uris.all { it in states && it !in reading }) {
             pendingSend = null
             confirmThen(waiting.uris, waiting.onCancel, waiting.send)
         }
     }
 
-    fun keepsOriginal(uri: Uri): Boolean = uri in keepOriginal
+    fun keepsOriginal(uri: Uri): Boolean = uri in keepMetadata
+
+    fun toggleKeepMetadata(uri: Uri) {
+        if (states[uri]?.metadata !is PdfMetadataResult.Removable || uri in reading) return
+        keepMetadata = if (uri in keepMetadata) keepMetadata - uri else keepMetadata + uri
+    }
 
     /** Forgets everything about PDFs that left the shelf. */
     fun retainOnly(uris: Collection<Uri>) {
         val staged = uris.toSet()
         states.keys.filter { it !in staged }.forEach(states::remove)
         reading.keys.filter { it !in staged }.forEach(reading::remove)
-        if (!staged.containsAll(keepOriginal)) keepOriginal = keepOriginal intersect staged
-        resumeWaitingSend()
+        if (!staged.containsAll(keepMetadata)) keepMetadata = keepMetadata intersect staged
+        if (pendingSend?.uris?.any { it !in staged } == true || decision?.sendUris?.any { it !in staged } == true) {
+            cancel()
+        } else {
+            resumeWaitingSend()
+        }
     }
 
-    /** The PDFs the person chose to send as they are, for the send starting now. A later send asks again. */
-    fun takeConsent(): Set<Uri> = keepOriginal.also { keepOriginal = emptySet() }
-
     /**
-     * Runs [send] at once unless some of [uris] are PDFs that keep their metadata and have no choice yet. Then it
-     * asks first: confirming records the choice for those PDFs and sends, cancelling runs [onCancel]. A send that
-     * names a PDF still being read waits for it.
+     * Runs [send] with the exact PDFs allowed to keep metadata. Refused PDFs require a fresh answer each time;
+     * a send waits for all its documents to finish inspection before deciding.
      */
     fun confirmThen(
         uris: List<Uri>,
         onCancel: () -> Unit,
-        send: () -> Unit,
+        send: (Set<Uri>) -> Unit,
     ) {
-        val undecided =
-            uris.distinct().filter { it !in keepOriginal && states[it]?.metadata is PdfMetadataResult.Refused }
+        val selected = keepMetadata intersect uris.toSet()
+        val refused = uris.distinct().filter { states[it]?.metadata is PdfMetadataResult.Refused }
         when {
             decision != null || pendingSend != null -> onCancel()
-            uris.any { it in reading } -> pendingSend = ComposerPdfPendingSend(uris, onCancel, send)
-            undecided.isEmpty() -> send()
-            else -> decision = decisionFor(undecided.mapNotNull(states::get), undecided, onCancel, send)
+            uris.any { it !in states || it in reading } -> pendingSend = ComposerPdfPendingSend(uris, onCancel, send)
+            refused.isEmpty() -> send(selected)
+            else ->
+                decision =
+                    decisionFor(refused.mapNotNull(states::get), refused, uris, onCancel) { approved ->
+                        send(selected + approved)
+                    }
         }
     }
 
-    /** Sends the waiting PDFs as they are. */
+    /** Delivers consent only to the waiting send, even if dispatch then refuses it. */
     fun confirm() {
         val waiting = decision ?: return
         decision = null
-        keepOriginal = keepOriginal + waiting.uris
-        waiting.send()
+        waiting.send(waiting.uris.toSet())
     }
 
     /** Keeps the waiting send on the shelf, including one still waiting for a PDF to be read. */
@@ -134,12 +144,14 @@ internal class ComposerPdfMetadataChoices {
 private fun decisionFor(
     pending: List<ComposerPdfState>,
     undecided: List<Uri>,
+    sendUris: List<Uri>,
     onCancel: () -> Unit,
-    send: () -> Unit,
+    send: (Set<Uri>) -> Unit,
 ) = ComposerPdfDecision(
     names = pending.map { it.name },
     reasons = pending.mapNotNullTo(linkedSetOf()) { (it.metadata as? PdfMetadataResult.Refused)?.reason },
     uris = undecided,
+    sendUris = sendUris,
     send = send,
     cancel = onCancel,
 )

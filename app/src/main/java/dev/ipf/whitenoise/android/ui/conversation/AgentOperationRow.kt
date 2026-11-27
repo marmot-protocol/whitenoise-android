@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.pressFeedbackInsideClip
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
@@ -193,6 +194,7 @@ internal fun AgentOperationRow(
 ) {
     var expanded by rememberSaveable(messageId) { mutableStateOf(false) }
     val (senderModifier, senderClick) = rememberMeasuredControlClick { origin -> onSenderClick?.invoke(origin) }
+    val senderSpokenName = sender?.let { emojiPlainText(it.name) }
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart,
@@ -209,7 +211,7 @@ internal fun AgentOperationRow(
                                 Modifier
                                     .then(senderModifier)
                                     .clip(CircleShape)
-                                    .semantics { contentDescription = sender.name }
+                                    .semantics { contentDescription = senderSpokenName ?: sender.name }
                                     .clickable(
                                         onClickLabel = stringResource(R.string.chat_list_search_open_profile),
                                         role = Role.Button,

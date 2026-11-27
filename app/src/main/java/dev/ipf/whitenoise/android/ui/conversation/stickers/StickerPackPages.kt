@@ -136,7 +136,8 @@ internal fun StickerBrowserPage(
     var syncing by remember { mutableStateOf(true) }
     var syncFailed by remember { mutableStateOf(false) }
     var refreshRequests by remember { mutableIntStateOf(0) }
-    var syncGeneration by remember { mutableIntStateOf(0) }
+    // Advances when a relay sync settles and when a failed read is retried; each advance re-reads the store.
+    var discoveryReads by remember { mutableIntStateOf(0) }
     val discovery = remember { DiscoveryResults() }
     val whiteNoise = rememberWhiteNoisePacks(library, refreshRequests)
     val discoverable = discovery.packs.filterNot { pack -> whiteNoise.any { it.coordinate == pack.coordinate } }
@@ -144,9 +145,9 @@ internal fun StickerBrowserPage(
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
         syncing = false
-        syncGeneration++
+        discoveryReads++
     }
-    LaunchedEffect(search, library.installed, syncGeneration) {
+    LaunchedEffect(search, library.installed, discoveryReads) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
         discovery.read(library, search)
     }
@@ -185,6 +186,7 @@ internal fun StickerBrowserPage(
             packs = discoverable,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
+            onReload = { discoveryReads++ },
         )
         item { StickerDisclosure(stringResource(R.string.sticker_packs_public_footer)) }
     }
@@ -254,12 +256,16 @@ private fun StickerSearchField(
     )
 }
 
-/** Adds the discovered packs, or a loading, empty or unreachable-with-retry state, to the list. */
+/**
+ * Adds the discovered packs, or a loading, empty or unreachable-with-retry state, to the list. [onRetry] syncs the
+ * relays again; [onReload] re-reads the local store after a failed read, without waiting on the relays.
+ */
 private fun LazyListScope.discoveryResults(
     state: DiscoveryState,
     packs: List<StickerPackFfi>,
     onOpen: (StickerPackFfi) -> Unit,
     onRetry: () -> Unit,
+    onReload: () -> Unit,
 ) {
     when (state) {
         DiscoveryState.Packs ->
@@ -268,7 +274,7 @@ private fun LazyListScope.discoveryResults(
         DiscoveryState.NoneOnRelays -> item { StickerDisclosure(stringResource(R.string.sticker_packs_none_on_relays)) }
         DiscoveryState.NoMatches -> item { StickerDisclosure(stringResource(R.string.sticker_packs_no_matches)) }
         DiscoveryState.Unreachable -> item { DiscoveryRetry(R.string.sticker_packs_unreachable, onRetry) }
-        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onRetry) }
+        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onReload) }
     }
 }
 

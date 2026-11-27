@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -76,23 +75,19 @@ import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
-import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
-import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
 import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.hasFolderWindows
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
 import dev.ipf.whitenoise.android.state.loadMoreFolderChats
-import dev.ipf.whitenoise.android.state.localDeleteBatchRetryNotice
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
-import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
@@ -100,9 +95,6 @@ import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -112,7 +104,6 @@ import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
-import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -121,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteHeaderMotion
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -580,10 +572,11 @@ internal fun ChatsScreen(
     LaunchedEffect(completeSelectAllScope) { completeSelection = null }
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
-    var pendingBulkDelete by
+    val pendingBulkDeleteState =
         remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
             mutableStateOf<PendingLocalChatDelete?>(null)
         }
+    var pendingBulkDelete by pendingBulkDeleteState
     val searchFocusRequester = rememberGlobalSearchShortcut(searchOpen, selectionMode, onGlobalSearchStateChange)
     val scope = rememberCoroutineScope()
 
@@ -941,7 +934,8 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             showArchived = showArchived,
         )
-    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
+    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberChatAvatarListState() }
+    val avatarVisibleKeys = rememberChatAvatarVisibleKeys(chatListState)
     // Active/archived viewports keep separate scrolling; only decorative fades share the account lifetime.
     val edgeFadeMotion = rememberScrollEdgeFadeMotion(appState.activeAccountRef to appState.runtimeGeneration)
     val folderArrival =
@@ -1028,15 +1022,7 @@ internal fun ChatsScreen(
                         rows
                     }
                 }
-            if (searchActive) {
-                rows
-            } else {
-                sortFolderChats(
-                    rows,
-                    selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT,
-                    appState.activeAccount?.accountIdHex,
-                ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
-            }
+            if (searchActive) rows else sortChatListFolderRows(rows, selectedFolder?.sort, appState, groupTitleCopy)
         }
     RecordUnreadFilterFirstResultFrame(
         active = unreadOnly,
@@ -2032,11 +2018,10 @@ internal fun ChatsScreen(
         }
 
     Scaffold(
-        // The body frame places this screen's banner slot below the playback strip instead.
         topNoticeSlot = false,
         topBar = {
             val connectivityState = rememberChatListConnectivityState(appState, controller)
-            Column {
+            Column(Modifier.conversationRouteHeaderMotion()) {
                 if (selectionMode) {
                     ChatListSelectionBar(onClose = ::clearSelection)
                 } else {
@@ -2355,17 +2340,27 @@ internal fun ChatsScreen(
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
         ) {
-            // Chats reset and folder management remain available with an empty list.
-            // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
-            // The prototype swaps the whole top column for the search bar and its mode chips, so the
-            // folder pills leave with it and come back when search closes.
-            if (appState.activeAccountRef != null && !searchOpen) {
-                key(appState.activeAccountRef, appState.runtimeGeneration) {
+            // Folder chips stay available above the empty list and yield to the search bar.
+            val folderAccount = appState.activeAccountRef
+            if (folderAccount != null && !searchOpen) {
+                key(folderAccount, appState.runtimeGeneration) {
+                    val selectFolder =
+                        rememberChatFolderAvatarSelection(appState, folderAccount, onSelectFolder) { id ->
+                            val rule = id?.let { appState.chatFolderPreferences.folderRule(folderAccount, it) }
+                            val source = chatFolderSource(rule, folderActiveItems, folderArchivedItems)
+                            val candidates = restrictToChatIds(source, id?.let { resolveFolderChatIds(it) })
+                            val sort = accountFolders.firstOrNull { it.id == id }?.sort
+                            val archived = rule?.smartFilter == null && rule?.archivedOnly == true
+                            val target =
+                                if (archived == showArchived) chatListState else searchViewport?.listState(archived)
+                            val ranked = sortChatListFolderRows(candidates, sort, appState, groupTitleCopy)
+                            folderAvatarViewport(ranked, target)
+                        }
                     ChatListFilterChips(
                         chips = folderChipModels,
                         chatsUnreadCount = appState.activeAccountMessageCount(),
                         selectedFolderId = selectedFolderId,
-                        onSelect = onSelectFolder,
+                        onSelect = selectFolder,
                         onEditFolder = { folderHandoff.editingFolderId = it },
                         onManageFolders = {
                             val sameOwner =
@@ -2535,28 +2530,25 @@ internal fun ChatsScreen(
                                                 )
                                             }
                                         }
-                                        searchSections.groups.forEachIndexed { targetIndex, item ->
-                                            this.item(
-                                                key = visibleRowId(item),
-                                                contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                            ) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRows(
+                                            searchSections.groups,
+                                            ::visibleRowId,
+                                            avatarVisibleKeys,
+                                            content = chatRowContent,
+                                        )
                                         if (messageResultsMode) {
                                             globalSearchResultItems(messageResultsContent) { result ->
                                                 messageResultReturnFocus(result)
                                             }
                                         }
                                     } else {
-                                        visibleItems.forEachIndexed { targetIndex, item ->
-                                            if (targetIndex == pinnedBoundary) {
-                                                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
-                                            }
-                                            this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                                chatRowContent(item, targetIndex)
-                                            }
-                                        }
+                                        chatListRowsWithPinnedBoundary(
+                                            visibleItems,
+                                            pinnedBoundary,
+                                            rowPlacementDurationMillis,
+                                            avatarVisibleKeys,
+                                            chatRowContent,
+                                        )
                                     }
                                 }
                             }
@@ -2723,80 +2715,14 @@ internal fun ChatsScreen(
         )
     }
 
-    pendingBulkDelete?.let { request ->
-        val isCurrent = { request.isCurrent(appState, controller) }
-        ChatDeleteConfirmationDialog(
-            ownerKey = request,
-            count = request.groupIds.size,
-            confirmEnabled = isCurrent(),
-            identity = {
-                GroupActingAccountIdentity(appState, request.actingAccountRef)
-                request.reviewItems.forEach { item ->
-                    val avatar = rememberChatListGroupAvatar(appState, item)
-                    GroupReviewDestinationIdentity(
-                        MemberReviewGroup(
-                            item.group.groupIdHex,
-                            chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                            avatar.pictureUrl,
-                            avatar.image,
-                            groupAnimation = avatar.groupAnimation,
-                        ),
-                        actionLabel = stringResource(R.string.delete_from_device),
-                    )
-                }
-            },
-            onConfirm = {
-                if (pendingBulkDelete !== request) return@ChatDeleteConfirmationDialog
-                pendingBulkDelete = null
-                if (!isCurrent()) return@ChatDeleteConfirmationDialog
-                if (request.groupIds.any { it in leavingAndDeleting }) {
-                    return@ChatDeleteConfirmationDialog
-                }
-                clearSelection()
-                appState.launchMutation {
-                    var failure: Throwable? = null
-                    var cleanupDeferred = false
-                    val observer =
-                        LocalChatDeleteObserver(
-                            onFailure = { failure = it },
-                            onCleanupDeferred = { cleanupDeferred = true },
-                        )
-                    val result =
-                        deleteLocalChatsBatch(request.groupIds, isCurrent) { groupId ->
-                            controller.deleteGroupLocalFromChatList(
-                                groupId,
-                                notify = false,
-                                observer = observer,
-                                requireNativeEligibility = request.requireNativeEligibility,
-                            )
-                        }
-                    if (isCurrent() && result.deleted < result.total) {
-                        val remaining = request.remaining(result.deleted)
-                        appState.presentStoppedLocalChatDeleteBatch(
-                            result,
-                            failure,
-                            notice =
-                                appState.localDeleteBatchRetryNotice(
-                                    controller,
-                                    remaining.groupIds,
-                                    isCurrent,
-                                    requireNativeEligibility = request.requireNativeEligibility,
-                                ),
-                        )
-                    } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
-                        appState.presentTransient(
-                            context.resources.getQuantityString(
-                                R.plurals.toast_chat_list_chats_deleted,
-                                result.deleted,
-                                result.deleted,
-                            ),
-                        )
-                    }
-                }
-            },
-            onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null },
-        )
-    }
+    ChatListLocalDeleteConfirmation(
+        appState = appState,
+        controller = controller,
+        pendingRequest = pendingBulkDeleteState,
+        busyChats = leavingAndDeleting,
+        groupTitleCopy = groupTitleCopy,
+        onAccepted = ::clearSelection,
+    )
 }
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
@@ -2810,5 +2736,3 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
-
-private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"

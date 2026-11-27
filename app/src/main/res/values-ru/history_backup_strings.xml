@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="history_backups">Резервные копии истории</string>
-    <string name="explanation_organize_hub_history_backups">Храните зашифрованную копию истории чатов, которую открывают слова восстановления, чтобы вернуть её после новой установки.</string>
+    <string name="explanation_organize_hub_history_backups">Храните зашифрованную историю чатов онлайн и восстанавливайте сообщения из чатов, в которых вы состоите на этом устройстве.</string>
+    <string name="history_backups_storage">White Noise хранит зашифрованную историю чатов на файловых серверах Blossom. Ваши ретрансляторы Nostr хранят зашифрованную запись, по которой приложение находит резервные копии.</string>
+    <string name="history_backups_restore_scope">Восстановить сообщения можно только в чатах, в которых вы сейчас состоите на этом устройстве. Если вы потеряете доступ к группе, попросите кого-нибудь с правом приглашать участников снова добавить вас.</string>
     <string name="history_backups_status">Резервные копии</string>
     <string name="history_backups_status_loading">Проверка…</string>
     <string name="history_backups_status_unavailable">Пока недоступно</string>
@@ -24,7 +26,7 @@
     <string name="history_backups_confirm_message">Введите слово %1$d и слово %2$d из своего списка. Если вы их не записали, отмените и начните заново, чтобы получить новые слова.</string>
     <string name="history_backups_word_label">Слово %1$d</string>
     <string name="history_backups_restore_words">Слова восстановления</string>
-    <string name="history_backups_restore_words_help">Введите все 12 слов через пробел.</string>
+    <string name="history_backups_restore_words_help">Сначала присоединитесь к чатам на этом устройстве. Затем введите все 12 слов через пробел.</string>
     <string name="history_backups_restore">Восстановить историю</string>
     <string name="history_backups_restoring">Запуск восстановления</string>
     <string name="history_backups_cancel_restore">Отменить восстановление</string>

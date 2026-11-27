@@ -36,7 +36,8 @@
         "anchor": "fun WhiteNoiseApp(",
         "test_ids": [
           "INT-002",
-          "NAV-001"
+          "NAV-001",
+          "SYS-006"
         ]
       }
     ],

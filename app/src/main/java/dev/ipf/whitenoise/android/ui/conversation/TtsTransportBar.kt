@@ -1,65 +1,53 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
-import dev.ipf.whitenoise.android.ui.icons.filled.SkipNext
-import dev.ipf.whitenoise.android.ui.icons.filled.SkipPrevious
 
 internal const val TTS_TRANSPORT_BODY_TAG = "tts-transport-body"
 
 /**
  * Shared read-aloud controls hosted by the app shell, normal chat-list flow,
- * or the modal text reader. Sentence and message navigation are
- * separate compact actions above message progress. The controls scroll
- * horizontally at narrow widths or large font scales without making the
- * transport taller. No scrub gesture, since the framework offers no
- * utterance-internal seek.
+ * or the modal text reader, on the same one-row strip as the voice player.
+ * Sentence steps stay on the row and message steps sit under More options.
+ * The row scrolls horizontally only when large text leaves no room. No scrub
+ * gesture, since the framework offers no utterance-internal seek.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -92,18 +80,27 @@ internal fun TtsTransportBar(
         // the conversation instead of completing or clamping the queue.
         onPreviousSentence = { appState.ttsHistorySession.previousSentence() },
         onNextSentence = { appState.ttsHistorySession.nextSentence() },
-        onPreviousMessage = { appState.ttsHistorySession.previousMessage() },
-        onNextMessage = { appState.ttsHistorySession.nextMessage() },
+        onPreviousMessage = appState.ttsHistorySession::previousMessage,
+        onNextMessage = appState.ttsHistorySession::nextMessage,
         onRateSelected = appState::setTtsRateOverride,
         onStop = { appState.stopSpeaking() },
         remainingSeconds = remainingSeconds,
         modifier = modifier,
         historyEdge = historyEdge,
         onBodyClick = onBodyClick,
+        currentNavigableState = {
+            appState.ttsController.state.value.takeIf {
+                ttsNavigationEnabled(it, appState.ttsHistorySession.edgeState.value)
+            }
+        },
     )
 }
 
-/** Compact transport body: playback controls, progress, remaining time and history edges. */
+/**
+ * Compact read-aloud body on the shared [PlaybackStrip]: play/pause, the remaining-time or status line,
+ * previous and next sentence, the speech rate, message steps under More options, and stop. A pending or failed
+ * history edge adds one announced status line under the row while it applies.
+ */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun TtsTransportBarContent(
@@ -122,131 +119,214 @@ internal fun TtsTransportBarContent(
     modifier: Modifier = Modifier,
     historyEdge: TtsHistoryEdgeState? = null,
     onBodyClick: (() -> Unit)? = null,
+    currentNavigableState: (() -> TtsState?)? = null,
 ) {
     val isError = state is TtsState.Error
     val isPreparing = state is TtsState.Preparing
-    val actionableBodyClick = onBodyClick.takeUnless { isError }
     val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
-    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        val bodyModifier =
-            if (actionableBodyClick == null) {
-                Modifier
+    val latestState by rememberUpdatedState(state)
+
+    /** Keeps an accepted menu action anchored to the message that was playing at the tap. */
+    fun canJumpMessage(): Boolean {
+        val current = if (currentNavigableState == null) latestState else currentNavigableState() ?: return false
+        return current.sessionId == state.sessionId &&
+            ttsNavigationEnabled(current) &&
+            current.messageIndex == state.messageIndex &&
+            current.messageProgressGeneration == state.messageProgressGeneration
+    }
+
+    val showProgress = !isError && !isPreparing && ttsMessageCount(state) > 0
+    val targetProgress = if (showProgress) ttsMessageProgressFraction(state) else 0f
+    val animatedProgress =
+        key(ttsProgressAnimationKey(state)) {
+            val progress by animateFloatAsState(
+                targetValue = targetProgress,
+                animationSpec = tween(durationMillis = TTS_MESSAGE_PROGRESS_ANIMATION_MILLIS),
+                label = "ttsMessageProgress",
+            )
+            progress
+        }
+    PlaybackStrip(
+        progress = { animatedProgress }.takeIf { showProgress },
+        modifier = modifier,
+        bodyModifier = Modifier.testTag(TTS_TRANSPORT_BODY_TAG),
+        onBodyClick = onBodyClick.takeUnless { isError },
+        // The remaining-time label already speaks the position; the bar would repeat it as a percentage.
+        announceProgress = false,
+        status =
+            if (historyEdge != null) {
+                { HistoryEdgeStatus(historyEdge) }
             } else {
-                Modifier.clickable(
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.tts_bar_return_to_source),
-                    onClick = actionableBodyClick,
+                null
+            },
+        leading = { TtsLeadingControl(state, onPause, onResume) },
+        info = { PlaybackStripInfo(title = null) { TtsStatusText(isError, isPreparing, remainingSeconds) } },
+        actions = {
+            TtsNavigationButton(
+                onClick = onPreviousSentence,
+                enabled = navigationEnabled,
+                label = R.string.tts_bar_skip_previous,
+                explanation = R.string.explanation_conversation_tts_previous_sentence,
+            ) { Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.tts_bar_skip_previous)) }
+            TtsNavigationButton(
+                onClick = onNextSentence,
+                enabled = navigationEnabled,
+                label = R.string.tts_bar_skip_next,
+                explanation = R.string.explanation_conversation_tts_next_sentence,
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, stringResource(R.string.tts_bar_skip_next)) }
+            if (!isError) {
+                TtsTransportRatePicker(
+                    rateOverride = rateOverride,
+                    activeRate = activeRate,
+                    onRateSelected = onRateSelected,
                 )
             }
-        Box(modifier = Modifier.testTag(TTS_TRANSPORT_BODY_TAG).then(bodyModifier)) {
-            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    IconButton(
+            key(state.sessionId, navigationEnabled) {
+                TtsMessageMenu(
+                    enabled = navigationEnabled,
+                    onPreviousMessage = { if (canJumpMessage()) onPreviousMessage() },
+                    onNextMessage = { if (canJumpMessage()) onNextMessage() },
+                )
+            }
+            PlaybackStripCloseButton(stringResource(R.string.tts_bar_stop), onStop)
+        },
+    )
+}
+
+/** Pause or resume while a queue is live; a spinner while speech prepares, an error glyph after a failure. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsLeadingControl(
+    state: TtsState,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+) {
+    when (state) {
+        is TtsState.Speaking ->
+            PlaybackStripPlayButton(playing = true, stringResource(R.string.tts_bar_pause), onPause)
+        is TtsState.Paused ->
+            PlaybackStripPlayButton(playing = false, stringResource(R.string.tts_bar_play), onResume)
+        is TtsState.Preparing ->
+            PlaybackStripLeadingSlot {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+            }
+        is TtsState.Error ->
+            PlaybackStripLeadingSlot {
+                Icon(painterResource(R.drawable.ic_error), null, tint = MaterialTheme.colorScheme.error)
+            }
+        // Native terminal states have no resumable queue; the slot stays so the row does not shift.
+        else -> PlaybackStripLeadingSlot()
+    }
+}
+
+/** A sentence step with the same tap and hold actions as other conversation controls. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsNavigationButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    @StringRes label: Int,
+    @StringRes explanation: Int,
+    icon: @Composable () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.explainOnLongPress(composerExplanation(label, explanation)),
+        content = icon,
+    )
+}
+
+/** Message jumps are available from the read-aloud strip’s More options menu. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsMessageMenu(
+    enabled: Boolean,
+    onPreviousMessage: () -> Unit,
+    onNextMessage: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    val dismiss = { open = false }
+    Box {
+        IconButton(onClick = { open = true }, enabled = enabled) {
+            Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+        }
+        WhiteNoiseDropdownMenu(
+            expanded = open,
+            onDismissRequest = dismiss,
+            items =
+                listOf(
+                    WhiteNoiseMenuItem(
+                        label = stringResource(R.string.tts_bar_previous_message),
                         onClick = onPreviousMessage,
-                        enabled = navigationEnabled,
+                        enabled = enabled,
                         modifier =
                             Modifier.explainOnLongPress(
                                 composerExplanation(
                                     R.string.tts_bar_previous_message,
                                     R.string.explanation_conversation_tts_previous_message,
                                 ),
+                                beforeShow = dismiss,
                             ),
-                    ) {
-                        Icon(
-                            Icons.Default.SkipPrevious,
-                            stringResource(R.string.tts_bar_previous_message),
-                            Modifier.mirrorInRtl(),
-                        )
-                    }
-                    IconButton(
-                        onClick = onPreviousSentence,
-                        enabled = navigationEnabled,
-                        modifier =
-                            Modifier.explainOnLongPress(
-                                composerExplanation(
-                                    R.string.tts_bar_skip_previous,
-                                    R.string.explanation_conversation_tts_previous_sentence,
-                                ),
-                            ),
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.tts_bar_skip_previous),
-                        )
-                    }
-                    when (state) {
-                        is TtsState.Speaking ->
-                            FilledTonalIconButton(onClick = onPause) {
-                                Icon(painterResource(R.drawable.ic_pause), stringResource(R.string.tts_bar_pause))
-                            }
-                        is TtsState.Paused ->
-                            FilledTonalIconButton(onClick = onResume) {
-                                Icon(painterResource(R.drawable.ic_play_arrow), stringResource(R.string.tts_bar_play))
-                            }
-                        // Native terminal/error states have no resumable queue.
-                        else -> Unit
-                    }
-                    IconButton(
-                        onClick = onNextSentence,
-                        enabled = navigationEnabled,
-                        modifier =
-                            Modifier.explainOnLongPress(
-                                composerExplanation(
-                                    R.string.tts_bar_skip_next,
-                                    R.string.explanation_conversation_tts_next_sentence,
-                                ),
-                            ),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = stringResource(R.string.tts_bar_skip_next),
-                        )
-                    }
-                    IconButton(
+                    ),
+                    WhiteNoiseMenuItem(
+                        label = stringResource(R.string.tts_bar_next_message),
                         onClick = onNextMessage,
-                        enabled = navigationEnabled,
+                        enabled = enabled,
                         modifier =
                             Modifier.explainOnLongPress(
                                 composerExplanation(
                                     R.string.tts_bar_next_message,
                                     R.string.explanation_conversation_tts_next_message,
                                 ),
+                                beforeShow = dismiss,
                             ),
-                    ) {
-                        Icon(
-                            Icons.Default.SkipNext,
-                            stringResource(R.string.tts_bar_next_message),
-                            Modifier.mirrorInRtl(),
-                        )
-                    }
-                    if (!isError) {
-                        TtsTransportRatePicker(
-                            rateOverride = rateOverride,
-                            activeRate = activeRate,
-                            onRateSelected = onRateSelected,
-                        )
-                    }
-                    IconButton(onClick = onStop) {
-                        Icon(
-                            painterResource(R.drawable.ic_stop),
-                            contentDescription = stringResource(R.string.tts_bar_stop),
-                        )
-                    }
-                }
-                TtsTransportProgress(state, isError, isPreparing, historyEdge, remainingSeconds)
-            }
-        }
+                    ),
+                ),
+        )
     }
 }
 
-// Compact status line for a pending or failed history edge load, announced
-// politely so TalkBack narrates the state change without stealing focus.
+/** Remaining time, or the preparing/failed status in its place. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TtsStatusText(
+    isError: Boolean,
+    isPreparing: Boolean,
+    remainingSeconds: Int?,
+) {
+    val style = MaterialTheme.typography.labelMedium
+    when {
+        isError ->
+            Text(stringResource(R.string.tts_bar_error), style = style, color = MaterialTheme.colorScheme.error)
+        isPreparing ->
+            Text(
+                stringResource(R.string.tts_bar_preparing),
+                style = style,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        remainingSeconds != null -> {
+            val resources = LocalResources.current
+            val description = ttsRemainingDescription(resources, remainingSeconds)
+            Text(
+                ttsRemainingLabel(resources, remainingSeconds),
+                modifier = Modifier.semantics { contentDescription = description },
+                // Direction follows the label's own script, so in an RTL layout an English
+                // estimate keeps its leading ~ instead of moving it to the far end.
+                style = style.copy(textDirection = TextDirection.Content),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        else ->
+            Text(
+                stringResource(R.string.read_aloud),
+                style = style,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+    }
+}
 
-/** Status line for the history edge being loaded or exhausted. */
+/** Status line for the history edge being loaded or exhausted, announced politely without stealing focus. */
 @Suppress("FunctionNaming")
 @Composable
 private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState) {
@@ -265,75 +345,4 @@ private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState) {
         modifier =
             Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
-}
-
-/** Reports the native message progress at full transport width without inventing utterance seeking. */
-@Suppress("FunctionNaming")
-@Composable
-private fun TtsTransportProgress(
-    state: TtsState,
-    isError: Boolean,
-    isPreparing: Boolean,
-    historyEdge: TtsHistoryEdgeState?,
-    remainingSeconds: Int?,
-) {
-    val showProgress = !isError && !isPreparing && ttsMessageCount(state) > 0
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (showProgress) {
-            val targetProgress = ttsMessageProgressFraction(state)
-            val animatedProgress =
-                key(ttsProgressAnimationKey(state)) {
-                    val progress by animateFloatAsState(
-                        targetValue = targetProgress,
-                        animationSpec = tween(durationMillis = 200),
-                        label = "ttsMessageProgress",
-                    )
-                    progress
-                }
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                drawStopIndicator = {},
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .clearAndSetSemantics {},
-            )
-        } else {
-            Box(modifier = Modifier.weight(1f))
-        }
-        if (historyEdge != null) {
-            HistoryEdgeStatus(historyEdge)
-        } else {
-            when {
-                isError -> Text(stringResource(R.string.tts_bar_error), color = MaterialTheme.colorScheme.error)
-                isPreparing -> Text(stringResource(R.string.tts_bar_preparing))
-                remainingSeconds != null -> {
-                    val resources = LocalResources.current
-                    val description = ttsRemainingDescription(resources, remainingSeconds)
-                    Text(
-                        ttsRemainingLabel(resources, remainingSeconds),
-                        modifier = Modifier.semantics { contentDescription = description },
-                        // Direction follows the label's own script, so in an RTL layout an English
-                        // estimate keeps its leading ~ instead of moving it to the far end.
-                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Flips a directional glyph in a right-to-left layout, where the transport row runs the other way, so the
- * previous and next message skips point outward like the sentence arrows beside them (#4065).
- */
-@Composable
-private fun Modifier.mirrorInRtl(): Modifier {
-    val rightToLeft = LocalLayoutDirection.current == LayoutDirection.Rtl
-    return if (rightToLeft) scale(scaleX = -1f, scaleY = 1f) else this
 }
