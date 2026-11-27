@@ -1687,6 +1687,10 @@ private val LABEL_IPV6_TOKEN =
 private val DOT_LIKE_CHARS = charArrayOf('.', '。', '．', '｡')
 private const val ASCII_MAX_CODE = 0x7F
 
+// The token patterns backtrack, so their cost grows with the square of the label. Plain-word labels
+// are far shorter; a longer label keeps the dialog without being scanned.
+private const val MAX_CLASSIFIED_LABEL_LENGTH = 512
+
 /**
  * Whether a labeled markdown link must route through the destination
  * confirmation dialog (#273): true when the visible [labelText] carries
@@ -1699,6 +1703,9 @@ internal fun shouldConfirmMarkdownLink(
     labelText: String,
     destination: String,
 ): Boolean {
+    if (labelText.length > MAX_CLASSIFIED_LABEL_LENGTH) {
+        return true
+    }
     val destHost =
         runCatching { URI(destination) }
             .getOrNull()
