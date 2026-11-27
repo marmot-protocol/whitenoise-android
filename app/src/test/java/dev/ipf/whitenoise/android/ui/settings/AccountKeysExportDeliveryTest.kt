@@ -578,6 +578,7 @@ class AccountKeysExportDeliveryTest {
     @Test
     fun rawShareMarksBothIntentAndPayloadSensitive() {
         val fixture = render()
+        fixture.recordSignUp()
         composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
         dialogButton(R.string.share).performClick()
         composeRule.waitUntil(TIMEOUT_MILLIS) { shadowOf(composeRule.activity).peekNextStartedActivity() != null }
