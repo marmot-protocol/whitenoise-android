@@ -234,7 +234,7 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
     memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
     rosterBlockReason = null
     // UseAfterEviction is authoritative: revoke capture before another result can write this chat's draft.
-    appState.releaseEvictedCaptureTarget(account, group.groupIdHex)
+    appState.releaseCaptureTarget(account, group.groupIdHex)
     appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
 }
 

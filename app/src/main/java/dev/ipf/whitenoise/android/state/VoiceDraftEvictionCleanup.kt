@@ -21,7 +21,7 @@ import java.nio.file.Files
 private const val INITIAL_VOICE_PURGE_RETRY_MS = 1_000L
 private const val MAX_VOICE_PURGE_RETRY_MS = 60_000L
 
-/** Persists failed evictions beside the app's draft storage so they survive a restart or a read-only draft dir. */
+/** Persists voice retirement and eviction readbacks independently of the chat's own draft directory. */
 internal class VoiceDraftEvictionJournal(
     private val directory: File,
 ) {
@@ -90,7 +90,7 @@ internal class VoiceDraftEvictionJournal(
     }
 }
 
-/** Keeps pre-eviction directories out of recovery and retries their deletion across process restarts. */
+/** Keeps removed chats' old directories out of recovery and retries their deletion across process restarts. */
 internal class VoiceDraftEvictionCleanup(
     private val journal: VoiceDraftEvictionJournal,
     draftRoot: File,
@@ -108,31 +108,34 @@ internal class VoiceDraftEvictionCleanup(
     private var worker: Job? = null
     val draftStore = VoiceDraftStore(draftRoot, ::blocksDraft)
 
-    /** Fences the active path only for confirmed eviction; an obsolete readback may schedule another read. */
+    /** Fences the active path for confirmed removal and reports whether the request is on disk. */
     fun stage(
         key: VoiceNoteKey,
         confirmed: Boolean,
-    ) {
+    ): Boolean {
         val previous = pending[key]
-        if (previous?.confirmed == true && !confirmed) return
+        if (previous?.confirmed == true && !confirmed) return previous.persisted
         val persisted =
             (previous != null && previous.confirmed == confirmed && previous.persisted) ||
                 journal.stage(key, confirmed)
         pending[key] = Request(confirmed, persisted)
+        return persisted
     }
 
     /** Includes an outstanding membership read as well as an unisolated, confirmed eviction. */
     fun contains(key: VoiceNoteKey): Boolean = key in pending
 
-    /** Blocks draft recovery and recording until the confirmed eviction's directory has been isolated. */
+    /** Blocks draft recovery and recording until the confirmed removal's directory has been isolated. */
     private fun blocksDraft(chatName: String): Boolean {
         val confirmed = pending.asSequence().filter { (_, request) -> request.confirmed }
         return confirmed.any { (key, _) -> draftStore.chatName(key) == chatName }
     }
 
-    /** Moves the old directory away before the same chat can save any replacement drafts. */
-    fun isolate(key: VoiceNoteKey) {
-        if (draftStore.quarantine(key)) complete(key)
+    /** Reports whether the old directory is out of the active path and can be swept separately. */
+    fun isolate(key: VoiceNoteKey): Boolean {
+        val isolated = draftStore.quarantine(key)
+        if (isolated) complete(key)
+        return isolated
     }
 
     /** Drops the fence once the live path is clean, or clears a readback that found active membership. */
@@ -185,19 +188,8 @@ internal fun WhiteNoiseAppState.createVoiceDraftEvictionCleanup(): VoiceDraftEvi
         draftRoot = appContext.noBackupFilesDir.resolve("voice-drafts"),
         scope = mutationsScope,
         isEvicted = { key -> marmotOrNull()?.let { readCaptureEviction(key, it) } },
-        releaseEvictedTarget = { key -> releaseEvictedCaptureTarget(key.accountRef, key.groupIdHex) },
+        releaseEvictedTarget = { key -> releaseCaptureTarget(key.accountRef, key.groupIdHex) },
     )
-
-/** Commits or journals private cleanup for the exact chat that native membership marked as evicted. */
-internal fun WhiteNoiseAppState.releaseEvictedCaptureTarget(
-    account: String,
-    groupIdHex: String,
-) {
-    val key = VoiceNoteKey(account, groupIdHex)
-    val purged = releaseCaptureTarget(account, groupIdHex) { voiceDraftEvictions.stage(key, confirmed = true) }
-    if (!purged) voiceDraftEvictions.isolate(key)
-    voiceDraftEvictions.resume()
-}
 
 /** Releases capture when a group projection first reports an authoritative eviction. */
 internal fun WhiteNoiseAppState.releaseEvictedCapture(
@@ -207,7 +199,7 @@ internal fun WhiteNoiseAppState.releaseEvictedCapture(
 ) {
     if (account == null || !current.selfMembership.isGroupEviction()) return
     if (previous?.selfMembership?.isGroupEviction() != true) {
-        releaseEvictedCaptureTarget(account, current.groupIdHex)
+        releaseCaptureTarget(account, current.groupIdHex)
     }
 }
 
@@ -248,7 +240,7 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
             voiceDraftEvictions.stage(key, confirmed = false)
             voiceDraftEvictions.resume()
         }
-    if (evicted == true) releaseEvictedCaptureTarget(account, group)
+    if (evicted == true) releaseCaptureTarget(account, group)
 }
 
 /** Authorizes removal only for the current capture and defers failed or superseded eviction reads. */

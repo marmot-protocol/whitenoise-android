@@ -162,7 +162,7 @@ internal class VoiceDraftStore(
                 }
             }.mapTo(HashSet()) { it.name }
 
-    /** A confirmed eviction fences the old directory until it is removed or moved out of the active path. */
+    /** A confirmed removal fences the old directory until it is removed or moved out of the active path. */
     fun canRecord(key: VoiceNoteKey): Boolean = !evictionPending(chatName(key))
 
     /** Removes the chat's whole directory, for a chat that left the account. */

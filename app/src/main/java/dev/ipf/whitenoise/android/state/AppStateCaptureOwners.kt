@@ -94,16 +94,27 @@ internal suspend fun WhiteNoiseAppState.localDeleteCaptureGuard(
         return@withContext { epoch == runtimeGeneration && sameCapture() }
     }
 
-/** Stops both capture owners for a removed chat and reports whether its saved voice files were deleted. */
+/** Stops both capture owners and durably retires the removed chat's voice directory after native confirmation. */
 internal fun WhiteNoiseAppState.releaseCaptureTarget(
     account: String,
     groupIdHex: String,
-    beforePurge: () -> Unit = {},
 ): Boolean {
+    val key = VoiceNoteKey(account, groupIdHex)
     conversationDictation.onTargetRemoved(account, groupIdHex)
-    val purged = voiceNotes.onTargetRemoved(account, groupIdHex, beforePurge)
-    if (purged) voiceDraftEvictions.complete(VoiceNoteKey(account, groupIdHex))
-    return purged
+    var journaled = false
+    val purged =
+        voiceNotes.onTargetRemoved(account, groupIdHex) {
+            journaled = voiceDraftEvictions.stage(key, confirmed = true)
+        }
+    val retired =
+        if (purged) {
+            voiceDraftEvictions.complete(key)
+            true
+        } else {
+            voiceDraftEvictions.isolate(key)
+        }
+    if (!purged || voiceDraftEvictions.contains(key)) voiceDraftEvictions.resume()
+    return retired || journaled
 }
 
 /** Maps recorder failures to localized, privacy-safe user presentation. */

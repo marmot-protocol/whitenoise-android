@@ -173,7 +173,7 @@ internal class VoiceNoteSessionOwner(
         return store.purgeAccount(accountRef)
     }
 
-    /** Revokes capture immediately and lets confirmed eviction journal its work before deleting files. */
+    /** Revokes capture immediately and lets confirmed removal journal its work before deleting files. */
     fun onTargetRemoved(
         accountRef: String,
         groupIdHex: String,

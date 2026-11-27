@@ -871,6 +871,52 @@ class ComposerExpansionDestructiveLifecycleTest {
             assertTrue(appState.localGroupDeleteCleanupJournal.hasPending())
         }
 
+    /** A failed voice purge during Delete cannot make the removed take appear after rejoin and restart. */
+    @Test
+    fun deletedVoiceDraftStaysRetired() = runBlocking { assertRemovedTakeRetired(forgetProtocol = false) }
+
+    /** Forget shares the same durable retirement as Delete. */
+    @Test
+    fun forgottenVoiceDraftStaysRetired() = runBlocking { assertRemovedTakeRetired(forgetProtocol = true) }
+
+    /** Blocks both filesystem operations while leaving the independent retirement journal writable. */
+    private suspend fun assertRemovedTakeRetired(forgetProtocol: Boolean) {
+        val take = saveVoiceDraft(GROUP_ID)
+        val directory = checkNotNull(take.parentFile)
+        val accountDirectory = checkNotNull(directory.parentFile)
+        val original = fixture(attachConversationController = false)
+        val appState = original.appState
+        val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+        assertTrue(directory.setWritable(false))
+        try {
+            assertTrue(accountDirectory.setWritable(false))
+            val cleanupComplete =
+                appState.deleteChatGroupLocalWithRecovery(
+                    LocalGroupRemovalRequest(ACCOUNT_REF, GROUP_ID, forgetProtocol),
+                    isCurrent = { true },
+                    readinessBudget = LocalGroupDeleteReadinessBudget(),
+                    onNativeCommitted = {},
+                )
+            assertEquals(listOf(if (forgetProtocol) "forget" else "delete"), original.calls.order)
+            assertTrue(take.isFile)
+
+            val restarted = fixture(attachConversationController = false).appState
+            val rejoined = restarted.marmotIo { chatListRow(ACCOUNT_REF, GROUP_ID) }
+            assertEquals(SelfMembershipFfi.MEMBER, rejoined?.selfMembership)
+            restarted.reconcilePendingLocalGroupDeleteCleanups()
+            restarted.voiceNotes.bind(key) { true }
+            assertNull(restarted.voiceNotes.draft(key))
+            assertTrue(take.isFile)
+            assertTrue(restarted.voiceDraftEvictions.contains(key))
+            assertTrue(cleanupComplete)
+            assertFalse(restarted.localGroupDeleteCleanupJournal.hasPending())
+        } finally {
+            val accountRestored = accountDirectory.setWritable(true)
+            val chatRestored = directory.setWritable(true)
+            assertTrue(accountRestored && chatRestored)
+        }
+    }
+
     /** A detached eviction keeps its retry when the filesystem rejects both deletion and isolation. */
     @Test
     fun failedEvictionPurgeIsRetried() =

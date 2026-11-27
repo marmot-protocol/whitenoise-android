@@ -237,7 +237,7 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
         withContext(Dispatchers.Main.immediate) {
             if (!captureIsCurrent()) return@withContext false
             cleanupStep("capture") {
-                check(releaseCaptureTarget(account, groupIdHex)) { "Could not purge voice drafts for removed chat" }
+                check(releaseCaptureTarget(account, groupIdHex)) { "Could not retire voice drafts for removed chat" }
             }
             true
         }

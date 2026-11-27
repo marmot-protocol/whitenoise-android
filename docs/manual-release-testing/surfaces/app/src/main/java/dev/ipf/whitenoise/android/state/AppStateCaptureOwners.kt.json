@@ -54,9 +54,9 @@
         ]
       },
       {
-        "surface": "Confirmed chat removal stops capture and purges its draft",
+        "surface": "Confirmed chat removal stops capture and retires its draft across rejoin and restart",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
-        "anchor": "voiceNotes.onTargetRemoved(account, groupIdHex, beforePurge)",
+        "anchor": "voiceDraftEvictions.stage(key, confirmed = true)",
         "test_ids": [
           "MED-061"
         ]

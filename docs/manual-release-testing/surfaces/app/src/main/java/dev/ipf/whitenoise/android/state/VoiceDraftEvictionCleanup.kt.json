@@ -6,7 +6,7 @@
       {
         "surface": "A confirmed eviction retires the old voice directory across rejoin and restart",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/VoiceDraftEvictionCleanup.kt",
-        "anchor": "voiceDraftEvictions.stage(key, confirmed = true)",
+        "anchor": "val isolated = draftStore.quarantine(key)",
         "test_ids": [
           "MED-061"
         ]

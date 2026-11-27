@@ -13,7 +13,9 @@ class VoiceDraftDiscardCoverageTest {
     fun removedChatsReleaseBothCaptureOwners() {
         val owner = source("state/AppStateCaptureOwners.kt", "releaseCaptureTarget")
         assertTrue("conversationDictation.onTargetRemoved(account, groupIdHex)" in owner)
-        assertTrue("voiceNotes.onTargetRemoved(account, groupIdHex, beforePurge)" in owner)
+        assertTrue("voiceNotes.onTargetRemoved(account, groupIdHex)" in owner)
+        assertTrue("voiceDraftEvictions.stage(key, confirmed = true)" in owner)
+        assertTrue("voiceDraftEvictions.isolate(key)" in owner)
         assertTrue(
             "releaseCaptureTarget(accountRef, groupIdHex)" in
                 source("state/AppState.kt", "removeActiveAccountFromGroupMemberSnapshot"),
@@ -23,7 +25,7 @@ class VoiceDraftDiscardCoverageTest {
                 source("state/GroupLocalRemoval.kt", "finishLocalGroupDeleteCleanup"),
         )
         assertTrue(
-            "appState.releaseEvictedCaptureTarget(account, group.groupIdHex)" in
+            "appState.releaseCaptureTarget(account, group.groupIdHex)" in
                 source("state/ConversationControllerRoster.kt", "markActiveAccountRemovedFromMembers"),
         )
     }
@@ -36,7 +38,7 @@ class VoiceDraftDiscardCoverageTest {
         assertTrue("appState.releaseEvictedCapture(" in source(projection, "installGroupRecordSnapshot"))
         val eviction = source("state/VoiceDraftEvictionCleanup.kt", "releaseEvictedCapture")
         assertTrue("current.selfMembership.isGroupEviction()" in eviction)
-        assertTrue("releaseEvictedCaptureTarget(account, current.groupIdHex)" in eviction)
+        assertTrue("releaseCaptureTarget(account, current.groupIdHex)" in eviction)
     }
 
     /** The process event handler reads native state for groups whose profile has no chat subscription. */
