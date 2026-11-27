@@ -114,6 +114,14 @@
         "test_ids": [
           "NTF-010"
         ]
+      },
+      {
+        "surface": "Sign-out and wipe cancel the departing account's cards on shared channels for each known conversation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "fun clearRevokedConversationShortcutsForAccount(",
+        "test_ids": [
+          "NTF-015"
+        ]
       }
     ]
   },
