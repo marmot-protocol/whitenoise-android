@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -12,11 +17,13 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -31,6 +38,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -39,11 +47,14 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_HEX
 import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_NPUB
 import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
+import dev.ipf.whitenoise.android.ui.group.ChatInfoQuickActions
+import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_MESSAGE_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.share.profile
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,6 +71,63 @@ class DetailsSurfacePolishScreenshotTest {
     val composeRule = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
+
+    @Test
+    @Config(qualifiers = "en-w1080dp-h600dp-mdpi")
+    fun groupMemberQuickActionsFitOneRowAtFractionalDensity() =
+        assertQuickActionRows(admin = false, fontScale = 1f, expected = listOf(3))
+
+    @Test
+    @Config(qualifiers = "en-w1080dp-h600dp-mdpi")
+    fun groupAdminQuickActionsStayBalancedAtFractionalDensity() =
+        assertQuickActionRows(admin = true, fontScale = 2f, expected = listOf(2, 2))
+
+    private fun assertQuickActionRows(
+        admin: Boolean,
+        fontScale: Float,
+        expected: List<Int>,
+    ) {
+        val density = Density(2.55f)
+        val muteControl =
+            ConversationMuteControl(
+                appState(),
+                GROUP_HEX,
+                muted = false,
+                mutedUntilMs = null,
+                pending = false,
+                restoreMode = ChatNotifyMode.ALL,
+                dialogOpen = mutableStateOf(false),
+                isCurrent = { true },
+            )
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides density) {
+                WhiteNoiseTheme(fontScale = fontScale) {
+                    Box(Modifier.width(with(density) { 1080.toDp() })) {
+                        ChatInfoQuickActions(
+                            onOpenProfile = null,
+                            onAddMembers = if (admin) ({}) else null,
+                            addMembersEnabled = true,
+                            muteControl = muteControl,
+                            disappearingState = "",
+                            disappearingEnabled = true,
+                            onOpenDisappearing = {},
+                            onOpenSearch = {},
+                        )
+                    }
+                }
+            }
+        }
+        val actions =
+            buildList {
+                if (admin) add(R.string.add_member)
+                addAll(listOf(R.string.mute, R.string.disappearing, R.string.quick_action_search))
+            }
+        val rows =
+            actions
+                .groupingBy { composeRule.onNodeWithContentDescription(app.getString(it)).fetchSemanticsNode().boundsInRoot.top }
+                .eachCount()
+        assertEquals(expected, rows.values.toList())
+    }
 
     @Test
     fun groupAdminLight() =

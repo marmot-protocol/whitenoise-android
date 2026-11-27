@@ -183,7 +183,8 @@ private fun quickActionWidth(
         val captionScale = captionStyle.fontSize.toDp().value / Typography.labelLarge.fontSize.value
         val minimumWidthPx = ceil(maxOf((72.dp * captionScale.coerceAtLeast(1f)).toPx(), captionWidthPx)).toInt()
         val availableWidthPx = availableWidth.roundToPx()
-        val gapPx = gap.roundToPx()
+        // FlowRow rounds spacing up when deciding whether another action fits.
+        val gapPx = ceil(gap.toPx()).toInt()
         val maxColumns = ((availableWidthPx + gapPx) / (minimumWidthPx + gapPx)).coerceIn(1, labels.size)
         val rows = (labels.size + maxColumns - 1) / maxColumns
         val columns = (labels.size + rows - 1) / rows
