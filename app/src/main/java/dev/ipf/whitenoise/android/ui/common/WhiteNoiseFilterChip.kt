@@ -22,21 +22,21 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+
+private const val AMOLED_SELECTED_CHIP_OUTLINE_ALPHA = 0.5f
 
 /**
- * The one compact selectable filter or option. A pill with a tonal fill, no border outside AMOLED, and the
- * secondary container plus a check when selected. In light and AMOLED themes the fill barely differs from the
- * unselected one, so the check is the only reliable cue at any font scale.
+ * A compact selectable filter or option. On AMOLED, a gray outline marks selection and leading icons stay visible.
+ * Light and dark themes use the secondary container and a check for selection.
  *
- * The check replaces a [leadingIcon] while selected; [showCheck] = false keeps the icon and drops the check, for
- * chips that are removable ([trailingIcon]).
+ * [showCheck] = false keeps the leading icon in every theme, for removable chips with a [trailingIcon].
  * [onLongClick] moves the gesture and semantics to one overlay that owns the whole chip, because the Material
  * chip has no long press; [modifier] then lands on that overlay, not on the chip's layout. [role] overrides the
  * chip's checkbox role, for example with a radio button in a single-choice group.
  * [contentDescription] names the chip for TalkBack when the visible label is truncated or carries a count.
- * [border] defaults to the AMOLED surface outline; pass null for chip rows that should stay borderless everywhere.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,10 +54,16 @@ internal fun WhiteNoiseFilterChip(
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
     role: Role? = null,
-    border: BorderStroke? = amoledSurfaceBorderStroke(),
 ) {
     val interactions = remember { MutableInteractionSource() }
-    val lead = if (selected && showCheck) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
+    val amoled = isAmoledSurfaceTheme()
+    val lead = if (selected && showCheck && !amoled) ({ WhiteNoiseFilterChipCheck() }) else leadingIcon
+    val border =
+        if (amoled && selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = AMOLED_SELECTED_CHIP_OUTLINE_ALPHA))
+        } else {
+            null
+        }
     val overlay = onLongClick != null
     val describe =
         if (contentDescription == null && role == null) {

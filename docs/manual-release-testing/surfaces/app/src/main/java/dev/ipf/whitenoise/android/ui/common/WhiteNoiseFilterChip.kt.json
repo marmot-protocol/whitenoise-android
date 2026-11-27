@@ -9,7 +9,9 @@
         "anchor": "fun WhiteNoiseFilterChip(",
         "test_ids": [
           "FLD-001",
-          "MSG-010"
+          "MSG-010",
+          "CON-041",
+          "FLD-012"
         ]
       },
       {
