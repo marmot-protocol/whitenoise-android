@@ -72,7 +72,11 @@ class DeviceLinkRequestSafetyTest {
         var links = 0
         val running = mutableStateOf<DeviceLinkCommand?>(null)
         compose.mainClock.autoAdvance = false
-        compose.setContent { WhiteNoiseTheme { DeviceLinkRequestContent(COMPARING, running.value, { links++ }, {}, {}) } }
+        compose.setContent {
+            WhiteNoiseTheme {
+                DeviceLinkRequestContent(COMPARING, running.value, { links++ }, {}, {})
+            }
+        }
         compose.mainClock.advanceTimeByFrame()
         val link = compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo()
         compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
