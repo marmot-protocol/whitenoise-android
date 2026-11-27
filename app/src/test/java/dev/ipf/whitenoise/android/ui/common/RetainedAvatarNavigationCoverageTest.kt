@@ -134,12 +134,13 @@ class RetainedAvatarNavigationCoverageTest {
             owner = rememberRetainedGroupAvatarPreparation(state, account, surface)
             SideEffect { ownerCommits++ }
             ObserveRetainedAvatarPixels(owner) { pixels ->
-                shown =
+                val image =
                     assets
                         .take(2)
                         .mapNotNull { asset ->
                             pixels.imageFor(asset, checkNotNull(asset.cacheKey(ACCOUNT)))
                         }.singleOrNull()
+                SideEffect { shown = image }
             }
         }
         rule.waitForIdle()
@@ -465,8 +466,7 @@ class RetainedAvatarNavigationCoverageTest {
 @Suppress("FunctionNaming")
 private fun ObserveRetainedAvatarPixels(
     owner: RetainedGroupAvatarPreparation,
-    onCommit: (PreparedGroupAvatarPixels) -> Unit,
+    content: @Composable (PreparedGroupAvatarPixels) -> Unit,
 ) {
-    val pixels = owner.pixels
-    SideEffect { onCommit(pixels) }
+    content(owner.pixels)
 }
