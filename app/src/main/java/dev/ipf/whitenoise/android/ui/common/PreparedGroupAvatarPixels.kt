@@ -21,6 +21,7 @@ internal data class PreparedGroupAvatarPixels(
     val retained: List<PreparedAvatarImage> = emptyList(),
     val recordLoaded: ((AvatarAssetFfi, ImageBitmap) -> Unit)? = null,
     val compatibility: RetainedGroupCompatibilityPixels? = null,
+    val lookup: ((AvatarAssetFfi) -> PreparedAvatarImage?)? = null,
 ) {
     fun matchesOwner(
         accountRef: String?,
@@ -39,21 +40,24 @@ internal data class PreparedGroupAvatarPixels(
         if (asset != null && image != null) recordLoaded?.invoke(asset, image)
     }
 
+    fun imageFor(
+        asset: AvatarAssetFfi?,
+        key: String,
+    ): ImageBitmap? = images[key] ?: exactFrame(asset)?.image
+
     /** Classification is reusable only for the exact selected revision, never fallback pixels. */
-    fun animationClassificationFor(asset: AvatarAssetFfi?): Boolean? =
-        asset?.takeIf { it.isRenderable() }?.let { current ->
-            retained
-                .firstOrNull {
-                    it.asset.target == current.target &&
-                        it.asset.reference == current.reference &&
-                        it.asset.contentRevision == current.contentRevision
-                }?.animationClassification
-        }
+    fun animationClassificationFor(asset: AvatarAssetFfi?): Boolean? = exactFrame(asset)?.animationClassification
 
     /** A revision refresh may reuse known pixels, but a removed or different selection never can. */
-    fun retainedFor(asset: AvatarAssetFfi?): ImageBitmap? =
+    fun retainedFor(asset: AvatarAssetFfi?): ImageBitmap? = retainedFrame(asset)?.image
+
+    private fun exactFrame(asset: AvatarAssetFfi?): PreparedAvatarImage? =
+        retainedFrame(asset)?.takeIf { it.asset.contentRevision == asset?.contentRevision }
+
+    private fun retainedFrame(asset: AvatarAssetFfi?): PreparedAvatarImage? =
         asset?.takeIf { it.isRenderable() }?.let { current ->
-            retained.firstOrNull { it.asset.target == current.target && it.asset.reference == current.reference }?.image
+            lookup?.invoke(current)
+                ?: retained.firstOrNull { it.asset.target == current.target && it.asset.reference == current.reference }
         }
 }
 

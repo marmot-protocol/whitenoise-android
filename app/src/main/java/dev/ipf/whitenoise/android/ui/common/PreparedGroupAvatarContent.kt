@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
@@ -18,6 +19,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.durableAvatar
@@ -46,6 +48,7 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
     surfaceIdentity: Any? = null,
     retainedPreparation: RetainedGroupAvatarPreparation? = null,
     compatibilityForRow: ((T) -> CompatibilityAvatarSelection)? = null,
+    domainForRow: ((T) -> MediaTrustDomain)? = null,
     content: @Composable () -> Unit,
 ) {
     val indexes = remember(rows, rowKey) { rows.withIndex().associate { (index, row) -> rowKey(row) to index } }
@@ -76,6 +79,7 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
                     indexFor = indexes::get,
                     assetAt = { assetForRow(rows[it]) },
                     compatibilityAt = { compatibilityForRow?.invoke(rows[it]) },
+                    domainAt = { domainForRow?.invoke(rows[it]) },
                 )
             }
         }
@@ -120,28 +124,24 @@ internal class RetainedGroupAvatarPreparation(
     private val runtimeGeneration: Int,
     private val lifetime: Long,
 ) {
-    var assets by mutableStateOf<List<AvatarAssetFfi>>(emptyList())
+    var assets by mutableStateOf<List<Pair<AvatarAssetFfi, MediaTrustDomain?>>>(emptyList())
         private set
-    private var retained by mutableStateOf<List<PreparedAvatarImage>>(emptyList())
+    private var retained by mutableStateOf<Map<Pair<String, String?>, MutableState<PreparedAvatarImage?>>>(emptyMap())
     private var recentRows = emptyList<String>()
     private var allowedAssets = emptyList<AvatarAssetFfi>()
     private val compatibility = RetainedGroupCompatibilityPixels()
 
-    /** Pixel changes belong to the consuming content's restart scope, never the shell owner factory. */
-    val pixels: PreparedGroupAvatarPixels
-        get() =
-            PreparedGroupAvatarPixels(
-                accountRef,
-                runtimeGeneration,
-                lifetime,
-                images =
-                    retained
-                        .mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }
-                        .toMap(),
-                retained = retained,
-                recordLoaded = ::recordLoaded,
-                compatibility = compatibility,
-            )
+    /** Keep the provider stable. Each row observes only the state of its own picture on load. */
+    val pixels =
+        PreparedGroupAvatarPixels(
+            accountRef,
+            runtimeGeneration,
+            lifetime,
+            images = emptyMap(),
+            recordLoaded = ::recordLoaded,
+            compatibility = compatibility,
+            lookup = { retained[it.selectionKey()]?.value },
+        )
 
     /** Protect visible and nearby rows first, then the most recently visible rows still in this list. */
     fun updateVisible(
@@ -150,6 +150,7 @@ internal class RetainedGroupAvatarPreparation(
         indexFor: (String) -> Int?,
         assetAt: (Int) -> AvatarAssetFfi?,
         compatibilityAt: (Int) -> CompatibilityAvatarSelection? = { null },
+        domainAt: (Int) -> MediaTrustDomain? = { null },
     ) {
         val visibleKeys = viewport.visible.map(keyAt).toSet()
         recentRows =
@@ -158,14 +159,17 @@ internal class RetainedGroupAvatarPreparation(
         val nearby = viewport.nearby
         val allowedRows = (nearby + recentRows.mapNotNull(indexFor)).distinct()
         allowedAssets = allowedRows.mapNotNull(assetAt).filter { it.isRenderable() }
-        retained = retained.filter { known -> allowedAssets.any { sameSelection(it, known.asset) } }
+        retained =
+            allowedAssets.associate { asset ->
+                val key = asset.selectionKey()
+                key to (retained[key] ?: mutableStateOf(null))
+            }
         compatibility.select(allowedRows.filter { assetAt(it) == null }.mapNotNull(compatibilityAt))
         assets =
             nearby
-                .mapNotNull(assetAt)
-                .filter { it.isRenderable() }
-                .distinctBy { Triple(it.target, it.reference, it.contentRevision) }
-                .map { it.copy() }
+                .mapNotNull { index ->
+                    assetAt(index)?.takeIf { it.isRenderable() }?.let { it.copy() to domainAt(index) }
+                }.distinctBy { (asset, _) -> Triple(asset.target, asset.reference, asset.contentRevision) }
     }
 
     /** Accept exact loaded pixels only for a still-selected revision, with at most one image per selection. */
@@ -179,25 +183,25 @@ internal class RetainedGroupAvatarPreparation(
                     allowedAssets.any { sameSelection(it, asset) && it.cacheKey(account) == candidate }
                 }
             } ?: return
-        val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
+        val slot = retained[asset.selectionKey()] ?: return
+        val previous = slot.value
         if (previous?.asset == asset && previous.image === image) return
         val classification =
             AvatarImageLoader.cachedAnimationClassification(key)
                 ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
-        retained = retained.filterNot { sameSelection(it.asset, asset) } +
-            PreparedAvatarImage(asset.copy(), image, classification)
+        slot.value = PreparedAvatarImage(asset.copy(), image, classification)
     }
 
     fun hasExactRevision(asset: AvatarAssetFfi): Boolean =
-        retained.any {
-            sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision
-        }
+        retained[asset.selectionKey()]?.value?.asset?.contentRevision == asset.contentRevision
 
     /** Target and reference identify a drawable picture independently of a content refresh. */
+    private fun AvatarAssetFfi.selectionKey(): Pair<String, String?> = target to reference
+
     private fun sameSelection(
         first: AvatarAssetFfi,
         second: AvatarAssetFfi,
-    ): Boolean = first.target == second.target && first.reference == second.reference
+    ): Boolean = first.selectionKey() == second.selectionKey()
 }
 
 /** Keep only presentation pixels for this account, runtime and cache lifetime, including during navigation. */
@@ -226,12 +230,12 @@ private fun PrepareRetainedAvatarWindow(
     window: RetainedGroupAvatarPreparation,
 ) {
     if (accountRef == null) return
-    for (asset in window.assets) {
+    for ((asset, domain) in window.assets) {
         key(asset.target, asset.reference, asset.contentRevision) {
-            LaunchedEffect(window, asset.availability) {
+            LaunchedEffect(window, asset.availability, domain) {
                 if (window.hasExactRevision(asset)) return@LaunchedEffect
                 withTimeoutOrNull(LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS) {
-                    appState.durableAvatar(asset, accountRef, acquireMissing = false, abandonable = true)?.let {
+                    appState.durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true)?.let {
                         window.recordLoaded(asset, it)
                     }
                 }
@@ -305,13 +309,14 @@ private fun rememberAvatarPixelPreparation(
             selected
                 .mapNotNull { asset ->
                     val imageKey = accountRef?.let(asset::cacheKey) ?: return@mapNotNull null
-                    (AvatarImageLoader.cachedImage(imageKey) ?: handoff?.images?.get(imageKey))?.let {
+                    val retained = Snapshot.withoutReadObservation { handoff?.imageFor(asset, imageKey) }
+                    (AvatarImageLoader.cachedImage(imageKey) ?: retained)?.let {
                         imageKey to
                             PreparedAvatarImage(
                                 asset.copy(),
                                 it,
                                 AvatarImageLoader.cachedAnimationClassification(imageKey)
-                                    ?: handoff?.animationClassificationFor(asset),
+                                    ?: Snapshot.withoutReadObservation { handoff?.animationClassificationFor(asset) },
                             )
                     }
                 }.toMap()
