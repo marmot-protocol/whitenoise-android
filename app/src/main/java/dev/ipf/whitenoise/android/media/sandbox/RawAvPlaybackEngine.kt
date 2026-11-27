@@ -89,6 +89,7 @@ internal class RawAvPlaybackEngine(
     private var revision = 0L
     private var seekRevision = 0L
     private var pendingSeek: SettableFuture<Void?>? = null
+    private var explicitSeek = false
     private var targetUs = 0L
     private var pausedUs = 0L
     private var durationUs = 0L
@@ -149,10 +150,7 @@ internal class RawAvPlaybackEngine(
         if (owners.register(this, epoch)) scope.launch { worker() } else close()
     }
 
-    /**
-     * Snapshots presentation state under the engine lock, converting time to milliseconds
-     * and swapping display dimensions for orthogonal video rotation.
-     */
+    /** Converts time to milliseconds and swaps display dimensions for orthogonal rotation. */
     fun snapshot(): RawAvPlaybackSnapshot =
         synchronized(lock) {
             val rotated = rotation == 90 || rotation == 270
@@ -175,24 +173,17 @@ internal class RawAvPlaybackEngine(
             )
         }
 
-    /**
-     * Returns current media position in milliseconds under the engine lock.
-     */
     fun positionMs(): Long = synchronized(lock) { positionUsLocked() / 1000 }
 
-    /**
-     * Requires this unreleased instance to remain registered in its original account epoch.
-     */
+    /** Requires this instance to remain registered in its original account epoch. */
     private fun current(): Boolean = !released && owners.current(this, epoch)
 
-    /**
-     * Uses renderer time only for a ready playing run with matching activation and seek.
-     * Otherwise returns the paused microsecond checkpoint; known duration bounds the live position.
-     */
+    /** Reads the live clock once the current video seek has a frame, otherwise the committed checkpoint. */
     private fun positionUsLocked(): Long {
         val running = playIntent && status == Status.Ready
         val matching = renderer.activeRun == activation && renderer.appliedSeek == seekRevision
-        if (!running || !matching) return pausedUs
+        val awaitingFrame = wantVideo && explicitSeek && pendingSeek != null
+        if (!running || !matching || awaitingFrame) return pausedUs
         val position = renderer.positionUs().coerceAtLeast(0)
         return if (durationUs > 0) position.coerceAtMost(durationUs) else position
     }
@@ -337,9 +328,7 @@ internal class RawAvPlaybackEngine(
         notifyChanged()
     }
 
-    /**
-     * Requests a paused poster only when no retained frame matches the current seek; wakes redraw work.
-     */
+    /** Requests a paused poster when the retained frame does not match the current seek. */
     private fun restorePosterLocked() {
         redraw = true
         firstFrameForOutput = false
@@ -352,6 +341,7 @@ internal class RawAvPlaybackEngine(
             pendingSeek?.cancel(false)
             val completion = SettableFuture.create<Void?>()
             pendingSeek = completion
+            explicitSeek = false
             dispatchPausedSeek(completion, explicit = false)
         }
         signal.trySend(Unit)
@@ -395,9 +385,7 @@ internal class RawAvPlaybackEngine(
                 pausedUs = 0
                 seekRevision++
             }
-            if (pendingSeek != null) pausedUs = targetUs
-            pendingSeek?.cancel(false)
-            pendingSeek = null
+            resumePendingSeek()
             error = null
             ducked = false
             playIntent = true
@@ -415,10 +403,14 @@ internal class RawAvPlaybackEngine(
         return true
     }
 
-    /**
-     * Captures the best available position, invalidates run work and retires renderer output.
-     * Focus retention is explicit; device clock/pause refusal is reported against the captured activation.
-     */
+    /** The retired paused poster may still cancel its original future. Keep a new promise on resume. */
+    private fun resumePendingSeek() {
+        val resumeSeek = explicitSeek && pendingSeek != null
+        pendingSeek?.cancel(false)
+        pendingSeek = if (resumeSeek) SettableFuture.create() else null
+    }
+
+    /** Captures the playhead and retires output for this activation before releasing focus. */
     private fun pause(
         retainFocus: Boolean,
         reason: Int = Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
@@ -432,14 +424,11 @@ internal class RawAvPlaybackEngine(
                     position.exceptionOrNull()?.let {
                         clockRefusal = RawOutputFailure("Raw audio clock unavailable", it)
                     }
-                    targetUs = pausedUs
                     playWhenReadyChangeReason = reason
                     playIntent = false
-                    pendingSeek?.cancel(false)
-                    pendingSeek = null
                     activation++
                     revision++
-                    restorePosterLocked()
+                    pausePendingSeek()
                 }
                 // Repeated paused commands preserve the admitted poster/seek, but still surrender focus below.
                 resumeOnGain = retainFocus
@@ -456,9 +445,19 @@ internal class RawAvPlaybackEngine(
         signal.trySend(Unit)
     }
 
-    /**
-     * Requests a millisecond seek through the same asynchronous path without observing its future.
-     */
+    /** Preserves the explicit target until the renderer supplies its first matching frame. */
+    private fun pausePendingSeek() {
+        val carrySeek = pendingSeek?.takeIf { explicitSeek }
+        if (carrySeek != null) {
+            dispatchPausedSeek(carrySeek)
+        } else {
+            targetUs = pausedUs
+            pendingSeek?.cancel(false)
+            pendingSeek = null
+            restorePosterLocked()
+        }
+    }
+
     fun seekTo(positionMs: Long) {
         seekToAsync(positionMs)
     }
@@ -472,6 +471,7 @@ internal class RawAvPlaybackEngine(
         synchronized(lock) {
             val refusal =
                 if (current()) {
+                    if (playIntent && wantVideo) pausedUs = runCatching { positionUsLocked() }.getOrDefault(pausedUs)
                     renderer.revokeAudioBefore(seekRevision + 1)
                 } else {
                     IOException("Media source owner retired")
@@ -483,8 +483,9 @@ internal class RawAvPlaybackEngine(
             }
             pendingSeek?.cancel(false)
             pendingSeek = completion
+            explicitSeek = true
             targetUs = RawAvPosterTarget.positionUs(positionMs, durationUs)
-            if (playIntent || !wantVideo) pausedUs = targetUs
+            if (!wantVideo) pausedUs = targetUs
             seekRevision++
             revision++
             firstFrameForOutput = false
@@ -496,9 +497,7 @@ internal class RawAvPlaybackEngine(
         return completion
     }
 
-    /**
-     * Queues a generation-bound video poster attempt, or immediately acknowledges an audio-only paused seek.
-     */
+    /** Queues a video poster or immediately acknowledges an audio-only paused seek. */
     private fun dispatchPausedSeek(
         completion: SettableFuture<Void?>,
         explicit: Boolean = true,
@@ -512,9 +511,7 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /**
-     * Requires the exact paused source activation, seek generation and target position.
-     */
+    /** Requires the exact paused source activation, seek generation and target position. */
     override fun posterCurrent(target: RawAvPosterTarget): Boolean =
         synchronized(lock) {
             target.matches(RawAvGeneration(activation, seekRevision), current(), playIntent, targetUs / 1000)
@@ -553,17 +550,21 @@ internal class RawAvPlaybackEngine(
             true
         }
 
-    /**
-     * Completes the pending seek only after its still-playing activation and seek generation match.
-     */
+    /** A seek with video is acknowledged by its first adopted frame. */
     override fun seeked(
         activation: Long,
         seek: Long,
     ) {
         synchronized(lock) {
-            if (!accepts(activation, seek)) return
-            pendingSeek?.set(null)
+            if (accepts(activation, seek) && (!wantVideo || width == 0)) completePlayingSeek()
+        }
+    }
+
+    private fun completePlayingSeek() {
+        pendingSeek?.let {
+            pausedUs = targetUs
             pendingSeek = null
+            it.set(null)
         }
     }
 
@@ -700,9 +701,7 @@ internal class RawAvPlaybackEngine(
         completion.get(24, TimeUnit.SECONDS)
     }
 
-    /**
-     * Adopts stream layout and positive duration only for the current playing activation.
-     */
+    /** Adopts stream layout and positive duration for the current playing activation. */
     override fun opened(
         info: AvStreamInfo,
         activation: Long,
@@ -744,6 +743,7 @@ internal class RawAvPlaybackEngine(
                 } else {
                     retainFrame(bitmap, rotation)
                     lastBitmapPtsUs = timestampUs
+                    completePlayingSeek()
                     true
                 }
             }
@@ -760,6 +760,7 @@ internal class RawAvPlaybackEngine(
         endUs: Long,
     ) = synchronized(lock) {
         if (!accepts(activation, seek)) return@synchronized
+        completePlayingSeek()
         if (repeat) {
             targetUs = 0
             pausedUs = 0
@@ -1002,9 +1003,7 @@ internal class RawAvPlaybackEngine(
         if (Looper.myLooper() == Looper.getMainLooper()) action() else main.post { action() }
     }
 
-    /**
-     * Enables the focus helper's route-loss receiver for playback.
-     */
+    /** Enables the route-loss receiver during playback. */
     private fun registerNoisy() = focus.started()
 
     /**

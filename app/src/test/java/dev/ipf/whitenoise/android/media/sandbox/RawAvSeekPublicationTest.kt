@@ -10,6 +10,7 @@ import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,14 +37,19 @@ class RawAvSeekPublicationTest {
             set(engine, "playIntent", true)
             val old = bitmap()
             adopt(engine, old)
-            engine.seekToAsync(1500)
+            set(engine, "width", 2)
+            val completion = engine.seekToAsync(1500)
+            val intent = engine.intent()
+            engine.seeked(intent.activation, intent.seek)
+            assertFalse(completion.isDone)
             render(engine)
             assertEquals(0, RecordingCanvasSurface.posts)
             assertEquals(0L, engine.snapshot().renderedFrame)
             assertFalse(old.isRecycled)
             val matching = bitmap()
-            val intent = engine.intent()
             assertTrue(engine.frame(matching, 0, intent.activation, intent.seek))
+            assertTrue(completion.isDone)
+            assertEquals(1500L, engine.positionMs())
             assertEquals(1, RecordingCanvasSurface.posts)
             assertEquals(1L, engine.snapshot().renderedFrame)
             assertTrue(old.isRecycled)
@@ -87,24 +93,32 @@ class RawAvSeekPublicationTest {
         }
     }
 
-    @Test fun missingPausedPosterKeepsTheCommittedFrameAfterReattachment() {
+    @Test fun pausingBeforeTheTargetFrameKeepsTheSeekAndLetsTheUserRetry() {
         withSurface { surface ->
             withEngine { engine ->
+                set(engine, "playIntent", true)
+                set(engine, "width", 2)
+                set(engine, "pausedUs", 800000L)
                 val old = bitmap()
                 adopt(engine, old)
-                val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
-                val intent = engine.intent()
-                val request =
-                    RawAvPausedSeekRequest(
-                        RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500),
-                        completion,
-                    )
+                val completion = engine.seekToAsync(1500)
+                val playing = engine.intent()
+                engine.seeked(playing.activation, playing.seek)
+                engine.setPlaying(false)
+
+                val request = takeQueuedPoster(engine)
+                assertTrue(request.explicit)
+                assertEquals(1500L, request.target.positionMs)
+                assertSame(completion, request.completion)
+                assertFalse(completion.isDone)
+                assertFalse(engine.snapshot().playWhenReady)
+                assertEquals(800L, engine.positionMs())
                 assertFalse(engine.posterResult(request, null))
                 val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
                 assertSame(refusal.cause, engine.snapshot().error)
                 val failedSeek = refusal.cause as RawPausedSeekFailure
                 assertEquals(1500L, failedSeek.positionMs)
-                assertEquals(0L, engine.positionMs())
+                assertEquals(800L, engine.positionMs())
                 assertEquals(0L, engine.snapshot().renderedFrame)
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0
@@ -195,15 +209,23 @@ class RawAvSeekPublicationTest {
             .invoke(engine)
     }
 
+    /** Reads the actual request published by pause with background workers stopped. */
+    @Suppress("UNCHECKED_CAST")
+    private fun takeQueuedPoster(engine: RawAvPlaybackEngine): RawAvPausedSeekRequest {
+        val poster = checkNotNull(field(engine, "pausedPoster"))
+        val requests = field(poster, "requests") as Channel<RawAvPausedSeekRequest>
+        return requests.tryReceive().getOrThrow()
+    }
+
     /** Reads fixture ownership without opening an alternate renderer or parser path. */
     private fun field(
-        engine: RawAvPlaybackEngine,
+        owner: Any,
         name: String,
     ): Any? =
-        engine.javaClass
+        owner.javaClass
             .getDeclaredField(name)
             .apply { isAccessible = true }
-            .get(engine)
+            .get(owner)
 
     /** Seeds only the controlled control state required for this interleaving. */
     private fun set(
