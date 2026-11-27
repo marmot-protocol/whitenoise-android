@@ -16,6 +16,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.CompromiseWarningItemFfi
 import dev.ipf.marmotkit.CompromiseWarningReasonFfi
 import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
+import dev.ipf.whitenoise.android.state.DeviceLinkAttempt
 import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.SignInListState
 import dev.ipf.whitenoise.android.ui.devices.DEVICE_DETAIL_REMOVE_TAG
@@ -103,6 +104,14 @@ class DeviceManagementScreenshotTest {
         show(Look(dark = true)) { LinkedDeviceDetailContent(tablet, busy = false, onBack = {}) }
         compose.onNodeWithTag(DEVICE_DETAIL_REMOVE_TAG).performScrollTo().performClick()
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/linked_device_remove_dark.png")
+    }
+
+    @Test
+    fun expiredLinkAttemptLight() {
+        val attempt = DeviceLinkAttempt("expired", 1_794_488_400L, reviewed = false)
+        val health = LinkedDevicesHealth(missedLinks = listOf(attempt))
+        show(Look()) { LinkedDevicesContent(fixtureRosterState(), onBack = {}, health = health) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_expired_attempt_light.png")
     }
 
     /** The roster with a security warning, a stalled device, an overdue refresh, chat counts and sign-ins. */

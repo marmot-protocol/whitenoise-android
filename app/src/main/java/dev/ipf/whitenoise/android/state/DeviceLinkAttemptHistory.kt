@@ -92,6 +92,18 @@ internal class DeviceLinkAttemptHistory(
     }
 }
 
+/** Records terminal snapshots even while the shell is stopped but the native worker is still running. */
+internal suspend fun WhiteNoiseAppState.refreshMissedDeviceLinkAttempts(accountRef: String) {
+    val generation = runtimeGeneration
+    val account = accounts.firstOrNull { it.label == accountRef && signInAlertsApply(it) } ?: return
+    val snapshot = runCatchingCancellable { marmotIo { deviceLinkSnapshot(accountRef) } }.getOrNull() ?: return
+    val watched = accounts.filter(::signInAlertsApply)
+    val stillWatched = watched.any { it.label == accountRef && it.accountIdHex == account.accountIdHex }
+    if (generation == runtimeGeneration && stillWatched) {
+        deviceLinkRequests.attempts?.observe(mapOf(accountRef to snapshot), watched.mapTo(mutableSetOf()) { it.label })
+    }
+}
+
 private fun decodeAttempt(stored: Any?): DeviceLinkAttempt? {
     val fields = (stored as? String)?.split(':', limit = 3).orEmpty()
     val time = fields.firstOrNull()?.toLongOrNull() ?: return null

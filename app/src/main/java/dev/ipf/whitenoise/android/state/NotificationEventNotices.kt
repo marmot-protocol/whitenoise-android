@@ -40,6 +40,9 @@ internal fun WhiteNoiseAppState.presentEventNotices(
     }
     // MDK found a sign-in or changed the security warning: the banner, badge and notifications follow it.
     signInAlertAccount(event)?.let { account -> scope.launch { refreshSignInAlerts(account) } }
+    if (event is MarmotEventFfi.DeviceLinkChanged) {
+        scope.launch(Dispatchers.Main) { refreshMissedDeviceLinkAttempts(event.accountLabel) }
+    }
 }
 
 /** A new-message receipt can carry media from a peer or another device signed in to this account. */
