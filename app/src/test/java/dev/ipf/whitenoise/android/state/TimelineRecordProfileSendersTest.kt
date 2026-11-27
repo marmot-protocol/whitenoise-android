@@ -30,6 +30,8 @@ class TimelineRecordProfileSendersTest {
     /** Builds a reply preview quoting a message from the given sender. */
     private fun replyPreview(sender: String) =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = "reply-target",
             sender = sender,
             plaintext = "quoted",
@@ -53,6 +55,8 @@ class TimelineRecordProfileSendersTest {
         reactionSenders: List<String> = emptyList(),
         timelineAt: ULong = 0uL,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = id,
         sourceMessageIdHex = id,

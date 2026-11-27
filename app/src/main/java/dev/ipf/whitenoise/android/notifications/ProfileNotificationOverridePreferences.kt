@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,7 +160,6 @@ internal class ProfileNotificationOverridePreferences(
 internal fun profileNotificationAuthor(update: NotificationUpdateFfi): String? =
     when {
         update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf -> null
-        update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> null
         LocalNotificationFormatter.isReaction(update) -> null
         else -> ProfileNotificationOverridePreferences.normalizedAuthor(update.sender.accountIdHex)
     }
@@ -170,7 +168,6 @@ internal fun profileNotificationAuthor(update: NotificationUpdateFfi): String? =
 internal fun profileNotificationSoundAuthor(update: NotificationUpdateFfi): String? =
     when {
         update.isFromSelf || update.sender.accountIdHex.equals(update.accountIdHex, ignoreCase = true) -> null
-        update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> null
         update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> profileNotificationAuthor(update)
         update.trigger in
             setOf(

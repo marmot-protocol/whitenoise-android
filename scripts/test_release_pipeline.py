@@ -697,6 +697,29 @@ class BundleSignatureTests(unittest.TestCase):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
+    def test_production_build_rejects_marmotkit_prereleases(self):
+        """Production accepts a formal MarmotKit pin and rejects an RC or mismatched tag."""
+        workflow = (ROOT / '.github/workflows/android-production-release.yml').read_text()
+        step = workflow.split('      - name: Read and validate version\n', 1)[1].split('\n      - name:', 1)[0]
+        command = '\n'.join(line.removeprefix('          ') for line in step.split('        run: |\n', 1)[1].splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pin = root / 'app/src/main/marmotkit/MARMOT_VERSION'
+            pin.parent.mkdir(parents=True)
+            (root / 'app/build.gradle.kts').write_text(f'versionName = "{VERSION}"\n')
+            for version, tag, accepted in (
+                ('0.19.0', 'marmotkit-v0.19.0', True),
+                ('0.20.0-rc.2', 'marmotkit-v0.20.0-rc.2', False),
+                ('0.20.0', 'marmotkit-v0.20.0-rc.2', False),
+            ):
+                with self.subTest(version=version, tag=tag):
+                    pin.write_text(f'artifact-id={version}\nartifact-tag={tag}\n')
+                    env = {**os.environ, 'EXPECTED_VERSION': VERSION, 'GITHUB_OUTPUT': str(root / 'output')}
+                    result = subprocess.run(['bash', '-c', command], cwd=root, env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                    if not accepted:
+                        self.assertIn('formal Stable MarmotKit', result.stderr)
+
     def test_release_workflows_have_only_manual_entrypoints(self):
         for name in ('android-production-release.yml', 'android-release-distribute.yml', 'android-zapstore-publish.yml'):
             text = (ROOT / '.github/workflows' / name).read_text()

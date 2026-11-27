@@ -88,9 +88,9 @@ class ProfileNotificationPresenterTest {
             assertTrue(presenter.show(update(author = bob), shortNpub = { it }))
             assertTrue(presenter.show(update().copy(accountRef = "work"), shortNpub = { it }))
             assertTrue(presenter.show(update().copy(reactionEmoji = "👍"), shortNpub = { it }))
-            assertTrue(
+            assertFalse(
                 presenter.show(
-                    update().copy(trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY),
+                    update().copy(trafficClass = NotificationTrafficClassFfi.STANDARD),
                     shortNpub = { it },
                 ),
             )
@@ -305,11 +305,12 @@ class ProfileNotificationPresenterTest {
         assertNull(profileNotificationAuthor(normal.copy(reactionEmoji = "👍")))
         assertNull(profileNotificationAuthor(normal.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)))
         assertNull(profileNotificationAuthor(normal.copy(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP)))
-        assertNull(
+        assertEquals(
+            alice,
             profileNotificationAuthor(
                 normal.copy(
                     isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             ),
         )

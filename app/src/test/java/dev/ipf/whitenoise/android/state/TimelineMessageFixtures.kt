@@ -47,6 +47,8 @@ internal fun timelineAppMessage(
 /** Projects an app message record into the equivalent timeline message record. */
 private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = record.messageIdHex,
         sourceMessageIdHex = record.messageIdHex,

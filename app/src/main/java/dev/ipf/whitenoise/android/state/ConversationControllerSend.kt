@@ -571,7 +571,7 @@ internal suspend fun ConversationController.discardPendingEdit(
                 )
             }
         }
-        status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
+        status == null || status.isTerminalLocalSendFailure -> optimisticEdits.remove(target)
         else -> optimisticEdits[target] = current.withNativeEditStatus(status)
     }
     publishTimelineFromIndexes()

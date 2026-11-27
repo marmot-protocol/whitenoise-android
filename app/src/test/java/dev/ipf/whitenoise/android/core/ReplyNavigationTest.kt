@@ -304,6 +304,8 @@ class ReplyNavigationTest {
         replyPreviewMessageId: String?,
         replyToMessageIdHex: String? = replyPreviewMessageId,
     ) = TimelineMessageRecordFfi(
+        agentItem = null,
+        agentItemFirstEventMissing = false,
         clientToken = null,
         messageIdHex = "reply",
         sourceMessageIdHex = null,
@@ -321,6 +323,8 @@ class ReplyNavigationTest {
         replyPreview =
             replyPreviewMessageId?.let {
                 TimelineReplyPreviewFfi(
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     messageIdHex = it,
                     sender = "bob",
                     plaintext = "parent",

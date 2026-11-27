@@ -127,28 +127,29 @@ class NotificationChannelSpecTest {
         )
     }
 
+    /** RC2 agent alerts use the standard traffic class and inherit group-message routing. */
     @Test
-    fun agentActivityRoutesToTheLowImportanceAgentChannel() {
+    fun standardAgentAlertUsesGroupMessageRouting() {
         val spec =
             NotificationChannelSpec.forUpdate(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             )
 
-        assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, spec)
-        assertEquals(ChannelImportance.LOW, spec.importance)
+        assertEquals(NotificationChannelSpec.GROUP_MESSAGES, spec)
     }
 
+    /** A mention still uses the configured mention channel when the traffic class is standard. */
     @Test
-    fun mentionTakesPrecedenceOverAgentActivity() {
+    fun mentionTakesPrecedenceOverStandardGroupRouting() {
         val spec =
             NotificationChannelSpec.forUpdate(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             )
 

@@ -1046,22 +1046,26 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** RC2 agent alerts arrive as standard updates and use the group's message channel. */
     @Test
-    fun inheritedAgentActivityPostsOnTheGlobalSilentAgentChannel() {
+    fun standardAgentAlertPostsOnTheGroupMessageChannel() {
         presenter.ensureChannels()
 
         runBlocking {
             presenter.show(
                 update(
                     isMention = false,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
                 shortNpub = { "npub1test" },
             )
         }
 
         assertEquals(
-            NotificationChannelSpec.AGENT_ACTIVITY.id,
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                conversationShortcutId("account-a", "group-a")!!,
+            ),
             manager.activeNotifications
                 .single()
                 .notification.channelId,

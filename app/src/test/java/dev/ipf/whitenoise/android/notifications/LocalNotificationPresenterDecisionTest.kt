@@ -43,19 +43,20 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals(0, decision?.historyCap)
     }
 
+    /** RC2 delivers waiting agent approvals as standard updates, with standard message actions. */
     @Test
-    fun agentActivityUsesPlainStyleAndNoReplyActions() {
+    fun standardAgentAlertUsesMessageStyleAndActions() {
         val decision =
             decision(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             )
 
-        assertSame(NotificationStyleChoice.Plain, decision?.style)
-        assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
-        assertEquals(0, decision?.historyCap)
+        assertSame(NotificationStyleChoice.Messaging, decision?.style)
+        assertEquals(listOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ), decision?.actions)
+        assertEquals(CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP, decision?.historyCap)
     }
 
     @Test

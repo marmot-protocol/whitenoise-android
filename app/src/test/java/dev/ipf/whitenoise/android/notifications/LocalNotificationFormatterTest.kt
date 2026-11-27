@@ -195,21 +195,22 @@ class LocalNotificationFormatterTest {
         assertNotEquals(message?.notificationTag, mention?.notificationTag)
     }
 
+    /** RC2 delivers agent alerts through the same message identity as other standard updates. */
     @Test
-    fun agentActivityGetsItsOwnNotificationIdentityDistinctFromFinalReplies() {
+    fun standardAgentAlertUsesConversationNotificationIdentity() {
         val finalReply = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
         val activity =
             content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupIdHex = "group-a",
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                    trafficClass = NotificationTrafficClassFfi.STANDARD,
                 ),
             )
 
         assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, finalReply?.notificationId)
-        assertEquals(LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID, activity?.notificationId)
-        assertNotEquals(finalReply?.notificationTag, activity?.notificationTag)
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, activity?.notificationId)
+        assertEquals(finalReply?.notificationTag, activity?.notificationTag)
     }
 
     @Test

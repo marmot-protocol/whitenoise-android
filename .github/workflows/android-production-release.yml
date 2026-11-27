@@ -56,6 +56,14 @@ jobs:
             printf 'Canonical version is %s, workflow requested %s\n' "$version_name" "$EXPECTED_VERSION" >&2
             exit 1
           fi
+          marmotkit_lock=app/src/main/marmotkit/MARMOT_VERSION
+          marmotkit_version="$(awk -F= '$1 == "artifact-id" { print $2 }' "$marmotkit_lock")"
+          marmotkit_tag="$(awk -F= '$1 == "artifact-tag" { print $2 }' "$marmotkit_lock")"
+          stable_version='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [[ ! "$marmotkit_version" =~ $stable_version || "$marmotkit_tag" != "marmotkit-v$marmotkit_version" ]]; then
+            printf '%s\n' 'Production builds require a formal Stable MarmotKit release pin.' >&2
+            exit 1
+          fi
           printf 'name=%s\n' "$version_name" >> "$GITHUB_OUTPUT"
 
       - name: Require production release secrets

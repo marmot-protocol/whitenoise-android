@@ -37,6 +37,10 @@ internal suspend fun ConversationController.publishDurableComposerText(
 internal fun pendingLocalSend(messageIds: List<String> = emptyList()): SendSummaryFfi =
     SendSummaryFfi(0u, messageIds, SendAcceptDispositionFfi.ACCEPTED_PENDING, SendMaintenanceDispositionFfi.READY)
 
+/** Whether MDK refused this token permanently, including a send fenced by new membership. */
+internal val LocalSendStatusFfi?.isTerminalLocalSendFailure: Boolean
+    get() = this == LocalSendStatusFfi.Rejected || this == LocalSendStatusFfi.RefusedNewMembers
+
 /** Queries native ownership before a retry; no Android send ledger is introduced. */
 internal fun MarmotInterface.recoveredLocalSend(
     account: String,
@@ -45,8 +49,9 @@ internal fun MarmotInterface.recoveredLocalSend(
 ): SendSummaryFfi? =
     when (val status = localSendStatus(account, group, token)) {
         is LocalSendStatusFfi.Completed -> status.summary
-        LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned -> pendingLocalSend()
-        LocalSendStatusFfi.Rejected -> error("local submission rejected; a new deliberate submission is required")
+        is LocalSendStatusFfi.Queued, is LocalSendStatusFfi.EngineOwned -> pendingLocalSend()
+        LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers ->
+            error("local submission rejected; a new deliberate submission is required")
         null -> null
     }
 

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -171,6 +170,7 @@ object LocalNotificationFormatter {
             tag.startsWith(GROUP_MEMBERSHIP_TAG_PREFIX + base)
     }
 
+    /** Maps a posted update to the same card identity used for replacement and dismissal. */
     fun notificationDismissalKey(update: NotificationUpdateFfi): NotificationDismissalKey =
         when {
             update.trigger == NotificationTriggerFfi.GROUP_INVITE ->
@@ -181,8 +181,6 @@ object LocalNotificationFormatter {
                 groupMembershipDismissalKey(update.accountRef, update.groupIdHex)
             isReaction(update) -> reactionDismissalKey(update.accountRef, update.groupIdHex)
             update.isMention -> mentionDismissalKey(update.accountRef, update.groupIdHex)
-            update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY ->
-                agentActivityDismissalKey(update.accountRef, update.groupIdHex)
             else -> conversationDismissalKey(update.accountRef, update.groupIdHex)
         }
 
