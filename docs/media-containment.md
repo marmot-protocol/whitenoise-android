@@ -42,7 +42,7 @@ Automatic A/V demuxing and decoding execute in the permissionless native worker.
 
 Playback speed is applied to raw PCM by the pinned Media3 1.11.1 Sonic processor. AudioTrack remains at unity speed and pitch. Each fixed-rate segment receives at most ten milliseconds of aligned PCM per input; its owned output must be consumed before another input or explicit end-of-input flush. A rate change drains the old segment before starting the latest requested rate on the same device. Position snapshots use cached source-time anchors and never resize or query the device from a UI getter. The source-derived maximum individual processor payload is 442,800 bytes; reachable payload plus one resize is below 2 MiB. Object headers, garbage awaiting collection and total process memory are outside that bound. A Media3 upgrade requires a new allocation proof.
 
-Preferred per-track reads retain one copied video frame and one PCM block suffix in the parent. During seek preroll the parent keeps the latest frame before the target until a replacement is read or video EOF confirms it is the final frame. The native compressed queue remains bounded to 8 MiB and 512 packets, or up to 2048 packets during a frame-threaded video read with interleaved audio. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
+Preferred per-track reads retain one pending copied video frame and one PCM block suffix in the parent. A seek can briefly hold two pending frames. When the next frame falls after the target, the parent displays the preceding frame immediately and schedules the next at its own timestamp. Video EOF also confirms the final frame's display interval. The native compressed queue remains bounded to 8 MiB and 512 packets, or up to 2048 packets during a frame-threaded video read with interleaved audio. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
 
 
 The host rechecks source ownership and cancellation when a provider returns a
@@ -134,8 +134,8 @@ in an exception. A paused worker can keep running code for that window, which an
 active worker of the same source could already do.
 
 After a seek, the worker defers RGBA conversion of pre-target video and holds
-one reference to the most recent deferred frame. At video EOF it returns that
-frame once so playback can display the final picture. It also yields a frame
+one reference to the most recent deferred frame. It returns that frame once when
+the next frame starts after the target or when video reaches EOF. It also yields a frame
 to the parent when half of the compressed lookahead is queued, after 500 ms of
 its 1.5-second call budget or after half of its read step budget.
 

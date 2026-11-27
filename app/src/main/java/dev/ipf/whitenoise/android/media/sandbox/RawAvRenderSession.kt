@@ -336,9 +336,7 @@ internal class RawAvRenderSession(
             while (valid(activation)) {
                 val intent = owner.intent()
                 if (appliedSeek != intent.seek) {
-                    progress.video?.bitmap?.recycle()
-                    progress.video = null
-                    progress.replacePreroll(null)
+                    progress.clearVideo()
                     progress.audio = null
                     progress.targetUs = intent.positionUs
                     applySeek(intent, seek)
@@ -359,8 +357,7 @@ internal class RawAvRenderSession(
                                 progress.replacePreroll(frame)
                                 drainPrerollAudio(progress, frame.timestampUs, activation, read)
                             } else {
-                                progress.replacePreroll(null)
-                                progress.video = frame
+                                progress.queueVideo(frame)
                             }
                         }
                         AvStreamFrame.VideoEnd -> {
@@ -374,23 +371,18 @@ internal class RawAvRenderSession(
                 }
                 val nextVideo = progress.video
                 if (nextVideo != null) {
-                    ensureAudioForVideo(progress, nextVideo.timestampUs, activation, read)
-                    val reserveTargetUs = audioReserveTargetUs(nextVideo.timestampUs)
-                    refillAudioReserve(progress, reserveTargetUs, activation, read)
                     if (!valid(activation, appliedSeek)) continue
                     // Before owner.frame is called, this coroutine alone owns and must recycle the bitmap on failure.
                     var ready = false
                     try {
-                        ready = waitForVideo(nextVideo.timestampUs, activation, progress, reserveTargetUs, read)
+                        ready = nextVideo.timestampUs < progress.targetUs ||
+                            waitForVideo(nextVideo.timestampUs, activation, progress, read)
                     } finally {
-                        if (!ready) {
-                            progress.video = null
-                            nextVideo.bitmap.recycle()
-                        }
+                        progress.advanceVideo()
+                        if (!ready) nextVideo.bitmap.recycle()
                     }
                     if (ready) {
                         // Once invoked, the owner may retain the bitmap even if its callback throws.
-                        progress.video = null
                         if (progress.lastVideoPts >= 0 && nextVideo.timestampUs > progress.lastVideoPts) {
                             progress.lastVideoDelta = nextVideo.timestampUs - progress.lastVideoPts
                         }
@@ -414,9 +406,7 @@ internal class RawAvRenderSession(
                 }
             }
         } finally {
-            progress.video?.bitmap?.recycle()
-            progress.video = null
-            progress.replacePreroll(null)
+            progress.clearVideo()
             progress.audio = null
         }
     }
@@ -713,9 +703,11 @@ internal class RawAvRenderSession(
         timestampUs: Long,
         activation: Long,
         progress: RawAvRenderProgress,
-        reserveTargetUs: Long,
         read: (Int) -> AvStreamFrame,
     ): Boolean {
+        ensureAudioForVideo(progress, timestampUs, activation, read)
+        val reserveTargetUs = audioReserveTargetUs(timestampUs)
+        refillAudioReserve(progress, reserveTargetUs, activation, read)
         while (valid(activation, appliedSeek)) {
             var tolerance = pumpAudio(progress)
             var clock = positionUs()

@@ -84,33 +84,37 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
-    /** Preferred reads return the final pre-target frame once when a seek lands in its display interval. */
+    /** Preferred reads keep the frame covering an interior seek or the final display interval. */
     @Test
-    fun preferredReadPreservesFinalFrameAfterSeek() {
+    fun preferredReadPreservesCoveringFrameAfterSeek() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         withFixture("red-h264.mp4") { source ->
             val stream =
                 IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), wantAudio = false, edge = 64)
             stream.use {
-                val track = AvStreamProtocol.VIDEO_TRACK
-                (stream.read(track) as AvStreamFrame.Video).bitmap.recycle()
+                assertVideoTimestamp(stream, 0L)
                 stream.seek(900_000L)
-                val finalFrame = stream.read(track) as AvStreamFrame.Video
-                try {
-                    assertEquals(800_000L, finalFrame.timestampUs)
-                } finally {
-                    finalFrame.bitmap.recycle()
-                }
-                assertEquals(AvStreamFrame.VideoEnd, stream.read(track))
+                assertVideoTimestamp(stream, 800_000L)
+                assertEquals(AvStreamFrame.VideoEnd, stream.read(AvStreamProtocol.VIDEO_TRACK))
                 stream.seek(200_000L)
-                val earlier = stream.read(track) as AvStreamFrame.Video
-                try {
-                    assertEquals(200_000L, earlier.timestampUs)
-                } finally {
-                    earlier.bitmap.recycle()
-                }
+                assertVideoTimestamp(stream, 200_000L)
+                stream.seek(300_000L)
+                assertVideoTimestamp(stream, 200_000L)
+                assertVideoTimestamp(stream, 400_000L)
             }
             assertTrue(stream.awaitRetired())
+        }
+    }
+
+    private fun assertVideoTimestamp(
+        stream: IsolatedAvStream,
+        expectedUs: Long,
+    ) {
+        val frame = stream.read(AvStreamProtocol.VIDEO_TRACK) as AvStreamFrame.Video
+        try {
+            assertEquals(expectedUs, frame.timestampUs)
+        } finally {
+            frame.bitmap.recycle()
         }
     }
 

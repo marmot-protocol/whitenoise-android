@@ -30,7 +30,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/media/sandbox/IsolatedMediaTransport.kt" to 724,
         "dev/ipf/whitenoise/android/media/sandbox/MediaWorkerPool.kt" to 745,
         "dev/ipf/whitenoise/android/media/sandbox/RawAvPlaybackEngine.kt" to 1058,
-        "dev/ipf/whitenoise/android/media/sandbox/RawAvRenderSession.kt" to 740,
+        "dev/ipf/whitenoise/android/media/sandbox/RawAvRenderSession.kt" to 732,
         "dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt" to 1472,
         "dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt" to 800,
         "dev/ipf/whitenoise/android/state/AppReviewDemo.kt" to 773,

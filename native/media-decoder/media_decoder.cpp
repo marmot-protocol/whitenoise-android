@@ -611,8 +611,7 @@ struct ConversionFrames {
 };
 
 /** Convert one validated video frame to bounded packed RGBA and copy only the declared output rows. */
-jlongArray video(JNIEnv* env, Session& s, jobject destination) {
-    auto* frame = s.video.frame;
+jlongArray video(JNIEnv* env, Session& s, jobject destination, AVFrame* frame) {
     check(frame->width > 0 && frame->height > 0 && frame->width <= kMaxDimension && frame->height <= kMaxDimension &&
           int64_t(frame->width) * frame->height <= kMaxPixels, "decoded_surface_budget_refused");
     validateVideoColor(s, frame);
@@ -834,7 +833,7 @@ void queuePacket(Session& s, size_t packetLimit = kMaxQueuedPackets) {
 
 /**
  * Defer conversion of pre-target video while compressed lookahead, time and read steps allow it.
- * The latest deferred frame stays available as the final picture if the decoder reaches EOF.
+ * Keep one deferred frame to cover the target when the next frame is later or the decoder ends.
  */
 bool skipPrerollVideo(Session& s, int step) {
     if (timestamp(s, s.video, s.video.frame) >= s.videoSkipBeforeUs) {
@@ -869,10 +868,11 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     for (int step = 0; step < kMaxReadSteps; ++step) {
         check(!interrupted(&s), "media_read_deadline");
         pump(s, selected);
-        if (preferred == 1 && selected.ended && s.prerollVideo) {
-            av_frame_move_ref(selected.frame, s.prerollVideo);
-            selected.hasFrame = true;
-            s.videoSkipBeforeUs = INT64_MIN;
+        if (preferred == 1 && s.prerollVideo &&
+            (selected.ended || (selected.hasFrame && timestamp(s, selected, selected.frame) > s.videoSkipBeforeUs))) {
+            auto result = video(env, s, videoOut, s.prerollVideo);
+            av_frame_free(&s.prerollVideo);
+            return result;
         }
         if (selected.hasFrame) {
             if (preferred == 1 && skipPrerollVideo(s, step)) {
@@ -885,7 +885,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
             }
             if (preferred == 1) {
                 av_frame_free(&s.prerollVideo);
-                auto result = video(env, s, videoOut);
+                auto result = video(env, s, videoOut, s.video.frame);
                 selected.hasFrame = false; av_frame_unref(selected.frame);
                 return result;
             }
@@ -951,7 +951,7 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
             const bool chooseVideo = s.video.hasFrame &&
                 (!s.audio.hasFrame || timestamp(s, s.video, s.video.frame) <= timestamp(s, s.audio, s.audio.frame));
             if (chooseVideo) {
-                auto result = video(env, s, videoOut);
+                auto result = video(env, s, videoOut, s.video.frame);
                 s.video.hasFrame = false;
                 av_frame_unref(s.video.frame);
                 return result;

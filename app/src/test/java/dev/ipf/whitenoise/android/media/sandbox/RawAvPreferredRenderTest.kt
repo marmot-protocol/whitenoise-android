@@ -45,7 +45,7 @@ class RawAvPreferredRenderTest {
                 assertEquals(owner.targetUs, it)
             })
             assertTrue(owner.ended)
-            assertEquals((351..359).map { it * 40_000L }, owner.displayed)
+            assertEquals((350..359).map { it * 40_000L }, owner.displayed)
             assertTrue("Interleaved audio must be consumed during preroll", packets.audioReads > 512)
             assertTrue(packets.maximumQueued <= 512)
             assertEquals(1, packets.crossingReads)
@@ -176,6 +176,30 @@ class RawAvPreferredRenderTest {
             }, { assertEquals(owner.targetUs, it) })
             assertEquals(listOf(40_000L), owner.displayed)
             assertEquals(960, sink.accepted)
+            assertTrue(owner.ended)
+        }
+
+    @Test fun sparseSeekPublishesTheCoveringFrameBeforeStartingTargetAudio() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 70_000L }
+            val session = session(owner, Sink())
+            val positions = mutableListOf<Long>()
+            owner.onFrame = { positions.add(session.positionUs()) }
+            val frames = ArrayDeque(listOf(video(50_000L), video(100_000L)))
+            var audioReads = 0
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    frames.removeFirstOrNull() ?: AvStreamFrame.VideoEnd
+                } else if (audioReads++ == 0) {
+                    AvStreamFrame.Audio(ByteArray(800), 8000, 1, owner.targetUs)
+                } else {
+                    AvStreamFrame.AudioEnd
+                }
+            }, { assertEquals(owner.targetUs, it) })
+
+            assertEquals(listOf(50_000L, 100_000L), owner.displayed)
+            assertEquals(owner.targetUs, positions.first())
+            assertTrue(positions.last() >= 99_000L)
             assertTrue(owner.ended)
         }
 
@@ -327,6 +351,7 @@ class RawAvPreferredRenderTest {
         var alive = true
         var activation = 7L
         var throwAfterAdoption = false
+        var onFrame: (() -> Unit)? = null
 
         override fun intent(): RawAvPlaybackIntent {
             val attributes = AudioAttributes.Builder().build()
@@ -352,6 +377,7 @@ class RawAvPreferredRenderTest {
             seek: Long,
         ): Boolean {
             displayed += (bitmap.getPixel(0, 0) and 0x00ffffff).toLong()
+            onFrame?.invoke()
             if (throwAfterAdoption) throw IOException("Owner retained this bitmap before failure")
             bitmap.recycle()
             return true
