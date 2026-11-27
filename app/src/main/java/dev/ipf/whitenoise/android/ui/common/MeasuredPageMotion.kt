@@ -117,11 +117,6 @@ internal fun ContentDrawScope.drawNativePage(
     // A settled current header stays in the fixed chrome pass, so rest frames are unchanged.
     val moving = header?.takeUnless { it.bounds.isEmpty || (chrome && it.presence >= 1f && it.offsetY == 0f) }
     val measuredBody = body?.takeUnless { it.isEmpty }
-    if (measuredBody == null && moving == null) {
-        // Unmeasured content is never replayed as an outgoing full-screen opaque sibling.
-        if (chrome) drawContent()
-        return
-    }
     if (chrome) drawContentOutside(listOfNotNull(measuredBody, moving?.bounds))
     if (moving != null && moving.presence > 0f) {
         // The band keeps its slot; content settles upward into it while fading in.
