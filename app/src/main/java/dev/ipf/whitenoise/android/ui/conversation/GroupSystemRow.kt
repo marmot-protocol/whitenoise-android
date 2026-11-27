@@ -411,9 +411,14 @@ internal fun groupSystemSummaryText(
     buildAnnotatedString {
         append(summary.text)
         for (link in summary.links) {
+            val tag =
+                when (link.role) {
+                    GroupSystemLinkRole.ACTOR -> GROUP_SYSTEM_ACTOR_LINK_TAG
+                    GroupSystemLinkRole.SUBJECT -> GROUP_SYSTEM_SUBJECT_LINK_TAG
+                }
             addLink(
                 LinkAnnotation.Clickable(
-                    tag = if (link.role == GroupSystemLinkRole.ACTOR) GROUP_SYSTEM_ACTOR_LINK_TAG else GROUP_SYSTEM_SUBJECT_LINK_TAG,
+                    tag = tag,
                     styles = TextLinkStyles(SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold)),
                 ) { onOpen(link.accountIdHex) },
                 start = link.range.first,

@@ -213,11 +213,14 @@ class GroupSystemProfileLinkScreenshotTest {
     }
 
     /** The tags of [node]'s links, in order. */
-    private fun linkTags(node: SemanticsNodeInteraction): List<String> = linkRanges(node).map { (it.item as LinkAnnotation.Clickable).tag }
+    private fun linkTags(node: SemanticsNodeInteraction): List<String?> = linkRanges(node).map(::linkTag)
 
-    private fun isActorLink(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag == GROUP_SYSTEM_ACTOR_LINK_TAG
+    private fun linkTag(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag
 
-    private fun isSubjectLink(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag == GROUP_SYSTEM_SUBJECT_LINK_TAG
+    private fun isActorLink(link: AnnotatedString.Range<LinkAnnotation>) = linkTag(link) == GROUP_SYSTEM_ACTOR_LINK_TAG
+
+    private fun isSubjectLink(link: AnnotatedString.Range<LinkAnnotation>): Boolean =
+        linkTag(link) == GROUP_SYSTEM_SUBJECT_LINK_TAG
 
     /** One linked row whose taps are discarded, for the rendering baselines. */
     @Composable

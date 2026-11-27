@@ -132,7 +132,9 @@ class GroupSystemSubjectLinkTest {
         val event = requireNotNull(event("member_added"))
         val noSlot = GroupSystemSubjectLink.summary(event, SELF, ACTOR, "Alice", "Bob") { _, _ -> "Group updated" }
         val doubledSubject =
-            GroupSystemSubjectLink.summary(event, SELF, ACTOR, "Alice", "Bob") { actor, subject -> "$actor: $subject and $subject" }
+            GroupSystemSubjectLink.summary(event, SELF, ACTOR, "Alice", "Bob") { actor, subject ->
+                "$actor: $subject and $subject"
+            }
 
         assertEquals(emptyList<GroupSystemProfileLink>(), noSlot.links)
         assertEquals("Alice: Bob and Bob", doubledSubject.text)
@@ -233,4 +235,5 @@ class GroupSystemSubjectLinkTest {
 }
 
 /** The link for [role], or null when that participant's name is plain text. */
-private fun GroupSystemLinkedSummary.link(role: GroupSystemLinkRole): GroupSystemProfileLink? = links.firstOrNull { it.role == role }
+private fun GroupSystemLinkedSummary.link(role: GroupSystemLinkRole): GroupSystemProfileLink? =
+    links.firstOrNull { it.role == role }
