@@ -73,15 +73,8 @@ internal class ReceivedVoiceTranscripts(
     fun forgetGroup(
         account: String,
         group: String,
-        onlyIfCached: Boolean = false,
     ) {
         val prefix = "$account|$group|"
-        if (onlyIfCached &&
-            resultOrder.none { it.startsWith(prefix) } &&
-            shownOrder.none { it.startsWith(prefix) }
-        ) {
-            return
-        }
         groupEpochs[prefix] = groupEpoch(account, group) + 1
         forgetPrefix(prefix)
     }

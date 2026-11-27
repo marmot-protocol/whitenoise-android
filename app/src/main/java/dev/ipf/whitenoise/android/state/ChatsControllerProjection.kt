@@ -41,9 +41,8 @@ private fun ChatsController.evictDepartedVoiceTranscripts(
     previous: AppGroupRecordFfi?,
 ) {
     val account = accountRef ?: return
-    if (record.endsVoiceTranscription()) {
-        val previouslyJoined = previous?.endsVoiceTranscription() == false
-        appState.receivedVoiceTranscripts.forgetGroup(account, record.groupIdHex, onlyIfCached = !previouslyJoined)
+    if (record.endsVoiceTranscription() && previous?.endsVoiceTranscription() != true) {
+        appState.receivedVoiceTranscripts.forgetGroup(account, record.groupIdHex)
     }
 }
 

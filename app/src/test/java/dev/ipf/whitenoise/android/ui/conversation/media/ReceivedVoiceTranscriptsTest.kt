@@ -82,6 +82,9 @@ class ReceivedVoiceTranscriptsTest {
 
         assertNull(removed.result("attachment"))
         assertFalse(removed.shown("message"))
+        val reopened = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        assertNull(reopened.result("attachment"))
+        assertFalse(reopened.shown("message"))
         assertEquals(complete, other.result("attachment"))
     }
 

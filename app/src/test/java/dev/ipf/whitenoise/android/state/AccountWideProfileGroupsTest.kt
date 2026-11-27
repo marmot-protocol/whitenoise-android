@@ -287,6 +287,46 @@ class AccountWideProfileGroupsTest {
         }
     }
 
+    @Test
+    fun coldDepartureRevokesRecognitionWithNoCachedTranscriptEvenAfterRejoining() {
+        val (appState, controller) = profileController(retainBeyondRecord = false) { _, _ -> roster(TARGET) }
+        try {
+            val cache = appState.receivedVoiceTranscripts
+            val preDeparture = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+            assertTrue(preDeparture.active)
+            val joined = adminGroup(BEYOND)
+            val departed = joined.copy(selfMembership = SelfMembershipFfi.REMOVED)
+            controller.installGroupRecordsSnapshot(mapOf(BEYOND to departed))
+            controller.foldGroupRecordForTest(joined)
+
+            preDeparture.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Late words"))
+            assertFalse(preDeparture.active)
+            val current = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+            assertTrue(current.active)
+            assertNull(current.result("recording"))
+        } finally {
+            controller.onCleared()
+        }
+    }
+
+    @Test
+    fun taskRemovalClearsReceivedTranscriptsWhileTheProcessSurvives() {
+        val appState = emptyAppState()
+        val cache = appState.receivedVoiceTranscripts
+        val old = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+        val complete = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words")
+        old.storeResult("recording", complete)
+        old.setShown("message", true)
+
+        appState.onTaskRemoved()
+        old.storeResult("recording", complete)
+
+        assertFalse(old.active)
+        val reopened = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = BEYOND)
+        assertNull(reopened.result("recording"))
+        assertFalse(reopened.shown("message"))
+    }
+
     /** The mutation's authoritative roster must replace a resolved off-window cache without adding a native row. */
     @Test
     fun successfulOffWindowRemovalRefreshesCommonGroupsWithoutExpandingTheWindow() =

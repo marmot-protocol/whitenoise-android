@@ -329,7 +329,7 @@
       {
         "surface": "Departure from a closed conversation clears its voice transcript cache",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row, controllers)",
+        "anchor": "receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row)",
         "test_ids": [
           "MED-038"
         ]

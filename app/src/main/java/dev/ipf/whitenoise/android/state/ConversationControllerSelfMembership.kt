@@ -24,18 +24,12 @@ internal fun AppGroupRecordFfi.endsVoiceTranscription(): Boolean = disbanded || 
 internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
     lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
 
-/** Evicts cached transcripts and revokes active work when a mounted conversation loses membership. */
+/** Clears transcripts and revokes recognition after an authoritative departure. */
 internal fun ReceivedVoiceTranscripts.forgetDepartedGroup(
     accountRef: String?,
     row: ChatListRowFfi,
-    controllers: List<ConversationController>,
 ) {
-    if (accountRef == null || !row.endsVoiceTranscription()) return
-    val mountedTransition =
-        controllers.any {
-            it.matchesConversation(accountRef, row.groupIdHex) && it.latestChatListRow?.endsVoiceTranscription() != true
-        }
-    forgetGroup(accountRef, row.groupIdHex, onlyIfCached = !mountedTransition)
+    if (accountRef != null && row.endsVoiceTranscription()) forgetGroup(accountRef, row.groupIdHex)
 }
 
 private fun SelfMembershipFfi.hasSettledDeparture(leaveRequestPending: Boolean): Boolean =

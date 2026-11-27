@@ -2631,7 +2631,7 @@ class WhiteNoiseAppState private constructor(
         row: ChatListRowFfi,
     ) {
         val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
-        receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row, controllers)
+        receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row)
         controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
     }
 
@@ -6188,8 +6188,8 @@ class WhiteNoiseAppState private constructor(
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
         voiceNotes.onAppBackgrounded()
-        // The app-state lifecycle is authoritative even if the TTS foreground
-        // service has not started yet or its start was rejected.
+        receivedVoiceTranscripts.clear()
+        // The app-state lifecycle also owns speech before its foreground service starts.
         stopSpeaking()
         mutationsScope.launch { draftWriter.flush() }
     }
