@@ -245,7 +245,9 @@ internal fun ConversationController.markActiveAccountRemovedFromMembers(account:
 internal fun ConversationController.recordSelfLeft(settledDeparture: Boolean = true) {
     selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     if (settledDeparture) {
-        boundAccountRef?.let { appState.receivedVoiceTranscripts.updateGroupMembership(it, group.groupIdHex, departed = true) }
+        boundAccountRef?.let { account ->
+            appState.receivedVoiceTranscripts.updateGroupMembership(account, group.groupIdHex, departed = true)
+        }
     }
 }
 
