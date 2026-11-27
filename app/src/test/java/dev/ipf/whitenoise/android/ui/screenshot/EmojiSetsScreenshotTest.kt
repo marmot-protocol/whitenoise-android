@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -36,7 +37,9 @@ import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.EmojiArt
+import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.settings.EMOJI_SETS_REFRESH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
 import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
@@ -226,6 +229,7 @@ class EmojiSetsScreenshotTest {
         assertEquals("Refresh retries discovery with the current query", listOf(""), searches)
     }
 
+    /** Captures the installed-set picker once both the set's artwork and the Unicode category tabs have loaded. */
     private fun picker(
         name: String,
         dark: Boolean = false,
@@ -254,8 +258,11 @@ class EmojiSetsScreenshotTest {
                 }
             }
         }
+        // The Unicode catalogue loads on a background thread, so its category tabs can arrive after the set's artwork.
+        val unicodeTab = emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodesWithTag(unicodeTab).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("emoji-set-picker").captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
     }
