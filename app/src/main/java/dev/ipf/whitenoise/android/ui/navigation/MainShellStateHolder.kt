@@ -237,15 +237,9 @@ internal class MainShellStateHolder(
             if (restored == null) {
                 clearSavedConversationRoute()
             } else {
-                // The saved account was just validated; a fresh holder's route owner may not be bound yet.
-                val route =
-                    ShellRoute.Conversation(
-                        accountRef = activeAccountRef,
-                        groupIdHex = restored.group.groupIdHex,
-                        open = ConversationOpenContext(),
-                        item = restored,
-                    )
-                dispatchShellNav(ShellNavEvent.RestoreSavedConversation(route))
+                dispatchShellNav(
+                    ShellNavEvent.RestoreSavedConversation(restoredConversationRoute(restored, activeAccountRef)),
+                )
             }
         }
     }

@@ -27,3 +27,18 @@ internal fun MainShellStateHolder.conversationRoute(
         open = open,
         item = item,
     )
+
+/**
+ * The route for [item] restored after process death, owned by [accountRef], the account its saved key was just
+ * validated against. It does not read the route owner, which a fresh holder may not have bound yet.
+ */
+internal fun restoredConversationRoute(
+    item: ChatListItem,
+    accountRef: String,
+): ShellRoute.Conversation =
+    ShellRoute.Conversation(
+        accountRef = accountRef,
+        groupIdHex = item.group.groupIdHex,
+        open = ConversationOpenContext(),
+        item = item,
+    )
