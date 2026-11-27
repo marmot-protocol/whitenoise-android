@@ -15,6 +15,7 @@ internal class DictationForegroundTestHost(
     var draft = TextFieldValue("")
     var revision = 0L
     val sent = mutableListOf<String>()
+    override var notificationSendAllowed = true
     override val conversationDictation =
         ConversationDictationController(
             platform = platform,

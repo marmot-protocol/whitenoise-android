@@ -678,7 +678,8 @@ class AndroidCiGateTest(unittest.TestCase):
 
         Each writer adds a few hundred MB per master push. Matrix duplicates and
         master-only jobs read whichever entry is newest instead, so two pushes
-        fit in the repository cache quota.
+        fit in the repository cache quota. Jobs that decode a signing keystore
+        restore nothing, because preview builds run PR code on master's cache scope.
         """
         master_only = "github.ref != 'refs/heads/master' }}"
         expected = {
@@ -688,9 +689,9 @@ class AndroidCiGateTest(unittest.TestCase):
                 '${{ ' + master_only,
                 'true',
             ],
-            'android-production-release.yml': ['true'],
+            'android-production-release.yml': ['disabled'],
             'android-release-runtime.yml': ['true', 'true'],
-            'android-staging-apk.yml': ['true', 'true', 'true'],
+            'android-staging-apk.yml': ['disabled', 'true', 'true'],
             'codeql.yml': ['true'],
             'dependency-submission.yml': ['true'],
             'fuzz-scheduled.yml': ['true'],
@@ -703,7 +704,9 @@ class AndroidCiGateTest(unittest.TestCase):
                     workflow,
                 )
                 found = [
-                    match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
+                    'disabled'
+                    if 'cache-disabled: true\n' in step
+                    else match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
                     for step in steps
                 ]
                 self.assertEqual(found, values)

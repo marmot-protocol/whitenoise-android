@@ -36,6 +36,7 @@ import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.AccountCircle
 import dev.ipf.whitenoise.android.ui.icons.outlined.Security
@@ -214,7 +215,7 @@ internal fun SetupDetails(
                 SetupRelayRepairDetails(repair, state.currentStep?.findings.orEmpty())
             }
             Text(stringResource(R.string.setup_checks), style = MaterialTheme.typography.titleMedium)
-            Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
+            EmojiLabel(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(state.currentStep?.step, finding))
             }

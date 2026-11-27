@@ -26,6 +26,9 @@ import kotlinx.coroutines.launch
 /** Process-level owner exposed to the microphone foreground service. */
 internal interface ConversationDictationServiceHost {
     val conversationDictation: ConversationDictationController
+
+    /** Whether App Lock lets notification actions send now, as for notification Reply. */
+    val notificationSendAllowed: Boolean
 }
 
 /**
@@ -77,7 +80,8 @@ internal class ConversationDictationForegroundService(
         intent: Intent?,
         startId: Int,
     ): Int {
-        val controller = hostResolver(service)?.conversationDictation
+        val host = hostResolver(service)
+        val controller = host?.conversationDictation
         val requiresForegroundStart = isStartCommand(intent)
         if (requiresForegroundStart) service.foreground.noteForegroundStartPending(startId)
         val callbackSession = intent?.getStringExtra(EXTRA_SESSION_TOKEN)?.substringAfterLast(':')?.toLongOrNull() ?: 0L
@@ -102,7 +106,8 @@ internal class ConversationDictationForegroundService(
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
-                ACTION_SEND -> controller.send()
+                // Past the App Lock boundary the transcript stays in the draft instead of being sent.
+                ACTION_SEND -> if (host?.notificationSendAllowed == true) controller.send() else controller.paste()
                 ACTION_RETRY_AUDIO -> controller.retryRetainedAudioIfAvailable()
                 ACTION_DISCARD_RECOVERY -> controller.cancel()
             }
@@ -344,14 +349,15 @@ internal class ConversationDictationForegroundService(
 
         /** Test seam for resolving the process-owned controller. */
         internal var hostResolver: (Service) -> ConversationDictationServiceHost? = { service ->
-            (service.application as? WhiteNoiseApplication)
-                ?.initializedAppState()
-                ?.initializedConversationDictation()
-                ?.let { controller ->
+            (service.application as? WhiteNoiseApplication)?.initializedAppState()?.let { appState ->
+                appState.initializedConversationDictation()?.let { controller ->
                     object : ConversationDictationServiceHost {
                         override val conversationDictation = controller
+                        override val notificationSendAllowed: Boolean
+                            get() = appState.appLock.notificationActionsAllowed
                     }
                 }
+            }
         }
 
         /** Test seam for simulating platform rejection of foreground promotion. */

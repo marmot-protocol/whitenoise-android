@@ -33,11 +33,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
@@ -191,7 +193,7 @@ internal fun WhiteNoiseChoiceRow(
                 .padding(start = ChoiceDialogDefaults.RowOverhang)
                 .padding(vertical = ChoiceDialogDefaults.RowTextPadding),
         ) {
-            Text(
+            EmojiLabel(
                 text = title,
                 color =
                     if (enabled) {
@@ -199,8 +201,7 @@ internal fun WhiteNoiseChoiceRow(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = fontFamily,
+                style = MaterialTheme.typography.bodyLarge.merge(TextStyle(fontFamily = fontFamily)),
             )
             if (subtitle != null) {
                 Text(
@@ -446,7 +447,7 @@ fun WhiteNoiseDialogCheckRow(
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
         leadingIcon?.invoke()
-        Text(
+        EmojiLabel(
             title,
             Modifier.weight(1f),
             color = MaterialTheme.colorScheme.onSurface,

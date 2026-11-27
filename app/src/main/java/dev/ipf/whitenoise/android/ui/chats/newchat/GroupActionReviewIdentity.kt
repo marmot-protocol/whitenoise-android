@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 
 /** Public identity without repeating technical labels or exposing operational references. */
 @Composable
@@ -98,8 +99,8 @@ internal fun GroupReviewPersonText(
     role: String,
     copyable: Boolean = true,
 ) {
-    person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-    groupReviewNicknameLabel(person)?.let { Text(it) }
+    person.publicName?.let { EmojiLabel(it, style = MaterialTheme.typography.titleSmall) }
+    groupReviewNicknameLabel(person)?.let { EmojiLabel(it) }
     if (person.identifier.isNotBlank()) {
         if (copyable) {
             GroupReviewNpub(person.identifier, role)
@@ -154,7 +155,7 @@ internal fun groupReviewPersonDescription(
     role: String,
 ): String {
     val nickname = groupReviewNicknameLabel(person)
-    return listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", ")
+    return emojiPlainText(listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", "))
 }
 
 /** A small visible label with a full-size copy target and complete spoken identity. */

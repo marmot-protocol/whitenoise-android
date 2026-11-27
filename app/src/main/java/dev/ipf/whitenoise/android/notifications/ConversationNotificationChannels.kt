@@ -151,8 +151,9 @@ object ConversationNotificationChannels {
         val parentSpec = NotificationChannelSpec.entries.firstOrNull { it.id == parentChannelId }
         val baseName = parentSpec?.let { NotificationChannels.baseName(context, it) }
         val usesCustomScope = parentSpec?.conversationPolicy == ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE
+        val displayTitle = conversationTitle?.let { context.emojiPlainText(it) }
         val (customDisplayName, customDescription) =
-            customChannelLabels(context, usesCustomScope, conversationTitle, baseName)
+            customChannelLabels(context, usesCustomScope, displayTitle, baseName)
         return synchronized(UserEventNotificationGroup.mutationLock) {
             val writeCurrent =
                 NotificationChannelWriteGuard.isCurrent(writeEpoch, accountRef, conversationShortcutId)
@@ -164,7 +165,7 @@ object ConversationNotificationChannels {
                 manager = manager,
                 parentChannelId = parentChannelId,
                 conversationShortcutId = conversationShortcutId,
-                conversationTitle = if (previews) conversationTitle else genericName,
+                conversationTitle = if (previews) displayTitle else genericName,
                 vibrationPattern = vibrationPattern,
                 sourceVibrationPattern = sourceVibrationPattern,
                 baseName = baseName,
