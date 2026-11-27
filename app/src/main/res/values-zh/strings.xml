@@ -2767,6 +2767,7 @@
     <string name="remote_signer_approval_title">你的签名器需要额外验证</string>
     <string name="remote_signer_approval_body">在浏览器中打开 %1$s，完成验证后返回 White Noise。</string>
     <string name="remote_signer_approval_open">开放批准页面</string>
+    <string name="remote_signer_approval_open_failed">无法打开批准页面。请重试。</string>
     <string name="remote_signer_approval_done">我已经完成了.</string>
     <string name="remote_signer_signing_in">正在登录…</string>
     <string name="remote_signer_try_again">再试一次</string>

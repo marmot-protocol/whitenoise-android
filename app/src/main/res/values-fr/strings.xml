@@ -2818,6 +2818,7 @@
     <string name="remote_signer_approval_title">Votre application de signature demande une vérification supplémentaire</string>
     <string name="remote_signer_approval_body">Ouvrez %1$s dans votre navigateur, terminez la vérification, puis revenez dans White Noise.</string>
     <string name="remote_signer_approval_open">Page d\'approbation ouverte</string>
+    <string name="remote_signer_approval_open_failed">Impossible d’ouvrir la page d’autorisation. Réessaie.</string>
     <string name="remote_signer_approval_done">J\'ai fini</string>
     <string name="remote_signer_signing_in">Connexion en cours…</string>
     <string name="remote_signer_try_again">Essayez encore .</string>

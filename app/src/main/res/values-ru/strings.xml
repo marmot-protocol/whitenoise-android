@@ -2913,6 +2913,7 @@
     <string name="remote_signer_approval_title">Приложение для подписи требует дополнительной проверки</string>
     <string name="remote_signer_approval_body">Откройте %1$s в браузере, пройдите проверку и вернитесь в White Noise.</string>
     <string name="remote_signer_approval_open">Открытая страница одобрения</string>
+    <string name="remote_signer_approval_open_failed">Не удалось открыть страницу подтверждения. Попробуйте ещё раз.</string>
     <string name="remote_signer_approval_done">Я закончил.</string>
     <string name="remote_signer_signing_in">Выполняется вход…</string>
     <string name="remote_signer_try_again">Попробуй еще раз.</string>

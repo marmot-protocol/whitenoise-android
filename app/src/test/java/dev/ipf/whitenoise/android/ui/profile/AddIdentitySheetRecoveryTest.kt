@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +37,22 @@ class AddIdentitySheetRecoveryTest {
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
     private val nsec = "nsec1" + "q".repeat(58)
+
+    /** Closing pairing restores the Add profile sign-in without dismissing its dialog. */
+    @Test
+    fun closingRemoteSignerReturnsToAddProfileSignIn() {
+        val engine = RecordingIdentityLoginCalls(loginFails = { error("opening pairing must not import a key") })
+        val appState = signInTestAppState(app, engine)
+        composeRule.setContent {
+            WhiteNoiseTheme { AddIdentitySheet(appState, onDismiss = { error("the sheet must stay open") }) }
+        }
+        composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_in.remote_signer").performClick()
+        composeRule.onNodeWithTag("remote_signer.screen").assertExists()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("remote_signer.screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_in.private_key").assertExists()
+    }
 
     /** Adding an identity retains the sheet and existing account when staged setup fails before acceptance. */
     @Test

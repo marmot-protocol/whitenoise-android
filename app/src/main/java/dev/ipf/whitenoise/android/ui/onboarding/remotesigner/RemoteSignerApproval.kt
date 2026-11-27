@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import dev.ipf.marmotkit.Nip46StateFfi
 import dev.ipf.marmotkit.Nip46StatusFfi
 import kotlinx.coroutines.currentCoroutineContext
@@ -8,6 +12,20 @@ import kotlinx.coroutines.isActive
 
 /** How often pairing re-reads MDK's local status to catch a browser approval request. */
 private const val APPROVAL_POLL_MS = 500L
+
+/** Opens a verified HTTPS approval page in the browser and reports whether Android accepted the launch. */
+internal fun Context.openRemoteSignerApproval(url: String): Boolean {
+    if (remoteSignerApprovalHost(url) == null) return false
+    val uri = Uri.parse(url).normalizeScheme()
+    return try {
+        startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
+}
 
 /** What the signer's current status means for an on-screen browser check. */
 internal sealed interface ApprovalSignal {

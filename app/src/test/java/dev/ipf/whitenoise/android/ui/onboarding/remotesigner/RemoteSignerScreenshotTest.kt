@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
+import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -8,27 +9,36 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.Nip46ErrorFfi
+import dev.ipf.marmotkit.Nip46StateFfi
+import dev.ipf.marmotkit.Nip46StatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RemoteSignerAccountStatus
 import dev.ipf.whitenoise.android.state.RemoteSignerHealth
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
 import dev.ipf.whitenoise.android.ui.settings.RemoteSignerAccountActions
+import dev.ipf.whitenoise.android.ui.settings.RemoteSignerPermissionsDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.remoteSignerAccountItems
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -117,6 +127,53 @@ class RemoteSignerScreenshotTest {
         }
     }
 
+    /** At 200% text, every expanded permission can scroll into view and the approval stays reachable. */
+    @Test fun accountPermissionReviewRtlLargeText() {
+        val permissions = FakeRemoteSignerSession().reviewPermissions()
+        RuntimeEnvironment.setFontScale(2f)
+        try {
+            show(dark = true, rtl = true) {
+                RemoteSignerPermissionsDialog(permissions, onApprove = {}, onDismiss = {})
+            }
+            composeRule.onNodeWithTag("remote_signer.review.details").performScrollTo().performClick()
+            permissions.grants.forEach { grant ->
+                composeRule.onNodeWithText(grant, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            }
+            composeRule.onNodeWithTag("remote_signer.account.approve").assertIsDisplayed()
+            val baseline = "src/test/snapshots/remote_signer_account_review_amoled_rtl_200.png"
+            composeRule.onNode(isDialog()).captureRoboImage(baseline)
+        } finally {
+            RuntimeEnvironment.setFontScale(1f)
+        }
+    }
+
+    /** A launch failure is visible in the flow and does not offer the acknowledgement until a launch succeeds. */
+    @Test fun approvalLaunchFailureLight() {
+        val session = FakeRemoteSignerSession()
+        val unconfined = Dispatchers.Unconfined
+        val scope = CoroutineScope(unconfined)
+        val pairing = RemoteSignerPairing(FakeRemoteSignerHost(session), scope, sessionDispatcher = unconfined)
+        try {
+            pairing.choose(RemoteSignerMethod.BunkerLink, "bunker://abcdef?relay=wss://relay.example&secret=s")
+            session.status = Nip46StatusFfi(Nip46StateFfi.APPROVAL, null, "https://signer.example/check", "r1", 1u)
+            pairing.approve()
+            var launchSucceeds = false
+            show(dark = false) {
+                RemoteSignerScreen(pairing, onClose = {}, onOpenApproval = { launchSucceeds })
+            }
+            composeRule.onNodeWithTag("remote_signer.approval.open").performClick()
+            composeRule.onNodeWithTag("remote_signer.approval.done").assertDoesNotExist()
+            val app = ApplicationProvider.getApplicationContext<Context>()
+            composeRule.onNodeWithText(app.getString(R.string.remote_signer_approval_open_failed)).assertIsDisplayed()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/remote_signer_approval_launch_failed_light.png")
+            composeRule.runOnIdle { launchSucceeds = true }
+            composeRule.onNodeWithTag("remote_signer.approval.open").performClick()
+            composeRule.onNodeWithTag("remote_signer.approval.done").assertIsDisplayed()
+        } finally {
+            scope.cancel()
+        }
+    }
+
     private lateinit var session: FakeRemoteSignerSession
 
     private fun RemoteSignerPairing.reviewed(): FakeRemoteSignerSession {
@@ -130,6 +187,7 @@ class RemoteSignerScreenshotTest {
         return session
     }
 
+    /** Renders a deterministic fake pairing step using the shared screenshot host. */
     private fun captureFlow(
         name: String,
         dark: Boolean = true,
@@ -143,11 +201,23 @@ class RemoteSignerScreenshotTest {
         val unconfined = Dispatchers.Unconfined
         val pairing = RemoteSignerPairing(host, CoroutineScope(unconfined), sessionDispatcher = unconfined)
         pairing.setup()
-        capture(name, dark, rtl, scale) { RemoteSignerScreen(pairing, onClose = {}, onOpenApproval = {}) }
+        capture(name, dark, rtl, scale) { RemoteSignerScreen(pairing, onClose = {}, onOpenApproval = { true }) }
     }
 
+    /** Captures the single root of a full-screen pairing step. */
     private fun capture(
         name: String,
+        dark: Boolean = true,
+        rtl: Boolean = false,
+        scale: Float = 1f,
+        content: @Composable () -> Unit,
+    ) {
+        show(dark, rtl, scale, content)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Supplies the same background, direction, and text scale to screen and dialog fixtures. */
+    private fun show(
         dark: Boolean = true,
         rtl: Boolean = false,
         scale: Float = 1f,
@@ -162,7 +232,6 @@ class RemoteSignerScreenshotTest {
                 }
             }
         }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
     private fun actions(health: RemoteSignerHealth) =
