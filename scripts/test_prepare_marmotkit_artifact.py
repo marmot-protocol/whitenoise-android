@@ -307,6 +307,17 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
 
         self.assertIn("FixtureApi", binding.read_text(encoding="utf-8"))
 
+    def test_extra_file_in_cached_tree_is_rebuilt_from_verified_archive(self) -> None:
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        injected = output / "kotlin/dev/ipf/marmotkit/Injected.kt"
+        injected.write_text("attacker-controlled\n", encoding="utf-8")
+
+        self.prepare()
+
+        self.assertFalse(injected.exists())
+
     def test_mutated_api_signature_and_marker_are_rebuilt(self) -> None:
         self.write_archive()
         self.write_lock()

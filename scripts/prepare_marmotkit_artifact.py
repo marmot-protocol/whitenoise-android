@@ -47,6 +47,13 @@ REQUIRED_ELF_EXPORTS = (
     b"Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext",
 )
 PAYLOAD_FILES = (*KOTLIN_FILES, *JNI_FILES, ELF_METADATA_FILE, "manifest.json")
+PREPARED_METADATA_FILES = {
+    ".prepared.json",
+    "marmotkit-api-signature.txt",
+    "prepared-files.sha256",
+    "native-provenance.json",
+    ".native-provenance.tmp",
+}
 MANIFEST_CONTENTS = (KOTLIN_FILES[0], *JNI_FILES)
 REQUIRED_PROPERTIES = {
     "schema",
@@ -615,6 +622,10 @@ def validate_prepared(output: Path, properties: dict[str, str], archive_hashes: 
         return False
     marker_files = metadata.get("files")
     if marker_files != archive_hashes:
+        return False
+    # Gradle compiles every file under the prepared tree, so a cached tree with extra files is rebuilt.
+    present = {path.relative_to(output).as_posix() for path in output.rglob("*") if not path.is_dir()}
+    if not present <= set(archive_hashes) | PREPARED_METADATA_FILES:
         return False
     try:
         for relative, expected_sha in archive_hashes.items():
