@@ -65,9 +65,12 @@ internal suspend fun WhiteNoiseAppState.shareAppInvite(
             val staged = QrShareCardRenderer.stage(context, QrShareCardSpec(title, WhiteNoiseUrls.DOWNLOAD))
             if (isCurrent()) {
                 launchOutboundShare(context, outboundShareIntent(message, listOf(staged.stream)), title).getOrThrow()
+                noteNotificationMoment()
             }
         }
     if (pictureResult.isFailure && isCurrent()) {
-        launchInviteShare(context, message, title).onFailure { presentOutboundShareFailure(operationCode, it) }
+        launchInviteShare(context, message, title)
+            .onSuccess { noteNotificationMoment() }
+            .onFailure { presentOutboundShareFailure(operationCode, it) }
     }
 }

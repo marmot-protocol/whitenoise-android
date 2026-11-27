@@ -753,6 +753,7 @@ internal fun ProfileSheet(
                         onInvite = {
                             if (owner.canAct()) {
                                 launchInviteShare(context, invite.message, invite.title)
+                                    .onSuccess { appState.noteNotificationMoment() }
                                     .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
                             }
                         },

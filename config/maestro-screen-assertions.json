@@ -5120,6 +5120,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+      "symbol": "NotificationAskDialog",
+      "bindings": [
+        {
+          "case": "consent-default-close",
+          "selector": {
+            "text": "Know when someone replies"
+          },
+          "scope": "Actual notification explanation after the usage choice closes on a returning install; Turn on notifications opens Android's prompt, which is denied.",
+          "entry_assertion": {
+            "text": "Know when someone replies"
+          },
+          "opened_by": {
+            "text": "Close"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
       "symbol": "WebLinkConfirmation",
       "bindings": [
