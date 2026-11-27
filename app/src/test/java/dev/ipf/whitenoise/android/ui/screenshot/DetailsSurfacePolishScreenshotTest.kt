@@ -129,7 +129,8 @@ class DetailsSurfacePolishScreenshotTest {
                 val button = composeRule.onNodeWithContentDescription(app.getString(action))
                 button.fetchSemanticsNode().boundsInRoot.top
             }
-        assertEquals(expected, buttonTops.groupingBy { it }.eachCount().values.toList())
+        val rows = buttonTops.groupingBy { it }.eachCount()
+        assertEquals(expected, rows.values.toList())
     }
 
     @Test
