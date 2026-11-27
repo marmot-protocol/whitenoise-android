@@ -6,8 +6,8 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.icu.text.ListFormatter
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -40,16 +40,20 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +72,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import java.util.Locale
 
 /** The set preview's Load emoji action. */
 internal const val EMOJI_SET_LOAD_TEST_TAG = "emoji_sets.load"
@@ -103,6 +108,9 @@ internal fun EmojiSetPreview(
 ) {
     BoxWithConstraints {
         val columns = gridColumns(maxWidth)
+        val rows = remember(set.emoji, columns) { set.emoji.chunked(columns) }
+        // The pulse runs only while the grid is on screen.
+        val pulse = if (images?.requested == true && rows.isNotEmpty()) rememberTilePulse() else StillPulse
         SettingsList {
             item(key = "set.header") { EmojiSetPreviewHeader(set, images) }
             // Install, Update and Load emoji all contact the image hosts, so the disclosure comes before each of them.
@@ -110,12 +118,14 @@ internal fun EmojiSetPreview(
             item(key = "set.actions") { EmojiSetActions(state, set, onInstall, onCancel, onRemove, onCheckUpdate) }
             item(key = "set.status") { EmojiSetStatus(state) }
             if (images == null || !images.requested) {
-                item(key = "set.load") {
-                    EmojiSetLoadCard(set, columns, enabled = images != null) { images?.request() }
+                if (rows.isNotEmpty()) {
+                    item(key = "set.load") {
+                        EmojiSetLoadCard(set, columns, enabled = images != null && !state.busy) { images?.request() }
+                    }
                 }
             } else {
-                set.emoji.chunked(columns).forEachIndexed { index, row ->
-                    item(key = "set.row.$index") { EmojiSetTileRow(row, columns, images) }
+                rows.forEachIndexed { index, row ->
+                    item(key = "set.row.$index") { EmojiSetTileRow(row, columns, images, pulse) }
                 }
             }
         }
@@ -134,7 +144,7 @@ private fun EmojiSetPreviewHeader(
     set: EmojiSetFfi,
     images: EmojiSetImages?,
 ) {
-    if (images != null) LaunchedEffect(images, images.requested) { images.loadCover() }
+    if (images != null) LaunchedEffect(images, images.requested, images.coverAttempt) { images.loadCover() }
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
@@ -256,7 +266,12 @@ private fun EmojiSetActions(
                     onClick = onRemove,
                     enabled = !state.busy,
                     modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
-                ) { Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(
+                        stringResource(R.string.remove),
+                        color = if (state.busy) Color.Unspecified else MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }
@@ -329,7 +344,7 @@ private fun EmojiSetLoadCard(
             }
             WhiteNoiseFilledTonalButton(
                 onClick = onLoad,
-                enabled = enabled && set.emoji.isNotEmpty(),
+                enabled = enabled,
                 modifier =
                     Modifier
                         .testTag(EMOJI_SET_LOAD_TEST_TAG)
@@ -352,7 +367,9 @@ private fun EmojiSetLoadCard(
 private fun EmojiSetHostDisclosure(set: EmojiSetFfi) {
     val hosts =
         remember(set) {
-            (listOfNotNull(set.imageUrl) + set.emoji.map { it.url }).mapNotNull { Uri.parse(it).host }.distinct()
+            (listOfNotNull(set.imageUrl) + set.emoji.map { it.url })
+                .mapNotNull { Uri.parse(it).host?.trim()?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty) }
+                .distinct()
         }
     val text =
         if (hosts.isEmpty()) {
@@ -378,12 +395,13 @@ private fun EmojiSetTileRow(
     row: List<EmojiSetEmojiFfi>,
     columns: Int,
     images: EmojiSetImages,
+    pulse: State<Float>,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         horizontalArrangement = Arrangement.spacedBy(TileGap),
     ) {
-        row.forEach { emoji -> EmojiSetTile(emoji.shortcode, images, Modifier.weight(1f)) }
+        row.forEach { emoji -> EmojiSetTile(emoji.shortcode, images, pulse, Modifier.weight(1f)) }
         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
     }
 }
@@ -396,6 +414,7 @@ private fun EmojiSetTileRow(
 private fun EmojiSetTile(
     shortcode: String,
     images: EmojiSetImages,
+    pulse: State<Float>,
     modifier: Modifier,
 ) {
     val image = images[shortcode]
@@ -412,7 +431,7 @@ private fun EmojiSetTile(
         }
     // The row's weight goes on a direct child; TooltipBox would hand it to its inner anchor.
     Box(modifier) {
-        EmojiSetTileContent(shortcode, image, label, description, canRetry) { images.retry(shortcode) }
+        EmojiSetTileContent(shortcode, image, label, description, canRetry, pulse) { images.retry(shortcode) }
     }
 }
 
@@ -425,6 +444,7 @@ private fun EmojiSetTileContent(
     label: String,
     description: String,
     canRetry: Boolean,
+    pulse: State<Float>,
     onRetry: () -> Unit,
 ) {
     TooltipBox(
@@ -441,7 +461,11 @@ private fun EmojiSetTileContent(
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .then(
                         if (canRetry) {
-                            Modifier.clickable(onClick = onRetry)
+                            Modifier.clickable(
+                                onClickLabel = stringResource(R.string.retry),
+                                role = Role.Button,
+                                onClick = onRetry,
+                            )
                         } else {
                             Modifier
                         },
@@ -456,9 +480,10 @@ private fun EmojiSetTileContent(
                     Icon(
                         painterResource(R.drawable.ic_error),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint =
+                            if (canRetry) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                EmojiSetImage.Loading, null -> PulsingBlank()
+                EmojiSetImage.Loading, null -> PulsingBlank(pulse)
             }
         }
     }
@@ -476,25 +501,30 @@ private fun BlankTile(modifier: Modifier) {
     )
 }
 
-/** The loading placeholder; it holds still when the system turns animations off. */
+/** One pulse shared by every loading tile, so they breathe together; it holds still when animations are off. */
 @Composable
-private fun PulsingBlank() {
-    val alpha =
-        if (rememberSystemAnimationsEnabled()) {
-            rememberInfiniteTransition(label = "emoji-tile")
-                .animateFloat(
-                    initialValue = 1f,
-                    targetValue = PULSE_LOW_ALPHA,
-                    animationSpec = infiniteRepeatable(tween(PULSE_MILLIS, easing = LinearEasing), RepeatMode.Reverse),
-                    label = "emoji-tile-alpha",
-                )
-        } else {
-            remember { mutableFloatStateOf(1f) }
-        }
+private fun rememberTilePulse(): State<Float> =
+    if (rememberSystemAnimationsEnabled()) {
+        rememberInfiniteTransition(label = "emoji-tile")
+            .animateFloat(
+                initialValue = 1f,
+                targetValue = PULSE_LOW_ALPHA,
+                animationSpec = infiniteRepeatable(tween(PULSE_MILLIS, easing = LinearEasing), RepeatMode.Reverse),
+                label = "emoji-tile-alpha",
+            )
+    } else {
+        remember { mutableFloatStateOf(1f) }
+    }
+
+private val StillPulse: State<Float> = mutableFloatStateOf(1f)
+
+/** The loading placeholder. The pulse is read while drawing, so it never recomposes the grid. */
+@Composable
+private fun PulsingBlank(pulse: State<Float>) {
     Box(
         Modifier
             .fillMaxSize(TILE_ART_FRACTION)
-            .alpha(alpha.value)
+            .graphicsLayer { alpha = pulse.value }
             .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     )

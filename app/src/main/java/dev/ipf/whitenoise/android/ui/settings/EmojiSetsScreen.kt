@@ -169,7 +169,13 @@ internal fun EmojiSetsContent(
         if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
-            val setImages = images?.takeIf { it.set.coordinate == set.coordinate }
+            // Images belong to one exact version and install state; a mismatch shows the unloaded preview.
+            val setImages =
+                images?.takeIf {
+                    it.set.coordinate == set.coordinate &&
+                        it.set.eventIdHex == set.eventIdHex &&
+                        it.set.installed?.eventIdHex == set.installed?.eventIdHex
+                }
             EmojiSetPreview(state, set, setImages, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
     }
@@ -300,8 +306,18 @@ internal fun EmojiSetFfi.displayTitle(): String =
         ?: identifier.takeIf { it.isReadableIdentifier() }
         ?: stringResource(R.string.emoji_sets_untitled)
 
-/** Hex digests, UUIDs and other machine-made `d` tags read as noise, so they never stand in for a title. */
-internal fun String.isReadableIdentifier(): Boolean =
-    isNotBlank() && !matches(MachineIdentifier)
+/** Hex digests, UUIDs, timestamps and random tokens read as noise, so they never stand in for a title. */
+internal fun String.isReadableIdentifier(): Boolean {
+    val id = trim()
+    if (id.isEmpty()) return false
+    val bare = id.removePrefix("0x")
+    val randomToken =
+        id.length >= RANDOM_TOKEN_LENGTH && id.none { it in WORD_SEPARATORS } &&
+            id.any(Char::isDigit) && id.any(Char::isLetter)
+    return !(bare.matches(HexLike) || id.matches(Timestamp) || randomToken)
+}
 
-private val MachineIdentifier = Regex("""[0-9a-fA-F-]{12,}""")
+private val HexLike = Regex("""[0-9a-fA-F-]{12,}""")
+private val Timestamp = Regex("""\d{8,}""")
+private const val WORD_SEPARATORS = " -_."
+private const val RANDOM_TOKEN_LENGTH = 16

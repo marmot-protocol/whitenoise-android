@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -72,6 +73,10 @@ internal class EmojiSetImages(
     var cover by mutableStateOf<EmojiSetImage?>(null)
         private set
 
+    /** Restarts the cover's effect after a cancelled load, like [attempt] for tiles. */
+    var coverAttempt by mutableIntStateOf(0)
+        private set
+
     private val images = mutableStateMapOf<String, EmojiSetImage>()
     private val attempts = mutableStateMapOf<String, Int>()
     private val readyOrder = ArrayDeque<String>()
@@ -94,8 +99,10 @@ internal class EmojiSetImages(
             images[shortcode] = image
             if (image is EmojiSetImage.Ready) retain(shortcode)
         } catch (cancelled: CancellationException) {
-            // A tile that scrolled away starts over when it returns.
+            // A blocking native read can unwind after its tile already came back and found it Loading; the new
+            // attempt restarts that tile's effect, and a tile still off screen loads when it returns.
             images.remove(shortcode)
+            attempts[shortcode] = attempt(shortcode) + 1
             throw cancelled
         }
     }
@@ -108,6 +115,7 @@ internal class EmojiSetImages(
             cover = fetch { source.cover(set) }
         } catch (cancelled: CancellationException) {
             cover = null
+            coverAttempt++
             throw cancelled
         }
     }
