@@ -41,6 +41,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@Suppress("LargeClass") // Warm-resume and process-restore contracts share one holder and local-snapshot fixture.
 class WarmResumeStateHolderTest {
     /** Verifies that account replacement cannot replay the cold-process indicator. */
     @Test
@@ -513,6 +514,8 @@ class WarmResumeStateHolderTest {
         holder.restoreConversationIfReady(controller, ACCOUNT_REF)
 
         assertSame(controller.items.single(), holder.selectedChat.value)
+        // A fresh holder's owner is unbound, so the route carries the validated saved account itself.
+        assertEquals(ACCOUNT_REF, (holder.shellNavigator.stack.last() as ShellRoute.Conversation).accountRef)
         holder.release()
         controller.onCleared()
     }

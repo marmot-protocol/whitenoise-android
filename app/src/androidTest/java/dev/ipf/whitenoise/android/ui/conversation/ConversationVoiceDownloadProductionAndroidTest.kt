@@ -367,6 +367,9 @@ class ConversationVoiceDownloadProductionAndroidTest {
             restoredHolder.restoreConversationIfReady(restoredChats, savedAccountRef)
             val restoredChat = requireNotNull(restoredHolder.selectedChat.value)
             assertEquals(savedGroupId, restoredChat.group.groupIdHex)
+            val restoredRoute = restoredHolder.shellNavigator.stack.last() as ShellRoute.Conversation
+            assertEquals(savedAccountRef, restoredRoute.accountRef)
+            assertEquals(savedGroupId, restoredRoute.groupIdHex)
             val restoredController =
                 restoredHolder.conversationController(
                     chatId = savedGroupId,
