@@ -104,6 +104,13 @@ class MediaAvNativeCorpusDeviceTest {
                 assertTrue(lastTimestampUs >= 9_900_000L)
                 assertEquals(AvStreamFrame.VideoEnd, stream.read(AvStreamProtocol.VIDEO_TRACK))
                 assertEquals(AvStreamFrame.AudioEnd, readToAudioBoundary(stream))
+
+                stream.seek(0L)
+                assertVideoTimestamp(stream, 0L)
+                assertEquals(AvStreamFrame.AudioDeferred, readToAudioBoundary(stream))
+                stream.seek(5_000_000L)
+                assertVideoTimestamp(stream, 5_000_000L)
+                assertVideoTimestamp(stream, 5_016_667L)
             }
             assertTrue(stream.awaitRetired())
         }
