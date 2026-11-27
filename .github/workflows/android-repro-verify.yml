@@ -13,7 +13,7 @@ on:
     tags:
       - '*'
   pull_request:
-    branches: [master]
+    branches: [master, develop]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/android-repro-verify.yml'

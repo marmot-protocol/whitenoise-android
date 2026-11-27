@@ -76,6 +76,13 @@ See `INT-010` in the combined manual checklist.
 
 ## Queue-gated PR feedback and full integration
 
+Android pull requests into `master` and `develop` use the same CI checks.
+The required Android CI workflow validates the Stable MarmotKit pin for
+`master` PRs, merge groups, and branch pushes even when it can reuse a
+result. The production build repeats the pin check before accessing signing
+secrets. A Stable pin uses a final `X.Y.Z` release and its matching Android
+archive. Published RC pins are eligible for validation on `develop`.
+
 The initial rollout preserves full master validation. Reduced PR work is enabled
 only when `ANDROID_CI_MODE` is exactly `merge-queue`, after native queue rules,
 external integration authorization and the existing source-owner repair loop are

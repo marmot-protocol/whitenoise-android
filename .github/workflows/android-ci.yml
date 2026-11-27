@@ -27,7 +27,7 @@ name: Android CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, develop]
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     types: [checks_requested]
@@ -148,6 +148,13 @@ jobs:
 
       # Other PR-controlled code runs only now, after the classifier and the lookup have written
       # their outputs, so it cannot alter them.
+      - name: Require Stable MarmotKit on master
+        if: >-
+          github.ref == 'refs/heads/master' ||
+          github.event.pull_request.base.ref == 'master' ||
+          github.event.merge_group.base_ref == 'refs/heads/master'
+        run: python3 -B scripts/check_marmotkit_release_channel.py
+
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
 
