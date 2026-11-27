@@ -94,15 +94,15 @@ internal fun WhiteNoiseAppState.releaseCaptureTarget(
     return voiceNotes.onTargetRemoved(account, groupIdHex)
 }
 
-/** Releases capture when an authoritative group projection first reports removal of this account or device. */
+/** Releases capture on an authoritative eviction and retries a purge while the group still reports removal. */
 internal fun WhiteNoiseAppState.releaseEvictedCapture(
     account: String?,
     previous: AppGroupRecordFfi?,
     current: AppGroupRecordFfi,
 ) {
-    if (account != null &&
-        current.selfMembership.isGroupEviction() &&
-        previous?.selfMembership?.isGroupEviction() != true
+    if (account == null || !current.selfMembership.isGroupEviction()) return
+    if (previous?.selfMembership?.isGroupEviction() != true ||
+        voiceNotes.hasPendingTargetPurge(VoiceNoteKey(account, current.groupIdHex))
     ) {
         releaseCaptureTarget(account, current.groupIdHex)
     }
@@ -135,7 +135,7 @@ internal suspend fun WhiteNoiseAppState.reconcileCaptureEviction(
 ) {
     val (account, group) = key
     if (marmotOrNull() !== runtime) return
-    if (!voiceNotes.hasCaptureOrDraft(key) && !conversationDictation.isOwnedBy(account, group)) return
+    if (!voiceNotes.needsTargetCleanup(key) && !conversationDictation.isOwnedBy(account, group)) return
 
     val epoch = runtimeGeneration
     val membership =

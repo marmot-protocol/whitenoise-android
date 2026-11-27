@@ -148,6 +148,55 @@ class VoiceNoteSessionOwnerTest {
             fixture.release()
         }
 
+    /** An accepted take cannot return after restart when the ordinary consumption marker is blocked. */
+    @Test
+    fun acceptedSendRetiresTheTakeWhenTheDiscardMarkerIsBlocked() =
+        runTest {
+            val fixture = Fixture(this)
+            val store = VoiceDraftStore(folder.root)
+            val recording = store.recordingDirectory(chat).resolve("voice-accepted.m4a").apply { writeText("audio") }
+            val draft = checkNotNull(store.commit(chat, recording, 2_000L, stopReason = null))
+            val marker = store.directory(chat).resolve("take.consumed")
+            assertTrue(marker.mkdir())
+            fixture.owner.bind(chat) { true }
+            assertEquals(draft, fixture.owner.draft(chat))
+
+            fixture.owner.consumeAfterSend(chat, draft.file)
+
+            assertNull(fixture.owner.draft(chat))
+            assertEquals(VoiceDraftRecovery.None, VoiceDraftStore(folder.root).recover(chat))
+            assertFalse(draft.file.exists())
+            fixture.release()
+        }
+
+    /** An accepted take stays hidden and keeps its cleanup identity while the draft directory is read-only. */
+    @Test
+    fun acceptedSendRetriesAfterStorageRecovers() =
+        runTest {
+            val fixture = Fixture(this)
+            val store = VoiceDraftStore(folder.root)
+            val directory = store.recordingDirectory(chat)
+            val recording = directory.resolve("voice-accepted.m4a").apply { writeText("audio") }
+            val draft = checkNotNull(store.commit(chat, recording, 2_000L, stopReason = null))
+            val recorder = fixture.owner.bind(chat) { true }
+            assertTrue(directory.setWritable(false))
+            try {
+                fixture.owner.consumeAfterSend(chat, draft.file)
+                assertNull(fixture.owner.draft(chat))
+                assertEquals(VoiceNoteActivity.None, fixture.owner.activity(chat))
+                assertTrue(draft.file.isFile)
+                fixture.owner.unbind(chat, recorder)
+            } finally {
+                assertTrue(directory.setWritable(true))
+            }
+
+            fixture.owner.bind(chat) { true }
+
+            assertEquals(VoiceDraftRecovery.None, VoiceDraftStore(folder.root).recover(chat))
+            assertFalse(draft.file.exists())
+            fixture.release()
+        }
+
     /** Removing a chat revokes the old recorder, and account teardown purges its remaining drafts. */
     @Test
     fun signOutAndLeavingTheChatEndTheTakeAndPurgeItsDrafts() =

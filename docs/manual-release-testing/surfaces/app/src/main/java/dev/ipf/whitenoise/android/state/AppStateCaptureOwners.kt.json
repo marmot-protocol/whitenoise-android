@@ -60,6 +60,14 @@
         "test_ids": [
           "MED-061"
         ]
+      },
+      {
+        "surface": "A still-evicted chat retries a failed voice draft purge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "voiceNotes.hasPendingTargetPurge",
+        "test_ids": [
+          "MED-061"
+        ]
       }
     ]
   },

@@ -93,7 +93,7 @@ internal class VoiceDraftStore(
         val dir = directory(key)
         val unfinished = dir.listFiles { file -> file.name.startsWith(RECORDING_PREFIX) }.orEmpty()
         unfinished.forEach { it.delete() }
-        if (File(dir, CONSUMED).isFile) {
+        if (consumptionMarkers(dir).any(File::isFile)) {
             finishConsumption(dir)
             return VoiceDraftRecovery.None
         }
@@ -108,17 +108,33 @@ internal class VoiceDraftStore(
     }
 
     /** Deletes exactly [file] when it is this chat's draft, so a stale owner can never delete a newer take. */
-    @Suppress("ReturnCount") // Reject stale drafts and failed consumption before cleanup.
     fun delete(
         key: VoiceNoteKey,
         file: File,
+    ): Boolean = consume(key, file, accepted = false)
+
+    /** Retires a queued take, using its audio as the marker if creating the discard marker fails. */
+    fun consumeAccepted(
+        key: VoiceNoteKey,
+        file: File,
+    ): Boolean = consume(key, file, accepted = true)
+
+    /** Commits consumption of the selected take before letting cleanup touch either draft index. */
+    @Suppress("ReturnCount") // Reject stale drafts and failed consumption before cleanup.
+    private fun consume(
+        key: VoiceNoteKey,
+        file: File,
+        accepted: Boolean,
     ): Boolean {
         val dir = directory(key)
         val pending = readMetadata(dir, PENDING_METADATA)?.file
         val current = pending ?: readMetadata(dir)?.file
         if (current != file) return false
         val marker = File(dir, CONSUMED)
-        if (!runCatching { marker.createNewFile() || marker.isFile }.getOrDefault(false)) return false
+        val marked = runCatching { marker.createNewFile() || marker.isFile }.getOrDefault(false)
+        if (!marked && !(accepted && runCatching { file.renameTo(File(dir, ACCEPTED)) }.getOrDefault(false))) {
+            return false
+        }
         finishConsumption(dir)
         return true
     }
@@ -133,7 +149,7 @@ internal class VoiceDraftStore(
             .orEmpty()
             .flatMap { account ->
                 account.listFiles().orEmpty().filter { dir ->
-                    !File(dir, CONSUMED).isFile &&
+                    consumptionMarkers(dir).none(File::isFile) &&
                         (File(dir, METADATA).isFile || readMetadata(dir, PENDING_METADATA) != null)
                 }
             }.mapTo(HashSet()) { it.name }
@@ -146,16 +162,20 @@ internal class VoiceDraftStore(
         accountDirectory(accountRef).deleteRecursively()
     }
 
-    // The marker commits consumption before cleanup touches either index. Leave it
-    // in place if cleanup fails, so the discarded indexes cannot restore a draft.
+    /** Leaves the consumption markers in place until both indexes and any listed audio have been removed. */
     private fun finishConsumption(dir: File): Boolean {
-        val marker = File(dir, CONSUMED)
-        if (!marker.isFile) return !marker.exists()
+        val markers = consumptionMarkers(dir)
+        if (markers.none(File::isFile)) return markers.none(File::exists)
         val indexes = listOf(File(dir, METADATA), File(dir, PENDING_METADATA))
         val files = indexes + draftFiles(dir)
         files.forEach { it.delete() }
-        return files.none { it.exists() } && marker.delete()
+        val filesRemoved = files.none(File::exists)
+        if (filesRemoved) markers.forEach { it.delete() }
+        return filesRemoved && markers.none(File::exists)
     }
+
+    /** Both markers make this directory's current and pending draft indexes ineligible for recovery. */
+    private fun consumptionMarkers(dir: File): List<File> = listOf(File(dir, CONSUMED), File(dir, ACCEPTED))
 
     private fun draftFiles(dir: File): List<File> =
         dir
@@ -210,6 +230,7 @@ internal class VoiceDraftStore(
 
     companion object {
         private const val CONSUMED = "take.consumed"
+        private const val ACCEPTED = "take.accepted"
         private const val METADATA = "take.json"
         private const val PENDING_METADATA = "take.pending.json"
         private const val TAKE_PREFIX = "take-"

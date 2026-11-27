@@ -788,6 +788,34 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A detached eviction retries a rejected filesystem purge on the next authoritative readback. */
+    @Test
+    fun failedEvictionPurgeIsRetried() =
+        runBlocking {
+            val take = saveVoiceDraft(GROUP_ID)
+            val directory = checkNotNull(take.parentFile)
+            val fixture =
+                fixture(
+                    attachConversationController = false,
+                    groupRecord = group().copy(selfMembership = SelfMembershipFfi.REMOVED),
+                )
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val runtime = appState.marmot()
+            assertTrue(directory.setWritable(false))
+            try {
+                appState.reconcileCaptureEviction(key, runtime)
+                assertTrue(take.isFile)
+                assertNull(appState.voiceNotes.draft(key))
+            } finally {
+                assertTrue(directory.setWritable(true))
+            }
+
+            appState.reconcileCaptureEviction(key, runtime)
+
+            assertFalse(directory.exists())
+        }
+
     /** Seeds a finished take using the actual private voice draft format. */
     private fun saveVoiceDraft(
         groupIdHex: String,
