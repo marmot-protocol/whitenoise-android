@@ -51,7 +51,10 @@ internal data class PreparedGroupAvatarPixels(
     /** A revision refresh may reuse known pixels, but a removed or different selection never can. */
     fun retainedFor(asset: AvatarAssetFfi?): ImageBitmap? = retainedFrame(asset)?.image
 
-    private fun exactFrame(asset: AvatarAssetFfi?): PreparedAvatarImage? = retainedFrame(asset)?.takeIf { it.asset.contentRevision == asset?.contentRevision }
+    private fun exactFrame(asset: AvatarAssetFfi?): PreparedAvatarImage? {
+        val frame = retainedFrame(asset)
+        return frame?.takeIf { it.asset.contentRevision == asset?.contentRevision }
+    }
 
     private fun retainedFrame(asset: AvatarAssetFfi?): PreparedAvatarImage? =
         asset?.takeIf { it.isRenderable() }?.let { current ->
