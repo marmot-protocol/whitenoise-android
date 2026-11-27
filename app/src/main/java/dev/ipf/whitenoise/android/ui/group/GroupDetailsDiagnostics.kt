@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
@@ -147,7 +148,7 @@ private fun PushTokenDebugRows(
     yesNo: (Boolean) -> String,
 ) {
     val memberName = appState.chatMemberTitle(token.memberIdHex)
-    Text(
+    EmojiLabel(
         memberName,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,

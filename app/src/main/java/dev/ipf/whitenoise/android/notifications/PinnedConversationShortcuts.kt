@@ -268,7 +268,7 @@ internal class PinnedConversationShortcuts(
         val privacy = NotificationPreviewPreferences.capture(context)
         val label =
             if (privacy.allowed) {
-                title.trim().ifBlank { context.getString(R.string.app_name) }
+                context.emojiPlainText(title.trim()).ifBlank { context.getString(R.string.app_name) }
             } else {
                 context.getString(R.string.app_name)
             }

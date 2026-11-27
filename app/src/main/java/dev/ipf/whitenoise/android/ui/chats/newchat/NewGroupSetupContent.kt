@@ -230,6 +230,7 @@ private fun GroupSetupNameField(
         label = { Text(stringResource(R.string.group_name)) },
         lineLimits = TextFieldLineLimits.SingleLine,
         keyboardOptions = KeyboardOptions(imeAction = if (customize) ImeAction.Next else ImeAction.Done),
+        emojiArtwork = true,
         leadingIcon = {
             TextEntryEmojiAction(
                 pickerOpen = state.emojiOpen,

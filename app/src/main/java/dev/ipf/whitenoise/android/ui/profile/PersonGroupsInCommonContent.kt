@@ -36,11 +36,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
+import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -133,7 +135,7 @@ internal fun PersonGroupsInCommonContent(
                                                 ) {
                                                     Icon(
                                                         painterResource(R.drawable.ic_more_vert),
-                                                        contentDescription = removeLabel(group),
+                                                        contentDescription = emojiPlainText(removeLabel(group)),
                                                     )
                                                 }
                                                 val menuScrollState = rememberScrollState()
@@ -148,7 +150,7 @@ internal fun PersonGroupsInCommonContent(
                                                         ),
                                                 ) { surface ->
                                                     DropdownMenuItem(
-                                                        text = { Text(removeLabel(group)) },
+                                                        text = { EmojiLabel(removeLabel(group)) },
                                                         onClick = {
                                                             surface.close {
                                                                 expanded = false

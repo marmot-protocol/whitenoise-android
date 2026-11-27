@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
@@ -48,9 +49,15 @@ internal fun SettingsRowTitle(
     title: String,
     editable: Boolean,
     destructive: Boolean = false,
+    titleCanContainEmoji: Boolean = true,
 ) {
     val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-    Text(title, color = color.dimmedUnless(editable))
+    val textColor = color.dimmedUnless(editable)
+    if (titleCanContainEmoji) {
+        EmojiLabel(title, color = textColor)
+    } else {
+        Text(title, color = textColor)
+    }
 }
 
 /** Supporting values wrap onto as many lines as they need instead of truncating. */
@@ -60,7 +67,7 @@ internal fun SettingsRowSupportingText(
     text: String,
     editable: Boolean,
 ) {
-    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable))
+    EmojiLabel(text, color = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable))
 }
 
 /** A busy row shows the existing Material indicator in place of its decorative trailing control. */

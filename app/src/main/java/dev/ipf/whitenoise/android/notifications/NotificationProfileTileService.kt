@@ -36,7 +36,15 @@ class NotificationProfileTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         listening?.cancel()
-        listening = CoroutineScope(Dispatchers.Main.immediate).launch { store.state.collect { updateTile() } }
+        listening =
+            CoroutineScope(Dispatchers.Main.immediate).launch {
+                store.state.collect { profiles ->
+                    if (!notificationProfileTileAppLockRequired(this@NotificationProfileTileService)) {
+                        prepareEmojiLabels(profiles.profiles.map { it.label })
+                    }
+                    updateTile()
+                }
+            }
     }
 
     override fun onStopListening() {
@@ -103,7 +111,10 @@ class NotificationProfileTileService : TileService() {
             AlertDialog
                 .Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(R.string.notification_profiles_title)
-                .setSingleChoiceItems(choices.labels.toTypedArray(), choices.checked) { shown, which ->
+                .setSingleChoiceItems(
+                    choices.labels.map { emojiPlainText(it) }.toTypedArray(),
+                    choices.checked,
+                ) { shown, which ->
                     shown.dismiss()
                     val profileId = choices.profileIds.getOrNull(which)
                     write {
@@ -154,7 +165,8 @@ class NotificationProfileTileService : TileService() {
                 when (model) {
                     NotificationProfileTileModel.Unavailable -> null
                     NotificationProfileTileModel.Off -> getString(R.string.notification_profiles_value_off)
-                    is NotificationProfileTileModel.On -> model.label ?: getString(R.string.notification_profile_on)
+                    is NotificationProfileTileModel.On ->
+                        model.label?.let { emojiPlainText(it) } ?: getString(R.string.notification_profile_on)
                 }
         }
         tile.updateTile()

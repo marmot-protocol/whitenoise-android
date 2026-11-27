@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
@@ -32,6 +34,7 @@ import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_PROFILES
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickSheet
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -264,7 +267,11 @@ internal fun NotificationProfileLeading(
         SettingsLeadingIcon(fallback, tint = tint)
     } else {
         Box(Modifier.size(SettingsRowDefaults.LeadingIconSize), contentAlignment = Alignment.Center) {
-            Text(emoji, fontSize = ProfileEmojiSize, maxLines = 1)
+            EmojiLabel(
+                emoji,
+                style = LocalTextStyle.current.merge(TextStyle(fontSize = ProfileEmojiSize)),
+                maxLines = 1,
+            )
         }
     }
 }
