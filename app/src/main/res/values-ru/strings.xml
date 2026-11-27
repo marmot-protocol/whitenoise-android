@@ -2975,4 +2975,8 @@
     <string name="dictation_transcribe_voice_messages_title">Автоматически расшифровывать голосовые сообщения</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Показывает расшифровки загруженных голосовых сообщений в чате. Требуется Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Эта ссылка не поддерживается.</string>
+    <string name="private_key_reminder_title">Сохраните закрытый ключ</string>
+    <string name="private_key_reminder_body">Если вы потеряете этот телефон, сохранить свой профиль и контакты можно будет только с помощью ключа.</string>
+    <string name="private_key_reminder_save">Сохранить ключ</string>
+    <string name="private_key_reminder_not_now">Не сейчас</string>
 </resources>

@@ -203,6 +203,7 @@ internal fun ChatsScreen(
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
     onFirstRunHelp: ((Boolean) -> Unit)? = null,
+    onSavePrivateKey: (() -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -2433,6 +2434,7 @@ internal fun ChatsScreen(
                 },
                 notice = {
                     ChatListPersistentNotices(appState, historyNotices, showChatListNotices, sourceList.isNotEmpty())
+                    PrivateKeyReminder(appState, controller, showChatListNotices, onSavePrivateKey)
                 },
             ) {
                 val unreadOwnerAvailable =

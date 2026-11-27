@@ -44,6 +44,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.PrivateKeyReminderStage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.reachSensitiveClipDeadline
 import dev.ipf.whitenoise.android.ui.common.useTestWorkManager
@@ -412,9 +413,13 @@ class AccountKeysExportDeliveryTest {
     @Test
     fun encryptedPreviewCopiesExactSensitiveValueAndHidesWithoutPickingAFile() {
         val fixture = render()
+        fixture.recordSignUp()
         openBackupPreview()
         assertEquals(0, fixture.picker.launchCount)
+        // Only showing the backup saves nothing, so the chat list keeps reminding (#4279).
+        assertEquals(PrivateKeyReminderStage.Pending, fixture.reminderStage())
         dialogButton(R.string.copy).performClick()
+        composeRule.runOnIdle { assertEquals(PrivateKeyReminderStage.Saved, fixture.reminderStage()) }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         composeRule.runOnIdle {
             val clip = requireNotNull(clipboard.primaryClip)
@@ -425,6 +430,28 @@ class AccountKeysExportDeliveryTest {
         dialogButton(R.string.hide).performClick()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** Copying the plain private key retires the chat list's reminder to save it (#4279). */
+    @Test
+    fun copyingThePrivateKeyRetiresTheSaveKeyReminder() {
+        val fixture = render()
+        fixture.recordSignUp()
+        composeRule
+            .onNodeWithText(context.getString(R.string.copy_private_key))
+            .performScrollTo()
+            .performClick()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.reminderStage() == PrivateKeyReminderStage.Saved }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle {
+            assertEquals(
+                RAW_KEY,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
+        }
     }
 
     /** The copied backup outlives the closed preview only until the clipboard deadline. */
@@ -680,6 +707,7 @@ class AccountKeysExportDeliveryTest {
         blockedBy: Teardown?,
     ) {
         val fixture = render()
+        fixture.recordSignUp()
         val uri = Uri.parse("content://key-export-test/authorized-key")
         val bytes = ByteArrayOutputStream()
         val opens = AtomicInteger()
@@ -713,6 +741,9 @@ class AccountKeysExportDeliveryTest {
         }
         assertEquals(if (encrypted) 1 else 0, fixture.native.encryptedCalls.get())
         assertEquals(if (encrypted) 0 else 1, fixture.native.rawCalls.get())
+        // A written key file, plain or encrypted, retires the save-key reminder; a blocked one leaves it (#4279).
+        val stage = if (blockedBy == null) PrivateKeyReminderStage.Saved else PrivateKeyReminderStage.Pending
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.reminderStage() == stage }
     }
 
     /** Idles the main looper while waiting, because the save is launched there before it moves to IO. */
@@ -821,6 +852,13 @@ class AccountKeysExportDeliveryTest {
         val native: NativeExports,
     ) {
         lateinit var exportState: KeyFileExport
+
+        private val accountIdHex get() = checkNotNull(appState.activeAccount).accountIdHex
+
+        /** Marks the active account as created by Sign up on this device, as the chat list's reminder requires. */
+        fun recordSignUp() = appState.privateKeyReminders.recordSignUp(accountIdHex)
+
+        fun reminderStage() = appState.privateKeyReminders.stage(accountIdHex)
     }
 
     private enum class Teardown { SignOut, Wipe }

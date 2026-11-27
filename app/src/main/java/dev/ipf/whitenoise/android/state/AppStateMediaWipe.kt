@@ -83,13 +83,14 @@ internal suspend fun WhiteNoiseAppState.wipeDecryptedMediaFromDisk(
         reasons.takeIf { it.isNotEmpty() }?.let { WipeFailureItem(null, it.joinToString("\n")) }
     }
 
-/** Drops the removed profile’s preview consent and releases its private share and editor leases. */
+/** Drops the removed profile’s preview consent and key reminder, and releases its private share and editor leases. */
 internal suspend fun WhiteNoiseAppState.purgeWipedAccountSources(
     wipedRef: String,
     wipedShareAccount: String?,
 ) {
     wipedShareAccount?.let { id ->
         publicJpegPreviewPreferences.removeAccount(id)
+        privateKeyReminders.forget(id)
         publicJpegPreviewLoader.clearPixels(id)
     }
     withContext(NonCancellable + Dispatchers.IO) {

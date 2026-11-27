@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Chat list: R.string.private_key_reminder_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "R.string.private_key_reminder_body",
+        "test_ids": [
+          "CHL-042"
+        ]
+      },
+      {
+        "surface": "Chat list: R.string.private_key_reminder_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "R.string.private_key_reminder_not_now",
+        "test_ids": [
+          "CHL-042"
+        ]
+      },
+      {
+        "surface": "Chat list: R.string.private_key_reminder_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "R.string.private_key_reminder_save",
+        "test_ids": [
+          "CHL-042"
+        ]
+      },
+      {
+        "surface": "Chat list: R.string.private_key_reminder_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "R.string.private_key_reminder_title",
+        "test_ids": [
+          "CHL-042"
+        ]
+      },
+      {
+        "surface": "PrivateKeyReminder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "fun PrivateKeyReminder(",
+        "test_ids": [
+          "CHL-042"
+        ]
+      },
+      {
+        "surface": "PrivateKeyReminderBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+        "anchor": "fun PrivateKeyReminderBanner(",
+        "test_ids": [
+          "CHL-042"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
