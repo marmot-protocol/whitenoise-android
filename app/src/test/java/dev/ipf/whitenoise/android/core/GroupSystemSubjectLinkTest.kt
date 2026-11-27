@@ -235,5 +235,4 @@ class GroupSystemSubjectLinkTest {
 }
 
 /** The link for [role], or null when that participant's name is plain text. */
-private fun GroupSystemLinkedSummary.link(role: GroupSystemLinkRole): GroupSystemProfileLink? =
-    links.firstOrNull { it.role == role }
+private fun GroupSystemLinkedSummary.link(role: GroupSystemLinkRole) = links.firstOrNull { it.role == role }

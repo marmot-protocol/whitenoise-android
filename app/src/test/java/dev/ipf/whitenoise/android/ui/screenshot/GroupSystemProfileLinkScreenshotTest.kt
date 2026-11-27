@@ -202,7 +202,7 @@ class GroupSystemProfileLinkScreenshotTest {
     }
 
     /** The link annotations on [node]'s text, in order. */
-    private fun linkRanges(node: SemanticsNodeInteraction): List<AnnotatedString.Range<LinkAnnotation>> {
+    private fun linkRanges(node: SemanticsNodeInteraction): List<LinkRange> {
         val text =
             node
                 .fetchSemanticsNode()
@@ -215,12 +215,11 @@ class GroupSystemProfileLinkScreenshotTest {
     /** The tags of [node]'s links, in order. */
     private fun linkTags(node: SemanticsNodeInteraction): List<String?> = linkRanges(node).map(::linkTag)
 
-    private fun linkTag(link: AnnotatedString.Range<LinkAnnotation>) = (link.item as? LinkAnnotation.Clickable)?.tag
+    private fun linkTag(link: LinkRange) = (link.item as? LinkAnnotation.Clickable)?.tag
 
-    private fun isActorLink(link: AnnotatedString.Range<LinkAnnotation>) = linkTag(link) == GROUP_SYSTEM_ACTOR_LINK_TAG
+    private fun isActorLink(link: LinkRange) = linkTag(link) == GROUP_SYSTEM_ACTOR_LINK_TAG
 
-    private fun isSubjectLink(link: AnnotatedString.Range<LinkAnnotation>): Boolean =
-        linkTag(link) == GROUP_SYSTEM_SUBJECT_LINK_TAG
+    private fun isSubjectLink(link: LinkRange) = linkTag(link) == GROUP_SYSTEM_SUBJECT_LINK_TAG
 
     /** One linked row whose taps are discarded, for the rendering baselines. */
     @Composable
@@ -330,6 +329,8 @@ class GroupSystemProfileLinkScreenshotTest {
         val SUBJECT_ID = "dd".repeat(32)
     }
 }
+
+private typealias LinkRange = AnnotatedString.Range<LinkAnnotation>
 
 /** Draft persistence that stores nothing. */
 private class ProfileLinkDraftPersistence : DraftPersistence {
