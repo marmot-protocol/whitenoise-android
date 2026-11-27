@@ -31,7 +31,6 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -1817,16 +1816,14 @@ class ConversationController(
     )
 
     /**
-     * Synchronous half of a media send: validates the album, allocates a
-     * temp id, retains the bytes for retry, inserts the optimistic bubble,
-     * and republishes the timeline so the bubble appears immediately.
-     * Returns null when the send can't proceed (no account, can't send,
-     * empty, oversize, or a reply with no event id yet). Caller pairs each non-null result with a
-     * matching [uploadQueued] call to drive the FFI work. [canQueue] rechecks a caller's
-     * presentation owner after Markdown preparation, before publishing any optimistic state.
+     * Validates the album, retains the bytes for retry, and publishes the optimistic row.
+     * A non-null result must be passed to [uploadQueued] to drive the FFI work.
+     * [canQueue] rechecks the caller's live owner after each suspension.
+     * [beforeQueue] commits any required source retirement at the last synchronous admission point.
      */
     @Suppress(
         "LongMethod",
+        "LongParameterList",
         "ReturnCount",
         "TooGenericExceptionCaught",
     ) // Admission guards precede the single optimistic publication and cancel timing on any preparation failure.
@@ -1837,6 +1834,7 @@ class ConversationController(
         outboundVisibleStartedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
         replyTarget: String? = replyingTo?.messageIdHex,
         replyVersion: Long = replySelectionVersion,
+        beforeQueue: () -> Boolean = { true },
     ): QueuedAttachmentSend? {
         if (!canQueue()) return null
         val account =
@@ -1889,9 +1887,9 @@ class ConversationController(
             outboundVisibleAttempt.cancel()
             return null
         }
-        val replyRevision = target?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
-        val replyStagingFailed = target != null && replyRevision == null
-        if (replyStagingFailed || !canQueueMediaForAccount(account, canQueue)) {
+        val reply = target?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
+        val replyStagingFailed = target != null && reply == null
+        if (replyStagingFailed || !commitQueuedMediaSource(account, reply, canQueue, beforeQueue)) {
             outboundVisibleAttempt.cancel()
             if (replyStagingFailed) appState.present(R.string.media_reply_draft_conflict)
             return null
@@ -1900,7 +1898,7 @@ class ConversationController(
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(
             key,
-            RetainedMediaUpload(attachments, trimmedCaption, target, replyRevision, replyVersion),
+            RetainedMediaUpload(attachments, trimmedCaption, target, reply?.revision, replyVersion),
         )
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots
@@ -2522,12 +2520,12 @@ class ConversationController(
                     }
                 if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
-                // Authoritative local self-leave: record it before the
+                // Latch the local read-only state before the
                 // synchronous snapshot drop so any subsequent
                 // authoritative roster round-trip that still
                 // sees the engine pre-eviction cannot re-add self and re-enable
                 // the composer / restore the full member count (issue #787).
-                recordSelfLeft()
+                recordSelfLeft(settledDeparture = false)
                 // Drop self from the cached member snapshot synchronously so
                 // re-opening the just-left group seeds a roster without self
                 // and renders the disabled notice immediately, instead of
@@ -3409,18 +3407,6 @@ class ConversationController(
         if (ownsInviteAcceptanceResult && inviteAcceptanceResolutionPending) {
             withMutationLockResult(Unit) { if (inviteAcceptanceResolutionPending) refreshMembers() }
         }
-    }
-
-    /**
-     * Latch the authoritative local self-leave marker (issue #787). Set on a
-     * confirmed self-leave (leaveGroup success) or engine eviction
-     * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
-     * roster application so a transient round-trip can't restore self
-     * before the engine eviction is observed locally. A removed device
-     * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
-     */
-    internal fun recordSelfLeft() {
-        selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
     /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */

@@ -14,9 +14,11 @@ import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -216,24 +218,30 @@ class FcmAutoInitDeliveryModeHandoffTest {
     @Test
     fun throwingFinishDrainStillEndsTheChange() =
         runBlocking {
+            BackgroundConnectionPreferences.setEnabledDurably(context, false)
             val platform = RecordingNativePushFallbackPlatform(context)
             val failConfig = AtomicBoolean(false)
+            val failedReads = AtomicInteger()
             val fixture =
                 fixture(platform, activeNative = true) {
-                    check(!failConfig.get()) { "push config unavailable" }
+                    if (failConfig.get()) {
+                        failedReads.incrementAndGet()
+                        error("push config unavailable")
+                    }
                     CONFIG
                 }
             try {
                 fixture.bootstrap()
                 val delivery = fixture.appState.notificationDelivery
-                PushTokenStore.create(context).recordPendingNativePushRegistrationSync()
+                val store = PushTokenStore.create(context)
+                store.recordPendingNativePushRegistrationSync()
                 failConfig.set(true)
 
-                fixture.runWithMainLooperPumping {
-                    runCatching { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
-                }
+                assertTrue("the service acknowledged the Local selection", selectLocal(fixture, platform))
 
+                assertTrue("the registration drain reached the failing config read", failedReads.get() > 0)
                 assertEquals("the change must end", 0, delivery.activeDeliveryModeTransactions.get())
+                assertTrue("the throwing drain keeps its retry", store.nativePushRegistrationSyncPending())
             } finally {
                 failConfig.set(false)
                 fixture.close()
@@ -250,22 +258,33 @@ class FcmAutoInitDeliveryModeHandoffTest {
                 fixture.bootstrap()
                 val delivery = fixture.appState.notificationDelivery
 
-                fixture.runWithMainLooperPumping {
-                    fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
-                }
+                val pushSelected =
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                    }
+                assertTrue(pushSelected)
                 assertEquals(0, delivery.activeDeliveryModeTransactions.get())
-                fixture.runWithMainLooperPumping {
-                    fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local)
-                }
+                assertTrue(selectLocal(fixture, platform))
                 assertEquals(0, delivery.activeDeliveryModeTransactions.get())
 
-                fixture.runWithMainLooperPumping {
-                    fixture.replaceNotificationSettings(NotificationSettingsFfi(ACCOUNT_A, "$ACCOUNT_A-id", true, true))
-                    delivery.reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes = true)
-                    withTimeout(10_000L) { while (delivery.notificationDeliveryModeBusy) yield() }
-                }
+                val previousStarts = platform.starts.size
+                fixture.replaceNotificationSettings(NotificationSettingsFfi(ACCOUNT_A, "$ACCOUNT_A-id", true, true))
+                val reconciled =
+                    fixture.runWithMainLooperPumping {
+                        delivery.reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes = true)
+                    }
+                assertTrue("activation handed off the Local cutover", reconciled)
+                val acknowledged = acknowledgeLocalStart(fixture, platform, previousStarts)
+                val openTransactions = delivery.activeDeliveryModeTransactions
 
-                assertEquals(0, delivery.activeDeliveryModeTransactions.get())
+                fixture.runWithMainLooperPumping {
+                    withTimeout(10_000L) {
+                        acknowledged.join()
+                        while (delivery.notificationDeliveryModeBusy || openTransactions.get() != 0) yield()
+                    }
+                }
+                assertTrue(BackgroundConnectionPreferences.isEnabled(context))
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
             } finally {
                 fixture.close()
             }
@@ -528,13 +547,7 @@ class FcmAutoInitDeliveryModeHandoffTest {
                 fixture.replacePushTokenStore(markerRejectingStore())
                 platform.failAutoInitWrites = true
 
-                val result = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
-                fixture.runWithMainLooperPumping { withTimeout(10_000L) { platform.awaitFirstStart() } }
-                val acknowledgement =
-                    fixture.beginNativePushFallbackRuntimeAcknowledgement(platform.starts.last())
-                        ?: error("Local service acknowledgement was not accepted")
-
-                val selected = fixture.runWithMainLooperPumping { result.await().also { acknowledgement.join() } }
+                val selected = selectLocal(fixture, platform)
                 assertFalse("a cutover with auto-init unsettled and no retry must not report success", selected)
                 assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
                 assertTrue("Local delivery stays established", BackgroundConnectionPreferences.isEnabled(context))
@@ -658,6 +671,38 @@ class FcmAutoInitDeliveryModeHandoffTest {
                 }
             },
         )
+    }
+
+    /** Completes the Local cutover by acknowledging the service start requested by this selection. */
+    private suspend fun selectLocal(
+        fixture: NotificationBootstrapTestFixture,
+        platform: RecordingNativePushFallbackPlatform,
+    ): Boolean =
+        coroutineScope {
+            val previousStarts = platform.starts.size
+            val selection = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
+            try {
+                val acknowledged = acknowledgeLocalStart(fixture, platform, previousStarts)
+                fixture.runWithMainLooperPumping { selection.await().also { acknowledged.join() } }
+            } finally {
+                selection.cancel()
+            }
+        }
+
+    /** Delivers the acknowledgement for the start following the caller's captured position. */
+    private suspend fun acknowledgeLocalStart(
+        fixture: NotificationBootstrapTestFixture,
+        platform: RecordingNativePushFallbackPlatform,
+        previousStarts: Int,
+    ): Job {
+        val generation =
+            fixture.runWithMainLooperPumping {
+                withTimeout(10_000L) {
+                    while (platform.starts.size == previousStarts) yield()
+                    platform.starts[previousStarts]
+                }
+            }
+        return checkNotNull(fixture.beginNativePushFallbackRuntimeAcknowledgement(generation))
     }
 
     /** Builds two local-signing accounts behind [platform], the active one on native push when [activeNative]. */

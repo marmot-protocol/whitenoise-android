@@ -3,6 +3,7 @@
     <string name="voice_recording_stopped_announcement">Grabación detenida</string>
     <string name="voice_message_seek">Posición de reproducción</string>
     <string name="video_failed">No se pudo cargar el vídeo</string>
+    <string name="video_seek_failed">No se pudo saltar a este punto</string>
     <string name="conversation_new_message_from">Nuevo mensaje de %1$s</string>
     <plurals name="conversation_new_messages">
         <item quantity="one">%1$d mensaje nuevo</item>

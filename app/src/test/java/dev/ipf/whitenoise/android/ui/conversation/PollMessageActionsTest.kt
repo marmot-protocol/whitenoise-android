@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -59,7 +60,7 @@ private const val UNTOUCHED_CLIPBOARD = "untouched"
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
-class PollMessageActionsTest : PollMessageTestFixtures() {
+class PollMessageActionsTest : PollMessageTestFixtures(Dispatchers.Unconfined) {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
     private val menuOpen = mutableStateOf(false)
     private val mounted = mutableStateOf(true)

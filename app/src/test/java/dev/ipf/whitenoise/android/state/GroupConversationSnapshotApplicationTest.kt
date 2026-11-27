@@ -63,6 +63,9 @@ class GroupConversationSnapshotApplicationTest {
             val nativeCalls = mutableListOf<Pair<Any?, Any?>>()
             controller.installCancelLeaveStub { account, group -> nativeCalls += account to group }
             try {
+                val transcripts = controller.appState.receivedVoiceTranscripts
+                val groupId = blocked.details.group.groupIdHex
+                val originalEpoch = transcripts.groupEpoch(ACCOUNT, groupId)
                 assertTrue(controller.refreshManagementState())
                 assertTrue(controller.canCancelBlockedLeave)
                 assertFalse(controller.canSendMessages)
@@ -77,10 +80,31 @@ class GroupConversationSnapshotApplicationTest {
                 assertTrue(controller.isSelfMember)
                 assertTrue(controller.canSendMessages)
                 assertFalse(controller.showsBlockedLeave)
+                assertEquals(originalEpoch, transcripts.groupEpoch(ACCOUNT, groupId))
             } finally {
                 controller.onCleared()
             }
         }
+
+    /** A provisional LEFT keeps cached transcripts until the group record settles the departure. */
+    @Test
+    fun settledGroupDepartureRevokesTheTranscriptScopeOnce() {
+        val joined = snapshot("Room", admin = true)
+        val pending = joined.withBlockedLeave().details.group
+        val settled = pending.copy(leaveRequestPending = false, leaveBlocked = false)
+        val controller = controller(initialGroup = joined.details.group) { joined }
+        try {
+            val transcripts = controller.appState.receivedVoiceTranscripts
+            val originalEpoch = transcripts.groupEpoch(ACCOUNT, pending.groupIdHex)
+            controller.applyGroupStateForTest(pending)
+            assertEquals(originalEpoch, transcripts.groupEpoch(ACCOUNT, pending.groupIdHex))
+            controller.applyGroupStateForTest(settled)
+            controller.applyGroupStateForTest(settled)
+            assertEquals(originalEpoch + 1, transcripts.groupEpoch(ACCOUNT, pending.groupIdHex))
+        } finally {
+            controller.onCleared()
+        }
+    }
 
     /** A cancellation can commit even when MDK fails to write its membership projection. */
     @Test
@@ -111,8 +135,12 @@ class GroupConversationSnapshotApplicationTest {
             val joined = snapshot("Stayed", admin = true)
             val controller = controller(initialGroup = joined.withBlockedLeave().details.group) { joined }
             try {
+                val transcripts = controller.appState.receivedVoiceTranscripts
+                val groupId = joined.details.group.groupIdHex
+                val originalEpoch = transcripts.groupEpoch(ACCOUNT, groupId)
                 controller.applyGroupStateForTest(joined.details.group)
                 assertFalse(controller.canSendMessages)
+                assertEquals(originalEpoch, transcripts.groupEpoch(ACCOUNT, groupId))
                 controller.refreshMembersAfterGroupState()
                 assertEquals(SelfMembershipFfi.MEMBER, controller.group.selfMembership)
                 assertTrue(controller.canSendMessages)

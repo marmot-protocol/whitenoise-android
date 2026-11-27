@@ -66,6 +66,82 @@ class ReceivedVoiceTranscriptsTest {
         assertEquals(complete, current.result("attachment"))
     }
 
+    @Test
+    fun removingAChatKeepsOtherResultsAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val removed = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "other")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+        assertNull(other.result("attachment"))
+        other.storeResult("attachment", complete)
+
+        transcripts.forgetGroup("alice", "removed")
+        removed.storeResult("attachment", complete)
+        removed.setShown("message", true)
+
+        assertNull(removed.result("attachment"))
+        assertFalse(removed.shown("message"))
+        val reopened = VoiceTranscriptionScope(transcripts, "alice", automatic = false, group = "removed")
+        assertNull(reopened.result("attachment"))
+        assertFalse(reopened.shown("message"))
+        assertEquals(complete, other.result("attachment"))
+    }
+
+    @Test
+    fun evictingOneGroupLeavesOtherRecognitionInFlight() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val departing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "departing")
+        val other = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "playing")
+        val otherAccount = VoiceTranscriptionScope(transcripts, "bob", automatic = true, group = "departing")
+
+        transcripts.forgetGroup("alice", "departing")
+        departing.storeResult("recording", complete)
+        other.storeResult("recording", complete)
+        otherAccount.storeResult("recording", complete)
+
+        assertFalse(departing.active)
+        assertNull(departing.result("recording"))
+        assertTrue(other.active)
+        assertEquals(complete, other.result("recording"))
+        assertTrue(otherAccount.active)
+        assertEquals(complete, otherAccount.result("recording"))
+    }
+
+    @Test
+    fun removedHistoryCannotRestartAutomaticTranscriptionWithAFreshScope() {
+        val transcripts = ReceivedVoiceTranscripts()
+        var member = true
+        val existing = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        assertTrue(existing.shown("message"))
+        member = false
+        assertFalse(existing.active)
+        transcripts.forgetGroup("alice", "chat")
+        val history = VoiceTranscriptionScope(transcripts, "alice", automatic = true, group = "chat") { member }
+        history.setShown("message", true)
+        history.storeResult("attachment", complete)
+        assertFalse(history.shown("message"))
+        assertNull(history.result("attachment"))
+    }
+
+    @Test
+    fun clearingForegroundStateDropsResultsAndChoicesAndRejectsLateWrites() {
+        val transcripts = ReceivedVoiceTranscripts()
+        val old = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        transcripts.clear()
+        old.storeResult("attachment", complete)
+        old.setShown("message", true)
+
+        val current = VoiceTranscriptionScope(transcripts, "alice", automatic = false)
+        assertNull(current.result("attachment"))
+        assertFalse(current.shown("message"))
+        current.storeResult("attachment", complete)
+        assertEquals(complete, current.result("attachment"))
+    }
+
     /** The oldest entries leave first once the cache is full, and a re-stored entry counts as new. */
     @Test
     fun evictsOldestPastCapacity() {
