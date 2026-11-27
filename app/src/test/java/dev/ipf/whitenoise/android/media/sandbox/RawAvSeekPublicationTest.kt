@@ -106,7 +106,14 @@ class RawAvSeekPublicationTest {
                 val completion = engine.seekToAsync(1500)
                 val playing = engine.intent()
                 engine.seeked(playing.activation, playing.seek)
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+                assertEquals(0, RecordingCanvasSurface.posts)
                 engine.setPlaying(false)
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(1L, engine.snapshot().renderedFrame)
 
                 val request = takeQueuedPoster(engine)
                 assertTrue(request.explicit)
@@ -121,7 +128,7 @@ class RawAvSeekPublicationTest {
                 val failedSeek = refusal.cause as RawPausedSeekFailure
                 assertEquals(1500L, failedSeek.positionMs)
                 assertEquals(800L, engine.positionMs())
-                assertEquals(0L, engine.snapshot().renderedFrame)
+                assertEquals(1L, engine.snapshot().renderedFrame)
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0
                 render(engine)

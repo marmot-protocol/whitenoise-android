@@ -89,7 +89,8 @@ class MediaAvNativeCorpusDeviceTest {
     fun preferredReadPreservesFinalFrameAfterSeek() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         withFixture("red-h264.mp4") { source ->
-            val stream = IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), wantAudio = false, edge = 64)
+            val stream =
+                IsolatedAvStream.openUri(context, android.net.Uri.fromFile(source), wantAudio = false, edge = 64)
             stream.use {
                 val track = AvStreamProtocol.VIDEO_TRACK
                 (stream.read(track) as AvStreamFrame.Video).bitmap.recycle()

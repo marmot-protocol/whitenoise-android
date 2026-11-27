@@ -451,6 +451,7 @@ internal class RawAvPlaybackEngine(
         val carrySeek = pendingSeek?.takeIf { explicitSeek }
         if (carrySeek != null) {
             dispatchPausedSeek(carrySeek)
+            requestRedraw()
         } else {
             targetUs = pausedUs
             pendingSeek?.cancel(false)
