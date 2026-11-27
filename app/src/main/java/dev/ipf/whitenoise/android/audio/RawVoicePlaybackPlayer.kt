@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import dev.ipf.whitenoise.android.media.sandbox.RawAvPlaybackEngine
+import dev.ipf.whitenoise.android.media.sandbox.RawAvPlaybackSnapshot
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CancellationException
@@ -81,7 +82,7 @@ internal class RawVoicePlaybackPlayer private constructor(
     /**
      * Reads cached engine state and rejects access after release.
      */
-    private fun snapshot(): RawAvPlaybackEngine.Snapshot {
+    private fun snapshot(): RawAvPlaybackSnapshot {
         check(!released) { "Voice playback is released" }
         return engine.snapshot()
     }

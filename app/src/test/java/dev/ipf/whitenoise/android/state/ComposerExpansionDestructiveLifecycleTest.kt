@@ -27,6 +27,8 @@ import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -34,11 +36,18 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.VoiceDraftStore
+import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.VoiceTranscriptionScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,8 +58,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import java.lang.reflect.Proxy
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -99,6 +110,35 @@ class ComposerExpansionDestructiveLifecycleTest {
             assertEquals(1, pendingCallbacks)
             assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
             assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** With staged media, a detached Send releases its claim before transport so the transcript can be kept. */
+    @Test
+    fun detachedDictationWithStagedMediaRejectsBeforeTransport() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            val photo =
+                SelectedMessageDraftAttachmentFfi(
+                    "photo",
+                    "photo.jpg",
+                    "image/jpeg",
+                    1uL,
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                )
+            fixture.calls.selectedDraft = SelectedMessageDraftContentFfi(GROUP_ID, "", null, listOf(photo), 1L, 1L)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var rejected = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(onDispatchRejectedBeforeTransport = { rejected++ })
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, rejected)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
         }
 
     @Test
@@ -637,6 +677,55 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
+    fun acceptedLeavePreservesTranscriptsUntilMembershipSettles() =
+        runBlocking {
+            for (fromChats in listOf(false, true)) {
+                val fixture = fixture(leaveConfirmed = false)
+                val chats = fixture.seededChatsController()
+                fixture.appState.attachChatsController(chats)
+                val cache = fixture.appState.receivedVoiceTranscripts
+                val transcript = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words")
+                val scope = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                scope.storeResult("recording", transcript)
+                scope.setShown("message", true)
+                try {
+                    val accepted =
+                        if (fromChats) chats.leaveGroup(GROUP_ID) else fixture.conversationController.leaveGroup()
+                    assertTrue(accepted)
+                    assertEquals(1, fixture.calls.leave.get())
+                    fixture.conversationController.refreshMembers()
+                    assertTrue(fixture.conversationController.membersVerified)
+                    assertEquals(SelfMembershipFfi.LEFT, fixture.conversationController.group.selfMembership)
+                    assertTrue(scope.active)
+                    val pending =
+                        fixture.groupRecord.copy(
+                            selfMembership = SelfMembershipFfi.LEFT,
+                            leaveRequestPending = true,
+                            leaveRequestedAtMs = 1uL,
+                            leaveBlocked = true,
+                        )
+                    chats.foldGroupRecordForTest(pending)
+                    assertTrue(scope.active)
+                    chats.foldGroupRecordForTest(fixture.groupRecord)
+                    assertEquals(transcript, scope.result("recording"))
+                    assertTrue(scope.shown("message"))
+
+                    chats.foldGroupRecordForTest(
+                        pending.copy(leaveRequestPending = false, leaveRequestedAtMs = null, leaveBlocked = false),
+                    )
+                    assertFalse(scope.active)
+                    val reopened = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                    assertNull(reopened.result("recording"))
+                    assertFalse(reopened.shown("message"))
+                } finally {
+                    fixture.appState.attachChatsController(null)
+                    chats.onCleared()
+                    fixture.conversationController.onCleared()
+                }
+            }
+        }
+
+    @Test
     fun failedChatListLeaveRetainsTheConversationGeometry() =
         runBlocking {
             val fixture = fixture(failLeave = true)
@@ -655,12 +744,15 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A committed local delete clears the removed chat's composer geometry and voice draft only. */
     @Test
     fun successfulLocalDeleteClearsOnlyTheRemovedConversationGeometry() =
         runBlocking {
             val fixture = fixture()
             val retained = retainExpansion(fixture.appState, GROUP_ID)
             val other = retainExpansion(fixture.appState, OTHER_GROUP)
+            val removedTake = saveVoiceDraft(GROUP_ID)
+            val retainedTake = saveVoiceDraft(OTHER_GROUP)
             val controller = fixture.seededChatsController()
             try {
                 assertEquals(
@@ -671,6 +763,8 @@ class ComposerExpansionDestructiveLifecycleTest {
                 shadowOf(Looper.getMainLooper()).idle()
 
                 assertEquals(1, fixture.calls.delete.get())
+                assertFalse(removedTake.exists())
+                assertTrue(retainedTake.isFile)
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
                 assertEquals(
                     other,
@@ -681,14 +775,17 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** A failed native delete preserves both the composer geometry and the saved take. */
     @Test
     fun failedLocalDeleteRetainsTheConversationGeometry() =
         runBlocking {
             val fixture = fixture(failDelete = true)
+            val retainedTake = saveVoiceDraft(GROUP_ID)
             val retained = retainExpansion(fixture.appState, GROUP_ID)
             val controller = fixture.seededChatsController()
             try {
                 assertFalse(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
+                assertTrue(retainedTake.isFile)
 
                 assertEquals(1, fixture.calls.delete.get())
                 assertEquals(
@@ -699,6 +796,269 @@ class ComposerExpansionDestructiveLifecycleTest {
                 controller.onCleared()
             }
         }
+
+    /** An account-wide group update purges the exact evicted chat even with no mounted conversation. */
+    @Test
+    fun projectedEvictionPurgesADetachedVoiceDraft() {
+        val fixture = fixture(attachConversationController = false)
+        val evictedTake = saveVoiceDraft(GROUP_ID)
+        val retainedTake = saveVoiceDraft(OTHER_GROUP)
+        val chats = fixture.seededChatsController()
+        try {
+            chats.foldGroup(group().copy(selfMembership = SelfMembershipFfi.REMOVED))
+            assertFalse(evictedTake.exists())
+            assertTrue(retainedTake.isFile)
+        } finally {
+            chats.onCleared()
+        }
+    }
+
+    /** Confirmed eviction purges only its chat even when another profile is selected during the native read. */
+    @Test
+    fun runtimeEvictionPurgesAfterNativeReadback() =
+        runBlocking {
+            val inactive = "inactive-account"
+            val cases =
+                listOf(
+                    inactive to SelfMembershipFfi.MEMBER,
+                    inactive to SelfMembershipFfi.REMOVED,
+                    ACCOUNT_REF to SelfMembershipFfi.REMOVED,
+                )
+            for ((account, membership) in cases) {
+                val take = saveVoiceDraft(GROUP_ID, account = account)
+                val retainedTake = saveVoiceDraft(OTHER_GROUP, account = account)
+                val fixture =
+                    fixture(
+                        attachConversationController = false,
+                        groupRecord = group().copy(selfMembership = membership),
+                    )
+                val appState = fixture.appState
+                val selection = appState.accountSwitchHandoff
+                fixture.calls.onChatListRow = { selection.beginRequest("another-profile") }
+                appState.reconcileCaptureEviction(VoiceNoteKey(account, GROUP_ID), appState.marmot())
+
+                assertEquals(1, fixture.calls.chatListRow.get())
+                assertEquals(membership == SelfMembershipFfi.MEMBER, take.isFile)
+                assertTrue(retainedTake.isFile)
+            }
+        }
+
+    /** A failed first lookup leaves the take alone and durably asks the process owner to read membership again. */
+    @Test
+    fun firstEvictionReadFailureQueuesARecheck() =
+        runBlocking {
+            val take = saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            fixture.calls.onChatListRow = { throw MarmotKitException.TransportClosed() }
+
+            appState.reconcileCaptureEviction(key, appState.marmot())
+
+            assertEquals(1, fixture.calls.chatListRow.get())
+            assertTrue(take.isFile)
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val journal = VoiceDraftEvictionJournal(context.noBackupFilesDir.resolve("voice-draft-evictions"))
+            assertEquals(mapOf(key to false), journal.pending())
+        }
+
+    /** An absence read interrupted by a new take cannot give an old local-delete journal authority over it. */
+    @Test(timeout = 10_000)
+    fun localDeleteReplayPreservesACaptureCreatedDuringAbsenceRead() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false, missingProjection = MissingProjection.JOINED)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val cache = appState.receivedVoiceTranscripts
+            val removedTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+            val otherTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = OTHER_GROUP)
+            removedTranscript.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words"))
+            val journal = appState.localGroupDeleteCleanupJournal
+            val intent = PendingLocalGroupDeleteCleanup(ACCOUNT_REF, GROUP_ID, emptyList(), emptySet())
+            journal.stage(intent)
+            val reading = CompletableDeferred<Unit>()
+            val finishRead = CountDownLatch(1)
+            fixture.calls.onChatListRow = {
+                reading.complete(Unit)
+                finishRead.await()
+            }
+            val readback = launch { appState.reconcilePendingLocalGroupDeleteCleanups() }
+            val replacement =
+                try {
+                    reading.await()
+                    saveVoiceDraft(GROUP_ID).also { appState.voiceNotes.bind(key) { true } }
+                } finally {
+                    finishRead.countDown()
+                }
+            readback.join()
+
+            assertEquals(1, fixture.calls.chatListRow.get())
+            assertFalse(removedTranscript.active)
+            assertTrue(otherTranscript.active)
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertEquals(intent, journal.find(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** A confirmed live delete also defers client cleanup when the capture changes before it can run. */
+    @Test
+    fun localDeleteCommitPreservesAReplacementVoiceTake() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture = fixture(attachConversationController = false)
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val cache = appState.receivedVoiceTranscripts
+            val removedTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+            val otherTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = OTHER_GROUP)
+            removedTranscript.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words"))
+            lateinit var replacement: File
+
+            val cleanupComplete =
+                appState.deleteChatGroupLocalWithRecovery(
+                    LocalGroupRemovalRequest(ACCOUNT_REF, GROUP_ID, forgetProtocol = false),
+                    isCurrent = { true },
+                    readinessBudget = LocalGroupDeleteReadinessBudget(),
+                    onNativeCommitted = {
+                        replacement = saveVoiceDraft(GROUP_ID)
+                        appState.voiceNotes.bind(key) { true }
+                    },
+                )
+
+            assertEquals(1, fixture.calls.delete.get())
+            assertFalse(cleanupComplete)
+            assertFalse(removedTranscript.active)
+            assertTrue(otherTranscript.active)
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertTrue(appState.localGroupDeleteCleanupJournal.hasPending())
+        }
+
+    /** A failed voice purge during Delete cannot make the removed take appear after rejoin and restart. */
+    @Test
+    fun deletedVoiceDraftStaysRetired() = runBlocking { assertRemovedTakeRetired(forgetProtocol = false) }
+
+    /** Forget shares the same durable retirement as Delete. */
+    @Test
+    fun forgottenVoiceDraftStaysRetired() = runBlocking { assertRemovedTakeRetired(forgetProtocol = true) }
+
+    /** Blocks both filesystem operations while leaving the independent retirement journal writable. */
+    private suspend fun assertRemovedTakeRetired(forgetProtocol: Boolean) {
+        val take = saveVoiceDraft(GROUP_ID)
+        val directory = checkNotNull(take.parentFile)
+        val accountDirectory = checkNotNull(directory.parentFile)
+        val original = fixture(attachConversationController = false)
+        val appState = original.appState
+        val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+        assertTrue(directory.setWritable(false))
+        try {
+            assertTrue(accountDirectory.setWritable(false))
+            val cleanupComplete =
+                appState.deleteChatGroupLocalWithRecovery(
+                    LocalGroupRemovalRequest(ACCOUNT_REF, GROUP_ID, forgetProtocol),
+                    isCurrent = { true },
+                    readinessBudget = LocalGroupDeleteReadinessBudget(),
+                    onNativeCommitted = {},
+                )
+            assertEquals(listOf(if (forgetProtocol) "forget" else "delete"), original.calls.order)
+            assertTrue(take.isFile)
+
+            val restarted = fixture(attachConversationController = false).appState
+            val rejoined = restarted.marmotIo { chatListRow(ACCOUNT_REF, GROUP_ID) }
+            assertEquals(SelfMembershipFfi.MEMBER, rejoined?.selfMembership)
+            restarted.reconcilePendingLocalGroupDeleteCleanups()
+            restarted.voiceNotes.bind(key) { true }
+            assertNull(restarted.voiceNotes.draft(key))
+            assertTrue(take.isFile)
+            assertTrue(restarted.voiceDraftEvictions.contains(key))
+            assertTrue(cleanupComplete)
+            assertFalse(restarted.localGroupDeleteCleanupJournal.hasPending())
+        } finally {
+            val accountRestored = accountDirectory.setWritable(true)
+            val chatRestored = directory.setWritable(true)
+            assertTrue(accountRestored && chatRestored)
+        }
+    }
+
+    /** A detached eviction keeps its retry when the filesystem rejects both deletion and isolation. */
+    @Test
+    fun failedEvictionPurgeIsRetried() =
+        runBlocking {
+            val take = saveVoiceDraft(GROUP_ID)
+            val directory = checkNotNull(take.parentFile)
+            val accountDirectory = checkNotNull(directory.parentFile)
+            val fixture =
+                fixture(
+                    attachConversationController = false,
+                    groupRecord = group().copy(selfMembership = SelfMembershipFfi.REMOVED),
+                )
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val runtime = appState.marmot()
+            assertTrue(directory.setWritable(false))
+            try {
+                assertTrue(accountDirectory.setWritable(false))
+                appState.reconcileCaptureEviction(key, runtime)
+                assertTrue(take.isFile)
+                assertNull(appState.voiceNotes.draft(key))
+                assertTrue(appState.voiceDraftEvictions.contains(key))
+            } finally {
+                val accountRestored = accountDirectory.setWritable(true)
+                val chatRestored = directory.setWritable(true)
+                assertTrue(accountRestored && chatRestored)
+            }
+
+            appState.reconcileCaptureEviction(key, runtime)
+
+            assertFalse(directory.exists())
+            assertFalse(appState.voiceDraftEvictions.contains(key))
+        }
+
+    /** A take saved after a native eviction read begins cannot be removed by that older result. */
+    @Test(timeout = 10_000)
+    fun evictionReadbackPreservesANewerVoiceDraft() =
+        runBlocking {
+            saveVoiceDraft(GROUP_ID)
+            val fixture =
+                fixture(
+                    attachConversationController = false,
+                    groupRecord = group().copy(selfMembership = SelfMembershipFfi.REMOVED),
+                )
+            val appState = fixture.appState
+            val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val reading = CompletableDeferred<Unit>()
+            val finishRead = CountDownLatch(1)
+            fixture.calls.onChatListRow = {
+                reading.complete(Unit)
+                finishRead.await()
+            }
+            val readback = launch { appState.reconcileCaptureEviction(key, appState.marmot()) }
+            val replacement =
+                try {
+                    reading.await()
+                    saveVoiceDraft(GROUP_ID).also { appState.voiceNotes.bind(key) { true } }
+                } finally {
+                    finishRead.countDown()
+                }
+            readback.join()
+
+            assertTrue(replacement.isFile)
+            assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
+            assertTrue(appState.voiceDraftEvictions.contains(key))
+        }
+
+    /** Seeds a finished take using the actual private voice draft format. */
+    private fun saveVoiceDraft(
+        groupIdHex: String,
+        account: String = ACCOUNT_REF,
+    ): File {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = VoiceDraftStore(context.noBackupFilesDir.resolve("voice-drafts"))
+        val key = VoiceNoteKey(account, groupIdHex)
+        val capture = store.recordingDirectory(key).resolve("voice-fixture.m4a").apply { writeText("audio") }
+        return checkNotNull(store.commit(key, capture, 2_000L, stopReason = null)).file
+    }
 
     @Test(timeout = 10_000)
     fun closedTransportRetriesLocalDeleteAndCleansUpOnce() =
@@ -1167,20 +1527,18 @@ class ComposerExpansionDestructiveLifecycleTest {
         ) { proxy, method, arguments ->
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
+                "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, calls.selectedDraft)
                 "localSendStatus" -> null
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
+                "groupRoster" -> lifecycleGroupRoster(groupRecord, calls.leave.get() > 0)
                 "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed", "groupManagementState" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
                 "chatListRow" -> lifecycleProjectionRow(projection, calls, localGroupPresent, left, arguments)
-                "chatList" -> {
-                    calls.chatList.incrementAndGet()
-                    lifecycleChatRows(localGroupPresent, left)
-                }
+                "chatList" -> readLifecycleChatRows(calls, localGroupPresent, left)
                 "leaveGroup" -> {
                     calls.order.add("leave")
                     calls.leave.incrementAndGet()
@@ -1216,6 +1574,23 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
+
+    private fun lifecycleGroupRoster(
+        group: AppGroupRecordFfi,
+        leaveAccepted: Boolean,
+    ) = conversationTimelineGroupRoster().copy(
+        groupIdHex = group.groupIdHex,
+        selfMembership = if (leaveAccepted) SelfMembershipFfi.LEFT else group.selfMembership,
+    )
+
+    private fun readLifecycleChatRows(
+        calls: LifecycleCalls,
+        present: Boolean,
+        left: Boolean,
+    ): List<ChatListRowFfi> {
+        calls.chatList.incrementAndGet()
+        return lifecycleChatRows(present, left)
     }
 
     private class LifecycleGroupProjection(
@@ -1266,6 +1641,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         arguments: Array<out Any?>?,
     ): ChatListRowFfi? {
         calls.chatListRow.incrementAndGet()
+        calls.onChatListRow()
         return if (projection.missing != MissingProjection.NONE && !left) {
             null
         } else {
@@ -1455,6 +1831,8 @@ class ComposerExpansionDestructiveLifecycleTest {
 
     /** Counts authoritative native mutations so false results cannot pass via an earlier guard. */
     private class LifecycleCalls {
+        var selectedDraft: SelectedMessageDraftContentFfi? = null
+        var onChatListRow: () -> Unit = {}
         val order = mutableListOf<String>()
         val send = AtomicInteger()
         val leave = AtomicInteger()

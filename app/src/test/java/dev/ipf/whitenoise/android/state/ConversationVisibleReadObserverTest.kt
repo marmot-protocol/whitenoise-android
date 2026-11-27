@@ -13,12 +13,17 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.VoiceTranscriptionScope
 import dev.ipf.whitenoise.android.ui.conversation.observeConversationVisibleReads
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -33,6 +38,46 @@ import java.time.Duration
 @Config(sdk = [36], qualifiers = "en")
 class ConversationVisibleReadObserverTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun chatListDepartureClearsTranscriptsWithoutAMountedConversation() {
+        val row = reminderRow()
+        val fixture = fixture(row)
+        try {
+            val state = fixture.appState
+            val account = ConversationTimelineTestIds.ACCOUNT_REF
+            val cache = state.receivedVoiceTranscripts
+            val complete = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "On my way")
+            val departing = VoiceTranscriptionScope(cache, account, automatic = false, group = row.groupIdHex)
+            val other = VoiceTranscriptionScope(cache, account, automatic = false, group = "other-group")
+            departing.storeResult("recording", complete)
+            departing.setShown("message", true)
+            other.storeResult("recording", complete)
+
+            val pending = row.copy(selfMembership = SelfMembershipFfi.LEFT, leaveRequestPending = true)
+            state.publishConversationChatListRow(account, pending)
+            assertEquals(complete, departing.result("recording"))
+            assertTrue(departing.shown("message"))
+
+            val removed = row.copy(selfMembership = SelfMembershipFfi.REMOVED)
+            state.publishConversationChatListRow(account, removed)
+            departing.storeResult("recording", complete)
+            val newScope = VoiceTranscriptionScope(cache, account, automatic = false, group = row.groupIdHex)
+            assertNull(newScope.result("recording"))
+            assertFalse(newScope.shown("message"))
+            assertEquals(complete, other.result("recording"))
+
+            val afterDeparture = cache.groupEpoch(account, row.groupIdHex)
+            state.publishConversationChatListRow(account, removed)
+            assertEquals(afterDeparture, cache.groupEpoch(account, row.groupIdHex))
+
+            state.publishConversationChatListRow(account, row.copy(selfMembership = SelfMembershipFfi.MEMBER))
+            state.publishConversationChatListRow(account, removed)
+            assertEquals(afterDeparture + 1, cache.groupEpoch(account, row.groupIdHex))
+        } finally {
+            fixture.close()
+        }
+    }
 
     @Test
     fun retiredAnchorReplyCannotInstallItsOldTimelinePage() {

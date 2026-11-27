@@ -582,6 +582,43 @@ class AutomaticMediaBindingRecoveryTest {
         }
     }
 
+    /** A retired binding still identifies a late endpoint before asking it to exit. */
+    @Test
+    fun accountResetBeforeConnectionIdentifiesLateEndpointBeforeRetirement() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), connect = false, reply = false)
+        val transport = IsolatedAutomaticAvTransport(context, processWitnessFactory = context::processWitness)
+        val file = java.io.File.createTempFile("av-late-connection-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val old = context.next()
+            transport.activateSession()
+            first.join()
+            assertNull(first.result.get())
+
+            old.connection.onServiceConnected(context.component, old.remote)
+            assertTrue(old.remote.retired.await(2, TimeUnit.SECONDS))
+            assertEquals(0L, old.remote.identityRequested.count)
+            assertEquals(0, old.remote.requests)
+            old.remote.die()
+            assertTrue(awaitAutomaticRelease(transport))
+
+            val second = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val replacement = context.next()
+            replacement.connection.onServiceConnected(context.component, replacement.remote)
+            assertTrue(replacement.remote.decoded.await(2, TimeUnit.SECONDS))
+            replacement.remote.die()
+            second.join()
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            stopAutomaticObserver(transport)
+            file.delete()
+        }
+    }
+
     /** Driver Flags Permit Synchronous Identity While Oneway Cannot Release An Uncalibrated Worker. */
     @Test
     fun driverFlagsPermitSynchronousIdentityWhileOnewayCannotReleaseAnUncalibratedWorker() {
@@ -1017,7 +1054,7 @@ class AutomaticMediaBindingRecoveryTest {
         fun poll(timeoutMs: Long): Bound? = arrivals.poll(timeoutMs, TimeUnit.MILLISECONDS)
 
         /** Require the next admitted binding within the fixture deadline. */
-        fun next(): Bound = checkNotNull(arrivals.poll(2, TimeUnit.SECONDS)) { "Binding was not admitted" }
+        fun next(): Bound = checkNotNull(arrivals.poll(10, TimeUnit.SECONDS)) { "Binding was not admitted" }
 
         /** Deliver scripted death to every binding retained by this fixture context. */
         fun dieAll() = bindings.forEach { it.remote.die() }
@@ -1175,7 +1212,7 @@ class AutomaticMediaBindingRecoveryTest {
             data.enforceInterface("android.os.IMessenger")
             if (data.readInt() != 0) {
                 val message = Message.CREATOR.createFromParcel(data)
-                if (message.what == AutomaticAvIdentity.MESSAGE) {
+                if (message.what == AutomaticAvIdentity.MESSAGE && heldIdentity == null) {
                     heldIdentity = message.replyTo.binder to message.arg1
                     identityRequested.countDown()
                     if (!holdIdentity) deliverIdentity()

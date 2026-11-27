@@ -205,6 +205,7 @@ internal class IsolatedAutomaticAvTransport(
                                 android.os.Binder.getCallingUid(),
                                 android.os.Binder.getCallingPid(),
                             )
+                    selected.identityObserved = selected.identityObserved || calibrated
                     val current =
                         !closed &&
                             session?.epoch == selected.reply.session.epoch &&
@@ -278,6 +279,7 @@ internal class IsolatedAutomaticAvTransport(
             if (worker !== selected) return
             selected.retiring = true
             if (pending === selected.reply) revokePending()
+            selected.connectionEnded = true
             selected.reply.connected.countDown()
         }
         // A binding notification is not a process-death receipt.
@@ -304,7 +306,13 @@ internal class IsolatedAutomaticAvTransport(
         val unbind =
             synchronized(bindingLock) {
                 if (selected.disposed || !selected.bindComplete || !selected.retiring) return
-                if (!selected.unbindStarted) true.also { selected.unbindStarted = true } else false
+                // Retiring a not-yet-identified live endpoint must first give it a chance to
+                // report its PID. An unknown lifetime still holds the lane after disconnection.
+                val unidentifiableEndpoint = selected.binder != null && !selected.linked
+                val ended = selected.connectionEnded || selected.dead.count == 0L
+                val mayIdentify = selected.bound && !unidentifiableEndpoint && !ended
+                val mayUnbind = !mayIdentify || selected.identityObserved
+                if (mayUnbind && !selected.unbindStarted) true.also { selected.unbindStarted = true } else false
             }
         if (unbind) {
             handler.post {
@@ -569,14 +577,7 @@ internal class IsolatedAutomaticAvTransport(
         try {
             if (!connect(selected, ticket)) return null
             val target = admittedTarget(selected, ticket, dispatch = false) ?: return null
-            val capability = responseCapability(selected, reply)
-            target.send(
-                Message.obtain().apply {
-                    what = AutomaticAvIdentity.MESSAGE
-                    arg1 = reply.id
-                    replyTo = capability
-                },
-            )
+            identify(selected, target)
             if (!await(selected.identityReady, ticket) ||
                 !selected.identityAccepted ||
                 !current(ticket)
@@ -590,8 +591,8 @@ internal class IsolatedAutomaticAvTransport(
                 Message.obtain().apply {
                     what = MediaDecodePolicy.DECODE
                     arg1 = reply.id
-                    replyTo = capability
-                    data = requestPayload(input, output, request)
+                    replyTo = selected.capability
+                    data = automaticAvDecodeRequest(context, input, output, request)
                 },
             )
             if (!await(reply.ready, ticket)) return null
@@ -659,6 +660,20 @@ internal class IsolatedAutomaticAvTransport(
         return isolated && restricted
     }
 
+    /** The same input-free reply capability identifies a worker during admission or retirement. */
+    private fun identify(
+        selected: Worker,
+        target: Messenger,
+    ) {
+        target.send(
+            Message.obtain().apply {
+                what = AutomaticAvIdentity.MESSAGE
+                arg1 = selected.reply.id
+                replyTo = selected.capability
+            },
+        )
+    }
+
     /** Send bounded retirement for the exact worker while retaining cleanup and process-absence evidence. */
     private fun retire(selected: Worker) {
         val target =
@@ -677,6 +692,7 @@ internal class IsolatedAutomaticAvTransport(
             try {
                 retirementExecutor.execute {
                     try {
+                        if (!selected.identityObserved) runCatching { identify(selected, target) }
                         runCatching { target.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
                     } finally {
                         synchronized(bindingLock) { selected.retireRpcActive = false }
@@ -708,34 +724,6 @@ internal class IsolatedAutomaticAvTransport(
         check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
         return requestDispatched && pending != null
     }
-
-    /** Construct only the bounded operation fields and selected descriptor capabilities admitted by this protocol. */
-    private fun requestPayload(
-        input: ParcelFileDescriptor,
-        output: SharedMemory,
-        request: MediaDecodeRequest,
-    ): Bundle =
-        Bundle().apply {
-            if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
-                val canary = File(context.filesDir, "media-containment-canary")
-                if (canary.isFile) putString("canaryPath", canary.absolutePath)
-            }
-            putInt("version", MediaDecodePolicy.VERSION)
-            putInt("operation", request.operation)
-            putInt("edge", request.edge)
-            putBoolean("oriented", request.option)
-            putLong("positionUs", request.positionUs)
-            putLong("offset", request.offset)
-            putLong("length", request.length ?: input.statSize)
-            request.region?.let {
-                putInt("left", it.left)
-                putInt("top", it.top)
-                putInt("right", it.right)
-                putInt("bottom", it.bottom)
-            }
-            putParcelable("input", input)
-            putParcelable("output", output)
-        }
 
     /**
      * Distinguish definite framework refusal from uncertain binding outcomes before admitting or retaining the
@@ -860,12 +848,16 @@ internal class IsolatedAutomaticAvTransport(
         var linked = false
         var bound = false
         var bindComplete = false
+        var connectionEnded = false
         var retiring = false
         var retireSent = false
         var disposed = false
         var holdReported = false
         val processWitness = processWitnessFactory()
         val identityReady = CountDownLatch(1)
+        val capability = responseCapability(this, reply)
+
+        @Volatile var identityObserved = false
 
         @Volatile var identityAccepted = false
         val safeToCopy = CountDownLatch(1)

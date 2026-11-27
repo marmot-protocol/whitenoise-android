@@ -94,8 +94,9 @@ internal class ConversationMenuImeHandoff {
 }
 
 /**
- * Runs the message-menu keyboard handoff for the conversation and returns the IME inset held below the
- * transcript, or null when the live IME owns it. Pausing drops a pending restore and the open menu. A
+ * Runs the message-menu keyboard handoff for the conversation and returns a reader for the IME inset held
+ * below the transcript, or null when the live IME owns it. Read it in layout so the hand-back animation
+ * does not recompose the conversation. Pausing drops a pending restore and the open menu. A
  * closed menu restores the input it hid unless the route is leaving or selection took over, and the
  * held inset then follows the returning keyboard.
  */
@@ -110,7 +111,7 @@ internal fun conversationMenuImeBackdrop(
     routeTransitionInProgress: Boolean,
     transcriptRoutedAway: Boolean,
     suppressRestore: Boolean,
-): Int? {
+): (() -> Int)? {
     val imeInsets = WindowInsets.ime
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
@@ -120,7 +121,7 @@ internal fun conversationMenuImeBackdrop(
     val displayedBottom =
         animatedMenuImeBackdrop(
             frozenBottom = handoff.backdropBottom,
-            returning = handoff.backdropReturning,
+            returning = { handoff.backdropReturning },
             liveBottom = { imeInsets.getBottom(density) },
             onReleased = { handoff.releaseBackdrop() },
         )

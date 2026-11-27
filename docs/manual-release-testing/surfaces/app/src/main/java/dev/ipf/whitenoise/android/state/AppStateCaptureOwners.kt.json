@@ -44,6 +44,22 @@
         "test_ids": [
           "MED-061"
         ]
+      },
+      {
+        "surface": "Wipe cleanup retains voice drafts until the native account removal is confirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "if (outcome.localCleanup.completed) purgeCaptureDrafts(account)",
+        "test_ids": [
+          "ACC-014"
+        ]
+      },
+      {
+        "surface": "Confirmed chat removal stops capture and retires its draft across rejoin and restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateCaptureOwners.kt",
+        "anchor": "voiceDraftEvictions.stage(key, confirmed = true)",
+        "test_ids": [
+          "MED-061"
+        ]
       }
     ]
   },

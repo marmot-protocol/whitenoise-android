@@ -42,7 +42,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChrome
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentViewerChromeDefaults
-import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
@@ -294,12 +293,15 @@ private fun NostrEventReaderContext(
                 )
             }
             card.gitLinks.forEach { link ->
-                TextButton(
-                    onClick = { clipboard.copy(link, link) },
-                ) {
-                    Text(stringResource(R.string.nostr_git_copy_url, link))
+                // An address a shell would expand is never copied; an https one can still be opened below.
+                if (isShellSafeGitLink(link)) {
+                    TextButton(
+                        onClick = { clipboard.copy(link, link) },
+                    ) {
+                        Text(stringResource(R.string.nostr_git_copy_url, link))
+                    }
                 }
-                if (Uri.parse(link).scheme.equals("https", ignoreCase = true) && isOpenableMarkdownLink(link)) {
+                if (isOpenableGitLink(link)) {
                     TextButton(onClick = { pendingOpenLink = link }) {
                         Text(stringResource(R.string.nostr_git_open_url, link))
                     }

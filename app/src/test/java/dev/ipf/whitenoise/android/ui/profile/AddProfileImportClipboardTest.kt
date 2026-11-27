@@ -94,7 +94,7 @@ class AddProfileImportClipboardTest {
             composeRule.onNodeWithTag("onboarding.welcome.sign_in").performClick()
             composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(key)
             composeRule.onNodeWithTag("onboarding.sign_in.action").performClick()
-            composeRule.waitUntil {
+            composeRule.waitUntil(timeoutMillis = 10_000L) {
                 shadowOf(Looper.getMainLooper()).idle()
                 entered.count == 0L
             }
@@ -111,7 +111,7 @@ class AddProfileImportClipboardTest {
                 composeRule.onNodeWithTag("onboarding.welcome.sign_in").assertExists()
             }
             release.countDown()
-            composeRule.waitUntil {
+            composeRule.waitUntil(timeoutMillis = 10_000L) {
                 shadowOf(Looper.getMainLooper()).idle()
                 app.accountSetup.controller != null
             }

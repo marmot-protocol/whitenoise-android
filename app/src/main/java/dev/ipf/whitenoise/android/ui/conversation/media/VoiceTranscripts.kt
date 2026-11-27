@@ -7,17 +7,19 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.endsVoiceTranscription
 import kotlinx.coroutines.sync.Mutex
 
 /**
  * Received voice-message transcripts for this process. Results are derived on this device, never enter the
- * message store and are dropped when the process ends; the cache only spares a recording from being transcribed
- * again after it scrolls away or the app returns from the background. Entries are scoped by account and evicted
- * oldest first past [capacity].
+ * message store. The foreground cache spares a recording from being transcribed again after it scrolls away.
+ * Entries are scoped by account and chat and evicted oldest first past [capacity].
  */
 @Stable
 internal class ReceivedVoiceTranscripts(
@@ -27,7 +29,11 @@ internal class ReceivedVoiceTranscripts(
     private val resultOrder = ArrayDeque<String>()
     private val shown = mutableStateMapOf<String, Boolean>()
     private val shownOrder = ArrayDeque<String>()
-    private val accountEpochs = mutableMapOf<String, Int>()
+    private val accountEpochs = mutableStateMapOf<String, Int>()
+    private val groupEpochs = mutableStateMapOf<String, Int>()
+    private val departedGroups = mutableSetOf<String>()
+    var generation by mutableIntStateOf(0)
+        private set
 
     /** One recognition at a time: OSTT runs a single model, and automatic mode may queue a whole screen of clips. */
     val gate = Mutex()
@@ -38,7 +44,7 @@ internal class ReceivedVoiceTranscripts(
         key: String,
         value: AudioTranscriptUi,
     ) {
-        put(results, resultOrder, key, value)
+        putVoiceTranscriptEntry(results, resultOrder, key, value, capacity)
     }
 
     /** The person's explicit show or hide for one message, or null to follow the automatic setting. */
@@ -48,31 +54,67 @@ internal class ReceivedVoiceTranscripts(
         key: String,
         value: Boolean,
     ) {
-        put(shown, shownOrder, key, value)
+        putVoiceTranscriptEntry(shown, shownOrder, key, value, capacity)
     }
 
+    /** The account epoch invalidates scopes made before this account's cache was cleared. */
     fun accountEpoch(account: String): Int = accountEpochs[account] ?: 0
 
+    /** The group epoch invalidates scopes made before this account's chat was removed. */
+    fun groupEpoch(
+        account: String,
+        group: String,
+    ): Int = groupEpochs["$account|$group|"] ?: 0
+
+    /** Clears this account's results and visibility choices while leaving other accounts' scopes valid. */
     fun forgetAccount(account: String) {
         accountEpochs[account] = accountEpoch(account) + 1
-        val resultPrefix = "$account|a|"
-        val shownPrefix = "$account|m|"
-        results.keys.removeAll { it.startsWith(resultPrefix) }
-        resultOrder.removeAll { it.startsWith(resultPrefix) }
-        shown.keys.removeAll { it.startsWith(shownPrefix) }
-        shownOrder.removeAll { it.startsWith(shownPrefix) }
+        val prefix = "$account|"
+        groupEpochs.keys.removeAll { it.startsWith(prefix) }
+        departedGroups.removeAll { it.startsWith(prefix) }
+        forgetPrefix(prefix)
     }
 
-    private fun <T> put(
-        map: MutableMap<String, T>,
-        order: ArrayDeque<String>,
-        key: String,
-        value: T,
+    /** Authoritative departures revoke scopes once until a later membership update rejoins the group. */
+    fun updateGroupMembership(
+        account: String,
+        group: String,
+        departed: Boolean,
     ) {
-        order.remove(key)
-        order.addLast(key)
-        map[key] = value
-        while (order.size > capacity) map.remove(order.removeFirst())
+        val key = "$account|$group|"
+        if (departed) {
+            if (departedGroups.add(key)) forgetGroup(account, group)
+        } else {
+            departedGroups.remove(key)
+        }
+    }
+
+    /** Revokes this chat's active scopes and removes its results and visibility choices. */
+    fun forgetGroup(
+        account: String,
+        group: String,
+    ) {
+        val prefix = "$account|$group|"
+        groupEpochs[prefix] = groupEpoch(account, group) + 1
+        forgetPrefix(prefix)
+    }
+
+    /** Revokes every scope and clears received transcripts when the app leaves the foreground. */
+    fun clear() {
+        generation++
+        groupEpochs.clear()
+        departedGroups.clear()
+        results.clear()
+        resultOrder.clear()
+        shown.clear()
+        shownOrder.clear()
+    }
+
+    private fun forgetPrefix(prefix: String) {
+        results.keys.removeAll { it.startsWith(prefix) }
+        resultOrder.removeAll { it.startsWith(prefix) }
+        shown.keys.removeAll { it.startsWith(prefix) }
+        shownOrder.removeAll { it.startsWith(prefix) }
     }
 
     private companion object {
@@ -80,43 +122,82 @@ internal class ReceivedVoiceTranscripts(
     }
 }
 
+private fun <T> putVoiceTranscriptEntry(
+    map: MutableMap<String, T>,
+    order: ArrayDeque<String>,
+    key: String,
+    value: T,
+    capacity: Int,
+) {
+    order.remove(key)
+    order.addLast(key)
+    map[key] = value
+    while (order.size > capacity) map.remove(order.removeFirst())
+}
+
 /**
- * One conversation's view of [ReceivedVoiceTranscripts]: keys are scoped to [account] so two signed-in accounts
- * in the same group never share a transcript, and [automatic] mirrors the Dictation setting.
+ * One conversation's view of [ReceivedVoiceTranscripts], scoped to its account, chat and foreground generation.
+ * [automatic] mirrors the Dictation setting.
  */
 @Stable
 internal class VoiceTranscriptionScope(
     val transcripts: ReceivedVoiceTranscripts,
     private val account: String,
     val automatic: Boolean,
+    private val group: String = "",
+    private val recognitionAllowed: () -> Boolean = { true },
 ) {
     private val accountEpoch = transcripts.accountEpoch(account)
+    private val generation = transcripts.generation
+    private val groupEpoch = transcripts.groupEpoch(account, group)
+    private val keyPrefix = "$account|$group|"
 
-    fun shown(messageIdHex: String): Boolean = transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
+    val active: Boolean
+        get() {
+            if (transcripts.generation != generation) return false
+            return transcripts.accountEpoch(account) == accountEpoch &&
+                transcripts.groupEpoch(account, group) == groupEpoch &&
+                recognitionAllowed()
+        }
+
+    /** Resolves the user's visibility choice or uses the automatic preference while the scope is active. */
+    fun shown(messageIdHex: String): Boolean {
+        if (!active) return false
+        return transcripts.shownOverride(messageKey(messageIdHex)) ?: automatic
+    }
 
     /** True only when the person asked for this message's transcript, rather than the automatic setting. */
-    fun requestedExplicitly(messageIdHex: String): Boolean = transcripts.shownOverride(messageKey(messageIdHex)) == true
+    fun requestedExplicitly(messageIdHex: String): Boolean {
+        if (!active) return false
+        return transcripts.shownOverride(messageKey(messageIdHex)) == true
+    }
 
+    /** Updates visibility only within the captured account, chat and foreground generation. */
     fun setShown(
         messageIdHex: String,
         value: Boolean,
     ) {
-        if (transcripts.accountEpoch(account) == accountEpoch) transcripts.setShown(messageKey(messageIdHex), value)
+        if (active) transcripts.setShown(messageKey(messageIdHex), value)
     }
 
-    fun result(attachmentKey: String): AudioTranscriptUi? = transcripts.result(attachmentKey(attachmentKey))
+    /** Reads a cached result only while this scope still owns the attachment. */
+    fun result(attachmentKey: String): AudioTranscriptUi? {
+        if (!active) return null
+        return transcripts.result(attachmentKey(attachmentKey))
+    }
 
+    /** Drops late recognition results when this scope has been revoked. */
     fun storeResult(
         attachmentKey: String,
         value: AudioTranscriptUi,
     ) {
-        if (transcripts.accountEpoch(account) != accountEpoch) return
+        if (!active) return
         transcripts.storeResult(attachmentKey(attachmentKey), value)
     }
 
-    private fun messageKey(messageIdHex: String) = "$account|m|$messageIdHex"
+    private fun messageKey(messageIdHex: String) = "${keyPrefix}m|$messageIdHex"
 
-    private fun attachmentKey(key: String) = "$account|a|$key"
+    private fun attachmentKey(key: String) = "${keyPrefix}a|$key"
 }
 
 /** Null outside a conversation; transcription then falls back to the per-message toggle's own scope. */
@@ -130,7 +211,21 @@ internal fun rememberVoiceTranscription(
     val preferences by appState.conversationDictationPreferences.state.collectAsState()
     val account = controller.boundAccountRef.orEmpty()
     val automatic = preferences.transcribeVoiceMessages
-    return remember(appState, account, automatic) {
-        VoiceTranscriptionScope(appState.receivedVoiceTranscripts, account, automatic)
+    val group = controller.group.groupIdHex
+    val transcripts = appState.receivedVoiceTranscripts
+    val generation = transcripts.generation
+    val accountEpoch = transcripts.accountEpoch(account)
+    val groupEpoch = transcripts.groupEpoch(account, group)
+    return remember(transcripts, controller, account, group, automatic, generation, accountEpoch, groupEpoch) {
+        VoiceTranscriptionScope(transcripts, account, automatic, group) {
+            val foreground = appState.appInForeground && !appState.appLock.screenVisible
+            val groupRecord = appState.boundChats(account)?.groupRecordsById?.get(group)
+            foreground &&
+                controller.isSelfMember &&
+                !controller.group.disbanded &&
+                controller.acceptsConversationActionOwner(account, group) &&
+                controller.latestChatListRow?.endsVoiceTranscription() != true &&
+                groupRecord?.endsVoiceTranscription() != true
+        }
     }
 }

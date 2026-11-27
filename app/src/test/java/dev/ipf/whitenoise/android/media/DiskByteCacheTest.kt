@@ -19,6 +19,7 @@ import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermission
 import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.Cipher
@@ -1538,6 +1539,8 @@ class DiskByteCacheTest {
                 }
             }
 
+        val peek = FutureTask { cold.contains("persisted") }
+        val probe = Thread(peek)
         reader.start()
         try {
             assertTrue(hydrationEntered.await(5, TimeUnit.SECONDS))
@@ -1545,10 +1548,12 @@ class DiskByteCacheTest {
                 "readiness must not publish while cold hydration is blocked",
                 readFinished.await(100, TimeUnit.MILLISECONDS),
             )
-            assertFalse("the main-safe peek remains a miss before handoff", cold.contains("persisted"))
+            probe.start()
+            assertFalse("the main-safe peek remains a miss before handoff", peek.get(10, TimeUnit.SECONDS))
         } finally {
             releaseHydration.countDown()
             reader.join(5_000)
+            probe.join(5_000)
         }
 
         assertTrue(readFinished.await(5, TimeUnit.SECONDS))
@@ -1611,42 +1616,27 @@ class DiskByteCacheTest {
                     putFinished.countDown()
                 }
             }
+        val peek = FutureTask { cache.contains("persisted") }
+        val probe = Thread(peek)
         putThread.start()
-
-        assertTrue(
-            "put should enter cold hydration",
-            hydrationEntered.await(5, TimeUnit.SECONDS),
-        )
-        assertFalse(
-            "put should still be parked in cold hydration",
-            putFinished.await(100, TimeUnit.MILLISECONDS),
-        )
-
-        val containsFinished = CountDownLatch(1)
-        var containsValue: Boolean? = null
-        val containsThread =
-            Thread {
-                try {
-                    containsValue = cache.contains("persisted")
-                } finally {
-                    containsFinished.countDown()
-                }
-            }
-        containsThread.start()
-
         try {
             assertTrue(
-                "contains must not wait for cold put hydration to release the cache monitor",
-                containsFinished.await(500, TimeUnit.MILLISECONDS),
+                "put should enter cold hydration",
+                hydrationEntered.await(5, TimeUnit.SECONDS),
             )
             assertFalse(
+                "put should still be parked in cold hydration",
+                putFinished.await(100, TimeUnit.MILLISECONDS),
+            )
+            probe.start()
+            assertFalse(
                 "cold contains still reports miss before hydration is installed",
-                containsValue!!,
+                peek.get(10, TimeUnit.SECONDS),
             )
         } finally {
             releaseHydration.countDown()
             putThread.join(5_000)
-            containsThread.join(5_000)
+            probe.join(5_000)
         }
         assertTrue("put should finish after hydration is released", putFinished.await(5, TimeUnit.SECONDS))
         assertNotNull(cache.get("new"))
@@ -1903,7 +1893,7 @@ class DiskByteCacheTest {
         override fun listFiles(): Array<File>? {
             hydrationEntered.countDown()
             try {
-                releaseHydration.await(5, TimeUnit.SECONDS)
+                releaseHydration.await()
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }

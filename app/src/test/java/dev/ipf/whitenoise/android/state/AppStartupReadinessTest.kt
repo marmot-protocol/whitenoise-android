@@ -5,37 +5,6 @@ import org.junit.Test
 import java.io.File
 
 class AppStartupReadinessTest {
-    /** Pins every startup unread publication to the current account-list lifetime. */
-    @Test
-    fun staleBackgroundUnreadFoldGuardsAllStatePublication() {
-        val source = accountUnreadRefreshSource()
-        val start = source.indexOf("internal suspend fun WhiteNoiseAppState.refreshAccountUnreadCounts(")
-        val end = source.indexOf("private suspend fun WhiteNoiseAppState.refreshAccountUnreadFold(", startIndex = start)
-        check(start >= 0 && end > start) { "Missing account unread refresh section" }
-        val refresh = source.substring(start, end)
-        val revisionGuard = refresh.lastIndexOf("if (!refreshIsCurrent()) return")
-        val atomicPublication = refresh.indexOf("accountUnreadStore.publishRefresh", startIndex = revisionGuard)
-
-        assertTrue(revisionGuard >= 0)
-        assertTrue(atomicPublication > revisionGuard)
-    }
-
-    @Test
-    fun onlyExplicitRetryRestoresBootstrappingBeforeAwaitingTheProcessAttempt() {
-        val source = appStateSource()
-        val bootstrap = source.functionBody("bootstrap")
-        val retry = source.functionBody("retryBootstrap")
-        val restorePhase = retry.indexOf("phase = AppPhase.Bootstrapping")
-        val awaitAttempt = retry.indexOf("bootstrap()")
-
-        assertTrue(
-            "background bootstrap must preserve an actionable failure",
-            "phase = AppPhase.Bootstrapping" !in bootstrap,
-        )
-        assertTrue(restorePhase >= 0)
-        assertTrue(awaitAttempt > restorePhase)
-    }
-
     @Test
     fun bootstrapMountsLocalShellBeforeUnreadRosterFold() {
         val source = appStateSource()

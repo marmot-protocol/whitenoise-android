@@ -172,7 +172,7 @@ class LocalNotificationReactionChipsTest {
         postConversationCard(presenter)
         val live = manager.activeNotifications.single().notification
         assertNull(live.bigContentView)
-        assertFalse(live.extras.containsKey(EXTRA_QUICK_REACTION_ROWS))
+        assertFalse(live.extras.containsKey(EXTRA_QUICK_REACTION_CHIPS))
         assertEquals(
             choices,
             replyAction()

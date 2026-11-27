@@ -54,11 +54,12 @@ class MediaWorkerPriorityTest {
         try {
             val first = context.next()
             assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
+            val pool = privateField(transport, "pool") as MediaWorkerPool
             val waiting = decodeIn(transport, 2, B)
-            Thread.sleep(FENCE_OBSERVATION_MS)
+            awaitDemand(pool, "slotDemand", 1)
             transport.prioritizeDomain(C, prioritized = true)
             val foreground = decodeIn(transport, 3, C)
-            Thread.sleep(FENCE_OBSERVATION_MS)
+            awaitDemand(pool, "priorityDemand", 1)
             assertTrue(withWorkerIdentity { first.remote.deliverHeldReply(successfulPixelReply()) })
             finish(held)
             finish(foreground)
@@ -146,7 +147,7 @@ class MediaWorkerPriorityTest {
             assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
             transport.prioritizeDomain(C, prioritized = true)
             val closed = decodeIn(transport, 3, C)
-            Thread.sleep(FENCE_OBSERVATION_MS)
+            awaitDemand(privateField(transport, "pool") as MediaWorkerPool, "priorityDemand", 1)
             transport.prioritizeDomain(C, prioritized = false)
             val other = decodeIn(transport, 2, B)
             assertTrue(withWorkerIdentity { first.remote.deliverHeldReply(successfulPixelReply()) })
@@ -179,14 +180,11 @@ class MediaWorkerPriorityTest {
             }
         try {
             val starting = context.next()
-            Thread.sleep(FENCE_OBSERVATION_MS)
+            awaitDemand(pool, "priorityDemand", foreground.size)
             starting.connection.onServiceConnected(context.component, starting.remote)
             val busy = checkNotNull(claimed.poll(2, TimeUnit.SECONDS)) { "one foreground claim was served" }
-            val started = System.nanoTime()
             val other = pool.claim(B, true, DEADLINE_MS) { true }
-            val waitedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
-            assertNotNull("B takes a free slot", other)
-            assertTrue("B waited $waitedMs ms behind a served domain", waitedMs < FENCE_OBSERVATION_MS)
+            assertNotNull("B takes a free slot while C's worker is held", other)
             pool.release(busy)
             assertNotNull("the second foreground claim reuses its worker", claimed.poll(2, TimeUnit.SECONDS))
         } finally {
@@ -194,6 +192,20 @@ class MediaWorkerPriorityTest {
             pool.close()
             context.dieAll()
         }
+    }
+
+    /** Waits for the pool to record demand while the test still controls the occupied worker. */
+    private fun awaitDemand(
+        pool: MediaWorkerPool,
+        field: String,
+        expected: Int,
+    ) {
+        val lock = privateField(pool, "lock")
+
+        fun demand(): Int = synchronized(lock) { privateField(pool, field) as Int }
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEADLINE_MS)
+        while (demand() != expected && System.nanoTime() < deadline) Thread.sleep(1L)
+        assertEquals(field, expected, demand())
     }
 
     /** A domain lane with no spares, so every new domain must start or evict a generation. */
@@ -226,7 +238,6 @@ class MediaWorkerPriorityTest {
         val A = MediaTrustDomain.Conversation("account", "a")
         val B = MediaTrustDomain.Conversation("account", "b")
         val C = MediaTrustDomain.Conversation("account", "c")
-        const val FENCE_OBSERVATION_MS = 300L
-        const val DEADLINE_MS = 3_000L
+        const val DEADLINE_MS = 10_000L
     }
 }

@@ -114,7 +114,7 @@ class DisappearingMessagesPickerScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_confirm_dark_green.png")
 
         composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_ACTION_TAG).performSemanticsAction(SemanticsActions.OnClick)
-        composeRule.waitUntil { composeRule.runOnUiThread { picked != null } }
+        composeRule.mainClock.advanceTimeUntil(timeoutMillis = 5_000L) { picked != null }
         composeRule.runOnIdle { assertEquals(300L, picked) }
     }
 

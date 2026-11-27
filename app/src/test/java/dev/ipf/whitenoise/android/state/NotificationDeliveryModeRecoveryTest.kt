@@ -427,6 +427,55 @@ class NotificationDeliveryModeRecoveryTest {
             }
         }
 
+    /** A foreground edge during the startup account read cannot replace that read and strand onboarding. */
+    @Test
+    fun foregroundDuringStartupAccountReadRestoresTheSignedInAccount() =
+        runBlocking {
+            val startupRead = CountDownLatch(1)
+            val startupReadMayFinish = CountDownLatch(1)
+            val overlappingRead = CountDownLatch(1)
+            val overlappingReadMayFinish = CountDownLatch(1)
+            val reads = AtomicInteger(0)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = listOf(account(ACCOUNT_A)),
+                    nativePushFallbackPlatform = RecordingNativePushFallbackPlatform(context),
+                    pushServerConfigProvider = { CONFIG },
+                    onListAccountsAfterStart = {
+                        if (reads.incrementAndGet() == 1) {
+                            startupRead.countDown()
+                            check(startupReadMayFinish.await(5, TimeUnit.SECONDS))
+                        } else if (startupReadMayFinish.count > 0L) {
+                            // Only a read that overlaps startup's is held, so it cannot publish first.
+                            overlappingRead.countDown()
+                            check(overlappingReadMayFinish.await(5, TimeUnit.SECONDS))
+                        }
+                    },
+                )
+            val bootstrap = async { fixture.bootstrap() }
+            try {
+                withTimeout(5_000) { while (startupRead.count > 0) yield() }
+                fixture.runOnMainLooperPumping { fixture.appState.setAppInForeground(true) }
+                // The foreground sync has either finished or started its own account read.
+                val sync = fixture.appState.notificationDelivery.nativePushSyncMutex
+                fixture.runWithMainLooperPumping {
+                    withTimeout(5_000) { while (sync.isLocked && overlappingRead.count > 0) yield() }
+                }
+                startupReadMayFinish.countDown()
+                bootstrap.await()
+
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+                assertEquals(ACCOUNT_A, fixture.appState.activeAccountRef)
+            } finally {
+                startupReadMayFinish.countDown()
+                overlappingReadMayFinish.countDown()
+                bootstrap.cancelAndJoin()
+                fixture.appState.setAppInForeground(false)
+                fixture.close()
+            }
+        }
+
     /** Foreground capability fallback keeps a disabled rendering preference unchanged. */
     @Test
     fun foregroundReconciliationPreservesRenderingOptOut() =

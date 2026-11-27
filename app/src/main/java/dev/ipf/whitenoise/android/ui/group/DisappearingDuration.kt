@@ -138,24 +138,32 @@ private fun pickCustomPickerState(
         if (fitsUnit) DisappearingCustomPickerState(index, pickerValue) else null
     }
 
-private fun disappearingLabelCountFitsPlural(
-    secs: Long,
-    secondsPerUnit: Long,
-): Boolean =
-    secs > 0L &&
-        secs % secondsPerUnit == 0L &&
-        secs / secondsPerUnit <= Int.MAX_VALUE.toLong()
+/**
+ * The plural quantity for [count]. Past the `Int` range it keeps the last six digits above one million, which
+ * keeps every shipped locale's CLDR category — Russian reads the last two digits, and the Romance "many" form
+ * needs whole millions.
+ */
+internal fun disappearingPluralQuantity(count: Long): Int {
+    if (count <= Int.MAX_VALUE) return count.toInt()
+    return (count % PLURAL_MILLION + PLURAL_MILLION).toInt()
+}
 
+private const val PLURAL_MILLION = 1_000_000L
+
+/** A protocol retention value as UI seconds. Past `Long.MAX_VALUE` it clamps, so it never wraps negative. */
+internal fun ULong.clampedDisappearingSecs(): Long = coerceAtMost(Long.MAX_VALUE.toULong()).toLong()
+
+/** Picks Off, a named preset, or else the largest unit that divides [secs] evenly. */
 internal fun disappearingLabelSpec(secs: Long): DisappearingLabelSpec =
     when {
         secs == 0L -> DisappearingLabelSpec.Off
         disappearingPresetLabelRes[secs] != null ->
             DisappearingLabelSpec.Preset(requireNotNull(disappearingPresetLabelRes[secs]))
-        disappearingLabelCountFitsPlural(secs, DISAPPEARING_SECONDS_PER_YEAR) ->
+        secs % DISAPPEARING_SECONDS_PER_YEAR == 0L ->
             DisappearingLabelSpec.Years(secs / DISAPPEARING_SECONDS_PER_YEAR)
-        disappearingLabelCountFitsPlural(secs, DISAPPEARING_SECONDS_PER_MONTH) ->
+        secs % DISAPPEARING_SECONDS_PER_MONTH == 0L ->
             DisappearingLabelSpec.Months(secs / DISAPPEARING_SECONDS_PER_MONTH)
-        disappearingLabelCountFitsPlural(secs, DISAPPEARING_SECONDS_PER_WEEK) ->
+        secs % DISAPPEARING_SECONDS_PER_WEEK == 0L ->
             DisappearingLabelSpec.Weeks(secs / DISAPPEARING_SECONDS_PER_WEEK)
         secs % DISAPPEARING_SECONDS_PER_DAY == 0L ->
             DisappearingLabelSpec.Days(secs / DISAPPEARING_SECONDS_PER_DAY)

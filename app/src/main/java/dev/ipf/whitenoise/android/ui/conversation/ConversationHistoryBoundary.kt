@@ -51,7 +51,7 @@ internal fun ConversationHistoryBoundary(
     modifier: Modifier = Modifier,
 ) {
     val title = stringResource(R.string.conversation_history_may_have_expired)
-    val duration = disappearingMessagesLabel(retentionSeconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
+    val duration = disappearingMessagesLabel(retentionSeconds)
     val timerDescription = stringResource(R.string.conversation_history_retention_description, title, duration)
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     Column(
