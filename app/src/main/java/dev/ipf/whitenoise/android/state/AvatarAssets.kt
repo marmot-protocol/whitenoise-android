@@ -130,15 +130,6 @@ private suspend fun WhiteNoiseAppState.readDurableAvatarBytes(
     return payload?.takeIf { it.matchesAvatarAsset(asset) && it.bytes.size.toULong() <= maxBytes }?.bytes
 }
 
-/** Reads a bounded list of stored references in one native call. The consumer checks each selection's revision. */
-internal suspend fun WhiteNoiseAppState.readDurableAvatarBatch(
-    account: String,
-    references: List<String>,
-): Map<String, AvatarBytesFfi> =
-    runCatchingCancellable {
-        marmotIo { readAvatarAssets(account, references, DURABLE_AVATAR_MAX_BYTES) }
-    }.getOrNull().orEmpty().associateBy { it.reference }
-
 /** Captures an export of the original retained image, without acquisition or cross-owner completion. */
 internal fun WhiteNoiseAppState.retainedAvatarBytesReader(
     asset: AvatarAssetFfi?,

@@ -38,10 +38,7 @@ internal fun rememberDurableAvatar(
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val cacheKey = accountRef?.let { ownedAsset?.takeIf { it.isRenderable() }?.cacheKey(it) }
-    val pins =
-        LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
-        }
+    val pins = ownedPreparedGroupAvatarPixels(appState, accountRef, lifetime)
     val prepared = cacheKey?.let { pins?.imageFor(ownedAsset, it) }
     val displayed = remember(appState) { DisplayedAvatarPixels() }
     val owner = displayedAvatarOwner(ownedAsset, accountRef, appState.runtimeGeneration, lifetime)
@@ -79,6 +76,15 @@ internal fun rememberDurableAvatar(
         pins?.recordCompleted(ownedAsset, exact)
     }
     return shown
+}
+
+@Composable
+private fun ownedPreparedGroupAvatarPixels(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    lifetime: Long,
+) = LocalPreparedGroupAvatarPixels.current?.takeIf {
+    it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
 }
 
 /** Pixels a [rememberDurableAvatar] call site last committed, and the selection they were drawn for. */

@@ -185,11 +185,12 @@ internal class RetainedGroupAvatarPreparation(
             } ?: return
         val slot = retained[asset.selectionKey()] ?: return
         val previous = slot.value
-        if (previous?.asset == asset && previous.image === image) return
-        val classification =
-            AvatarImageLoader.cachedAnimationClassification(key)
-                ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
-        slot.value = PreparedAvatarImage(asset.copy(), image, classification)
+        if (previous?.asset != asset || previous.image !== image) {
+            val classification =
+                AvatarImageLoader.cachedAnimationClassification(key)
+                    ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
+            slot.value = PreparedAvatarImage(asset.copy(), image, classification)
+        }
     }
 
     fun hasExactRevision(asset: AvatarAssetFfi): Boolean =

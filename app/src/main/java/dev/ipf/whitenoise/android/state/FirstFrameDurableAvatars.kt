@@ -217,3 +217,12 @@ internal fun AccountSwitchLocalSnapshot.installFirstFrameDurableAvatars() {
         AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource, it.animationClassification)
     }
 }
+
+/** Reads a bounded list of stored references in one native call. The consumer checks each selection's revision. */
+internal suspend fun WhiteNoiseAppState.readDurableAvatarBatch(
+    account: String,
+    references: List<String>,
+): Map<String, AvatarBytesFfi> =
+    runCatchingCancellable {
+        marmotIo { readAvatarAssets(account, references, DURABLE_AVATAR_MAX_BYTES) }
+    }.getOrNull().orEmpty().associateBy { it.reference }
