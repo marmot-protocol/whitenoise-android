@@ -70,6 +70,10 @@ class ConversationVisibleReadObserverTest {
             val afterDeparture = cache.groupEpoch(account, row.groupIdHex)
             state.publishConversationChatListRow(account, removed)
             assertEquals(afterDeparture, cache.groupEpoch(account, row.groupIdHex))
+
+            state.publishConversationChatListRow(account, row.copy(selfMembership = SelfMembershipFfi.MEMBER))
+            state.publishConversationChatListRow(account, removed)
+            assertEquals(afterDeparture + 1, cache.groupEpoch(account, row.groupIdHex))
         } finally {
             fixture.close()
         }

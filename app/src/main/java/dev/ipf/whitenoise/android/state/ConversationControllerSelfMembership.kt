@@ -24,12 +24,16 @@ internal fun AppGroupRecordFfi.endsVoiceTranscription(): Boolean = disbanded || 
 internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
     lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
 
-/** Clears transcripts and revokes recognition after an authoritative departure. */
-internal fun ReceivedVoiceTranscripts.forgetDepartedGroup(
+/** Synchronizes voice transcription scope with settled row membership. */
+internal fun ReceivedVoiceTranscripts.updateGroupMembership(
     accountRef: String?,
     row: ChatListRowFfi,
 ) {
-    if (accountRef != null && row.endsVoiceTranscription()) forgetGroup(accountRef, row.groupIdHex)
+    if (accountRef == null) return
+    val departed = row.endsVoiceTranscription()
+    if (departed || row.selfMembership == SelfMembershipFfi.MEMBER) {
+        updateGroupMembership(accountRef, row.groupIdHex, departed)
+    }
 }
 
 private fun SelfMembershipFfi.hasSettledDeparture(leaveRequestPending: Boolean): Boolean =

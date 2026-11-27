@@ -2631,7 +2631,7 @@ class WhiteNoiseAppState private constructor(
         row: ChatListRowFfi,
     ) {
         val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
-        receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row)
+        receivedVoiceTranscripts.updateGroupMembership(accountRef, row)
         controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
     }
 

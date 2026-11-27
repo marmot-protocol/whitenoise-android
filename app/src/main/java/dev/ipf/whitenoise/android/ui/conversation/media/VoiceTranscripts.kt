@@ -31,6 +31,7 @@ internal class ReceivedVoiceTranscripts(
     private val shownOrder = ArrayDeque<String>()
     private val accountEpochs = mutableStateMapOf<String, Int>()
     private val groupEpochs = mutableStateMapOf<String, Int>()
+    private val departedGroups = mutableSetOf<String>()
     var generation by mutableIntStateOf(0)
         private set
 
@@ -67,7 +68,22 @@ internal class ReceivedVoiceTranscripts(
         accountEpochs[account] = accountEpoch(account) + 1
         val prefix = "$account|"
         groupEpochs.keys.removeAll { it.startsWith(prefix) }
+        departedGroups.removeAll { it.startsWith(prefix) }
         forgetPrefix(prefix)
+    }
+
+    /** Authoritative departures revoke scopes once until a later membership update rejoins the group. */
+    fun updateGroupMembership(
+        account: String,
+        group: String,
+        departed: Boolean,
+    ) {
+        val key = "$account|$group|"
+        if (departed) {
+            if (departedGroups.add(key)) forgetGroup(account, group)
+        } else {
+            departedGroups.remove(key)
+        }
     }
 
     fun forgetGroup(
@@ -82,6 +98,7 @@ internal class ReceivedVoiceTranscripts(
     fun clear() {
         generation++
         groupEpochs.clear()
+        departedGroups.clear()
         results.clear()
         resultOrder.clear()
         shown.clear()

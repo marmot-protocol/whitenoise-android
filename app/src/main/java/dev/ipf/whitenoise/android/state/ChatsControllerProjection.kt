@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -21,9 +22,8 @@ internal fun ChatsController.foldGroup(
     // committed record is the edit itself, so it neither needs the fence nor counts as the
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
-    val previous = groupRecordsById[record.groupIdHex]
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
-    evictDepartedVoiceTranscripts(folded, previous)
+    syncVoiceTranscriptionMembership(folded)
     if (fromSubscription) chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
     if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
     scheduleRecompute()
@@ -31,18 +31,15 @@ internal fun ChatsController.foldGroup(
 
 /** Reconnect snapshots and streaming updates both cover chats outside the retained windows. */
 internal fun ChatsController.installGroupRecordsSnapshot(records: Map<String, AppGroupRecordFfi>) {
-    val previous = groupRecordsById
     groupRecordsById = records.mapValues { (_, group) -> withRetainedName(group) }
-    groupRecordsById.values.forEach { evictDepartedVoiceTranscripts(it, previous[it.groupIdHex]) }
+    groupRecordsById.values.forEach { syncVoiceTranscriptionMembership(it) }
 }
 
-private fun ChatsController.evictDepartedVoiceTranscripts(
-    record: AppGroupRecordFfi,
-    previous: AppGroupRecordFfi?,
-) {
+private fun ChatsController.syncVoiceTranscriptionMembership(record: AppGroupRecordFfi) {
     val account = accountRef ?: return
-    if (record.endsVoiceTranscription() && previous?.endsVoiceTranscription() != true) {
-        appState.receivedVoiceTranscripts.forgetGroup(account, record.groupIdHex)
+    val departed = record.endsVoiceTranscription()
+    if (departed || record.selfMembership == SelfMembershipFfi.MEMBER) {
+        appState.receivedVoiceTranscripts.updateGroupMembership(account, record.groupIdHex, departed)
     }
 }
 
