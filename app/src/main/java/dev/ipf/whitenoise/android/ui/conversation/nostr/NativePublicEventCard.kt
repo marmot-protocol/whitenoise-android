@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState.Loaded
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
 
@@ -68,25 +70,30 @@ internal suspend fun WhiteNoiseAppState.refreshPublicEventCardAuthor(
     }
 }
 
-/** Maps MDK previews to card states, enriching present events from one batched cached-identity read. */
-private suspend fun WhiteNoiseAppState.publicEventCardStates(previews: List<PublicEventPreviewFfi>): CardStates {
-    val events = previews.map { it.verifiedEvent() }
-    val authors = cachedEventAuthors(events.mapNotNull { it?.pubkey })
-    return previews.mapIndexed { index, preview ->
-        when (preview.state) {
-            PublicEventPreviewStateFfi.PRESENT ->
-                events[index]?.let { event ->
-                    val card =
-                        event.toCardModel().copy(authorMetadata = authors[event.pubkey.lowercase(Locale.ROOT)])
-                    Loaded(card, preparedPreview(card))
-                } ?: NostrEventCardState.Invalid
-            // MDK records an author's NIP-09 deletion durably, so it settles the card.
-            PublicEventPreviewStateFfi.DELETED -> NostrEventCardState.NotFound
-            PublicEventPreviewStateFfi.MISSING -> null
-            PublicEventPreviewStateFfi.UNSUPPORTED -> NostrEventCardState.Invalid
+/**
+ * Maps MDK previews to card states, enriching present events from one batched cached-identity read. Callers
+ * resolve cards from the conversation's UI scope, and mapping walks every value a received event carries, so it
+ * runs on [Dispatchers.Default].
+ */
+private suspend fun WhiteNoiseAppState.publicEventCardStates(previews: List<PublicEventPreviewFfi>): CardStates =
+    withContext(Dispatchers.Default) {
+        val events = previews.map { it.verifiedEvent() }
+        val authors = cachedEventAuthors(events.mapNotNull { it?.pubkey })
+        previews.mapIndexed { index, preview ->
+            when (preview.state) {
+                PublicEventPreviewStateFfi.PRESENT ->
+                    events[index]?.let { event ->
+                        val card =
+                            event.toCardModel().copy(authorMetadata = authors[event.pubkey.lowercase(Locale.ROOT)])
+                        Loaded(card, preparedPreview(card))
+                    } ?: NostrEventCardState.Invalid
+                // MDK records an author's NIP-09 deletion durably, so it settles the card.
+                PublicEventPreviewStateFfi.DELETED -> NostrEventCardState.NotFound
+                PublicEventPreviewStateFfi.MISSING -> null
+                PublicEventPreviewStateFfi.UNSUPPORTED -> NostrEventCardState.Invalid
+            }
         }
     }
-}
 
 /** The signature-verified event MDK attached to a present preview, or null when it is absent or unreadable. */
 private fun PublicEventPreviewFfi.verifiedEvent(): NostrEvent? =

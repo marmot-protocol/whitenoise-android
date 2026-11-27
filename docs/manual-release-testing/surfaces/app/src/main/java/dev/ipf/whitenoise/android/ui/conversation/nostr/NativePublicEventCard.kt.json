@@ -18,6 +18,14 @@
         "test_ids": [
           "STB-002"
         ]
+      },
+      {
+        "surface": "Received events are mapped to cards on a background dispatcher, so a card with many hostile values never stalls the chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NativePublicEventCard.kt",
+        "anchor": "private suspend fun WhiteNoiseAppState.publicEventCardStates(",
+        "test_ids": [
+          "RDR-002"
+        ]
       }
     ]
   },
