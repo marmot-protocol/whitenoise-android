@@ -1822,6 +1822,15 @@
     <string name="ai_agents_setup_title">設定 %1$s</string>
     <string name="ai_agents_setup_instruction">將此貼到 %1$s。只會分享你的公開金鑰，並要求代理在安裝前取得你的同意。僅用於你信任的代理。</string>
     <string name="ai_agents_copy_prompt">複製提示</string>
+    <string name="ai_agent_review_key">核對代理公鑰</string>
+    <string name="ai_agent_setup_next">收到代理的公鑰後，回到這裡核對公鑰並開啟代理的個人資料。</string>
+    <string name="ai_agent_key_intro">貼上連接器顯示的公鑰或個人資料連結。</string>
+    <string name="ai_agent_key_label">代理公鑰</string>
+    <string name="ai_agent_check_key">檢查公鑰</string>
+    <string name="ai_agent_key_invalid">請輸入有效的代理公鑰或個人資料連結。</string>
+    <string name="ai_agent_key_self">這是你自己的公鑰。請使用代理的公鑰。</string>
+    <string name="ai_agent_key_compare">請比對此公鑰與連接器顯示的公鑰。如果相同，請開啟個人資料並開始聊天。</string>
+    <string name="ai_agent_open_profile">開啟個人資料</string>
     <string name="ai_agents_docs_opened">正在開啟連接器文件。</string>
     <string name="ai_agents_docs_failed">無法開啟連接器文件。</string>
     <string name="ai_agents_manual_setup_title">手動設定</string>
@@ -2115,6 +2124,7 @@
     <string name="setup_finding_unreachable">無法連線至此中繼站。</string>
     <string name="setup_relay_timeout_title">有一個中繼未及時回應</string>
     <string name="setup_finding_timed_out">此次檢查已逾時。</string>
+    <string name="setup_finding_rate_limited">轉送站正在限制請求頻率。請稍後再試。</string>
     <string name="setup_finding_authentication_required">此中繼站要求驗證身分。</string>
     <string name="setup_finding_payment_required">此中繼站要求付費。</string>
     <string name="setup_finding_access_restricted">對此中繼站的存取受到限制。</string>

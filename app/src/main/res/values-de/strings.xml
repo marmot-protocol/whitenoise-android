@@ -1859,6 +1859,15 @@
     <string name="ai_agents_setup_title">%1$s einrichten</string>
     <string name="ai_agents_setup_instruction">Füge dies in %1$s ein. Es teilt nur deinen öffentlichen Schlüssel und bittet den Agenten, vor der Installation deine Zustimmung einzuholen. Nur mit einem Agenten verwenden, dem du vertraust.</string>
     <string name="ai_agents_copy_prompt">Eingabeaufforderung kopieren</string>
+    <string name="ai_agent_review_key">Agentenschlüssel prüfen</string>
+    <string name="ai_agent_setup_next">Sobald dir dein Agent seinen öffentlichen Schlüssel gibt, kehre hierher zurück, um ihn zu prüfen und das Profil zu öffnen.</string>
+    <string name="ai_agent_key_intro">Füge den öffentlichen Schlüssel oder Profillink ein, den dein Connector anzeigt.</string>
+    <string name="ai_agent_key_label">Öffentlicher Schlüssel des Agenten</string>
+    <string name="ai_agent_check_key">Schlüssel prüfen</string>
+    <string name="ai_agent_key_invalid">Gib einen gültigen öffentlichen Schlüssel oder Profillink des Agenten ein.</string>
+    <string name="ai_agent_key_self">Das ist dein eigener öffentlicher Schlüssel. Verwende den Schlüssel deines Agenten.</string>
+    <string name="ai_agent_key_compare">Vergleiche diesen Schlüssel mit dem Schlüssel, den dein Connector anzeigt. Stimmen sie überein, öffne das Profil, um einen Chat zu starten.</string>
+    <string name="ai_agent_open_profile">Profil öffnen</string>
     <string name="ai_agents_docs_opened">Die Konnektor-Dokumentation wird geöffnet.</string>
     <string name="ai_agents_docs_failed">Die Konnektor-Dokumentation ließ sich nicht öffnen.</string>
     <string name="ai_agents_manual_setup_title">Manuelle Einrichtung</string>
@@ -2170,6 +2179,7 @@
     <string name="setup_finding_unreachable">Dieses Relay konnte nicht erreicht werden.</string>
     <string name="setup_relay_timeout_title">Ein Relay hat nicht rechtzeitig geantwortet</string>
     <string name="setup_finding_timed_out">Bei dieser Prüfung wurde das Zeitlimit überschritten.</string>
+    <string name="setup_finding_rate_limited">Das Relay begrenzt die Anfragen. Versuche es gleich noch einmal.</string>
     <string name="setup_finding_authentication_required">Dieses Relay erfordert eine Authentifizierung.</string>
     <string name="setup_finding_payment_required">Dieses Relay erfordert eine Zahlung.</string>
     <string name="setup_finding_access_restricted">Der Zugriff auf dieses Relay ist eingeschränkt.</string>

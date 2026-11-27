@@ -1866,6 +1866,15 @@
     <string name="ai_agents_setup_title">Configurer %1$s</string>
     <string name="ai_agents_setup_instruction">Collez ceci dans %1$s. Seule votre clé publique est partagée, et l’agent est invité à demander votre accord avant d’installer. À utiliser uniquement avec un agent de confiance.</string>
     <string name="ai_agents_copy_prompt">Copier l’invite</string>
+    <string name="ai_agent_review_key">Vérifier la clé de l’agent</string>
+    <string name="ai_agent_setup_next">Quand ton agent te donne sa clé publique, reviens ici pour la vérifier et ouvrir son profil.</string>
+    <string name="ai_agent_key_intro">Colle la clé publique ou le lien du profil affiché par ton connecteur.</string>
+    <string name="ai_agent_key_label">Clé publique de l’agent</string>
+    <string name="ai_agent_check_key">Vérifier la clé</string>
+    <string name="ai_agent_key_invalid">Saisis une clé publique ou un lien de profil valide pour l’agent.</string>
+    <string name="ai_agent_key_self">C’est ta propre clé publique. Utilise celle de ton agent.</string>
+    <string name="ai_agent_key_compare">Compare cette clé à celle affichée par ton connecteur. Si elles correspondent, ouvre le profil pour lancer une discussion.</string>
+    <string name="ai_agent_open_profile">Ouvrir le profil</string>
     <string name="ai_agents_docs_opened">Ouverture de la documentation du connecteur.</string>
     <string name="ai_agents_docs_failed">Impossible d’ouvrir la documentation du connecteur.</string>
     <string name="ai_agents_manual_setup_title">Configuration manuelle</string>
@@ -2158,6 +2167,7 @@
     <string name="setup_finding_unreachable">Ce relais n’a pas pu être joint.</string>
     <string name="setup_relay_timeout_title">Un relais n’a pas répondu à temps</string>
     <string name="setup_finding_timed_out">Cette vérification a dépassé le délai prévu.</string>
+    <string name="setup_finding_rate_limited">Le relais limite les requêtes. Réessaie dans un instant.</string>
     <string name="setup_finding_authentication_required">Ce relais exige une authentification.</string>
     <string name="setup_finding_payment_required">Ce relais exige un paiement.</string>
     <string name="setup_finding_access_restricted">L’accès à ce relais est restreint.</string>

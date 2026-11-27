@@ -71,6 +71,7 @@ internal fun AgentKeyReviewScreen(
             else -> null
         }
     val canonicalKey = (result as? AgentKeyCheck.Valid)?.npub
+    val actionLabel = if (canonicalKey == null) R.string.ai_agent_check_key else R.string.ai_agent_open_profile
     SettingsScaffold(
         title = stringResource(R.string.ai_agent_review_key),
         onBack = onBack,
@@ -78,13 +79,16 @@ internal fun AgentKeyReviewScreen(
             SettingsBottomAction {
                 WhiteNoiseButton(
                     onClick = {
-                        if (canonicalKey == null || input.text.toString().trim() != raw) check() else onOpenProfile(canonicalKey)
+                        if (canonicalKey == null || input.text.toString().trim() != raw) {
+                            check()
+                        } else {
+                            onOpenProfile(canonicalKey)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().testTag("ai_agents.key_action"),
                     enabled = raw.isNotEmpty(),
                 ) {
-                    val label = if (canonicalKey == null) R.string.ai_agent_check_key else R.string.ai_agent_open_profile
-                    Text(stringResource(label))
+                    Text(stringResource(actionLabel))
                 }
             }
         },

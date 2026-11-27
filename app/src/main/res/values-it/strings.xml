@@ -1866,6 +1866,15 @@
     <string name="ai_agents_setup_title">Configura %1$s</string>
     <string name="ai_agents_setup_instruction">Incolla questo in %1$s. Condivide solo la tua chiave pubblica e chiede all’agente la tua approvazione prima di installare. Usalo solo con un agente di cui ti fidi.</string>
     <string name="ai_agents_copy_prompt">Copia prompt</string>
+    <string name="ai_agent_review_key">Verifica la chiave dell’agente</string>
+    <string name="ai_agent_setup_next">Quando l’agente ti dà la sua chiave pubblica, torna qui per verificarla e aprire il suo profilo.</string>
+    <string name="ai_agent_key_intro">Incolla la chiave pubblica o il link al profilo mostrato dal connettore.</string>
+    <string name="ai_agent_key_label">Chiave pubblica dell’agente</string>
+    <string name="ai_agent_check_key">Verifica chiave</string>
+    <string name="ai_agent_key_invalid">Inserisci una chiave pubblica o un link al profilo valido per l’agente.</string>
+    <string name="ai_agent_key_self">Questa è la tua chiave pubblica. Usa quella dell’agente.</string>
+    <string name="ai_agent_key_compare">Confronta questa chiave con quella mostrata dal connettore. Se corrispondono, apri il profilo per avviare una chat.</string>
+    <string name="ai_agent_open_profile">Apri profilo</string>
     <string name="ai_agents_docs_opened">Apertura della documentazione del connettore.</string>
     <string name="ai_agents_docs_failed">Impossibile aprire la documentazione del connettore.</string>
     <string name="ai_agents_manual_setup_title">Configurazione manuale</string>
@@ -2158,6 +2167,7 @@
     <string name="setup_finding_unreachable">Non è stato possibile raggiungere questo relay.</string>
     <string name="setup_relay_timeout_title">Un relay non ha risposto in tempo</string>
     <string name="setup_finding_timed_out">Questa verifica ha superato il tempo limite.</string>
+    <string name="setup_finding_rate_limited">Il relay sta limitando le richieste. Riprova tra poco.</string>
     <string name="setup_finding_authentication_required">Questo relay richiede l’autenticazione.</string>
     <string name="setup_finding_payment_required">Questo relay richiede un pagamento.</string>
     <string name="setup_finding_access_restricted">L’accesso a questo relay è limitato.</string>

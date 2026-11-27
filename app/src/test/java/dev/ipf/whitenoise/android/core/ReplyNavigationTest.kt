@@ -320,31 +320,7 @@ class ReplyNavigationTest {
         receivedAt = 1uL,
         invalidationStatus = null,
         replyToMessageIdHex = replyToMessageIdHex,
-        replyPreview =
-            replyPreviewMessageId?.let {
-                TimelineReplyPreviewFfi(
-                    messageIdHex = it,
-                    sender = "bob",
-                    plaintext = "parent",
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blocks = emptyList(),
-                            blankLinesBefore = ByteArray(0),
-                        ),
-                    kind = 9uL,
-                    mediaJson = null,
-                    media = emptyList(),
-                    replyToMessageIdHex = null,
-                    thread = null,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    deleted = false,
-                    deletionSource = DeletionSourceFfi.UNKNOWN,
-                    invalidationStatus = null,
-                    sticker = null,
-                )
-            },
+        replyPreview = replyPreviewMessageId?.let(::timelineReplyPreview),
         mediaJson = null,
         media = emptyList(),
         thread = null,
@@ -364,4 +340,29 @@ class ReplyNavigationTest {
         recipientConfirmed = false,
         historyImportProvenance = null,
     )
+
+    /** Creates the optional native preview of the message being replied to. */
+    private fun timelineReplyPreview(messageId: String) =
+        TimelineReplyPreviewFfi(
+            messageIdHex = messageId,
+            sender = "bob",
+            plaintext = "parent",
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
+            kind = 9uL,
+            mediaJson = null,
+            media = emptyList(),
+            replyToMessageIdHex = null,
+            thread = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
+            deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
+            invalidationStatus = null,
+            sticker = null,
+        )
 }

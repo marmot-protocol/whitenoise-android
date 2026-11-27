@@ -1855,6 +1855,15 @@
     <string name="ai_agents_setup_title">Configurar %1$s</string>
     <string name="ai_agents_setup_instruction">Pega esto en %1$s. Solo comparte tu clave pública y pide al agente tu aprobación antes de instalar. Úsalo solo con un agente de confianza.</string>
     <string name="ai_agents_copy_prompt">Copiar indicación</string>
+    <string name="ai_agent_review_key">Revisar la llave del agente</string>
+    <string name="ai_agent_setup_next">Cuando tu agente te dé su llave pública, vuelve aquí para comprobarla y abrir su perfil.</string>
+    <string name="ai_agent_key_intro">Pega la llave pública o el enlace al perfil que muestra tu conector.</string>
+    <string name="ai_agent_key_label">Llave pública del agente</string>
+    <string name="ai_agent_check_key">Comprobar llave</string>
+    <string name="ai_agent_key_invalid">Introduce una llave pública o un enlace al perfil del agente que sea válido.</string>
+    <string name="ai_agent_key_self">Esta es tu propia llave pública. Usa la de tu agente.</string>
+    <string name="ai_agent_key_compare">Compara esta llave con la que muestra tu conector. Si coinciden, abre el perfil para iniciar un chat.</string>
+    <string name="ai_agent_open_profile">Abrir perfil</string>
     <string name="ai_agents_docs_opened">Abriendo la documentación del conector.</string>
     <string name="ai_agents_docs_failed">No se pudo abrir la documentación del conector.</string>
     <string name="ai_agents_manual_setup_title">Configuración manual</string>
@@ -2158,6 +2167,7 @@
     <string name="setup_finding_unreachable">No se pudo acceder a este relé.</string>
     <string name="setup_relay_timeout_title">Un relay no respondió a tiempo</string>
     <string name="setup_finding_timed_out">Se agotó el tiempo de esta comprobación.</string>
+    <string name="setup_finding_rate_limited">El relé está limitando las solicitudes. Vuelve a intentarlo en breve.</string>
     <string name="setup_finding_authentication_required">Este relé requiere autenticación.</string>
     <string name="setup_finding_payment_required">Este relé requiere un pago.</string>
     <string name="setup_finding_access_restricted">El acceso a este relé está restringido.</string>

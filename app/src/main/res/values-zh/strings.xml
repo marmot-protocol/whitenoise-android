@@ -1822,6 +1822,15 @@
     <string name="ai_agents_setup_title">设置 %1$s</string>
     <string name="ai_agents_setup_instruction">将此粘贴到 %1$s。只会分享你的公钥，并要求代理在安装前征得你的同意。仅用于你信任的代理。</string>
     <string name="ai_agents_copy_prompt">复制提示</string>
+    <string name="ai_agent_review_key">核对代理公钥</string>
+    <string name="ai_agent_setup_next">收到代理的公钥后，回到这里核对公钥并打开代理的个人资料。</string>
+    <string name="ai_agent_key_intro">粘贴连接器显示的公钥或个人资料链接。</string>
+    <string name="ai_agent_key_label">代理公钥</string>
+    <string name="ai_agent_check_key">检查公钥</string>
+    <string name="ai_agent_key_invalid">请输入有效的代理公钥或个人资料链接。</string>
+    <string name="ai_agent_key_self">这是你自己的公钥。请使用代理的公钥。</string>
+    <string name="ai_agent_key_compare">请将此公钥与连接器显示的公钥进行比较。如果一致，请打开个人资料并开始聊天。</string>
+    <string name="ai_agent_open_profile">打开个人资料</string>
     <string name="ai_agents_docs_opened">正在打开连接器文档。</string>
     <string name="ai_agents_docs_failed">无法打开连接器文档。</string>
     <string name="ai_agents_manual_setup_title">手动设置</string>
@@ -2114,6 +2123,7 @@
     <string name="setup_finding_unreachable">无法连接此中继器。</string>
     <string name="setup_relay_timeout_title">有一个中继未及时响应</string>
     <string name="setup_finding_timed_out">此次检查已超时。</string>
+    <string name="setup_finding_rate_limited">中继正在限制请求频率。请稍后重试。</string>
     <string name="setup_finding_authentication_required">此中继器要求身份验证。</string>
     <string name="setup_finding_payment_required">此中继器要求付费。</string>
     <string name="setup_finding_access_restricted">对此中继器的访问受到限制。</string>

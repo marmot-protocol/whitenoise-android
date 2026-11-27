@@ -91,7 +91,7 @@ class AiAgentsScreenTest {
             when (input) {
                 TEST_NPUB -> MemberRefFfi("OWN", "OWN", TEST_NPUB)
                 "nprofile1agent", "marmot://profile/nprofile1agent" -> MemberRefFfi("agent", "agent", TEST_NPUB)
-                "nsec1secret", hex, "marmot://profile/$hex" -> error("Only public Bech32 references may reach the decoder")
+                "nsec1secret", hex, "marmot://profile/$hex" -> error("Unexpected private input to the decoder")
                 else -> null
             }
         }

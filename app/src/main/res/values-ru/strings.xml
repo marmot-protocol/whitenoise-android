@@ -1943,6 +1943,15 @@
     <string name="ai_agents_setup_title">Настройка %1$s</string>
     <string name="ai_agents_setup_instruction">Вставьте это в %1$s. Передаётся только ваш открытый ключ, а агента просят получить ваше согласие перед установкой. Используйте только с агентом, которому доверяете.</string>
     <string name="ai_agents_copy_prompt">Копировать запрос</string>
+    <string name="ai_agent_review_key">Проверить ключ агента</string>
+    <string name="ai_agent_setup_next">Когда агент сообщит свой публичный ключ, вернитесь сюда, чтобы проверить его и открыть профиль агента.</string>
+    <string name="ai_agent_key_intro">Вставьте публичный ключ или ссылку на профиль, которые показывает коннектор.</string>
+    <string name="ai_agent_key_label">Публичный ключ агента</string>
+    <string name="ai_agent_check_key">Проверить ключ</string>
+    <string name="ai_agent_key_invalid">Введите действительный публичный ключ агента или ссылку на его профиль.</string>
+    <string name="ai_agent_key_self">Это ваш публичный ключ. Используйте ключ агента.</string>
+    <string name="ai_agent_key_compare">Сравните этот ключ с тем, который показывает коннектор. Если ключи совпадают, откройте профиль, чтобы начать чат.</string>
+    <string name="ai_agent_open_profile">Открыть профиль</string>
     <string name="ai_agents_docs_opened">Открытие документации коннектора.</string>
     <string name="ai_agents_docs_failed">Не удалось открыть документацию коннектора.</string>
     <string name="ai_agents_manual_setup_title">Ручная настройка</string>
@@ -2235,6 +2244,7 @@
     <string name="setup_finding_unreachable">Не удалось связаться с этим реле.</string>
     <string name="setup_relay_timeout_title">Ретранслятор не ответил вовремя</string>
     <string name="setup_finding_timed_out">Время ожидания проверки истекло.</string>
+    <string name="setup_finding_rate_limited">Ретранслятор ограничивает частоту запросов. Повторите попытку чуть позже.</string>
     <string name="setup_finding_authentication_required">Это реле требует аутентификации.</string>
     <string name="setup_finding_payment_required">Это реле требует оплаты.</string>
     <string name="setup_finding_access_restricted">Доступ к этому реле ограничен.</string>
