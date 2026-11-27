@@ -110,7 +110,7 @@ class ConversationShortcutLifecycleCoverageTest {
         )
         assertTrue(
             "Account cleanup must cancel each known conversation's cards, which outlive deleted channels",
-            "retirement.dismissConversationMessagesImmediately(accountRef, groupIdHex)" in presenterCleanup &&
+            "retirement.dismissConversationMessages(accountRef, groupIdHex" in presenterCleanup &&
                 "knownGroupIds.forEach" in presenterCleanup,
         )
         assertTrue(

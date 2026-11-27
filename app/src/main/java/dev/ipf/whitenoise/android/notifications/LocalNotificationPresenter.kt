@@ -145,15 +145,16 @@ class LocalNotificationPresenter(
     /**
      * Clears the departing account's cards and shortcut presentation under the caller's acknowledged
      * credential-revocation fence. Most cards post to shared channels, so deleting the account's own
-     * channels and shortcuts leaves them in the shade; each known conversation's cards are cancelled here.
+     * channels and shortcuts leaves them in the shade; each known conversation's cards are cancelled here,
+     * retrying a stale platform snapshot like conversation opening does.
      */
-    fun clearRevokedConversationShortcutsForAccount(
+    suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
         knownGroupIds: Collection<String> = emptySet(),
     ) {
         knownGroupIds.forEach { groupIdHex ->
-            retirement.dismissConversationMessagesImmediately(accountRef, groupIdHex)
+            retirement.dismissConversationMessages(accountRef, groupIdHex, Dispatchers.IO)
         }
         conversationShortcuts.clearRevokedConversationShortcutsForAccount(
             accountRef,
