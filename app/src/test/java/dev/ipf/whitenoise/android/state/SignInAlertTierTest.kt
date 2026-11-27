@@ -128,7 +128,11 @@ class SignInAlertTierTest {
         assertFalse(again.postCompromise)
 
         val more =
-            plan(emptyList(), warning = listOf(alertWarning("a"), alertWarning("b")), announcedWarning = first.announcedWarning)
+            plan(
+                emptyList(),
+                warning = listOf(alertWarning("a"), alertWarning("b")),
+                announcedWarning = first.announcedWarning,
+            )
         assertTrue(more.postCompromise)
 
         assertTrue(plan(emptyList(), announcedWarning = more.announcedWarning).withdrawCompromise)

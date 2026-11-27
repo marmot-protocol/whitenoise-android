@@ -108,7 +108,12 @@ class SignInAlertScreenshotTest {
     private fun Rows() {
         Column {
             listOf(SignInAlertTier.Review, SignInAlertTier.Compromise).forEach { tier ->
-                AccountHubGroup(ProfileReadiness.Loading, onOpenLinkedDevices = {}, onOpenDetail = {}, devicesTier = tier)
+                AccountHubGroup(
+                    ProfileReadiness.Loading,
+                    onOpenLinkedDevices = {},
+                    onOpenDetail = {},
+                    devicesTier = tier,
+                )
             }
         }
     }

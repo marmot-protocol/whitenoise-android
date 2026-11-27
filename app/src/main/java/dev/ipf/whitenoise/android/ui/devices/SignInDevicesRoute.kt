@@ -54,7 +54,9 @@ internal fun SignInDevicesRouteEffect(
                         appState.setActiveAccount(
                             request.accountRef,
                             shouldActivate = {
-                                eligible() && appState.signInAlerts.devicesRequest == request && !appState.appLock.screenVisible
+                                eligible() &&
+                                    appState.signInAlerts.devicesRequest == request &&
+                                    !appState.appLock.screenVisible
                             },
                         )
                     if (!activated && !appState.appLock.screenVisible) appState.signInAlerts.devicesOpened(request)
@@ -105,7 +107,8 @@ internal fun DevicesRowTrailing(tier: SignInAlertTier) {
                         .testTag(DEVICES_ROW_BADGE_TAG)
                         .semantics { contentDescription = description },
                 containerColor = if (compromise) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                contentColor = if (compromise) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
+                contentColor =
+                    if (compromise) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
             )
         }
         Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)

@@ -406,15 +406,14 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
-        SignInAlertNavigation.accountRef(intent, notificationTapTokens)?.let { account ->
+        val signInAlertAccount = SignInAlertNavigation.accountRef(intent, notificationTapTokens)
+        val opensProfileChooser = signInAlertAccount == null && notificationProfileTileRoute.accept(intent)
+        if (signInAlertAccount != null) {
             pinTapGate.supersede()
-            appState.signInAlerts.requestDevices(account)
-            setIntent(Intent(this, MainActivity::class.java))
-            return
+            appState.signInAlerts.requestDevices(signInAlertAccount)
         }
-        val opensProfileChooser = notificationProfileTileRoute.accept(intent)
-        if (opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
-            if (!opensProfileChooser) {
+        if (signInAlertAccount != null || opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
+            if (signInAlertAccount == null && !opensProfileChooser) {
                 pinTapGate.supersede()
                 inboundAppUpdateTap += 1
             }
@@ -430,16 +429,10 @@ class MainActivity : AppCompatActivity() {
         val pinTarget = pinTapGate.target(this, intent)
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
-            if (retainNotification) {
-                null
+            if (!retainNotification) {
+                pinTarget ?: parseNotificationTarget(intent, retainPendingShareOnRecreation, notificationTapTokens)
             } else {
-                pinTarget ?: NotificationNavigation.parse(
-                    intent,
-                    importReplyDraft = !retainPendingShareOnRecreation,
-                    isTrustedTargetSignature = notificationTapTokens::isValidTarget,
-                ) { notificationKey, tapToken ->
-                    notificationTapTokens.isValid(notificationKey, tapToken)
-                }
+                null
             }
         val parsedShare =
             if (retainPendingShareOnRecreation && inboundShareRequest != null) {
@@ -887,3 +880,16 @@ internal class AppUnlockPromptHostState : ViewModel() {
         expectedCipher = null
     }
 }
+
+private fun parseNotificationTarget(
+    intent: Intent?,
+    retainPendingShareOnRecreation: Boolean,
+    tokens: NotificationTapTokens,
+): NotificationTarget? =
+    NotificationNavigation.parse(
+        intent,
+        importReplyDraft = !retainPendingShareOnRecreation,
+        isTrustedTargetSignature = tokens::isValidTarget,
+    ) { notificationKey, tapToken ->
+        tokens.isValid(notificationKey, tapToken)
+    }

@@ -274,7 +274,9 @@ class DeviceManagementContentTest {
 
         compose.onNodeWithTag(COMPROMISE_WARNING_TAG).assertExists()
         compose.onNodeWithText(context.getString(R.string.compromise_warning_title)).assertExists()
-        compose.onNodeWithText(context.getString(R.string.compromise_warning_step_move), substring = true).assertExists()
+        compose
+            .onNodeWithText(context.getString(R.string.compromise_warning_step_move), substring = true)
+            .assertExists()
         compose.onNodeWithText(context.getString(R.string.compromise_warning_dismiss)).assertExists()
         compose.onNodeWithText(context.getString(R.string.compromise_warning_dismiss_detail)).assertExists()
         compose.onNodeWithTag(COMPROMISE_WARNING_DISMISS_TAG).performClick()

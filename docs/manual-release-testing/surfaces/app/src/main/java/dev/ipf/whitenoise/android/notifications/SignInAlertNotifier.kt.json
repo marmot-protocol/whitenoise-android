@@ -40,15 +40,6 @@
         ]
       },
       {
-        "surface": "Sign-in alerts: R.string.sign_in_alert_compromise_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
-        "anchor": "R.string.sign_in_alert_compromise_title",
-        "test_ids": [
-          "SET-076",
-          "SET-077"
-        ]
-      },
-      {
         "surface": "Sign-in alerts: R.string.sign_in_alert_review_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.sign_in_alert_review_body",

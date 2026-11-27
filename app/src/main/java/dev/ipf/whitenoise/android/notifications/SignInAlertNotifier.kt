@@ -42,8 +42,9 @@ internal class SignInAlertNotifier(
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setOnlyAlertOnce(!alert)
-                    .setPublicVersion(publicVersion(R.string.sign_in_alert_review_public, NotificationChannelSpec.SIGN_IN_REVIEW))
-                    .build(),
+                    .setPublicVersion(
+                        publicVersion(R.string.sign_in_alert_review_public, NotificationChannelSpec.SIGN_IN_REVIEW),
+                    ).build(),
         )
     }
 
@@ -61,12 +62,13 @@ internal class SignInAlertNotifier(
             accountRef = accountRef,
             notification =
                 builder(accountRef, COMPROMISE_ID, NotificationChannelSpec.ACCOUNT_SECURITY)
-                    .setContentTitle(context.getString(R.string.sign_in_alert_compromise_title))
+                    .setContentTitle(context.getString(R.string.sign_in_alert_compromise_public))
                     .setContentText(body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setPublicVersion(publicVersion(R.string.sign_in_alert_compromise_public, NotificationChannelSpec.ACCOUNT_SECURITY))
-                    .build(),
+                    .setPublicVersion(
+                        publicVersion(R.string.sign_in_alert_compromise_public, NotificationChannelSpec.ACCOUNT_SECURITY),
+                    ).build(),
         )
     }
 
@@ -165,13 +167,18 @@ internal object SignInAlertNavigation {
         intent: Intent?,
         tokens: NotificationTapTokens,
     ): String? {
-        if (intent?.action != ACTION_OPEN) return null
-        val data = intent.data ?: return null
-        if (data.scheme != URI_SCHEME || data.host != URI_HOST) return null
-        val account = intent.getStringExtra(EXTRA_ACCOUNT_REF)?.takeIf(String::isNotBlank) ?: return null
+        val data =
+            intent
+                ?.takeIf { it.action == ACTION_OPEN }
+                ?.data
+                ?.takeIf { it.scheme == URI_SCHEME && it.host == URI_HOST }
+                ?: return null
+        val account = intent.getStringExtra(EXTRA_ACCOUNT_REF)?.takeIf(String::isNotBlank)
         val id = intent.getIntExtra(EXTRA_ID, -1)
-        if (id != SignInAlertNotifier.REVIEW_ID && id != SignInAlertNotifier.COMPROMISE_ID) return null
-        return account.takeIf { tokens.isValid(tapKey(account, id), data.pathSegments.singleOrNull()) }
+        return account?.takeIf {
+            (id == SignInAlertNotifier.REVIEW_ID || id == SignInAlertNotifier.COMPROMISE_ID) &&
+                tokens.isValid(tapKey(it, id), data.pathSegments.singleOrNull())
+        }
     }
 
     fun tapKey(

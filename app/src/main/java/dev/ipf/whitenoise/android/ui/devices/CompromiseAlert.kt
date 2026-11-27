@@ -65,8 +65,7 @@ internal fun CompromiseAlertHost(
     val alerts = appState.signInAlerts
     // A warning raised before the event stream opened, or for an account just switched to, is read here.
     LaunchedEffect(accountRef, appState.runtimeGeneration) { appState.refreshSignInAlerts(accountRef) }
-    val snapshot = alerts.snapshot(accountRef) ?: return
-    if (blocked || snapshot.alertDue.isEmpty()) return
+    val snapshot = alerts.snapshot(accountRef)?.takeIf { !blocked && it.alertDue.isNotEmpty() } ?: return
     val scope = rememberCoroutineScope()
     var hiding by remember(accountRef) { mutableStateOf(false) }
     CompromiseAlert(

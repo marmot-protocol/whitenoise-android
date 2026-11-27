@@ -120,8 +120,12 @@ class SignInAlertNotifierTest {
     private fun assertNamesNothing(notification: Notification) {
         val extras = notification.extras
         val texts =
-            listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT, Notification.EXTRA_BIG_TEXT, Notification.EXTRA_SUB_TEXT)
-                .mapNotNull { extras.getCharSequence(it)?.toString() }
+            listOf(
+                Notification.EXTRA_TITLE,
+                Notification.EXTRA_TEXT,
+                Notification.EXTRA_BIG_TEXT,
+                Notification.EXTRA_SUB_TEXT,
+            ).mapNotNull { extras.getCharSequence(it)?.toString() }
         assertTrue(texts.isNotEmpty())
         texts.forEach { assertFalse(it, it.contains(ACCOUNT)) }
     }

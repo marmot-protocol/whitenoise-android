@@ -47,17 +47,21 @@ internal suspend fun WhiteNoiseAppState.refreshSignInAlerts(accountRef: String) 
         val account = accounts.firstOrNull { it.label == accountRef }
         if (!linkedDevicesAvailable() || account == null || !signInAlertsApply(account)) {
             alerts.forget(accountRef)
-            return
+            return@withLock
         }
         val generation = runtimeGeneration
         val (signIns, warning) =
             runCatchingCancellable {
                 marmotIo { unrecognizedSignIns(accountRef) to compromiseWarning(accountRef) }
-            }.getOrNull() ?: return
-        if (generation != runtimeGeneration) return
+            }.getOrNull() ?: return@withLock
         val current = accounts.firstOrNull { it.label == accountRef }
-        if (current?.accountIdHex != account.accountIdHex || !signInAlertsApply(current)) return
-        alerts.publish(accountRef, account.accountIdHex, signIns, warning)
+        if (
+            generation == runtimeGeneration &&
+            current?.accountIdHex == account.accountIdHex &&
+            signInAlertsApply(current)
+        ) {
+            alerts.publish(accountRef, account.accountIdHex, signIns, warning)
+        }
     }
 }
 

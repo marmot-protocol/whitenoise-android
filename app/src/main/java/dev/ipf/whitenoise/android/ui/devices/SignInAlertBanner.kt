@@ -48,8 +48,7 @@ internal const val COMPROMISE_CARD_HIDE_TAG = "sign_in_alert.compromise_card.hid
  */
 @Composable
 internal fun SignInAlertChatListNotice(appState: WhiteNoiseAppState) {
-    if (!linkedDevicesAvailable()) return
-    val accountRef = appState.activeAccountRef ?: return
+    val accountRef = appState.activeAccountRef?.takeIf { linkedDevicesAvailable() } ?: return
     val snapshot = appState.signInAlerts.snapshot(accountRef) ?: return
     val scope = rememberCoroutineScope()
     var hiding by remember(accountRef) { mutableStateOf(false) }
@@ -61,7 +60,9 @@ internal fun SignInAlertChatListNotice(appState: WhiteNoiseAppState) {
         onHide = {
             hiding = true
             scope.launch {
-                if (!appState.hideCompromiseWarning(accountRef)) appState.present(R.string.compromise_warning_hide_failed)
+                if (!appState.hideCompromiseWarning(accountRef)) {
+                    appState.present(R.string.compromise_warning_hide_failed)
+                }
                 hiding = false
             }
         },
@@ -102,7 +103,8 @@ internal fun SignInAlertBanner(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related, Alignment.End),
         ) {
-            val color = if (compromise) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary
+            val color =
+                if (compromise) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary
             if (compromise) {
                 TextButton(onClick = onHide, enabled = !hiding, modifier = Modifier.testTag(COMPROMISE_CARD_HIDE_TAG)) {
                     Text(stringResource(R.string.compromise_warning_dismiss), color = color)
