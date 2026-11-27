@@ -1224,20 +1224,13 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
-                "groupRoster" ->
-                    conversationTimelineGroupRoster().copy(
-                        groupIdHex = groupRecord.groupIdHex,
-                        selfMembership = if (calls.leave.get() > 0) SelfMembershipFfi.LEFT else groupRecord.selfMembership,
-                    )
+                "groupRoster" -> lifecycleGroupRoster(groupRecord, calls.leave.get() > 0)
                 "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed", "groupManagementState" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
                 "chatListRow" -> lifecycleProjectionRow(projection, calls, localGroupPresent, left, arguments)
-                "chatList" -> {
-                    calls.chatList.incrementAndGet()
-                    lifecycleChatRows(localGroupPresent, left)
-                }
+                "chatList" -> readLifecycleChatRows(calls, localGroupPresent, left)
                 "leaveGroup" -> {
                     calls.order.add("leave")
                     calls.leave.incrementAndGet()
@@ -1273,6 +1266,23 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
+
+    private fun lifecycleGroupRoster(
+        group: AppGroupRecordFfi,
+        leaveAccepted: Boolean,
+    ) = conversationTimelineGroupRoster().copy(
+        groupIdHex = group.groupIdHex,
+        selfMembership = if (leaveAccepted) SelfMembershipFfi.LEFT else group.selfMembership,
+    )
+
+    private fun readLifecycleChatRows(
+        calls: LifecycleCalls,
+        present: Boolean,
+        left: Boolean,
+    ): List<ChatListRowFfi> {
+        calls.chatList.incrementAndGet()
+        return lifecycleChatRows(present, left)
     }
 
     private class LifecycleGroupProjection(
