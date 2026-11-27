@@ -133,7 +133,13 @@ class ConversationRouteHeaderMotionScreenshotTest {
                     listOf("All", "Unread", "Groups").forEach { Pill(it) }
                 }
             }
-            Column(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp).conversationRouteBodyMotion()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 8.dp)
+                    .conversationRouteBodyMotion(),
+            ) {
                 ChatRow("Design team", "Mina: The review is ready")
                 ChatRow("Release planning", "Version 0.7.0 checklist")
                 ChatRow("Mina", "See you tomorrow")

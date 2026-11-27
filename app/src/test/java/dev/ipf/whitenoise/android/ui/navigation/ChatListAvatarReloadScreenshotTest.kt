@@ -266,8 +266,10 @@ class ChatListAvatarReloadScreenshotTest {
     }
 
     /** The independent search icon marks the first frame painted by the header band. */
-    private fun hasPaintedHeader(): Boolean =
-        hasCyanInk(rule.onNodeWithContentDescription("Search chats"), FIRST_HEADER_CONTRAST)
+    private fun hasPaintedHeader(): Boolean {
+        val searchIcon = rule.onNodeWithContentDescription("Search chats")
+        return hasCyanInk(searchIcon, FIRST_HEADER_CONTRAST)
+    }
 
     private fun hasPaintedRow(tag: String): Boolean =
         hasCyanInk(

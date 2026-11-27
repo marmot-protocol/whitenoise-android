@@ -94,10 +94,13 @@ class ConversationRouteHeaderMotionTest {
         val route = mutableStateOf<String?>(null)
         rule.mainClock.autoAdvance = false
         setRouteContent(route) {
-            HeaderPage(
-                conversation = it != null,
-                color = if (it == "Bravo") Color.Green else if (it == null) Color.Blue else Color.Red,
-            )
+            val color =
+                when (it) {
+                    "Bravo" -> Color.Green
+                    null -> Color.Blue
+                    else -> Color.Red
+                }
+            HeaderPage(conversation = it != null, color = color)
         }
         rule.mainClock.advanceTimeBy(400)
         commit(route, "Alpha")
