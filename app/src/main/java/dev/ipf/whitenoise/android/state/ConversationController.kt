@@ -31,7 +31,6 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -2521,12 +2520,12 @@ class ConversationController(
                     }
                 if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
-                // Authoritative local self-leave: record it before the
+                // Latch the local read-only state before the
                 // synchronous snapshot drop so any subsequent
                 // authoritative roster round-trip that still
                 // sees the engine pre-eviction cannot re-add self and re-enable
                 // the composer / restore the full member count (issue #787).
-                recordSelfLeft()
+                recordSelfLeft(settledDeparture = false)
                 // Drop self from the cached member snapshot synchronously so
                 // re-opening the just-left group seeds a roster without self
                 // and renders the disabled notice immediately, instead of
@@ -3408,18 +3407,6 @@ class ConversationController(
         if (ownsInviteAcceptanceResult && inviteAcceptanceResolutionPending) {
             withMutationLockResult(Unit) { if (inviteAcceptanceResolutionPending) refreshMembers() }
         }
-    }
-
-    /**
-     * Latch the authoritative local self-leave marker (issue #787). Set on a
-     * confirmed self-leave (leaveGroup success) or engine eviction
-     * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
-     * roster application so a transient round-trip can't restore self
-     * before the engine eviction is observed locally. A removed device
-     * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
-     */
-    internal fun recordSelfLeft() {
-        selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
     /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */

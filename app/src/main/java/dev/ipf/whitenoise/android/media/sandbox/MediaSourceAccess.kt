@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.system.Os
 import android.system.OsConstants
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -108,7 +109,10 @@ internal class MediaSourceAccess(
         file: File,
         block: (ParcelFileDescriptor) -> T?,
     ): T? {
-        if (closed || !file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) return null
+        if (closed || !file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) {
+            if (!closed && !file.exists()) throw FileNotFoundException("Selected media file unavailable")
+            return null
+        }
         return own(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { input ->
             if (closed || input.value.statSize !in 1..MAX_MEDIA_SOURCE_BYTES) null else block(input.value)
         }
@@ -163,8 +167,8 @@ internal class MediaSourceAccess(
     }
 
     /**
-     * Accepts file/content URI ranges after size and offset validation under provider admission.
-     * Whole files keep the descriptor path; slices are staged. The separate capability passed to
+     * Borrows local files directly and validates content URI ranges under provider admission.
+     * Whole files keep the descriptor path; slices are staged. The capability passed to
      * [block] closes on return and does not retain the provider admission slot.
      */
     fun <T> withMediaUriInput(
@@ -172,7 +176,10 @@ internal class MediaSourceAccess(
         uri: android.net.Uri,
         block: (ParcelFileDescriptor) -> T?,
     ): T? {
-        if (uri.scheme != "file" && uri.scheme != "content") return null
+        if (uri.scheme != "content") {
+            val filePath = uri.path?.takeIf { uri.scheme == "file" }
+            return filePath?.let { withMediaFileInput(File(it), block) }
+        }
         val selected =
             withProviderDeadline { signal, opened ->
                 resolver.openAssetFileDescriptor(uri, "r", signal)?.let(::own)?.use { owner ->

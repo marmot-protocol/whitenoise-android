@@ -1579,6 +1579,7 @@ class WhiteNoiseAppState private constructor(
             persistenceDispatcher = appLockPersistenceDispatcher,
             appInForeground = { appInForeground },
             stopSpeaking = ::stopSpeaking,
+            onScreenShown = receivedVoiceTranscripts::clear,
             presentNotice = { present(it) },
             resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
             resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
@@ -2631,6 +2632,7 @@ class WhiteNoiseAppState private constructor(
         row: ChatListRowFfi,
     ) {
         val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
+        receivedVoiceTranscripts.updateGroupMembership(accountRef, row)
         controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
     }
 
@@ -4922,6 +4924,7 @@ class WhiteNoiseAppState private constructor(
             .resetForAccount()
         // Revoke decrypted speech before another identity can use platform Resume.
         stopSpeaking()
+        receivedVoiceTranscripts.clear()
         diagnostics.observations.invalidate()
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch { diagnostics.activity(engine, ProductAnalyticsActivityFfi.ACCOUNT_CHANGED) }
@@ -6130,6 +6133,7 @@ class WhiteNoiseAppState private constructor(
                 dismissVisibleConversationNotifications()
             }
         } else {
+            receivedVoiceTranscripts.clear()
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
             voiceNotes.onAppBackgrounded()
@@ -6186,8 +6190,8 @@ class WhiteNoiseAppState private constructor(
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
         voiceNotes.onAppBackgrounded()
-        // The app-state lifecycle is authoritative even if the TTS foreground
-        // service has not started yet or its start was rejected.
+        receivedVoiceTranscripts.clear()
+        // The app-state lifecycle also owns speech before its foreground service starts.
         stopSpeaking()
         mutationsScope.launch { draftWriter.flush() }
     }
@@ -7085,7 +7089,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Synchronously drop the active account from the cached member snapshot for
-     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
+     * [groupIdHex] after a leave request is accepted (issue #545). The snapshot seeds the
      * next [ConversationController]'s `seededSelfMember`; without this, a stale
      * positive snapshot would still place self in the group and flash the active
      * composer when the just-left conversation is re-opened. No-op when there is

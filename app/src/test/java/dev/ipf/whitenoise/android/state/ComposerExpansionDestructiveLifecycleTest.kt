@@ -42,6 +42,9 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.VoiceTranscriptionScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -674,6 +677,55 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
+    fun acceptedLeavePreservesTranscriptsUntilMembershipSettles() =
+        runBlocking {
+            for (fromChats in listOf(false, true)) {
+                val fixture = fixture(leaveConfirmed = false)
+                val chats = fixture.seededChatsController()
+                fixture.appState.attachChatsController(chats)
+                val cache = fixture.appState.receivedVoiceTranscripts
+                val transcript = AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words")
+                val scope = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                scope.storeResult("recording", transcript)
+                scope.setShown("message", true)
+                try {
+                    val accepted =
+                        if (fromChats) chats.leaveGroup(GROUP_ID) else fixture.conversationController.leaveGroup()
+                    assertTrue(accepted)
+                    assertEquals(1, fixture.calls.leave.get())
+                    fixture.conversationController.refreshMembers()
+                    assertTrue(fixture.conversationController.membersVerified)
+                    assertEquals(SelfMembershipFfi.LEFT, fixture.conversationController.group.selfMembership)
+                    assertTrue(scope.active)
+                    val pending =
+                        fixture.groupRecord.copy(
+                            selfMembership = SelfMembershipFfi.LEFT,
+                            leaveRequestPending = true,
+                            leaveRequestedAtMs = 1uL,
+                            leaveBlocked = true,
+                        )
+                    chats.foldGroupRecordForTest(pending)
+                    assertTrue(scope.active)
+                    chats.foldGroupRecordForTest(fixture.groupRecord)
+                    assertEquals(transcript, scope.result("recording"))
+                    assertTrue(scope.shown("message"))
+
+                    chats.foldGroupRecordForTest(
+                        pending.copy(leaveRequestPending = false, leaveRequestedAtMs = null, leaveBlocked = false),
+                    )
+                    assertFalse(scope.active)
+                    val reopened = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+                    assertNull(reopened.result("recording"))
+                    assertFalse(reopened.shown("message"))
+                } finally {
+                    fixture.appState.attachChatsController(null)
+                    chats.onCleared()
+                    fixture.conversationController.onCleared()
+                }
+            }
+        }
+
+    @Test
     fun failedChatListLeaveRetainsTheConversationGeometry() =
         runBlocking {
             val fixture = fixture(failLeave = true)
@@ -818,6 +870,10 @@ class ComposerExpansionDestructiveLifecycleTest {
             val fixture = fixture(attachConversationController = false, missingProjection = MissingProjection.JOINED)
             val appState = fixture.appState
             val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val cache = appState.receivedVoiceTranscripts
+            val removedTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+            val otherTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = OTHER_GROUP)
+            removedTranscript.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words"))
             val journal = appState.localGroupDeleteCleanupJournal
             val intent = PendingLocalGroupDeleteCleanup(ACCOUNT_REF, GROUP_ID, emptyList(), emptySet())
             journal.stage(intent)
@@ -838,6 +894,8 @@ class ComposerExpansionDestructiveLifecycleTest {
             readback.join()
 
             assertEquals(1, fixture.calls.chatListRow.get())
+            assertFalse(removedTranscript.active)
+            assertTrue(otherTranscript.active)
             assertTrue(replacement.isFile)
             assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
             assertEquals(intent, journal.find(ACCOUNT_REF, GROUP_ID))
@@ -851,6 +909,10 @@ class ComposerExpansionDestructiveLifecycleTest {
             val fixture = fixture(attachConversationController = false)
             val appState = fixture.appState
             val key = VoiceNoteKey(ACCOUNT_REF, GROUP_ID)
+            val cache = appState.receivedVoiceTranscripts
+            val removedTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = GROUP_ID)
+            val otherTranscript = VoiceTranscriptionScope(cache, ACCOUNT_REF, automatic = false, group = OTHER_GROUP)
+            removedTranscript.storeResult("recording", AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, "Cached words"))
             lateinit var replacement: File
 
             val cleanupComplete =
@@ -866,6 +928,8 @@ class ComposerExpansionDestructiveLifecycleTest {
 
             assertEquals(1, fixture.calls.delete.get())
             assertFalse(cleanupComplete)
+            assertFalse(removedTranscript.active)
+            assertTrue(otherTranscript.active)
             assertTrue(replacement.isFile)
             assertEquals(replacement, appState.voiceNotes.draft(key)?.file)
             assertTrue(appState.localGroupDeleteCleanupJournal.hasPending())
@@ -1468,15 +1532,13 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
+                "groupRoster" -> lifecycleGroupRoster(groupRecord, calls.leave.get() > 0)
                 "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed", "groupManagementState" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
                 "chatListRow" -> lifecycleProjectionRow(projection, calls, localGroupPresent, left, arguments)
-                "chatList" -> {
-                    calls.chatList.incrementAndGet()
-                    lifecycleChatRows(localGroupPresent, left)
-                }
+                "chatList" -> readLifecycleChatRows(calls, localGroupPresent, left)
                 "leaveGroup" -> {
                     calls.order.add("leave")
                     calls.leave.incrementAndGet()
@@ -1512,6 +1574,23 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
+
+    private fun lifecycleGroupRoster(
+        group: AppGroupRecordFfi,
+        leaveAccepted: Boolean,
+    ) = conversationTimelineGroupRoster().copy(
+        groupIdHex = group.groupIdHex,
+        selfMembership = if (leaveAccepted) SelfMembershipFfi.LEFT else group.selfMembership,
+    )
+
+    private fun readLifecycleChatRows(
+        calls: LifecycleCalls,
+        present: Boolean,
+        left: Boolean,
+    ): List<ChatListRowFfi> {
+        calls.chatList.incrementAndGet()
+        return lifecycleChatRows(present, left)
     }
 
     private class LifecycleGroupProjection(

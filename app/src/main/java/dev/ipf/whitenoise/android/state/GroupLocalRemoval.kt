@@ -96,6 +96,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
         onAdmitted()
         val account = request.account
         val groupIdHex = request.groupIdHex
+        val runtime = runtimeGeneration
         val captureIsCurrent = localDeleteCaptureGuard(account, groupIdHex)
         val attempt =
             LocalGroupDeleteAttempt(
@@ -130,11 +131,16 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                     preflightFallback = request.mediaPreflightFallback(),
                 ),
             )
-        onNativeCommitted()
-        if (pending != null) {
-            completeLocalGroupDeleteCleanup(pending, attempt, captureIsCurrent)
-        } else {
-            true
+        withContext(NonCancellable) {
+            withContext(Dispatchers.Main.immediate) {
+                if (runtimeGeneration == runtime) receivedVoiceTranscripts.forgetGroup(account, groupIdHex)
+            }
+            onNativeCommitted()
+            if (pending != null) {
+                completeLocalGroupDeleteCleanup(pending, attempt, captureIsCurrent)
+            } else {
+                true
+            }
         }
     }
 
@@ -143,7 +149,7 @@ private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
     attempt: LocalGroupDeleteAttempt,
     captureIsCurrent: () -> Boolean,
-) = withContext(NonCancellable) {
+): Boolean {
     var cleanupFailure: Throwable? = null
     val result =
         runCatching {
@@ -160,7 +166,7 @@ private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
             appStateDebug(failure) { "local delete client cleanup deferred" }
             schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
         }
-    result.isSuccess
+    return result.isSuccess
 }
 
 private suspend fun WhiteNoiseAppState.prepareLocalGroupDeleteCleanup(
@@ -193,10 +199,15 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
                     },
                     isGroupPresent = { nativeGroupPresent(pending.account, pending.groupIdHex) },
                     cleanup = {
-                        withContext(Dispatchers.Main.immediate) {
-                            dismissLocalDeleteFailure(it.account, it.groupIdHex)
+                        withContext(NonCancellable) {
+                            withContext(Dispatchers.Main.immediate) {
+                                if (runtimeGeneration == runtime) {
+                                    receivedVoiceTranscripts.forgetGroup(it.account, it.groupIdHex)
+                                }
+                                dismissLocalDeleteFailure(it.account, it.groupIdHex)
+                            }
+                            finishLocalGroupDeleteCleanup(it, captureIsCurrent)
                         }
-                        withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it, captureIsCurrent) }
                     },
                     finish = localGroupDeleteCleanupJournal::finish,
                 )
@@ -291,6 +302,7 @@ internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     account: String,
     groupIdHex: String,
 ) {
+    withContext(Dispatchers.Main.immediate) { receivedVoiceTranscripts.forgetGroup(account, groupIdHex) }
     val media =
         runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
             .getOrNull()

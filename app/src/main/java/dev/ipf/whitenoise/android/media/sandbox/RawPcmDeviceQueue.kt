@@ -15,7 +15,8 @@ internal class RawPcmDeviceQueue(
     private val restart: () -> Unit,
     private val nowMs: () -> Long,
 ) {
-    private var outputFrames = 0L
+    var outputFrames = 0L
+        private set
     private var queuedFrames = 0L
     private var observedHead = 0L
     private var effectiveFrames = normalFrames
@@ -88,7 +89,6 @@ internal class RawPcmDeviceQueue(
     val acceptedDeviceFrames: Long get() = queuedFrames
     val physicalHeadFrames: Long get() = observedHead
     val playedOutputFrames: Long get() = minOf(observedHead, outputFrames)
-    val mediaDrained: Boolean get() = observedHead >= outputFrames
     val fullyDrained: Boolean get() = paddingRemaining == 0 && observedHead >= queuedFrames
 
     /**

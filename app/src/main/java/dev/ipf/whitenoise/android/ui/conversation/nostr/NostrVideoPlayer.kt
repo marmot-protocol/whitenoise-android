@@ -4,6 +4,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.media.sandbox.RawPausedSeekFailure
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
@@ -93,9 +95,9 @@ private fun NostrVideoPlayback(
     var attempt by remember(directory) { mutableIntStateOf(0) }
     var download by remember(directory) { mutableStateOf<File?>(null) }
     var failed by remember(directory) { mutableStateOf(false) }
+    var seekFailure by remember(directory) { mutableStateOf<RawPausedSeekFailure?>(null) }
     var playerGeneration by remember(directory) { mutableIntStateOf(0) }
-    // Consumed synchronously, so one failure starts at most one new attempt. A completed download is kept: a playback
-    // failure rebuilds only the player, and only a failed download fetches the clip again.
+    // Consume the failure synchronously. Reuse the private copy if the player still has one.
     val retry = {
         if (failed) {
             failed = false
@@ -124,8 +126,15 @@ private fun NostrVideoPlayback(
     if (file == null) {
         NostrVideoPlayerSurface(player = null, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
     } else {
-        val player = rememberNostrVideoPlayer(file, playerGeneration) { failed = true }
-        NostrVideoPlayerSurface(player = player, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
+        val player =
+            rememberNostrVideoPlayer(file, playerGeneration) { error ->
+                seekFailure = error?.cause as? RawPausedSeekFailure
+                if (error != null && seekFailure == null) {
+                    if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) download = null
+                    failed = true
+                }
+            }
+        NostrVideoPlayerSurface(player, failed, retry, onDismiss, seekFailure)
     }
 }
 
@@ -134,7 +143,7 @@ private fun NostrVideoPlayback(
 private fun rememberNostrVideoPlayer(
     file: File,
     generation: Int,
-    onPlaybackFailed: () -> Unit,
+    onPlaybackError: (PlaybackException?) -> Unit,
 ): Player {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -146,7 +155,7 @@ private fun rememberNostrVideoPlayer(
                 setHandleAudioBecomingNoisy(true)
                 addListener(
                     object : Player.Listener {
-                        override fun onPlayerError(error: PlaybackException) = onPlaybackFailed()
+                        override fun onPlayerErrorChanged(error: PlaybackException?) = onPlaybackError(error)
                     },
                 )
             }
@@ -176,6 +185,7 @@ private fun NostrVideoPlayerSurface(
     playbackFailed: Boolean,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
+    seekFailure: RawPausedSeekFailure? = null,
 ) {
     Box(
         modifier = Modifier.fillMaxSize().nativePageBody().background(Color.Black),
@@ -198,7 +208,14 @@ private fun NostrVideoPlayerSurface(
         } else if (!playbackFailed) {
             CircularProgressIndicator(color = Color.White, modifier = Modifier.testTag(NOSTR_VIDEO_DOWNLOADING_TAG))
         }
-        if (playbackFailed) NostrVideoPlaybackFailure(onRetry)
+        if (playbackFailed) {
+            NostrVideoPlaybackFailure(onRetry)
+        } else if (seekFailure != null && player != null) {
+            NostrVideoPlaybackFailure(
+                onRetry = { if (player.playerError?.cause === seekFailure) player.seekTo(seekFailure.positionMs) },
+                message = R.string.video_seek_failed,
+            )
+        }
         AttachmentViewerChrome(
             title = stringResource(R.string.media_type_video),
             onClose = onDismiss,
@@ -213,7 +230,10 @@ private fun NostrVideoPlayerSurface(
 }
 
 @Composable
-private fun NostrVideoPlaybackFailure(onRetry: () -> Unit) {
+private fun NostrVideoPlaybackFailure(
+    onRetry: () -> Unit,
+    @StringRes message: Int = R.string.nostr_video_playback_failed,
+) {
     Column(
         modifier =
             Modifier
@@ -224,7 +244,7 @@ private fun NostrVideoPlaybackFailure(onRetry: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = stringResource(R.string.nostr_video_playback_failed),
+            text = stringResource(message),
             color = Color.White,
             style = MaterialTheme.typography.bodyLarge,
         )
