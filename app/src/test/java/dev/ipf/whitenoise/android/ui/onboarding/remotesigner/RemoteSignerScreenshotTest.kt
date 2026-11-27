@@ -23,11 +23,13 @@ import dev.ipf.marmotkit.Nip46ErrorFfi
 import dev.ipf.marmotkit.Nip46StateFfi
 import dev.ipf.marmotkit.Nip46StatusFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.RemoteSignerAccountStatus
 import dev.ipf.whitenoise.android.state.RemoteSignerHealth
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.onboarding.SignInContent
 import dev.ipf.whitenoise.android.ui.settings.RemoteSignerAccountActions
-import dev.ipf.whitenoise.android.ui.settings.RemoteSignerPermissionsDialog
+import dev.ipf.whitenoise.android.ui.settings.RemoteSignerAccountDialogs
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.remoteSignerAccountItems
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -130,10 +132,25 @@ class RemoteSignerScreenshotTest {
     /** At 200% text, every expanded permission can scroll into view and the approval stays reachable. */
     @Test fun accountPermissionReviewRtlLargeText() {
         val permissions = FakeRemoteSignerSession().reviewPermissions()
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        val state =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore.forContext(app),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = null,
+            )
         RuntimeEnvironment.setFontScale(2f)
         try {
             show(dark = true, rtl = true) {
-                RemoteSignerPermissionsDialog(permissions, onApprove = {}, onDismiss = {})
+                RemoteSignerAccountDialogs(
+                    state,
+                    account = "fixture",
+                    dialog = null,
+                    review = permissions,
+                    onDismiss = {},
+                )
             }
             composeRule.onNodeWithTag("remote_signer.review.details").performScrollTo().performClick()
             permissions.grants.forEach { grant ->

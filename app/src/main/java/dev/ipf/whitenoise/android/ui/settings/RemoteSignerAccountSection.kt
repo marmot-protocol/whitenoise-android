@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +28,7 @@ import dev.ipf.whitenoise.android.state.reconnectRemoteSigner
 import dev.ipf.whitenoise.android.state.reviewRemoteSignerPermissions
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerPermissionReview
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.openRemoteSignerApproval
@@ -134,7 +133,7 @@ internal fun rememberRemoteSignerAccountActions(
     }
 }
 
-/** Disconnect confirmation, renewed permission review and the re-pair flow for one account. */
+/** Hosts disconnect, re-pairing, and permission re-review with independently scrolling grants. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun RemoteSignerAccountDialogs(
@@ -166,42 +165,25 @@ internal fun RemoteSignerAccountDialogs(
         }
     }
     review?.let { permissions ->
-        RemoteSignerPermissionsDialog(
-            permissions = permissions,
-            onApprove = {
-                onDismiss()
-                appState.launchMutation { appState.approveRemoteSignerPermissions(account, permissions) }
+        WhiteNoiseAlertDialog(
+            ownerKey = permissions,
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.remote_signer_review_title)) },
+            text = { RemoteSignerPermissionReview(permissions, Modifier.fadingVerticalScroll()) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        appState.launchMutation { appState.approveRemoteSignerPermissions(account, permissions) }
+                    },
+                    modifier = Modifier.testTag("remote_signer.account.approve"),
+                ) {
+                    Text(stringResource(R.string.remote_signer_review_approve))
+                }
             },
-            onDismiss = onDismiss,
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         )
     }
-}
-
-/** Keeps all permission rows reachable while the dialog's approval and dismissal actions stay pinned. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun RemoteSignerPermissionsDialog(
-    permissions: Nip46PermissionsFfi,
-    onApprove: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    WhiteNoiseAlertDialog(
-        ownerKey = permissions,
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.remote_signer_review_title)) },
-        text = {
-            RemoteSignerPermissionReview(
-                permissions,
-                Modifier.verticalScroll(rememberScrollState()),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onApprove, modifier = Modifier.testTag("remote_signer.account.approve")) {
-                Text(stringResource(R.string.remote_signer_review_approve))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
 }
 
 /** The status line; a pending browser check names the page's host before anything can be opened. */

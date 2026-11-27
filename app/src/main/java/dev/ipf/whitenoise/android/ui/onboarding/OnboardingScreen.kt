@@ -52,11 +52,7 @@ internal fun OnboardingScreen(
     val identity = privateKeyState.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var remoteSigner by remember { mutableStateOf<RemoteSignerEntry?>(null) }
-    val signingInState =
-        remember {
-            val action = inFlightAction
-            mutableStateOf(action == OnboardingAction.Importing || action == OnboardingAction.AmberLogin)
-        }
+    val signingInState = remember { mutableStateOf(false) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
