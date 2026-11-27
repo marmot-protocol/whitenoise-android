@@ -1,0 +1,22 @@
+allprojects {
+    pluginManager.withPlugin("com.android.application") {
+        if (project.path != ":app") return
+        def components = project.extensions.getByName("androidComponents")
+        def fixture = project.file(project.property("climbFixture"))
+        components.finalizeDsl({ android ->
+            android.testBuildType = "nonMinifiedRelease"
+            def benchmark = android.sourceSets.getByName("androidTest")
+            benchmark.java.setSrcDirs([])
+            benchmark.kotlin.setSrcDirs([new File(fixture, "kotlin")])
+            benchmark.assets.setSrcDirs([new File(fixture, "assets")])
+            benchmark.manifest.srcFile(new File(fixture.parentFile, "AndroidManifest.xml"))
+        } as org.gradle.api.Action)
+        components.onVariants(components.selector().withBuildType("nonMinifiedRelease")) { variant ->
+            variant.applicationId.set(project.property("climbApplicationId").toString())
+            variant.sources.manifests.addStaticManifestFile(new File(fixture.parentFile, "AppManifest.xml").absolutePath)
+        }
+        project.configurations.matching { it.name.contains("AndroidTest") }.configureEach {
+            resolutionStrategy.deactivateDependencyLocking()
+        }
+    }
+}

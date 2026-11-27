@@ -360,10 +360,39 @@ permissions:
   contents: read
 
 jobs:
+  playback-cadence-fixture:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/4262-cadence-72aa749'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ runner.temp }}/marmotkit-cache
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+        with:
+          cache-read-only: true
+      - name: Build ARM64 app and test APKs
+        run: bash scripts/playback-cadence-fixture/build.sh
+      - name: Retain fixture APKs and source pins
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: playback-cadence-fixture-${{ github.sha }}
+          path: build/playback-cadence-apks/
+          if-no-files-found: error
+          retention-days: 3
+
   # Draft PRs boot no emulators; ready_for_review starts the run.
   changes:
     name: Select emulator lanes
-    if: ${{ (!github.event.pull_request.draft && !inputs.mdk_preview_qualification) || (inputs.media_trace_target && inputs.media_trace_target != 'healthy') }}
+    if: ${{ github.ref != 'refs/heads/diagnostics/4262-cadence-72aa749' && ((!github.event.pull_request.draft && !inputs.mdk_preview_qualification) || (inputs.media_trace_target && inputs.media_trace_target != 'healthy')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -1123,7 +1152,7 @@ jobs:
 
   mdk-signed-preview:
     name: Exact trusted preview upgrade and cold restart
-    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy') && (github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification) }}
+    if: ${{ github.ref != 'refs/heads/diagnostics/4262-cadence-72aa749' && ((!inputs.media_trace_target || inputs.media_trace_target == 'healthy') && (github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
