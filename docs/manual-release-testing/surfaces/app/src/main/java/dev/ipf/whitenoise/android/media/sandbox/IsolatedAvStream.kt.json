@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-046"
         ]
+      },
+      {
+        "surface": "Video playback inherits the foreground client's scheduling group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedAvStream.kt",
+        "anchor": "Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT",
+        "test_ids": [
+          "MED-046"
+        ]
       }
     ]
   },

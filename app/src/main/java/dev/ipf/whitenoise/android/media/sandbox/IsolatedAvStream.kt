@@ -351,11 +351,18 @@ internal class IsolatedAvStream private constructor(
     @Suppress("TooGenericExceptionCaught") // Any binding exception leaves process creation uncertain.
     private fun bind() {
         bindingAttempted = true
+        // A video worker supplies frames to the foreground player, so let Android inherit its scheduling group.
+        val flags =
+            if (lane == AvStreamLane.Playback && wantVideo) {
+                Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT
+            } else {
+                Context.BIND_AUTO_CREATE
+            }
         val accepted =
             try {
                 context.bindIsolatedService(
                     Intent(context, MediaAvPlaybackService::class.java),
-                    Context.BIND_AUTO_CREATE,
+                    flags,
                     workerInstanceName(if (lane == AvStreamLane.Playback) "av_playback" else "av_analysis", instance),
                     { command -> callbackHandler.post(command) },
                     connection,
