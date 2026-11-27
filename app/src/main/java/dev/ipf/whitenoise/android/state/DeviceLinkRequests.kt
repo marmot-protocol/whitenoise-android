@@ -253,9 +253,9 @@ internal class DeviceLinkRequestWatcher(
 
     /** Presents [request] because the user tapped its notice. Nothing opens while the shell is blocked. */
     fun open(request: DeviceLinkRequest) {
-        val next = queue.open(request, blocked)
-        if (queue.presented == null) next.presented?.let { attempts?.reviewed(it) }
-        queue = next
+        val presented = queue.presented
+        queue = queue.open(request, blocked)
+        if (presented == null) queue.presented?.let { attempts?.reviewed(it) }
     }
 
     /** Puts the notice for [request] off until MDK drops it, without answering it. */
