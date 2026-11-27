@@ -2631,14 +2631,7 @@ class WhiteNoiseAppState private constructor(
         row: ChatListRowFfi,
     ) {
         val controllers = synchronized(conversationControllerLock) { conversationControllers.toList() }
-        if (accountRef != null && row.endsVoiceTranscription()) {
-            val mountedTransition =
-                controllers.any {
-                    it.matchesConversation(accountRef, row.groupIdHex) &&
-                        it.latestChatListRow?.endsVoiceTranscription() != true
-                }
-            receivedVoiceTranscripts.forgetGroup(accountRef, row.groupIdHex, onlyIfCached = !mountedTransition)
-        }
+        receivedVoiceTranscripts.forgetDepartedGroup(accountRef, row, controllers)
         controllers.forEach { controller -> controller.applyAuthoritativeChatListRow(accountRef, row) }
     }
 

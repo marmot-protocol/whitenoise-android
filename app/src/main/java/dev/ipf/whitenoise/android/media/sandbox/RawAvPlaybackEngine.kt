@@ -131,7 +131,6 @@ internal class RawAvPlaybackEngine(
             it.observation = observation
         }
 
-    /** Samples playback diagnostics when requested. */
     fun observeAudio() {
         observation?.let(renderer::observeAudio)
     }
@@ -322,7 +321,6 @@ internal class RawAvPlaybackEngine(
         }
     }
 
-    /** Admits prepared work under the engine lock. The opened stream supplies its authoritative layout. */
     private fun finishPreparation(completion: SettableFuture<Void?>) {
         headerReady = true
         status = if (playIntent) Status.Buffering else Status.Ready

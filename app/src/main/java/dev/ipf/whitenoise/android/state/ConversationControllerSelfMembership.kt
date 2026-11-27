@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.ReceivedVoiceTranscripts
 
 /**
  * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
@@ -22,6 +23,20 @@ internal fun AppGroupRecordFfi.endsVoiceTranscription(): Boolean = disbanded || 
 
 internal fun ChatListRowFfi.endsVoiceTranscription(): Boolean =
     lifecycleState == GroupLifecycleStateFfi.DISBANDED || selfMembership.hasSettledDeparture(leaveRequestPending)
+
+/** Evicts cached transcripts and revokes active work when a mounted conversation loses membership. */
+internal fun ReceivedVoiceTranscripts.forgetDepartedGroup(
+    accountRef: String?,
+    row: ChatListRowFfi,
+    controllers: List<ConversationController>,
+) {
+    if (accountRef == null || !row.endsVoiceTranscription()) return
+    val mountedTransition =
+        controllers.any {
+            it.matchesConversation(accountRef, row.groupIdHex) && it.latestChatListRow?.endsVoiceTranscription() != true
+        }
+    forgetGroup(accountRef, row.groupIdHex, onlyIfCached = !mountedTransition)
+}
 
 private fun SelfMembershipFfi.hasSettledDeparture(leaveRequestPending: Boolean): Boolean =
     isNonMember() && !(this == SelfMembershipFfi.LEFT && leaveRequestPending)
