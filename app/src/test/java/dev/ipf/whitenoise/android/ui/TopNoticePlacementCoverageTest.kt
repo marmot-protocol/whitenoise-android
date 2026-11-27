@@ -70,7 +70,13 @@ class TopNoticePlacementCoverageTest {
         val root = mainSource("ui/WhiteNoiseApp.kt").functionBody("WhiteNoiseApp")
         assertTrue("AppQuestionHosts(appState, topNoticeHost)" in root)
         val questions = mainSource("ui/AppQuestionHosts.kt").functionBody("AppQuestionHosts")
-        val linkScope = questions.kotlinBlockFrom("CompositionLocalProvider(LocalTopNoticeHost provides topNoticeHost)")
+        val provider = "CompositionLocalProvider(LocalTopNoticeHost provides topNoticeHost)"
+        val linkScope =
+            questions.kotlinBlockFrom(
+                openDelimiter = questions.indexOf(provider) + provider.length,
+                description = provider,
+                searchForOpening = true,
+            )
         assertTrue("DeviceLinkRequestHost(" in linkScope)
     }
 
