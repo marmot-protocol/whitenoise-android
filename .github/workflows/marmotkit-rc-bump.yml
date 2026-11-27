@@ -1,0 +1,76 @@
+name: MarmotKit RC bump
+
+on:
+  schedule:
+    - cron: '10 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-marmotkit-rc-bump
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Verify Android MarmotKit RC
+    # The schedule lives on master. Only the development checkout feeds the candidate.
+    if: github.repository == 'marmot-protocol/whitenoise-android' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      proposal: ${{ steps.candidate.outputs.proposal }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare the next pin
+        id: candidate
+        env:
+          PROPOSAL_DIR: ${{ runner.temp }}/marmotkit-rc-proposal
+        run: |
+          if [[ ! -f scripts/sync_marmotkit_rc.py ]]; then
+            echo "::error::Merge the MarmotKit RC sync command (#4268) into develop before running the bump."
+            exit 1
+          fi
+          python3 scripts/sync_marmotkit_rc.py --proposal-dir "$PROPOSAL_DIR"
+          if [[ -f "$PROPOSAL_DIR/proposal.json" ]]; then
+            git rev-parse HEAD > "$PROPOSAL_DIR/base.txt"
+            echo "proposal=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Hand verified proposal to publisher
+        if: steps.candidate.outputs.proposal == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: marmotkit-rc-proposal
+          path: ${{ runner.temp }}/marmotkit-rc-proposal/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Open or refresh the RC pull request
+    needs: prepare
+    if: needs.prepare.outputs.proposal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: marmotkit-rc-proposal
+          path: ${{ runner.temp }}/marmotkit-rc-proposal
+
+      - name: Publish draft to develop
+        env:
+          GH_TOKEN: ${{ secrets.MARMOTKIT_BUMP_TOKEN }}
+        run: bash .github/scripts/publish-marmotkit-rc.sh "$RUNNER_TEMP/marmotkit-rc-proposal"

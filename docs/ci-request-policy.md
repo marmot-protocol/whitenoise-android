@@ -88,6 +88,19 @@ secrets, and the local release script checks it before building production APKs.
 A Stable pin uses a final `X.Y.Z` release and its matching Android
 archive. Published RC pins are eligible for validation on `develop`.
 
+The scheduled MarmotKit RC bump runs from the default branch, `master`, and
+prepares the next Android pin from `develop`. It opens or refreshes one draft
+PR from `automation/marmotkit-rc` to `develop`. It preserves human commits
+and ready-for-review candidates. Reruns with the same pin leave the PR alone.
+
+Land the RC sync command on `develop` before enabling the schedule. Configure
+the repository secret `MARMOTKIT_BUMP_TOKEN` with a dedicated bot user's
+fine-grained token that can write Contents and Pull requests in this repository. This lets the
+automated PR trigger Android CI. The token is used only by the job that
+publishes the signed pin commit. Review the release impact and, when the ZIP
+does not declare features, record builder evidence below the generated section
+in the draft before marking it ready.
+
 The initial rollout preserves full master validation. Reduced PR work is enabled
 only when `ANDROID_CI_MODE` is exactly `merge-queue`, after native queue rules,
 external integration authorization and the existing source-owner repair loop are
