@@ -70,7 +70,8 @@ class StickerPresentationTest {
         assertEquals(DiscoveryState.LoadFailed, state(readFailed = true, search = "cat"))
         assertEquals(DiscoveryState.LoadFailed, state(readFailed = true, failed = true))
         assertEquals(DiscoveryState.Packs, state(count = 1, readFailed = true))
-        assertEquals(DiscoveryState.Loading, state(loading = true, readFailed = true))
+        // A failed local read offers its retry even while a relay sync is still running.
+        assertEquals(DiscoveryState.LoadFailed, state(loading = true, readFailed = true))
     }
 
     @Test
