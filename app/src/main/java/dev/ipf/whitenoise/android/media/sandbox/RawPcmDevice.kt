@@ -71,10 +71,7 @@ internal class AndroidRawPcmDevice(
 ) : RawPcmDevice {
     override val underruns: Int get() = track.underrunCount
     private val track: AudioTrack
-    private val timestamp = AudioTimestamp()
-    private var nextTimestampNs = Long.MIN_VALUE
-    private var hasTimestamp = false
-    private var sampledTimestamp = false
+    private val presentationClock = RawPcmPresentationClock(rate, ::readTimestamp)
     private var routeType: Int? = null
     override var presentationRouteGeneration = 0
         private set
@@ -142,35 +139,17 @@ internal class AndroidRawPcmDevice(
     override fun headPosition(): Int = track.playbackHeadPosition
 
     override fun presentationFrames(): Long? {
-        val now = System.nanoTime()
         if (routeChanged.getAndSet(false)) {
             presentationRouteGeneration++
             routeType = null
-            resetTimestamp()
+            presentationClock.reset()
         }
-        if (now >= nextTimestampNs) {
-            if (routeType == null) routeType = runCatching { track.routedDevice?.type }.getOrNull()
-            val previousFrame = timestamp.framePosition
-            val previousTime = timestamp.nanoTime
-            val available = runCatching { track.getTimestamp(timestamp) }.getOrDefault(false)
-            val moved = timestamp.framePosition != previousFrame && timestamp.nanoTime > previousTime
-            val advancing = available && (!sampledTimestamp || moved)
-            val interval = if (sampledTimestamp && advancing) TIMESTAMP_STABLE_NS else TIMESTAMP_WARMUP_NS
-            nextTimestampNs = now + interval
-            sampledTimestamp = sampledTimestamp || available
-            hasTimestamp = advancing
-        }
-        if (!hasTimestamp) return null
-        val elapsed = now - timestamp.nanoTime
-        return elapsed.takeIf { it in -NANOS_PER_SECOND..MAX_TIMESTAMP_AGE_NS }?.let {
-            (timestamp.framePosition + it * rate / NANOS_PER_SECOND).coerceAtLeast(0L)
-        }
+        return presentationClock.frames(System.nanoTime(), underruns)
     }
 
-    private fun resetTimestamp() {
-        sampledTimestamp = false
-        hasTimestamp = false
-        nextTimestampNs = Long.MIN_VALUE
+    private fun readTimestamp(timestamp: AudioTimestamp): Boolean {
+        if (routeType == null) routeType = runCatching { track.routedDevice?.type }.getOrNull()
+        return track.getTimestamp(timestamp)
     }
 
     /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
@@ -187,7 +166,7 @@ internal class AndroidRawPcmDevice(
 
     /** Starts the owned raw-PCM device without enabling a compressed-media parser. */
     override fun play() {
-        resetTimestamp()
+        presentationClock.reset()
         track.play()
     }
 
@@ -210,11 +189,65 @@ internal class AndroidRawPcmDevice(
     }
 
     private companion object {
+        const val LOCAL_ROUTE_LATENCY_MS = 60L
+        const val UNKNOWN_ROUTE_LATENCY_MS = 300L
+    }
+}
+
+/** Samples the hardware clock and rejects extrapolation across a mixer underrun. */
+internal class RawPcmPresentationClock(
+    private val rate: Int,
+    private val readTimestamp: (AudioTimestamp) -> Boolean,
+) {
+    private val timestamp = AudioTimestamp()
+    private var nextTimestampNs = Long.MIN_VALUE
+    private var hasTimestamp = false
+    private var sampledTimestamp = false
+    private var previousUnderruns = 0
+    private var minimumTimestampNs = Long.MIN_VALUE
+
+    fun frames(
+        nowNs: Long,
+        underruns: Int,
+    ): Long? {
+        if (underruns != previousUnderruns) {
+            previousUnderruns = underruns
+            minimumTimestampNs = nowNs
+            hasTimestamp = false
+            nextTimestampNs = nowNs
+        }
+        if (nowNs >= nextTimestampNs) sample(nowNs)
+        if (!hasTimestamp) return null
+        val elapsed = nowNs - timestamp.nanoTime
+        return elapsed.takeIf { it in -NANOS_PER_SECOND..MAX_TIMESTAMP_AGE_NS }?.let {
+            (timestamp.framePosition + it * rate / NANOS_PER_SECOND).coerceAtLeast(0L)
+        }
+    }
+
+    private fun sample(nowNs: Long) {
+        val previousFrame = timestamp.framePosition
+        val previousTime = timestamp.nanoTime
+        val available = runCatching { readTimestamp(timestamp) }.getOrDefault(false)
+        val moved = timestamp.framePosition != previousFrame && timestamp.nanoTime > previousTime
+        val advancing = available && timestamp.nanoTime >= minimumTimestampNs && (!sampledTimestamp || moved)
+        val interval = if (sampledTimestamp && advancing) TIMESTAMP_STABLE_NS else TIMESTAMP_WARMUP_NS
+        nextTimestampNs = nowNs + interval
+        sampledTimestamp = sampledTimestamp || available
+        hasTimestamp = advancing
+    }
+
+    /** A new route or play start returns to timestamp warmup. */
+    fun reset() {
+        sampledTimestamp = false
+        hasTimestamp = false
+        nextTimestampNs = Long.MIN_VALUE
+        minimumTimestampNs = Long.MIN_VALUE
+    }
+
+    private companion object {
         const val NANOS_PER_SECOND = 1_000_000_000L
         const val TIMESTAMP_WARMUP_NS = 50_000_000L
         const val TIMESTAMP_STABLE_NS = 10_000_000_000L
         const val MAX_TIMESTAMP_AGE_NS = TIMESTAMP_STABLE_NS + NANOS_PER_SECOND
-        const val LOCAL_ROUTE_LATENCY_MS = 60L
-        const val UNKNOWN_ROUTE_LATENCY_MS = 300L
     }
 }

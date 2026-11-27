@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -124,6 +125,33 @@ class RawPcmOutputSonicTest {
             assertEquals(10_000L, output.positionUs())
             assertTrue(output.drained())
         }
+    }
+
+    @Test fun underrunRejectsStaleSamplesUntilTheHardwareClockAdvancesAgain() {
+        var sampleTimeNs = 1_000_000_000L
+        var sampleFrame = 8_000L
+        val clock =
+            RawPcmPresentationClock(8_000) { timestamp ->
+                timestamp.nanoTime = sampleTimeNs
+                timestamp.framePosition = sampleFrame
+                true
+            }
+        assertEquals(8_000L, clock.frames(sampleTimeNs, underruns = 0))
+        sampleTimeNs += 50_000_000L
+        sampleFrame += 400
+        assertEquals(8_400L, clock.frames(sampleTimeNs, underruns = 0))
+
+        // Stable polling would otherwise extrapolate the old sample for another ten seconds.
+        val stalledAtNs = sampleTimeNs + 1_000_000_000L
+        assertEquals(16_400L, clock.frames(stalledAtNs, underruns = 0))
+        sampleTimeNs += 100_000_000L
+        sampleFrame += 800
+        assertNull(clock.frames(stalledAtNs, underruns = 1))
+        assertNull(clock.frames(stalledAtNs + 50_000_000L, underruns = 1))
+
+        sampleTimeNs = stalledAtNs + 100_000_000L
+        sampleFrame += 80
+        assertEquals(9_280L, clock.frames(sampleTimeNs, underruns = 1))
     }
 
     @Test fun endOfStreamWaitsForRouteLatencyBeforeTheFirstTimestamp() {
