@@ -6,6 +6,7 @@ import android.graphics.Paint
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.asImageBitmap
@@ -69,7 +70,7 @@ class ComposerCustomEmojiScreenshotTest {
                         ComposerPill(
                             actionColors = accountActionColors(appState = null),
                             textFieldValue = TextFieldValue(DRAFT, selection = TextRange(DRAFT.length)),
-                            composerFocus = FocusRequester(),
+                            composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,
                             onValueChange = {},
                             onEmojiPickerToggle = {},

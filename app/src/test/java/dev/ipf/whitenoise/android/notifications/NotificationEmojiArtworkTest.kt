@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -289,8 +290,7 @@ class NotificationEmojiArtworkTest {
                     emojiArtworkPreparer = { text, _ ->
                         val artifact = requireNotNull(notificationEmojiArtwork(context, text))
                         try {
-                            kotlinx.coroutines.delay(NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS + 50L)
-                            artifact
+                            awaitCancellation()
                         } finally {
                             artifact.close()
                         }

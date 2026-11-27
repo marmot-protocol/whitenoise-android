@@ -12,6 +12,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -54,6 +55,29 @@ class LocalGroupDeleteCleanupJournalTest {
 
         assertEquals(setOf("group-a", "group-b"), journal.groupIdsForAccount("account-a"))
         assertEquals(emptySet<String>(), journal.groupIdsForAccount("account-z"))
+    }
+
+    /** An unreadable entry fails the sign-out group read, whose account it may hide, while replay skips it. */
+    @Test
+    fun unreadableEntryFailsTheGroupReadButNotReplay() {
+        val directory = folder.newFolder("local-delete-corrupt")
+        val journal = LocalGroupDeleteCleanupJournal(directory)
+        journal.stage(pending)
+        File(directory, "corrupt.json").writeText("{not json")
+
+        assertTrue(runCatching { journal.groupIdsForAccount("account-a") }.isFailure)
+        assertEquals(listOf(pending), journal.pending())
+    }
+
+    /** A journal path that exists but cannot be listed fails the sign-out group read instead of reading as empty. */
+    @Test
+    fun unlistableJournalFailsTheGroupRead() {
+        val journal = LocalGroupDeleteCleanupJournal(folder.newFile("journal-is-a-file"))
+
+        assertTrue(runCatching { journal.groupIdsForAccount("account-a") }.isFailure)
+        assertEquals(emptyList<PendingLocalGroupDeleteCleanup>(), journal.pending())
+        val missing = LocalGroupDeleteCleanupJournal(File(folder.root, "never-created"))
+        assertEquals(emptySet<String>(), missing.groupIdsForAccount("account-a"))
     }
 
     @Test
@@ -123,7 +147,11 @@ class LocalGroupDeleteCleanupJournalTest {
         val incomplete = java.io.File(committed.path + ".new")
         incomplete.writeText("incomplete")
         committed.delete()
-        assertEquals(null, LocalGroupDeleteCleanupJournal(directory).find(pending.account, pending.groupIdHex))
+        val restarted = LocalGroupDeleteCleanupJournal(directory)
+        assertEquals(null, restarted.find(pending.account, pending.groupIdHex))
+        // Sign-out's strict read and replay both skip the uncommitted stage rather than failing on it.
+        assertEquals(emptySet<String>(), restarted.groupIdsForAccount(pending.account))
+        assertEquals(emptyList<PendingLocalGroupDeleteCleanup>(), restarted.pending())
     }
 
     @Test

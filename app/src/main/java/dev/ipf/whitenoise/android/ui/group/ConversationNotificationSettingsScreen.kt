@@ -113,13 +113,7 @@ internal fun ConversationNotificationSettingsScreen(
             blockedChannels =
                 withContext(Dispatchers.IO) {
                     val descriptor =
-                        NotificationConversationDescriptor(
-                            shortcut,
-                            isDm,
-                            conversationTitle,
-                            vibrationPattern,
-                            accountRef,
-                        )
+                        NotificationConversationDescriptor(shortcut, isDm, conversationTitle, vibrationPattern)
                     runCatching {
                         androidBlockedConversationCategories(
                             context,
@@ -207,14 +201,13 @@ private fun NotificationCategoriesSection(
     val accountRef = appState.activeAccountRef
     val shortcutId = remember(accountRef, groupIdHex) { accountRef?.let { conversationShortcutId(it, groupIdHex) } }
     val descriptor =
-        remember(shortcutId, isDm, conversationTitle, primaryVibrationPattern, accountRef) {
+        remember(shortcutId, isDm, conversationTitle, primaryVibrationPattern) {
             shortcutId?.let {
                 NotificationConversationDescriptor(
                     shortcutId = it,
                     isDm = isDm,
                     title = conversationTitle,
                     primaryVibrationPattern = primaryVibrationPattern,
-                    accountRef = accountRef,
                 )
             }
         }
