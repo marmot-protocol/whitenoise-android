@@ -186,6 +186,7 @@ class Nip30EmojiTest {
                 ":a: `x` ".repeat(8_000),
             )
         texts.forEach(Nip30Emoji::shortcodesIn)
+        assertEquals(listOf(":a:"), Nip30Emoji.shortcodesIn("$emptyTildeFences:a:"))
     }
 
     /** Only the NIP-30 alphabet MDK accepts for a sent tag, up to 62 characters, can be sent. */

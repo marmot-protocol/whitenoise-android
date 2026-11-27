@@ -60,7 +60,8 @@ private fun addCodeSpans(
         index = maxOf(runEnd, index + 1)
     }
     val closers = arrayOfNulls<IntRange>(runs.size)
-    val nextByLength = HashMap<Int, IntRange>()
+    // Indexed by run length, which is at most the gap's length, so every lookup is constant time.
+    val nextByLength = arrayOfNulls<IntRange>((runs.maxOfOrNull { it.last - it.first + 1 } ?: 0) + 1)
     for (position in runs.indices.reversed()) {
         val run = runs[position]
         val length = run.last - run.first + 1
