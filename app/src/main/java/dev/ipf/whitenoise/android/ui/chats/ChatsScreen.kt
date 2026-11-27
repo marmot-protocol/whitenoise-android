@@ -2026,7 +2026,6 @@ internal fun ChatsScreen(
         }
 
     Scaffold(
-        // The body frame places this screen's banner slot below the playback strip instead.
         topNoticeSlot = false,
         topBar = {
             val connectivityState = rememberChatListConnectivityState(appState, controller)
