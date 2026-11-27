@@ -1667,9 +1667,6 @@
     <string name="emoji_sets_builtin_shown">预装 · %1$s</string>
     <string name="emoji_sets_builtin_hidden">已从选择器中隐藏。消息中仍会显示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
-    <string name="emoji_sets_load_image">加载预览图片</string>
-    <string name="emoji_sets_image_privacy">加载预览或安装表情包会向其图片服务器暴露你的 IP 地址。</string>
-    <string name="emoji_sets_preview_host">预览图片服务器：%1$s</string>
     <string name="emoji_sets_install">安装表情包</string>
     <string name="emoji_sets_update">更新表情包</string>
     <string name="emoji_sets_check_update">检查更新</string>

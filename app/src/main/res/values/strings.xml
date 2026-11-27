@@ -1989,9 +1989,22 @@
     <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
-    <string name="emoji_sets_load_image">Load preview image</string>
-    <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>
-    <string name="emoji_sets_preview_host">Preview image host: %1$s</string>
+    <string name="emoji_sets_load_emoji">Load emoji</string>
+    <!-- %1$s is a web host such as nostr.build. -->
+    <string name="emoji_sets_image_host">Images come from %1$s. Loading or installing them shares your IP address with that host.</string>
+    <!-- %1$s is a web host such as nostr.build; %2$d counts the other hosts. -->
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Images come from %1$s and %2$d other host. Loading or installing them shares your IP address with those hosts.</item>
+        <item quantity="other">Images come from %1$s and %2$d other hosts. Loading or installing them shares your IP address with those hosts.</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Loading or installing these images shares your IP address with their hosts.</string>
+    <!-- %1$s is an emoji count such as "12 emoji"; %2$s is Installed or Update available. -->
+    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Untitled set</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_loading">%1$s, loading</string>
+    <!-- %1$s is an emoji shortcode such as :fox:. -->
+    <string name="emoji_sets_emoji_failed">%1$s couldn’t load. Tap to retry.</string>
     <string name="emoji_sets_install">Install set</string>
     <string name="emoji_sets_update">Update set</string>
     <string name="emoji_sets_check_update">Check for update</string>

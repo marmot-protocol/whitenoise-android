@@ -1688,9 +1688,6 @@
     <string name="emoji_sets_builtin_shown">Önceden yüklü · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Seçicide gizli. Mesajlarda görünmeye devam eder.</string>
     <string name="emoji_sets_update_available">Güncelleme var</string>
-    <string name="emoji_sets_load_image">Önizleme görselini yükle</string>
-    <string name="emoji_sets_image_privacy">Önizleme yüklemek veya set kurmak, IP adresinizi setin görsel sunucularıyla paylaşır.</string>
-    <string name="emoji_sets_preview_host">Önizleme görseli sunucusu: %1$s</string>
     <string name="emoji_sets_install">Seti yükle</string>
     <string name="emoji_sets_update">Seti güncelle</string>
     <string name="emoji_sets_check_update">Güncellemeyi denetle</string>

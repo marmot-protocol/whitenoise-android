@@ -1692,9 +1692,6 @@
     <string name="emoji_sets_builtin_shown">Pré-instalado · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Oculto no seletor. Continua aparecendo nas mensagens.</string>
     <string name="emoji_sets_update_available">Atualização disponível</string>
-    <string name="emoji_sets_load_image">Carregar imagem de prévia</string>
-    <string name="emoji_sets_image_privacy">Carregar uma prévia ou instalar um conjunto compartilha seu endereço IP com os servidores de imagens dele.</string>
-    <string name="emoji_sets_preview_host">Servidor da imagem de prévia: %1$s</string>
     <string name="emoji_sets_install">Instalar conjunto</string>
     <string name="emoji_sets_update">Atualizar conjunto</string>
     <string name="emoji_sets_check_update">Verificar atualização</string>

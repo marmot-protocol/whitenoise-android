@@ -1699,9 +1699,6 @@
     <string name="emoji_sets_builtin_shown">Vorinstalliert · %1$s</string>
     <string name="emoji_sets_builtin_hidden">In der Auswahl ausgeblendet. Wird in Nachrichten weiter angezeigt.</string>
     <string name="emoji_sets_update_available">Update verfügbar</string>
-    <string name="emoji_sets_load_image">Vorschaubild laden</string>
-    <string name="emoji_sets_image_privacy">Beim Laden einer Vorschau oder Installieren eines Sets sehen dessen Bild-Hosts deine IP-Adresse.</string>
-    <string name="emoji_sets_preview_host">Host des Vorschaubilds: %1$s</string>
     <string name="emoji_sets_install">Set installieren</string>
     <string name="emoji_sets_update">Set aktualisieren</string>
     <string name="emoji_sets_check_update">Nach Update suchen</string>

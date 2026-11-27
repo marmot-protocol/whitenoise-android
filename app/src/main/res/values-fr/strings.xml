@@ -1703,9 +1703,6 @@
     <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
-    <string name="emoji_sets_load_image">Charger l’image d’aperçu</string>
-    <string name="emoji_sets_image_privacy">Charger un aperçu ou installer un ensemble partage votre adresse IP avec ses hébergeurs d’images.</string>
-    <string name="emoji_sets_preview_host">Hébergeur de l’image d’aperçu : %1$s</string>
     <string name="emoji_sets_install">Installer l’ensemble</string>
     <string name="emoji_sets_update">Mettre à jour l’ensemble</string>
     <string name="emoji_sets_check_update">Rechercher une mise à jour</string>

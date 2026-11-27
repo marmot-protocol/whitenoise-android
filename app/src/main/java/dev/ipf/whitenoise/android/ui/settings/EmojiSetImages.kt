@@ -1,0 +1,136 @@
+package dev.ipf.whitenoise.android.ui.settings
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.EmojiSetFfi
+import dev.ipf.whitenoise.android.state.EmojiSetsBackend
+import dev.ipf.whitenoise.android.ui.EmojiArt
+import dev.ipf.whitenoise.android.ui.decodeEmojiImage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+
+/** One tile's image while the set preview is open. */
+internal sealed interface EmojiSetImage {
+    data object Loading : EmojiSetImage
+
+    data object Failed : EmojiSetImage
+
+    class Ready(
+        val art: EmojiArt,
+    ) : EmojiSetImage
+}
+
+/** Where a preview's pixels come from. */
+internal interface EmojiSetImageSource {
+    /** The cover, from the set author's host. */
+    suspend fun cover(set: EmojiSetFfi): ByteArray
+
+    /** One emoji, from the installed snapshot when [local], otherwise from the set author's host. */
+    suspend fun emoji(
+        set: EmojiSetFfi,
+        shortcode: String,
+        local: Boolean,
+    ): ByteArray
+}
+
+/** Adapts the screen's owner-scoped backend. */
+internal fun EmojiSetsBackend.imageSource(): EmojiSetImageSource =
+    object : EmojiSetImageSource {
+        override suspend fun cover(set: EmojiSetFfi): ByteArray = this@imageSource.cover(set)
+
+        override suspend fun emoji(
+            set: EmojiSetFfi,
+            shortcode: String,
+            local: Boolean,
+        ): ByteArray =
+            if (local) installedEmojiImage(set, shortcode) else emojiImage(set, shortcode)
+    }
+
+/**
+ * Transient images for one opened set version. An installed snapshot of exactly this version renders from local
+ * storage at once. Anything else stays blank until [request], because each load shares the user's IP address with
+ * the host the set author chose. Tiles load as they scroll into view, a few at a time, and nothing is stored.
+ */
+internal class EmojiSetImages(
+    val set: EmojiSetFfi,
+    private val source: EmojiSetImageSource,
+    private val decode: suspend (ByteArray) -> EmojiArt? = ::decodeEmojiArt,
+) {
+    /** True when the installed snapshot is this exact version, so its images are already on the device. */
+    val local: Boolean = set.installed?.eventIdHex == set.eventIdHex
+
+    /** Whether tiles may load. Local sets start loaded; remote ones wait for the user. */
+    var requested by mutableStateOf(local)
+        private set
+
+    /** The cover, once requested and only for a remote set that names one. */
+    var cover by mutableStateOf<EmojiSetImage?>(null)
+        private set
+
+    private val images = mutableStateMapOf<String, EmojiSetImage>()
+    private val permits = Semaphore(MAX_PARALLEL_LOADS)
+
+    /** The tile state for [shortcode]; null before its first load and after a failed one is retried. */
+    operator fun get(shortcode: String): EmojiSetImage? = images[shortcode]
+
+    /** Records the user's consent to contact this set's image hosts. */
+    fun request() {
+        requested = true
+    }
+
+    /** Loads [shortcode] once, unless it is already loading or loaded. */
+    suspend fun load(shortcode: String) {
+        if (!requested || images[shortcode] != null) return
+        images[shortcode] = EmojiSetImage.Loading
+        try {
+            images[shortcode] = fetch { source.emoji(set, shortcode, local) }
+        } catch (cancelled: CancellationException) {
+            // A tile that scrolled away starts over when it returns.
+            images.remove(shortcode)
+            throw cancelled
+        }
+    }
+
+    /** Loads the cover once, for a remote set that names one. */
+    suspend fun loadCover() {
+        if (!requested || local || set.imageUrl == null || cover != null) return
+        cover = EmojiSetImage.Loading
+        try {
+            cover = fetch { source.cover(set) }
+        } catch (cancelled: CancellationException) {
+            cover = null
+            throw cancelled
+        }
+    }
+
+    /** Clears a failed tile so it loads again. */
+    fun retry(shortcode: String) {
+        if (images[shortcode] == EmojiSetImage.Failed) images.remove(shortcode)
+    }
+
+    /** The first loaded emoji, which stands in for a missing or unloaded cover. */
+    fun firstReady(): EmojiArt? =
+        set.emoji.firstNotNullOfOrNull { (images[it.shortcode] as? EmojiSetImage.Ready)?.art }
+
+    @Suppress("TooGenericExceptionCaught") // Any fetch or decode failure becomes a retryable tile.
+    private suspend fun fetch(read: suspend () -> ByteArray): EmojiSetImage =
+        try {
+            permits.withPermit { decode(read()) }?.let(EmojiSetImage::Ready) ?: EmojiSetImage.Failed
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            EmojiSetImage.Failed
+        }
+
+    private companion object {
+        const val MAX_PARALLEL_LOADS = 4
+    }
+}
+
+private suspend fun decodeEmojiArt(bytes: ByteArray): EmojiArt? =
+    withContext(Dispatchers.Default) { decodeEmojiImage(bytes)?.let(EmojiArt::Decoded) }
