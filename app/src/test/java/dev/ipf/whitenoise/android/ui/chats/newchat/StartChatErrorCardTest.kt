@@ -57,20 +57,38 @@ class StartChatErrorCardTest {
         assertFalse(unknown.invitation)
     }
 
-    /** A missing KeyPackage keeps the failure title and optional share without claiming White Noise is missing. */
+    /** A recipient with no KeyPackage at all is someone to invite: named when known, never a failure title. */
     @Test
-    fun missingKeyKeepsFailureTitleAndOptionalShareWithoutAssumingInstallation() {
-        val error =
-            startChatErrorUiState(
-                npub = "npub1alice",
-                progressHex = "alice",
-                error = MarmotKitException.MissingKeyPackage("alice", MissingKeyPackageReasonFfi.NOT_FOUND),
-                recipientName = "Alice",
-                displayName = { "Alice" },
+    fun missingKeyIsPresentedAsAnInvitationNamedWhenKnown() {
+        val missing = MarmotKitException.MissingKeyPackage("alice", MissingKeyPackageReasonFfi.NOT_FOUND)
+        val named = startChatErrorUiState("npub1alice", "alice", missing, "Alice") { "Alice" }
+        assertTrue(named.invitation)
+        assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_for, listOf("Alice")), named.title)
+        assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_detail), named.detail)
+        assertFalse(named.copyable)
+
+        val unnamed = startChatErrorUiState("npub1alice", "alice", missing, null) { " " }
+        assertTrue(unnamed.invitation)
+        assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise), unnamed.title)
+        assertEquals(AppText.Resource(R.string.start_chat_not_on_white_noise_detail), unnamed.detail)
+    }
+
+    /** Only a confirmed missing package becomes an invitation; other recipient failures keep today's copy. */
+    @Test
+    fun otherRecipientFailuresKeepCouldNotStartChat() {
+        val failures =
+            mapOf(
+                MarmotKitException.MissingKeyPackage("alice", MissingKeyPackageReasonFfi.OBSOLETE_ONLY) to
+                    R.string.error_obsolete_key_package_for,
+                MarmotKitException.DirectoryLookupIncomplete("alice") to R.string.error_directory_lookup_incomplete_for,
+                MarmotKitException.MissingMemberInboxRoute("alice") to R.string.error_missing_member_inbox_for,
             )
-        assertTrue(error.invitation)
-        assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), error.title)
-        assertEquals(AppText.Resource(R.string.error_missing_key_package_for, listOf("Alice")), error.detail)
+        failures.forEach { (failure, detail) ->
+            val state = startChatErrorUiState("npub1alice", "alice", failure, "Alice") { "Alice" }
+            assertFalse(state.invitation)
+            assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), state.title)
+            assertEquals(AppText.Resource(detail, listOf("Alice")), state.detail)
+        }
     }
 
     @Test
@@ -122,18 +140,16 @@ class StartChatErrorCardTest {
     }
 
     @Test
-    fun invitationCardRendersShareAndRetryActions() {
+    fun invitationCardRendersSendInviteAndRetryActions() {
         var inviteTaps = 0
         var retryTaps = 0
         val error =
-            StartChatErrorUiState(
+            startChatErrorUiState(
                 npub = "npub1alice",
                 progressHex = "deadbeef",
-                detail = AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),
-                diagnosticReport = null,
+                error = MarmotKitException.MissingKeyPackage("alice", MissingKeyPackageReasonFfi.NOT_FOUND),
                 recipientName = "Alice",
-                invitation = true,
-                title = AppText.Resource(R.string.invite_to_white_noise),
+                displayName = { "Alice" },
             )
 
         composeRule.setContent {
@@ -145,12 +161,12 @@ class StartChatErrorCardTest {
             )
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.invite_to_white_noise)).assertExists()
-        composeRule
-            .onNodeWithText(context.getString(R.string.invite_to_white_noise_description, "Alice"))
-            .assertExists()
+        val title = context.getString(R.string.start_chat_not_on_white_noise_for, "Alice")
+        composeRule.onNodeWithText(title).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.start_chat_not_on_white_noise_detail)).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.copy)).assertDoesNotExist()
-        composeRule.onNodeWithText(context.getString(R.string.share)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.share)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.send_invite)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
 
         assertEquals(1, inviteTaps)

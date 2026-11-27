@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Não encontramos uma chave de conversa utilizável para %1$s. Peça para ela instalar ou atualizar o White Noise e abri-lo e tente novamente.</string>
     <string name="invite_to_white_noise">Convidar para o White Noise</string>
     <string name="invite_friends">Convidar amigos</string>
-    <string name="invite_to_white_noise_description">%1$s ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
-    <string name="unknown_invite_to_white_noise_description">Este usuário ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
     <string name="invite_message">Junte-se a mim no White Noise. Sem número de telefone. Sem vigilância. Apenas privacidade real. Baixe aqui: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s ainda não está no White Noise</string>
+    <string name="start_chat_not_on_white_noise">Esta pessoa ainda não está no White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Envie um convite. Quando a pessoa tiver instalado e aberto o White Noise, tente novamente.</string>
+    <string name="send_invite">Enviar convite</string>
+    <string name="invite_message_personal">Sou %1$s no White Noise, um mensageiro privado que não precisa de número de telefone. Instale o app, toque em Novo chat e cole minha chave para falar comigo: %2$s\nBaixe aqui: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Esse destinatário não é uma chave pública Nostr válida. Use um npub, link de perfil ou chave pública hex.</string>
     <string name="error_group_create_failed_retry">Algo deu errado ao configurar a conversa criptografada. Verifique sua conexão e tente novamente.</string>
     <string name="error_no_group_members_selected">Não foi possível adicionar nenhuma das pessoas selecionadas. Peça que verifiquem a configuração da conversa ou altere sua seleção.</string>

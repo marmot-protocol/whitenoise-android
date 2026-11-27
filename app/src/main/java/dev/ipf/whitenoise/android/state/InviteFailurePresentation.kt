@@ -139,6 +139,34 @@ internal fun startProfileChatFailureDetail(
     displayName: (String) -> String,
 ): AppText = groupCreateFailureDetail(throwable, displayName)
 
+/** A recipient with no KeyPackage at all is someone to invite, not a failure; every other failure keeps its title. */
+internal fun startProfileChatErrorTitle(
+    throwable: Throwable,
+    displayName: (String) -> String,
+): AppText =
+    if (throwable is MissingKeyPackage && startProfileChatFailureIsMissingSetup(throwable)) {
+        recipientFailureDetail(
+            throwable.account,
+            displayName,
+            R.string.start_chat_not_on_white_noise,
+            R.string.start_chat_not_on_white_noise_for,
+        )
+    } else {
+        AppText.Resource(R.string.toast_couldnt_start_chat)
+    }
+
+/** Invitation guidance for a confirmed missing package; every other start-chat failure keeps its shared detail. */
+internal fun startProfileChatErrorDetail(
+    throwable: Throwable,
+    displayName: (String) -> String,
+    recipientName: String?,
+): AppText =
+    if (startProfileChatFailureIsMissingSetup(throwable)) {
+        AppText.Resource(R.string.start_chat_not_on_white_noise_detail)
+    } else {
+        inviteFailureDetail(throwable, displayName, recipientName, R.string.error_group_create_failed_retry)
+    }
+
 /** Offers a diagnostic report for unexpected and publish failures while keeping known recovery guidance in the UI. */
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {

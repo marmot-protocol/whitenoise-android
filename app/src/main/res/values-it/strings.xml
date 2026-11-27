@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Non abbiamo trovato una chiave di chat utilizzabile per %1$s. Chiedi di installare o aggiornare White Noise e aprirlo, poi riprova.</string>
     <string name="invite_to_white_noise">Invita su White Noise</string>
     <string name="invite_friends">Invita amici</string>
-    <string name="invite_to_white_noise_description">%1$s non è ancora su White Noise. Condividi l\'app per avviare una chat sicura.</string>
-    <string name="unknown_invite_to_white_noise_description">Questo utente non è ancora su White Noise. Condividi l\'app per avviare una chat sicura.</string>
     <string name="invite_message">Unisciti a me su White Noise. Nessun numero di telefono. Nessuna sorveglianza. Solo vera privacy. Scarica qui: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s non è ancora su White Noise</string>
+    <string name="start_chat_not_on_white_noise">Questa persona non è ancora su White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Inviale un invito. Quando avrà installato e aperto White Noise, riprova.</string>
+    <string name="send_invite">Invia invito</string>
+    <string name="invite_message_personal">Sono %1$s su White Noise, un’app di messaggistica privata che non richiede un numero di telefono. Installala, tocca Nuova chat e incolla la mia chiave per scrivermi: %2$s\nScarica: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Quel destinatario non è una chiave pubblica Nostr valida. Utilizza un npub, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_group_create_failed_retry">Si è verificato un problema durante la configurazione della chat crittografata. Controlla la connessione e riprova.</string>
     <string name="error_no_group_members_selected">Non è stato possibile aggiungere nessuna delle persone selezionate. Chiedi loro di controllare la configurazione della chat oppure modifica la selezione.</string>

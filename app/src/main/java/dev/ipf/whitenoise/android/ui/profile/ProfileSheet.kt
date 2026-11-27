@@ -39,8 +39,8 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
-import dev.ipf.whitenoise.android.share.launchInviteShare
-import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.share.activeAccountInvite
+import dev.ipf.whitenoise.android.share.shareAppInvite
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -374,8 +374,7 @@ internal fun ProfileSheet(
             busy = followBusy,
             creatingChat = creatingChat,
         )
-    val inviteTitle = stringResource(R.string.invite_to_white_noise)
-    val inviteMessage = stringResource(R.string.invite_message)
+    val invite = activeAccountInvite(appState)
     val groupPickerRevision = appState.profileGroupPickerRevision
     val liveGroupsRevision = appState.forwardTargetsRevision
     // Chats beyond the retained chat-list window, so groups in common and both pickers see every chat (#2983).
@@ -748,8 +747,9 @@ internal fun ProfileSheet(
                         onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
                         onInvite = {
                             if (owner.canAct()) {
-                                launchInviteShare(context, inviteMessage, inviteTitle)
-                                    .onFailure { appState.presentOutboundShareFailure("PROFILE_INVITE_SHARE", it) }
+                                appState.launchMutation {
+                                    appState.shareAppInvite(context, invite, "PROFILE_INVITE_SHARE", owner::canAct)
+                                }
                             }
                         },
                         onCopy = { clipboard.copy(it) },
