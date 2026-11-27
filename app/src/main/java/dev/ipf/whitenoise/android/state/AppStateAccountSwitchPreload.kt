@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -65,22 +66,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
             }.rows
         ensureAccountSwitchRequestIsCurrent(generation)
         val rows = presentedRows.map { it.row }
-        val firstFrameAvatars =
-            prewarmFirstFrameDurableAvatars(
-                accountRef,
-                presentedRows,
-                awaitColdWorkers = plan.awaitColdAvatarWorkers,
-                decode = prefetched == null,
-                onPrepared =
-                    if (plan.startupRestoration) {
-                        { renderable, decoded ->
-                            ensureAccountSwitchRequestIsCurrent(generation)
-                            recordStartupAvatarPreparation(renderable, decoded)
-                        }
-                    } else {
-                        null
-                    },
-            )
+        val firstFrameAvatars = prewarmSwitchAvatars(accountRef, presentedRows, generation, plan, prefetched == null)
         ensureAccountSwitchRequestIsCurrent(generation)
         recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
         val presentation =
@@ -114,6 +100,33 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
         }
         null
     }
+
+private suspend fun WhiteNoiseAppState.prewarmSwitchAvatars(
+    accountRef: String,
+    rows: List<PresentedChatRowFfi>,
+    generation: Long,
+    plan: AccountSwitchPreloadPlan,
+    decode: Boolean,
+): List<FirstFrameDurableAvatar> =
+    prewarmFirstFrameDurableAvatars(
+        accountRef,
+        rows,
+        preparation =
+            FirstFrameAvatarPreparation(
+                awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                decode = decode,
+                stillCurrent = { accountSwitchHandoff.isCurrent(generation) },
+            ),
+        onPrepared =
+            if (plan.startupRestoration) {
+                { renderable, decoded ->
+                    ensureAccountSwitchRequestIsCurrent(generation)
+                    recordStartupAvatarPreparation(renderable, decoded)
+                }
+            } else {
+                null
+            },
+    )
 
 private suspend fun WhiteNoiseAppState.loadAccountSwitchPresentationSeeds(
     accountRef: String,

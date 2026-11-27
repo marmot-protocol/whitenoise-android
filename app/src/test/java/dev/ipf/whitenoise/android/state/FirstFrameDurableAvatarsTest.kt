@@ -287,7 +287,11 @@ class FirstFrameDurableAvatarsTest {
             val handoff =
                 withAvatarClock { scheduler ->
                     val result =
-                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                        fixture.state.prewarmFirstFrameDurableAvatars(
+                            ACCOUNT,
+                            listOf(stored),
+                            FirstFrameAvatarPreparation(awaitColdWorkers = false),
+                        )
                     assertEquals(0L, scheduler.currentTime)
                     result
                 }
@@ -307,7 +311,11 @@ class FirstFrameDurableAvatarsTest {
             val handoff =
                 withAvatarClock { scheduler ->
                     val result =
-                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                        fixture.state.prewarmFirstFrameDurableAvatars(
+                            ACCOUNT,
+                            listOf(stored),
+                            FirstFrameAvatarPreparation(awaitColdWorkers = false),
+                        )
                     assertEquals(0L, scheduler.currentTime)
                     result
                 }
@@ -334,7 +342,11 @@ class FirstFrameDurableAvatarsTest {
             val handoff =
                 withAvatarClock { scheduler ->
                     val result =
-                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                        fixture.state.prewarmFirstFrameDurableAvatars(
+                            ACCOUNT,
+                            listOf(stored),
+                            FirstFrameAvatarPreparation(awaitColdWorkers = false),
+                        )
                     assertEquals(0L, scheduler.currentTime)
                     result
                 }
@@ -342,6 +354,30 @@ class FirstFrameDurableAvatarsTest {
             assertEquals("the cached pixels need no second read", 1, fixture.reads.get())
             assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
         }
+    }
+
+    @Test
+    fun aCacheClearRetiresPixelsThatAreStillInAnAccountHandoff() {
+        val storedBytes = payload()
+        val fixture = NativeAvatars { listOf(storedBytes) }
+        val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
+        val avatars = withAvatarClock { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
+        val key = avatars.single().key
+        assertNotNull(AvatarImageLoader.cachedImage(key))
+
+        fixture.state.displayAvatars.retirePending(ACCOUNT)
+        AvatarImageLoader.clearStoredAvatars()
+        AccountSwitchLocalSnapshot(
+            accountRef = ACCOUNT,
+            activeAccountIdHex = null,
+            rows = listOf(stored.row),
+            groups = emptyList(),
+            memberIds = emptyList(),
+            profiles = emptyList(),
+            firstFrameAvatars = avatars,
+        ).installFirstFrameDurableAvatars()
+
+        assertNull(AvatarImageLoader.cachedImage(key))
     }
 
     /** Keeps the caller's budget clock still while real IO/native decoding runs; only tests advance it. */

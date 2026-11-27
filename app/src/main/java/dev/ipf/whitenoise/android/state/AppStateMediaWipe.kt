@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.clearInactivePlaybackAndCheckRemaining
@@ -9,6 +10,7 @@ import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Fails closed before native deletion if Android cannot persist the share cleanup obligation. */
@@ -67,6 +69,8 @@ internal suspend fun WhiteNoiseAppState.wipeDecryptedMediaFromDisk(
                     .getOrDefault(true)
         }
         if (wipedAccountRef != null) {
+            runCatching { check(displayAvatars.clearAccount(wipedAccountRef)) }
+                .onFailure { onFailure("display avatar cache", it) }
             runCatching { forwardRequestPersistence.removeForAccount(wipedAccountRef) }
                 .onFailure { onFailure("pending forward request", it) }
             wipeSharedPlaintext(appContext, wipedAccountRef, retireSession, onFailure)
@@ -105,6 +109,35 @@ internal suspend fun WhiteNoiseAppState.purgeWipedAccountSources(
             }
         }.onFailure {
             appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
+        }
+    }
+}
+
+/** Signs out the departing profile's avatar cache alongside the existing media cleanup. */
+internal suspend fun WhiteNoiseAppState.wipeSignedOutMedia(accountRef: String) {
+    withContext(NonCancellable + Dispatchers.IO) {
+        runCatching {
+            if (accounts.any { it.label != accountRef && !it.signedOut }) {
+                check(displayAvatars.clearAccount(accountRef))
+            } else {
+                displayAvatars.clearAll()
+            }
+        }.onFailure { failure ->
+            appStateDebug { "display avatar cleanup failed: ${failure.javaClass.simpleName}" }
+        }
+    }
+    wipeDecryptedMediaFromDisk()
+}
+
+/** Replays deferred derivative cleanup only for a successful, still-current native inventory. */
+internal fun WhiteNoiseAppState.scheduleDisplayAvatarAccountReconciliation(
+    accounts: List<AccountSummaryFfi>,
+    stillCurrent: () -> Boolean,
+) {
+    val active = accounts.filterNot(AccountSummaryFfi::signedOut).mapTo(mutableSetOf(), AccountSummaryFfi::label)
+    mutationsScope.launch(Dispatchers.IO) {
+        runCatchingCancellable { displayAvatars.retainAccounts(active, stillCurrent) }.onFailure {
+            appStateDebug { "display avatar account reconciliation failed: ${it.javaClass.simpleName}" }
         }
     }
 }

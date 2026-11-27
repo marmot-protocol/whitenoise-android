@@ -214,6 +214,7 @@ internal class NativeManageStorageAccess(
     override suspend fun clearCaches() {
         admitted {
             native { clearAvatarCache(account) }
+            appState.clearDisplayAvatarAccount(account)
             appState.clearDecryptedAttachmentCopies()
         }
     }
