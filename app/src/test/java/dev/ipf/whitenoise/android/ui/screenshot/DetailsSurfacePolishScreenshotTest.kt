@@ -74,13 +74,15 @@ class DetailsSurfacePolishScreenshotTest {
 
     @Test
     @Config(qualifiers = "en-w1080dp-h600dp-mdpi")
-    fun groupMemberQuickActionsFitOneRowAtFractionalDensity() =
+    fun groupMemberQuickActionsFitOneRowAtFractionalDensity() {
         assertQuickActionRows(admin = false, fontScale = 1f, expected = listOf(3))
+    }
 
     @Test
     @Config(qualifiers = "en-w1080dp-h600dp-mdpi")
-    fun groupAdminQuickActionsStayBalancedAtFractionalDensity() =
+    fun groupAdminQuickActionsStayBalancedAtFractionalDensity() {
         assertQuickActionRows(admin = true, fontScale = 2f, expected = listOf(2, 2))
+    }
 
     private fun assertQuickActionRows(
         admin: Boolean,
@@ -122,14 +124,12 @@ class DetailsSurfacePolishScreenshotTest {
                 if (admin) add(R.string.add_member)
                 addAll(listOf(R.string.mute, R.string.disappearing, R.string.quick_action_search))
             }
-        val rows =
-            actions
-                .groupingBy { action ->
-                    val button = composeRule.onNodeWithContentDescription(app.getString(action))
-                    button.fetchSemanticsNode().boundsInRoot.top
-                }
-                .eachCount()
-        assertEquals(expected, rows.values.toList())
+        val buttonTops =
+            actions.map { action ->
+                val button = composeRule.onNodeWithContentDescription(app.getString(action))
+                button.fetchSemanticsNode().boundsInRoot.top
+            }
+        assertEquals(expected, buttonTops.groupingBy { it }.eachCount().values.toList())
     }
 
     @Test
