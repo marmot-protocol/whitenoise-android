@@ -113,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteHeaderMotion
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -2025,11 +2026,10 @@ internal fun ChatsScreen(
         }
 
     Scaffold(
-        // The body frame places this screen's banner slot below the playback strip instead.
         topNoticeSlot = false,
         topBar = {
             val connectivityState = rememberChatListConnectivityState(appState, controller)
-            Column {
+            Column(Modifier.conversationRouteHeaderMotion()) {
                 if (selectionMode) {
                     ChatListSelectionBar(onClose = ::clearSelection)
                 } else {
