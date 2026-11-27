@@ -382,6 +382,16 @@ internal fun WhiteNoiseApp(
             localProjectionAvailable = localProjectionAvailable,
         )
     }
+    LaunchedEffect(appState.phase, appState.activeAccountRef) {
+        if (appState.phase == AppPhase.Ready && appState.activeAccountRef != null) {
+            appState.notificationAskMoment.noteReady()
+        }
+    }
+    val notificationChoiceReady =
+        !diagnosticsPromptOpen &&
+            !appState.diagnostics.requiresChoice &&
+            !appState.auditUploadConsentRequired &&
+            appState.diagnostics.snapshot != null
     LaunchedEffect(
         appState.phase,
         appState.activeAccountRef,
@@ -390,27 +400,14 @@ internal fun WhiteNoiseApp(
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
         appState.appLock.screenVisible,
-        diagnosticsPromptOpen,
-        appState.diagnostics.requiresChoice,
-        appState.auditUploadConsentRequired,
-        appState.diagnostics.snapshot,
-        appState.notificationAskMoment.reached,
+        notificationChoiceReady,
     ) {
-        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) {
+        if (!notificationChoiceReady || appState.phase != AppPhase.Ready || appState.appLock.screenVisible) {
             return@LaunchedEffect
         }
-        if (appState.diagnostics.snapshot == null) return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready || appState.appLock.screenVisible) return@LaunchedEffect
-        appState.notificationAskMoment.noteReady()
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
-        if (appState.shouldRequestDefaultNotificationPermission()) {
-            // The explanation comes first; the prompt stays in flight until it is answered.
-            appState.markDefaultNotificationPermissionPromptLaunched()
-            appState.notificationAskMoment.explanationVisible = true
-        } else {
-            appState.enableDefaultNotificationsIfReady()
-        }
+        appState.enableDefaultNotificationsIfReady()
     }
     RootToastSnackbarEffect(appState, snackbarHostState, retryLabel = stringResource(R.string.retry))
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
@@ -787,7 +784,7 @@ internal fun WhiteNoiseApp(
             onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
     }
-    NotificationAskHost(appState, suppressed = !protectedPhaseReady || diagnosticsPromptOpen) {
+    NotificationAskHost(appState, suppressed = !protectedPhaseReady || !notificationChoiceReady) {
         notificationPermissionTicket = appState.diagnostics.observations.ticket()
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }

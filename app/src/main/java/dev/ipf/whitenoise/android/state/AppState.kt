@@ -6491,7 +6491,7 @@ class WhiteNoiseAppState private constructor(
         defaultNotificationPermissionPromptInFlight = false
         if (defaultNotificationsEnableAttempted) return
         defaultNotificationsEnableAttempted = true
-        preferences.edit().putBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, true).apply()
+        preferences.edit().putBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, true).commit()
         appStateDebug { "default notifications enable attempted" }
     }
 

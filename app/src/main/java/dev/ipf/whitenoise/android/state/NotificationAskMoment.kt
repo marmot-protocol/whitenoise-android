@@ -17,9 +17,6 @@ internal class NotificationAskMoment(
     private val readySeenBeforeThisProcess = preferences.getBoolean(FIRST_READY_SEEN_KEY, false)
     private var replyExpected by mutableStateOf(false)
 
-    /** True while the explanation before the system dialog waits for the person's answer. */
-    var explanationVisible by mutableStateOf(false)
-
     /** Whether this is a moment to ask; observable, so a waiting effect re-runs when a reply becomes expected. */
     val reached: Boolean
         get() = replyExpected || readySeenBeforeThisProcess
@@ -31,7 +28,7 @@ internal class NotificationAskMoment(
     /** Records that this install reached a ready account, so the next process start is a moment to ask. */
     fun noteReady() {
         if (preferences.getBoolean(FIRST_READY_SEEN_KEY, false)) return
-        preferences.edit().putBoolean(FIRST_READY_SEEN_KEY, true).apply()
+        preferences.edit().putBoolean(FIRST_READY_SEEN_KEY, true).commit()
     }
 
     companion object {

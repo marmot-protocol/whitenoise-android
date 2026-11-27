@@ -18,17 +18,13 @@ internal fun NotificationAskHost(
     suppressed: Boolean,
     onLaunchSystemDialog: () -> Unit,
 ) {
-    val moment = appState.notificationAskMoment
-    if (!moment.explanationVisible || suppressed || appState.appLock.screenVisible) return
+    if (suppressed || appState.appLock.screenVisible || !appState.shouldRequestDefaultNotificationPermission()) return
     NotificationAskDialog(
         onConfirm = {
-            moment.explanationVisible = false
+            appState.markDefaultNotificationPermissionPromptLaunched()
             onLaunchSystemDialog()
         },
-        onDismiss = {
-            moment.explanationVisible = false
-            appState.markDefaultNotificationsEnableAttempted()
-        },
+        onDismiss = appState::markDefaultNotificationsEnableAttempted,
     )
 }
 
@@ -45,7 +41,9 @@ internal fun NotificationAskDialog(
         confirmLabel = stringResource(R.string.notification_permission_ask_confirm),
         dismissLabel = stringResource(R.string.notification_permission_ask_not_now),
         onConfirm = onConfirm,
-        onDismiss = onDismiss,
+        closeOnConfirm = false,
+        onDismiss = {},
+        onDismissStart = onDismiss,
         ownerKey = Unit,
     )
 }
