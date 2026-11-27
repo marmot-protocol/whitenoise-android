@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -27,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +60,7 @@ internal fun MediaPreviewSendBar(
 ) {
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
-    var caption by rememberSaveable { mutableStateOf(initialCaption) }
+    val caption = rememberTextFieldState(initialCaption)
     Column(Modifier.fillMaxWidth().imePadding()) {
         if (preparing) AttachmentPreparationStatus()
         Row(
@@ -69,8 +69,7 @@ internal fun MediaPreviewSendBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ProseTextField(
-                value = caption,
-                onValueChange = { caption = it },
+                state = caption,
                 containerModifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.add_caption)) },
                 maxLines = 4,
@@ -78,7 +77,7 @@ internal fun MediaPreviewSendBar(
                 colors = previewCaptionFieldColors(),
             )
             FilledIconButton(
-                onClick = { onSend(caption) },
+                onClick = { onSend(caption.text.toString()) },
                 enabled = sendEnabled,
                 modifier =
                     Modifier

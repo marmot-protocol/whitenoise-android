@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -150,7 +151,7 @@ private fun ShareChatPickerAccountItem(
             if (titleIsKey) {
                 PublicKeyCopyText(accountTitle, npub)
             } else {
-                Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                EmojiLabel(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         supportingContent =

@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationPinResult
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+import dev.ipf.whitenoise.android.notifications.prepareEmojiLabels
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -87,6 +88,7 @@ internal fun PinConversationAction(
                             val (capability, item) = request
                             val presentation =
                                 appState.pinnedConversationPresentation(checkNotNull(account), item, latestTitle)
+                            androidContext.prepareEmojiLabels(listOf(presentation.title))
                             withContext(Dispatchers.IO) {
                                 shortcuts.request(capability, presentation.title, null, presentation = presentation) {
                                     isActive && stillCurrent()

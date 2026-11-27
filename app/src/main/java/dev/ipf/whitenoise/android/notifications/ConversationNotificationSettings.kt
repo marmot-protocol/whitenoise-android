@@ -94,7 +94,7 @@ internal fun conversationSettingsShortcut(
     existing: ShortcutInfoCompat? = null,
 ): ShortcutInfoCompat {
     val previewToken = NotificationPreviewPreferences.capture(context)
-    val requestedTitle = title.trim().ifBlank { context.getString(R.string.app_name) }
+    val requestedTitle = context.emojiPlainText(title.trim()).ifBlank { context.getString(R.string.app_name) }
     val displayTitle = preferredConversationShortcutTitle(requestedTitle, existing?.longLabel?.toString())
     val avatarBitmap = AvatarImageLoader.peekBitmap(avatarUrl)
     val icon =

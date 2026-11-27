@@ -497,7 +497,6 @@ internal fun RelayDetailsScreen(
             },
             onDismiss = { removeDialog = false },
             destructive = true,
-            emojiLabels = true,
             confirmModifier =
                 Modifier.explainOnLongPress(
                     Explanation(
