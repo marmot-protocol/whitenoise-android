@@ -49,25 +49,31 @@ internal class LocalGroupDeleteCleanupJournal(
     }
 
     /** Every readable intent; an unreadable entry is logged and skipped so replay can still finish the rest. */
-    fun pending(): List<PendingLocalGroupDeleteCleanup> = readEntries().mapNotNull { it.getOrNull() }
+    fun pending(): List<PendingLocalGroupDeleteCleanup> {
+        val files = directory.listFiles().orEmpty()
+        return readEntries(files).mapNotNull { it.getOrNull() }
+    }
 
     /**
      * Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. Throws
      * when the journal or any of its entries cannot be read, since that entry's account and group are unknown.
      */
     fun groupIdsForAccount(account: String): Set<String> {
-        check(directory.listFiles() != null || !directory.exists()) { "local delete journal could not be listed" }
-        return readEntries()
+        // One listing serves both the failure check and the read, so a later failed listing cannot pass as empty.
+        val files =
+            directory.listFiles() ?: run {
+                check(!directory.exists()) { "local delete journal could not be listed" }
+                emptyArray()
+            }
+        return readEntries(files)
             .map { it.getOrThrow() }
             .filter { it.account == account }
             .mapTo(HashSet()) { it.groupIdHex }
     }
 
-    /** Reads each journal entry once, keeping a failure for the caller to skip or propagate. */
-    private fun readEntries(): List<Result<PendingLocalGroupDeleteCleanup>> =
-        directory
-            .listFiles()
-            .orEmpty()
+    /** Reads each journal entry in [files] once, keeping a failure for the caller to skip or propagate. */
+    private fun readEntries(files: Array<out File>): List<Result<PendingLocalGroupDeleteCleanup>> =
+        files
             .mapNotNull { file ->
                 val name = file.name.removeSuffix(".bak").removeSuffix(".new")
                 name.takeIf { it.endsWith(FILE_SUFFIX) }

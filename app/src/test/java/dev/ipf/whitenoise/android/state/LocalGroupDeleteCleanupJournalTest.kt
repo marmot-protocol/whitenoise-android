@@ -69,6 +69,17 @@ class LocalGroupDeleteCleanupJournalTest {
         assertEquals(listOf(pending), journal.pending())
     }
 
+    /** A journal path that exists but cannot be listed fails the sign-out group read instead of reading as empty. */
+    @Test
+    fun unlistableJournalFailsTheGroupRead() {
+        val journal = LocalGroupDeleteCleanupJournal(folder.newFile("journal-is-a-file"))
+
+        assertTrue(runCatching { journal.groupIdsForAccount("account-a") }.isFailure)
+        assertEquals(emptyList<PendingLocalGroupDeleteCleanup>(), journal.pending())
+        val missing = LocalGroupDeleteCleanupJournal(File(folder.root, "never-created"))
+        assertEquals(emptySet<String>(), missing.groupIdsForAccount("account-a"))
+    }
+
     @Test
     fun failedJournalStageCannotAuthorizeNativeMutation() {
         val blockedDirectory = folder.newFile("not-a-directory")
