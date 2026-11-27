@@ -31,7 +31,7 @@ internal class RawPcmOutput(
     private var headWrap = 0L
     private var lastHardwareFrames = 0L
     private var lastHeadAdvanceMs = 0L
-    private var presentationLagFrames: Long? = null
+    private var presentationLag: PresentationLag? = null
     private var presentationRouteGeneration = 0
     private var stalledSinceMs: Long? = null
     private var position = 0L
@@ -257,21 +257,30 @@ internal class RawPcmOutput(
         val route = device.presentationRouteGeneration
         if (route != presentationRouteGeneration) {
             presentationRouteGeneration = route
-            presentationLagFrames = null
+            presentationLag = null
             lastHeadAdvanceMs = nowMs
         }
         val remainingLag =
             if (lag != null && lag in -sampleRate.toLong()..sampleRate.toLong()) {
-                lag.coerceAtLeast(0L).also { presentationLagFrames = it }
+                lag.coerceAtLeast(0L).also { presentationLag = PresentationLag(head, nowMs, it) }
             } else {
-                // During a timestamp gap, allow the last observed latency to drain even if
-                // the mixer has taken the final frame and the head has stopped moving.
-                val elapsedMs = (nowMs - lastHeadAdvanceMs).coerceIn(0L, 1000L)
-                val estimatedLag = presentationLagFrames ?: device.fallbackPresentationLatencyMs * sampleRate / 1000L
-                (estimatedLag - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
+                val last = presentationLag
+                val stationary = last?.takeIf { it.head == head }
+                // A remaining delay measured after the head stopped only decays from that sample.
+                val referenceMs = stationary?.measuredAtMs ?: lastHeadAdvanceMs
+                val elapsedMs = (nowMs - referenceMs).coerceIn(0L, 1000L)
+                val routeLag = device.fallbackPresentationLatencyMs * sampleRate / 1000L
+                val estimate = stationary?.frames ?: maxOf(routeLag, last?.frames ?: 0L)
+                (estimate - elapsedMs * sampleRate / 1000L).coerceAtLeast(0L)
             }
         return (head - physicalBase - remainingLag).coerceIn(0L, queue.playedOutputFrames)
     }
+
+    private data class PresentationLag(
+        val head: Long,
+        val measuredAtMs: Long,
+        val frames: Long,
+    )
 
     /**
      * Carries source and hardware frame anchors across a drained rate change without replacing the device.

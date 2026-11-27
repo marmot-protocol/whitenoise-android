@@ -127,6 +127,51 @@ class RawPcmOutputSonicTest {
         }
     }
 
+    @Test fun losingTheTimestampAfterTheMixerStopsStillPlaysTheAudibleTail() {
+        val device = Device().apply { presented = 0L }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertTrue(device.head >= 80)
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(4))
+            device.presented = 40L
+            output.prepareForWait(true)
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(1))
+            device.presented = null
+            output.prepareForWait(true)
+            assertFalse(output.drained())
+            assertEquals(6_000L, output.positionUs())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(4))
+            output.prepareForWait(true)
+            assertTrue(output.drained())
+        }
+    }
+
+    @Test fun timestampGapAfterZeroLagUsesTheRouteDelayForNewFrames() {
+        val device =
+            Device().apply {
+                presented = 0L
+                fallbackPresentationLatencyMs = 10
+            }
+        RawPcmOutput(8000, 1, device).use { output ->
+            output.play()
+            output.prepareForWait(false)
+            device.presented = null
+            assertEquals(160, output.write(ByteArray(160), 0))
+            output.prepareForWait(true)
+            assertFalse(output.drained())
+            assertEquals(0L, output.positionUs())
+
+            ShadowSystemClock.advanceBy(Duration.ofMillis(10))
+            output.prepareForWait(true)
+            assertTrue(output.drained())
+        }
+    }
+
     @Test fun underrunRejectsStaleSamplesUntilTheHardwareClockAdvancesAgain() {
         var sampleTimeNs = 1_000_000_000L
         var sampleFrame = 8_000L
