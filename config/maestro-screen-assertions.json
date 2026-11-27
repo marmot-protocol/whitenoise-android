@@ -4799,7 +4799,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
@@ -4815,7 +4815,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]

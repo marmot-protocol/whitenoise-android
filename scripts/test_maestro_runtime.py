@@ -2167,11 +2167,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('runCatchingCancellable { native.revealNsec(target) }.getOrNull()', source)
         self.assertNotRegex(source, r'\$\{?(?:expected|secret|clip|item)\b')
 
-    def test_settings_entry_uses_real_multi_identity_selector(self):
-        """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
-        helper = (runtime.ROOT / '.maestro/fixtures/open-settings.yaml').read_text()
-        self.assertIn('Switch Profile, Maestro (Alice|Bob|Carol)', helper)
-        self.assertIn('- tapOn: "Settings"', helper)
+    def test_settings_entry_handles_both_avatar_destinations(self):
+        """Quick switching opens Settings directly; the selector offers its own Settings action."""
+        helper = runtime.ROOT / '.maestro/fixtures/open-settings.yaml'
+        _, commands = list(yaml.safe_load_all(helper.read_text()))
+        self.assertEqual(commands[0], {'tapOn': {'id': 'chats.switchProfile'}})
+        self.assertIn({'runFlow': {'when': {'visible': 'Switch Profile'},
+                                  'commands': [{'tapOn': 'Settings'}]}}, commands)
+        self.assertEqual(commands[-1], {'assertVisible': {'id': 'settings-home-content'}})
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
 
