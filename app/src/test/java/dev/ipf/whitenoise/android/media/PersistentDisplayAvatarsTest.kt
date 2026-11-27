@@ -4,8 +4,11 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.util.AtomicFile
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,6 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import javax.crypto.spec.SecretKeySpec
 
@@ -86,6 +90,19 @@ class PersistentDisplayAvatarsTest {
     }
 
     @Test
+    fun anUnreadableEnvelopeDoesNotPublishAnUnrecoverableKey() {
+        assertTrue(keyFile.mkdir())
+        File(keyFile, "obstruction").writeText("Blocks the atomic rename")
+        val provider = keyProvider()
+
+        assertThrows(IOException::class.java) { provider.getOrCreate() }
+
+        assertTrue(keyFile.deleteRecursively())
+        val recovered = provider.getOrCreate()
+        assertArrayEquals(recovered.encoded, keyProvider().getOrCreate().encoded)
+    }
+
+    @Test
     fun retiringAnOldRevisionPreservesItsReplacement() {
         val cache = cache()
         val replacement = key.copy(revision = 2uL)
@@ -94,12 +111,44 @@ class PersistentDisplayAvatarsTest {
         cache.write(key, pixels, old)
         cache.write(replacement, pixels, old)
 
-        cache.retirePending(key.accountRef)
-        cache.evictSelections(listOf(key))
+        cache.retireSelections(key.accountRef, listOf(key))
+        assertFalse(cache.hasEntry(key))
+        cache.evictRetiredSelections(key.accountRef)
 
         cache.write(key, pixels, old)
         assertNull(cache.read(key, cache.generation(key.accountRef)))
         checkNotNull(cache.read(replacement, cache.generation(key.accountRef))).bitmap.recycle()
+    }
+
+    @Test
+    fun delayedEvictionPreservesTheReselectedEntryAndItsNewPack() {
+        val writer = cache()
+        val account = key.accountRef
+        val unselected = key.copy(groupIdHex = "other-chat")
+        val old = writer.generation(account)
+        val pixels = DisplayAvatarPixels(bitmap, false)
+        writer.write(key, pixels, old)
+        writer.write(unselected, pixels, old)
+        writer.writeStartupPack(account, listOf(key, unselected), old)
+
+        writer.retireSelections(account, listOf(key))
+        writer.retireSelections(account, listOf(unselected))
+        val current = writer.generation(account)
+        assertNull(writer.read(unselected, old))
+        writer.write(key, pixels.copy(animated = true), current)
+        writer.writeStartupPack(account, listOf(key), current)
+        writer.evictRetiredSelections(account)
+
+        val reopened = cache()
+        val generation = reopened.generation(account)
+        val stored = checkNotNull(reopened.read(key, generation))
+        assertEquals(true, stored.animated)
+        stored.bitmap.recycle()
+        assertNull(reopened.read(unselected, generation))
+        val pack = reopened.readStartupPack(account, listOf(key, unselected), generation)
+        assertEquals(setOf(key), pack.keys)
+        assertEquals(true, pack.getValue(key).animated)
+        pack.getValue(key).bitmap.recycle()
     }
 
     @Test
@@ -127,12 +176,27 @@ class PersistentDisplayAvatarsTest {
         cache.write(key, pixels, generation)
         cache.write(other, pixels, cache.generation(other.accountRef))
 
-        cache.retainAccounts(setOf(other.accountRef), stillCurrent = { false })
+        cache.retainAccounts(emptySet()) { false }
         assertTrue(cache.hasEntry(key))
-        cache.retainAccounts(setOf(other.accountRef), stillCurrent = { true })
+        assertTrue(keyFile.isFile)
+        cache.retainAccounts(setOf(other.accountRef)) { false }
+        assertTrue(cache.hasEntry(key))
+        cache.retainAccounts(setOf(other.accountRef)) { action ->
+            action()
+            true
+        }
 
         assertNull(cache.read(key, cache.generation(key.accountRef)))
         assertTrue(cache.hasEntry(other))
+
+        val retired = cache.generation(other.accountRef)
+        cache.retainAccounts(emptySet()) { action ->
+            action()
+            true
+        }
+        cache.write(other, pixels, retired)
+        assertNull(cache.read(other, cache.generation(other.accountRef)))
+        assertFalse(keyFile.exists())
     }
 
     @Test
@@ -152,9 +216,18 @@ class PersistentDisplayAvatarsTest {
         }
     }
 
-    private fun cache(): PersistentDisplayAvatars =
-        PersistentDisplayAvatars(
-            root,
-            EnvelopeCacheKeyProvider(AtomicFile(keyFile), { wrappingKey }, {}, root::deleteRecursively),
-        )
+    @Test
+    fun oversizedNonPremultipliedPixelsAreRejectedBeforeDrawing() {
+        val original = Bitmap.createBitmap(512, 256, Bitmap.Config.ARGB_8888)
+        try {
+            original.setPremultiplied(false)
+            assertNull(DisplayAvatarCodec.encode(DisplayAvatarPixels(original, null)))
+        } finally {
+            original.recycle()
+        }
+    }
+
+    private fun cache(): PersistentDisplayAvatars = PersistentDisplayAvatars(root, keyProvider())
+
+    private fun keyProvider(): EnvelopeCacheKeyProvider = EnvelopeCacheKeyProvider(AtomicFile(keyFile), { wrappingKey }, {}, root::deleteRecursively)
 }

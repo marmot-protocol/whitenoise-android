@@ -49,6 +49,7 @@ internal class PersistentDisplayAvatars(
     private val lock = Any()
     private val generationLock = Any()
     private val accountGenerations = mutableMapOf<String, Long>()
+    private val retiredSelections = mutableMapOf<String, MutableSet<DisplayAvatarKey>>()
     private var allGeneration = 0L
 
     /** Capture before starting an asynchronous decode or disk read. */
@@ -83,8 +84,23 @@ internal class PersistentDisplayAvatars(
         }
     }
 
+    /** Records disk evictions before allowing work under the next account generation. */
+    fun retireSelections(
+        accountRef: String,
+        keys: List<DisplayAvatarKey>,
+    ) {
+        synchronized(generationLock) {
+            retirePending(accountRef)
+            retiredSelections.getOrPut(accountRef) { mutableSetOf() }.addAll(keys)
+        }
+    }
+
     /** Off-main presence hint for writeback. Rendering always requires an authenticated read. */
-    fun hasEntry(key: DisplayAvatarKey): Boolean = entry(key, key.canonical()).baseFile.isFile
+    fun hasEntry(key: DisplayAvatarKey): Boolean =
+        synchronized(lock) {
+            evictRetiredSelections(key.accountRef)
+            entry(key, key.canonical()).baseFile.isFile
+        }
 
     fun read(
         key: DisplayAvatarKey,
@@ -113,6 +129,7 @@ internal class PersistentDisplayAvatars(
         val encoded = DisplayAvatarCodec.encode(pixels) ?: return
         val canonical = key.canonical()
         synchronized(lock) {
+            evictRetiredSelections(key.accountRef)
             if (isCurrent(key.accountRef, generation)) {
                 seal(entry(key, canonical), ENTRY_MAGIC, canonical, encoded)
             }
@@ -147,6 +164,7 @@ internal class PersistentDisplayAvatars(
         generation: DisplayAvatarGeneration,
     ) {
         synchronized(lock) {
+            evictRetiredSelections(accountRef)
             if (!isCurrent(accountRef, generation)) return
             val entries =
                 keys
@@ -208,10 +226,11 @@ internal class PersistentDisplayAvatars(
             accountDir(accountRef).deleteRecursively()
         }
 
-    /** Deletes exact selections after the caller has retired their in-flight producers. */
-    fun evictSelections(keys: List<DisplayAvatarKey>) {
+    /** Removes obsolete files before a newer producer can replace them. */
+    fun evictRetiredSelections(accountRef: String) {
         synchronized(lock) {
-            keys.map(DisplayAvatarKey::accountRef).distinct().forEach { pack(it).delete() }
+            val keys = synchronized(generationLock) { retiredSelections.remove(accountRef) } ?: return
+            pack(accountRef).delete()
             keys.forEach { entry(it, it.canonical()).delete() }
         }
     }
@@ -229,34 +248,38 @@ internal class PersistentDisplayAvatars(
 
     fun clearAll() {
         synchronized(lock) {
-            synchronized(generationLock) {
-                allGeneration++
-                accountGenerations.clear()
-            }
+            retireAllPending()
             keyProvider.clear()
         }
     }
 
-    /** Repairs interrupted sign-out or wipe using an accepted native account inventory. */
+    private fun retireAllPending() {
+        synchronized(generationLock) {
+            allGeneration++
+            accountGenerations.clear()
+        }
+    }
+
+    /** Repairs interrupted cleanup. [runIfCurrent] guards generation changes without holding the roster lock for I/O. */
     fun retainAccounts(
         accountRefs: Set<String>,
-        stillCurrent: () -> Boolean,
+        runIfCurrent: (() -> Unit) -> Boolean,
     ) {
         val kept = accountRefs.mapTo(mutableSetOf()) { accountDir(it).name }
         synchronized(lock) {
-            if (!stillCurrent()) return
             if (kept.isEmpty()) {
-                clearAll()
-            } else {
-                val orphaned = root.listFiles()?.filter { it.isDirectory && it.name !in kept }.orEmpty()
-                synchronized(generationLock) {
+                if (runIfCurrent(::retireAllPending)) keyProvider.clear()
+                return
+            }
+            val orphaned = root.listFiles()?.filter { it.isDirectory && it.name !in kept }.orEmpty()
+            val accepted =
+                runIfCurrent {
                     // Capture registers accounts even if a write has not yet created their directory.
-                    if (stillCurrent()) {
+                    synchronized(generationLock) {
                         accountGenerations.keys.filterNot(accountRefs::contains).forEach(::retirePending)
                     }
                 }
-                orphaned.forEach { if (stillCurrent()) check(it.deleteRecursively()) }
-            }
+            if (accepted) orphaned.forEach { if (runIfCurrent {}) check(it.deleteRecursively()) }
         }
     }
 

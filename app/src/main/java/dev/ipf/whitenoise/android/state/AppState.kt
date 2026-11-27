@@ -4348,9 +4348,7 @@ class WhiteNoiseAppState private constructor(
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
-                scheduleDisplayAvatarAccountReconciliation(refreshedAccounts) {
-                    accountListLifetime.isCurrent(requestToken)
-                }
+                scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }

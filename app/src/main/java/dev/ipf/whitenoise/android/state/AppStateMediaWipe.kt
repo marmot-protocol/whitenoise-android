@@ -132,11 +132,13 @@ internal suspend fun WhiteNoiseAppState.wipeSignedOutMedia(accountRef: String) {
 /** Replays deferred derivative cleanup only for a successful, still-current native inventory. */
 internal fun WhiteNoiseAppState.scheduleDisplayAvatarAccountReconciliation(
     accounts: List<AccountSummaryFfi>,
-    stillCurrent: () -> Boolean,
+    accountListToken: Long,
 ) {
     val active = accounts.filterNot(AccountSummaryFfi::signedOut).mapTo(mutableSetOf(), AccountSummaryFfi::label)
     mutationsScope.launch(Dispatchers.IO) {
-        runCatchingCancellable { displayAvatars.retainAccounts(active, stillCurrent) }.onFailure {
+        runCatchingCancellable {
+            displayAvatars.retainAccounts(active) { retire -> accountListLifetime.runIfCurrent(accountListToken, retire) }
+        }.onFailure {
             appStateDebug { "display avatar account reconciliation failed: ${it.javaClass.simpleName}" }
         }
     }

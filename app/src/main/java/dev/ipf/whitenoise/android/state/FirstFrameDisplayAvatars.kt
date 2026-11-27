@@ -205,8 +205,8 @@ internal fun WhiteNoiseAppState.retireReplacedDisplayAvatars(
             oldKey?.takeUnless { next?.let { asset -> durableDisplayAvatarKey(accountRef, groupId, asset) } == it }
         }
     if (retired.isEmpty()) return
-    displayAvatars.retirePending(accountRef)
+    displayAvatars.retireSelections(accountRef, retired)
     mutationsScope.launch(Dispatchers.IO) {
-        runCatchingCancellable { displayAvatars.evictSelections(retired) }
+        runCatchingCancellable { displayAvatars.evictRetiredSelections(accountRef) }
     }
 }

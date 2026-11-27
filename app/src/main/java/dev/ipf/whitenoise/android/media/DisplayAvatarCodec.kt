@@ -30,7 +30,8 @@ internal object DisplayAvatarCodec {
 
     fun encode(pixels: DisplayAvatarPixels): ByteArray? {
         val source = pixels.bitmap
-        if (source.isRecycled || source.config != Bitmap.Config.ARGB_8888) return null
+        val supportedFormat = !source.isRecycled && source.config == Bitmap.Config.ARGB_8888
+        if (!supportedFormat || (source.hasAlpha() && !source.isPremultiplied)) return null
         val bitmap = displaySized(source)
         return try {
             encodeDisplayPixels(bitmap, pixels.animated)
@@ -57,8 +58,7 @@ internal object DisplayAvatarCodec {
     ): ByteArray? {
         val width = bitmap.width
         val height = bitmap.height
-        val unsupportedAlpha = bitmap.hasAlpha() && !bitmap.isPremultiplied
-        if (!validDimensions(width, height) || unsupportedAlpha || bitmap.rowBytes != width * BYTES_PER_PIXEL) {
+        if (!validDimensions(width, height) || bitmap.rowBytes != width * BYTES_PER_PIXEL) {
             return null
         }
         val raw = ByteArray(width * height * BYTES_PER_PIXEL)

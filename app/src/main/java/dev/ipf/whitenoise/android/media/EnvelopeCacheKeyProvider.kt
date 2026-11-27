@@ -60,16 +60,20 @@ internal class EnvelopeCacheKeyProvider(
         return create()
     }
 
-    private fun unwrap(): SecretKey {
+    private fun readEnvelope(): ByteArray {
         val envelope = ByteArray(ENVELOPE_BYTES)
-        val exactLength =
-            DataInputStream(wrapped.openRead()).use { stream ->
-                stream.readFully(envelope)
-                stream.read() == -1
-            }
+        DataInputStream(wrapped.openRead()).use { stream ->
+            stream.readFully(envelope)
+            if (stream.read() != -1) throw IOException("Invalid display avatar key envelope length")
+        }
+        return envelope
+    }
+
+    private fun unwrap(): SecretKey {
+        val envelope = readEnvelope()
         val header = ByteBuffer.wrap(envelope)
         val validHeader = header.int == MAGIC && header.short == VERSION && header.short.toInt() == IV_BYTES
-        if (!exactLength || !validHeader) throw IOException("Invalid display avatar key envelope")
+        if (!validHeader) throw IOException("Invalid display avatar key envelope")
         val iv = ByteArray(IV_BYTES)
         header.get(iv)
         val cipher = Cipher.getInstance(ALGORITHM)
@@ -105,11 +109,13 @@ internal class EnvelopeCacheKeyProvider(
             val out = wrapped.startWrite()
             try {
                 out.write(envelope)
+                out.fd.sync()
                 wrapped.finishWrite(out)
             } catch (failure: IOException) {
                 wrapped.failWrite(out)
                 throw failure
             }
+            if (!readEnvelope().contentEquals(envelope)) throw IOException("Could not commit display avatar key")
             return SecretKeySpec(raw, "AES")
         } finally {
             raw.fill(0)

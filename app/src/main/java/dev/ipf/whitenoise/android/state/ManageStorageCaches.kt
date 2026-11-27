@@ -73,6 +73,8 @@ private fun directoryBytes(directory: File): Long {
 /** Clears one account without deleting the cache of another signed-in profile. */
 internal suspend fun WhiteNoiseAppState.clearDisplayAvatarAccount(account: String) {
     displayAvatars.retirePending(account)
-    withContext(Dispatchers.IO) { check(displayAvatars.clearAccount(account)) }
+    withContext(Dispatchers.IO) {
+        check(displayAvatars.clearAccount(account)) { "Could not clear display avatar files" }
+    }
     AvatarImageLoader.clearStoredAvatarsWithPrefix("$STORED_AVATAR_KEY_PREFIX$account:")
 }
