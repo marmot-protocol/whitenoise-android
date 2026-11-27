@@ -36,10 +36,10 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
+import dev.ipf.whitenoise.android.state.groupCreateFailureCopyable
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatErrorDetail
 import dev.ipf.whitenoise.android.state.startProfileChatErrorTitle
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
@@ -73,7 +73,7 @@ internal fun createdGroupIdAfterProjectionUnavailable(error: Throwable): String?
     }?.takeIf { it.isNotBlank() }
 
 private fun startChatFailureReport(error: Throwable): String? =
-    if (startProfileChatFailureCopyable(error)) {
+    if (groupCreateFailureCopyable(error)) {
         privacySafeErrorPresentation("START_PROFILE_CHAT", error).report
     } else {
         null

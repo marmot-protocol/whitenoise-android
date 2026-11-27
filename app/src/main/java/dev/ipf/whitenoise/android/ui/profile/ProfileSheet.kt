@@ -473,7 +473,9 @@ internal fun ProfileSheet(
                                 },
                                 displayName = appState::displayName,
                                 invitationRecipientName = { accountIdHex ->
-                                    appState.contactDisplayNameCachedOrNull(accountIdHex) ?: contactNickname ?: personName
+                                    appState.contactDisplayNameCachedOrNull(accountIdHex)
+                                        ?: contactNickname
+                                        ?: personName
                                 },
                                 markCreateOpenStage = appState::markChatCreateOpenStage,
                                 abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,

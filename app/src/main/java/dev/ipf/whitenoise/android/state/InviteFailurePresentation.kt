@@ -181,8 +181,6 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
         else -> true
     }
 
-internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
-
 /**
  * Uses the captured recipient for a typed removal action. [skippedName] resolves a report covering multiple recipients
  * against that same submission. An incomplete lookup keeps its retry guidance.

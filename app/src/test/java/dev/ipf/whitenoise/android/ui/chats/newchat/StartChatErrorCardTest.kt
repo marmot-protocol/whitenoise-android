@@ -127,7 +127,7 @@ class StartChatErrorCardTest {
                 "alice",
                 MarmotKitException.DirectoryLookupIncomplete("alice"),
                 "Alice",
-                { "Alice" },
+                displayName = { "Alice" },
             )
         var retries = 0
         composeRule.setContent {
