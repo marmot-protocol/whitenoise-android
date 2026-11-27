@@ -117,15 +117,17 @@ class EmojiSetsScreenshotTest {
     @Test fun previewDark() = gallery("preview_dark", dark = true, requested = false, installed = updateAvailable)
 
     /** The two-button update row and consent action, mirrored with large text. */
-    @Test fun previewRtlLarge() =
+    @Test fun previewRtlLarge() {
         gallery("preview_rtl_large", rtl = true, requested = false, installed = updateAvailable)
+    }
 
     /** After Load emoji: loaded art, pulsing blanks for tiles in flight and a retry mark for a failed one. */
     @Test fun previewLoadingLight() = gallery("preview_loading_light", requested = true, pending = setOf("owl", "bee"))
 
     /** An installed snapshot of this exact version renders from the device without asking. */
-    @Test fun previewInstalledDark() =
+    @Test fun previewInstalledDark() {
         gallery("preview_installed_dark", dark = true, requested = false, installed = installedHere)
+    }
 
     /** The loaded grid mirrored with large text. */
     @Test fun previewLoadedRtlLarge() = gallery("preview_loaded_rtl_large", rtl = true, requested = true)
@@ -449,8 +451,18 @@ private val GalleryCodes =
 
 private val GalleryColors =
     listOf(
-        0xFFFF8426, 0xFF8D6E63, 0xFF66BB6A, 0xFFFFCA28, 0xFFFFA726, 0xFF29B6F6,
-        0xFF795548, 0xFFAB47BC, 0xFFFFEE58, 0xFFF48FB1, 0xFFB0BEC5, 0xFFEF5350,
+        0xFFFF8426,
+        0xFF8D6E63,
+        0xFF66BB6A,
+        0xFFFFCA28,
+        0xFFFFA726,
+        0xFF29B6F6,
+        0xFF795548,
+        0xFFAB47BC,
+        0xFFFFEE58,
+        0xFFF48FB1,
+        0xFFB0BEC5,
+        0xFFEF5350,
     )
 
 /** Simple drawn faces, one per gallery shortcode. */

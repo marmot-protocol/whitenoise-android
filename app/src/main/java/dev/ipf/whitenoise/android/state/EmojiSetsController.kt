@@ -94,7 +94,9 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
         override suspend fun current(coordinate: String): EmojiSetFfi? = scoped { emojiSet(account, coordinate) }
 
         override suspend fun cover(set: EmojiSetFfi): ByteArray =
-            scoped { fetchEmojiSetCover(account, set.coordinate, set.eventIdHex).bytes }
+            scoped {
+                fetchEmojiSetCover(account, set.coordinate, set.eventIdHex).bytes
+            }
 
         override suspend fun emojiImage(
             set: EmojiSetFfi,

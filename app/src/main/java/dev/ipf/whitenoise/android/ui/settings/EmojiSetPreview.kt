@@ -305,8 +305,10 @@ private fun EmojiSetHostDisclosure(set: EmojiSetFfi) {
     val hosts =
         remember(set) {
             (listOfNotNull(set.imageUrl) + set.emoji.map { it.url })
-                .mapNotNull { Uri.parse(it).host?.trim()?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty) }
-                .distinct()
+                .mapNotNull {
+                    val host = Uri.parse(it).host?.trim()
+                    host?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty)
+                }.distinct()
         }
     val text =
         if (hosts.isEmpty()) {

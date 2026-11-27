@@ -48,8 +48,7 @@ internal fun EmojiSetsBackend.imageSource(): EmojiSetImageSource =
             set: EmojiSetFfi,
             shortcode: String,
             local: Boolean,
-        ): ByteArray =
-            if (local) installedEmojiImage(set, shortcode) else emojiImage(set, shortcode)
+        ): ByteArray = if (local) installedEmojiImage(set, shortcode) else emojiImage(set, shortcode)
     }
 
 /**
@@ -161,7 +160,9 @@ internal class EmojiSetImages(
 
     /** The first loaded emoji, which stands in for a missing or unloaded cover. */
     fun firstReady(): EmojiArt? =
-        set.emoji.firstNotNullOfOrNull { (images[it.shortcode] as? EmojiSetImage.Ready)?.art }
+        set.emoji.firstNotNullOfOrNull {
+            (images[it.shortcode] as? EmojiSetImage.Ready)?.art
+        }
 
     /** Drops older offscreen images first. Tiles still in composition keep their images until they detach. */
     private fun trimReadyImages() {
@@ -191,4 +192,6 @@ internal class EmojiSetImages(
 }
 
 private suspend fun decodeEmojiArt(bytes: ByteArray): EmojiArt? =
-    withContext(Dispatchers.Default) { decodeEmojiImage(bytes)?.let(EmojiArt::Decoded) }
+    withContext(Dispatchers.Default) {
+        decodeEmojiImage(bytes)?.let(EmojiArt::Decoded)
+    }

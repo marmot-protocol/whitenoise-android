@@ -319,9 +319,8 @@ internal fun String.isReadableIdentifier(): Boolean {
     val id = trim()
     if (id.isEmpty()) return false
     val bare = id.removePrefix("0x")
-    val randomToken =
-        id.length >= RANDOM_TOKEN_LENGTH && id.none { it in WORD_SEPARATORS } &&
-            id.any(Char::isDigit) && id.any(Char::isLetter)
+    val hasLettersAndDigits = id.any(Char::isDigit) && id.any(Char::isLetter)
+    val randomToken = id.length >= RANDOM_TOKEN_LENGTH && hasLettersAndDigits && id.none { it in WORD_SEPARATORS }
     return !(bare.matches(HexLike) || id.matches(Timestamp) || randomToken)
 }
 
