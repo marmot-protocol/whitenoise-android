@@ -1699,6 +1699,21 @@
     <string name="emoji_sets_builtin_shown">Vorinstalliert · %1$s</string>
     <string name="emoji_sets_builtin_hidden">In der Auswahl ausgeblendet. Wird in Nachrichten weiter angezeigt.</string>
     <string name="emoji_sets_update_available">Update verfügbar</string>
+    <string name="emoji_sets_load_emoji">Emojis laden</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Die Bilder stammen von %1$s. Beim Laden oder Installieren erhalten die Bild-Hosts deine IP-Adresse.</item>
+        <item quantity="other">Die Bilder stammen von %1$s. Beim Laden oder Installieren erhalten die Bild-Hosts deine IP-Adresse.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d weiterer</item>
+        <item quantity="other">%1$d weitere</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Beim Laden oder Installieren dieser Bilder erhalten die Bild-Hosts deine IP-Adresse.</string>
+    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Unbenanntes Set</string>
+    <string name="emoji_sets_emoji_loading">%1$s wird geladen</string>
+    <string name="emoji_sets_emoji_failed">%1$s konnte nicht geladen werden.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s ist auf diesem Gerät nicht verfügbar.</string>
     <string name="emoji_sets_install">Set installieren</string>
     <string name="emoji_sets_update">Set aktualisieren</string>
     <string name="emoji_sets_check_update">Nach Update suchen</string>

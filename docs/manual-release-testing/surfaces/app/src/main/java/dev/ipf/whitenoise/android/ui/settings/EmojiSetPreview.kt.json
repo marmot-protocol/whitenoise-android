@@ -256,6 +256,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-075"
+        ]
+      },
+      {
         "surface": "R.string.explanation_organize_emoji_cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
         "anchor": "R.string.explanation_organize_emoji_cancel",

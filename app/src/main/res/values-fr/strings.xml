@@ -1703,6 +1703,21 @@
     <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
+    <string name="emoji_sets_load_emoji">Charger les émojis</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+        <item quantity="other">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d de plus</item>
+        <item quantity="other">%1$d de plus</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Les hébergeurs de ces images reçoivent votre adresse IP lorsque vous les chargez ou les installez.</string>
+    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Jeu sans nom</string>
+    <string name="emoji_sets_emoji_loading">Chargement de %1$s</string>
+    <string name="emoji_sets_emoji_failed">Impossible de charger %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s n’est pas disponible sur cet appareil.</string>
     <string name="emoji_sets_install">Installer l’ensemble</string>
     <string name="emoji_sets_update">Mettre à jour l’ensemble</string>
     <string name="emoji_sets_check_update">Rechercher une mise à jour</string>

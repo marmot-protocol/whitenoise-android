@@ -1773,6 +1773,25 @@
     <string name="emoji_sets_builtin_shown">Предустановлен · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Скрыт из выбора. По-прежнему виден в сообщениях.</string>
     <string name="emoji_sets_update_available">Доступно обновление</string>
+    <string name="emoji_sets_load_emoji">Загрузить эмодзи</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="few">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="many">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="other">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">ещё %1$d</item>
+        <item quantity="few">ещё %1$d</item>
+        <item quantity="many">ещё %1$d</item>
+        <item quantity="other">ещё %1$d</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">При загрузке или установке этих изображений ваш IP-адрес будет виден серверам, на которых они хранятся.</string>
+    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Набор без названия</string>
+    <string name="emoji_sets_emoji_loading">Загрузка %1$s</string>
+    <string name="emoji_sets_emoji_failed">Не удалось загрузить %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s недоступен на этом устройстве.</string>
     <string name="emoji_sets_install">Установить набор</string>
     <string name="emoji_sets_update">Обновить набор</string>
     <string name="emoji_sets_check_update">Проверить обновление</string>

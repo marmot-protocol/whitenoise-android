@@ -1688,6 +1688,21 @@
     <string name="emoji_sets_builtin_shown">Önceden yüklü · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Seçicide gizli. Mesajlarda görünmeye devam eder.</string>
     <string name="emoji_sets_update_available">Güncelleme var</string>
+    <string name="emoji_sets_load_emoji">Emojileri yükle</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Görsellerin kaynağı: %1$s. Görselleri yüklediğinizde veya kümeyi kurduğunuzda, görsellerin barındırıldığı sunucular IP adresinizi alır.</item>
+        <item quantity="other">Görsellerin kaynağı: %1$s. Görselleri yüklediğinizde veya kümeyi kurduğunuzda, görsellerin barındırıldığı sunucular IP adresinizi alır.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d tane daha</item>
+        <item quantity="other">%1$d tane daha</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Bu görselleri yüklediğinizde veya kümeyi kurduğunuzda, görsellerin barındırıldığı sunucular IP adresinizi alır.</string>
+    <string name="emoji_sets_summary">%1$s · %2$s</string>
+    <string name="emoji_sets_untitled">Adsız küme</string>
+    <string name="emoji_sets_emoji_loading">%1$s yükleniyor</string>
+    <string name="emoji_sets_emoji_failed">%1$s yüklenemedi.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s bu cihazda kullanılamıyor.</string>
     <string name="emoji_sets_install">Seti yükle</string>
     <string name="emoji_sets_update">Seti güncelle</string>
     <string name="emoji_sets_check_update">Güncellemeyi denetle</string>
