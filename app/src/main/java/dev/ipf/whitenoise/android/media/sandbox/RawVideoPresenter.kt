@@ -105,8 +105,10 @@ internal class RawVideoPresenter(
     }
 
     /** A preparation poster can stand in for a playback frame only at the start. */
-    fun holds(seek: Long, requireTimestamp: Boolean): Boolean =
-        synchronized(lock) { retained?.let { it.seek == seek && (!requireTimestamp || it.ptsUs >= 0) } == true }
+    fun holds(
+        seek: Long,
+        requireTimestamp: Boolean,
+    ): Boolean = synchronized(lock) { retained?.let { it.seek == seek && (!requireTimestamp || it.ptsUs >= 0) } == true }
 
     /** The retained bitmap, for tests and diagnostics only. */
     internal fun retainedBitmap(): Bitmap? = synchronized(lock) { retained?.bitmap }
@@ -217,7 +219,10 @@ internal class RawVideoPresenter(
         }
     }
 
-    private fun postCurrent(frame: RawVideoFrame, attemptRevision: Long): Long? =
+    private fun postCurrent(
+        frame: RawVideoFrame,
+        attemptRevision: Long,
+    ): Long? =
         synchronized(presentationLock) {
             if (closed || attemptRevision != presentationRevision || !canDraw(frame)) return@synchronized null
             var submitted: Long? = null
@@ -235,8 +240,7 @@ internal class RawVideoPresenter(
             submitted
         }
 
-    private fun canDraw(frame: RawVideoFrame): Boolean =
-        frame.seek == allowedSeek || synchronized(lock) { allowCommitted && frame === committed }
+    private fun canDraw(frame: RawVideoFrame): Boolean = frame.seek == allowedSeek || synchronized(lock) { allowCommitted && frame === committed }
 
     private fun draw(
         frame: RawVideoFrame,

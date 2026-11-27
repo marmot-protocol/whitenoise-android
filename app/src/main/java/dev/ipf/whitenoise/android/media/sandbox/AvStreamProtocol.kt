@@ -34,7 +34,11 @@ internal object AvStreamProtocol {
     const val MAX_DURATION_US = 24L * 60 * 60 * 1_000_000
 
     /** Extra audio is optional only during A/V playback. */
-    fun requireReadTrack(track: Int, video: Boolean, audio: Boolean) {
+    fun requireReadTrack(
+        track: Int,
+        video: Boolean,
+        audio: Boolean,
+    ) {
         require(
             when (track) {
                 ANY_TRACK -> video || audio
@@ -47,7 +51,10 @@ internal object AvStreamProtocol {
     }
 
     /** A deferred read carries no shared output and is valid only for optional PCM. */
-    fun requireReadKind(track: Int, kind: Int) {
+    fun requireReadKind(
+        track: Int,
+        kind: Int,
+    ) {
         require(
             when (track) {
                 ANY_TRACK -> kind in 0..2

@@ -288,8 +288,7 @@ class RawAvSeekPublicationTest {
                 Bitmap::class.java,
                 Int::class.javaPrimitiveType,
                 Long::class.javaPrimitiveType,
-            )
-            .apply { isAccessible = true }
+            ).apply { isAccessible = true }
             .invoke(engine, bitmap, 0, -1L)
     }
 
