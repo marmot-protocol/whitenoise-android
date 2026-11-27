@@ -48,6 +48,16 @@ class AgentOperationPresentationTest {
         assertEquals("test", arguments.getJSONArray("paths").getString(1))
     }
 
+    /** A deeply nested payload from a group member renders as text instead of overflowing the UI thread's stack. */
+    @Test
+    fun deeplyNestedPayloadFallsBackToText() {
+        val nested = """{"text":"x","details":{"args":""" + "[".repeat(30_000) + "]".repeat(30_000) + "}}"
+        val presentation = requireNotNull(AgentOperationProjector.project(agentOperation(nested)))
+
+        assertEquals(nested, presentation.text)
+        assertEquals(null, presentation.argumentsJson)
+    }
+
     @Test
     fun missingDetailsKeepsPreviewExpandableWithoutInventingArguments() {
         val presentation =

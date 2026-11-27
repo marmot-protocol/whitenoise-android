@@ -37,10 +37,16 @@ object AgentOperationProjector {
     private const val OperationStatusTag = "operation-status"
     private const val OperationTypeTag = "operation"
 
+    // Tool arguments nest a few levels; this keeps org.json's recursion far from the UI thread's stack limit.
+    private const val MaxPayloadDepth = 64
+
     fun project(record: AppMessageRecordFfi): AgentOperationPresentation? {
         if (!MessageProjector.isAgentOperation(record)) return null
 
-        val payload = runCatching { JSONObject(record.plaintext) }.getOrNull()
+        val payload =
+            record.plaintext
+                .takeIf { GroupSystemEventJson.nestingWithin(it, MaxPayloadDepth) }
+                ?.let { runCatching { JSONObject(it) }.getOrNull() }
         val eventType = payload.stringOrNull("event_type") ?: record.tagValue(OperationTypeTag)
         val name = payload.stringOrNull("name") ?: record.tagValue(OperationNameTag)
         val status = payload.stringOrNull("status") ?: record.tagValue(OperationStatusTag)
