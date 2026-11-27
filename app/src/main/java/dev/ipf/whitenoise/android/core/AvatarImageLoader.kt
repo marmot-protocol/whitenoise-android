@@ -499,15 +499,18 @@ object AvatarImageLoader {
         image: ImageBitmap,
         animatedSource: ByteArray?,
         animationClassification: Boolean? = null,
-    ) {
-        if (!isStoredAvatarKey(key)) return
-        synchronized(lock) {
-            if (cache.get(key) != null) return
+        expectedCacheLifetime: Long? = null,
+    ): Boolean {
+        if (!isStoredAvatarKey(key)) return false
+        return synchronized(lock) {
+            val expired = expectedCacheLifetime != null && !cacheLifetime.isCurrent(expectedCacheLifetime)
+            if (cache.get(key) != null || expired) return@synchronized false
             cache.put(key, image)
             failureExpiresAt.remove(key)
             publishAnimatedSourceLocked(key, animatedSource)
             // Missing encoded bytes may mean eviction, not a static picture. Preserve the handed-off classification.
             cache.classifyAnimation(key, if (animatedSource != null) true else animationClassification)
+            true
         }
     }
 

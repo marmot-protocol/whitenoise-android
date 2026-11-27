@@ -1067,7 +1067,12 @@ APK in place.
 
 `BaselineProfileGenerator` collects on the
 [prepared device](#prepare-a-physical-device-fixture), whose `GROUP_NAME`
-conversation must hold enough history to scroll several screens. Only cold launch-to-surface rules (populated startup to the
+conversation must hold enough history to scroll several screens. Open the fixture
+chat list with a downloaded group picture among its first rows and let the
+picture load. Cold-launch the app again to let it build the startup pack from
+the saved picture before generating the profile. The generator checks that a
+cold launch restores a group picture from the pack.
+Only cold launch-to-surface rules (populated startup to the
 chat list and a cold share to the recipient picker) enter the Startup Profile.
 Chat open, conversation scroll, member roster and warm share delivery remain in
 the Baseline Profile so they cannot crowd startup code out of the primary DEX,

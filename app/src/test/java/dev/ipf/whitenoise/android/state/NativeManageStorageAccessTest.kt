@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.whitenoise.android.core.nostr.sha256
+import dev.ipf.whitenoise.android.core.nostr.toHex
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -18,6 +20,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.lang.reflect.Proxy
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 
 /** The MarmotKit-backed storage access: partial removals, their cache cleanup, and owner admission. */
 @RunWith(RobolectricTestRunner::class)
@@ -47,6 +51,27 @@ class NativeManageStorageAccessTest {
                 assertEquals("remove m1", expected.message)
             }
             assertTrue(playback.exists())
+        }
+
+    @Test fun avatarCacheDeletionFailureStillCleansPlaybackCopies() =
+        runBlocking {
+            val playback = playbackCopy()
+            val avatarRoot = File(context.cacheDir, MediaCacheDirs.DISPLAY_AVATARS)
+            val accountDir = avatarRoot.resolve("acct-${sha256(ACCOUNT.encodeToByteArray()).toHex()}")
+            accountDir.mkdirs()
+            val retained = accountDir.resolve("picture.enc").apply { writeText("fixture") }
+            Files.setPosixFilePermissions(accountDir.toPath(), PosixFilePermissions.fromString("r-x------"))
+            try {
+                val access = access(FakeRemovalNative(failOn = null))
+                val failure = runCatching { access.clearCaches() }.exceptionOrNull()
+                assertTrue(failure is IllegalStateException)
+                assertEquals("Could not clear display avatar files", failure?.message)
+                assertTrue(retained.exists())
+                assertFalse(playback.exists())
+            } finally {
+                Files.setPosixFilePermissions(accountDir.toPath(), PosixFilePermissions.fromString("rwx------"))
+                accountDir.deleteRecursively()
+            }
         }
 
     /** A retired owner is refused before any native call. */
@@ -102,6 +127,7 @@ class NativeManageStorageAccessTest {
                         targets.map { AttachmentLocalAssetFfi("ref:${messageId(it)}", 10uL) }
                     }
                     "controlAttachment" -> remove((requireNotNull(arguments)[1] as String).removePrefix("ref:"))
+                    "clearAvatarCache" -> Unit
                     "toString" -> "FakeRemovalNative"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === arguments?.firstOrNull()

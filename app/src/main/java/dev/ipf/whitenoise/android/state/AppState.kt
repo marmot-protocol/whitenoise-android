@@ -692,6 +692,7 @@ class WhiteNoiseAppState private constructor(
     /** Encrypted retained originals, separate from the bounded display derivatives. */
     internal val diskMediaCache = createOriginalMediaCache(appContext, ::bumpMediaCacheRevision)
     internal val displayThumbnails = createDisplayThumbnailCache(appContext)
+    internal val displayAvatars = createDisplayAvatarCache(appContext)
 
     /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
     internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
@@ -4347,6 +4348,7 @@ class WhiteNoiseAppState private constructor(
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
+                scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }
@@ -5189,7 +5191,7 @@ class WhiteNoiseAppState private constructor(
         preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
         reloadMediaAutoDownloadMatrix()
         phase = AppPhase.Onboarding
-        wipeDecryptedMediaFromDisk()
+        wipeSignedOutMedia(account)
         notificationDelivery.settleFcmAfterSignOut(next, refreshed)
         notificationDelivery.localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
@@ -6135,6 +6137,7 @@ class WhiteNoiseAppState private constructor(
             refreshLocalNotificationPermission()
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
+            refillForegroundDisplayAvatars()
             notificationScope.launch { catchUpAfterForegroundActivation() }
             scheduleForegroundDisplayThumbnailReconciliation()
         }

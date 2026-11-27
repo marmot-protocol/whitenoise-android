@@ -15,6 +15,7 @@ import java.nio.file.Files
 object MediaCacheDirs {
     const val ORIGINALS = "decrypted-media"
     const val DISPLAY_THUMBNAILS = "display-thumbnails-v1"
+    const val DISPLAY_AVATARS = "display-avatars-v1"
     const val VOICE = "voice_attachments"
     const val VIDEO = "video_attachments"
     const val SHARED = "shared_media"

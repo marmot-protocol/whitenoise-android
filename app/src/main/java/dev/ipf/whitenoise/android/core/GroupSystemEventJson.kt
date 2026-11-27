@@ -83,7 +83,16 @@ object GroupSystemEventJson {
      */
     internal fun withinResourceBounds(plaintext: String): Boolean =
         !utf8LengthExceedsLimit(plaintext) &&
-            JsonStructureBoundsScanner().scan(plaintext)
+            JsonStructureBoundsScanner(MAX_JSON_DEPTH, MAX_COLLECTION_ELEMENTS).scan(plaintext)
+
+    /**
+     * Whether peer-authored [plaintext] nests at most [maxDepth] containers, rejecting the same lenient
+     * syntax. org.json parses recursively, so deeper input can overflow the calling thread's stack.
+     */
+    internal fun nestingWithin(
+        plaintext: String,
+        maxDepth: Int,
+    ): Boolean = JsonStructureBoundsScanner(maxDepth, Int.MAX_VALUE).scan(plaintext)
 
     private fun utf8LengthExceedsLimit(plaintext: String): Boolean {
         var bytes = 0
@@ -119,8 +128,11 @@ object GroupSystemEventJson {
      * strict JSON serializer. Unquoted literals without quotes still pass,
      * because they end at the first structural character and cannot hide one.
      */
-    private class JsonStructureBoundsScanner {
-        private val membersByDepth = IntArray(MAX_JSON_DEPTH + 1)
+    private class JsonStructureBoundsScanner(
+        private val maxDepth: Int,
+        private val maxElements: Int,
+    ) {
+        private val membersByDepth = IntArray(maxDepth + 1)
         private var depth = 0
         private var inString = false
         private var escaped = false
@@ -166,10 +178,10 @@ object GroupSystemEventJson {
 
         private fun startContainer(): Boolean {
             depth++
-            if (depth <= MAX_JSON_DEPTH) {
+            if (depth <= maxDepth) {
                 membersByDepth[depth] = 1
             }
-            return depth <= MAX_JSON_DEPTH
+            return depth <= maxDepth
         }
 
         private fun endContainer(): Boolean {
@@ -181,7 +193,7 @@ object GroupSystemEventJson {
 
         private fun consumeSeparator(): Boolean {
             if (depth > 0) membersByDepth[depth]++
-            return depth == 0 || membersByDepth[depth] <= MAX_COLLECTION_ELEMENTS
+            return depth == 0 || membersByDepth[depth] <= maxElements
         }
 
         private fun isLiteralCharacter(character: Char): Boolean =

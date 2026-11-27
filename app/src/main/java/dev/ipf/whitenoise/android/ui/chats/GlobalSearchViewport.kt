@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -153,8 +152,8 @@ internal fun GlobalSearchGridResetEffect(
 /** Called inside an account/runtime key at the shell, not inside the disposable search route. */
 @Composable
 internal fun rememberGlobalSearchViewport(): GlobalSearchViewport {
-    val active = rememberLazyListState()
-    val archived = rememberLazyListState()
+    val active = rememberChatAvatarListState()
+    val archived = rememberChatAvatarListState()
     val grid = rememberLazyGridState()
     val activeReset = rememberSaveable(saver = ChatListSearchViewportStateSaver) { ChatListSearchViewportState() }
     val archivedReset = rememberSaveable(saver = ChatListSearchViewportStateSaver) { ChatListSearchViewportState() }

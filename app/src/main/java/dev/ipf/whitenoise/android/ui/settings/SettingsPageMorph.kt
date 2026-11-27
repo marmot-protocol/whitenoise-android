@@ -420,7 +420,8 @@ internal class SettingsPageMorph {
         backplate: Color,
         captureContent: Boolean = true,
     ) {
-        val inputs = captureInputs?.invoke()
+        // Read the viewport only when this frame may record it: the read subscribes the host draw to every scroll.
+        val inputs = if (recording && captureContent) captureInputs?.invoke() else null
         if (!recording) clearPictures()
         if (!captureContent || settled?.inputs != inputs) settled = null
         val native = nativeContours(host)

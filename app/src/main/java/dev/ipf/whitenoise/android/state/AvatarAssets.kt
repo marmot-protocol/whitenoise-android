@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.STORED_AVATAR_KEY_PREFIX
+import dev.ipf.whitenoise.android.media.DisplayAvatarKey
 
 /**
  * Byte budget for one batched read, MarmotKit's documented maximum. The engine already validated and
@@ -55,24 +56,34 @@ internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
  * that is showing (rows, the cold-start prewarm, prepared avatar windows) pass [abandonable], letting a decode
  * that is still queued once all of them have left be skipped.
  */
+@Suppress("LongParameterList") // Optional scheduling and cache ownership belong to the request.
 internal suspend fun WhiteNoiseAppState.durableAvatar(
     asset: AvatarAssetFfi?,
     accountRef: String? = activeAccountRef,
     acquireMissing: Boolean = true,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
     abandonable: Boolean = false,
+    displayKey: DisplayAvatarKey? = null,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     if (acquireMissing && ownedAsset?.wantsAcquisition() == true) requestAvatars(listOf(ownedAsset.target), accountRef)
-    val renderable = ownedAsset?.takeIf { it.isRenderable() }
-    val reference = renderable?.reference
     val account = accountRef
+    val renderable = ownedAsset?.takeIf(AvatarAssetFfi::isRenderable)
     val key = account?.let { renderable?.cacheKey(it) }
-    if (reference == null || key == null || account == null) return null
+    if (account == null || renderable == null || key == null) return null
     val decodeDomain = domain ?: durableAvatarDomain(renderable, account)
-    return AvatarImageLoader.loadStored(key, lifetime, decodeDomain, abandonable) {
-        readDurableAvatarBytes(account, checkNotNull(renderable))
+    val derivative = displayKey?.takeIf { it.storedKey() == key && AvatarImageLoader.cachedImage(key) == null }
+    val diskGeneration = displayAvatars.generation(account)
+    if (derivative != null) restoreDisplayAvatar(derivative, diskGeneration, lifetime)
+    val needsDecode = derivative != null && AvatarImageLoader.cachedImage(key) == null
+    return try {
+        AvatarImageLoader.loadStored(key, lifetime, decodeDomain, abandonable) {
+            readDurableAvatarBytes(account, renderable)
+        }
+    } finally {
+        // Cache publication can satisfy a row's adoption waiter before this caller resumes.
+        if (needsDecode) persistDisplayAvatar(checkNotNull(derivative), diskGeneration)
     }
 }
 
@@ -169,4 +180,5 @@ internal suspend fun WhiteNoiseAppState.requestAvatars(
 internal suspend fun WhiteNoiseAppState.clearDurableAvatars() {
     val account = activeAccountRef ?: return
     runCatchingCancellable { marmotIo { clearAvatarCache(account) } }
+    clearDisplayAvatarAccount(account)
 }
