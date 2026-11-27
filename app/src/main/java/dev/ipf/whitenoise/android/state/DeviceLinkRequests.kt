@@ -16,7 +16,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * A link request on one of this installation's profiles, named by MDK's opaque prompt id. [open] says whether it
- * still needs this user or is still in progress; a settled request only reports its outcome.
+ * still needs this user or is still in progress; a settled request only reports its outcome. [repeated] says Link is
+ * no longer offered for it, because its profile had more requests lately than one person linking would make.
  */
 internal data class DeviceLinkRequest(
     val accountRef: String,
@@ -24,7 +25,10 @@ internal data class DeviceLinkRequest(
     val requestedAtSeconds: Long,
     val open: Boolean = true,
     val comparing: Boolean = false,
-)
+    val repeated: Boolean = false,
+) {
+    val id: Pair<String, String> get() = accountRef to promptId
+}
 
 /**
  * Whether a prompt still needs this user or is still in progress. A prompt that linked, was added by another device
@@ -49,9 +53,12 @@ internal fun DeviceLinkPromptStateFfi.isOpen(): Boolean =
 /**
  * Every link request across [snapshots] (one per profile), oldest first. This only reads: a request on a profile
  * that is not active is listed so the user can be told about it, and is answered only after that profile is activated
- * and its prompt re-read.
+ * and its prompt re-read. A request still waiting for an answer on a profile in [repeatedAccounts] is marked repeated.
  */
-internal fun deviceLinkRequests(snapshots: Map<String, DeviceLinkSnapshotFfi>): List<DeviceLinkRequest> =
+internal fun deviceLinkRequests(
+    snapshots: Map<String, DeviceLinkSnapshotFfi>,
+    repeatedAccounts: Set<String> = emptySet(),
+): List<DeviceLinkRequest> =
     snapshots
         .flatMap { (accountRef, snapshot) ->
             snapshot.prompts.map { prompt ->
@@ -61,6 +68,7 @@ internal fun deviceLinkRequests(snapshots: Map<String, DeviceLinkSnapshotFfi>): 
                     prompt.requestedAt.toLong(),
                     open = prompt.state.isOpen(),
                     comparing = prompt.state is DeviceLinkPromptStateFfi.Comparing,
+                    repeated = accountRef in repeatedAccounts && prompt.state.isUnanswered(),
                 )
             }
         }.sortedWith(
@@ -70,46 +78,57 @@ internal fun deviceLinkRequests(snapshots: Map<String, DeviceLinkSnapshotFfi>): 
         )
 
 /**
- * Chooses which link request the app shell presents. Only an open request starts being presented, oldest first. A
- * presented request stays presented while MDK still lists it, through to its outcome, so a newer request never
- * replaces a comparison in progress. Nothing new is presented while [offer] is told the shell is blocked (the app is
- * locked or another protected flow is on screen). Closing the prompt hides that request here and answers nothing:
- * declining is a separate native action.
+ * Which link request the chat list announces and which one the app shell presents. Nothing is presented on its own:
+ * MDK's requests only feed the chat list's [notice], and a request is presented only when the user [open]s it there.
+ * A presented request stays presented while MDK still lists it, through to its outcome, so a newer request never
+ * replaces a comparison in progress. Closing the prompt only returns the request to the notice, and putting the notice
+ * off hides that request until MDK drops it. Neither answers anything: declining is a separate native action.
  */
 internal data class DeviceLinkRequestQueue(
+    val requests: List<DeviceLinkRequest> = emptyList(),
     val presented: DeviceLinkRequest? = null,
-    val hidden: Map<Pair<String, String>, HiddenUntil> = emptyMap(),
+    val dismissed: Set<Pair<String, String>> = emptySet(),
 ) {
+    /**
+     * The one request the chat list announces: an open request that is neither on screen nor put off, a repeated one
+     * first and otherwise the oldest, so a burst of requests still makes one notice.
+     */
+    val notice: DeviceLinkRequest?
+        get() =
+            requests
+                .filter { it.open && it.id != presented?.id && it.id !in dismissed }
+                .sortedByDescending(DeviceLinkRequest::repeated)
+                .firstOrNull()
+
     /** The queue after MDK's latest [requests]. Requests MDK no longer lists are forgotten. */
-    fun offer(
-        requests: List<DeviceLinkRequest>,
+    fun offer(requests: List<DeviceLinkRequest>): DeviceLinkRequestQueue {
+        val listed = requests.associateBy(DeviceLinkRequest::id)
+        return DeviceLinkRequestQueue(
+            requests = requests,
+            presented = presented?.let { listed[it.id] },
+            dismissed = dismissed.filterTo(mutableSetOf()) { it in listed },
+        )
+    }
+
+    /**
+     * The queue after the user tapped the notice for [request]. Only a request MDK still lists as open opens, never
+     * while the shell is [blocked] and never over a request already on screen.
+     */
+    fun open(
+        request: DeviceLinkRequest,
         blocked: Boolean,
     ): DeviceLinkRequestQueue {
-        val listed = requests.associateBy { it.accountRef to it.promptId }
-        val stillHidden =
-            hidden.filter { (id, until) ->
-                val request = listed[id]
-                request != null && !(until == HiddenUntil.Comparison && request.comparing)
-            }
-        val kept = presented?.let { listed[it.accountRef to it.promptId] }
-        val startable = requests.firstOrNull { it.open && (it.accountRef to it.promptId) !in stillHidden }
-        val next = kept ?: startable.takeUnless { blocked }
-        return DeviceLinkRequestQueue(presented = next, hidden = stillHidden)
+        if (blocked || presented != null) return this
+        val current = requests.firstOrNull { it.id == request.id && it.open } ?: return this
+        return copy(presented = current, dismissed = dismissed - current.id)
     }
 
-    /** The queue after the user closed the presented request without answering it. */
-    fun hidePresented(reopenForComparison: Boolean = true): DeviceLinkRequestQueue {
-        val closed = presented ?: return this
-        val until = if (reopenForComparison && !closed.comparing) HiddenUntil.Comparison else HiddenUntil.End
-        val id = closed.accountRef to closed.promptId
-        return DeviceLinkRequestQueue(presented = null, hidden = hidden + (id to until))
-    }
+    /** The queue after the user put the notice for [request] off: hidden until MDK drops it, and answered nothing. */
+    fun dismiss(request: DeviceLinkRequest): DeviceLinkRequestQueue =
+        if (requests.none { it.id == request.id }) this else copy(dismissed = dismissed + request.id)
 
-    /** An active comparison can reopen after preparation; Not now on another profile lasts for this request. */
-    enum class HiddenUntil {
-        Comparison,
-        End,
-    }
+    /** The queue after the user closed the presented request without answering it: it is announced again. */
+    fun close(): DeviceLinkRequestQueue = copy(presented = null)
 }
 
 /**
@@ -119,6 +138,10 @@ internal data class DeviceLinkRequestQueue(
  * change, never on a timer of the watcher's own, so an expired request is never revived or extended by the host. The
  * one timed read is Review's: while a reviewed request is unchecked and the app is started, its profile is read
  * again until one read succeeds.
+ *
+ * MDK forgets a declined request at once and a settled one minutes after it settles. For one hour, the watcher
+ * keeps when it first saw each unanswered request, including across process restarts. That is
+ * all it needs to tell repeated requests apart; see [unansweredLinkRequests].
  */
 @Stable
 internal class DeviceLinkRequestWatcher(
@@ -126,6 +149,8 @@ internal class DeviceLinkRequestWatcher(
     private val owns: () -> Boolean = { true },
     private val canPresentOutcome: (String) -> Boolean = { true },
     private val nowMs: () -> Long = ::monotonicNowMs,
+    private val historyNowMs: () -> Long = nowMs,
+    private val history: DeviceLinkRequestHistory? = null,
 ) {
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
         private set
@@ -140,6 +165,15 @@ internal class DeviceLinkRequestWatcher(
 
     var queue by mutableStateOf(DeviceLinkRequestQueue())
         private set
+
+    /** Whether the shell was last reported blocked, so a tap on the chat list's notice opens nothing until unlock. */
+    var blocked by mutableStateOf(false)
+        private set
+
+    /** Per profile, when each unanswered request was first seen, by [historyNowMs]. */
+    private var unanswered = history?.read().orEmpty()
+
+    private var watchedAccounts: Set<String>? = null
 
     /** How many command results each profile has had published, so a read begun before one can tell it is stale. */
     private var accepted = emptyMap<String, Long>()
@@ -161,18 +195,16 @@ internal class DeviceLinkRequestWatcher(
      * Re-reads [accounts] and drops profiles no longer signed in. A profile whose read fails keeps its last
      * snapshot, so a transient failure never dismisses a comparison on screen.
      */
-    suspend fun refresh(
-        accounts: List<String>,
-        blocked: Boolean,
-    ) {
+    suspend fun refresh(accounts: List<String>) {
         reads.withLock {
             val before = accepted
             val read = accounts.mapNotNull { account -> read(account)?.let { account to it } }.toMap()
             if (!owns()) return
             // A command result published meanwhile is newer than these reads, so it stays.
             val fresh = read.filterKeys { accepted[it] == before[it] }
-            countSuccessfulReads(fresh.keys)
-            publish(snapshots.filterKeys { it in accounts } + fresh, blocked)
+            successfulReads = successfulReads.counted(fresh.keys)
+            watchedAccounts = accounts.toSet()
+            publish(snapshots.filterKeys { it in accounts } + fresh)
         }
     }
 
@@ -180,26 +212,22 @@ internal class DeviceLinkRequestWatcher(
     suspend fun onEvent(
         event: MarmotEventFfi,
         accounts: List<String>,
-        blocked: Boolean,
     ) {
         val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
-        reread(account, blocked)
+        reread(account)
     }
 
     /**
      * Re-reads [accountRef] alone. The host calls it after [accept], because the command's snapshot can be older
      * than a read MDK's change event already published, and no further event is due once a link has settled.
      */
-    suspend fun reread(
-        accountRef: String,
-        blocked: Boolean,
-    ) {
+    suspend fun reread(accountRef: String) {
         reads.withLock {
             val before = accepted[accountRef]
             val snapshot = read(accountRef)
             if (snapshot != null && owns() && accepted[accountRef] == before) {
-                countSuccessfulReads(setOf(accountRef))
-                publish(snapshots + (accountRef to snapshot), blocked)
+                successfulReads = successfulReads.counted(setOf(accountRef))
+                publish(snapshots + (accountRef to snapshot))
             }
         }
     }
@@ -212,36 +240,52 @@ internal class DeviceLinkRequestWatcher(
     fun accept(
         accountRef: String,
         snapshot: DeviceLinkSnapshotFfi,
-        blocked: Boolean,
         beforeCommand: DeviceLinkSnapshotFfi?,
     ) {
         if (!owns() || snapshots[accountRef] !== beforeCommand) return
         accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
-        publish(snapshots + (accountRef to snapshot), blocked)
+        publish(snapshots + (accountRef to snapshot))
     }
 
-    /** Re-evaluates what to present after the shell became blocked or unblocked. */
-    fun reoffer(blocked: Boolean) = publish(snapshots, blocked)
-
-    /** Hides the presented request without answering it. */
-    fun hidePresented(blocked: Boolean) {
-        val presented = queue.presented ?: return
-        queue = queue.hidePresented(reopenForComparison = canPresentOutcome(presented.accountRef))
-        reoffer(blocked)
+    /** The shell owns blocking. A suspended snapshot read must never restore an older value. */
+    fun setBlocked(blocked: Boolean) {
+        this.blocked = blocked
     }
 
-    private fun countSuccessfulReads(accounts: Set<String>) {
-        successfulReads = successfulReads + accounts.associateWith { (successfulReads[it] ?: 0L) + 1L }
+    /** Re-evaluates settled outcomes after the active profile changes. */
+    fun reoffer() = publish(snapshots)
+
+    /** Presents [request] because the user tapped its notice. Nothing opens while the shell is blocked. */
+    fun open(request: DeviceLinkRequest) {
+        queue = queue.open(request, blocked)
     }
 
-    private fun publish(
-        next: Map<String, DeviceLinkSnapshotFfi>,
-        blocked: Boolean,
-    ) {
-        linkedAwaitingCount = awaitingChatCount(snapshots, next, linkedAwaitingCount, nowMs())
+    /** Puts the notice for [request] off until MDK drops it, without answering it. */
+    fun dismiss(request: DeviceLinkRequest) {
+        queue = queue.dismiss(request)
+    }
+
+    /** Closes the presented request without answering it; the chat list announces it again. */
+    fun close() {
+        queue = queue.close()
+    }
+
+    private fun publish(next: Map<String, DeviceLinkSnapshotFfi>) {
+        val now = nowMs()
+        linkedAwaitingCount = awaitingChatCount(snapshots, next, linkedAwaitingCount, now)
+        val historyTime = historyNowMs()
+        val previous = unanswered
+        val unreadAccounts = previous.filterKeys { it !in next && watchedAccounts?.contains(it) != false }
+        unanswered = unansweredLinkRequests(previous, next, historyTime) +
+            unreadAccounts
+                .mapValues { (_, prompts) ->
+                    prompts.filterValues { historyTime - it in 0 until REPEATED_LINK_REQUEST_WINDOW_MS }
+                }.filterValues { it.isNotEmpty() }
+        if (unanswered != previous) history?.write(unanswered)
         snapshots = next
-        val visible = deviceLinkRequests(next).filter { it.open || canPresentOutcome(it.accountRef) }
-        queue = queue.offer(visible, blocked)
+        val repeated = repeatedLinkRequestAccounts(unanswered)
+        val visible = deviceLinkRequests(next, repeated).filter { it.open || canPresentOutcome(it.accountRef) }
+        queue = queue.offer(visible)
     }
 
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure keeps the prior snapshot.
@@ -254,6 +298,9 @@ internal class DeviceLinkRequestWatcher(
             null
         }
 }
+
+/** These read counts with one more successful read of each of [accounts]. */
+private fun Map<String, Long>.counted(accounts: Set<String>): Map<String, Long> = this + accounts.associateWith { (this[it] ?: 0L) + 1L }
 
 /** Milliseconds from a monotonic clock, the one [DeviceLinkRequestWatcher.linkedAwaitingCount] is measured on. */
 internal fun monotonicNowMs(): Long = System.nanoTime() / NANOS_PER_MILLI
@@ -291,5 +338,7 @@ internal fun WhiteNoiseAppState.runtimeLinkRequests() =
             readSnapshot = { account -> marmotIo { deviceLinkSnapshot(account) } },
             owns = { runtimeGeneration == epoch },
             canPresentOutcome = { account -> activeAccountRef == account },
+            historyNowMs = System::currentTimeMillis,
+            history = DeviceLinkRequestHistory(appContext),
         )
     }

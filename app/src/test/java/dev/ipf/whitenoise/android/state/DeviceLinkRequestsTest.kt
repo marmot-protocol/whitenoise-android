@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Link requests are read across profiles, presented one at a time and never answered by the shell itself. */
+/** Link requests are read across profiles, announced in one notice, opened only by a tap and never answered here. */
 class DeviceLinkRequestsTest {
     /** Only prompts that still need the user or are in progress count as open. */
     @Test
@@ -56,94 +56,143 @@ class DeviceLinkRequestsTest {
         )
     }
 
-    /** The oldest open request is presented, and a newer one never replaces it while MDK still lists it. */
+    /** No request is presented on its own, open or settled: MDK's requests only feed the chat list's notice. */
     @Test
-    fun aPresentedRequestIsNotReplacedByAnotherOne() {
+    fun noRequestIsPresentedWithoutATap() {
+        val open = DeviceLinkRequest("a", "p1", 10, comparing = true)
+        val settled = DeviceLinkRequest("a", "p0", 5, open = false)
+
+        val queue = DeviceLinkRequestQueue().offer(listOf(settled, open))
+
+        assertNull(queue.presented)
+        assertEquals(open, queue.notice)
+    }
+
+    /** Opening the notice presents that request, and a newer one never replaces it while MDK still lists it. */
+    @Test
+    fun anOpenedRequestIsNotReplacedByAnotherOne() {
         val first = DeviceLinkRequest("a", "p1", 10)
         val older = DeviceLinkRequest("b", "p0", 1)
 
-        val presented = DeviceLinkRequestQueue().offer(listOf(first), blocked = false)
-        val afterOlderArrives = presented.offer(listOf(older, first), blocked = false)
+        val presented = DeviceLinkRequestQueue().offer(listOf(first)).open(first, blocked = false)
+        val afterOlderArrives = presented.offer(listOf(older, first))
 
         assertEquals(first, presented.presented)
         assertEquals(first, afterOlderArrives.presented)
+        assertEquals(first, afterOlderArrives.open(older, blocked = false).presented)
+        assertEquals(older, afterOlderArrives.notice)
     }
 
-    /** A settled request never starts being presented. */
+    /** A settled request has no notice and cannot be opened. */
     @Test
-    fun aSettledRequestIsNotPresented() {
+    fun aSettledRequestIsNotAnnouncedOrOpened() {
         val settled = DeviceLinkRequest("a", "p1", 10, open = false)
+        val queue = DeviceLinkRequestQueue().offer(listOf(settled))
 
-        assertNull(DeviceLinkRequestQueue().offer(listOf(settled), blocked = false).presented)
+        assertNull(queue.notice)
+        assertNull(queue.open(settled, blocked = false).presented)
     }
 
-    /** A presented request stays through to its outcome, so the user sees how it ended. */
+    /** An opened request stays through to its outcome, so the user sees how it ended. */
     @Test
-    fun aPresentedRequestStaysThroughToItsOutcome() {
+    fun anOpenedRequestStaysThroughToItsOutcome() {
         val request = DeviceLinkRequest("a", "p1", 10)
-        val presented = DeviceLinkRequestQueue().offer(listOf(request), blocked = false)
+        val presented = DeviceLinkRequestQueue().offer(listOf(request)).open(request, blocked = false)
 
-        val settled = presented.offer(listOf(request.copy(open = false)), blocked = false)
+        val settled = presented.offer(listOf(request.copy(open = false)))
 
         assertEquals(request.copy(open = false), settled.presented)
     }
 
-    /** Nothing new is presented while a protected flow is on screen, and it is presented once that ends. */
+    /** The notice opens nothing while a protected flow is on screen; the request keeps its notice for later. */
     @Test
-    fun nothingNewIsPresentedWhileBlocked() {
+    fun nothingOpensWhileBlocked() {
         val request = DeviceLinkRequest("a", "p1", 10)
+        val queue = DeviceLinkRequestQueue().offer(listOf(request))
 
-        val blocked = DeviceLinkRequestQueue().offer(listOf(request), blocked = true)
-        val unblocked = blocked.offer(listOf(request), blocked = false)
+        val blocked = queue.open(request, blocked = true)
 
         assertNull(blocked.presented)
-        assertEquals(request, unblocked.presented)
+        assertEquals(request, blocked.notice)
+        assertEquals(request, blocked.open(request, blocked = false).presented)
     }
 
-    /** A request already presented stays presented when a protected flow starts. */
+    /** Closing an opened request answers nothing and returns it to the notice; it never reopens by itself. */
     @Test
-    fun aPresentedRequestSurvivesBlocking() {
+    fun closingReturnsTheRequestToTheNotice() {
         val request = DeviceLinkRequest("a", "p1", 10)
-        val presented = DeviceLinkRequestQueue().offer(listOf(request), blocked = false)
+        val presented = DeviceLinkRequestQueue().offer(listOf(request)).open(request, blocked = false)
 
-        assertEquals(request, presented.offer(listOf(request), blocked = true).presented)
+        val closed = presented.close().offer(listOf(request.copy(comparing = true)))
+
+        assertNull(presented.notice)
+        assertNull(closed.presented)
+        assertEquals(request.copy(comparing = true), closed.notice)
     }
 
-    /** Closing a request hides it without answering, presents the next one, and forgets it once MDK drops it. */
+    /** Not now on the notice hides that request until MDK drops it, and the next request takes the notice. */
     @Test
-    fun hidingARequestPresentsTheNextAndIsForgottenWhenMdkDropsIt() {
+    fun puttingTheNoticeOffHidesThatRequestUntilMdkDropsIt() {
         val first = DeviceLinkRequest("a", "p1", 10)
         val second = DeviceLinkRequest("a", "p2", 20)
-        val presented = DeviceLinkRequestQueue().offer(listOf(first, second), blocked = false)
+        val queue = DeviceLinkRequestQueue().offer(listOf(first, second))
 
-        val hidden = presented.hidePresented().offer(listOf(first, second), blocked = false)
-        val dropped = hidden.offer(listOf(second), blocked = false)
+        val dismissed = queue.dismiss(first).offer(listOf(first.copy(comparing = true), second))
+        val dropped = dismissed.offer(listOf(second))
 
-        assertEquals(second, hidden.presented)
-        assertEquals(setOf("a" to "p1"), hidden.hidden.keys)
-        assertTrue(dropped.hidden.isEmpty())
+        assertEquals(first, queue.notice)
+        assertEquals(second, dismissed.notice)
+        assertNull(dismissed.presented)
+        assertEquals(setOf("a" to "p1"), dismissed.dismissed)
+        assertTrue(dropped.dismissed.isEmpty())
     }
 
-    /** Closing preparation allows the later emoji comparison for the same MDK prompt to appear. */
+    /** However many requests are open there is one notice, and a repeated one takes it before an older request. */
     @Test
-    fun closeDuringPreparationKeepsTheComparisonReachable() =
+    fun manyRequestsMakeOneNoticeWithARepeatedOneFirst() {
+        val older = DeviceLinkRequest("a", "p1", 10)
+        val repeated = DeviceLinkRequest("b", "p2", 20, repeated = true)
+
+        assertEquals(repeated, DeviceLinkRequestQueue().offer(listOf(older, repeated)).notice)
+        assertEquals(older, DeviceLinkRequestQueue().offer(listOf(older, repeated.copy(repeated = false))).notice)
+    }
+
+    /** A request that reached comparison while closed waits for a tap instead of opening. */
+    @Test
+    fun aComparisonNeverOpensByItself() =
         runTest {
             var state: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p", 1u, state)) })
-            watcher.reread("a", blocked = false)
-            watcher.hidePresented(blocked = false)
-            watcher.reread("a", blocked = false)
+            watcher.reread("a")
             assertNull(watcher.queue.presented)
 
+            watcher.open(watcher.queue.notice!!)
+            watcher.close()
             state = DeviceLinkPromptStateFfi.Comparing(emptyList())
-            watcher.reread("a", blocked = false)
-            assertTrue(watcher.queue.presented?.comparing == true)
-            watcher.hidePresented(blocked = false)
-            watcher.reread("a", blocked = false)
+            watcher.reread("a")
+
             assertNull(watcher.queue.presented)
+            assertTrue(watcher.queue.notice?.comparing == true)
         }
 
-    /** Not now on the other-profile notice keeps that notice hidden when the same request reaches comparison. */
+    /** The watcher remembers the shell's lock, so the notice opens nothing until it is reported unlocked. */
+    @Test
+    fun theWatcherOpensNothingWhileBlocked() =
+        runTest {
+            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p", 1u)) })
+            watcher.setBlocked(true)
+            watcher.reread("a")
+            val notice = watcher.queue.notice!!
+
+            watcher.open(notice)
+            assertNull(watcher.queue.presented)
+
+            watcher.setBlocked(false)
+            watcher.open(notice)
+            assertEquals("p", watcher.queue.presented?.promptId)
+        }
+
+    /** Not now on another profile's notice keeps it quiet when the same request reaches comparison. */
     @Test
     fun anIgnoredOtherProfileRequestStaysQuiet() =
         runTest {
@@ -153,14 +202,15 @@ class DeviceLinkRequestsTest {
                     readSnapshot = { snapshot(prompt("p", 1u, state)) },
                     canPresentOutcome = { false },
                 )
-            watcher.reread("other", blocked = false)
-            watcher.hidePresented(blocked = false)
+            watcher.reread("other")
+            watcher.dismiss(watcher.queue.notice!!)
             state = DeviceLinkPromptStateFfi.Comparing(emptyList())
-            watcher.reread("other", blocked = false)
+            watcher.reread("other")
             assertNull(watcher.queue.presented)
+            assertNull(watcher.queue.notice)
         }
 
-    /** A settled request for another account drops its notice and frees the queue for the next request. */
+    /** A settled request for another account drops its notice, and the next request takes it. */
     @Test
     fun otherProfileNoticeEndsWhenTheRequestSettles() =
         runTest {
@@ -172,23 +222,25 @@ class DeviceLinkRequestsTest {
                     },
                     canPresentOutcome = { it == "mine" },
                 )
-            watcher.refresh(listOf("other", "mine"), blocked = false)
-            assertEquals("other", watcher.queue.presented?.accountRef)
+            watcher.refresh(listOf("other", "mine"))
+            assertEquals("other", watcher.queue.notice?.accountRef)
+            watcher.open(watcher.queue.notice!!)
             first = ENDED
-            watcher.reread("other", blocked = false)
-            assertEquals("next", watcher.queue.presented?.promptId)
+            watcher.reread("other")
+            assertNull(watcher.queue.presented)
+            assertEquals("next", watcher.queue.notice?.promptId)
         }
 
     /** A request MDK no longer lists stops being presented. */
     @Test
     fun aRequestMdkDroppedIsNoLongerPresented() {
         val request = DeviceLinkRequest("a", "p1", 10)
-        val presented = DeviceLinkRequestQueue().offer(listOf(request), blocked = false)
+        val presented = DeviceLinkRequestQueue().offer(listOf(request)).open(request, blocked = false)
 
-        assertNull(presented.offer(emptyList(), blocked = false).presented)
+        assertNull(presented.offer(emptyList()).presented)
     }
 
-    /** The watcher reads every signed-in profile and presents the oldest open request, whichever profile owns it. */
+    /** The watcher reads every signed-in profile and announces the oldest open request, whichever profile owns it. */
     @Test
     fun theWatcherReadsEveryProfile() =
         runTest {
@@ -201,10 +253,12 @@ class DeviceLinkRequestsTest {
                     },
                 )
 
-            watcher.refresh(listOf("a", "b"), blocked = false)
+            watcher.refresh(listOf("a", "b"))
 
             assertEquals(listOf("a", "b"), reads)
-            assertEquals(DeviceLinkRequest("b", "b1", 5), watcher.queue.presented)
+            assertNull(watcher.queue.presented)
+            assertEquals(DeviceLinkRequest("b", "b1", 5), watcher.queue.notice)
+            watcher.open(watcher.queue.notice!!)
             assertEquals("b1", watcher.presentedPrompt?.promptId)
         }
 
@@ -220,10 +274,11 @@ class DeviceLinkRequestsTest {
                         snapshot(prompt("p1", 10u))
                     },
                 )
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
+            watcher.open(watcher.queue.notice!!)
             fail = true
 
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
 
             assertEquals(DeviceLinkRequest("a", "p1", 10), watcher.queue.presented)
         }
@@ -233,11 +288,11 @@ class DeviceLinkRequestsTest {
     fun aSignedOutProfileIsDropped() =
         runTest {
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u)) })
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
 
-            watcher.refresh(emptyList(), blocked = false)
+            watcher.refresh(emptyList())
 
-            assertNull(watcher.queue.presented)
+            assertNull(watcher.queue.notice)
             assertTrue(watcher.snapshots.isEmpty())
         }
 
@@ -255,9 +310,9 @@ class DeviceLinkRequestsTest {
                 )
             val accounts = listOf("a", "b")
 
-            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "b"), accounts, blocked = false)
-            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "other"), accounts, blocked = false)
-            watcher.onEvent(MarmotEventFfi.LinkedDevicesChanged("id", "a"), accounts, blocked = false)
+            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "b"), accounts)
+            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "other"), accounts)
+            watcher.onEvent(MarmotEventFfi.LinkedDevicesChanged("id", "a"), accounts)
 
             assertEquals(listOf("b"), reads)
         }
@@ -276,9 +331,9 @@ class DeviceLinkRequestsTest {
                     owns = { owned },
                 )
 
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
 
-            assertNull(watcher.queue.presented)
+            assertNull(watcher.queue.notice)
             assertTrue(watcher.snapshots.isEmpty())
         }
 
@@ -287,10 +342,11 @@ class DeviceLinkRequestsTest {
     fun aCommandsSnapshotUpdatesThePrompt() =
         runTest {
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u)) })
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
+            watcher.open(watcher.queue.notice!!)
 
             val linking = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking))
-            watcher.accept("a", linking, blocked = false, beforeCommand = watcher.snapshots["a"])
+            watcher.accept("a", linking, beforeCommand = watcher.snapshots["a"])
 
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }
@@ -304,16 +360,16 @@ class DeviceLinkRequestsTest {
             watcher =
                 DeviceLinkRequestWatcher(
                     readSnapshot = {
-                        watcher.accept("a", linking, blocked = false, beforeCommand = watcher.snapshots["a"])
+                        watcher.accept("a", linking, beforeCommand = watcher.snapshots["a"])
                         snapshot(prompt("p1", 10u))
                     },
                 )
 
-            watcher.refresh(listOf("a"), blocked = false)
-            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
+            watcher.refresh(listOf("a"))
+            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.prompt("a", "p1")?.state)
 
-            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "a"), listOf("a"), blocked = false)
-            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
+            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "a"), listOf("a"))
+            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.prompt("a", "p1")?.state)
         }
 
     /** A delayed command and a failed reconciliation must preserve an independently observed terminal state. */
@@ -327,22 +383,22 @@ class DeviceLinkRequestsTest {
                     check(!fails)
                     current
                 })
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
             val beforeCommand = watcher.snapshots["a"]
             current = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linked))
-            watcher.reread("a", blocked = false)
+            watcher.reread("a")
             fails = true
 
             val delayed = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking))
-            watcher.accept("a", delayed, blocked = false, beforeCommand = beforeCommand)
-            watcher.reread("a", blocked = false)
+            watcher.accept("a", delayed, beforeCommand = beforeCommand)
+            watcher.reread("a")
 
             assertEquals(DeviceLinkPromptStateFfi.Linked, watcher.prompt("a", "p1")?.state)
         }
 
-    /** Closing the prompt hides it and answers nothing; unblocking later does not bring it back. */
+    /** Closing the prompt answers nothing; unblocking later does not bring it back over the app. */
     @Test
-    fun hidingThePresentedRequestAnswersNothing() =
+    fun closingThePresentedRequestAnswersNothing() =
         runTest {
             var reads = 0
             val watcher =
@@ -352,12 +408,14 @@ class DeviceLinkRequestsTest {
                         snapshot(prompt("p1", 10u))
                     },
                 )
-            watcher.refresh(listOf("a"), blocked = false)
+            watcher.refresh(listOf("a"))
+            watcher.open(watcher.queue.notice!!)
 
-            watcher.hidePresented(blocked = false)
-            watcher.reoffer(blocked = false)
+            watcher.close()
+            watcher.setBlocked(false)
 
             assertNull(watcher.queue.presented)
+            assertEquals("p1", watcher.queue.notice?.promptId)
             assertEquals(1, reads)
         }
 

@@ -16,9 +16,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -115,6 +118,8 @@ internal enum class DeviceLinkAction(
     NotNow(R.string.link_request_not_now),
     Done(R.string.done),
     Close(R.string.close),
+    DontLink(R.string.link_request_dont_link),
+    ReviewDevices(R.string.link_request_review_devices),
 }
 
 /**
@@ -290,6 +295,7 @@ internal fun DeviceLinkStepLayout(
     onAction: (DeviceLinkAction) -> Unit,
     primaryEnabled: Boolean = true,
     failureMessage: Int? = null,
+    onCodeVisible: (() -> Unit)? = null,
     content: @Composable () -> Unit = {},
 ) {
     SettingsScaffold(title = screenTitle, onBack = onBack) {
@@ -313,7 +319,20 @@ internal fun DeviceLinkStepLayout(
                     modifier = text.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
-            if (step.code.isNotEmpty()) item(key = "code") { DeviceLinkCode(step.code, block) }
+            if (step.code.isNotEmpty()) {
+                item(key = "code") {
+                    val reportVisibility =
+                        if (onCodeVisible == null) {
+                            Modifier
+                        } else {
+                            Modifier.onGloballyPositioned {
+                                val bounds = it.boundsInWindow()
+                                if (bounds.width > 0f && bounds.height > 0f) onCodeVisible()
+                            }
+                        }
+                    DeviceLinkCode(step.code, block.then(reportVisibility))
+                }
+            }
             item(key = "content") {
                 Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField)) { content() }
             }
@@ -345,13 +364,16 @@ private fun DeviceLinkStepActions(
     onAction: (DeviceLinkAction) -> Unit,
 ) {
     step.primary?.let { action ->
-        WhiteNoiseButton(
-            onClick = { onAction(action) },
-            enabled = running == null && primaryEnabled,
-            loading = running != null && running != DeviceLinkCommand.Cancel && running != DeviceLinkCommand.Decline,
-            loadingLabel = stringResource(action.label),
-            modifier = Modifier.fillMaxWidth().testTag(DEVICE_LINK_PRIMARY_TAG),
-        ) { Text(stringResource(action.label)) }
+        // A press that began while Link was disabled must never finish on its enabled button.
+        key(action, if (action == DeviceLinkAction.Link) primaryEnabled else true) {
+            WhiteNoiseButton(
+                onClick = { onAction(action) },
+                enabled = running == null && primaryEnabled,
+                loading = running != null && running != DeviceLinkCommand.Cancel && running != DeviceLinkCommand.Decline,
+                loadingLabel = stringResource(action.label),
+                modifier = Modifier.fillMaxWidth().testTag(DEVICE_LINK_PRIMARY_TAG),
+            ) { Text(stringResource(action.label)) }
+        }
     }
     step.secondary?.let { action ->
         WhiteNoiseOutlinedButton(

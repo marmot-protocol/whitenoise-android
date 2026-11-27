@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -133,8 +134,12 @@ internal fun rememberApprovalDraft() =
  * Link device stays one tap: the device joins the account's chats with their history (both on, as MDK offers them),
  * and Options opens those two choices for anyone who wants to change them. The choices stay as entered if a
  * submission fails. [onLink] receives them, [onDecline] is Not now and [onClose] leaves without answering.
+ *
+ * Link can be tapped only [DEVICE_LINK_ARM_DELAY_MS] after the code first appears. A [repeated] request offers no
+ * Link at all: it warns instead, with Don't link ([onDecline]) and Review devices ([onReviewDevices]).
  */
 @Composable
+@Suppress("LongParameterList") // The request's state, its two answers, leaving, and the warning's devices route.
 internal fun DeviceLinkRequestContent(
     state: DeviceLinkPromptStateFfi,
     running: DeviceLinkCommand?,
@@ -143,6 +148,8 @@ internal fun DeviceLinkRequestContent(
     onClose: () -> Unit,
     failureMessage: Int? = null,
     draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
+    repeated: Boolean = false,
+    onReviewDevices: () -> Unit = onClose,
 ) {
     val label = draft.label
     // MDK requires a name. The approving device supplies the default, shown in the empty field.
@@ -153,23 +160,28 @@ internal fun DeviceLinkRequestContent(
             .trim()
             .ifEmpty { placeholder }
     val nameFits = deviceLabelFits(name)
-    val step = deviceLinkRequestStep(state) { IdentityFormatter.clockTime(it) }
+    val warning = repeatedLinkRequestStep(state).takeIf { repeated }
+    val step = warning ?: deviceLinkRequestStep(state) { IdentityFormatter.clockTime(it) }
+    var codeVisible by remember(step.code) { mutableStateOf(false) }
+    val armed = rememberLinkArmed(step.code, codeVisible)
     DeviceLinkStepLayout(
         screenTitle = stringResource(R.string.link_request_title),
         step = step,
         running = running,
         onBack = onClose,
-        primaryEnabled = step.primary != DeviceLinkAction.Link || nameFits,
+        primaryEnabled = step.primary != DeviceLinkAction.Link || (nameFits && armed),
         failureMessage = failureMessage,
+        onCodeVisible = { codeVisible = true },
         onAction = { action ->
             when (action) {
-                DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
-                DeviceLinkAction.NotNow -> onDecline()
+                DeviceLinkAction.Link -> if (nameFits && armed) onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
+                DeviceLinkAction.NotNow, DeviceLinkAction.DontLink -> onDecline()
+                DeviceLinkAction.ReviewDevices -> onReviewDevices()
                 else -> onClose()
             }
         },
     ) {
-        if (state is DeviceLinkPromptStateFfi.Comparing) {
+        if (warning == null && state is DeviceLinkPromptStateFfi.Comparing) {
             DeviceLinkNameField(
                 label = label,
                 placeholder = placeholder,
@@ -292,5 +304,6 @@ internal fun LinkThisDeviceContent(
         onBack = onBack,
         onAction = onAction,
         failureMessage = failureMessage,
+        onCodeVisible = { codeVisible = true },
     )
 }

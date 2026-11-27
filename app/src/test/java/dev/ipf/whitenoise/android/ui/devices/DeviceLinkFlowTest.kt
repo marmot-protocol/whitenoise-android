@@ -166,6 +166,7 @@ class DeviceLinkFlowTest {
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().performTextReplacement("  Desk  ")
         compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle {
@@ -192,11 +193,13 @@ class DeviceLinkFlowTest {
         compose.runOnIdle { blocked.value = true }
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).assertDoesNotExist()
         compose.runOnIdle { blocked.value = false }
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(false, linked?.bringHistory)
             request.value = request.value.copy(promptId = "second")
         }
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(true, linked?.bringHistory) }
     }
@@ -214,6 +217,7 @@ class DeviceLinkFlowTest {
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag(DEVICE_LINK_ADD_TO_CHATS_TAG).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
@@ -232,6 +236,7 @@ class DeviceLinkFlowTest {
             compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement(blank)
             compose.onNodeWithText(placeholder, useUnmergedTree = true).assertIsDisplayed()
         }
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_ARM_DELAY_MS + 100L)
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
         compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
