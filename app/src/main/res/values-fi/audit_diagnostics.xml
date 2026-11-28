@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Audit-lokien toimitus</string>
+    <string name="audit_delivery_last_success">Viimeisin onnistunut tarkistus</string>
+    <string name="audit_delivery_waiting">Odottaa lähetystä</string>
+    <string name="audit_delivery_resume">Jatka toimitusta</string>
+    <string name="audit_delivery_resuming">Yritetään lähettää audit-lokeja…</string>
+    <string name="audit_delivery_resume_failed">Toimitusta ei voitu jatkaa</string>
+    <string name="audit_delivery_active">Aktiivinen</string>
+    <string name="audit_delivery_retrying">Yritetään automaattisesti uudelleen</string>
+    <string name="audit_delivery_paused">Keskeytetty</string>
+    <string name="audit_settings_loading">Ladataan…</string>
+    <string name="audit_retention_title">Säilytä audit-lokeja</string>
+    <string name="audit_retention_save_failed">Lokien säilytysaikaa ei voitu muuttaa</string>
+    <string name="audit_retention_confirm_title">Poistetaanko vanhemmat audit-lokit?</string>
+    <string name="audit_retention_confirm_body">Kun lokeja säilytetään %1$s, vanhemmat audit-lokit poistetaan tältä laitteelta, myös ne, jotka odottavat vielä lähettämistä.</string>
+    <string name="audit_retention_confirm_action">Poista vanhemmat lokit</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d päivä</item>
+        <item quantity="other">%d päivää</item>
+    </plurals>
+</resources>

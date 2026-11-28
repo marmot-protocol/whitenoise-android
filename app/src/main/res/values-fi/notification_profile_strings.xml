@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification profiles (#3601): device-wide quiet times that let only chosen chats notify. -->
+    <string name="notification_profiles_title">Ilmoitusprofiilit</string>
+    <!-- Value on the Notifications settings row when no profile is on. -->
+    <string name="notification_profiles_value_off">Pois</string>
+    <string name="explanation_privacy_notif_profiles">Keskeytä ilmoitukset aikataulun mukaan tai hetkeksi ja valitse, mitkä keskustelut voivat silti lähettää sinulle ilmoituksia.</string>
+    <string name="notification_profiles_explainer">Kun profiili on päällä, vain valitsemasi keskustelut, henkilöt ja poikkeukset voivat lähettää sinulle ilmoituksia tällä laitteella. Viestit saapuvat silti ja näkyvät lukemattomina.</string>
+    <string name="notification_profiles_empty_title">Ei vielä profiileja</string>
+    <string name="notification_profiles_empty_body">Luo profiili, joka keskeyttää ilmoitukset yöksi, työpäivän ajaksi tai aina, kun tarvitset hiljaisuutta.</string>
+    <!-- Names of the starter profiles every install begins with; saved once as ordinary, editable names. -->
+    <string name="notification_profile_preset_sleep">Uni</string>
+    <string name="notification_profile_preset_work">Työ</string>
+    <string name="notification_profile_preset_focus">Keskittyminen</string>
+    <string name="notification_profile_create">Luo profiili</string>
+    <string name="notification_profile_new_title">Uusi profiili</string>
+    <string name="notification_profile_edit_title">Muokkaa profiilia</string>
+    <string name="notification_profile_name_label">Profiilin nimi</string>
+    <!-- Example names shown in the empty name field. -->
+    <string name="notification_profile_name_placeholder">Uni, Työ, Keskittyminen…</string>
+    <string name="notification_profile_allowed_section">Sallitut ilmoitukset</string>
+    <string name="notification_profile_allowed_chats">Sallitut keskustelut</string>
+    <!-- Value of Allowed chats when the profile lets no chat through. -->
+    <string name="notification_profile_allowed_none">Ei mitään</string>
+    <string name="notification_profile_allowed_hint">Nämä keskustelut ja henkilöt lähettävät sinulle yhä ilmoituksia, kun tämä profiili on päällä. Mykistetyt keskustelut pysyvät mykistettyinä.</string>
+    <!-- %1$s is the name of the signed-in account whose chats the picker shows. -->
+    <string name="notification_profile_allowed_account_note">Keskustelut ja henkilöt valitaan tilille %1$s. Vaihda tiliä valitaksesi ne toiselle tilille.</string>
+    <string name="notification_profile_mentions">Ilmoita maininnoista</string>
+    <string name="notification_profile_mentions_detail">Viestit, joissa sinut mainitaan, lähettävät yhä ilmoituksen, myös muista keskusteluista.</string>
+    <string name="notification_profile_schedule_section">Aikataulu</string>
+    <string name="notification_profile_schedule_enable">Ota käyttöön automaattisesti</string>
+    <string name="notification_profile_schedule_start">Alkaa</string>
+    <string name="notification_profile_schedule_end">Päättyy</string>
+    <!-- %1$s is a clock time; shown when the quiet time ends after midnight. -->
+    <string name="notification_profile_schedule_end_next_day">%1$s seuraavana päivänä</string>
+    <string name="notification_profile_schedule_days">Päivät</string>
+    <string name="notification_profile_schedule_days_error">Valitse vähintään yksi päivä.</string>
+    <string name="notification_profile_schedule_same_time_error">Alkamis- ja päättymisajan on oltava eri.</string>
+    <string name="notification_profile_days_every_day">Joka päivä</string>
+    <string name="notification_profile_days_weekdays">Arkipäivät</string>
+    <string name="notification_profile_days_weekends">Viikonloput</string>
+    <string name="notification_profile_no_schedule">Ei aikataulua</string>
+    <string name="notification_profile_on">Päällä</string>
+    <!-- %1$s is a clock time. -->
+    <string name="notification_profile_on_until">Päällä %1$s asti</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_banner_on">%1$s on päällä</string>
+    <!-- %1$s is the profile name and %2$s a clock time. -->
+    <string name="notification_profile_banner_on_until">%1$s on päällä %2$s asti</string>
+    <string name="notification_profile_banner_detail">Vain sallitut keskustelut lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_banner_detail_mentions">Vain sallitut keskustelut ja maininnat lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_turn_on">Ota käyttöön</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_turn_off_named">Poista %1$s käytöstä</string>
+    <string name="notification_profile_for_one_hour">1 tunniksi</string>
+    <!-- %1$s is a clock time. -->
+    <string name="notification_profile_until_time">%1$s asti</string>
+    <string name="notification_profile_until_off">Kunnes poistan sen käytöstä</string>
+    <string name="notification_profile_delete">Poista profiili</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_delete_confirm_title">Poistetaanko profiili %1$s?</string>
+    <string name="notification_profile_delete_confirm_body">Sen aikataulu ja sallitut keskustelut poistetaan.</string>
+    <string name="notification_profile_discard_detail">Profiiliin tekemiäsi muutoksia ei ole tallennettu.</string>
+    <string name="notification_profile_save_failed">Profiilia ei voitu tallentaa. Yritä uudelleen.</string>
+    <string name="notification_profile_change_failed">Ilmoitusprofiilia ei voitu vaihtaa. Yritä uudelleen.</string>
+    <!-- %1$s is the profile name; read by screen readers for the chat list status button. -->
+    <string name="notification_profile_quick_open_active">Ilmoitusprofiili päällä: %1$s</string>
+    <string name="explanation_chats_notification_profiles">Ota ilmoitusprofiili käyttöön tai poista se käytöstä poistumatta keskusteluistasi.</string>
+    <string name="settings_search_alias_notification_profiles">älä häiritse|DND|hiljaiset tunnit|aikataulu|keskittyminen|uni</string>
+    <string name="notification_profile_allowed_people">Sallitut henkilöt</string>
+    <string name="notification_profile_people_hint">Nämä henkilöt voivat lähettää sinulle ilmoituksia missä tahansa keskustelussa, kun tämä profiili on päällä.</string>
+    <string name="notification_profile_all_dms">Salli kaikki yksityisviestit</string>
+    <string name="notification_profile_all_dms_detail">Kenen tahansa yksityisviestit lähettävät sinulle ilmoituksen.</string>
+    <string name="notification_profile_repeated">Päästä toistuvat viestit läpi</string>
+    <string name="notification_profile_repeated_detail">Saman henkilön toinen viesti 3 minuutin sisällä lähettää sinulle ilmoituksen.</string>
+    <string name="notification_profile_group_changes">Salli kutsut ja ryhmämuutokset</string>
+    <string name="notification_profile_group_changes_detail">Kutsut, poistot ja ylläpitäjämuutokset lähettävät sinulle ilmoituksen.</string>
+    <string name="notification_profile_emoji_choose">Valitse emoji</string>
+    <string name="notification_profile_emoji_change">Vaihda emoji</string>
+    <string name="notification_profile_emoji_remove">Poista emoji</string>
+    <string name="notification_profile_banner_detail_people">Vain sallitut keskustelut ja henkilöt lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_banner_detail_dms">Vain sallitut keskustelut ja yksityisviestit lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_banner_detail_group_changes">Vain sallitut keskustelut ja ryhmämuutokset lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_banner_detail_repeated">Vain sallitut keskustelut ja toistuvat viestit lähettävät sinulle ilmoituksia.</string>
+    <string name="notification_profile_banner_detail_exceptions">Vain poikkeuksesi lähettävät sinulle ilmoituksia.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d henkilö</item>
+        <item quantity="other">%1$d henkilöä</item>
+    </plurals>
+    <string name="notification_profile_tile_label">Ilmoitusprofiili</string>
+    <string name="notification_profiles_quick_access">Pikakäyttö</string>
+    <string name="notification_profile_show_in_chat_list">Näytä keskusteluluettelossa</string>
+    <string name="notification_profile_show_in_chat_list_detail">Lisää keskusteluluetteloon painikkeen profiilien vaihtamista varten.</string>
+    <string name="notification_profile_add_tile">Lisää pika-asetuksiin</string>
+    <string name="notification_profile_add_tile_detail">Vaihda profiileja pika-asetuspaneelista.</string>
+    <string name="notification_profile_add_tile_failed">Ruutua ei voitu lisätä. Lisää se pika-asetusten muokkausnäkymästä.</string>
+    <string name="notification_profile_tile_hint">Jos haluat vaihtaa profiileja pika-asetuksista, lisää Ilmoitusprofiili-ruutu niiden muokkausnäkymästä.</string>
+</resources>

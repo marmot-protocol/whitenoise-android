@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_title">Keskustelut-widget</string>
+    <string name="widget_privacy">Valitse tili tälle widgetille. Viestien teksti pysyy piilossa.</string>
+    <string name="widget_all_accounts">Kaikki tilit</string>
+    <string name="widget_unread_only">Vain lukemattomat</string>
+    <string name="widget_unavailable">Keskustelut eivät ole saatavilla</string>
+    <string name="widget_open_app">Avaa White Noise</string>
+    <string name="widget_conversation">Keskustelu</string>
+    <string name="widget_unread">Lukemattomat viestit</string>
+    <string name="widget_recent">Viimeisin keskustelu</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">Käytetäänkö tätä GIFiä ryhmässä?</string>
+    <string name="group_gif_upload_notice">Animoitu GIF lähetetään julkiselle kuvapalvelimelle. Kuka tahansa, jolla on sen linkki, voi nähdä sen. Koko GIFiä käytetään rajaamatta.</string>
+    <string name="group_gif_upload_confirm">Lähetä GIF</string>
+    <string name="group_photo_title">Ryhmän kuva</string>
+    <string name="group_photo_encrypted_detail">Salattu. Vain ryhmän jäsenet näkevät sen.</string>
+    <string name="group_photo_public_detail">Julkisella kuvapalvelimella. Kuka tahansa, jolla on sen linkki, voi nähdä sen.</string>
+    <string name="group_photo_upload_title">Käytetäänkö tätä kuvaa ryhmässä?</string>
+    <string name="group_photo_upload_notice">Kuva lähetetään julkiselle kuvapalvelimelle. Kuka tahansa, jolla on sen linkki, voi nähdä sen.</string>
+    <string name="group_photo_upload_confirm">Jatka</string>
+</resources>

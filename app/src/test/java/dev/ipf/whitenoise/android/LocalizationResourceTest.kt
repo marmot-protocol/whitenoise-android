@@ -774,6 +774,7 @@ class LocalizationResourceTest {
                 "chiedi la mia approvazione prima di qualsiasi modifica",
                 "запросите моё одобрение до любых изменений",
                 "her değişiklikten önce onayımı isteyin",
+                "pyydä hyväksyntääni ennen kuin teet koneelle muutoksia",
                 "任何更改之前请求我的批准",
                 "任何變更之前請求我的核准",
             )
@@ -896,6 +897,7 @@ class LocalizationResourceTest {
                 "values" to "Resume following read-aloud",
                 "values-de" to "Erneut dem Vorlesen folgen",
                 "values-es" to "Reanudar el seguimiento de la lectura en voz alta",
+                "values-fi" to "Jatka ääneen luetun seuraamista",
                 "values-fr" to "Reprendre le suivi de la lecture à voix haute",
                 "values-it" to "Riprendi a seguire la lettura ad alta voce",
                 "values-pt" to "Retomar o acompanhamento da leitura em voz alta",
@@ -955,6 +957,14 @@ class LocalizationResourceTest {
                         explanation = "Explícame cómo funciona el conector y qué cambiará la instalación.",
                         approval = "pide mi aprobación antes de realizar cualquier cambio.",
                         postApproval = "Una vez que lo apruebe, instala y verifica el conector",
+                    ),
+                "values-fi" to
+                    AgentConnectorCopyRequirements(
+                        disclosureFlow = "Napauta agenttiasi, kopioi sen kehote ja liitä se sinne",
+                        promptPrefix = "Tämä on asennuskehote",
+                        explanation = "Selitä minulle, miten connector toimii ja mitä asennus muuttaa.",
+                        approval = "pyydä hyväksyntääni ennen kuin teet muutoksia.",
+                        postApproval = "Kun hyväksyn, asenna connector ja varmista sen toiminta",
                     ),
                 "values-fr" to
                     AgentConnectorCopyRequirements(
@@ -1143,6 +1153,7 @@ class LocalizationResourceTest {
                 "language_chinese_simplified",
                 "language_chinese_traditional",
                 "language_english",
+                "language_finnish",
                 "language_french",
                 "language_german",
                 "language_italian",
@@ -1385,6 +1396,19 @@ class LocalizationResourceTest {
                         "media_counted_format",
                         // "Emoji" is the standard Portuguese loan word.
                         "group_image_source_emoji",
+                    ),
+                "values-fi" to
+                    setOf(
+                        // "Video" and "Emoji" are the standard Finnish words.
+                        "attachment_type_video",
+                        "nostr_event_type_video",
+                        "group_image_source_emoji",
+                        // MLS "epoch" and the relay "Inbox" role keep their English terms in Finnish.
+                        "epoch",
+                        "relay_role_inbox",
+                        "setup_review_role_inbox",
+                        // The counted-preview format is punctuation-only here.
+                        "media_counted_format",
                     ),
                 "values-ru" to
                     setOf(

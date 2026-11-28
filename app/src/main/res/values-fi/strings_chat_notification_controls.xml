@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Ilmoitukset tällä laitteella</string>
+    <string name="notification_sound_appearance">Ääni ja ulkoasu</string>
+    <string name="notification_system_blocked">Estetty Androidin asetuksissa</string>
+    <string name="notification_alerts_detail">Valitse tämän laitteen ilmoitukset. Kun tavalliset ilmoitukset on keskeytetty, käyttöön otetut maininnat näkyvät silti. Ryhmän jäsenyysilmoituksilla on omat asetuksensa.</string>
+    <string name="notification_scope_choose">Ääniasetukset</string>
+    <string name="notification_pause_ordinary_alerts">Keskeytä tavalliset ilmoitukset</string>
+    <string name="notification_alert_paused">Keskeytetty, kun tämä keskustelu on mykistetty</string>
+    <string name="notification_sound_scope_control">Ääniasetukset: %1$s</string>
+</resources>

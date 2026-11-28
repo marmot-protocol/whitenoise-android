@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="translation_title">Käännä</string>
+    <string name="translation_automatic">Käännä viestit automaattisesti</string>
+    <string name="translation_detect_language">Tunnista kieli</string>
+    <string name="translation_target_language">Kohdekieli</string>
+    <string name="translation_loading">Käännetään laitteella…</string>
+    <string name="translation_open_engine">Avaa käännösohjelma</string>
+    <string name="translation_engine_managed">Suositeltu käännösohjelma: Offline Translator. Käännös tehdään laitteellasi. Hallitse kielipaketteja siinä sovelluksessa.</string>
+    <string name="translation_missing_engine">Asenna Offline Translator, jotta voit kääntää tällä laitteella.</string>
+    <string name="translation_unverified_engine">Tämä käännösohjelma on varmentamaton tai sitä ei tueta. Tekstiä ei lähetetty.</string>
+    <string name="translation_detection_failed">Valitse lähdekieli ja yritä uudelleen.</string>
+    <string name="translation_source_model_missing">Asenna lähdekielen kielipaketti käännösohjelmaan.</string>
+    <string name="translation_engine_failed">Käännös epäonnistui. Tarkista käännösohjelman kielipaketit ja yritä sitten uudelleen.</string>
+    <string name="translation_recovery_notice">Käännös ei ole saatavilla. Yritä uudelleen napauttamalla Käännä tai avaa käännösohjelma.</string>
+    <string name="translation_inherit">Käytä yleistä asetusta</string>
+    <string name="translation_on">Päällä</string>
+    <string name="translation_off">Pois</string>
+    <string name="translation_inherit_language">Käytä yleistä kohdekieltä</string>
+    <string name="translation_privacy_warning">Offline Translator voi kirjoittaa viestien tekstiä ja käännöksiä Androidin järjestelmälokeihin. White Noise ei voi taata toisen sovelluksen käsittelemän tekstin turvallisuutta.</string>
+    <string name="translation_choose_language">Valitse kieli</string>
+    <string name="translation_unsupported_target">Tallennettu kohdekieli ei ole saatavilla Offline Translatorissa. Valitse toinen kieli.</string>
+    <string name="translation_engine_update_required">Tämä kieli vaatii uudemman Offline Translatorin. Päivitä käännösohjelma ja yritä sitten uudelleen.</string>
+    <string name="translation_install_zapstore">Asenna Zapstoresta</string>
+    <string name="translation_install_release">Asenna GitHubista</string>
+    <string name="translation_install_release_reason">Zapstore ei vielä tarjoa versiota, jota White Noise voi käyttää, joten tämä avaa julkaisijan version %1$s GitHubissa.</string>
+    <string name="translation_install_open_failed">Mikään sovellus ei voinut avata Offline Translatoria tai sen lataussivua. Asenna verkkoselain ja yritä sitten uudelleen.</string>
+    <string name="translation_composer_toggle">Käännä</string>
+    <string name="translation_composer_will_send">Lähetetään</string>
+    <string name="translation_composer_placeholder">Käännös näkyy tässä</string>
+    <string name="translation_composer_detection_failed">Kieltä ei voitu tunnistaa. Kirjoita vähän lisää.</string>
+    <string name="translation_search_languages">Hae kieliä</string>
+</resources>

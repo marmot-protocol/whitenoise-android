@@ -784,6 +784,13 @@ android {
             isUniversalApk = true
         }
     }
+    bundle {
+        language {
+            // Play installs only the device's system languages from a split
+            // bundle, so a locale picked in the app would have no resources.
+            enableSplit = false
+        }
+    }
 }
 
 tasks.named("preBuild").configure {

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Jaettu keskustelussa</string>
+    <string name="shared_content_photos_videos">Kuvat ja videot</string>
+    <string name="shared_content_loaded_scope">Vain tähän keskusteluun jo ladatut viestit näytetään.</string>
+    <string name="shared_content_loading">Ladataan jaettua sisältöä…</string>
+    <string name="shared_content_empty">Ei jaettua sisältöä</string>
+    <string name="shared_content_go_to_message">Siirry viestiin</string>
+    <plurals name="shared_item_count">
+        <item quantity="one">%1$d kohde</item>
+        <item quantity="other">%1$d kohdetta</item>
+    </plurals>
+    <string name="shared_content_browse_history">Selaa jaettujen liitteiden historiaa</string>
+    <string name="shared_content_partial">Vastaavia liitteitä ei ole vielä ladattu</string>
+    <string name="shared_content_page_failed">Jaettua sisältöä ei voitu ladata. Yritä uudelleen.</string>
+    <string name="shared_content_history_end">Paikallisen liitehistorian loppu</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d kuva valittu</item>
+        <item quantity="other">%1$d kuvaa valittu</item>
+    </plurals>
+    <string name="shared_media_select_photo">Valitse kuva</string>
+    <string name="shared_media_cancel_selection">Peruuta valinta</string>
+    <string name="shared_media_share_selected_photos">Jaa valitut kuvat</string>
+    <string name="shared_media_photo_from">Kuva, lähettäjä %1$s</string>
+    <string name="shared_media_video_not_selectable">Video, ei valittavissa</string>
+    <string name="shared_media_share_photos_failed">Kuvia ei voitu jakaa</string>
+    <string name="shared_media_share_photos_unavailable">Osa valituista kuvista ei ole enää saatavilla, joten mitään ei jaettu. Niiden valinta on poistettu. Yritä uudelleen.</string>
+    <string name="shared_media_share_photos_too_large">Nämä kuvat ovat liian suuria jaettaviksi kerralla. Valitse vähemmän ja yritä uudelleen.</string>
+    <string name="shared_media_jump_to_date">Siirry päivämäärään</string>
+</resources>

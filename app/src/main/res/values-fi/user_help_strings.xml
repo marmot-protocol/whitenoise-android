@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Opi käyttämään White Noisea</string>
+    <string name="learn_find_title">Etsi henkilö</string>
+    <string name="learn_find_body">Onko sinulla ystävän linkki tai QR-koodi? Avaa Uusi keskustelu ja liitä linkki tai skannaa koodi, niin löydät hänet. Jos nimellä haku ei tuota tuloksia, pyydä häntä jakamaan profiilinsa.</string>
+    <string name="learn_share_title">Jaa profiilisi</string>
+    <string name="learn_share_body">Anna toiselle julkisen profiilisi linkki tai näytä QR-koodisi, niin hän löytää sinut White Noisesta. Pidä yksityinen kirjautumisavaimesi omana tietonasi.</string>
+    <string name="learn_actions_title">Vastaa tai reagoi</string>
+    <string name="learn_actions_body">Vastaa pyyhkäisemällä viestiä keskustelun keskikohtaa kohti. Paina viestiä pitkään, niin näet lisää toimintoja, myös reaktiot.</string>
+    <string name="learn_example_question">Nähdäänkö huomenna?</string>
+    <string name="learn_example_message">Nähdään huomenna!</string>
+    <string name="learn_show_actions">Näytä viestin toiminnot</string>
+    <string name="learn_open_share">Avaa Jaa ja yhdistä</string>
+    <string name="learn_group_title">Luo yksityinen ryhmä</string>
+    <string name="learn_group_body">Kokoa oikeat ihmiset samaan keskusteluun. Aloita ryhmä kohdasta Uusi keskustelu ja valitse, keitä kutsut. Viestisi ovat päästä päähän salattuja.</string>
+    <string name="learn_demo_label">Harjoituskeskustelu · mitään ei lähetetä</string>
+    <string name="learn_demo_sender">Demoyhteystieto</string>
+    <string name="learn_marmot_title">Keskustele sovelluksesta riippumatta</string>
+    <string name="learn_marmot_body">Ystäväsi voivat liittyä keskusteluun toisesta yhteensopivasta sovelluksesta. White Noise käyttää Marmotia, avointa protokollaa, jonka avulla eri tiimit voivat tehdä keskenään yhteensopivia sovelluksia.</string>
+    <string name="learn_marmot_link">Tutustu Marmot-sovelluksiin</string>
+    <string name="learn_marmot_link_failed">Sovellushakemistoa ei voitu avata. Avaa marmot.build/apps.html selaimessasi.</string>
+</resources>

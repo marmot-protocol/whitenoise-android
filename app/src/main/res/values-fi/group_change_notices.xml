@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A group change the user asked for that MarmotKit could not make and never retries. The toast title is the
+         chat's name; its detail joins what did not happen with why. -->
+    <string name="group_change_invite_not_sent">Kutsua ei lähetetty</string>
+    <string name="group_change_member_not_removed">Jäsentä ei poistettu</string>
+    <string name="group_change_details_not_updated">Ryhmän tietoja ei päivitetty</string>
+    <string name="group_change_leave_failed">Ryhmästä ei voitu poistua</string>
+    <string name="group_change_end_failed">Ryhmää ei voitu lopettaa</string>
+    <string name="group_change_message_not_sent">Viestiä ei lähetetty</string>
+    <string name="group_change_not_made">Ryhmän muutosta ei tehty</string>
+    <string name="group_change_reason_not_admin">Et ole enää tämän ryhmän ylläpitäjä.</string>
+    <string name="group_change_reason_not_member">Et ole enää tämän ryhmän jäsen.</string>
+    <string name="group_change_reason_not_delivered">Se ei tavoittanut yhtäkään ryhmän releistä. Tarkista yhteytesi ja yritä sitten uudelleen.</string>
+    <string name="group_change_reason_refused">Ryhmän releet hylkäsivät sen. Tarkista keskustelu ja yritä sitten uudelleen.</string>
+    <string name="group_change_reason_not_accepted">Ryhmä ei voinut hyväksyä sitä. Tarkista keskustelu ja yritä sitten uudelleen.</string>
+    <string name="group_change_reason_superseded">Ryhmään tehtiin samaan aikaan toinen muutos. Tarkista keskustelu ja yritä sitten uudelleen.</string>
+    <string name="group_change_already_done">Toinen tähän ryhmään tehty muutos teki jo sen, minkä sinun muutoksesi olisi tehnyt.</string>
+    <!-- %1$s is what did not happen, such as "Invitation not sent"; %2$s says why, as a full sentence. -->
+    <string name="group_change_notice_detail">%1$s. %2$s</string>
+</resources>

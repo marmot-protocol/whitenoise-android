@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Long-press message menu: the row under the first-level actions that shows or hides the rest. -->
+    <string name="more_message_actions">Lisää toimintoja</string>
+    <string name="fewer_message_actions">Vähemmän toimintoja</string>
+    <string name="explanation_message_action_more">Näyttää kaikki tämän viestin toiminnot.</string>
+    <string name="explanation_message_action_fewer">Palaa yleisimpiin toimintoihin.</string>
+    <!-- Spoken state of the More/Fewer actions button, so a screen reader hears what activating it changed. -->
+    <string name="message_actions_all_shown">Kaikki toiminnot näytetään</string>
+    <string name="message_actions_common_shown">Yleisimmät toiminnot näytetään</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">Keskustelun yläpalkin pikatoiminnot</string>
+    <string name="header_shortcut_search">Hae keskustelusta</string>
+    <string name="explanation_header_shortcut_search">Näyttää hakupainikkeen jokaisen keskustelun yläpalkissa. Se avaa saman haun kuin keskustelun tiedot. Koskee vain tätä laitetta.</string>
+    <string name="explanation_header_shortcut_mute">Näyttää mykistyspainikkeen jokaisen keskustelun yläpalkissa. Mykistys kysyy keston, ja mykistyksen poisto tulee voimaan heti. Koskee vain tätä laitetta.</string>
+    <string name="explanation_header_shortcut_read_aloud">Näyttää ääneen lukemisen painikkeen jokaisen keskustelun yläpalkissa. Se ottaa uusien viestien ääneen lukemisen käyttöön tai poistaa sen käytöstä kyseisessä keskustelussa samoin kuin keskustelun tiedoissa. Koskee vain tätä laitetta.</string>
+    <string name="header_shortcuts_hint">Yläpalkissa näkyy niin monta kuin keskustelun nimen viereen mahtuu, siinä järjestyksessä kuin valitset ne.</string>
+    <string name="header_shortcut_members">Jäsenet</string>
+    <string name="explanation_header_shortcut_members">Näyttää jäsenpainikkeen ryhmäkeskustelujen yläpalkissa. Se avaa jäsenluettelon. Koskee vain tätä laitetta.</string>
+    <string name="explanation_header_shortcut_add_members">Näyttää jäsenten lisäyspainikkeen ryhmäkeskusteluissa, joihin voit lisätä henkilöitä. Koskee vain tätä laitetta.</string>
+</resources>

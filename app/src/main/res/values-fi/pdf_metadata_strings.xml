@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Composer card for a staged PDF: its type and page count, for example "PDF · 12 pages". -->
+    <plurals name="composer_pdf_pages">
+        <item quantity="one">PDF · %d sivu</item>
+        <item quantity="other">PDF · %d sivua</item>
+    </plurals>
+    <!-- Composer card states for the PDF's hidden document details: author, apps, dates and similar. -->
+    <string name="composer_pdf_metadata_removed">Metatiedot poistettu</string>
+    <string name="composer_pdf_metadata_removed_on_send">Metatiedot poistetaan lähetettäessä</string>
+    <string name="composer_pdf_metadata_signed">Allekirjoitettu: metatiedot säilyvät</string>
+    <string name="composer_pdf_metadata_encrypted">Suojattu: metatiedot säilyvät</string>
+    <string name="composer_pdf_metadata_unsupported">Metatietoja ei voi poistaa</string>
+    <string name="composer_pdf_metadata_sending_as_is">Lähetetään metatietoineen</string>
+    <!-- Asked before sending PDFs whose metadata cannot be removed. -->
+    <string name="composer_pdf_metadata_dialog_title">Lähetetäänkö metatietoineen?</string>
+    <string name="composer_pdf_metadata_dialog_signed">Tiedosto %1$s on allekirjoitettu. Metatietojen poistaminen rikkoisi allekirjoituksen, joten sen voi lähettää vain sellaisenaan.</string>
+    <string name="composer_pdf_metadata_dialog_encrypted">Tiedosto %1$s on suojattu salasanalla, joten sen metatietoja ei voi poistaa.</string>
+    <string name="composer_pdf_metadata_dialog_unsupported">White Noise ei voi poistaa metatietoja turvallisesti tiedostosta %1$s.</string>
+    <plurals name="composer_pdf_metadata_dialog_several">
+        <item quantity="one">Metatietoja ei voi poistaa %1$d PDF-tiedostosta: %2$s.</item>
+        <item quantity="other">Metatietoja ei voi poistaa %1$d PDF-tiedostosta: %2$s.</item>
+    </plurals>
+    <string name="composer_pdf_metadata_dialog_consequence">Kaikki tämän keskustelun jäsenet näkevät tietoja, kuten tekijän, tiedoston tehneet sovellukset ja sen, milloin se luotiin tai sitä muutettiin.</string>
+    <string name="composer_pdf_metadata_send_as_is">Lähetä sellaisenaan</string>
+    <string name="media_file_pdf_metadata_kept">Tätä PDF-tiedostoa ei lähetetty, koska sen metatietoja ei voitu poistaa. Lähetä se kirjoituskentästä, niin voit valita, lähetetäänkö se sellaisenaan.</string>
+</resources>

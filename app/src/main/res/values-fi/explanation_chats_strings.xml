@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">Poistuu tästä keskustelusta ja poistaa sen tältä laitteelta. Muut jäsenet jäävät keskusteluun, ja voit palata vain, jos joku lisää sinut uudelleen.</string>
+    <string name="explanation_chat_actions_delete">Poistaa tämän keskustelun ja sen viestit vain tältä laitteelta. Muille keskustelun osallistujille mikään ei muutu.</string>
+    <string name="explanation_chat_actions_abandon_dm">Hylkää tämän yksityisviestin ja poistaa sen tältä laitteelta. Toiselle henkilölle ei ilmoiteta.</string>
+    <string name="explanation_chat_actions_abandon_group">Hylkää tämän ryhmän ja poistaa sen tältä laitteelta. Muut jäsenet jäävät ryhmään.</string>
+    <string name="explanation_chat_info_mute">Hiljentää tavalliset viesti-ilmoitukset tästä keskustelusta. Suorat maininnat voivat silti ilmoittaa sinulle, ja saat edelleen kaikki viestit.</string>
+    <string name="explanation_chat_info_copy_peer_public_key">Kopioi tämän henkilön julkisen avaimen leikepöydälle. Julkinen avain on osoite, jolla ihmiset löytävät hänet ja ottavat häneen yhteyttä, joten sen jakaminen on turvallista. Se ei koskaan sisällä hänen yksityistä avaintaan.</string>
+    <string name="explanation_chat_info_unmute">Ottaa tämän keskustelun ilmoitukset taas käyttöön.</string>
+    <string name="explanation_chat_info_add_members">Avaa jäsenvalitsimen, jotta voit kutsua ihmisiä tähän ryhmään.</string>
+    <string name="explanation_chat_info_disappearing">Määrittää, katoavatko tämän keskustelun uudet viestit valitun ajan jälkeen. Jo lähetettyihin viesteihin se ei vaikuta.</string>
+    <string name="explanation_chat_info_copy_chat_link">Kopioi linkin tähän keskusteluun. Voit jakaa sen, jotta muut voivat pyytää liittymistä.</string>
+    <string name="explanation_chat_info_relays">Näyttää ja muokkaa releitä, joiden kautta tämä ryhmä lähettää ja vastaanottaa viestejä. Muutokset koskevat koko ryhmää.</string>
+    <string name="explanation_chat_info_transfer_admin">Siirtää ylläpitäjän roolin toiselle jäsenelle. Pysyt ryhmässä, mutta uusi ylläpitäjä voi sen jälkeen hallita sitä.</string>
+    <string name="explanation_chat_info_step_down">Luovut ylläpitäjän roolista ja pysyt ryhmässä tavallisena jäsenenä. Toinen ylläpitäjä voi tehdä sinusta taas ylläpitäjän.</string>
+    <string name="explanation_group_enable_disbanding">Sallii ylläpitäjän lakkauttaa tämän ryhmän myöhemmin. Asetuksen käyttöönotto ei lakkauta ryhmää.</string>
+    <string name="explanation_group_disband">Lopettaa tämän ryhmän pysyvästi kaikilta jäseniltä. Tätä ei voi kumota.</string>
+    <string name="explanation_chat_list_avatar_switch">Avaa profiilin vaihtimen, jossa voit vaihtaa käyttämääsi tiliä. Muut tilisi pysyvät kirjautuneina.</string>
+    <string name="explanation_chat_list_avatar_settings">Avaa asetukset, joissa hallitset tiliäsi ja sovellusta. Sinulla on yksi kirjautunut tili.</string>
+    <string name="explanation_new_message_talk_to_agent">Avaa tekoälyagenttien asetukset, joissa voit määrittää agentin, jolle voit lähettää viestejä kuin yhteystiedolle.</string>
+    <string name="explanation_chats_fab_check_relays">Releidesi asetukset vaativat huomiota, joten viestit eivät välttämättä tule perille. Avaa releesi, jotta voit tarkistaa ne.</string>
+    <string name="explanation_new_message_admin">Tekee tästä jäsenestä ylläpitäjän, joka voi hallita ryhmää. Voit muuttaa tätä myöhemmin.</string>
+    <string name="explanation_chat_list_manage_folders">Avaa kansioiden hallinnan, jossa voit luoda, nimetä uudelleen, järjestää ja poistaa keskustelukansioitasi.</string>
+    <string name="explanation_app_update_icon">Sovelluspäivitys on saatavilla tai sitä käsitellään. Avaa asetukset, joissa näet sen tilan.</string>
+    <string name="explanation_search_filters_active">Hakusuodattimet ovat päällä, joten tuloksia on rajattu. Avaa suodattimet, jotta voit muuttaa tai tyhjentää ne.</string>
+</resources>
