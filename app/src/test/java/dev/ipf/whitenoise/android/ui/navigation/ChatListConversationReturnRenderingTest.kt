@@ -382,8 +382,9 @@ internal class ReturnFixture(
     private val liveSubscriptions =
         if (distinctGroupsPerRow) {
             ConversationLiveSubscriptions(
-                openTimeline = { _, _, _ ->
+                openTimeline = { _, groupIdHex, _ ->
                     val index = timelineOpens.getAndIncrement()
+                    holdOtherChat(otherChatTimelineGate, groupIdHex)
                     beforeTimelineOpen(index)
                     timelineScripts[index]
                 },
@@ -399,8 +400,9 @@ internal class ReturnFixture(
                 ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
             ConversationLiveSubscriptions(
                 // The nth open gets script n even when the hook holds an earlier open past a later one.
-                openTimeline = { _, _, _ ->
+                openTimeline = { _, groupIdHex, _ ->
                     val index = timelineOpens.getAndIncrement()
+                    holdOtherChat(otherChatTimelineGate, groupIdHex)
                     beforeTimelineOpen(index)
                     timelineScripts[index]
                 },
@@ -409,7 +411,7 @@ internal class ReturnFixture(
         }
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
-            otherChatTimelineGate?.let(liveSubscriptions::holdingOtherChats) ?: liveSubscriptions,
+            liveSubscriptions,
             additionalAccounts = additionalAccounts,
         ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
@@ -612,12 +614,10 @@ private class ReturnGroups(
     override fun close() = Unit
 }
 
-/** Opens [ConversationTimelineTestIds.GROUP_ID] at once, while every other chat's timeline waits for [gate]. */
-private fun ConversationLiveSubscriptions.holdingOtherChats(gate: CompletableDeferred<Unit>) =
-    ConversationLiveSubscriptions(
-        openTimeline = { account, groupIdHex, limit ->
-            if (!groupIdHex.equals(ConversationTimelineTestIds.GROUP_ID, ignoreCase = true)) gate.await()
-            openTimeline(account, groupIdHex, limit)
-        },
-        openGroupState = openGroupState,
-    )
+/** Holds a non-target chat's timeline open on [gate], after its open index is taken, so scripts keep their order. */
+private suspend fun holdOtherChat(
+    gate: CompletableDeferred<Unit>?,
+    groupIdHex: String,
+) {
+    if (gate != null && !groupIdHex.equals(ConversationTimelineTestIds.GROUP_ID, ignoreCase = true)) gate.await()
+}

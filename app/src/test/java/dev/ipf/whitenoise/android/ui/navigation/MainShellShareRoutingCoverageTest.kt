@@ -165,6 +165,10 @@ class MainShellShareRoutingCoverageTest {
             "chatsActive must read the navigator's section, not a value captured by the last composition",
             "appState.canShareFromChats(shellStateHolder.sectionState.sectionName," in chatsActive,
         )
+        assertTrue(
+            "ChatsScreen must receive the live guard",
+            "chatsActive = chatsActive," in mainShellSource().readText(),
+        )
     }
 
     private fun mainShellSource(): File =

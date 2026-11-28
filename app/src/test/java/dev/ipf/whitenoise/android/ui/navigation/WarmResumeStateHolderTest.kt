@@ -163,12 +163,13 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        firstActivityHolder.openForTest(snapshotController.items.single())
+        val openedRow = snapshotController.items.single()
+        firstActivityHolder.openForTest(openedRow)
 
         val freshActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
 
         assertSame(loadedController, freshActivityHolder.chatsController(ACCOUNT_REF, runtimeGeneration = 4))
-        assertSame(firstActivityHolder.selectedChat.value, freshActivityHolder.selectedChat.value)
+        assertSame(openedRow, freshActivityHolder.selectedChat.value)
         freshActivityHolder.release()
         snapshotController.onCleared()
     }
