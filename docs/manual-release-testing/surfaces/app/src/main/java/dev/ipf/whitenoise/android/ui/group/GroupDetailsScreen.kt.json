@@ -130,14 +130,6 @@
         ]
       },
       {
-        "surface": "string:back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:chat_actions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.chat_actions",
@@ -520,14 +512,6 @@
         ]
       },
       {
-        "surface": "R.string.back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "R.string.chat_actions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.chat_actions",
@@ -754,6 +738,14 @@
         "anchor": "R.string.explanation_chat_info_step_down",
         "test_ids": [
           "GRP-042"
+        ]
+      },
+      {
+        "surface": "Shared group details top bar and collapsed identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "WhiteNoiseTopBar(",
+        "test_ids": [
+          "GRP-001"
         ]
       }
     ]
