@@ -10,7 +10,8 @@
         "test_ids": [
           "MSG-004",
           "MSG-005",
-          "MSG-050"
+          "MSG-050",
+          "MSG-051"
         ]
       },
       {
@@ -45,6 +46,17 @@
         "anchor": "if (disclosure != null && disclosureWidth != null) {",
         "test_ids": [
           "MSG-050"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: FocusedActionMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

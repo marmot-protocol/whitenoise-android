@@ -15,9 +15,13 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -65,6 +69,15 @@ class FocusedMessageImeOverlayTest {
             fontScale = 1f,
             layoutDirection = LayoutDirection.Ltr,
             previewHeight = 400,
+        )
+
+    /** A preview taller than the frame can spare still leaves two whole action rows inside the menu (#4100). */
+    @Test
+    fun previewTallerThanTheFrameLeavesTwoActionRows() =
+        assertActionsScrollWithoutMovingPreview(
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            previewHeight = 700,
         )
 
     /** The real text preview can fill five 200%-scale lines plus a reply and footer. */
@@ -392,6 +405,7 @@ class FocusedMessageImeOverlayTest {
         val previewBefore = composeRule.onNodeWithTag("message-actions-preview").fetchSemanticsNode().boundsInRoot
         assertPreviewWithinFrame(previewBefore, "the message must start inside the short frame")
         composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).assertIsDisplayed()
+        assertRowsScrollInsideTheMenuSurface(minimumRows = if (previewHeight > 60) 2 else 0)
         if (previewHeight > 60) {
             val actionViewport =
                 composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG).fetchSemanticsNode().boundsInRoot
@@ -409,6 +423,28 @@ class FocusedMessageImeOverlayTest {
         composeRule.onNodeWithText("Action 11").performClick()
         composeRule.runOnIdle { assertEquals("the final action must remain reachable", 1, lastActionClicks) }
         composeRule.onNodeWithTag("message-actions-preview").assertDoesNotExist()
+    }
+
+    /**
+     * Only the rows scroll, inside the menu's rounded surface: no scroll or clip sits between the stack and the
+     * surface, so the surface's outline and its shadow allowance fit the frame (#4100). Screenshots cannot show
+     * this, because the baseline renderer draws no shadows inside popups.
+     */
+    private fun assertRowsScrollInsideTheMenuSurface(minimumRows: Int) {
+        val panel = composeRule.onNodeWithTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG)
+        panel.assert(!hasScrollAction())
+        composeRule
+            .onNode(hasScrollAction() and hasAnyAncestor(hasTestTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG)))
+            .assertExists("the action rows must scroll inside the menu surface")
+        val panelBounds = panel.fetchSemanticsNode().boundsInRoot
+        val frame = composeRule.onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val shadowAllowance = with(composeRule.density) { 8.dp.toPx() }
+        assertTrue(
+            "the menu and its shadow must end above the frame's bottom edge",
+            panelBounds.bottom + shadowAllowance <= frame.bottom + 0.5f,
+        )
+        val rowHeight = with(composeRule.density) { 48.dp.toPx() }
+        assertTrue("the menu must keep $minimumRows whole rows", panelBounds.height >= rowHeight * minimumRows)
     }
 
     /** Checks all preview edges remain inside the overlay frame within rounding tolerance. */
