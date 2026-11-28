@@ -5,18 +5,27 @@ package dev.ipf.whitenoise.android.ui.common
 import android.os.Build
 import android.view.MotionEvent
 import android.view.Window
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
+import dev.ipf.whitenoise.android.R
 
 /** Keeps overlays away from a sensitive dialog and rejects both fully and partly obscured gestures. */
 @Composable
 internal fun ProtectDialogInput() {
     val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-    DisposableEffect(window) {
+    val context = LocalContext.current
+    DisposableEffect(window, context) {
         val original = window?.callback
-        val guarded = original?.let(::ObscuredTouchGuard)
+        val guarded =
+            original?.let {
+                ObscuredTouchGuard(it) {
+                    Toast.makeText(context, R.string.link_touch_blocked, Toast.LENGTH_SHORT).show()
+                }
+            }
         if (window != null && guarded != null) {
             window.callback = guarded
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.setHideOverlayWindows(true)
@@ -32,8 +41,10 @@ internal fun ProtectDialogInput() {
 
 private class ObscuredTouchGuard(
     private val delegate: Window.Callback,
+    private val onObscured: () -> Unit,
 ) : Window.Callback by delegate {
     private var blocked = false
+    private var warned = false
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         val isDown = event.actionMasked == MotionEvent.ACTION_DOWN
@@ -44,6 +55,10 @@ private class ObscuredTouchGuard(
             delegate.dispatchTouchEvent(event)
         } else {
             blocked = true
+            if (!warned) {
+                warned = true
+                onObscured()
+            }
             if (!isDown) {
                 val cancel = MotionEvent.obtain(event)
                 try {

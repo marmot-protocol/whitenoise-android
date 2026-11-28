@@ -222,5 +222,6 @@
     <string name="link_consent_someone_asked">Alguien me pidió que lo hiciera</string>
     <string name="link_consent_unlock">Desbloquea este teléfono para comparar los emojis</string>
     <string name="link_consent_lock_required">Configura un bloqueo de pantalla en este teléfono para vincular un dispositivo.</string>
-    <string name="link_consent_report_failed">No se pudo marcar el inicio de sesión como desconocido. Revísalo en Dispositivos.</string>
+    <string name="link_consent_report_guidance">Se rechazó la vinculación. Abre el inicio de sesión en Dispositivos para denunciarlo.</string>
+    <string name="link_touch_blocked">Otra aplicación está cubriendo White Noise. Cierra su ventana e inténtalo de nuevo.</string>
 </resources>

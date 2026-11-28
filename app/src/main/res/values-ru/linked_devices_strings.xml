@@ -224,5 +224,6 @@
     <string name="link_consent_someone_asked">Меня попросили это сделать</string>
     <string name="link_consent_unlock">Разблокируйте этот телефон, чтобы сравнить эмодзи</string>
     <string name="link_consent_lock_required">Чтобы связать устройство, настройте блокировку экрана на этом телефоне.</string>
-    <string name="link_consent_report_failed">Не удалось пометить вход как неизвестный. Проверьте его в разделе «Устройства».</string>
+    <string name="link_consent_report_guidance">Привязка отклонена. Откройте этот вход в разделе «Устройства», чтобы сообщить о нём.</string>
+    <string name="link_touch_blocked">Другое приложение перекрывает White Noise. Закройте его окно и повторите попытку.</string>
 </resources>

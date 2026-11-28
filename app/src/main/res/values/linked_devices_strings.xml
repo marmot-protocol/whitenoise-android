@@ -222,5 +222,6 @@
     <string name="link_consent_someone_asked">Someone asked me to do this</string>
     <string name="link_consent_unlock">Unlock this phone to compare emoji</string>
     <string name="link_consent_lock_required">Set a screen lock on this phone to link a device.</string>
-    <string name="link_consent_report_failed">Couldn’t mark this sign-in as unrecognized. Check Devices to review it.</string>
+    <string name="link_consent_report_guidance">Link declined. Open the sign-in in Devices to report it.</string>
+    <string name="link_touch_blocked">Another app is covering White Noise. Close its window and try again.</string>
 </resources>

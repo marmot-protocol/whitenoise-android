@@ -222,5 +222,6 @@
     <string name="link_consent_someone_asked">Jemand hat mich darum gebeten</string>
     <string name="link_consent_unlock">Entsperre dieses Telefon, um Emojis zu vergleichen</string>
     <string name="link_consent_lock_required">Richte auf diesem Telefon eine Displaysperre ein, um ein Gerät zu verknüpfen.</string>
-    <string name="link_consent_report_failed">Die Anmeldung konnte nicht als unbekannt markiert werden. Prüfe sie unter Geräte.</string>
+    <string name="link_consent_report_guidance">Kopplung abgelehnt. Öffne die Anmeldung unter „Geräte“, um sie zu melden.</string>
+    <string name="link_touch_blocked">Eine andere App verdeckt White Noise. Schließe ihr Fenster und versuche es erneut.</string>
 </resources>

@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -16,6 +17,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DeviceLinkPromptFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.devices.DEVICE_LINK_DID_NOT_START_TAG
+import dev.ipf.whitenoise.android.ui.devices.DEVICE_LINK_SOMEONE_ASKED_TAG
 import dev.ipf.whitenoise.android.ui.devices.DEVICE_LINK_WITH_ME_TAG
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkConsentGate
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkConsentPage
@@ -80,7 +83,7 @@ class DeviceLinkConsentScreenshotTest {
     }
 
     @Test
-    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1000dp-mdpi")
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h2200dp-mdpi")
     fun onCallRtlAtLargeFont() {
         compose.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -101,6 +104,9 @@ class DeviceLinkConsentScreenshotTest {
                 }
             }
         }
+        compose.onNodeWithTag(DEVICE_LINK_WITH_ME_TAG).assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag(DEVICE_LINK_DID_NOT_START_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(DEVICE_LINK_SOMEONE_ASKED_TAG).assertIsDisplayed()
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_consent_dark_rtl_large_font.png")
     }
 }

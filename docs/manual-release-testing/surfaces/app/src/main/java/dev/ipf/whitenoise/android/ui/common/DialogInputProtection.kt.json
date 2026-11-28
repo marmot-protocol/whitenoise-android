@@ -10,6 +10,14 @@
         "test_ids": [
           "SET-079"
         ]
+      },
+      {
+        "surface": "Obscured gesture: R.string.link_touch_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogInputProtection.kt",
+        "anchor": "R.string.link_touch_blocked",
+        "test_ids": [
+          "SET-079"
+        ]
       }
     ]
   },

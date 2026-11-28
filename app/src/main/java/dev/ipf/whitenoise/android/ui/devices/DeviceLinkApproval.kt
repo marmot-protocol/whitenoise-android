@@ -197,7 +197,14 @@ internal fun DeviceLinkRequestContent(
             )
         }
         if (warning != null && onReport != null) {
-            TextButton(onClick = onReport, enabled = running == null) {
+            TextButton(
+                onClick = onReport,
+                enabled = running == null,
+                modifier =
+                    Modifier
+                        .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                        .testTag(DEVICE_LINK_DID_NOT_START_TAG),
+            ) {
                 Text(stringResource(R.string.link_consent_did_not_start))
             }
         }

@@ -222,5 +222,6 @@
     <string name="link_consent_someone_asked">Biri benden bunu yapmamı istedi</string>
     <string name="link_consent_unlock">Emojileri karşılaştırmak için bu telefonun kilidini açın</string>
     <string name="link_consent_lock_required">Cihaz bağlamak için bu telefonda ekran kilidi ayarlayın.</string>
-    <string name="link_consent_report_failed">Oturum açma işlemi tanınmıyor olarak işaretlenemedi. Cihazlar bölümünden kontrol edin.</string>
+    <string name="link_consent_report_guidance">Bağlantı reddedildi. Bildirmek için oturum açma kaydını Cihazlar bölümünde açın.</string>
+    <string name="link_touch_blocked">Başka bir uygulama White Noise’u kapatıyor. Uygulamanın penceresini kapatıp tekrar deneyin.</string>
 </resources>

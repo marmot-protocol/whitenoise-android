@@ -81,7 +81,7 @@ internal fun SignInDevicesRequestEffect(
         appState.deviceLinkRequests.close()
         onOpen()
         appState.signInAlerts.updateDevicesRequest(request)
-        if (request.linkReportGeneration != null) appState.present(R.string.link_consent_report_failed)
+        if (request.linkReportGeneration != null) appState.presentTransient(R.string.link_consent_report_guidance)
     }
 }
 

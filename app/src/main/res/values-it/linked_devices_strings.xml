@@ -223,5 +223,6 @@
     <string name="link_consent_someone_asked">Qualcuno mi ha chiesto di farlo</string>
     <string name="link_consent_unlock">Sblocca questo telefono per confrontare le emoji</string>
     <string name="link_consent_lock_required">Imposta un blocco schermo su questo telefono per collegare un dispositivo.</string>
-    <string name="link_consent_report_failed">Impossibile contrassegnare questo accesso come sconosciuto. Controllalo in Dispositivi.</string>
+    <string name="link_consent_report_guidance">Collegamento rifiutato. Apri l’accesso in Dispositivi per segnalarlo.</string>
+    <string name="link_touch_blocked">Un’altra app copre White Noise. Chiudi la sua finestra e riprova.</string>
 </resources>

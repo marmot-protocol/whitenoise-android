@@ -223,5 +223,6 @@
     <string name="link_consent_someone_asked">Quelqu’un m’a demandé de le faire</string>
     <string name="link_consent_unlock">Déverrouillez ce téléphone pour comparer les émojis</string>
     <string name="link_consent_lock_required">Configurez un verrouillage de l’écran sur ce téléphone pour associer un appareil.</string>
-    <string name="link_consent_report_failed">Impossible de marquer cette connexion comme inconnue. Vérifiez-la dans Appareils.</string>
+    <string name="link_consent_report_guidance">Association refusée. Ouvrez la connexion dans Appareils pour la signaler.</string>
+    <string name="link_touch_blocked">Une autre application recouvre White Noise. Fermez sa fenêtre et réessayez.</string>
 </resources>

@@ -49,9 +49,9 @@
         ]
       },
       {
-        "surface": "Device linking consent: R.string.link_consent_report_failed",
+        "surface": "Device linking consent: R.string.link_consent_report_guidance",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
-        "anchor": "R.string.link_consent_report_failed",
+        "anchor": "R.string.link_consent_report_guidance",
         "test_ids": [
           "SET-079"
         ]

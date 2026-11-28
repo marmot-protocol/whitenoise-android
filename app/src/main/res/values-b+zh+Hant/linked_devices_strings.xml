@@ -221,5 +221,6 @@
     <string name="link_consent_someone_asked">有人要求我這麼做</string>
     <string name="link_consent_unlock">解鎖這部手機以核對表情符號</string>
     <string name="link_consent_lock_required">請先在這部手機上設定螢幕鎖定，再連結裝置。</string>
-    <string name="link_consent_report_failed">無法將此登入標記為陌生登入。請前往「裝置」查看。</string>
+    <string name="link_consent_report_guidance">已拒絕連結。請在「裝置」中開啟該登入記錄以回報。</string>
+    <string name="link_touch_blocked">另一個應用程式遮住了 White Noise。請關閉它的視窗後再試一次。</string>
 </resources>
