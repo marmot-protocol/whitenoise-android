@@ -160,7 +160,7 @@ class LocalGroupDeleteControllerTest {
 
     @Test
     fun exhaustedNativeDeleteRestoresRowAndReportsItsPhase() =
-        runTest {
+        runLocalGroupDeleteTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
             flushChatRows()
