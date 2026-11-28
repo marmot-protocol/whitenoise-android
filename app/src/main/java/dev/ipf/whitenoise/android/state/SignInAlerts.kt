@@ -162,20 +162,19 @@ internal class SignInAlerts(
         snapshots = snapshots + (accountRef to snapshot.copy(alerted = alerted))
     }
 
-    /** Asks the app to open [accountRef]'s Devices screen, switching to that account first when needed. */
-    fun requestDevices(accountRef: String) =
-        synchronized(lock) {
-            devicesRequest = SignInDevicesRequest(accountRef, ++requests)
-        }
-
-    /** Keeps a successful decline's review handoff without displacing an explicit Devices request. */
-    fun requestDevicesAfterLinkDecline(
+    /** Opens [accountRef]'s Devices screen. A link-report handoff yields to an explicit request. */
+    fun requestDevices(
         accountRef: String,
-        runtimeGeneration: Int,
+        linkReportGeneration: Int? = null,
     ) {
         synchronized(lock) {
-            if (devicesRequest == null) {
-                devicesRequest = SignInDevicesRequest(accountRef, ++requests, linkReportGeneration = runtimeGeneration)
+            if (linkReportGeneration == null || devicesRequest == null) {
+                devicesRequest =
+                    SignInDevicesRequest(
+                        accountRef,
+                        ++requests,
+                        linkReportGeneration = linkReportGeneration,
+                    )
             }
         }
     }

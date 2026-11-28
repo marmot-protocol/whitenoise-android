@@ -89,8 +89,8 @@ private val WhiteNoiseAppState.deviceRoutingUnlocked: Boolean
     get() = !appLock.screenVisible && !appLock.evaluationPending
 
 private fun WhiteNoiseAppState.deviceRoutingReady(request: SignInDevicesRequest?): Boolean {
-    if (!deviceRoutingUnlocked) return false
-    if (request?.linkReportGeneration == null) return true
+    val unlocked = deviceRoutingUnlocked
+    if (!unlocked || request?.linkReportGeneration == null) return unlocked
     val warning = signInAlerts.snapshot(request.accountRef)?.alertDue
     return groupChangeConfirmations.pending == null && warning.isNullOrEmpty()
 }

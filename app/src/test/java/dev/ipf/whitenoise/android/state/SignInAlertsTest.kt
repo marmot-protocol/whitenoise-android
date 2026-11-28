@@ -231,7 +231,7 @@ class SignInAlertsTest {
 
     @Test
     fun linkReportCanWaitForUnlockButCannotOverrideNewerNavigation() {
-        alerts.requestDevicesAfterLinkDecline(ACCOUNT, runtimeGeneration = 2)
+        alerts.requestDevices(ACCOUNT, linkReportGeneration = 2)
         val queued = checkNotNull(alerts.devicesRequest)
         assertFalse(queued.isStaleLinkReport(ACCOUNT, runtimeGeneration = 2))
         assertTrue(queued.isStaleLinkReport("other", runtimeGeneration = 2))
@@ -242,7 +242,7 @@ class SignInAlertsTest {
 
         alerts.requestDevices("other")
         val explicit = alerts.devicesRequest
-        alerts.requestDevicesAfterLinkDecline(ACCOUNT, runtimeGeneration = 2)
+        alerts.requestDevices(ACCOUNT, linkReportGeneration = 2)
         assertEquals(explicit, alerts.devicesRequest)
     }
 

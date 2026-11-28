@@ -236,8 +236,8 @@ private suspend fun reportLinkRequest(
     generation: Int,
 ) {
     fun ownsAccount() = appState.activeAccountRef == request.accountRef && appState.runtimeGeneration == generation
-    if (!ownsAccount() || watcher.blocked || watcher.queue.presented?.id != request.id) return
-    if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return
+    val blocked = watcher.blocked || appState.appLock.screenVisible || appState.appLock.evaluationPending
+    if (blocked || !ownsAccount() || watcher.queue.presented?.id != request.id) return
     val previous = watcher.snapshots[request.accountRef]
     val result =
         runCatchingCancellable { appState.marmotIo { declineDeviceLink(request.accountRef, request.promptId) } }
@@ -247,7 +247,7 @@ private suspend fun reportLinkRequest(
             watcher.accept(request.accountRef, snapshot, beforeCommand = previous)
             val current = watcher.queue.presented
             if (current == null || current.id == request.id) {
-                appState.signInAlerts.requestDevicesAfterLinkDecline(request.accountRef, generation)
+                appState.signInAlerts.requestDevices(request.accountRef, linkReportGeneration = generation)
             }
             watcher.reread(request.accountRef)
         },
