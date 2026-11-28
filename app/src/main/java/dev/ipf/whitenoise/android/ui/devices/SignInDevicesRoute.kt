@@ -30,8 +30,8 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal const val DEVICES_ROW_BADGE_TAG = "settings.account.linked_devices.badge"
 
 /**
- * Carries a request to open an account's Devices screen (from the chat-list notice, the full-screen alert or a
- * notification tap) to Settings → Account. A request for another account switches to it first, and the app moves
+ * Carries a request to open an account's Devices screen (from an alert, notification tap or link report) to
+ * Settings → Account. A request for another account switches to it first, and the app moves
  * only once that account is active. [onOpenAccount] opens Settings → Account; the Account screen opens Devices.
  */
 @Composable
@@ -42,10 +42,16 @@ internal fun SignInDevicesRouteEffect(
 ) {
     val request = appState.signInAlerts.devicesRequest
     val active = appState.activeAccountRef
-    val unlocked = appState.deviceRoutingUnlocked
+    val canRoute = appState.deviceRoutingReady(request)
+    val generation = appState.runtimeGeneration
 
-    LaunchedEffect(request, active, navigationAccount, appState.phase, unlocked) {
-        if (request == null || request.accountOpened || appState.phase != AppPhase.Ready) return@LaunchedEffect
+    LaunchedEffect(request, active, navigationAccount, appState.phase, canRoute, generation) {
+        if (request == null) return@LaunchedEffect
+        if (request.isStaleLinkReport(appState.activeAccountRef, appState.runtimeGeneration)) {
+            appState.signInAlerts.updateDevicesRequest(request)
+            return@LaunchedEffect
+        }
+        if (request.accountOpened || appState.phase != AppPhase.Ready) return@LaunchedEffect
         if (!appState.canRouteDevices(request)) return@LaunchedEffect
         when {
             !appState.devicesAccountEligible(request) -> appState.signInAlerts.updateDevicesRequest(request)
@@ -67,21 +73,31 @@ internal fun SignInDevicesRequestEffect(
     onOpen: () -> Unit,
 ) {
     val request = appState.signInAlerts.devicesRequest
-    LaunchedEffect(request, appState.activeAccountRef, appState.deviceRoutingUnlocked) {
+    val canRoute = appState.deviceRoutingReady(request)
+    LaunchedEffect(request, appState.activeAccountRef, canRoute, appState.runtimeGeneration) {
         if (request?.accountOpened != true || request.accountRef != appState.activeAccountRef) return@LaunchedEffect
         if (!appState.canRouteDevices(request) || !appState.devicesAccountEligible(request)) return@LaunchedEffect
+        if (request.isStaleLinkReport(appState.activeAccountRef, appState.runtimeGeneration)) return@LaunchedEffect
         appState.deviceLinkRequests.close()
         onOpen()
         appState.signInAlerts.updateDevicesRequest(request)
+        if (request.linkReportGeneration != null) appState.present(R.string.link_consent_report_failed)
     }
 }
 
 private val WhiteNoiseAppState.deviceRoutingUnlocked: Boolean
     get() = !appLock.screenVisible && !appLock.evaluationPending
 
+private fun WhiteNoiseAppState.deviceRoutingReady(request: SignInDevicesRequest?): Boolean {
+    if (!deviceRoutingUnlocked) return false
+    if (request?.linkReportGeneration == null) return true
+    val warning = signInAlerts.snapshot(request.accountRef)?.alertDue
+    return groupChangeConfirmations.pending == null && warning.isNullOrEmpty()
+}
+
 private fun WhiteNoiseAppState.canRouteDevices(request: SignInDevicesRequest): Boolean {
     val current = signInAlerts.devicesRequest
-    return deviceRoutingUnlocked && current == request
+    return current == request && deviceRoutingReady(request)
 }
 
 private fun WhiteNoiseAppState.devicesAccountEligible(request: SignInDevicesRequest): Boolean =

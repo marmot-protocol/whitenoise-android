@@ -57,7 +57,16 @@ internal data class SignInDevicesRequest(
     val accountRef: String,
     val id: Long,
     val accountOpened: Boolean = false,
-)
+    val linkReportGeneration: Int? = null,
+) {
+    /** A report may wait for unlock, but a profile or runtime change cancels its handoff. */
+    fun isStaleLinkReport(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+    ): Boolean =
+        linkReportGeneration != null &&
+            (linkReportGeneration != runtimeGeneration || accountRef != activeAccountRef)
+}
 
 /**
  * The app-wide view of every signed-in account's sign-in alerts, outside the Devices screen: the chat-list banner,
@@ -158,6 +167,18 @@ internal class SignInAlerts(
         synchronized(lock) {
             devicesRequest = SignInDevicesRequest(accountRef, ++requests)
         }
+
+    /** Keeps a successful decline's review handoff without displacing an explicit Devices request. */
+    fun requestDevicesAfterLinkDecline(
+        accountRef: String,
+        runtimeGeneration: Int,
+    ) {
+        synchronized(lock) {
+            if (devicesRequest == null) {
+                devicesRequest = SignInDevicesRequest(accountRef, ++requests, linkReportGeneration = runtimeGeneration)
+            }
+        }
+    }
 
     /** Advances or clears only the matching Devices request. */
     fun updateDevicesRequest(

@@ -117,7 +117,7 @@ internal fun DeviceLinkRequestHost(
                 draft = draft,
                 reporting = { reporting.value },
                 onReport = {
-                    launchLinkReport(appState, watcher, request, runtimeGeneration, reporting, showDevices)
+                    launchLinkReport(appState, watcher, request, runtimeGeneration, reporting)
                 },
                 onReviewDevices = showDevices,
             )

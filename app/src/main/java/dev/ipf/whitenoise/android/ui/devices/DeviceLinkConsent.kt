@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.signInAlerts
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ProtectDialogInput
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -205,26 +206,19 @@ private fun rememberLinkCallWarning(
     return call
 }
 
-/** Keeps a report in flight across dialog recreation and opens Devices only for the same request. */
+/** Keeps a report in flight across dialog recreation. */
 internal fun launchLinkReport(
     appState: WhiteNoiseAppState,
     watcher: DeviceLinkRequestWatcher,
     request: DeviceLinkRequest,
     generation: Int,
     reporting: MutableState<Boolean>,
-    onReviewed: () -> Unit,
 ) {
     if (reporting.value) return
     reporting.value = true
     appState.launchMutation {
         try {
-            if (reportLinkRequest(appState, watcher, request, generation)) {
-                val current = watcher.queue.presented
-                if (current == null || current.id == request.id) {
-                    onReviewed()
-                    appState.present(R.string.link_consent_report_failed)
-                }
-            }
+            reportLinkRequest(appState, watcher, request, generation)
         } finally {
             reporting.value = false
         }
@@ -240,26 +234,29 @@ private suspend fun reportLinkRequest(
     watcher: DeviceLinkRequestWatcher,
     request: DeviceLinkRequest,
     generation: Int,
-): Boolean {
+) {
     fun ownsAccount() = appState.activeAccountRef == request.accountRef && appState.runtimeGeneration == generation
-    if (!ownsAccount() || watcher.blocked || watcher.queue.presented?.id != request.id) return false
+    if (!ownsAccount() || watcher.blocked || watcher.queue.presented?.id != request.id) return
+    if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return
     val previous = watcher.snapshots[request.accountRef]
     val result =
         runCatchingCancellable { appState.marmotIo { declineDeviceLink(request.accountRef, request.promptId) } }
-    return if (ownsAccount() && !watcher.blocked) {
-        result.fold(
-            onSuccess = { snapshot -> watcher.accept(request.accountRef, snapshot, beforeCommand = previous) },
-            onFailure = {
-                if (watcher.queue.presented?.id == request.id) {
-                    appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it)
-                }
-            },
-        )
-        if (result.isSuccess) watcher.reread(request.accountRef)
-        result.isSuccess && ownsAccount() && !watcher.blocked
-    } else {
-        false
-    }
+    if (!ownsAccount()) return
+    result.fold(
+        onSuccess = { snapshot ->
+            watcher.accept(request.accountRef, snapshot, beforeCommand = previous)
+            val current = watcher.queue.presented
+            if (current == null || current.id == request.id) {
+                appState.signInAlerts.requestDevicesAfterLinkDecline(request.accountRef, generation)
+            }
+            watcher.reread(request.accountRef)
+        },
+        onFailure = {
+            if (!watcher.blocked && watcher.queue.presented?.id == request.id) {
+                appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it)
+            }
+        },
+    )
 }
 
 @Suppress("LongParameterList")

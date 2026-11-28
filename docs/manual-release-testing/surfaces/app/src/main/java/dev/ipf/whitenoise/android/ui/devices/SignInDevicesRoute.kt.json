@@ -9,7 +9,8 @@
         "anchor": "fun SignInDevicesRouteEffect(",
         "test_ids": [
           "SET-077",
-          "SET-078"
+          "SET-078",
+          "SET-079"
         ]
       },
       {
@@ -18,7 +19,8 @@
         "anchor": "fun SignInDevicesRequestEffect(",
         "test_ids": [
           "SET-077",
-          "SET-078"
+          "SET-078",
+          "SET-079"
         ]
       },
       {
