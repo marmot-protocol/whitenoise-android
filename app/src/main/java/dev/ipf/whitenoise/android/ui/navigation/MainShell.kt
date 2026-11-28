@@ -671,8 +671,7 @@ internal fun MainShell(
         }
     }
 
-    // The first argument is the staged share's request id, which binds a deferred cross-account open.
-    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ share, accountRef, groupIds ->
+    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ requestId, accountRef, groupIds ->
         if (groupIds.isEmpty()) return@openStagedShare
         val otherCount = groupIds.size - 1
         if (accountRef == appState.activeAccountRef) {
@@ -689,7 +688,7 @@ internal fun MainShell(
         } else {
             val pending =
                 PendingStagedShareOpen(
-                    requestId = share,
+                    requestId = requestId,
                     accountRef = accountRef,
                     groupIdHex = groupIds.first(),
                     otherChatCount = otherCount,
@@ -953,6 +952,7 @@ internal fun MainShell(
         appState.clearPresentedProfile()
         profileGroupForegroundState.close()
         clearSharePickerRequest()
+        pendingStagedShareOpen = null
         sectionName = MainSection.Settings.name
         settingsDetailName = SettingsDetail.Account.name
     }

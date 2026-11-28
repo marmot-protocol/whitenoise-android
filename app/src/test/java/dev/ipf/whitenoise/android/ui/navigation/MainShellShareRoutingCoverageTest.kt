@@ -132,6 +132,19 @@ class MainShellShareRoutingCoverageTest {
         )
     }
 
+    @Test
+    fun signInReviewRetiresThePickerAndAnyDeferredShareOpenBeforeRoutingToDevices() {
+        val route =
+            mainShellSource()
+                .readText()
+                .substringAfter("SignInDevicesRouteEffect(appState, previousActiveAccountRef) {", missingDelimiterValue = "")
+                .substringBefore("settingsDetailName = SettingsDetail.Account.name", missingDelimiterValue = "")
+
+        val settingsIndex = route.indexOf("sectionName = MainSection.Settings.name")
+        assertTrue(route.indexOf("clearSharePickerRequest()") in 0 until settingsIndex)
+        assertTrue(route.indexOf("pendingStagedShareOpen = null") in 0 until settingsIndex)
+    }
+
     private fun mainShellSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
