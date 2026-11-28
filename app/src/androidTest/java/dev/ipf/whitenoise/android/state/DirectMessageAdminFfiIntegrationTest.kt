@@ -7,12 +7,14 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MdkAdoptionDeviceAcceptance
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -150,10 +152,11 @@ class DirectMessageAdminFfiIntegrationTest {
                 ),
             )
         val preferenceName = "${root.parentFile?.name}-${root.name}"
+        var state: WhiteNoiseAppState? = null
         try {
             native.start()
             val account = native.createIdentity(relays, relays)
-            val state =
+            state =
                 WhiteNoiseAppState(
                     context = context,
                     draftStore = DraftStore(NoDrafts),
@@ -166,6 +169,8 @@ class DirectMessageAdminFfiIntegrationTest {
             test(Participant(native, account, state))
         } finally {
             withContext(NonCancellable) {
+                // Stop the app state's background work before closing the store it reads.
+                state?.mutationsScope?.cancel()
                 try {
                     native.shutdownAndClose()
                 } finally {
@@ -187,7 +192,8 @@ class DirectMessageAdminFfiIntegrationTest {
             seconds: Long,
         ): String {
             assertTrue(state.setDefaultDisappearingMessagesSeconds(seconds))
-            return state.createProfileChatGroup(requireNotNull(native.npub(peer.account.accountIdHex)))
+            val npub = requireNotNull(native.npub(peer.account.accountIdHex))
+            return retryWhileWorkerBusy { state.createProfileChatGroup(npub) }
         }
 
         /** Accepts the founding Welcome once the recipient's worker has processed it. */
@@ -195,7 +201,7 @@ class DirectMessageAdminFfiIntegrationTest {
             withTimeout(30_000L) {
                 while (native.chatListRow(account.label, group) == null) delay(100L)
             }
-            native.acceptGroupInvite(account.label, group)
+            retryWhileWorkerBusy { native.acceptGroupInvite(account.label, group) }
         }
 
         /** Accepts [group] only when this participant was invited to it rather than founding it. */
@@ -209,7 +215,23 @@ class DirectMessageAdminFfiIntegrationTest {
                     }
                     current
                 }
-            if (row.pendingConfirmation) native.acceptGroupInvite(account.label, group)
+            if (row.pendingConfirmation) retryWhileWorkerBusy { native.acceptGroupInvite(account.label, group) }
+        }
+
+        /**
+         * Retries as the user's Retry would while the account worker finishes an exclusive catch-up, such as the
+         * peer's Welcome arriving during a simultaneous start. MarmotKit guarantees the busy call did not start.
+         */
+        private suspend fun <T> retryWhileWorkerBusy(block: suspend () -> T): T {
+            repeat(BUSY_RETRIES) {
+                try {
+                    return block()
+                } catch (busy: MarmotKitException) {
+                    if (!isTypedMutationContention(busy)) throw busy
+                    delay(BUSY_RETRY_DELAY_MS)
+                }
+            }
+            return block()
         }
 
         /** Checks the full admin set, self permission and timer that Android reads for chat details. */
@@ -240,6 +262,11 @@ class DirectMessageAdminFfiIntegrationTest {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val BUSY_RETRIES = 20
+        const val BUSY_RETRY_DELAY_MS = 250L
     }
 
     /** Draft persistence that keeps the tests isolated from the installed app's drafts. */
