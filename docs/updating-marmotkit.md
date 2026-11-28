@@ -190,8 +190,10 @@ RC, pin the Stable Android bundle in `MARMOT_VERSION` and commit
 }
 ```
 
-CI checks Stable pins on `develop` and `master`. Hosted and local production
-builds also run the check before building. The check reads that exact verified
+CI checks Stable pins on `develop` and `master`. The hosted workflow validates
+the Stable pin format before loading signing files. Hosted and local production
+builds verify the public promotion evidence once through `scripts/release.sh`
+before Gradle runs. The check reads that exact verified
 revision of `stable/latest.json` on MDK's `rc-meta` history. It verifies that the recorded
 tag still points to a commit from `develop` and that its RC version and MDK
 source match the promotion. A separate MDK release commit must have the tested
