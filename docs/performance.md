@@ -811,6 +811,92 @@ report always leaves tracker completion false: reviewed budget provenance,
 before/after attribution and the holistic device matrix remain required. Rail
 energy includes system activity and cannot establish app-exclusive mAh savings.
 
+### Report-only battery eval
+
+Start on a dedicated Pixel with the disposable profile and authenticated fixture
+described above. Run the same release-like target APK in both arms (A/A).
+Begin with Push idle and add Local idle, the disabled fixture floor, a
+five-message Push burst, and reconnect as those fixtures are ready.
+
+| Scenario key | Existing benchmark method | Default window | Headline metric |
+| --- | --- | --- | --- |
+| `push_idle` | `BackgroundIdleBenchmark#idleWithNativePushPower` | 60 s | Average measured mW |
+| `local_idle` | `BackgroundIdleBenchmark#idleWithKeepConnectedPower` | 60 s | Average measured mW |
+| `disabled_idle` | `BackgroundIdleBenchmark#idleWithDeliveryDisabledPower` | 60 s | Average measured mW |
+| `push_burst` | `BackgroundIdleBenchmark#pushBurstPower` | 30 s | mJ per five-message burst |
+| `reconnect` | `NetworkRecoveryBenchmark#backgroundValidatedNetworkRecoveryPower` | 25 s | mJ per completed catch-up |
+
+1. Use [hosted qualification artifacts](#hosted-qualification-artifacts) and
+   the existing state-preserving runner. Run one benchmark method per
+   invocation with the disposable profile in the foreground before setup.
+   For the hosted route, run the collector from the APK's source revision.
+   Use Wireless debugging for setup and collection, and physically disconnect
+   power for each measured window. Confirm actual unplugged flags, a screen-off
+   window, and the fixture process and posture for every sample. Keep the same
+   OS build, network and relay fixture, battery policy, and charge range.
+2. Collect at least five adjacent pairs for each scenario. Alternate the order
+   (A then B, B then A), let the device settle between samples, and record the
+   actual measured duration from the trace. Discard neither failed deliveries
+   nor outliers. Use a fresh set of five disposable messages per Push burst.
+   For reconnect, queue the same count of fresh messages while offline and
+   independently verify the canonical backlog and retry count within the window.
+   The reconnect benchmark proves validated connectivity, so retain separate
+   evidence that White Noise completed catch-up on time. A Wi-Fi outage can
+   also disconnect the host's Wireless debugging session. For offline scenarios,
+   use the [on-device collector](#direct-platform-collector-for-disposable-profile-diagnostics)
+   and retrieve the trace after connectivity returns.
+3. Run the A/A report. For a candidate run (A/B), keep A as the same calibrated
+   APK, use the candidate as B, and repeat the scenario with the same measurement
+   setup. Use a benchmark harness with the same measurement configuration and
+   preserve fixtures in place. Rerun A/A after changing the device build or
+   measurement setup, or when A/A is unstable.
+
+```bash
+python3 scripts/battery_eval.py same-apk.json > calibration-report.json
+python3 scripts/battery_eval.py candidate.json --calibration same-apk.json > battery-report.json
+```
+
+The input is a local JSON campaign with `schema: 1`, `device` (`model`, `api`,
+full build fingerprint as `build`), `network` (`wifi` or `cellular`), `method`
+(`macrobenchmark` or `perfetto`), and `fixture_sha256` (the hash of a private
+fixture setup identifier covering the unit, profile, and configuration).
+Include `a` and `b` provenance objects with `source_sha`, `target_apk_sha256`
+of the installed benchmark target, and `mdk_sha`. Both provenance objects
+are identical for A/A. The `scenarios` object maps each measured scenario to:
+
+- `window_ms` for the planned window shared by both arms, `expected_messages`
+  (zero for idle, five for Push burst, or the planned backlog for reconnect),
+  and `max_recovery_attempts` (the predeclared cap for reconnect, zero otherwise).
+- `pairs`, an array of two-sample arrays in actual capture order. Each sample
+  records `arm` (`a` or `b`), `duration_ms`, `temperature_decicelsius`,
+  booleans `charging`, `screen_off`, `process_alive`, `restored` and
+  `permission`, plus `mode` (`push` or `local`), `received`, `duplicates`,
+  `receipt_before_window_end`, and `recovery_attempts`. For idle, record
+  zero received and a false receipt flag. When the disabled fixture is in
+  effect, record Push mode and the revoked notification permission.
+  Both arms of a Push burst or reconnect pair must use the same measured
+  duration because the report compares total energy. Idle reports average
+  power using each sample's measured duration.
+- For Macrobenchmark, set each sample's `benchmark_json` to the path of its
+  unmodified one-iteration `*-benchmarkData.json` relative to the campaign
+  directory. Set `capture_sha256` to that file's SHA-256. For direct Perfetto
+  collection, set `capture_sha256` to the private trace's digest and supply
+  `energy_uws` with `total`, `cpu`, `network` and `memory` from the measured
+  slice. Sum the same available hardware rails for all samples across A/A and
+  A/B. For a verified delivery failure without an energy report, record
+  the failed delivery counts and use null for `benchmark_json` or `energy_uws`.
+  Use a digest of the retained failure evidence if a capture was unavailable.
+
+The A/A noise floor is the largest absolute paired percentage change observed
+on that scenario. A/A requires a temperature spread of at most 2°C and a
+total-power or energy range of at most 25% of its median. A/B checks the
+combined temperature range against the same limit and reports the paired
+median and range against the floor. Delivery failure suppresses an energy
+verdict. Missing evidence and unstable calibration are inconclusive. The command
+always reports the evidence status as JSON and exits successfully for evaluation
+outcomes, including higher energy. Keep the campaign inputs and raw traces
+private. The battery measurements are advisory and need no PR status check.
+
 To measure group creation separately, use the state-preserving runner with an
 explicit mutation argument. This creates ten persistent MLS groups:
 
