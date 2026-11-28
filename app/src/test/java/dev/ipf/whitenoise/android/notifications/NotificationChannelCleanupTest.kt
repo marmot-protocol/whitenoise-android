@@ -157,12 +157,12 @@ class NotificationChannelCleanupTest {
     }
 
     /**
-     * Channels materialized directly via `resolveForPost` or `setScope` (such as hidden-preview
-     * posts, plain posts, failed shortcut publishes, or scope overrides) record ownership at
-     * creation time so multi-account sign-out deletes them even with zero shortcuts published.
+     * Channels materialized directly via `resolveForPost` (such as hidden-preview posts, plain posts,
+     * or failed shortcut publishes) record ownership at creation time so multi-account sign-out
+     * deletes them even with zero shortcuts published.
      */
     @Test
-    fun routingResolveForPostAndSetScopeRecordOwnershipAtChannelCreation() {
+    fun routingResolveForPostRecordsOwnershipAtChannelCreation() {
         val routing = ConversationNotificationRouting(context)
         val postShortcut = checkNotNull(conversationShortcutId("account-a", "group-hidden-post"))
         val postRoute =
@@ -173,21 +173,6 @@ class NotificationChannelCleanupTest {
                 primaryVibrationPattern = defaultPattern,
                 accountRef = "account-a",
             )
-        val scopeShortcut = checkNotNull(conversationShortcutId("account-a", "group-scope-only"))
-        val scopeSetting =
-            routing
-                .setScope(
-                    conversation =
-                        NotificationConversationDescriptor(
-                            shortcutId = scopeShortcut,
-                            isDm = false,
-                            title = "Scoped Mentions Group",
-                            primaryVibrationPattern = defaultPattern,
-                            accountRef = "account-a",
-                        ),
-                    category = OverridableConversationNotificationCategory.MENTIONS,
-                    scope = ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT,
-                ).getOrThrow()
         val otherShortcut = checkNotNull(conversationShortcutId("account-b", "group-other-post"))
         val otherRoute =
             routing.resolveForPost(
@@ -201,8 +186,7 @@ class NotificationChannelCleanupTest {
         clearRevokedConversationShortcutsForAccount(context, "account-a", includeUnscopedLegacy = false)
 
         assertNull(manager.getNotificationChannel(postRoute.channelId))
-        assertNull(manager.getNotificationChannel(scopeSetting.settingsTarget.channelId))
-        assertNoChannelContainsText("Hidden Preview DM", "Scoped Mentions Group")
+        assertNoChannelContainsText("Hidden Preview DM")
         assertNotNull(manager.getNotificationChannel(otherRoute.channelId))
         assertAllGlobalChannelsPresent()
     }

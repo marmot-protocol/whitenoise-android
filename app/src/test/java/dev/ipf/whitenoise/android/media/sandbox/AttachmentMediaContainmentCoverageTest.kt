@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.invariantGateRepositoryRoot
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -151,8 +153,67 @@ class AttachmentMediaContainmentCoverageTest {
         )
         assertTrue(
             "The selected descriptor must enter the native decoder",
-            "NativeMediaEngine.nativeOpen(input.fd, offset, length, edge)" in service,
+            "NativeMediaEngine.nativeOpen(input.fd, offset, length, edge, playbackColors)" in service,
         )
+    }
+
+    /** An unidentified automatic worker receives the identity request before its retire message. */
+    @Test
+    fun automaticWorkerRetirementRequestsIdentityFirst() {
+        val retire = source("media/sandbox/IsolatedAutomaticAvTransport.kt").readText().functionBody("retire")
+        val identity = retire.indexOf("if (!selected.identityObserved) runCatching { identify(selected, target) }")
+        assertTrue(identity in 0 until retire.indexOf("what = MediaDecodePolicy.RETIRE"))
+    }
+
+    /** A local URI must use the local file capability before content-provider admission. */
+    @Test
+    fun fileUrisBypassProviderAdmission() {
+        val access = source("media/sandbox/MediaSourceAccess.kt").readText()
+        val uriInput =
+            access.kotlinBlockFrom(
+                openDelimiter = access.indexOf("fun <T> withMediaUriInput("),
+                description = "withMediaUriInput",
+                searchForOpening = true,
+            )
+        assertTrue(
+            uriInput.indexOf("uri.path?.takeIf { uri.scheme == \"file\" }") in
+                0 until uriInput.indexOf("return filePath?.let { withMediaFileInput(File(it), block) }"),
+        )
+        assertTrue(uriInput.indexOf("withMediaFileInput(") in 0 until uriInput.indexOf("withProviderDeadline"))
+    }
+
+    /** Frame threads can extend the packet count for interleaved audio without raising the byte cap. */
+    @Test
+    fun preferredVideoScalesOnlyThePacketCountForFrameThreads() {
+        val native = File(invariantGateRepositoryRoot(), "native/media-decoder/media_decoder.cpp").readText()
+        val preferred =
+            native.kotlinBlockFrom(
+                openDelimiter = native.indexOf("jlongArray readPreferred("),
+                description = "readPreferred",
+                searchForOpening = true,
+            )
+        assertTrue("preferred == 1 && s.wantAudio && selected.codec" in preferred)
+        assertTrue("(selected.codec->active_thread_type & FF_THREAD_FRAME)" in preferred)
+        assertTrue("kMaxQueuedPackets * (frameThreadedVideo ? s.threads : 1)" in preferred)
+        val reserveStart = preferred.indexOf("if (reserveAudio) {")
+        assertTrue(reserveStart in 0 until preferred.indexOf("queuePacket(s, packetLimit)"))
+        val reserve =
+            preferred.kotlinBlockFrom(
+                openDelimiter = reserveStart,
+                description = "optional PCM reserve",
+                searchForOpening = true,
+            )
+        val reserveGuard = reserve.indexOf("if (s.queuedPackets != 0 ||")
+        assertTrue(reserve.indexOf("consumeQueuedVideoForAudio(") in 0 until reserveGuard)
+        val defer =
+            reserve.kotlinBlockFrom(
+                openDelimiter = reserveGuard,
+                description = "optional PCM deferral",
+                searchForOpening = true,
+            )
+        assertTrue("return longs(env, {5," in defer)
+        assertTrue("kMaxQueuedBytes = 8U * 1024 * 1024" in native)
+        assertTrue("s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < packetLimit" in native)
     }
 
     /** Local Video And Transcription Enter Only The Isolated Raw Stream. */

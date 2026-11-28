@@ -60,6 +60,8 @@ internal class AppProfileSignUp(
             val created = receipt?.account ?: appState.marmotIo { createIdentityWithBootstrapRelays() }
             created.requireNewAccount(knownAccounts).also {
                 creatingRuntimes[it] = owner.copy(initialProfile = receipt?.profile)
+                // Sign up made this key here and nowhere else, so Chats reminds the user to save it (#4279).
+                appState.privateKeyReminders.recordSignUp(it.accountIdHex)
             }
         }
     }

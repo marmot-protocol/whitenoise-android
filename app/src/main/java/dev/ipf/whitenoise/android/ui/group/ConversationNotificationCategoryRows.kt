@@ -125,6 +125,7 @@ internal fun notificationChannelIcon(channel: NotificationChannelSpec): Int =
         NotificationChannelSpec.GROUP_MEMBERSHIP -> R.drawable.ic_supervisor_account
         NotificationChannelSpec.AGENT_ACTIVITY -> R.drawable.ic_ai_agents
         NotificationChannelSpec.APP_UPDATES -> R.drawable.ic_system_update
+        NotificationChannelSpec.SIGN_IN_REVIEW, NotificationChannelSpec.ACCOUNT_SECURITY -> R.drawable.ic_lock
         NotificationChannelSpec.USER_EVENT_SUMMARY -> R.drawable.ic_summarize
     }
 
@@ -140,6 +141,8 @@ internal fun notificationChannelTitle(parent: NotificationChannelSpec): String =
             NotificationChannelSpec.GROUP_MEMBERSHIP -> R.string.notification_channel_group_membership
             NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+            NotificationChannelSpec.SIGN_IN_REVIEW -> R.string.sign_in_alert_badge_review
+            NotificationChannelSpec.ACCOUNT_SECURITY -> R.string.notification_channel_account_security
             NotificationChannelSpec.USER_EVENT_SUMMARY -> R.string.notification_channel_summary
         },
     )

@@ -7,11 +7,13 @@ import yaml
 
 CONTEXT = 'Android merge authorization'
 RESERVED=[CONTEXT,'Android merge queue canary hold']
-# Existing publishers need these capabilities, never statuses/checks writes.
+# These jobs need scoped writes, never statuses/checks writes.
 WRITE_ALLOW = {
     # Cancels a failed or dropped merge-group run; it runs no repository code.
     ('android-ci.yml', 'merge-group-fail-fast'): {'actions'},
     ('android-pr-preview-publish.yml', 'publish'): {'contents', 'pull-requests'},
+    # Deletes release assets using the trusted close-event cleanup script.
+    ('android-pr-preview-cleanup.yml', 'prune'): {'contents'},
     ('android-release-distribute.yml', 'github-draft'): {'contents'},
     ('dependency-submission.yml', None): {'contents'},
     ('pr-screenshots.yml', None): {'issues', 'pull-requests'},
@@ -28,9 +30,9 @@ def validate(name, workflow):
     if 'push' in event_names:
         settings=events.get('push') if isinstance(events,dict) else None
         branches=settings.get('branches') if isinstance(settings,dict) else None
-        # Only explicit master-only pushes are known to exclude native queue
-        # branches. Unknown glob/tag/filter combinations stay conservative.
-        queue_trigger=queue_trigger or branches!=['master']
+        # The signing workflow's exact develop filter also excludes native queue branches.
+        staging_push = name == 'android-staging-apk.yml' and settings == {'branches': ['develop']}
+        queue_trigger = queue_trigger or (branches != ['master'] and not staging_push)
     if queue_trigger and re.search(r'\bsecrets\b',json.dumps(workflow),re.IGNORECASE):
         raise ValueError('queue workflows cannot access repository secrets')
     for scope, permissions in [(None, workflow.get('permissions'))] + [

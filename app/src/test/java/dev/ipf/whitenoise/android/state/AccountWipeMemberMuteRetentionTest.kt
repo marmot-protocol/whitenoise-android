@@ -12,6 +12,8 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.audio.VoiceDraftStore
+import dev.ipf.whitenoise.android.audio.VoiceNoteKey
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -186,6 +188,33 @@ class AccountWipeMemberMuteRetentionTest {
             assertFalse(removed.exists())
             assertTrue(preserved.exists())
         }
+
+    /** A refused wipe preserves the saved take, and a successful retry purges only the wiped account. */
+    @Test
+    fun voiceDraftPurgesOnlyWhenNativeWipeCompletes() =
+        runBlocking {
+            val removed = saveVoiceDraft(WIPED_ACCOUNT)
+            val retained = saveVoiceDraft(SURVIVING_ACCOUNT)
+            val state = appState()
+            localCleanupCompleted = false
+
+            assertFalse(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+            assertTrue(removed.isFile)
+            assertTrue(retained.isFile)
+
+            localCleanupCompleted = true
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
+            assertFalse(removed.exists())
+            assertTrue(retained.isFile)
+        }
+
+    /** Saves a real indexed take in the same private store the app's voice owner opens. */
+    private fun saveVoiceDraft(account: String): File {
+        val store = VoiceDraftStore(context.noBackupFilesDir.resolve("voice-drafts"))
+        val key = VoiceNoteKey(account, GROUP)
+        val capture = store.recordingDirectory(key).resolve("voice-fixture.m4a").apply { writeText("audio") }
+        return checkNotNull(store.commit(key, capture, 2_000L, stopReason = null)).file
+    }
 
     /** Wiping the final signed-in identity must not select a retained signed-out identity. */
     @Test

@@ -25,6 +25,21 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         with self.assertRaises(ValueError):validate('android-pr-preview-publish.yml',{
             'permissions':{},'jobs':{'other':{'permissions':{'contents':'write'}}}})
 
+    def test_preview_cleanup_write_is_limited_to_its_release_job(self):
+        workflow_name = 'android-pr-preview-cleanup.yml'
+        trigger = {'pull_request_target': {'types': ['closed']}}
+        release_write = {'contents': 'write', 'pull-requests': 'read'}
+        validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+            'prune': {'permissions': release_write}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: contents'):
+            validate(workflow_name, {'on': trigger, 'permissions': release_write, 'jobs': {'prune': {}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: contents'):
+            validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+                'other': {'permissions': release_write}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission: pull-requests'):
+            validate(workflow_name, {'on': trigger, 'permissions': {}, 'jobs': {
+                'prune': {'permissions': {'contents': 'write', 'pull-requests': 'write'}}}})
+
     def test_fail_fast_watcher_alone_may_write_actions(self):
         """Only Android CI's merge-group fail-fast job may hold actions write, never statuses or checks."""
         watcher = {'permissions': {'actions': 'write'}}
@@ -59,6 +74,23 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         for expression in ['${{ toJSON(secrets) }}','${{ fromJSON(toJSON(secrets)) }}','${{ secrets }}']:
             with self.assertRaisesRegex(ValueError,'secrets'):
                 validate('normal.yml',{'on':'merge_group','permissions':{},'jobs':{'test':{'if':expression}}})
+
+    def test_staging_push_filter_excludes_queue_candidates(self):
+        staging = 'android-staging-apk.yml'
+        push = {'branches': ['develop']}
+        workflow = {'permissions': {}, 'jobs': {'test': {'steps': [
+            {'env': {'KEY': '${{ secrets.SIGNING_KEY }}'}},
+        ]}}}
+        validate(staging, {**workflow, 'on': {'push': push, 'workflow_dispatch': {}}})
+        for name, events in (
+            ('other.yml', {'push': push}),
+            (staging, {'push': {'branches': ['develop*']}}),
+            (staging, {'push': {'branches': ['develop', 'gh-readonly-queue/**']}}),
+            (staging, {'push': push, 'merge_group': {}}),
+            (staging, {'push': push, 'pull_request': {}}),
+        ):
+            with self.subTest(name=name, events=events), self.assertRaisesRegex(ValueError, 'secrets'):
+                validate(name, {**workflow, 'on': events})
 
     def test_candidate_jobs_cannot_escape_through_reusable_jobs_or_environments(self):
         for job in [{'uses':'organization/repo/.github/workflows/build.yml@main'},

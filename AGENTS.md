@@ -19,6 +19,9 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 
 ## Working and validation
 
+- Branch from `origin/develop` for ordinary changes. Open the PR with
+  `--base develop` and verify its base after filing. Use `master` for stable
+  releases and hotfixes.
 - For Android UI design, implementation, and requested design reviews, use the
   [Android design skill](.agents/skills/white-noise-android-design/SKILL.md) and
   [illustrated UI guide](docs/android-ui-patterns.md). Monochrome is the default

@@ -76,6 +76,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetInset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledSelectedChipBorder
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -345,7 +347,7 @@ private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowS
     )
 }
 
-/** A compact choice; the selected one fills with the accent and gains a check. */
+/** A compact timer choice with a gray selection outline on AMOLED and an accent fill elsewhere. */
 @Composable
 private fun DisappearingChip(
     label: String,
@@ -356,12 +358,14 @@ private fun DisappearingChip(
     enabled: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val amoled = isAmoledSurfaceTheme()
+    val filled = selected && !amoled
     val container by animateColorAsState(
-        if (selected) scheme.primary else Color.Transparent,
+        if (filled) scheme.primary else Color.Transparent,
         label = "disappearing-chip-container",
     )
     val content by animateColorAsState(
-        if (selected) scheme.onPrimary else scheme.onSurface,
+        if (filled) scheme.onPrimary else scheme.onSurface,
         label = "disappearing-chip-content",
     )
     val border by animateColorAsState(
@@ -380,7 +384,7 @@ private fun DisappearingChip(
         shape = MaterialTheme.shapes.medium,
         color = container,
         contentColor = content,
-        border = BorderStroke(1.dp, border),
+        border = if (amoled) amoledSelectedChipBorder(selected) else BorderStroke(1.dp, border),
     ) {
         Row(
             Modifier.padding(horizontal = Dimens.spaceXs, vertical = Dimens.spaceMd),
@@ -388,7 +392,7 @@ private fun DisappearingChip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnimatedVisibility(
-                visible = selected,
+                visible = filled,
                 enter = expandHorizontally() + fadeIn(),
                 exit = shrinkHorizontally() + fadeOut(),
             ) {
@@ -401,7 +405,7 @@ private fun DisappearingChip(
                     Spacer(Modifier.width(Dimens.spaceXs))
                 }
             }
-            if (iconRes != null && !selected) {
+            if (iconRes != null && !filled) {
                 Icon(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(Dimens.spaceXs))
             }

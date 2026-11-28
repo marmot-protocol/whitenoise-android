@@ -15,8 +15,8 @@ concurrency:
 jobs:
   prepare:
     name: Verify Android MarmotKit RC
-    # The schedule lives on master. Only the development checkout feeds the candidate.
-    if: github.repository == 'marmot-protocol/whitenoise-android' && github.ref == 'refs/heads/master'
+    # Both the schedule and manual runs use the protected develop branch.
+    if: github.repository == 'marmot-protocol/whitenoise-android' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -34,7 +34,7 @@ jobs:
           PROPOSAL_DIR: ${{ runner.temp }}/marmotkit-rc-proposal
         run: |
           if [[ ! -f scripts/sync_marmotkit_rc.py ]]; then
-            echo "::error::Merge the MarmotKit RC sync command (#4268) into develop before running the bump."
+            echo "::error::The MarmotKit RC sync command is missing from develop."
             exit 1
           fi
           python3 scripts/sync_marmotkit_rc.py --proposal-dir "$PROPOSAL_DIR"

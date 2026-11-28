@@ -61,7 +61,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.bubbleFooterLastLineW
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlin.coroutines.coroutineContext
@@ -87,8 +86,8 @@ private data class AudioTranscriptSlot(
 /**
  * The per-message switch behind the side transcribe disc. Each received recording registers whether its file is
  * ready and whether work is in flight; the disc shows when any recording is registered and drives them all.
- * Whether the transcript is shown lives in the conversation's [VoiceTranscriptionScope], so it survives scrolling
- * and backgrounding; outside a conversation the toggle keeps its own scope.
+ * The conversation's [VoiceTranscriptionScope] retains the visible choice while scrolling. Outside a
+ * conversation the toggle keeps its own scope.
  */
 @Stable
 internal class AudioTranscriptionToggleState(
@@ -158,8 +157,8 @@ internal fun rememberReceivedAudioTranscription(
 /**
  * Transcribes the received recording on this device while its message's transcript is shown, either because the
  * automatic setting is on or because the person turned the side disc on, and reveals the text beneath the voice
- * row once it is ready. A finished transcript is kept for the process lifetime; turning the disc off hides it and
- * cancels pending work. Leaving the foreground cancels work, which resumes on return. An automatic attempt that
+ * row once it is ready. Turning the disc off hides it and cancels pending work. Leaving the foreground clears
+ * the conversation cache and cancels work. An automatic attempt that
  * fails stays quiet. An explicit request retries and can show guidance. Transcripts never enter the message
  * store or composer.
  */
@@ -186,7 +185,7 @@ internal fun ReceivedAudioTranscription(
     val ui = if (shown) complete ?: pending.takeUnless { failedAutomatically } else null
     val working = ui?.phase == AudioTranscriptPhase.WORKING
 
-    val ready = file != null || complete != null
+    val ready = scope.active && (file != null || complete != null)
     LaunchedEffect(toggle, ready, working, failedAutomatically) {
         toggle.register(slotKey, ready, working, failedAutomatically)
     }
@@ -200,9 +199,9 @@ internal fun ReceivedAudioTranscription(
             return@LaunchedEffect
         }
         pending = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
-        val result = loadAudioTranscript(context, file, scope.transcripts.gate)
+        val result = loadAudioTranscript(context, file, scope)
         coroutineContext.ensureActive()
-        if (result.phase == AudioTranscriptPhase.COMPLETE) {
+        if (result?.phase == AudioTranscriptPhase.COMPLETE) {
             scope.storeResult(attachmentKey, result)
             pending = null
         } else {
@@ -225,11 +224,14 @@ internal fun ReceivedAudioTranscription(
 private suspend fun loadAudioTranscript(
     context: Context,
     file: File,
-    gate: Mutex,
-): AudioTranscriptUi {
+    scope: VoiceTranscriptionScope,
+): AudioTranscriptUi? {
     holdCacheFileInUse(file)
     return try {
-        gate.withLock { AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, transcribeAttachment(context, file)) }
+        scope.transcripts.gate.withLock {
+            if (!scope.active) return@withLock null
+            AudioTranscriptUi(AudioTranscriptPhase.COMPLETE, transcribeAttachment(context, file))
+        }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: AttachmentSpeechException) {

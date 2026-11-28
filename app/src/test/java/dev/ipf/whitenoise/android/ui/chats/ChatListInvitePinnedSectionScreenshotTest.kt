@@ -10,6 +10,8 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -22,6 +24,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.PrivateKeyReminderStage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.state.noChatRowActions
@@ -32,6 +35,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +53,7 @@ import java.util.concurrent.TimeUnit
  * Visual contract for #3579 on the mounted production chat list: the pinned section comes first, one
  * divider follows the last pin, and a pending invite heads the unpinned rows. The ordering itself is
  * gated by [ChatListInvitePinnedSectionCoverageTest]; these baselines pin how the mixed section reads.
+ * The same mounted list also pins the reminder to save the private key above the rows (#4279).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -85,6 +90,28 @@ class ChatListInvitePinnedSectionScreenshotTest {
     /** RTL at 200% text mirrors the rows while the divider stays between the pins and the invite. */
     @Test fun invitePinnedSectionLargeFontRtl() = capture("large_font_rtl", rtl = true, fontScale = 2f)
 
+    /** Light theme: a Sign up account with chats sees the save-key reminder above its rows. */
+    @Test fun privateKeyReminderLight() = captureReminder("light")
+
+    /** AMOLED keeps the reminder outlined on pure black instead of a grey card. */
+    @Test fun privateKeyReminderAmoled() = captureReminder("amoled", dark = true, amoled = true)
+
+    /** RTL at 200% text wraps the reminder and keeps both actions on screen. */
+    @Test fun privateKeyReminderLargeFontRtl() = captureReminder("large_font_rtl", rtl = true, fontScale = 2f)
+
+    /** The banner can scroll to both actions while Chats keeps its own viewport. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h320dp-mdpi")
+    fun privateKeyReminderLeavesRoomForChatsInAShortWindow() {
+        var saveRequests = 0
+        mount(dark = false, amoled = false, rtl = true, fontScale = 2f, recordSignUp = true) { saveRequests++ }
+        rule.onNodeWithTag("chat.row.$PIN_0").assertIsDisplayed()
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_SAVE_TAG).performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(1, saveRequests) }
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_NOT_NOW_TAG).performScrollTo().performClick()
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_TAG).assertDoesNotExist()
+    }
+
     /** Mounts the list, delivers one invite as a native row update would, and records the settled frame. */
     private fun capture(
         variant: String,
@@ -93,17 +120,7 @@ class ChatListInvitePinnedSectionScreenshotTest {
         rtl: Boolean = false,
         fontScale: Float = 1f,
     ) {
-        val model = InvitePinnedFixture(scope).also { fixture = it }
-        rule.setContent {
-            CompositionLocalProvider(
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
-                    ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> })
-                }
-            }
-        }
-        settle()
+        val model = mount(dark, amoled, rtl, fontScale)
         val invite = chatRow(INVITE).copy(title = INVITE_TITLE, activitySortAt = NEWEST, pendingConfirmation = true)
         model.rows[INVITE] = invite
         rule.runOnIdle { model.controller.applyChatListRow(invite) }
@@ -111,6 +128,61 @@ class ChatListInvitePinnedSectionScreenshotTest {
         rule.onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG).assertCountEquals(1)
         listOf(PIN_0, PIN_1, INVITE).forEach { rule.onNodeWithTag("chat.row.$it").assertIsDisplayed() }
         rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_invite_pinned_section_$variant.png")
+    }
+
+    /**
+     * Mounts the list for an account created by Sign up on this device and records the reminder above the rows. Save
+     * key asks the shell to open Profile keys; Not now hides the reminder for this account.
+     */
+    private fun captureReminder(
+        variant: String,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+    ) {
+        var saveRequests = 0
+        val model = mount(dark, amoled, rtl, fontScale, recordSignUp = true) { saveRequests++ }
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_TAG).assertIsDisplayed()
+        listOf(PIN_0, PIN_1).forEach { rule.onNodeWithTag("chat.row.$it").assertIsDisplayed() }
+        rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_private_key_reminder_$variant.png")
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_SAVE_TAG).performClick()
+        rule.runOnIdle { assertEquals(1, saveRequests) }
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_NOT_NOW_TAG).performClick()
+        rule.onNodeWithTag(PRIVATE_KEY_REMINDER_TAG).assertDoesNotExist()
+        rule.runOnIdle {
+            assertEquals(PrivateKeyReminderStage.Dismissed, model.state.privateKeyReminders.stage(ACCOUNT_ID))
+        }
+    }
+
+    /** Mounts the production chat list over the fixture rows and settles its first projection. */
+    private fun mount(
+        dark: Boolean,
+        amoled: Boolean,
+        rtl: Boolean,
+        fontScale: Float,
+        recordSignUp: Boolean = false,
+        onSavePrivateKey: (() -> Unit)? = null,
+    ): InvitePinnedFixture {
+        val model = InvitePinnedFixture(scope).also { fixture = it }
+        if (recordSignUp) model.state.privateKeyReminders.recordSignUp(ACCOUNT_ID)
+        rule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
+                    ChatsScreen(
+                        model.state,
+                        model.controller,
+                        {},
+                        { _, _, _, _ -> },
+                        onSavePrivateKey = onSavePrivateKey,
+                    )
+                }
+            }
+        }
+        settle()
+        return model
     }
 
     /** Runs pending test-scheduler work and Android Main twice, then waits for Compose to idle. */

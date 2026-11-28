@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.CompromiseWarningItemFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.SignInResponseFfi
 import dev.ipf.marmotkit.UnrecognizedSignInFfi
+import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,15 +68,17 @@ internal data class SignInReviewFailure(
 
 /**
  * Mirrors one account's unrecognized sign-ins and compromise warning from MDK and sends the user's answers. The
- * three answers stay separate calls with separate meanings: Not now keeps the sign-in listed, Reject records it as
- * not the user's on every device, and Dismiss only ends a prompt another device already answered. Dismissing the
- * warning marks it seen here and changes nothing else.
+ * answers stay separate calls with separate meanings: Not now keeps the sign-in listed, Reject records it as not the
+ * user's on every device, Dismiss only ends a prompt another device already answered, and Mine, don't link sets it
+ * aside and has [keepMine] remember it on this device. Dismissing the warning marks it seen here and changes nothing
+ * else.
  */
 @Stable
 internal class SignInReviewController(
     val accountRef: String,
     private val native: SignInReviewNative,
     private val owns: () -> Boolean = { true },
+    private val keepMine: (slotIdHex: String) -> Unit = {},
 ) {
     var list by mutableStateOf(SignInListState())
         private set
@@ -180,6 +183,19 @@ internal class SignInReviewController(
         slotIdHex: String,
         response: SignInResponseFfi,
     ) = act(SignInReviewAction.Answer) { native.answerSignIn(accountRef, slotIdHex, response) }
+
+    /**
+     * Answers Mine, don't link for [signIn]: a sign-in still waiting is set aside in MDK (Not now), then this device
+     * remembers it as the user's so it is never announced again. MDK has no answer that says this yet (marmot#519),
+     * so other devices still list it. Nothing is remembered when MDK refuses the answer.
+     */
+    suspend fun markMine(signIn: UnrecognizedSignInFfi) =
+        act(SignInReviewAction.Answer) {
+            if (signIn.state == UnrecognizedSignInStateFfi.PROMPT) {
+                native.answerSignIn(accountRef, signIn.slotIdHex, SignInResponseFfi.NOT_NOW)
+            }
+            keepMine(signIn.slotIdHex)
+        }
 
     /** Marks the warning seen on this device. It revokes nothing and secures nothing. */
     suspend fun dismissWarning() {

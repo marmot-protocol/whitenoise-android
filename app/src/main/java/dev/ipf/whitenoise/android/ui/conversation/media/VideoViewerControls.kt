@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,8 +48,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,6 +61,7 @@ import androidx.media3.common.util.Util
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.sandbox.RawPausedSeekFailure
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.delay
 
@@ -296,12 +301,14 @@ internal fun VideoSeekSlider(
 ) {
     var duration by remember(player) { mutableLongStateOf(0L) }
     var position by remember(player) { mutableLongStateOf(0L) }
+    var failedSeek by remember(player) { mutableStateOf<RawPausedSeekFailure?>(null) }
     var scrub by remember(player) { mutableStateOf<Float?>(null) }
     val latestOnScrubbingChange by rememberUpdatedState(onScrubbingChange)
     LaunchedEffect(player) {
         while (true) {
             duration = player.duration.takeIf { it > 0L } ?: 0L
             position = player.currentPosition.coerceAtLeast(0L)
+            failedSeek = player.playerError?.cause as? RawPausedSeekFailure
             delay(VIDEO_PROGRESS_POLL_MILLIS)
         }
     }
@@ -315,7 +322,10 @@ internal fun VideoSeekSlider(
                 scrub = it
             },
             onValueChangeFinished = {
-                scrub?.let { position = (it * duration).toLong().also(player::seekTo) }
+                scrub?.let {
+                    player.seekTo((it * duration).toLong())
+                    position = player.currentPosition.coerceAtLeast(0L)
+                }
                 scrub = null
                 latestOnScrubbingChange(false)
             },
@@ -336,19 +346,56 @@ internal fun VideoSeekSlider(
             },
         )
     }
-    if (!showTimes) {
-        slider(modifier.fillMaxWidth())
-        return
-    }
     val elapsed = scrub?.let { (it * duration).toLong() } ?: position
+    Column(modifier.fillMaxWidth()) {
+        VideoSeekRecovery(player, failedSeek)
+        if (showTimes) {
+            VideoSeekWithTimes(elapsed, duration, slider)
+        } else {
+            slider(Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** The attachment viewer shows both times alongside its scrubber. */
+@Composable
+private fun VideoSeekWithTimes(
+    elapsed: Long,
+    duration: Long,
+    slider: @Composable (Modifier) -> Unit,
+) {
     Row(
-        modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VideoTimeText(elapsed, VIDEO_VIEWER_ELAPSED_TAG)
         slider(Modifier.weight(1f))
         VideoTimeText(duration.takeIf { it > 0L }, VIDEO_VIEWER_TOTAL_TAG)
+    }
+}
+
+/** Both video controls can retry the paused seek while the prior frame stays visible. */
+@Composable
+private fun VideoSeekRecovery(
+    player: Player,
+    failure: RawPausedSeekFailure?,
+) {
+    if (failure == null) return
+    Row(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.video_seek_failed),
+            modifier = Modifier.weight(1f).padding(start = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        TextButton(onClick = {
+            if (player.playerError?.cause === failure) player.seekTo(failure.positionMs)
+        }) { Text(stringResource(R.string.retry)) }
     }
 }
 

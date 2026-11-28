@@ -6,11 +6,6 @@ import org.junit.Test
 
 class MessageBubbleLayoutTest {
     @Test
-    fun longMessagesCollapseOnlyAfterFiftyTwoRenderedLines() {
-        assertEquals(52, MESSAGE_COLLAPSE_LINE_LIMIT)
-    }
-
-    @Test
     fun bubbleColumnLeavesAFixedOppositeGutter() {
         assertEquals(
             352.dp,

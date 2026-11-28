@@ -1129,11 +1129,11 @@ jobs:
         flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
         shard: [0, 1, 2, 3]
     steps:
-      # Include checkout/setup time; never reset this budget when tests start.
+      # Include setup time and let the supervisor dump threads and clean up before the 30-minute step limit.
       - name: Reserve unit-test diagnostics and upload time
         shell: bash
         run: |
-          python3 -c 'import time; print("UNIT_TEST_DEADLINE_MONOTONIC=" + str(time.monotonic() + 32 * 60))' >> "$GITHUB_ENV"
+          python3 -c 'import time; print("UNIT_TEST_DEADLINE_MONOTONIC=" + str(time.monotonic() + 28 * 60))' >> "$GITHUB_ENV"
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

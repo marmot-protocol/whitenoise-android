@@ -38,15 +38,18 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.sandbox.RawPausedSeekFailure
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -163,6 +166,39 @@ class MediaViewerVideoControlsScreenshotTest {
         assertTrue("seek $sought must land within the drag", sought in (CLIP_MS / 10)..(CLIP_MS / 2))
         assertEquals(sought, player.currentPosition)
         assertTrue("seeking must not hide the controls", chromeVisible)
+    }
+
+    @Test
+    fun pausedScrubStaysAtCommittedPositionAndOffersRetryOnFailure() {
+        val player = ScriptedVideoPlayer(durationMs = CLIP_MS)
+        val pending = SettableFuture.create<Void?>()
+        player.pendingSeek = pending
+        render(player, WindowInsets(bottom = 48.dp), darkTheme = true, amoled = true, fontScale = LARGE_FONT_SCALE)
+
+        dragSeekBar(from = 0.1f, to = 0.5f, expectedAfterRelease = 0f)
+        val target = player.seeks.single()
+        composeRule.onNodeWithTag(VIDEO_VIEWER_ELAPSED_TAG).assertTextEquals("00:00")
+        composeRule.runOnUiThread {
+            val failure = RawPausedSeekFailure(target)
+            val errorCode = PlaybackException.ERROR_CODE_DECODING_FAILED
+            player.update {
+                setPlaybackState(Player.STATE_IDLE)
+                setPlayerError(PlaybackException("Paused seek failed", failure, errorCode))
+            }
+            pending.setException(failure)
+            player.pendingSeek = null
+        }
+        settle()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val error = composeRule.onNodeWithText(context.getString(R.string.video_seek_failed))
+        error.assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_video_seek_recovery.png")
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        settle()
+
+        error.assertDoesNotExist()
+        assertEquals(listOf(target, target), player.seeks)
+        assertEquals(target, player.currentPosition)
     }
 
     /** A horizontal drag on the picture itself still pages the gallery. */
@@ -385,6 +421,7 @@ class MediaViewerVideoControlsScreenshotTest {
     private fun dragSeekBar(
         from: Float,
         to: Float,
+        expectedAfterRelease: Float? = null,
     ): Float {
         val bar = composeRule.onNodeWithTag(VIDEO_VIEWER_SEEK_TAG)
         bar.performTouchInput {
@@ -398,7 +435,7 @@ class MediaViewerVideoControlsScreenshotTest {
         bar.performTouchInput { up() }
         composeRule.waitForIdle()
         val held = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
-        assertEquals("the thumb must stay at the released position before the next poll", shown, held, 0.001f)
+        assertEquals("the thumb must follow the player after release", expectedAfterRelease ?: shown, held, 0.001f)
         settle()
         return shown
     }
@@ -451,6 +488,7 @@ class MediaViewerVideoControlsScreenshotTest {
         durationMs: Long?,
     ) : SimpleBasePlayer(Looper.getMainLooper()) {
         val seeks = mutableListOf<Long>()
+        var pendingSeek: SettableFuture<Void?>? = null
         private var state =
             State
                 .Builder()
@@ -471,6 +509,13 @@ class MediaViewerVideoControlsScreenshotTest {
         /** Publishes the scripted state. */
         override fun getState(): State = state
 
+        override fun getPlaceholderState(suggestedPlaceholderState: State): State =
+            if (pendingSeek == null) {
+                suggestedPlaceholderState
+            } else {
+                state
+            }
+
         /** Applies a scripted state change and notifies listeners. */
         fun update(change: State.Builder.() -> State.Builder) {
             state = state.buildUpon().change().build()
@@ -490,7 +535,14 @@ class MediaViewerVideoControlsScreenshotTest {
             seekCommand: Int,
         ): ListenableFuture<*> {
             seeks += positionMs
-            state = state.buildUpon().setContentPositionMs(positionMs).build()
+            pendingSeek?.let { return it }
+            state =
+                state
+                    .buildUpon()
+                    .setPlayerError(null)
+                    .setPlaybackState(Player.STATE_READY)
+                    .setContentPositionMs(positionMs)
+                    .build()
             return Futures.immediateVoidFuture()
         }
     }

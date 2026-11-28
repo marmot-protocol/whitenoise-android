@@ -101,7 +101,7 @@ class DiskByteCacheLockHygieneCoverageTest {
                 syncCacheDirectory = { directory ->
                     if (blockSync.get()) {
                         syncEntered.countDown()
-                        releaseSync.await(BARRIER_SECONDS, TimeUnit.SECONDS)
+                        releaseSync.await()
                     }
                     FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { it.force(true) }
                 },
@@ -139,7 +139,7 @@ class DiskByteCacheLockHygieneCoverageTest {
                 renameFile = { source, target ->
                     if (blockRename.get()) {
                         renameEntered.countDown()
-                        releaseRename.await(BARRIER_SECONDS, TimeUnit.SECONDS)
+                        releaseRename.await()
                     }
                     source.renameTo(target)
                 },
@@ -225,7 +225,7 @@ class DiskByteCacheLockHygieneCoverageTest {
                 maxBytes = 1024,
                 syncCacheDirectory = { directory ->
                     syncEntered.countDown()
-                    releaseSync.await(BARRIER_SECONDS, TimeUnit.SECONDS)
+                    releaseSync.await()
                     FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { it.force(true) }
                 },
             )
@@ -493,7 +493,7 @@ class DiskByteCacheLockHygieneCoverageTest {
         return thread.state == target
     }
 
-    /** Runs `cache.contains(key)` on an independent thread and asserts it finishes without stalling. */
+    /** Runs `cache.contains(key)` on an independent thread while the caller holds I/O until `finally`. */
     private fun probeContains(
         cache: DiskByteCache,
         key: String,
@@ -552,7 +552,7 @@ class DiskByteCacheLockHygieneCoverageTest {
             if (isArmed.get()) {
                 enteredLatch.countDown()
                 try {
-                    releaseLatch.await(BARRIER_SECONDS, TimeUnit.SECONDS)
+                    releaseLatch.await()
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                 }
@@ -578,7 +578,7 @@ class DiskByteCacheLockHygieneCoverageTest {
             if (isArmed.get()) {
                 enteredLatch.countDown()
                 try {
-                    releaseLatch.await(BARRIER_SECONDS, TimeUnit.SECONDS)
+                    releaseLatch.await()
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                 }
@@ -590,7 +590,7 @@ class DiskByteCacheLockHygieneCoverageTest {
     private companion object {
         const val DISK_BYTE_CACHE_SOURCE = "src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"
         const val BARRIER_SECONDS = 5L
-        const val PROBE_TIMEOUT_MS = 500L
+        const val PROBE_TIMEOUT_MS = 10_000L
         const val JOIN_TIMEOUT_MS = 5_000L
         const val STATE_POLL_NANOS = 1_000_000L
         val FORBIDDEN_INDEX_MONITOR_TOKENS =

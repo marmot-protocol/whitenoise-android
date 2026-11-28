@@ -2200,6 +2200,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
+      "symbol": "DeviceLinkDevicesWindow",
+      "bindings": [],
+      "remaining": "Opening Devices from a repeated request requires a second installation. SET-075 covers entering Devices from the warning and returning to Chats.",
+      "second_device": ["SET-075"]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
+      "symbol": "CompromiseAlert",
+      "bindings": [],
+      "remaining": "Showing the compromise alert requires a native warning. SET-078 covers the alert, follow-up actions and dismissal.",
+      "second_device": ["SET-078"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
       "symbol": "ActiveProfileLinkRequest",
       "bindings": [],
@@ -4741,7 +4755,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
@@ -4757,7 +4771,7 @@
           },
           "scope": "Settings route and home child opened from avatar, System Back restores Chats.",
           "opened_by": {
-            "text": "Settings"
+            "id": "chats.switchProfile"
           }
         }
       ]
@@ -5116,6 +5130,25 @@
             "text": "Offline speech recognition"
           },
           "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/NotificationAskDialog.kt",
+      "symbol": "NotificationAskDialog",
+      "bindings": [
+        {
+          "case": "consent-default-close",
+          "selector": {
+            "text": "Know when someone replies"
+          },
+          "scope": "Actual notification explanation after the usage choice closes on a returning install; Turn on notifications opens Android's prompt, which is denied.",
+          "entry_assertion": {
+            "text": "Know when someone replies"
+          },
+          "opened_by": {
+            "text": "Close"
+          }
         }
       ]
     },
@@ -7129,7 +7162,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
       "symbol": "SignInReviewDialog",
       "bindings": [],
       "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",

@@ -1,0 +1,137 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.link_request_not_now",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_detail_before",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_detail_before",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_detail_new",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_detail_new",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_dismiss",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_previously_linked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_previously_linked",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_question_before",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_question_before",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_question_new",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_question_new",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_reject_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_reject_confirm",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "SignInReviewDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "fun SignInReviewDialog(",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "SignInReviewText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "fun SignInReviewText(",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "NotNowButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "fun NotNowButton(",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "RejectButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "fun RejectButton(",
+        "test_ids": [
+          "SET-065",
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_dont_recognize",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_dont_recognize",
+        "test_ids": [
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in review: R.string.sign_in_mine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_mine",
+        "test_ids": [
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Sign-in review: R.string.sign_in_reject",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
+        "anchor": "R.string.sign_in_reject",
+        "test_ids": [
+          "SET-065"
+        ]
+      }
+    ]
+  }
+}

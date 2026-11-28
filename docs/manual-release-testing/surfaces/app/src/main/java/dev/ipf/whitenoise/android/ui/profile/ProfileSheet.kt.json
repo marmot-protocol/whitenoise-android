@@ -89,10 +89,11 @@
       {
         "surface": "setting:profile_invite_to_white_noise",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.invite_to_white_noise",
+        "anchor": "\"PROFILE_INVITE_SHARE\"",
         "test_ids": [
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "NCH-006"
         ]
       }
     ],

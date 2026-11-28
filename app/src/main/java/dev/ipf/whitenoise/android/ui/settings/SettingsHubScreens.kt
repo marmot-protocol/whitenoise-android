@@ -11,11 +11,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.state.SignInAlertTier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.devices.DevicesRowTrailing
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesScreen
+import dev.ipf.whitenoise.android.ui.devices.SignInDevicesRequestEffect
+import dev.ipf.whitenoise.android.ui.devices.devicesRowTier
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
@@ -38,6 +42,8 @@ internal fun AccountScreen(
 ) {
     // Keyed by account so a roster opened for one profile never reopens over another.
     var linkedDevicesOpen by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    // A sign-in notice, alert or notification for this account opens its devices directly.
+    SignInDevicesRequestEffect(appState) { linkedDevicesOpen = true }
     if (linkedDevicesOpen) {
         BackHandler { linkedDevicesOpen = false }
         LinkedDevicesScreen(appState, onBack = { linkedDevicesOpen = false })
@@ -58,6 +64,7 @@ internal fun AccountScreen(
                     readiness = readiness,
                     onOpenLinkedDevices = { linkedDevicesOpen = true },
                     onOpenDetail = onOpenDetail,
+                    devicesTier = appState.devicesRowTier(),
                 )
             }
         }
@@ -66,13 +73,15 @@ internal fun AccountScreen(
 
 /**
  * The Account hub's connected group; the Profile row carries the live readiness summary. The Devices row is
- * present only when [onOpenLinkedDevices] is given.
+ * present only when [onOpenLinkedDevices] is given, with a badge for a sign-in to review or an open security warning
+ * per [devicesTier].
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun AccountHubGroup(
     readiness: ProfileReadiness,
     onOpenLinkedDevices: (() -> Unit)? = null,
+    devicesTier: SignInAlertTier = SignInAlertTier.Passive,
     onOpenDetail: (SettingsDetail?) -> Unit,
 ) {
     SettingsGroup(
@@ -119,6 +128,7 @@ internal fun AccountHubGroup(
                     explanation = stringResource(R.string.explanation_linked_devices_hub),
                     onClick = onOpenLinkedDevices,
                     modifier = Modifier.testTag("settings.account.linked_devices"),
+                    trailing = { DevicesRowTrailing(devicesTier) },
                     leading = { SettingsLeadingIcon(R.drawable.ic_devices) },
                 )
             }

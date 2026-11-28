@@ -13,6 +13,16 @@
           "MED-009"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Discard and Record Again wait for the durable write",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingReview.kt",
+        "anchor": "if (discarded) clearClip(expected)",
+        "test_ids": [
+          "MED-059"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

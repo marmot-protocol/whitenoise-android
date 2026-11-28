@@ -25,7 +25,7 @@ Pushing a PR does not automatically build previews. When debugging or required
 human/device testing needs the current candidate, first look for existing trusted
 artifacts for that exact head and a matching active request. One request builds
 the stable (update-compatible) channel only; add `-f include_isolated=true`
-only for an opt-in qualification that consumes the unsigned isolated artifact:
+to also publish and link a signed side-by-side APK:
 
 ```sh
 gh workflow run android-pr-apk.yml --repo marmot-protocol/whitenoise-android \
@@ -88,13 +88,12 @@ secrets, and the local release script checks it before building production APKs.
 A Stable pin uses a final `X.Y.Z` release and its matching Android
 archive. Published RC pins are eligible for validation on `develop`.
 
-The scheduled MarmotKit RC bump runs from the default branch, `master`, and
-prepares the next Android pin from `develop`. It opens or refreshes one draft
+The scheduled MarmotKit RC bump runs from `develop`, the default branch, and
+prepares the next Android pin from its current checkout. It opens or refreshes one draft
 PR from `automation/marmotkit-rc` to `develop`. It preserves human commits
 and ready-for-review candidates. Reruns with the same pin leave the PR alone.
 
-Land the RC sync command on `develop` before enabling the schedule. Configure
-the repository secret `MARMOTKIT_BUMP_TOKEN` with a dedicated bot user's
+Configure the repository secret `MARMOTKIT_BUMP_TOKEN` with a dedicated bot user's
 fine-grained token that can write Contents and Pull requests in this repository. This lets the
 automated PR trigger Android CI. The token is used only by the job that
 publishes the signed pin commit. Review the release impact and, when the ZIP
