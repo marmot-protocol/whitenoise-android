@@ -2451,7 +2451,9 @@ internal fun ChatsScreen(
                     val loadingSource = controller.isLoading && sourceList.isEmpty()
                     val blockingLoad = loadFailurePlacement == LoadFailurePlacement.FullScreen
                     val activeEmptyPageScroll =
-                        emptyPageScroll.takeUnless { unreadRefreshPending || failedUnreadSnapshot || loadingSource || blockingLoad }
+                        emptyPageScroll.takeUnless {
+                            unreadRefreshPending || failedUnreadSnapshot || loadingSource || blockingLoad
+                        }
                     ChatListUnreadPullSurface(
                         unreadOnly = unreadOnly,
                         actionsAvailable = unreadActionsAvailable,
