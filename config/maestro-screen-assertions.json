@@ -2210,8 +2210,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
       "symbol": "DeviceLinkConsentDialog",
       "bindings": [],
-      "remaining": "The dialog requires a link from another installation. SET-061 covers link choices and dismissal; SET-078 covers consent, phone unlock and report feedback.",
-      "second_device": ["SET-061", "SET-078"]
+      "remaining": "The dialog requires a link from another installation. SET-061 covers link choices and dismissal; SET-079 covers consent, phone unlock and report feedback.",
+      "second_device": ["SET-061", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",

@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogInputProtection.kt",
         "anchor": "fun ProtectDialogInput(",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       }
     ]

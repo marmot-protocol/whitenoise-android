@@ -201,7 +201,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkApproval.kt",
         "anchor": "R.string.link_consent_did_not_start",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       }
     ]

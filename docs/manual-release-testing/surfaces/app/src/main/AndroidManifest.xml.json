@@ -388,7 +388,7 @@
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.HIDE_OVERLAY_WINDOWS",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       }
     ],

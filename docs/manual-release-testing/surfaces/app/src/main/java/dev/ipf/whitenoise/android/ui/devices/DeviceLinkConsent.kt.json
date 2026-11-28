@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "fun DeviceLinkConsentDialog(",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_report_failed",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_device_action_failed",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "fun DeviceLinkConsentGate(",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "fun DeviceLinkConsentPage(",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_request_title",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_access",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_did_not_start",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_have_device",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_lock_required",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -88,7 +88,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_on_call",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -96,7 +96,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_requested_at",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -104,7 +104,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_scam",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -112,7 +112,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_someone_asked",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -120,7 +120,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_unlock",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       },
       {
@@ -128,7 +128,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
         "anchor": "R.string.link_consent_with_me",
         "test_ids": [
-          "SET-078"
+          "SET-079"
         ]
       }
     ]
