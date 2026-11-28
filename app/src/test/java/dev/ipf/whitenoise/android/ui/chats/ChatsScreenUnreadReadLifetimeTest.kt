@@ -303,6 +303,7 @@ class ChatsScreenUnreadReadLifetimeTest {
     fun mountedSourceFailureAllowsPullAfterScrolledEmptyState() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         model.state.swipePreferences.setPullUnread(true)
+        model.controller.isLoading = false
         val folders = model.state.chatFolderPreferences
         val folder = checkNotNull(folders.createFolder(ACTION_ACCOUNT, "Archived chats"))
         folders.setFolderRule(ACTION_ACCOUNT, folder.id, ChatFolderRule(archivedOnly = true, includeMuted = true))
