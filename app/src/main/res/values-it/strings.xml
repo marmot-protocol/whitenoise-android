@@ -797,7 +797,6 @@
     <string name="conversation_jump_to_mention">Vai alla menzione</string>
     <string name="notification_channel_reactions">Reazioni</string>
     <string name="notification_channel_invites">Inviti</string>
-    <string name="notification_channel_agent_activity">Attività dell’agente</string>
     <string name="notification_channel_direct_messages_default">Messaggi diretti · Predefinito per tutte le chat</string>
     <string name="notification_channel_group_global_defaults">Impostazioni predefinite globali</string>
     <string name="notification_channel_direct_messages_default_description">Comportamento predefinito degli avvisi Android per i messaggi diretti</string>
@@ -812,8 +811,6 @@
     <string name="notification_channel_group_membership">Modifiche all’appartenenza ai gruppi</string>
     <string name="notification_channel_group_membership_default">Modifiche all’appartenenza ai gruppi · Predefinito per tutte le chat</string>
     <string name="notification_channel_group_membership_default_description">Comportamento predefinito degli avvisi Android quando vieni rimosso dai gruppi</string>
-    <string name="notification_channel_agent_activity_default">Attività dell’agente · Predefinito per tutte le chat</string>
-    <string name="notification_channel_agent_activity_default_description">Comportamento predefinito degli avvisi Android per l’attività dell’agente nelle chat</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizzato)</string>
     <string name="notification_channel_custom_description">Comportamento degli avvisi personalizzato per %1$s in %2$s</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
@@ -2188,6 +2185,7 @@
     <string name="setup_finding_too_many_relays">L’elenco contiene troppi relay.</string>
     <string name="setup_finding_multi_device_unsupported">Le conversazioni non si sincronizzano tra dispositivi.</string>
     <string name="setup_finding_discovery_incomplete">La ricerca non è stata completata. Da questo risultato non verrà dedotta alcuna sostituzione.</string>
+    <string name="setup_finding_rate_limited">Troppe richieste. Riprova tra poco.</string>
     <string name="setup_profile_help">Aggiungi un nome per farti riconoscere. Puoi farlo più tardi.</string>
     <string name="setup_details">Dettagli</string>
     <string name="setup_hide_details">Nascondi dettagli</string>

@@ -1531,14 +1531,14 @@ class MessageForwardingTest {
 
         /** Hands every message held at Queued to the engine, as MDK's account worker eventually does. */
         fun releaseQueued() {
-            heldQueued.forEach { token -> tokenStatuses[token] = LocalSendStatusFfi.EngineOwned }
+            heldQueued.forEach { token -> tokenStatuses[token] = LocalSendStatusFfi.EngineOwned("11".repeat(32)) }
             heldQueued.clear()
         }
 
         /** Lets admissions that outlived their wait land after all, the way MDK finishes them in the background. */
         fun landStalledAdmissions() {
             stalledAdmissions.forEach { (target, index, token) ->
-                tokenStatuses[token] = LocalSendStatusFfi.EngineOwned
+                tokenStatuses[token] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
                 published += target to index
             }
             stalledAdmissions.clear()
@@ -1693,12 +1693,12 @@ class MessageForwardingTest {
                     awaitCancellation()
                 }
                 ScriptedAdmission.HoldQueued -> {
-                    tokenStatuses[token] = LocalSendStatusFfi.Queued
+                    tokenStatuses[token] = LocalSendStatusFfi.Queued("11".repeat(32))
                     heldQueued += token
                     published += target to index
                 }
                 ScriptedAdmission.RejectWhileQueued -> {
-                    tokenStatuses[token] = LocalSendStatusFfi.Queued
+                    tokenStatuses[token] = LocalSendStatusFfi.Queued("11".repeat(32))
                     rejected += target to index
                     // The account worker drains it and fails validation after an epoch change, so every reference
                     // uploaded to this destination before it is stale from now on.
@@ -1710,7 +1710,7 @@ class MessageForwardingTest {
                     throw staleEpochRefusal()
                 }
                 null -> {
-                    tokenStatuses[token] = LocalSendStatusFfi.EngineOwned
+                    tokenStatuses[token] = LocalSendStatusFfi.EngineOwned("11".repeat(32))
                     published += target to index
                 }
             }

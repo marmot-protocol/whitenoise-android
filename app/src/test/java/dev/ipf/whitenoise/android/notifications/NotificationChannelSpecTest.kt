@@ -128,34 +128,6 @@ class NotificationChannelSpecTest {
     }
 
     @Test
-    fun agentActivityRoutesToTheLowImportanceAgentChannel() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, spec)
-        assertEquals(ChannelImportance.LOW, spec.importance)
-    }
-
-    @Test
-    fun mentionTakesPrecedenceOverAgentActivity() {
-        val spec =
-            NotificationChannelSpec.forUpdate(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
-
-        assertEquals(NotificationChannelSpec.MENTIONS, spec)
-    }
-
-    @Test
     fun channelIdsAreTheFrozenStableContractWithTheOs() {
         // These IDs are a stable contract — changing one discards the user's
         // per-channel overrides, so it's only done deliberately (re-keying to
@@ -166,7 +138,6 @@ class NotificationChannelSpecTest {
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
         assertEquals("group_membership_v1", NotificationChannelSpec.GROUP_MEMBERSHIP.id)
-        assertEquals("agent_activity_v1", NotificationChannelSpec.AGENT_ACTIVITY.id)
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 
@@ -187,19 +158,18 @@ class NotificationChannelSpecTest {
         )
     }
 
-    /** Builds a notification update with the given trigger, DM, reaction, mention and traffic class. */
+    /** Builds an update with the supplied trigger, chat type, reaction and mention. */
     private fun update(
         trigger: NotificationTriggerFfi,
         isDm: Boolean = false,
         reactionEmoji: String? = null,
         isMention: Boolean = false,
-        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = trigger,
-        trafficClass = trafficClass,
+        trafficClass = NotificationTrafficClassFfi.STANDARD,
         accountRef = "account",
         accountIdHex = "account",
         groupIdHex = "group",

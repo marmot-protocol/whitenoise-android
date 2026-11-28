@@ -314,6 +314,8 @@ class WindowApplyPreparationTest {
     /** Builds a reply preview whose id and quoted text are keyed by the given index. */
     private fun replyPreview(index: Int) =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = "reply-$index",
             sender = "reply-sender",
             plaintext = "quoted-$index",

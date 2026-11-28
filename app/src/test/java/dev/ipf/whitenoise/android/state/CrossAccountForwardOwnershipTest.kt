@@ -75,7 +75,7 @@ class CrossAccountForwardOwnershipTest {
                     onStatusEntered?.invoke()
                     statusGate?.await()
                     // The engine takes every admitted message at once in this fixture.
-                    if (arguments[2] in admittedTokens) LocalSendStatusFfi.EngineOwned else null
+                    if (arguments[2] in admittedTokens) LocalSendStatusFfi.EngineOwned("11".repeat(32)) else null
                 }
                 "timelineMessages" -> {
                     calls += RecordedCall("timelineMessages", arguments!![0] as String)

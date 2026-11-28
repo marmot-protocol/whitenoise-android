@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
 import androidx.core.app.NotificationCompat
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import org.junit.Assert.assertEquals
@@ -37,21 +36,6 @@ class LocalNotificationPresenterDecisionTest {
     @Test
     fun reactionUsesPlainStyleAndNoActions() {
         val decision = decision(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = "👍"))
-
-        assertSame(NotificationStyleChoice.Plain, decision?.style)
-        assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
-        assertEquals(0, decision?.historyCap)
-    }
-
-    @Test
-    fun agentActivityUsesPlainStyleAndNoReplyActions() {
-        val decision =
-            decision(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            )
 
         assertSame(NotificationStyleChoice.Plain, decision?.style)
         assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
@@ -380,10 +364,8 @@ class LocalNotificationPresenterDecisionTest {
         groupIdHex: String = "group",
         isDm: Boolean = false,
         reactionEmoji: String? = null,
-        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = notificationUpdate(
         trigger = trigger,
-        trafficClass = trafficClass,
         accountRef = accountRef,
         groupIdHex = groupIdHex,
         isDm = isDm,

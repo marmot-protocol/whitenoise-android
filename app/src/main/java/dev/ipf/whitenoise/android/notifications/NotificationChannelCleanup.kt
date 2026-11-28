@@ -53,14 +53,18 @@ internal fun profileNotificationChannelAccountPrefix(accountRef: String): String
  */
 internal fun conversationChannelShortcutId(channel: NotificationChannel): String? {
     val channelId = channel.id
-    val parent =
+    val activeParent =
         NotificationChannelSpec.entries.firstOrNull { spec ->
             channelId.startsWith("${spec.id}$CONVERSATION_CHANNEL_INFIX$CONVERSATION_SHORTCUT_PREFIX")
         }
+    val parentId =
+        activeParent?.id ?: LEGACY_AGENT_ACTIVITY_CHANNEL_ID.takeIf { legacy ->
+            channelId.startsWith("$legacy$CONVERSATION_CHANNEL_INFIX$CONVERSATION_SHORTCUT_PREFIX")
+        }
     val fromId =
-        parent?.let { spec ->
+        parentId?.let {
             channelId
-                .removePrefix("${spec.id}$CONVERSATION_CHANNEL_INFIX")
+                .removePrefix("$it$CONVERSATION_CHANNEL_INFIX")
                 .substringBefore(VIBRATION_SUFFIX_MARKER)
                 .takeIf(::isConversationShortcutId)
         }

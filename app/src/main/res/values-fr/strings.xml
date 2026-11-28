@@ -797,7 +797,6 @@
     <string name="conversation_jump_to_mention">Aller à la mention</string>
     <string name="notification_channel_reactions">Réactions</string>
     <string name="notification_channel_invites">Invitations</string>
-    <string name="notification_channel_agent_activity">Activité de l’agent</string>
     <string name="notification_channel_direct_messages_default">Messages directs · Valeur par défaut pour toutes les discussions</string>
     <string name="notification_channel_group_global_defaults">Paramètres globaux par défaut</string>
     <string name="notification_channel_direct_messages_default_description">Comportement d’alerte Android par défaut pour les messages directs</string>
@@ -812,8 +811,6 @@
     <string name="notification_channel_group_membership">Modifications d’appartenance aux groupes</string>
     <string name="notification_channel_group_membership_default">Modifications d’appartenance aux groupes · Par défaut pour toutes les discussions</string>
     <string name="notification_channel_group_membership_default_description">Comportement par défaut des alertes Android lorsque votre accès à un groupe est retiré</string>
-    <string name="notification_channel_agent_activity_default">Activité de l’agent · Valeur par défaut pour toutes les discussions</string>
-    <string name="notification_channel_agent_activity_default_description">Comportement d’alerte Android par défaut pour l’activité de l’agent dans les discussions</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personnalisé)</string>
     <string name="notification_channel_custom_description">Comportement d’alerte personnalisé pour %1$s dans %2$s</string>
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
@@ -2188,6 +2185,7 @@
     <string name="setup_finding_too_many_relays">La liste contient trop de relais.</string>
     <string name="setup_finding_multi_device_unsupported">Les conversations ne sont pas synchronisées entre les appareils.</string>
     <string name="setup_finding_discovery_incomplete">La découverte n’a pas pu se terminer. Aucun remplacement ne sera déduit de ce résultat.</string>
+    <string name="setup_finding_rate_limited">Trop de requêtes. Réessayez dans un instant.</string>
     <string name="setup_profile_help">Ajoutez un nom pour que les autres vous reconnaissent. Vous pourrez le faire plus tard.</string>
     <string name="setup_details">Détails</string>
     <string name="setup_hide_details">Masquer les détails</string>

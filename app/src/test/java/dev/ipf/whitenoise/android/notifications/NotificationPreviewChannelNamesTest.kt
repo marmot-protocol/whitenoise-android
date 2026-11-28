@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +17,25 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NotificationPreviewChannelNamesTest {
+    /** Upgraded installs can scrub and locate a legacy child without creating the retired parent on fresh installs. */
+    @Test
+    fun retiredAgentChannelsRemainRedactableAndRecognizable() {
+        val context: Context = RuntimeEnvironment.getApplication()
+        val manager = context.getSystemService(NotificationManager::class.java)
+        NotificationChannels.ensureChannels(context)
+        assertNull(manager.getNotificationChannel(LEGACY_AGENT_ACTIVITY_CHANNEL_ID))
+
+        val shortcut = checkNotNull(conversationShortcutId("account", "chat"))
+        val id = ConversationNotificationChannels.conversationChannelId(LEGACY_AGENT_ACTIVITY_CHANNEL_ID, shortcut)
+        manager.createNotificationChannel(NotificationChannel(id, "Private group", NotificationManager.IMPORTANCE_LOW))
+
+        assertTrue(redactNotificationChannelNames(context))
+        val legacyChild = manager.getNotificationChannel(id)
+        assertEquals(context.getString(R.string.notifications), legacyChild.name)
+        assertEquals(context.getString(R.string.notification_hidden_content), legacyChild.description)
+        assertEquals(shortcut, conversationChannelShortcutId(legacyChild))
+    }
+
     @Test
     fun offScrubsExistingAndNewChildNamesWithoutChangingTheirAlertSettings() =
         runBlocking {

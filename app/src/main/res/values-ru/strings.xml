@@ -833,7 +833,6 @@
     <string name="conversation_jump_to_mention">Перейти к упоминанию</string>
     <string name="notification_channel_reactions">Реакции</string>
     <string name="notification_channel_invites">Приглашения</string>
-    <string name="notification_channel_agent_activity">Активность агента</string>
     <string name="notification_channel_direct_messages_default">Личные сообщения · По умолчанию для всех чатов</string>
     <string name="notification_channel_group_global_defaults">Общие настройки по умолчанию</string>
     <string name="notification_channel_direct_messages_default_description">Стандартные уведомления Android для личных сообщений</string>
@@ -848,8 +847,6 @@
     <string name="notification_channel_group_membership">Изменения членства в группах</string>
     <string name="notification_channel_group_membership_default">Изменения членства в группах · По умолчанию для всех чатов</string>
     <string name="notification_channel_group_membership_default_description">Стандартные настройки уведомлений Android, когда вас удаляют из групп</string>
-    <string name="notification_channel_agent_activity_default">Активность агента · По умолчанию для всех чатов</string>
-    <string name="notification_channel_agent_activity_default_description">Стандартные уведомления Android об активности агента в чатах</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (настроено)</string>
     <string name="notification_channel_custom_description">Настроенные уведомления для %1$s в %2$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
@@ -2269,6 +2266,7 @@
     <string name="setup_finding_too_many_relays">В списке слишком много реле.</string>
     <string name="setup_finding_multi_device_unsupported">Разговоры не синхронизируются между устройствами.</string>
     <string name="setup_finding_discovery_incomplete">Поиск не удалось завершить. На основании этого результата замена предлагаться не будет.</string>
+    <string name="setup_finding_rate_limited">Слишком много запросов. Повторите попытку чуть позже.</string>
     <string name="setup_profile_help">Добавьте имя, чтобы вас узнавали. Это можно сделать позже.</string>
     <string name="setup_details">Подробности</string>
     <string name="setup_hide_details">Скрыть подробности</string>

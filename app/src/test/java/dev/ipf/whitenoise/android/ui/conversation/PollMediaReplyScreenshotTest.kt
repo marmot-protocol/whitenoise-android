@@ -154,6 +154,8 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
     /** The reply preview MDK projects for a reply to [target]. */
     private fun replyPreviewOf(target: TimelineMessage) =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = target.record.messageIdHex,
             replyToMessageIdHex = null,
             sender = target.record.sender,

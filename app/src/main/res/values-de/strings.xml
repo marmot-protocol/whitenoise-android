@@ -795,7 +795,6 @@
     <string name="conversation_jump_to_mention">Zur Erwähnung springen</string>
     <string name="notification_channel_reactions">Reaktionen</string>
     <string name="notification_channel_invites">Einladungen</string>
-    <string name="notification_channel_agent_activity">Agentenaktivität</string>
     <string name="notification_channel_direct_messages_default">Direktnachrichten · Standard für alle Chats</string>
     <string name="notification_channel_group_global_defaults">Globale Standardeinstellungen</string>
     <string name="notification_channel_direct_messages_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Direktnachrichten</string>
@@ -810,8 +809,6 @@
     <string name="notification_channel_group_membership">Änderungen der Gruppenmitgliedschaft</string>
     <string name="notification_channel_group_membership_default">Änderungen der Gruppenmitgliedschaft · Standard für alle Chats</string>
     <string name="notification_channel_group_membership_default_description">Standardmäßiges Android-Benachrichtigungsverhalten, wenn du aus Gruppen entfernt wirst</string>
-    <string name="notification_channel_agent_activity_default">Agentenaktivität · Standard für alle Chats</string>
-    <string name="notification_channel_agent_activity_default_description">Standardmäßiges Android-Benachrichtigungsverhalten für Agentenaktivität in Chats</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (benutzerdefiniert)</string>
     <string name="notification_channel_custom_description">Benutzerdefiniertes Benachrichtigungsverhalten für %1$s in %2$s</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
@@ -2200,6 +2197,7 @@
     <string name="setup_finding_too_many_relays">Die Liste enthält zu viele Relays.</string>
     <string name="setup_finding_multi_device_unsupported">Unterhaltungen werden nicht zwischen Geräten synchronisiert.</string>
     <string name="setup_finding_discovery_incomplete">Die Suche konnte nicht abgeschlossen werden. Aus diesem Ergebnis wird keine Ersatzliste abgeleitet.</string>
+    <string name="setup_finding_rate_limited">Zu viele Anfragen. Versuche es gleich noch einmal.</string>
     <string name="setup_profile_help">Füge einen Namen hinzu, damit andere dich erkennen. Das geht auch später.</string>
     <string name="setup_details">Details</string>
     <string name="setup_hide_details">Details ausblenden</string>

@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.notifications
 
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+
+/**
+ * Recognizes channels from older installs for ownership and privacy cleanup.
+ * Existing parent channels stay dormant on upgrade so Android does not count them as deleted categories.
+ */
+internal const val LEGACY_AGENT_ACTIVITY_CHANNEL_ID = "agent_activity_v1"
 
 /**
  * Stable Android notification channel identities and the routing that maps a
@@ -82,14 +87,6 @@ enum class NotificationChannelSpec(
         launcherBadgeByDefault = false,
     ),
 
-    /** Agent tool progress and status updates. Visible but silent by default. */
-    AGENT_ACTIVITY(
-        "agent_activity_v1",
-        ChannelImportance.LOW,
-        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
-        launcherBadgeByDefault = false,
-    ),
-
     /** Zapstore app-update availability notices. Low importance: visible, no buzz. */
     APP_UPDATES(
         "app_updates_v1",
@@ -152,7 +149,6 @@ enum class NotificationChannelSpec(
                         // Mentions take precedence over the DM/group split: a
                         // mention is the highest-signal message, on its own channel.
                         update.isMention -> MENTIONS
-                        update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> AGENT_ACTIVITY
                         update.isDm -> DIRECT_MESSAGES
                         else -> GROUP_MESSAGES
                     }

@@ -1156,9 +1156,6 @@
     <string name="notification_channel_group_membership">Group membership changes</string>
     <string name="notification_channel_group_membership_default">Group membership changes · Default for all chats</string>
     <string name="notification_channel_group_membership_default_description">Default Android alert behavior when you are removed from groups</string>
-    <string name="notification_channel_agent_activity">Agent activity</string>
-    <string name="notification_channel_agent_activity_default">Agent activity · Default for all chats</string>
-    <string name="notification_channel_agent_activity_default_description">Default Android alert behavior for agent activity in chats</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (custom)</string>
     <string name="notification_channel_custom_description">Custom %1$s alert behavior for %2$s</string>
     <string name="notification_group_invite">Group invite</string>
@@ -2402,6 +2399,7 @@
     <string name="setup_finding_too_many_relays">The list contains too many relays.</string>
     <string name="setup_finding_multi_device_unsupported">Conversations do not sync across devices.</string>
     <string name="setup_finding_discovery_incomplete">Discovery could not finish. No replacement will be inferred from this result.</string>
+    <string name="setup_finding_rate_limited">Too many requests. Try again shortly.</string>
     <string name="setup_profile_help">Optional. You can add a profile later.</string>
     <string name="setup_details">Details</string>
     <string name="setup_hide_details">Hide details</string>

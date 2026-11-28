@@ -21,8 +21,7 @@ internal fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         // so a future trigger that *does* change
         // reactions fails the exhaustiveness check rather than silently
         // missing a recompute.
-        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
-        TimelineUpdateTriggerFfi.AGENT_OPERATION,
+        TimelineUpdateTriggerFfi.AGENT_ITEM,
         TimelineUpdateTriggerFfi.GROUP_SYSTEM,
         TimelineUpdateTriggerFfi.CUSTOM_EVENT,
         -> false

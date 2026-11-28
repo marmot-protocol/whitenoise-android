@@ -797,7 +797,6 @@
     <string name="conversation_jump_to_mention">Ir para a menção</string>
     <string name="notification_channel_reactions">Reações</string>
     <string name="notification_channel_invites">Convites</string>
-    <string name="notification_channel_agent_activity">Atividade do agente</string>
     <string name="notification_channel_direct_messages_default">Mensagens diretas · Padrão para todas as conversas</string>
     <string name="notification_channel_group_global_defaults">Padrões globais</string>
     <string name="notification_channel_direct_messages_default_description">Comportamento padrão de alertas do Android para mensagens diretas</string>
@@ -812,8 +811,6 @@
     <string name="notification_channel_group_membership">Alterações de participação em grupos</string>
     <string name="notification_channel_group_membership_default">Alterações de participação em grupos · Padrão para todas as conversas</string>
     <string name="notification_channel_group_membership_default_description">Comportamento padrão dos alertas do Android quando você é removido de grupos</string>
-    <string name="notification_channel_agent_activity_default">Atividade do agente · Padrão para todas as conversas</string>
-    <string name="notification_channel_agent_activity_default_description">Comportamento padrão de alertas do Android para atividade do agente em conversas</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizado)</string>
     <string name="notification_channel_custom_description">Comportamento de alertas personalizado para %1$s em %2$s</string>
     <string name="notification_group_invite">Você foi convidado para uma conversa segura</string>
@@ -2188,6 +2185,7 @@
     <string name="setup_finding_too_many_relays">A lista contém relays demais.</string>
     <string name="setup_finding_multi_device_unsupported">As conversas não são sincronizadas entre dispositivos.</string>
     <string name="setup_finding_discovery_incomplete">A descoberta não pôde ser concluída. Nenhuma substituição será deduzida deste resultado.</string>
+    <string name="setup_finding_rate_limited">Demasiados pedidos. Tente novamente em breve.</string>
     <string name="setup_profile_help">Adicione um nome para que reconheçam você. Você pode fazer isso depois.</string>
     <string name="setup_details">Detalhes</string>
     <string name="setup_hide_details">Ocultar detalhes</string>

@@ -797,7 +797,6 @@
     <string name="conversation_jump_to_mention">Ir a la mención</string>
     <string name="notification_channel_reactions">Reacciones</string>
     <string name="notification_channel_invites">Invitaciones</string>
-    <string name="notification_channel_agent_activity">Actividad del agente</string>
     <string name="notification_channel_direct_messages_default">Mensajes directos · Predeterminado para todos los chats</string>
     <string name="notification_channel_group_global_defaults">Valores predeterminados globales</string>
     <string name="notification_channel_direct_messages_default_description">Comportamiento predeterminado de alertas de Android para mensajes directos</string>
@@ -812,8 +811,6 @@
     <string name="notification_channel_group_membership">Cambios en la membresía de grupos</string>
     <string name="notification_channel_group_membership_default">Cambios en la membresía de grupos · Predeterminado para todos los chats</string>
     <string name="notification_channel_group_membership_default_description">Comportamiento predeterminado de las alertas de Android cuando te eliminan de grupos</string>
-    <string name="notification_channel_agent_activity_default">Actividad del agente · Predeterminado para todos los chats</string>
-    <string name="notification_channel_agent_activity_default_description">Comportamiento predeterminado de alertas de Android para la actividad del agente en chats</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personalizado)</string>
     <string name="notification_channel_custom_description">Comportamiento de alertas personalizado para %1$s en %2$s</string>
     <string name="notification_group_invite">Has sido invitado a un chat seguro</string>
@@ -2188,6 +2185,7 @@
     <string name="setup_finding_too_many_relays">La lista contiene demasiados relés.</string>
     <string name="setup_finding_multi_device_unsupported">Las conversaciones no se sincronizan entre dispositivos.</string>
     <string name="setup_finding_discovery_incomplete">El descubrimiento no pudo finalizar. No se deducirá ningún reemplazo de este resultado.</string>
+    <string name="setup_finding_rate_limited">Demasiadas solicitudes. Vuelve a intentarlo en breve.</string>
     <string name="setup_profile_help">Añade un nombre para que te reconozcan. Puedes hacerlo más tarde.</string>
     <string name="setup_details">Detalles</string>
     <string name="setup_hide_details">Ocultar detalles</string>

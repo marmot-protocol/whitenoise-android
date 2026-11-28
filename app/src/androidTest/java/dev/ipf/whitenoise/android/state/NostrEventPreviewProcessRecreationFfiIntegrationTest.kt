@@ -326,6 +326,8 @@ private fun message(
     plaintext: String,
     timelineAt: ULong,
 ) = TimelineMessageRecordFfi(
+    agentItem = null,
+    agentItemFirstEventMissing = false,
     clientToken = null,
     messageIdHex = messageIdHex,
     sourceMessageIdHex = null,

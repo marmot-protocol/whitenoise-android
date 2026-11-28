@@ -88,12 +88,6 @@ class ProfileNotificationPresenterTest {
             assertTrue(presenter.show(update(author = bob), shortNpub = { it }))
             assertTrue(presenter.show(update().copy(accountRef = "work"), shortNpub = { it }))
             assertTrue(presenter.show(update().copy(reactionEmoji = "👍"), shortNpub = { it }))
-            assertTrue(
-                presenter.show(
-                    update().copy(trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY),
-                    shortNpub = { it },
-                ),
-            )
             assertEquals(0, manager.notificationChannels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) })
         }
 
@@ -296,7 +290,7 @@ class ProfileNotificationPresenterTest {
         }
 
     /**
-     * Self messages, reactions, membership events and agent traffic remain outside message-only mute policy.
+     * Self messages, reactions, and membership events remain outside message-only mute policy.
      */
     @Test fun messageMuteExclusionsAreIndependentOfEventSoundEligibility() {
         val normal = update()
@@ -305,14 +299,6 @@ class ProfileNotificationPresenterTest {
         assertNull(profileNotificationAuthor(normal.copy(reactionEmoji = "👍")))
         assertNull(profileNotificationAuthor(normal.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)))
         assertNull(profileNotificationAuthor(normal.copy(trigger = NotificationTriggerFfi.REMOVED_FROM_GROUP)))
-        assertNull(
-            profileNotificationAuthor(
-                normal.copy(
-                    isMention = true,
-                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
-                ),
-            ),
-        )
         assertNull(profileNotificationAuthor(normal.copy(sender = NotificationUserFfi("invalid", null, null))))
     }
 

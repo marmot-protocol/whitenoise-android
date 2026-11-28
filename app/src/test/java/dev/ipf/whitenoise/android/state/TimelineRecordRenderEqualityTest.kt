@@ -81,6 +81,8 @@ class TimelineRecordRenderEqualityTest {
     /** Builds the baseline timeline record compared in the render-equality checks. */
     private fun record() =
         TimelineMessageRecordFfi(
+            agentItem = null,
+            agentItemFirstEventMissing = false,
             clientToken = null,
             messageIdHex = "message",
             sourceMessageIdHex = "source",
