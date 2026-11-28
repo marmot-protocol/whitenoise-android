@@ -269,7 +269,8 @@ internal suspend fun stageMessageShareStreams(
 /**
  * Writes one share source into a new file of the shared cache and returns its FileProvider stream. The file joins
  * [protectedFiles] before anything is written, so a failure anywhere leaves it to the caller's cleanup. A private
- * file lease is moved into place when it can be, so a large attachment is not copied twice.
+ * file lease is moved into place when it can be, so a large attachment is not copied twice. A failure reading the
+ * source while it is copied, rather than writing the staged file, is raised as [ShareSourceReadException].
  */
 private suspend fun stageShareFile(
     context: Context,
@@ -296,7 +297,9 @@ private suspend fun stageShareFile(
             protectedFiles += file
             if (!(plaintext is AttachmentPlaintext.Lease && plaintext.file.renameTo(file))) {
                 // A cancelled Share stops copying at the next chunk instead of finishing a large file.
-                CancellableOutputStream(file.outputStream(), job).use(plaintext::copyTo)
+                CancellableOutputStream(file.outputStream(), job).use { target ->
+                    copySource(source, plaintext, target)
+                }
             }
             if (file.length() != expectedBytes) throw IOException("share source length changed while staging")
             // The cache file keeps its collision-safe generated name, while the
@@ -312,15 +315,41 @@ private suspend fun stageShareFile(
     }
 }
 
-/** Writes through to [delegate], refusing every write once [job] is cancelled, so a copy stops at its next chunk. */
+/** Copies [plaintext] into [target], raising a failure to read it, not to write [target], as [source]'s. */
+private fun copySource(
+    source: MessageShareAttachmentSource,
+    plaintext: AttachmentPlaintext,
+    target: CancellableOutputStream,
+) {
+    try {
+        plaintext.copyTo(target)
+    } catch (failure: IOException) {
+        if (target.writeFailed) throw failure
+        throw ShareSourceReadException(source, failure)
+    }
+}
+
+/** Reading [source]'s plaintext failed with [cause] while it was copied into the share cache. */
+internal class ShareSourceReadException(
+    val source: MessageShareAttachmentSource,
+    cause: IOException,
+) : IOException("share source could not be read", cause)
+
+/**
+ * Writes through to [delegate], refusing every write once [job] is cancelled, so a copy stops at its next chunk.
+ * [writeFailed] tells a failed write of the staged file apart from a failed read of its source.
+ */
 private class CancellableOutputStream(
     private val delegate: OutputStream,
     private val job: Job?,
 ) : FilterOutputStream(delegate) {
+    var writeFailed = false
+        private set
+
     /** Writes one byte unless the share was cancelled. */
     override fun write(b: Int) {
         job?.ensureActive()
-        delegate.write(b)
+        tracked { delegate.write(b) }
     }
 
     /** Writes [len] bytes of [b] from [off] in one call unless the share was cancelled. */
@@ -330,7 +359,17 @@ private class CancellableOutputStream(
         len: Int,
     ) {
         job?.ensureActive()
-        delegate.write(b, off, len)
+        tracked { delegate.write(b, off, len) }
+    }
+
+    /** Runs [write], recording that the staged file could not be written when it throws. */
+    private inline fun tracked(write: () -> Unit) {
+        try {
+            write()
+        } catch (failure: IOException) {
+            writeFailed = true
+            throw failure
+        }
     }
 }
 

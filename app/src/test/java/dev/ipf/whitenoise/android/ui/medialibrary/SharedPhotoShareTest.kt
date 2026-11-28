@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.OUTBOUND_SHARE_MAX_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareTooLargeException
@@ -199,6 +200,29 @@ class SharedPhotoShareTest {
                             /** Holds nothing to release. */
                             override fun close() = Unit
                         }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
+            assertNoShare()
+        }
+
+    /** A photo whose cached file is reclaimed after it was acquired cannot be moved or read, and is named. */
+    @Test
+    fun aReclaimedPhotoLeaseNamesItsPhoto() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", listOf(beach, harbour), "Share", { gallery }) { photo ->
+                        if (photo != harbour) return@shareSelectedPhotos AttachmentPlaintext.Bytes(bytesOf(photo))
+                        val file = File(leaseDirectory, "harbour.lease").apply { writeBytes(bytesOf(photo)) }
+                        AttachmentPlaintext.Lease(DiskByteCacheLease(file)).also { file.delete() }
                     }
                 }.exceptionOrNull()
 

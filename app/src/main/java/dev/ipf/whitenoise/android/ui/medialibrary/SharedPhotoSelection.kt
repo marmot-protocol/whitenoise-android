@@ -7,14 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.ShareSourceReadException
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentsExternally
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
-import java.io.FilterOutputStream
 import java.io.IOException
-import java.io.OutputStream
 
 /** A gallery slot: the message and authored attachment index a tile was selected from. */
 private fun SharedMediaTile.slot() = messageIdHex to attachmentIndex
@@ -178,7 +177,7 @@ internal suspend fun shareSelectedPhotos(
     } catch (failure: Exception) {
         // A photo removed while it was read usually fails its read; report it as unavailable so it is deselected.
         val settled = failure is CancellationException || failure is SharedPhotosUnavailableException
-        throw sharedPhotosFailure(failure, if (settled) null else unavailable())
+        throw sharedPhotosFailure(failure, if (settled) null else unavailable(), photos)
     }
 }
 
@@ -188,90 +187,48 @@ private fun requireSharedPhotosAvailable(unavailable: List<SharedMediaTile>?) {
     if (unavailable.isNotEmpty()) throw SharedPhotosUnavailableException(unavailable)
 }
 
-/**
- * Reads [photo] through [source], tagging a failure with the photo so the share can name and deselect it. A streamed
- * source is wrapped so a failure while it is copied is tagged too; in-memory bytes and a private file lease are local
- * and keep their own type, so a lease can still be moved into place.
- */
+/** Reads [photo] through [source], tagging a failure with the photo so the share can name and deselect it. */
 @Suppress("TooGenericExceptionCaught") // Any provider or download failure of this one photo is attributed to it.
 private suspend fun readPhoto(
     photo: SharedMediaTile,
     source: suspend (SharedMediaTile) -> AttachmentPlaintext,
-): AttachmentPlaintext {
-    val plaintext =
-        try {
-            source(photo)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (failure: Exception) {
-            throw SharedPhotoReadException(photo, failure)
-        }
-    val local = plaintext is AttachmentPlaintext.Bytes || plaintext is AttachmentPlaintext.Lease
-    return if (local) plaintext else AttributedPhotoPlaintext(photo, plaintext)
-}
-
-/** A streamed photo whose read failures, but not failures writing the staged copy, are attributed to [photo]. */
-private class AttributedPhotoPlaintext(
-    private val photo: SharedMediaTile,
-    private val delegate: AttachmentPlaintext,
-) : AttachmentPlaintext by delegate {
-    /** Copies the photo, tagging a failure that did not come from [output] with the photo. */
-    override fun copyTo(output: OutputStream) {
-        val target = WriteFailureTrackingStream(output)
-        try {
-            delegate.copyTo(target)
-        } catch (failure: IOException) {
-            if (target.failed) throw failure
-            throw SharedPhotoReadException(photo, failure)
-        }
+): AttachmentPlaintext =
+    try {
+        source(photo)
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (failure: Exception) {
+        throw SharedPhotoReadException(photo, failure)
     }
-}
-
-/** Passes writes to [delegate] and remembers whether one of them failed. */
-private class WriteFailureTrackingStream(
-    private val delegate: OutputStream,
-) : FilterOutputStream(delegate) {
-    var failed = false
-        private set
-
-    /** Writes one byte, recording a failure. */
-    override fun write(b: Int) = tracked { delegate.write(b) }
-
-    /** Writes [len] bytes of [b] from [off], recording a failure. */
-    override fun write(
-        b: ByteArray,
-        off: Int,
-        len: Int,
-    ) = tracked { delegate.write(b, off, len) }
-
-    /** Runs [write], marking this stream failed when it throws. */
-    private inline fun tracked(write: () -> Unit) {
-        try {
-            write()
-        } catch (failure: IOException) {
-            failed = true
-            throw failure
-        }
-    }
-}
 
 /**
- * [failure], unless photos found [unavailable] after it explain it better, or it is one photo's failed read, which
- * becomes that photo's unavailability so the rest of the selection can still be shared.
+ * [failure], unless photos found [unavailable] after it explain it better, or it is one of [photos]' failed read or
+ * copy, which becomes that photo's unavailability so the rest of the selection can still be shared.
  */
 private fun sharedPhotosFailure(
     failure: Exception,
     unavailable: List<SharedMediaTile>?,
-): Exception =
-    when {
+    photos: List<SharedMediaTile>,
+): Exception {
+    val unreadable =
+        when (failure) {
+            is SharedPhotoReadException -> failure.photo
+            is ShareSourceReadException -> photos.getOrNull(failure.source.attachmentIndex)
+            else -> null
+        }
+    return when {
         !unavailable.isNullOrEmpty() ->
             SharedPhotosUnavailableException(unavailable).apply { addSuppressed(failure.readCause()) }
-        failure is SharedPhotoReadException ->
-            SharedPhotosUnavailableException(listOf(failure.photo), unreadable = true).apply {
+        unreadable != null ->
+            SharedPhotosUnavailableException(listOf(unreadable), unreadable = true).apply {
                 initCause(failure.readCause())
             }
         else -> failure
     }
+}
 
-/** The provider or download failure behind a photo's failed read, or [this] for any other failure. */
-private fun Exception.readCause(): Throwable = (this as? SharedPhotoReadException)?.cause ?: this
+/** The provider, download or copy failure behind a photo's failed read, or [this] for any other failure. */
+private fun Exception.readCause(): Throwable {
+    val tagged = this is SharedPhotoReadException || this is ShareSourceReadException
+    return if (tagged) cause ?: this else this
+}
