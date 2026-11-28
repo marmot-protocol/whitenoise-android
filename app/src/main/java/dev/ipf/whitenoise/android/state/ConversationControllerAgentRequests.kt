@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.agent.AgentRequest
 import dev.ipf.whitenoise.android.core.agent.AgentRequestEncoder
+import dev.ipf.whitenoise.android.core.agent.AgentRequestEvent
 
 /**
  * Sends an answer or a control to the agent in this chat.
@@ -34,20 +35,8 @@ internal suspend fun ConversationController.sendAgentRequest(
                 check(canSendMessages && boundAccountRef == account && group.groupIdHex == groupId)
                 appState.marmotIo {
                     check(isCurrentAgentSession(account, groupId, target))
-                    agentNativeRequestHistory(account, groupId, listOf(target)).outstanding(target) ?: run {
-                        val accepted =
-                            admitLocalSend(account, groupId, token, probeExistingAdmission = false) {
-                                sendCustomEventWithClientToken(
-                                    account,
-                                    groupId,
-                                    event.kind,
-                                    event.tags,
-                                    event.content,
-                                    token,
-                                )
-                            }
-                        AgentRequestAdmission(accepted.messageIds.single())
-                    }
+                    agentNativeRequestHistory(account, groupId, listOf(target)).outstanding(target)
+                        ?: admitAgentRequest(account, groupId, target, event, token)
                 }
             }
         Log.i("WNAgents", "event=request_result outcome=accepted action=${request.logName}")
@@ -57,6 +46,30 @@ internal suspend fun ConversationController.sendAgentRequest(
         Log.i("WNAgents", "event=request_result outcome=failed action=${request.logName}")
         appState.presentFailure(R.string.agent_request_failed, "AGENT_REQUEST", throwable)
         null
+    }
+}
+
+/**
+ * Admits [event] under [token] and returns the request event MDK now owns.
+ *
+ * When admission ends ambiguously and MDK recovers ownership of the token, the recovered summary
+ * carries no event ID. The native send records the raw request before durable acceptance, so the
+ * request is read back from native history instead of reporting a failure for a send MDK will deliver.
+ */
+internal suspend fun MarmotInterface.admitAgentRequest(
+    account: String,
+    groupId: String,
+    target: AgentRequestTarget,
+    event: AgentRequestEvent,
+    token: String,
+): AgentRequestAdmission {
+    val accepted =
+        admitLocalSend(account, groupId, token, probeExistingAdmission = false) {
+            sendCustomEventWithClientToken(account, groupId, event.kind, event.tags, event.content, token)
+        }
+    accepted.messageIds.singleOrNull()?.let { return AgentRequestAdmission(it) }
+    return checkNotNull(agentNativeRequestHistory(account, groupId, listOf(target)).outstanding(target)) {
+        "MDK owns the agent request, but native history has no matching request"
     }
 }
 
