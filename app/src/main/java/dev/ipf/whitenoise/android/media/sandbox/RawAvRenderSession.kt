@@ -86,14 +86,15 @@ internal interface RawAvRenderOwner {
     )
 }
 
-/** One persistent caller drives this finite raw-output session, with no queued decode tasks. */
-@Suppress("TooManyFunctions") // Clock, raw sinks and input ownership belong to one renderer session.
+/** One persistent caller drives raw PCM and video output for the selected source. */
+@Suppress("TooManyFunctions", "LongParameterList")
 internal class RawAvRenderSession(
     private val context: Context,
     private val uri: Uri,
     private val wantVideo: Boolean,
     private val wantAudio: Boolean,
     private val owner: RawAvRenderOwner,
+    private val frameBitmaps: RawVideoBitmaps = RawVideoBitmaps.Fresh,
     private val pcmFactory: (Int, Int, AudioAttributes) -> RawPcmSink = ::RawPcmOutput,
 ) {
     /** Set once by the engine before its worker starts; null leaves ordinary playback diagnostics disabled. */
@@ -290,22 +291,14 @@ internal class RawAvRenderSession(
             val info = selected.info
             synchronized(clockLock) { sourceHasAudio = wantAudio && info.hasAudio }
             owner.opened(info, activation)
-            consumeFrames(info, activation, selected::read, selected::seek)
+            consumeFrames(info, activation, { track -> selected.read(track, frameBitmaps) }, selected::seek)
             reusable = true
         } catch (failure: Exception) {
-            if (valid(
-                    activation,
-                    operationSeek,
-                )
-            ) {
+            if (valid(activation, operationSeek)) {
                 owner.failed(activation, operationSeek, rawPlaybackFailure(failure))
             }
         } catch (failure: OutOfMemoryError) {
-            if (valid(
-                    activation,
-                    operationSeek,
-                )
-            ) {
+            if (valid(activation, operationSeek)) {
                 owner.failed(activation, operationSeek, IOException("Raw playback output memory unavailable", failure))
             }
         } finally {
@@ -470,53 +463,59 @@ internal class RawAvRenderSession(
         }
     }
 
-    /** Freezes one source-time reserve target; subsequent playback progress cannot move this target. */
-    private fun audioReserveTargetUs(timestampUs: Long): Long =
+    /** Freezes the existing presentation reserve and extends it toward the mixer in the same snapshot. */
+    private fun audioReserve(timestampUs: Long): RawAvAudioReserve =
         synchronized(clockLock) {
             val reserveUs = ceil(AUDIO_RESERVE_US * clockSpeed.toDouble()).toLong()
-            (maxOf(timestampUs, positionUs()) + reserveUs).coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
+            val presentedUs = positionUs()
+            val mixerUs = pcm?.let { audioAnchorUs + it.mixerPositionUs } ?: presentedUs
+            val baselineUs = maxOf(timestampUs, presentedUs) + reserveUs
+            RawAvAudioReserve(baselineUs, mixerUs + reserveUs)
         }
 
-    /**
-     * Uses existing device capacity for a soft reserve, without waiting on backpressure or known audio EOF.
-     * Written credits cap source admission while DSP output still waits to enter the actual device buffer.
-     */
+    /** Uses written PCM credits to fill spare device capacity without waiting on backpressure. */
     private suspend fun refillAudioReserve(
         progress: RawAvRenderProgress,
-        targetUs: Long,
+        reserve: RawAvAudioReserve,
         activation: Long,
         read: (Int) -> AvStreamFrame,
     ) {
         while (sourceHasAudio && !eofWallClock && valid(activation, appliedSeek)) {
             pumpAudio(progress)
-            if (progress.audioEnded && progress.audio == null) return
-            val covered =
+            if ((progress.audioEnded && progress.audio == null) || progress.audioReserveDeferred) return
+            val bufferedUs =
                 synchronized(clockLock) {
                     val sink = pcm
-                    audioAnchorUs + (sink?.bufferedPositionUs() ?: 0) >= targetUs ||
-                        audioAnchorUs + (sink?.writtenPositionUs() ?: 0) >= targetUs
+                    audioAnchorUs + maxOf(sink?.bufferedPositionUs() ?: 0, sink?.writtenPositionUs() ?: 0)
                 }
-            if (covered || !feedAudioStep(progress, activation, read, waitOnBackpressure = false)) return
+            if (bufferedUs >= reserve.targetUs) break
+            val track = reserve.trackFor(bufferedUs)
+            if (!feedAudioStep(progress, activation, read, waitOnBackpressure = false, track = track)) return
         }
     }
 
     /**
-     * Writes at most one bounded audio quantum, preserving offsets across partial sink acceptance.
-     * Gap silence and media bytes keep separate credits; an invalid accepted byte count is an output failure.
-     * Returns whether input credit advanced; optional reserve work never sleeps on refused credit.
+     * Writes one bounded quantum or less, keeping separate offsets for gap silence and media bytes.
+     * Returns whether input credit advanced. Optional reserve reads and writes can defer.
      */
-    @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Partial source credits and both EOF guards commit together.
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount", "ReturnCount") // Invalid or deferred reads exit before PCM.
     private suspend fun feedAudioStep(
         progress: RawAvRenderProgress,
         activation: Long,
         read: (Int) -> AvStreamFrame,
         waitOnBackpressure: Boolean = true,
+        track: Int = AvStreamProtocol.AUDIO_TRACK,
     ): Boolean {
         if (!valid(activation, appliedSeek)) return false
         if (progress.audio == null && !progress.audioEnded) {
-            when (val frame = read(AvStreamProtocol.AUDIO_TRACK)) {
+            when (val frame = read(track)) {
                 is AvStreamFrame.Audio -> adoptPcm(frame, progress, activation)
                 AvStreamFrame.AudioEnd -> progress.audioEnded = true
+                AvStreamFrame.AudioDeferred -> {
+                    check(track == AvStreamProtocol.AUDIO_RESERVE_TRACK)
+                    progress.audioReserveDeferred = true
+                    return false
+                }
                 is AvStreamFrame.Video -> {
                     frame.bitmap.recycle()
                     throw IOException("Unexpected video from preferred audio read")
@@ -706,13 +705,14 @@ internal class RawAvRenderSession(
         read: (Int) -> AvStreamFrame,
     ): Boolean {
         ensureAudioForVideo(progress, timestampUs, activation, read)
-        val reserveTargetUs = audioReserveTargetUs(timestampUs)
-        refillAudioReserve(progress, reserveTargetUs, activation, read)
+        progress.audioReserveDeferred = false
+        val reserve = audioReserve(timestampUs)
+        refillAudioReserve(progress, reserve, activation, read)
         while (valid(activation, appliedSeek)) {
             var tolerance = pumpAudio(progress)
             var clock = positionUs()
             if (timestampUs > clock + tolerance) {
-                refillAudioReserve(progress, reserveTargetUs, activation, read)
+                refillAudioReserve(progress, reserve, activation, read)
                 if (!valid(activation, appliedSeek)) break
                 tolerance = pumpAudio(progress)
                 clock = positionUs()

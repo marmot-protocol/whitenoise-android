@@ -4,6 +4,12 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 /**
+ * Recognizes channels from older installs for ownership and privacy cleanup.
+ * Existing parent channels stay dormant on upgrade so Android does not count them as deleted categories.
+ */
+internal const val LEGACY_AGENT_ACTIVITY_CHANNEL_ID = "agent_activity_v1"
+
+/**
  * Stable Android notification channel identities and the routing that maps a
  * [NotificationUpdateFfi] to the channel it belongs on.
  *
@@ -81,18 +87,26 @@ enum class NotificationChannelSpec(
         launcherBadgeByDefault = false,
     ),
 
-    /** Agent tool progress and status updates. Visible but silent by default. */
-    AGENT_ACTIVITY(
-        "agent_activity_v1",
-        ChannelImportance.LOW,
-        ConversationChannelPolicy.GLOBAL_UNTIL_OVERRIDE,
-        launcherBadgeByDefault = false,
-    ),
-
     /** Zapstore app-update availability notices. Low importance: visible, no buzz. */
     APP_UPDATES(
         "app_updates_v1",
         ChannelImportance.LOW,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
+
+    /** Unknown sign-ins deserve a quiet review, even if nothing indicates key misuse. */
+    SIGN_IN_REVIEW(
+        "sign_in_review_v1",
+        ChannelImportance.DEFAULT,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
+
+    /** High importance only when MDK reports evidence of key misuse. */
+    ACCOUNT_SECURITY(
+        "account_security_v1",
+        ChannelImportance.HIGH,
         ConversationChannelPolicy.GLOBAL_ONLY,
         launcherBadgeByDefault = false,
     ),

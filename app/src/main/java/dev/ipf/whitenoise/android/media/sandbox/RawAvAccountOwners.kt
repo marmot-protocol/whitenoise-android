@@ -12,6 +12,7 @@ internal class RawAvAccountOwners<T : Any> {
         val active: T?,
     )
 
+    private val presentationLock = Any()
     private var epoch = 0L
     private val instances = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<T, Boolean>())
     private var active: T? = null
@@ -64,16 +65,17 @@ internal class RawAvAccountOwners<T : Any> {
         return wasActive
     }
 
-    /** The action never acquires an engine lock. Callers acquire their engine lock first. */
-    @Synchronized fun withCurrent(
+    /** Orders surface submission with epoch retirement without holding the registry monitor during a draw. */
+    fun withCurrent(
         owner: T,
         expectedEpoch: Long,
         action: () -> Unit,
-    ): Boolean {
-        if (!current(owner, expectedEpoch)) return false
-        action()
-        return true
-    }
+    ): Boolean =
+        synchronized(presentationLock) {
+            if (!current(owner, expectedEpoch)) return@synchronized false
+            action()
+            true
+        }
 
     /**
      * Runs [action] under the registry monitor only for the exact active owner.
@@ -95,11 +97,14 @@ internal class RawAvAccountOwners<T : Any> {
     }
 
     /** Revocation is atomic. Callers close the returned owners only after leaving this monitor. */
-    @Synchronized fun retireAll(): Retired<T> {
-        epoch++
-        val retired = Retired(instances.toList(), active)
-        instances.clear()
-        active = null
-        return retired
-    }
+    fun retireAll(): Retired<T> =
+        synchronized(presentationLock) {
+            synchronized(this) {
+                epoch++
+                val retired = Retired(instances.toList(), active)
+                instances.clear()
+                active = null
+                retired
+            }
+        }
 }

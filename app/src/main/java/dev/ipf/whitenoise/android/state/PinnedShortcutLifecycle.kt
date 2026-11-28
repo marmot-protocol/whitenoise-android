@@ -16,10 +16,10 @@ import kotlinx.coroutines.yield
 private const val SIGN_OUT_GROUP_READ_ATTEMPTS = 3
 private const val SIGN_OUT_OWNER_SAVE_ATTEMPTS = 3
 
-/** Captured departing-account group inventory together with whether every native listing succeeded. */
+/** Captured departing-account group inventory together with whether every native and journal listing succeeded. */
 private data class AccountGroupInventory(
     val groupIds: Set<String>,
-    val nativeInventoryComplete: Boolean,
+    val inventoryComplete: Boolean,
 )
 
 /** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
@@ -84,7 +84,7 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
  * another account remains signed in. Pending local-delete journal groups are included, since journal
  * replay no longer runs for an account once it has signed out.
  *
- * Returns null before native revocation when native inventory remained incomplete while
+ * Returns null before native revocation when native or journal inventory remained incomplete while
  * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
  * the departing ownership record and any last-signer sweep could not be durably saved after retries.
  */
@@ -95,7 +95,7 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
     val inventory = readAccountKnownGroupIds(accountRef)
     val groupIds = inventory.groupIds
     val unaccountedChannelRisk =
-        !inventory.nativeInventoryComplete &&
+        !inventory.inventoryComplete &&
             !includeUnscopedLegacy &&
             withContext(Dispatchers.IO) {
                 hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
@@ -131,6 +131,11 @@ private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: Stri
     val chats = readGroupInventoryWithRetry("chats") { marmotIo { chatList(accountRef, includeArchived = true) } }
     val quarantined =
         readGroupInventoryWithRetry("quarantined groups") { marmotIo { quarantinedGroups(accountRef) } }
+    // An unreadable local-delete journal could hide a group, so it leaves the inventory incomplete.
+    val journaled =
+        runCatchingCancellable {
+            withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
+        }
     val groupIds =
         buildSet {
             chats?.forEach { row -> add(row.groupIdHex) }
@@ -143,13 +148,11 @@ private suspend fun WhiteNoiseAppState.readAccountKnownGroupIds(accountRef: Stri
             runCatching { conversationVibrationPreferences.groupIdsForAccount(accountRef) }
                 .getOrDefault(emptySet())
                 .forEach(::add)
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef) }
-            }.getOrDefault(emptySet()).forEach(::add)
+            journaled.getOrDefault(emptySet()).forEach(::add)
         }
     return AccountGroupInventory(
         groupIds = groupIds,
-        nativeInventoryComplete = chats != null && quarantined != null,
+        inventoryComplete = chats != null && quarantined != null && journaled.isSuccess,
     )
 }
 

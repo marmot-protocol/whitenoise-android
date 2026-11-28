@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -24,7 +26,6 @@ import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.deviceLabelFits
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
-import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
@@ -33,7 +34,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal const val DEVICE_LINK_LABEL_TAG = "device_link.label"
 internal const val DEVICE_LINK_ADD_TO_CHATS_TAG = "device_link.add_to_chats"
 internal const val DEVICE_LINK_BRING_HISTORY_TAG = "device_link.bring_history"
-internal const val DEVICE_LINK_OPTIONS_TAG = "device_link.options"
 
 /**
  * The step for a link request on a device already signed in. Link device and Not now are offered only while MDK
@@ -54,7 +54,7 @@ internal fun deviceLinkRequestStep(
                 detail = R.string.link_request_compare_detail,
                 code = state.code,
                 primary = DeviceLinkAction.Link,
-                secondary = DeviceLinkAction.NotNow,
+                secondary = DeviceLinkAction.DontLink,
             )
         DeviceLinkPromptStateFfi.CompetingRequests ->
             DeviceLinkStep(title, R.string.link_request_competing, secondary = DeviceLinkAction.Close)
@@ -94,25 +94,22 @@ private fun addedElsewhereStep(state: DeviceLinkPromptStateFfi.AddedElsewhere): 
 @Stable
 internal class DeviceLinkApprovalDraft(
     name: String = "",
-    expanded: Boolean = false,
     add: Boolean = true,
     history: Boolean = true,
 ) {
     val label = TextFieldState(name)
-    var optionsOpen by mutableStateOf(expanded)
     var addToAllChats by mutableStateOf(add)
     var bringHistory by mutableStateOf(history)
 
     companion object {
         val Saver =
             listSaver<DeviceLinkApprovalDraft, Any>(
-                save = { listOf(it.label.text.toString(), it.optionsOpen, it.addToAllChats, it.bringHistory) },
+                save = { listOf(it.label.text.toString(), it.addToAllChats, it.bringHistory) },
                 restore = { values ->
                     DeviceLinkApprovalDraft(
                         name = values[0] as String,
-                        expanded = values[1] as Boolean,
-                        add = values[2] as Boolean,
-                        history = values[3] as Boolean,
+                        add = values[values.lastIndex - 1] as Boolean,
+                        history = values.last() as Boolean,
                     )
                 },
             )
@@ -130,11 +127,14 @@ internal fun rememberApprovalDraft() =
 /**
  * A link request as the approving device shows it. While MDK shows the code, the new device's name is on the step
  * itself, so the user sees what it will be called before linking, and an empty field shows the default it gets.
- * Link device stays one tap: the device joins the account's chats with their history (both on, as MDK offers them),
- * and Options opens those two choices for anyone who wants to change them. The choices stay as entered if a
- * submission fails. [onLink] receives them, [onDecline] is Not now and [onClose] leaves without answering.
+ * Both sharing choices are visible and start on, as MDK offers them. The choices stay as entered if a submission
+ * fails. [onLink] receives them, Don't link calls [onDecline], and [onClose] leaves without answering.
+ *
+ * Link can be tapped only [DEVICE_LINK_ARM_DELAY_MS] after the code first appears. A [repeated] request offers no
+ * Link at all: it warns instead, with Don't link ([onDecline]) and Review devices ([onReviewDevices]).
  */
 @Composable
+@Suppress("LongParameterList") // The request's state, its two answers, leaving, and the warning's devices route.
 internal fun DeviceLinkRequestContent(
     state: DeviceLinkPromptStateFfi,
     running: DeviceLinkCommand?,
@@ -143,6 +143,9 @@ internal fun DeviceLinkRequestContent(
     onClose: () -> Unit,
     failureMessage: Int? = null,
     draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
+    repeated: Boolean = false,
+    onReviewDevices: () -> Unit = onClose,
+    onReport: (() -> Unit)? = null,
 ) {
     val label = draft.label
     // MDK requires a name. The approving device supplies the default, shown in the empty field.
@@ -153,58 +156,66 @@ internal fun DeviceLinkRequestContent(
             .trim()
             .ifEmpty { placeholder }
     val nameFits = deviceLabelFits(name)
-    val step = deviceLinkRequestStep(state) { IdentityFormatter.clockTime(it) }
+    val warning = repeatedLinkRequestStep(state).takeIf { repeated }
+    val step = warning ?: deviceLinkRequestStep(state) { IdentityFormatter.clockTime(it) }
+    var codeVisible by remember(step.code) { mutableStateOf(false) }
+    val armed = rememberLinkArmed(step.code, codeVisible)
     DeviceLinkStepLayout(
         screenTitle = stringResource(R.string.link_request_title),
         step = step,
         running = running,
         onBack = onClose,
-        primaryEnabled = step.primary != DeviceLinkAction.Link || nameFits,
+        primaryEnabled = step.primary != DeviceLinkAction.Link || (nameFits && armed),
         failureMessage = failureMessage,
+        onCodeVisible = { codeVisible = true },
         onAction = { action ->
             when (action) {
-                DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
-                DeviceLinkAction.NotNow -> onDecline()
+                DeviceLinkAction.Link -> {
+                    if (nameFits && armed) {
+                        onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
+                    }
+                }
+                DeviceLinkAction.NotNow, DeviceLinkAction.DontLink -> onDecline()
+                DeviceLinkAction.ReviewDevices -> onReviewDevices()
                 else -> onClose()
             }
         },
     ) {
-        if (state is DeviceLinkPromptStateFfi.Comparing) {
+        if (warning == null && state is DeviceLinkPromptStateFfi.Comparing) {
             DeviceLinkNameField(
                 label = label,
                 placeholder = placeholder,
                 tooLong = stringResource(R.string.link_request_label_too_long).takeUnless { nameFits },
                 enabled = running == null,
             )
-            DeviceLinkOptionsRow(onToggle = { draft.optionsOpen = !draft.optionsOpen })
-            if (draft.optionsOpen) {
-                DeviceLinkSharingChoices(
-                    addToAllChats = draft.addToAllChats,
-                    bringHistory = draft.bringHistory,
-                    enabled = running == null,
-                    onAddToAllChats = { draft.addToAllChats = it },
-                    onBringHistory = { draft.bringHistory = it },
-                )
-            }
+            DeviceLinkSharingChoices(
+                addToAllChats = draft.addToAllChats,
+                bringHistory = draft.bringHistory,
+                enabled = running == null,
+                onAddToAllChats = { draft.addToAllChats = it },
+                onBringHistory = { draft.bringHistory = it },
+            )
+        }
+        if (warning != null && onReport != null) {
+            DeviceLinkReportButton(enabled = running == null, onReport = onReport)
         }
     }
 }
 
-/** The row that opens and closes the two sharing choices, saying what they cover while they stay closed. */
 @Composable
-private fun DeviceLinkOptionsRow(onToggle: () -> Unit) {
-    SettingsGroup {
-        row("options") { context ->
-            SettingsAction(
-                context = context,
-                title = stringResource(R.string.link_request_options),
-                subtitle = stringResource(R.string.link_request_options_detail),
-                onClick = onToggle,
-                modifier = Modifier.testTag(DEVICE_LINK_OPTIONS_TAG),
-                explanation = stringResource(R.string.explanation_link_request_options),
-                leading = { SettingsLeadingIcon(R.drawable.ic_expand_more) },
-            )
-        }
+private fun DeviceLinkReportButton(
+    enabled: Boolean,
+    onReport: () -> Unit,
+) {
+    TextButton(
+        onClick = onReport,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .testTag(DEVICE_LINK_DID_NOT_START_TAG),
+    ) {
+        Text(stringResource(R.string.link_consent_did_not_start))
     }
 }
 

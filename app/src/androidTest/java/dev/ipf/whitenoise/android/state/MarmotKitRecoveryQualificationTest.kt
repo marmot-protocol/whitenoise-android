@@ -43,6 +43,7 @@ class MarmotKitRecoveryQualificationTest {
     private lateinit var context: Context
     private lateinit var relay: LoopbackNostrRelay
     private lateinit var relays: List<String>
+    private var auditEnabled: Boolean? = null
     private val roots = mutableListOf<File>()
     private val runtimes = mutableListOf<Marmot>()
 
@@ -50,13 +51,22 @@ class MarmotKitRecoveryQualificationTest {
     @Before
     fun setUp() {
         context = InstrumentationRegistry.getInstrumentation().targetContext
+        val arguments = InstrumentationRegistry.getArguments()
         MarmotAndroid.initialize(context)
         relay =
             LoopbackNostrRelay().apply {
                 requestLimitClamp = RELAY_CLAMP
-                refuseComparison = InstrumentationRegistry.getArguments().getString("comparison") != "ignore"
+                refuseComparison = arguments.getString("comparison") != "ignore"
             }
         relays = listOf(relay.url)
+        if (context.packageName.endsWith(".mdkqualification")) {
+            auditEnabled =
+                when (arguments.getString("qualificationAuditChoice")) {
+                    "enabled" -> true
+                    "declined" -> false
+                    else -> error("Specify the recovery fixture audit choice")
+                }
+        }
     }
 
     /** Closes every runtime this case opened, then the relay, then deletes the generated roots. */
@@ -409,6 +419,10 @@ class MarmotKitRecoveryQualificationTest {
         val root = File(context.cacheDir, "recovery-qualification-$role-${UUID.randomUUID()}").apply { mkdirs() }
         roots += root
         val runtime = open(root)
+        auditEnabled?.let { enabled ->
+            runtime.setAuditLogSettings(runtime.auditLogSettings().copy(enabled = enabled))
+            assertEquals("Native recovery audit recording", enabled, runtime.auditLogSettings().enabled)
+        }
         return Participant(root, runtime, runtime.createIdentity(relays, relays))
     }
 
@@ -428,6 +442,9 @@ class MarmotKitRecoveryQualificationTest {
     /** Reopens [participant]'s root, the way a relaunched process does. */
     private suspend fun reopen(participant: Participant): Participant {
         val runtime = open(participant.root)
+        auditEnabled?.let { enabled ->
+            assertEquals("Native recovery audit recording after restart", enabled, runtime.auditLogSettings().enabled)
+        }
         return Participant(participant.root, runtime, participant.account)
     }
 

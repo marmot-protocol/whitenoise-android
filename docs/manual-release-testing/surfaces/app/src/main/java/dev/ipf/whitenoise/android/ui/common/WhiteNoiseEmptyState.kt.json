@@ -1,0 +1,21 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEmptyState.kt",
+  "legacy_sha256": "92344a5134cf5c47273323ebba29f6aa1a6e9c44d3ea71a07b017ece34351026",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseEmptyState",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEmptyState.kt",
+        "anchor": "fun WhiteNoiseEmptyState(",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002",
+          "CHL-001",
+          "FIND-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

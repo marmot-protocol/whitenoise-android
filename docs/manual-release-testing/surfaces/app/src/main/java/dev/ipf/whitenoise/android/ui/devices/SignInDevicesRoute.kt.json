@@ -1,0 +1,62 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SignInDevicesRouteEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "fun SignInDevicesRouteEffect(",
+        "test_ids": [
+          "SET-077",
+          "SET-078",
+          "SET-079"
+        ]
+      },
+      {
+        "surface": "SignInDevicesRequestEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "fun SignInDevicesRequestEffect(",
+        "test_ids": [
+          "SET-077",
+          "SET-078",
+          "SET-079"
+        ]
+      },
+      {
+        "surface": "DevicesRowTrailing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "fun DevicesRowTrailing(",
+        "test_ids": [
+          "SET-077",
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Settings account: R.string.sign_in_alert_badge_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "R.string.sign_in_alert_badge_review",
+        "test_ids": [
+          "SET-077"
+        ]
+      },
+      {
+        "surface": "Settings account: R.string.sign_in_alert_badge_compromise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "R.string.sign_in_alert_badge_compromise",
+        "test_ids": [
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Device linking consent: R.string.link_consent_report_guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "R.string.link_consent_report_guidance",
+        "test_ids": [
+          "SET-079"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -30,9 +30,9 @@ def validate(name, workflow):
     if 'push' in event_names:
         settings=events.get('push') if isinstance(events,dict) else None
         branches=settings.get('branches') if isinstance(settings,dict) else None
-        # Only explicit master-only pushes are known to exclude native queue
-        # branches. Unknown glob/tag/filter combinations stay conservative.
-        queue_trigger=queue_trigger or branches!=['master']
+        # The signing workflow's exact develop filter also excludes native queue branches.
+        staging_push = name == 'android-staging-apk.yml' and settings == {'branches': ['develop']}
+        queue_trigger = queue_trigger or (branches != ['master'] and not staging_push)
     if queue_trigger and re.search(r'\bsecrets\b',json.dumps(workflow),re.IGNORECASE):
         raise ValueError('queue workflows cannot access repository secrets')
     for scope, permissions in [(None, workflow.get('permissions'))] + [

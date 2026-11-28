@@ -138,7 +138,6 @@ class NotificationChannelSpecTest {
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
         assertEquals("group_membership_v1", NotificationChannelSpec.GROUP_MEMBERSHIP.id)
-        assertEquals("agent_activity_v1", NotificationChannelSpec.AGENT_ACTIVITY.id)
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 
@@ -159,19 +158,18 @@ class NotificationChannelSpecTest {
         )
     }
 
-    /** Builds a notification update with the given trigger, DM, reaction, mention and traffic class. */
+    /** Builds an update with the supplied trigger, chat type, reaction and mention. */
     private fun update(
         trigger: NotificationTriggerFfi,
         isDm: Boolean = false,
         reactionEmoji: String? = null,
         isMention: Boolean = false,
-        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = trigger,
-        trafficClass = trafficClass,
+        trafficClass = NotificationTrafficClassFfi.STANDARD,
         accountRef = "account",
         accountIdHex = "account",
         groupIdHex = "group",

@@ -290,7 +290,7 @@ class ProfileNotificationPresenterTest {
         }
 
     /**
-     * Self messages, reactions, membership events and agent traffic remain outside message-only mute policy.
+     * Self messages, reactions, and membership events remain outside message-only mute policy.
      */
     @Test fun messageMuteExclusionsAreIndependentOfEventSoundEligibility() {
         val normal = update()

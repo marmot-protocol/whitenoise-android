@@ -52,6 +52,8 @@ internal fun StartChatErrorCard(
         } else {
             error.title.resolveForCompose()
         }
+    // Someone who isn't on White Noise yet is an invitation, not an error.
+    val titleColor = if (error.invitation) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
     val detail = error.detail.resolveForCompose()
     val retryLabel =
         stringResource(if (error.retryGroupIdHex != null) R.string.new_message_open_chat else R.string.retry)
@@ -64,7 +66,7 @@ internal fun StartChatErrorCard(
         Text(
             title,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.error,
+            color = titleColor,
         )
         Text(
             detail,
@@ -84,7 +86,7 @@ internal fun StartChatErrorCard(
                         val shareIcon = painterResource(R.drawable.ic_share)
                         Icon(shareIcon, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.share))
+                        Text(stringResource(R.string.send_invite))
                     }
                 }
                 else -> Button(onClick = onRetry) { Text(retryLabel) }

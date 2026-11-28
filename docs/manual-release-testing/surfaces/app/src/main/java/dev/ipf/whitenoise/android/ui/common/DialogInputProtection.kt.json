@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogInputProtection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ProtectDialogInput",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogInputProtection.kt",
+        "anchor": "fun ProtectDialogInput(",
+        "test_ids": [
+          "SET-079"
+        ]
+      },
+      {
+        "surface": "Obscured gesture: R.string.link_touch_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogInputProtection.kt",
+        "anchor": "R.string.link_touch_blocked",
+        "test_ids": [
+          "SET-079"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

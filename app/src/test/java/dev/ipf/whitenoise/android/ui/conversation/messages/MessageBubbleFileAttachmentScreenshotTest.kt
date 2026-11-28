@@ -932,6 +932,8 @@ open class MessageBubbleFileAttachmentFixtures {
     /** Provides a deterministic parent projection for the captioned reply case. */
     protected fun replyPreview() =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = PARENT_MESSAGE_ID,
             sender = SENDER_ID,
             plaintext = "Parent message",

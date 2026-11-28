@@ -114,20 +114,24 @@ class DurableLocalSendsTest {
             }
         }
 
-    /** A rejected token is terminal instead of silently sending the same payload under another identity. */
+    /** A rejected or membership-fenced token cannot silently send the payload under a new identity. */
     @Test
     fun rejectedTokenRequiresDeliberateNewSubmission() =
         runTest {
-            val engine =
-                nativeBoundary { method, _ ->
-                    check(method == "localSendStatus")
-                    LocalSendStatusFfi.Rejected
-                }
-            val failure =
-                runCatching {
-                    engine.sendComposerTextWithToken("account", "group", null, "hello", "rejected")
-                }.exceptionOrNull()
-            assertTrue(failure is IllegalStateException)
+            for (status in listOf(LocalSendStatusFfi.Rejected, LocalSendStatusFfi.RefusedNewMembers)) {
+                val calls = mutableListOf<String>()
+                val engine =
+                    nativeBoundary { method, _ ->
+                        calls += method
+                        status
+                    }
+                val failure =
+                    runCatching {
+                        engine.sendComposerTextWithToken("account", "group", null, "hello", "rejected")
+                    }.exceptionOrNull()
+                assertTrue(failure is IllegalStateException)
+                assertEquals(listOf("localSendStatus"), calls)
+            }
         }
 
     /** A failed status probe is diagnostic context, not a replacement for the admission failure. */

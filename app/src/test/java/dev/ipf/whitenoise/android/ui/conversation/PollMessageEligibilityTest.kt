@@ -107,6 +107,8 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
                 replyToMessageIdHex = item.record.messageIdHex,
                 replyPreview =
                     TimelineReplyPreviewFfi(
+                        retentionSeconds = null,
+                        retentionExpiresAt = null,
                         messageIdHex = item.record.messageIdHex,
                         sender = item.record.sender,
                         plaintext = item.record.plaintext,

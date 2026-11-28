@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_permission_ask_title">Entérate cuando alguien responda</string>
+    <string name="notification_permission_ask_message">Activa las notificaciones para ver mensajes nuevos e invitaciones a chats sin abrir White Noise.</string>
+    <string name="notification_permission_ask_confirm">Activar notificaciones</string>
+    <string name="notification_permission_ask_not_now">Ahora no</string>
+</resources>

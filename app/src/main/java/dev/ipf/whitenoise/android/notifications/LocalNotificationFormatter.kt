@@ -110,6 +110,7 @@ object LocalNotificationFormatter {
             id = MENTION_NOTIFICATION_ID,
         )
 
+    /** Clears agent cards posted by older installs before alerts moved to standard message channels. */
     fun agentActivityDismissalKey(
         accountRef: String,
         groupIdHex: String,
@@ -170,6 +171,7 @@ object LocalNotificationFormatter {
             tag.startsWith(GROUP_MEMBERSHIP_TAG_PREFIX + base)
     }
 
+    /** Maps a posted update to the same card identity used for replacement and dismissal. */
     fun notificationDismissalKey(update: NotificationUpdateFfi): NotificationDismissalKey =
         when {
             update.trigger == NotificationTriggerFfi.GROUP_INVITE ->

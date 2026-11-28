@@ -48,32 +48,51 @@ internal class LocalGroupDeleteCleanupJournal(
         }
     }
 
-    fun pending(): List<PendingLocalGroupDeleteCleanup> =
-        directory
-            .listFiles()
-            .orEmpty()
-            .mapNotNull { file ->
-                val name = file.name.removeSuffix(".bak").removeSuffix(".new")
-                name.takeIf { it.endsWith(FILE_SUFFIX) }
-            }.distinct()
-            .mapNotNull { name ->
-                val result =
-                    runCatching {
-                        val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
-                        check(fileName(decoded.account, decoded.groupIdHex) == name) {
-                            "local delete journal identity mismatch"
-                        }
-                        decoded
-                    }
-                result.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
-                result.getOrNull()
-            }
+    /** Every readable intent; an unreadable entry is logged and skipped so replay can still finish the rest. */
+    fun pending(): List<PendingLocalGroupDeleteCleanup> {
+        val files = directory.listFiles().orEmpty()
+        return readEntries(files).mapNotNull { it.getOrNull() }
+    }
 
-    /** Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. */
-    fun groupIdsForAccount(account: String): Set<String> =
-        pending()
+    /**
+     * Group ids [account] still has pending cleanup for, so sign-out can delete them before replay is lost. Throws
+     * when the journal or any of its entries cannot be read, since that entry's account and group are unknown.
+     */
+    fun groupIdsForAccount(account: String): Set<String> {
+        // One listing serves both the failure check and the read, so a later failed listing cannot pass as empty.
+        val files =
+            directory.listFiles() ?: run {
+                check(!directory.exists()) { "local delete journal could not be listed" }
+                emptyArray()
+            }
+        return readEntries(files)
+            .map { it.getOrThrow() }
             .filter { it.account == account }
             .mapTo(HashSet()) { it.groupIdHex }
+    }
+
+    /**
+     * Reads each committed journal entry in [files] once, keeping a failure for the caller to skip or propagate. An
+     * entry is committed once its base file or `.bak` backup exists; a lone `.new` file is a stage that never
+     * committed, so no native delete was admitted for it.
+     */
+    private fun readEntries(files: Array<out File>): List<Result<PendingLocalGroupDeleteCleanup>> =
+        files
+            .mapNotNull { file ->
+                file.name
+                    .takeUnless { it.endsWith(".new") }
+                    ?.removeSuffix(".bak")
+                    ?.takeIf { it.endsWith(FILE_SUFFIX) }
+            }.distinct()
+            .map { name ->
+                runCatching {
+                    val decoded = decode(String(AtomicFile(File(directory, name)).readFully(), Charsets.UTF_8))
+                    check(fileName(decoded.account, decoded.groupIdHex) == name) {
+                        "local delete journal identity mismatch"
+                    }
+                    decoded
+                }.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
+            }
 
     /** Explicit retries must fail closed on a corrupt intent rather than overwrite its cleanup keys. */
     fun find(

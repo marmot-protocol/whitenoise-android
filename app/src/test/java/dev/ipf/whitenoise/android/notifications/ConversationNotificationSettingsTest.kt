@@ -194,7 +194,7 @@ class ConversationNotificationSettingsTest {
 
     /** Optional custom categories can resolve their own exact conversation child. */
     @Test
-    fun openCanTargetTheAgentActivityChannelForOneConversation() {
+    fun openCanTargetTheInviteChannelForOneConversation() {
         val app = RuntimeEnvironment.getApplication()
         NotificationChannels.ensureChannels(app)
 
@@ -203,14 +203,14 @@ class ConversationNotificationSettingsTest {
             accountRef = "account-a",
             groupIdHex = "group-a",
             isDm = false,
-            parent = NotificationChannelSpec.AGENT_ACTIVITY,
+            parent = NotificationChannelSpec.INVITES,
         )
 
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val started = Shadows.shadowOf(app).nextStartedActivity
         assertEquals(
             ConversationNotificationChannels.conversationChannelId(
-                NotificationChannelSpec.AGENT_ACTIVITY.id,
+                NotificationChannelSpec.INVITES.id,
                 shortcutId,
             ),
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
@@ -220,7 +220,7 @@ class ConversationNotificationSettingsTest {
                 .getSystemService(NotificationManager::class.java)
                 .getNotificationChannel(
                     ConversationNotificationChannels.conversationChannelId(
-                        NotificationChannelSpec.AGENT_ACTIVITY.id,
+                        NotificationChannelSpec.INVITES.id,
                         shortcutId,
                     ),
                 ),

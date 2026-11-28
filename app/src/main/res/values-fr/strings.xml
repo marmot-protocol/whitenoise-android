@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Aucune clé de discussion utilisable n’a été trouvée pour %1$s. Demandez-lui d’installer ou de mettre à jour White Noise et de l’ouvrir, puis réessayez.</string>
     <string name="invite_to_white_noise">Inviter sur White Noise</string>
     <string name="invite_friends">Inviter des amis</string>
-    <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
-    <string name="unknown_invite_to_white_noise_description">Cet utilisateur n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
     <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise">Cette personne n’est pas encore sur White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Envoyez-lui une invitation. Quand elle aura installé et ouvert White Noise, réessayez.</string>
+    <string name="send_invite">Envoyer une invitation</string>
+    <string name="invite_message_personal">Je suis %1$s sur White Noise, une messagerie privée qui ne demande pas de numéro de téléphone. Installe-la, touche Nouveau chat et colle ma clé pour m’écrire : %2$s\nTéléchargement : https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
     <string name="error_no_group_members_selected">Aucune des personnes sélectionnées n’a pu être ajoutée. Demandez-leur de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
@@ -794,7 +797,6 @@
     <string name="conversation_jump_to_mention">Aller à la mention</string>
     <string name="notification_channel_reactions">Réactions</string>
     <string name="notification_channel_invites">Invitations</string>
-    <string name="notification_channel_agent_activity">Activité de l’agent</string>
     <string name="notification_channel_direct_messages_default">Messages directs · Valeur par défaut pour toutes les discussions</string>
     <string name="notification_channel_group_global_defaults">Paramètres globaux par défaut</string>
     <string name="notification_channel_direct_messages_default_description">Comportement d’alerte Android par défaut pour les messages directs</string>
@@ -809,8 +811,6 @@
     <string name="notification_channel_group_membership">Modifications d’appartenance aux groupes</string>
     <string name="notification_channel_group_membership_default">Modifications d’appartenance aux groupes · Par défaut pour toutes les discussions</string>
     <string name="notification_channel_group_membership_default_description">Comportement par défaut des alertes Android lorsque votre accès à un groupe est retiré</string>
-    <string name="notification_channel_agent_activity_default">Activité de l’agent · Valeur par défaut pour toutes les discussions</string>
-    <string name="notification_channel_agent_activity_default_description">Comportement d’alerte Android par défaut pour l’activité de l’agent dans les discussions</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (personnalisé)</string>
     <string name="notification_channel_custom_description">Comportement d’alerte personnalisé pour %1$s dans %2$s</string>
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
@@ -1684,6 +1684,9 @@
     <string name="notification_channel_app_updates">Mises à jour de l\'application</string>
     <string name="notification_channel_app_updates_global">Mises à jour de l\'application · Toute l\'application</string>
     <string name="notification_channel_app_updates_global_description">Comportement d’alerte Android pour les mises à jour de White Noise</string>
+    <string name="notification_channel_account_security">Sécurité du compte</string>
+    <string name="notification_channel_account_security_global">Sécurité du compte · Toute l’application</string>
+    <string name="notification_channel_account_security_global_description">Comportement d’alerte Android pour les connexions inconnues et les avertissements de sécurité</string>
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
     <string name="custom_emoji">Emoji personnalisés</string>
@@ -1703,9 +1706,20 @@
     <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
-    <string name="emoji_sets_load_image">Charger l’image d’aperçu</string>
-    <string name="emoji_sets_image_privacy">Charger un aperçu ou installer un ensemble partage votre adresse IP avec ses hébergeurs d’images.</string>
-    <string name="emoji_sets_preview_host">Hébergeur de l’image d’aperçu : %1$s</string>
+    <string name="emoji_sets_load_emoji">Charger les émojis</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+        <item quantity="other">Les images proviennent de %1$s. Leurs hébergeurs reçoivent votre adresse IP lors du chargement ou de l’installation.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">%1$d de plus</item>
+        <item quantity="other">%1$d de plus</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Les hébergeurs de ces images reçoivent votre adresse IP lorsque vous les chargez ou les installez.</string>
+    <string name="emoji_sets_untitled">Jeu sans nom</string>
+    <string name="emoji_sets_emoji_loading">Chargement de %1$s</string>
+    <string name="emoji_sets_emoji_failed">Impossible de charger %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s n’est pas disponible sur cet appareil.</string>
     <string name="emoji_sets_install">Installer l’ensemble</string>
     <string name="emoji_sets_update">Mettre à jour l’ensemble</string>
     <string name="emoji_sets_check_update">Rechercher une mise à jour</string>
@@ -2181,6 +2195,7 @@
     <string name="setup_finding_too_many_relays">La liste contient trop de relais.</string>
     <string name="setup_finding_multi_device_unsupported">Les conversations ne sont pas synchronisées entre les appareils.</string>
     <string name="setup_finding_discovery_incomplete">La découverte n’a pas pu se terminer. Aucun remplacement ne sera déduit de ce résultat.</string>
+    <string name="setup_finding_rate_limited">Trop de requêtes. Réessayez dans un instant.</string>
     <string name="setup_profile_help">Ajoutez un nom pour que les autres vous reconnaissent. Vous pourrez le faire plus tard.</string>
     <string name="setup_details">Détails</string>
     <string name="setup_hide_details">Masquer les détails</string>
@@ -2828,6 +2843,7 @@
     <string name="remote_signer_approval_title">Votre application de signature demande une vérification supplémentaire</string>
     <string name="remote_signer_approval_body">Ouvrez %1$s dans votre navigateur, terminez la vérification, puis revenez dans White Noise.</string>
     <string name="remote_signer_approval_open">Page d\'approbation ouverte</string>
+    <string name="remote_signer_approval_open_failed">Impossible d’ouvrir la page d’autorisation. Réessaie.</string>
     <string name="remote_signer_approval_done">J\'ai fini</string>
     <string name="remote_signer_signing_in">Connexion en cours…</string>
     <string name="remote_signer_try_again">Essayez encore .</string>
@@ -2890,4 +2906,11 @@
     <string name="dictation_transcribe_voice_messages_title">Transcrire automatiquement les messages vocaux</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Affiche les transcriptions des messages vocaux téléchargés dans la conversation. Nécessite Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Ce lien n’est pas pris en charge.</string>
+    <string name="private_key_reminder_title">Enregistrez votre clé privée</string>
+    <string name="private_key_reminder_body">Si vous perdez ce téléphone, seule votre clé vous permettra de conserver votre identité et vos contacts.</string>
+    <string name="private_key_reminder_save">Enregistrer la clé</string>
+    <string name="private_key_reminder_not_now">Pas maintenant</string>
+    <string name="first_run_chats_title">Lancez votre première conversation</string>
+    <string name="first_run_chats_detail">Invitez une personne avec qui vous discutez. En attendant, posez vos questions à l’équipe White Noise.</string>
+    <string name="first_run_new_chat">Nouveau chat</string>
 </resources>

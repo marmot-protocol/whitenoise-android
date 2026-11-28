@@ -183,7 +183,6 @@ class NotificationScopeSettingsScreenshotTest {
             setting(NotificationChannelSpec.MENTIONS, custom = true),
             setting(NotificationChannelSpec.REACTIONS, custom = false),
             setting(NotificationChannelSpec.INVITES, custom = false),
-            setting(NotificationChannelSpec.AGENT_ACTIVITY, custom = true),
         )
 
     private fun setting(

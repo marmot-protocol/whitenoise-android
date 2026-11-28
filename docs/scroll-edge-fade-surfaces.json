@@ -108,6 +108,17 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PrivateKeyReminder.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "Keep the reminder actions reachable in a short window while reserving space for chat rows.",
+      "test_ids": [
+        "CHL-042"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -119,21 +130,6 @@
         "SCR-002",
         "SCR-003",
         "SCR-004"
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
-      "calls": {
-        "fadingVerticalScroll": 1
-      },
-      "family": "chats",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004",
-        "SET-061"
       ]
     },
     {
@@ -288,7 +284,8 @@
         "SCR-001",
         "SCR-002",
         "SCR-003",
-        "SCR-004"
+        "SCR-004",
+        "SET-061"
       ]
     },
     {
@@ -1620,9 +1617,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-076"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
       "calls": {
-        "SettingsList": 2
+        "SettingsList": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1898,6 +1910,20 @@
         "SCR-001",
         "SCR-002",
         "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "ONB-029",
+        "SCR-001",
+        "SCR-002",
         "SCR-004"
       ]
     },
@@ -2278,6 +2304,35 @@
       "calls": {
         "verticalScroll": 1
       }
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-079"
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",

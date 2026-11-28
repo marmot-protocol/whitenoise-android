@@ -14,7 +14,6 @@ internal enum class OverridableConversationNotificationCategory(
     MENTIONS(NotificationChannelSpec.MENTIONS),
     REACTIONS(NotificationChannelSpec.REACTIONS),
     INVITES(NotificationChannelSpec.INVITES),
-    AGENT_ACTIVITY(NotificationChannelSpec.AGENT_ACTIVITY),
     ;
 
     companion object {
@@ -38,7 +37,6 @@ internal data class NotificationConversationDescriptor(
     val isDm: Boolean,
     val title: String?,
     val primaryVibrationPattern: ConversationVibrationPattern,
-    val accountRef: String? = null,
 )
 
 internal sealed interface AndroidNotificationSettingsTarget {
@@ -212,10 +210,8 @@ internal class ConversationNotificationRouting(
         conversation: NotificationConversationDescriptor,
         category: OverridableConversationNotificationCategory,
         scope: ConversationNotificationScope,
-        isWriteAllowed: () -> Boolean = { true },
     ): Result<ConversationNotificationCategorySetting> =
         runCatching {
-            check(isWriteAllowed()) { "Notification scope write is no longer current" }
             // Establish a durable pre-override state before creating a new
             // child. Otherwise a failed custom write would leave a child with
             // no preference, and the legacy migration probe would activate it
@@ -244,11 +240,8 @@ internal class ConversationNotificationRouting(
                                     parentChannelId = category.channel.id,
                                     conversationShortcutId = conversation.shortcutId,
                                     conversationTitle = conversation.title,
-                                    accountRef = conversation.accountRef,
-                                    isWriteAllowed = isWriteAllowed,
                                 ),
                             ) { "Global notification channel is unavailable" }
-                        check(isWriteAllowed()) { "Notification scope write is no longer current" }
                         check(preferences.set(conversation.shortcutId, category, scope)) {
                             "Could not persist notification scope"
                         }
@@ -256,7 +249,6 @@ internal class ConversationNotificationRouting(
                     }
 
                     ConversationNotificationScope.USE_GLOBAL_DEFAULT -> {
-                        check(isWriteAllowed()) { "Notification scope write is no longer current" }
                         check(preferences.set(conversation.shortcutId, category, scope)) {
                             "Could not persist notification scope"
                         }

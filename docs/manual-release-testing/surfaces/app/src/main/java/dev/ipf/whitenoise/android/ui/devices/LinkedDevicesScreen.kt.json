@@ -176,7 +176,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "fun LinkedDevicesContent(",
         "test_ids": [
-          "SET-060"
+          "SET-060",
+          "SET-080"
         ]
       },
       {
@@ -193,6 +194,14 @@
         "anchor": "R.string.link_device_joining_chats",
         "test_ids": [
           "SET-067"
+        ]
+      },
+      {
+        "surface": "Missed device link attempts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_request_expired_attempt",
+        "test_ids": [
+          "SET-077"
         ]
       }
     ]

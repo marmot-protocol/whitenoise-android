@@ -594,7 +594,7 @@ android {
         create("staging") {
             dimension = "environment"
             applicationIdSuffix = ".staging"
-            // Every master merge produces a staging APK. Keep the production
+            // Every develop push produces a staging APK. Keep the production
             // release version stable while making the installed staging build
             // identifiable from Settings and Android package metadata.
             versionNameSuffix = "-staging-$buildShortSha" + if (startupDiagnosticsRequested) "-startup-diagnostics" else ""
@@ -860,7 +860,7 @@ androidComponents {
 
     // Mirror the release-build naming convention onto dev debug APKs during
     // per-PR preview builds so testers can tell PR previews apart on disk in
-    // the same way they can tell master-branch staging APKs apart.
+    // the same way they can tell staging APKs apart.
     if (prNumber != null) {
         onVariants(selector().withBuildType("debug").withFlavor("environment" to "dev")) { variant ->
             variant.outputs.forEach { output ->

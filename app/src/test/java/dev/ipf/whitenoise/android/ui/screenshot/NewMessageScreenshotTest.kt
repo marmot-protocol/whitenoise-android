@@ -122,10 +122,25 @@ class NewMessageScreenshotTest {
             lookupFailed = true,
         )
 
-    /** The new-message error for a recipient with no KeyPackage, in the light theme. */
+    /** A recipient with no KeyPackage is presented as an invitation with Send invite and Retry. */
     @Test fun missingKeyLight() =
         capture(
             "new_message_missing_key_light.png",
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
+        )
+
+    @Test fun missingKeyAmoled() =
+        capture(
+            "new_message_missing_key_amoled.png",
+            dark = true,
+            amoled = true,
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
+        )
+
+    @Test fun missingKeyLargeRtl() =
+        capture(
+            "new_message_missing_key_large_rtl.png",
+            largeRtl = true,
             error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
         )
 
@@ -157,7 +172,7 @@ class NewMessageScreenshotTest {
             "ada",
             error,
             "Ada Lovelace",
-            { "Ada Lovelace" },
+            displayName = { "Ada Lovelace" },
         )
 
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */

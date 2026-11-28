@@ -270,9 +270,12 @@
     <string name="error_missing_key_package_for">Не удалось найти пригодный ключ чата для %1$s. Попросите установить или обновить White Noise и открыть приложение, затем повторите попытку.</string>
     <string name="invite_to_white_noise">Пригласить в White Noise</string>
     <string name="invite_friends">Пригласить друзей</string>
-    <string name="invite_to_white_noise_description">%1$s ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
-    <string name="unknown_invite_to_white_noise_description">Этот пользователь ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
     <string name="invite_message">Присоединяйтесь ко мне в White Noise. Без номера телефона. Без слежки. Только настоящая приватность. Скачайте здесь: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s ещё не в White Noise</string>
+    <string name="start_chat_not_on_white_noise">Этого человека ещё нет в White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Отправьте приглашение. Когда этот человек установит и откроет White Noise, попробуйте снова.</string>
+    <string name="send_invite">Отправить приглашение</string>
+    <string name="invite_message_personal">Я %1$s в White Noise — это приватный мессенджер, которому не нужен номер телефона. Установи его, нажми «Новый чат» и вставь мой ключ, чтобы написать мне: %2$s\nСкачать: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Этот получатель не является действительным открытым ключом Nostr. Используйте npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_group_create_failed_retry">Что-то пошло не так при настройке зашифрованного чата. Проверьте подключение и повторите попытку.</string>
     <string name="error_no_group_members_selected">Не удалось добавить никого из выбранных. Попросите их проверить настройки чата или измените свой выбор.</string>
@@ -830,7 +833,6 @@
     <string name="conversation_jump_to_mention">Перейти к упоминанию</string>
     <string name="notification_channel_reactions">Реакции</string>
     <string name="notification_channel_invites">Приглашения</string>
-    <string name="notification_channel_agent_activity">Активность агента</string>
     <string name="notification_channel_direct_messages_default">Личные сообщения · По умолчанию для всех чатов</string>
     <string name="notification_channel_group_global_defaults">Общие настройки по умолчанию</string>
     <string name="notification_channel_direct_messages_default_description">Стандартные уведомления Android для личных сообщений</string>
@@ -845,8 +847,6 @@
     <string name="notification_channel_group_membership">Изменения членства в группах</string>
     <string name="notification_channel_group_membership_default">Изменения членства в группах · По умолчанию для всех чатов</string>
     <string name="notification_channel_group_membership_default_description">Стандартные настройки уведомлений Android, когда вас удаляют из групп</string>
-    <string name="notification_channel_agent_activity_default">Активность агента · По умолчанию для всех чатов</string>
-    <string name="notification_channel_agent_activity_default_description">Стандартные уведомления Android об активности агента в чатах</string>
     <string name="notification_channel_custom_name">%1$s · %2$s (настроено)</string>
     <string name="notification_channel_custom_description">Настроенные уведомления для %1$s в %2$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
@@ -1752,6 +1752,9 @@
     <string name="notification_channel_app_updates">Обновления приложения</string>
     <string name="notification_channel_app_updates_global">Обновления приложения · Для всего приложения</string>
     <string name="notification_channel_app_updates_global_description">Уведомления Android об обновлениях приложения White Noise</string>
+    <string name="notification_channel_account_security">Безопасность учётной записи</string>
+    <string name="notification_channel_account_security_global">Безопасность учётной записи · Для всего приложения</string>
+    <string name="notification_channel_account_security_global_description">Уведомления Android о неизвестных входах и предупреждениях о безопасности</string>
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
     <string name="custom_emoji">Свои эмодзи</string>
@@ -1773,9 +1776,24 @@
     <string name="emoji_sets_builtin_shown">Предустановлен · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Скрыт из выбора. По-прежнему виден в сообщениях.</string>
     <string name="emoji_sets_update_available">Доступно обновление</string>
-    <string name="emoji_sets_load_image">Загрузить изображение</string>
-    <string name="emoji_sets_image_privacy">При загрузке превью или установке набора ваш IP-адрес увидят серверы его изображений.</string>
-    <string name="emoji_sets_preview_host">Сервер изображения превью: %1$s</string>
+    <string name="emoji_sets_load_emoji">Загрузить эмодзи</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="few">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="many">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+        <item quantity="other">Источник изображений: %1$s. При загрузке или установке ваш IP-адрес будет виден серверам, на которых хранятся изображения.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">ещё %1$d</item>
+        <item quantity="few">ещё %1$d</item>
+        <item quantity="many">ещё %1$d</item>
+        <item quantity="other">ещё %1$d</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">При загрузке или установке этих изображений ваш IP-адрес будет виден серверам, на которых они хранятся.</string>
+    <string name="emoji_sets_untitled">Набор без названия</string>
+    <string name="emoji_sets_emoji_loading">Загрузка %1$s</string>
+    <string name="emoji_sets_emoji_failed">Не удалось загрузить %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s недоступен на этом устройстве.</string>
     <string name="emoji_sets_install">Установить набор</string>
     <string name="emoji_sets_update">Обновить набор</string>
     <string name="emoji_sets_check_update">Проверить обновление</string>
@@ -2258,6 +2276,7 @@
     <string name="setup_finding_too_many_relays">В списке слишком много реле.</string>
     <string name="setup_finding_multi_device_unsupported">Разговоры не синхронизируются между устройствами.</string>
     <string name="setup_finding_discovery_incomplete">Поиск не удалось завершить. На основании этого результата замена предлагаться не будет.</string>
+    <string name="setup_finding_rate_limited">Слишком много запросов. Повторите попытку чуть позже.</string>
     <string name="setup_profile_help">Добавьте имя, чтобы вас узнавали. Это можно сделать позже.</string>
     <string name="setup_details">Подробности</string>
     <string name="setup_hide_details">Скрыть подробности</string>
@@ -2923,6 +2942,7 @@
     <string name="remote_signer_approval_title">Приложение для подписи требует дополнительной проверки</string>
     <string name="remote_signer_approval_body">Откройте %1$s в браузере, пройдите проверку и вернитесь в White Noise.</string>
     <string name="remote_signer_approval_open">Открытая страница одобрения</string>
+    <string name="remote_signer_approval_open_failed">Не удалось открыть страницу подтверждения. Попробуйте ещё раз.</string>
     <string name="remote_signer_approval_done">Я закончил.</string>
     <string name="remote_signer_signing_in">Выполняется вход…</string>
     <string name="remote_signer_try_again">Попробуй еще раз.</string>
@@ -2985,4 +3005,11 @@
     <string name="dictation_transcribe_voice_messages_title">Автоматически расшифровывать голосовые сообщения</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Показывает расшифровки загруженных голосовых сообщений в чате. Требуется Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Эта ссылка не поддерживается.</string>
+    <string name="private_key_reminder_title">Сохраните закрытый ключ</string>
+    <string name="private_key_reminder_body">Если вы потеряете этот телефон, сохранить свой профиль и контакты можно будет только с помощью ключа.</string>
+    <string name="private_key_reminder_save">Сохранить ключ</string>
+    <string name="private_key_reminder_not_now">Не сейчас</string>
+    <string name="first_run_chats_title">Начните первую беседу</string>
+    <string name="first_run_chats_detail">Пригласите кого-нибудь, с кем вы общаетесь. Пока ждёте, можете задать любой вопрос команде White Noise.</string>
+    <string name="first_run_new_chat">Новый чат</string>
 </resources>

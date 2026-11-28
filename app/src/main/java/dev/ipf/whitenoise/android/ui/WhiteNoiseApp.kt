@@ -382,6 +382,16 @@ internal fun WhiteNoiseApp(
             localProjectionAvailable = localProjectionAvailable,
         )
     }
+    LaunchedEffect(appState.phase, appState.activeAccountRef) {
+        if (appState.phase == AppPhase.Ready && appState.activeAccountRef != null) {
+            appState.notificationAskMoment.noteReady()
+        }
+    }
+    val notificationChoiceReady =
+        !diagnosticsPromptOpen &&
+            !appState.diagnostics.requiresChoice &&
+            !appState.auditUploadConsentRequired &&
+            appState.diagnostics.snapshot != null
     LaunchedEffect(
         appState.phase,
         appState.activeAccountRef,
@@ -390,25 +400,14 @@ internal fun WhiteNoiseApp(
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
         appState.appLock.screenVisible,
-        diagnosticsPromptOpen,
-        appState.diagnostics.requiresChoice,
-        appState.auditUploadConsentRequired,
-        appState.diagnostics.snapshot,
+        notificationChoiceReady,
     ) {
-        if (diagnosticsPromptOpen || appState.diagnostics.requiresChoice || appState.auditUploadConsentRequired) {
+        if (!notificationChoiceReady || appState.phase != AppPhase.Ready || appState.appLock.screenVisible) {
             return@LaunchedEffect
         }
-        if (appState.diagnostics.snapshot == null) return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready || appState.appLock.screenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
-        if (appState.shouldRequestDefaultNotificationPermission()) {
-            appState.markDefaultNotificationPermissionPromptLaunched()
-            notificationPermissionTicket = appState.diagnostics.observations.ticket()
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            appState.enableDefaultNotificationsIfReady()
-        }
+        appState.enableDefaultNotificationsIfReady()
     }
     RootToastSnackbarEffect(appState, snackbarHostState, retryLabel = stringResource(R.string.retry))
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
@@ -771,7 +770,7 @@ internal fun WhiteNoiseApp(
             }
         }
         // Inside the scope, so the device-name field of a link request also honours the incognito keyboard.
-        AppQuestionHosts(appState)
+        AppQuestionHosts(appState, topNoticeHost)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
@@ -784,6 +783,10 @@ internal fun WhiteNoiseApp(
             onConfirm = { dictation.acceptDisclosure(dictationState) },
             onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
+    }
+    NotificationAskHost(appState, suppressed = !protectedPhaseReady || !notificationChoiceReady) {
+        notificationPermissionTicket = appState.diagnostics.observations.ticket()
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 

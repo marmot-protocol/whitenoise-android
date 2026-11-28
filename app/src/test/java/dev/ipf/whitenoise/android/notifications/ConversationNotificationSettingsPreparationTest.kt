@@ -52,7 +52,7 @@ class ConversationNotificationSettingsPreparationTest {
                         requestedParents =
                             listOf(
                                 NotificationChannelSpec.GROUP_MESSAGES,
-                                NotificationChannelSpec.AGENT_ACTIVITY,
+                                NotificationChannelSpec.INVITES,
                             ),
                         vibrationPattern = ConversationVibrationPattern.DOUBLE,
                     ),
@@ -67,8 +67,8 @@ class ConversationNotificationSettingsPreparationTest {
                 result.targetsByParentChannelId.getValue(NotificationChannelSpec.GROUP_MESSAGES.id).channelId,
             )
             assertEquals(
-                "${NotificationChannelSpec.AGENT_ACTIVITY.id}:SYSTEM_DEFAULT",
-                result.targetsByParentChannelId.getValue(NotificationChannelSpec.AGENT_ACTIVITY.id).channelId,
+                "${NotificationChannelSpec.INVITES.id}:SYSTEM_DEFAULT",
+                result.targetsByParentChannelId.getValue(NotificationChannelSpec.INVITES.id).channelId,
             )
         }
 

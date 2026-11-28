@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Sign-in alerts: R.string.compromise_warning_explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+        "anchor": "R.string.compromise_warning_explainer",
+        "test_ids": [
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.compromise_warning_step_move",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+        "anchor": "R.string.compromise_warning_step_move",
+        "test_ids": [
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.compromise_warning_step_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+        "anchor": "R.string.compromise_warning_step_remove",
+        "test_ids": [
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.compromise_warning_step_signer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+        "anchor": "R.string.compromise_warning_step_signer",
+        "test_ids": [
+          "SET-078"
+        ]
+      },
+      {
+        "surface": "Sign-in alerts: R.string.compromise_warning_steps_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
+        "anchor": "R.string.compromise_warning_steps_title",
+        "test_ids": [
+          "SET-078"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

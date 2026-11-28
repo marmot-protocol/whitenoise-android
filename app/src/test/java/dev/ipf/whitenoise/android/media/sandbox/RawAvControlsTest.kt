@@ -100,10 +100,12 @@ class RawAvControlsTest {
         engine.prepare().get(2, TimeUnit.SECONDS)
         setField(engine, "pausedUs", 2250000L)
         setField(engine, "targetUs", 2250000L)
-        setField(engine, "lastBitmapPtsUs", 2250000L)
+        val presenter = field(engine, "presenter") as RawVideoPresenter
+        val intent = engine.intent()
+        presenter.show(RawVideoFrame(bitmap, 0, intent.activation, intent.seek, 2250000L))
         engine.stop()
         engine.prepare().get(1, TimeUnit.SECONDS)
-        assertSame(bitmap, field(engine, "lastBitmap"))
+        assertSame(bitmap, presenter.retainedBitmap())
         assertFalse(bitmap.isRecycled)
         assertNull(field(engine, "pendingSeek"))
         assertEquals(1, calls.get())
@@ -590,7 +592,7 @@ class RawAvControlsTest {
     ): RawAvRenderSession {
         val context = RuntimeEnvironment.getApplication()
         val uri = Uri.parse("file:///fixture.mp4")
-        return RawAvRenderSession(context, uri, false, true, owner, factory)
+        return RawAvRenderSession(context, uri, false, true, owner, pcmFactory = factory)
     }
 
     private class FakeOwner : RawAvRenderOwner {

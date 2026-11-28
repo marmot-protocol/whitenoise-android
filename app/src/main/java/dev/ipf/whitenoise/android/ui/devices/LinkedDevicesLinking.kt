@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
 import dev.ipf.marmotkit.DeviceGroupMoveViewFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DeviceLinkAttempt
 import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -37,6 +38,7 @@ internal data class LinkedDevicesLinking(
     val moves: List<DeviceGroupMoveViewFfi> = emptyList(),
     val approvedLinkJoining: Boolean = false,
     val busy: Boolean = false,
+    val externalSignerCanReview: Boolean = false,
 )
 
 /** What the roster screen can ask its owner to do. */
@@ -60,6 +62,7 @@ internal data class LinkedDevicesHealth(
     val repairNeedsConfirmation: Boolean = false,
     val busy: Boolean = false,
     val review: SignInReviewState = SignInReviewState(),
+    val missedLinks: List<DeviceLinkAttempt> = emptyList(),
 )
 
 /** Whether a move is still under way. MDK accepts no further move or link request while one is. */

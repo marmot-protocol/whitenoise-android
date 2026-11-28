@@ -58,6 +58,12 @@ internal fun LinkedDevicesContent(
     SettingsScaffold(title = stringResource(R.string.linked_devices), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(LINKED_DEVICES_LIST_TAG)) {
             compromiseWarning(health.review, actions.review.onDismissWarning)
+            health.missedLinks.forEach { attempt ->
+                item(key = "missed-link:${attempt.id}") {
+                    val time = deviceDate(attempt.requestedAtSeconds, withTime = true)
+                    if (time != null) SettingsCallout(stringResource(R.string.link_request_expired_attempt, time))
+                }
+            }
             linkedDevicesNotices(health, actions.onRepair)
             if (state.readFailed) linkedDevicesFailure(state.refreshing, actions.onRetry)
             item(key = "detail") { LinkedDevicesIntro(stringResource(R.string.linked_devices_detail)) }
@@ -65,7 +71,10 @@ internal fun LinkedDevicesContent(
             linkedDevicesChatCounts(health.counts)
             linkedDevicesMoves(linking, actions.onDismissMoveSibling)
             linkedDevicesLinking(state, linking, actions.onLinkThisDevice)
-            if (linking.availability == DeviceLinkAvailability.Available) signInReview(health.review, actions.review)
+            val canLink = linking.availability == DeviceLinkAvailability.Available
+            if (canLink || linking.externalSignerCanReview) {
+                signInReview(health.review, actions.review, canStartFresh = canLink)
+            }
             linkedDevicesMoveAction(state, linking, actions.onLinkThisDevice)
         }
     }

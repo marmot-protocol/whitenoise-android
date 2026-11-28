@@ -20,8 +20,8 @@ import dev.ipf.whitenoise.android.R
  * it Android silently falls back to the app-wide parent channel.
  *
  * Ordinary messages always use a conversation child so Android's People and
- * conversation controls keep working. Mentions, reactions, invites, and agent
- * activity inherit their stable global channels until the user explicitly asks
+ * conversation controls keep working. Mentions, reactions, and invites
+ * inherit their stable global channels until the user explicitly asks
  * for a custom child. The channel id remains deterministic so legacy children,
  * the post path, and settings deep links all resolve the same user-owned channel.
  *
@@ -102,7 +102,6 @@ object ConversationNotificationChannels {
             NotificationChannelSpec.MENTIONS,
             NotificationChannelSpec.REACTIONS,
             NotificationChannelSpec.INVITES,
-            NotificationChannelSpec.AGENT_ACTIVITY,
         )
 
     /**

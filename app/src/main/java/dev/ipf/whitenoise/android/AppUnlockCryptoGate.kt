@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricPrompt
+import dev.ipf.whitenoise.android.state.AppText
 import java.security.InvalidKeyException
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -75,3 +76,32 @@ internal fun verifyExpectedAppUnlockCipher(
 }
 
 private val APP_UNLOCK_CHALLENGE = "white-noise-app-unlock".toByteArray(Charsets.UTF_8)
+
+internal fun foregroundReturnExpiryElapsedRealtime(
+    nowElapsedRealtime: Long,
+    hostResumed: Boolean,
+): Long? {
+    if (hostResumed) return null
+    return nowElapsedRealtime.coerceAtMost(Long.MAX_VALUE - APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS) +
+        APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS
+}
+
+internal fun appLockAuthErrorMessage(errorCode: Int): AppText =
+    when (errorCode) {
+        BiometricPrompt.ERROR_CANCELED,
+        BiometricPrompt.ERROR_USER_CANCELED,
+        BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+        -> AppText.Resource(R.string.app_lock_auth_cancelled)
+        BiometricPrompt.ERROR_LOCKOUT,
+        BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
+        -> AppText.Resource(R.string.app_lock_auth_locked)
+        BiometricPrompt.ERROR_TIMEOUT -> AppText.Resource(R.string.app_lock_auth_timed_out)
+        BiometricPrompt.ERROR_HW_NOT_PRESENT,
+        BiometricPrompt.ERROR_HW_UNAVAILABLE,
+        BiometricPrompt.ERROR_NO_BIOMETRICS,
+        BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
+        -> AppText.Resource(R.string.app_lock_auth_unavailable)
+        else -> AppText.Resource(R.string.app_lock_auth_failed)
+    }
+
+private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L

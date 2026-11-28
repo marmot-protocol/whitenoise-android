@@ -30,6 +30,8 @@ class TimelineRecordProfileSendersTest {
     /** Builds a reply preview quoting a message from the given sender. */
     private fun replyPreview(sender: String) =
         TimelineReplyPreviewFfi(
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             messageIdHex = "reply-target",
             sender = sender,
             plaintext = "quoted",
