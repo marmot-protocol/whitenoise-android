@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -75,37 +76,49 @@ fun WhiteNoiseDropdownMenu(
                         }
                     }
                 }
-            DropdownMenuItem(
-                text = { if (item.emojiLabel) EmojiLabel(item.label) else Text(item.label) },
-                onClick = activate,
-                modifier = item.modifier.then(originModifier).then(choiceSemantics(item.selected)),
-                leadingIcon =
-                    item.icon?.let { icon ->
-                        {
-                            Icon(
-                                painterResource(icon),
-                                contentDescription = null,
-                                modifier = Modifier.size(MenuIconSize),
-                            )
-                        }
-                    },
-                trailingIcon =
-                    if (item.selected == true) {
-                        {
-                            Icon(
-                                painterResource(R.drawable.ic_check),
-                                contentDescription = null,
-                                modifier = Modifier.size(MenuIconSize),
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                enabled = item.enabled,
-                colors = MenuDefaults.itemColors(textColor = contentColor, leadingIconColor = contentColor),
-            )
+            WhiteNoiseDropdownMenuRow(item, contentColor, activate, originModifier)
         }
     }
+}
+
+/** One menu row: the label, an optional leading icon, and a trailing check on the chosen value of a choice menu. */
+@Suppress("FunctionNaming")
+@Composable
+private fun WhiteNoiseDropdownMenuRow(
+    item: WhiteNoiseMenuItem,
+    contentColor: Color,
+    activate: () -> Unit,
+    originModifier: Modifier,
+) {
+    DropdownMenuItem(
+        text = { if (item.emojiLabel) EmojiLabel(item.label) else Text(item.label) },
+        onClick = activate,
+        modifier = item.modifier.then(originModifier).then(choiceSemantics(item.selected)),
+        leadingIcon =
+            item.icon?.let { icon ->
+                {
+                    Icon(
+                        painterResource(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(MenuIconSize),
+                    )
+                }
+            },
+        trailingIcon =
+            if (item.selected == true) {
+                {
+                    Icon(
+                        painterResource(R.drawable.ic_check),
+                        contentDescription = null,
+                        modifier = Modifier.size(MenuIconSize),
+                    )
+                }
+            } else {
+                null
+            },
+        enabled = item.enabled,
+        colors = MenuDefaults.itemColors(textColor = contentColor, leadingIconColor = contentColor),
+    )
 }
 
 /** A choice row reads as one radio option of the menu, so TalkBack announces which value is current. */

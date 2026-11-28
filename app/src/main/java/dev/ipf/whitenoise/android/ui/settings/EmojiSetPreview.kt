@@ -227,36 +227,47 @@ private fun EmojiSetActions(
                             ),
                     ) { Text(stringResource(R.string.emoji_sets_check_update)) }
             }
-            if (installed != null) {
-                var confirmRemove by remember(set.coordinate) { mutableStateOf(false) }
-                if (confirmRemove) {
-                    // Removal deletes the downloaded images, and downloading them again is not an Undo.
-                    ConfirmDialog(
-                        title = stringResource(R.string.emoji_sets_remove_title, set.displayTitle()),
-                        message = stringResource(R.string.emoji_sets_remove_detail),
-                        confirmLabel = stringResource(R.string.remove),
-                        destructive = true,
-                        onConfirm = {
-                            confirmRemove = false
-                            onRemove()
-                        },
-                        onDismiss = { confirmRemove = false },
-                        confirmTag = "emoji_sets.remove.confirm",
-                        cancelTag = "emoji_sets.remove.cancel",
-                    )
-                }
-                WhiteNoiseOutlinedButton(
-                    onClick = { confirmRemove = true },
-                    enabled = !state.busy,
-                    modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
-                ) {
-                    Text(
-                        stringResource(R.string.remove),
-                        color = if (state.busy) Color.Unspecified else MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+            if (installed != null) EmojiSetRemoveButton(set, enabled = !state.busy, onRemove = onRemove)
         }
+    }
+}
+
+/**
+ * Remove for an installed set, error-coloured while it can run. It confirms first (#4097), because getting the set
+ * back means downloading it again, which is not an Undo.
+ */
+@Composable
+private fun EmojiSetRemoveButton(
+    set: EmojiSetFfi,
+    enabled: Boolean,
+    onRemove: () -> Unit,
+) {
+    var confirmRemove by remember(set.coordinate) { mutableStateOf(false) }
+    if (confirmRemove) {
+        // Removal deletes the downloaded images, and downloading them again is not an Undo.
+        ConfirmDialog(
+            title = stringResource(R.string.emoji_sets_remove_title, set.displayTitle()),
+            message = stringResource(R.string.emoji_sets_remove_detail),
+            confirmLabel = stringResource(R.string.remove),
+            destructive = true,
+            onConfirm = {
+                confirmRemove = false
+                onRemove()
+            },
+            onDismiss = { confirmRemove = false },
+            confirmTag = "emoji_sets.remove.confirm",
+            cancelTag = "emoji_sets.remove.cancel",
+        )
+    }
+    WhiteNoiseOutlinedButton(
+        onClick = { confirmRemove = true },
+        enabled = enabled,
+        modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
+    ) {
+        Text(
+            stringResource(R.string.remove),
+            color = if (enabled) MaterialTheme.colorScheme.error else Color.Unspecified,
+        )
     }
 }
 

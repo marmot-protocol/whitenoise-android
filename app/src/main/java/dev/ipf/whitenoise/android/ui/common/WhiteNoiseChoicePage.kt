@@ -1,3 +1,6 @@
+// The page composable and its row model belong together, so the file is named after the page.
+@file:Suppress("MatchingDeclarationName")
+
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Column
@@ -58,7 +61,9 @@ internal fun <T> WhiteNoiseChoicePage(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     searchPlaceholder: String? = null,
-    matches: (WhiteNoisePageChoice<T>, String) -> Boolean = { choice, query -> choice.title.contains(query, ignoreCase = true) },
+    matches: (WhiteNoisePageChoice<T>, String) -> Boolean = { choice, query ->
+        choice.title.contains(query, ignoreCase = true)
+    },
     rowTag: (Int, T) -> String = { index, _ -> "choice_page.row.$index" },
     searchTag: String = WHITE_NOISE_CHOICE_PAGE_SEARCH_TAG,
     emptyText: String? = null,

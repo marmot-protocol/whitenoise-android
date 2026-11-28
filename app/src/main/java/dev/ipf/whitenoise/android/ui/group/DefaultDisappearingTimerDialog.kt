@@ -104,7 +104,11 @@ internal fun DefaultDisappearingTimerDialog(
         },
         dismissButton =
             if (custom) {
-                { TextButton(onClick = { custom = false }, enabled = acceptsInput) { Text(stringResource(R.string.back)) } }
+                {
+                    TextButton(onClick = { custom = false }, enabled = acceptsInput) {
+                        Text(stringResource(R.string.back))
+                    }
+                }
             } else {
                 null
             },

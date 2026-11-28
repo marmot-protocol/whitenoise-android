@@ -449,7 +449,13 @@ internal fun AvatarViewerFrame(
                                 ),
                             )
                             if (editActionLabel != null && onEditPicture != null) {
-                                add(WhiteNoiseMenuItem(label = editActionLabel, icon = R.drawable.ic_edit, onClick = onEditPicture))
+                                add(
+                                    WhiteNoiseMenuItem(
+                                        label = editActionLabel,
+                                        icon = R.drawable.ic_edit,
+                                        onClick = onEditPicture,
+                                    ),
+                                )
                             }
                         },
                 )

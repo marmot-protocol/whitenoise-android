@@ -61,11 +61,22 @@ internal fun TtsTransportRatePicker(
             },
             header =
                 if (customEditorOpen) {
-                    { TtsCustomRateEditor(initialRate = activeRate, onDismiss = { customEditorOpen = false }, onRateSelected = select) }
+                    {
+                        TtsCustomRateEditor(
+                            initialRate = activeRate,
+                            onDismiss = { customEditorOpen = false },
+                            onRateSelected = select,
+                        )
+                    }
                 } else {
                     null
                 },
-            items = if (customEditorOpen) emptyList() else transportRateItems(rateOverride, locale, select) { customEditorOpen = true },
+            items =
+                if (customEditorOpen) {
+                    emptyList()
+                } else {
+                    transportRateItems(rateOverride, locale, select) { customEditorOpen = true }
+                },
         )
     }
 }

@@ -7,7 +7,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,9 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -37,18 +34,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -339,7 +332,7 @@ internal fun disappearingChipColumns(): Int =
     }
 
 @Composable
-private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+internal fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -350,7 +343,7 @@ private fun ChipRow(content: @Composable androidx.compose.foundation.layout.RowS
 
 /** A compact timer choice with a gray selection outline on AMOLED and an accent fill elsewhere. */
 @Composable
-private fun DisappearingChip(
+internal fun DisappearingChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -470,100 +463,6 @@ private fun DisappearingPruneConfirm(
                 colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
                 modifier = Modifier.testTag(DISAPPEARING_CONFIRM_ACTION_TAG),
             ) { Text(stringResource(R.string.disappearing_confirm_button)) }
-        }
-    }
-}
-
-/** The custom duration being edited: a value in one of [disappearingCustomUnits], read back as [secs]. */
-@Stable
-internal class DisappearingCustomState(
-    initialSecs: Long,
-) {
-    private val start = disappearingCustomPickerStateForSeconds(initialSecs)
-    var unitIndex by mutableIntStateOf(start.unitIndex)
-    var value by mutableIntStateOf(start.value)
-    val secs: Long get() = disappearingCustomSeconds(value, unitIndex)
-}
-
-/** A custom-duration editor seeded from [initialSecs], reset whenever that changes. */
-@Composable
-internal fun rememberDisappearingCustomState(initialSecs: Long): DisappearingCustomState = remember(initialSecs) { DisappearingCustomState(initialSecs) }
-
-/**
- * The custom-duration controls shared by the chat sheet's second page and the Settings default dialog: a big
- * readout, a slider with fine steps and plus/minus buttons, and the unit choices.
- */
-@Composable
-@Suppress("LongMethod")
-internal fun DisappearingCustomControls(state: DisappearingCustomState) {
-    val units = disappearingCustomUnits
-    val unitIndex = state.unitIndex
-    val value = state.value
-    val maxValue = units[unitIndex].max
-    val columns = disappearingChipColumns()
-    val secs = state.secs
-    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-        AnimatedContent(
-            targetState = secs,
-            transitionSpec = {
-                val up = targetState > initialState
-                (slideInVertically { h -> if (up) h / 2 else -h / 2 } + fadeIn())
-                    .togetherWith(slideOutVertically { h -> if (up) -h / 2 else h / 2 } + fadeOut())
-            },
-            modifier = Modifier.fillMaxWidth().animateContentSize(),
-            label = "disappearing-custom-readout",
-        ) { shownSecs ->
-            Text(
-                disappearingMessagesLabel(shownSecs),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = WhiteNoiseSpacing.Related),
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = { state.value = (value - 1).coerceIn(1, maxValue) },
-                enabled = value > 1,
-                modifier = Modifier.testTag(DISAPPEARING_CUSTOM_DECREASE_TAG),
-            ) {
-                Icon(painterResource(R.drawable.ic_remove), stringResource(R.string.disappearing_custom_decrease))
-            }
-            Slider(
-                value = value.coerceAtMost(maxValue).toFloat(),
-                onValueChange = { state.value = it.toInt().coerceIn(1, maxValue) },
-                valueRange = 1f..maxValue.toFloat(),
-                steps = (maxValue - 2).coerceAtLeast(0),
-                modifier = Modifier.weight(1f).testTag(DISAPPEARING_CUSTOM_SLIDER_TAG),
-            )
-            IconButton(
-                onClick = { state.value = (value + 1).coerceAtMost(maxValue) },
-                enabled = value < maxValue,
-                modifier = Modifier.testTag(DISAPPEARING_CUSTOM_INCREASE_TAG),
-            ) {
-                Icon(painterResource(R.drawable.ic_add), stringResource(R.string.disappearing_custom_increase))
-            }
-        }
-        Column(
-            Modifier.selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        ) {
-            units.indices.chunked(columns).forEach { row ->
-                ChipRow {
-                    row.forEach { index ->
-                        DisappearingChip(
-                            label = stringResource(units[index].labelRes),
-                            selected = unitIndex == index,
-                            onClick = {
-                                state.unitIndex = index
-                                state.value = clampDisappearingCustomValue(value, index)
-                            },
-                            modifier = Modifier.weight(1f).testTag(disappearingUnitTag(index)),
-                        )
-                    }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
         }
     }
 }

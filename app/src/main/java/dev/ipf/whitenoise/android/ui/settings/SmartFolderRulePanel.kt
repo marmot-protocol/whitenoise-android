@@ -279,7 +279,8 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
             onDismissRequest = { open = false },
             items =
                 listOf(true, false).map { allRead ->
-                    val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
+                    val title =
+                        if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
                     WhiteNoiseMenuItem(
                         label = stringResource(title),
                         onClick = { onSelect(allRead) },

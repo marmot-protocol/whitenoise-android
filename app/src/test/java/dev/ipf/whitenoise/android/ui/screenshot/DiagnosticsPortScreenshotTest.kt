@@ -64,12 +64,24 @@ class DiagnosticsPortScreenshotTest {
     @Test fun clearConfirmLight() = capture("diagnostics_clear_confirm_light", clearConfirm = true)
 
     /** The Clear confirmation keeps its error-coloured action on the dark dialog surface. */
-    @Test fun clearConfirmDark() = capture("diagnostics_clear_confirm_dark", dark = true, clearConfirm = true)
+    @Test
+    fun clearConfirmDark() = capture("diagnostics_clear_confirm_dark", dark = true, clearConfirm = true)
 
     /** The Clear confirmation wraps its warning in RTL at two-times font scale. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
-    fun clearConfirmRtlLargeText() = capture("diagnostics_clear_confirm_rtl_large", largeRtl = true, clearConfirm = true)
+    fun clearConfirmRtlLargeText() {
+        capture("diagnostics_clear_confirm_rtl_large", largeRtl = true, clearConfirm = true)
+    }
+
+    /** Opens ⋮, taps Clear and captures the confirmation dialog it raises. */
+    private fun captureClearConfirmation(name: String) {
+        composeRule.onNodeWithTag("diagnostics.actions").performClick()
+        composeRule.onNodeWithTag("diagnostics.action.clear").performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
+    }
 
     /** Uses stable, synthetic presentation fixtures and no wall-clock-dependent event time. */
     private fun capture(
@@ -131,14 +143,7 @@ class DiagnosticsPortScreenshotTest {
             composeRule.onNodeWithTag("diagnostics.health").assertIsDisplayed()
             composeRule.onNodeWithTag("diagnostics.actions.menu").assertDoesNotExist()
         }
-        if (clearConfirm) {
-            composeRule.onNodeWithTag("diagnostics.actions").performClick()
-            composeRule.onNodeWithTag("diagnostics.action.clear").performClick()
-            composeRule.mainClock.advanceTimeBy(1_000)
-            composeRule.waitForIdle()
-            composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
-            return
-        }
+        if (clearConfirm) return captureClearConfirmation(name)
         composeRule
             .onNodeWithTag(if (health) "sheet.surface" else DIAGNOSTICS_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/$name.png")
