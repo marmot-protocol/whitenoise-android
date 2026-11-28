@@ -48,8 +48,10 @@ internal class MessageBubbleTtsPresentation(
  * order and every `remember` keeps its keys and scope. The inputs are the values the bubble computed above this
  * point; nothing here reads state the bubble did not already read in the same composition.
  */
+// Explicit inputs, one per value the old inline block read from the bubble. The body moved unchanged from
+// MessageBubble, whose length and branching were covered by its detekt baseline entry.
 @Composable
-@Suppress("LongParameterList") // Explicit inputs: one per value the old inline block read from the bubble.
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun rememberMessageBubbleTtsPresentation(
     appState: WhiteNoiseAppState,
     record: AppMessageRecordFfi,

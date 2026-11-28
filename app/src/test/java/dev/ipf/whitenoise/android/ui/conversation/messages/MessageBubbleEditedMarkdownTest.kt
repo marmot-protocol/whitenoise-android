@@ -80,6 +80,11 @@ class MessageBubbleEditedMarkdownTest {
             "edited display markdown must use dedicated display resolver",
             "rememberMessageBubbleEditedDisplayMarkdownDocument(" in source,
         )
+        assertTrue(
+            "the bubble must hand its edited display document to the read-aloud presentation",
+            "rememberMessageBubbleTtsPresentation(" in source &&
+                "editedMarkdownDocument = editedMarkdownDocument" in source,
+        )
         val presentationSource = messageBubbleTtsPresentationSource().readText()
         assertTrue(
             "active TTS must reuse the display parse instead of parsing an edit twice",
@@ -336,7 +341,9 @@ class MessageBubbleEditedMarkdownTest {
     private fun messageBubbleTtsPresentationSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTtsPresentation.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTtsPresentation.kt"),
+            File(
+                "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleTtsPresentation.kt",
+            ),
         ).first { it.exists() }
 
     /** Builds an app state with a single running, locally signing active account. */
