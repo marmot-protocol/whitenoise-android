@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,7 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
-import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.SpeechChoicePage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,6 +84,35 @@ class TtsVoiceMediaSettingsComposeTest {
         composeRule.onNodeWithText(app.getString(R.string.tts_media_mix_title)).assertIsOn()
     }
 
+    /** Tapping an available voice on the catalog page applies it once and the page returns to its opener. */
+    @Test
+    fun availableVoiceAppliesAndClosesThePage() {
+        var applied = 0
+        var dismissed = 0
+        val voice =
+            TtsVoiceOption(
+                key = TtsVoiceKey("engine.a", "Local voice", "en-US"),
+                label = "Local voice",
+                localeTag = "en-US",
+                unavailableReason = null,
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SpeechChoicePage(
+                    title = app.getString(R.string.tts_voice_title),
+                    choices = listOf(speechVoiceChoice(voice, Locale.US, selected = false) { applied++ }),
+                    onDismiss = { dismissed++ },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Local voice").assertIsSelectable().performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.runOnIdle {
+            assertEquals(1, applied)
+            assertEquals(1, dismissed)
+        }
+    }
+
     /** A network-only voice announces its locale and reason and stays unselectable. */
     @Test
     fun unavailableVoiceNamesLocaleAndReasonAndCannotBeActivated() {
@@ -96,7 +126,7 @@ class TtsVoiceMediaSettingsComposeTest {
             )
         composeRule.setContent {
             WhiteNoiseTheme {
-                SpeechChoiceDialog(
+                SpeechChoicePage(
                     title = app.getString(R.string.tts_voice_title),
                     choices = listOf(speechVoiceChoice(voice, Locale.US, selected = false) { clicked = true }),
                     onDismiss = {},

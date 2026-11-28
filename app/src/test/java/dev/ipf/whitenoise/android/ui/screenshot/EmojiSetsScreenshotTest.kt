@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -242,6 +243,39 @@ class EmojiSetsScreenshotTest {
             onCancel = {},
             onRemove = {},
         )
+    }
+
+    /**
+     * Remove asks first, because getting the set back means downloading it again: Cancel keeps the set, and only
+     * the confirmation's error-coloured Remove runs the removal (#4097).
+     */
+    @Test fun removeConfirmsBeforeRemovingTheSet() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val set = emojiSetFixture().copy(installed = installedHere)
+        var removals = 0
+        setTheme(dark = false, rtl = false) {
+            EmojiSetsContent(
+                state = EmojiSetsState(sets = listOf(set), preview = set),
+                onBack = {},
+                onSearch = {},
+                onShow = {},
+                images = null,
+                onInstall = {},
+                onCancel = {},
+                onRemove = { removals++ },
+            )
+        }
+        val remove = context.getString(R.string.remove)
+        composeRule.onNodeWithText(remove).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.emoji_sets_remove_detail)).assertExists()
+        composeRule.onNodeWithTag("emoji_sets.remove.cancel").performClick()
+        composeRule.runOnIdle { assertEquals(0, removals) }
+        composeRule.onNodeWithText(remove).performClick()
+        composeRule.mainClock.advanceTimeBy(DIALOG_SETTLE_MS)
+        composeRule.waitForIdle()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/emoji_sets_remove_confirm_light.png")
+        composeRule.onNodeWithTag("emoji_sets.remove.confirm").performClick()
+        composeRule.runOnIdle { assertEquals(1, removals) }
     }
 
     /** The update check waits for the opening sync, which would otherwise drop the lookup. */
@@ -491,3 +525,6 @@ private fun galleryFixture() =
         imageUrl = "https://cdn.emoji.example/cover.png",
         emoji = GalleryCodes.map { dev.ipf.marmotkit.EmojiSetEmojiFfi(it, "https://cdn.emoji.example/$it.png") },
     )
+
+/** Time for a dialog to finish its entrance before capture. */
+private const val DIALOG_SETTLE_MS = 1_000L

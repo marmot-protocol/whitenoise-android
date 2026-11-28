@@ -10,9 +10,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -22,7 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
-import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.SpeechChoicePage
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -77,23 +77,48 @@ class TtsVoiceMediaSettingsScreenshotTest {
         )
     }
 
-    /** The voice picker with the automatic entry, an offline voice and a network-only one that cannot be chosen. */
+    /**
+     * The voice catalog page (#4094): Back, an offline voice selected and a network-only one that cannot be chosen,
+     * as Material radio rows.
+     */
     @Test
-    fun voiceChoicesLight() {
+    fun voicePageLight() = voicePage("tts_voice_page_light")
+
+    /** The voice page on the dark theme keeps the selected radio and disabled row legible. */
+    @Test
+    fun voicePageDark() = voicePage("tts_voice_page_dark", dark = true)
+
+    /** The voice page mirrored with 200 % text, so the locale and reason lines wrap. */
+    @Test
+    fun voicePageRtlLargeFont() = voicePage("tts_voice_page_rtl_large_font", rtlLarge = true)
+
+    /** Renders [SpeechChoicePage] with fixed voices and captures its page window. */
+    private fun voicePage(
+        name: String,
+        dark: Boolean = false,
+        rtlLarge: Boolean = false,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                SpeechChoiceDialog(
-                    title = stringResource(R.string.tts_voice_title),
-                    choices =
-                        listOf(
-                            speechVoiceChoice(offlineVoice(), Locale.US, selected = true) {},
-                            speechVoiceChoice(networkVoice(), Locale.US, selected = false) {},
-                        ),
-                    onDismiss = {},
-                )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtlLarge) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalDensity provides Density(density = 1f, fontScale = if (rtlLarge) 2f else 1f),
+            ) {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    SpeechChoicePage(
+                        title = stringResource(R.string.tts_voice_title),
+                        choices =
+                            listOf(
+                                speechVoiceChoice(offlineVoice(), Locale.US, selected = true) {},
+                                speechVoiceChoice(networkVoice(), Locale.US, selected = false) {},
+                            ),
+                        onDismiss = {},
+                    )
+                }
             }
         }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/tts_voice_choices_light.png")
+        composeRule.mainClock.advanceTimeBy(PAGE_SETTLE_MS)
+        composeRule.waitForIdle()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** The speech preference rows as Read Aloud groups them. */
@@ -153,3 +178,6 @@ class TtsVoiceMediaSettingsScreenshotTest {
         const val GALLERY_TAG = "tts-voice-media-settings-gallery"
     }
 }
+
+/** Time for the page to finish its entrance before capture. */
+private const val PAGE_SETTLE_MS = 1_000L

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_CHOICE_PAGE_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -140,7 +141,7 @@ class ComposerTranslationLanguagePickerTest {
         scope.cancel()
     }
 
-    /** The settings picker opens the same sheet and saves the chosen language. */
+    /** Without asPage the picker opens the in-chat sheet and saves the chosen language. */
     @Test
     fun settingsPickerOpensTheSheetAndSaves() {
         var saved: String? = null
@@ -154,5 +155,32 @@ class ComposerTranslationLanguagePickerTest {
         composeRule.onNodeWithTag("translation.language.de").performClick()
         composeRule.runOnIdle { assertEquals("de", saved) }
         composeRule.onNodeWithTag("translation.language.search").assertDoesNotExist()
+    }
+
+    /**
+     * In Settings the language list is a catalog, so [TranslationLanguagePicker] with asPage opens a page with Back
+     * (#4094): the same search and radio rows, the current language selected, and a tap that saves and returns.
+     */
+    @Test
+    fun settingsCatalogPageSearchesSelectsAndReturns() {
+        var saved: String? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TranslationLanguagePicker(
+                    title = "Target language",
+                    selected = "en",
+                    onSelected = { saved = it },
+                    asPage = true,
+                )
+            }
+        }
+        composeRule.onNodeWithText("Target language", substring = true).performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_CHOICE_PAGE_TAG).assertExists()
+        composeRule.onNodeWithTag("translation.language.en").assertIsSelected()
+        composeRule.onNodeWithTag("translation.language.search").performTextReplacement("deu")
+        composeRule.onNodeWithTag("translation.language.de").performClick()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.runOnIdle { assertEquals("de", saved) }
+        composeRule.onNodeWithTag(WHITE_NOISE_CHOICE_PAGE_TAG).assertDoesNotExist()
     }
 }

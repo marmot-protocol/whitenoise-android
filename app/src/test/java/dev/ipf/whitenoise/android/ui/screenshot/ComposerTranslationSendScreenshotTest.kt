@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTextInput
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.TranslationEngine
 import dev.ipf.whitenoise.android.translation.TranslationEngineIdentity
 import dev.ipf.whitenoise.android.translation.TranslationLanguageChoices
+import dev.ipf.whitenoise.android.translation.TranslationLanguagePickerPage
 import dev.ipf.whitenoise.android.translation.TranslationLanguagePickerSheet
 import dev.ipf.whitenoise.android.translation.TranslationTrust
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -96,6 +98,16 @@ class ComposerTranslationSendScreenshotTest {
         picker("translation_language_picker_amoled_large_rtl.png", dark = true, amoled = true, rtl = true)
     }
 
+    /** The Settings catalog page (#4094): Back, search and radio rows with the current language selected. */
+    @Test fun pageLight() = picker("translation_language_page_light.png", page = true)
+
+    /** The catalog page on the dark theme. */
+    @Test fun pageDark() = picker("translation_language_page_dark.png", dark = true, page = true)
+
+    /** The catalog page mirrored at twice the font size. */
+    @Test
+    fun pageLargeRtl() = picker("translation_language_page_large_rtl.png", rtl = true, page = true)
+
     /** Renders the composer in translate mode, either waiting on the engine or with the translation ready. */
     private fun composer(
         name: String,
@@ -136,13 +148,18 @@ class ComposerTranslationSendScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$name")
     }
 
-    /** Renders the shared picker sheet, optionally with [query] typed into its search field. */
+    /**
+     * Renders the in-chat picker sheet, or with [page] the Settings catalog page, optionally with [query] typed into
+     * its search field.
+     */
+    @Suppress("LongParameterList")
     private fun picker(
         name: String,
         dark: Boolean = false,
         amoled: Boolean = false,
         query: String = "",
         rtl: Boolean = false,
+        page: Boolean = false,
     ) {
         val names =
             linkedMapOf(
@@ -159,18 +176,23 @@ class ComposerTranslationSendScreenshotTest {
             )
         composeRule.setContent {
             Appearance(dark, amoled, rtl) {
-                TranslationLanguagePickerSheet(
-                    title = "Target language",
-                    choices = TranslationLanguageChoices(names.keys.toList()) { names.getValue(it) },
-                    selected = if (query.isEmpty()) "zh_hant" else "de",
-                    onDismiss = {},
-                    onSelect = {},
-                )
+                val choices = TranslationLanguageChoices(names.keys.toList()) { names.getValue(it) }
+                val selected = if (query.isEmpty()) "zh_hant" else "de"
+                if (page) {
+                    TranslationLanguagePickerPage("Target language", choices, selected, onDismiss = {}, onSelect = {})
+                } else {
+                    TranslationLanguagePickerSheet("Target language", choices, selected, onDismiss = {}, onSelect = {})
+                }
             }
         }
         if (query.isNotEmpty()) composeRule.onNodeWithTag("translation.language.search").performTextInput(query)
+        if (page) composeRule.mainClock.advanceTimeBy(PAGE_SETTLE_MS)
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("sheet.surface").captureRoboImage("src/test/snapshots/$name")
+        if (page) {
+            composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name")
+        } else {
+            composeRule.onNodeWithTag("sheet.surface").captureRoboImage("src/test/snapshots/$name")
+        }
     }
 
     /** Applies the theme, and for [rtl] a right-to-left layout at twice the font size. */
@@ -212,3 +234,6 @@ class ComposerTranslationSendScreenshotTest {
         const val FRAMES = 30
     }
 }
+
+/** Time for the catalog page to finish its entrance before capture. */
+private const val PAGE_SETTLE_MS = 1_000L
