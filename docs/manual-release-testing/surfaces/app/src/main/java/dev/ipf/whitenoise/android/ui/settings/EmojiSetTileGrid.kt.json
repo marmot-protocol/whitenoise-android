@@ -1,0 +1,77 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EmojiSetTileRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "fun EmojiSetTileRow(",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "EmojiSetTile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "fun EmojiSetTile(",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "PulsingBlank",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "fun PulsingBlank(",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "EmojiSetTileContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "fun EmojiSetTileContent(",
+        "test_ids": [
+          "SET-076"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:emoji_sets_emoji_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "R.string.emoji_sets_emoji_loading",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_emoji_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "R.string.emoji_sets_emoji_failed",
+        "test_ids": [
+          "SET-076"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_emoji_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "R.string.emoji_sets_emoji_unavailable",
+        "test_ids": [
+          "SET-076"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetTileGrid.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-076"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -85,8 +85,8 @@
     <string name="explanation_organize_emoji_find">在你的中继（传递消息的服务器）上搜索与你输入内容匹配的表情包。如果你粘贴了表情包链接，它会直接打开该表情包。在你选择安装之前，不会安装任何内容。</string>
     <string name="explanation_organize_emoji_set">打开此表情包的预览，让你在安装前先查看。名称下方的一行显示它有多少个表情，或者它是否已安装、是否有更新。</string>
     <string name="explanation_organize_emoji_builtin_set">关闭后，此表情符号组将不会出现在表情选择器和建议中。别人发送其中的表情符号时仍会显示，你可以随时重新开启。</string>
-    <string name="explanation_organize_emoji_load_image">从托管此表情包的服务器加载它的预览图片。这会向该图片托管方分享你的 IP 地址。不加载的话，表情包只会以文字形式显示。</string>
     <string name="explanation_organize_emoji_install">安装此表情包，让你可以在消息中使用其中的表情。安装会下载图片，这会向它们的图片托管方分享你的 IP 地址。安装过程中你可以取消，之后也可以移除该表情包。</string>
+    <string name="explanation_organize_emoji_load_emoji">从托管服务器加载图片，预览此表情包中的表情。服务器会收到你的 IP 地址。图片只在安装表情包后保存。</string>
     <string name="explanation_organize_emoji_update">用此表情包的较新版本替换你已安装的副本。更新会再次下载图片，这会向它们的图片托管方分享你的 IP 地址。</string>
     <string name="explanation_organize_emoji_check_update">再次查找此已安装表情包的较新版本。如果找到，会出现更新按钮。在你更新之前，已安装的表情包不会改变。</string>
     <string name="explanation_organize_emoji_remove">从你已安装的表情包中移除此表情包，这样它的表情不再供你使用。你以后可以再次找到并安装该表情包。</string>

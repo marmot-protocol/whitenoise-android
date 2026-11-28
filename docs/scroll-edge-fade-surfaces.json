@@ -1601,9 +1601,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-076"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
       "calls": {
-        "SettingsList": 2
+        "SettingsList": 1
       },
       "family": "settings",
       "policy": "ordinary",
