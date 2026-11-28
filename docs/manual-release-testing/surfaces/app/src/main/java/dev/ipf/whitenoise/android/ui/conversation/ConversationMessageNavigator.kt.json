@@ -26,6 +26,14 @@
         "test_ids": [
           "FIND-019"
         ]
+      },
+      {
+        "surface": "In-chat search close returns to the reading position",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMessageNavigator.kt",
+        "anchor": "fun closeSearch(",
+        "test_ids": [
+          "FIND-011"
+        ]
       }
     ]
   },

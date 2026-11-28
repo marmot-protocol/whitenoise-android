@@ -2979,46 +2979,6 @@ class ConversationController(
     }
 
     /**
-     * Move the subscription-owned bounded window toward [match] until that
-     * exhaustive local-search result is present or the relevant side of local
-     * history is exhausted. Timestamp + id let traversal page in either
-     * direction after an earlier jump shifted the capped window.
-     */
-    suspend fun loadSearchResultMessageAvailable(match: ConversationSearchMatch): Boolean {
-        while (!timelineRecords.containsKey(match.messageIdHex)) {
-            if (timelineRecords.isEmpty()) break
-            val oldest =
-                timelineRecords.values.minWithOrNull(
-                    compareBy({ it.timelineAt }, { it.messageIdHex }),
-                ) ?: break
-            val newest =
-                timelineRecords.values.maxWithOrNull(
-                    compareBy({ it.timelineAt }, { it.messageIdHex }),
-                ) ?: break
-            val direction =
-                conversationSearchPageDirection(
-                    match = match,
-                    oldestTimelineAt = oldest.timelineAt,
-                    oldestMessageId = oldest.messageIdHex,
-                    newestTimelineAt = newest.timelineAt,
-                    newestMessageId = newest.messageIdHex,
-                    hasMoreBefore = hasMoreBefore,
-                    hasMoreAfter = hasMoreAfter,
-                )
-            val madeProgress =
-                when (direction) {
-                    // Anchor at the oldest held row: an unanchored page at the window cap stays
-                    // head-anchored and trims what it just fetched, so it never reaches the match (#2873).
-                    ConversationSearchPageDirection.OLDER -> loadOlderPage(anchorMessageIdHex = oldest.messageIdHex)
-                    ConversationSearchPageDirection.NEWER -> loadNewerPage()
-                    null -> false
-                }
-            if (!madeProgress) break
-        }
-        return timelineRecords.containsKey(match.messageIdHex)
-    }
-
-    /**
      * Move the bounded window toward a message at a known timeline position,
      * paging in whichever direction it lies — [loadUntilMessageAvailable]
      * only walks older, so it can never reach a target newer than the loaded

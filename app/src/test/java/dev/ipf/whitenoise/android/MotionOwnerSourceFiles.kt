@@ -11,6 +11,7 @@ internal fun File.motionOwnerSource(): String {
                 listOf(
                     "ConversationNavigationState.kt",
                     "ConversationMessageNavigator.kt",
+                    "ConversationSearchSession.kt",
                     "ConversationMessageDragSelection.kt",
                     "ConversationReadAloudFollow.kt",
                     "ConversationBodyExpansionPosition.kt",

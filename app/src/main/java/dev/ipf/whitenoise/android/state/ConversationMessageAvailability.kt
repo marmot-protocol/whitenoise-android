@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -174,4 +176,48 @@ internal suspend fun retryConversationWindowJump(
         }
     }
     return ConversationWindowJumpResult.RETRYABLE
+}
+
+/**
+ * Move the subscription-owned bounded window toward [match] until that
+ * exhaustive local-search result is present or the relevant side of local
+ * history is exhausted. Timestamp + id let traversal page in either
+ * direction after an earlier jump shifted the capped window.
+ *
+ * [isCurrent] is checked before every page, so a navigation the reader superseded mid-traversal, such as a search
+ * return interrupted by a drag, requests no further page (#4224).
+ */
+internal suspend fun ConversationController.loadSearchResultMessageAvailable(
+    match: ConversationSearchMatch,
+    isCurrent: () -> Boolean = { true },
+): Boolean {
+    var progressing = true
+    while (progressing && !timelineRecords.containsKey(match.messageIdHex) && isCurrent()) {
+        progressing = pageTowardSearchMatch(match)
+    }
+    return timelineRecords.containsKey(match.messageIdHex)
+}
+
+/** Pages the window once toward [match]; false when it is empty, has no history left that way, or made no progress. */
+private suspend fun ConversationController.pageTowardSearchMatch(match: ConversationSearchMatch): Boolean {
+    val order = compareBy<TimelineMessageRecordFfi>({ it.timelineAt }, { it.messageIdHex })
+    val oldest = timelineRecords.values.minWithOrNull(order) ?: return false
+    val newest = timelineRecords.values.maxWith(order)
+    val direction =
+        conversationSearchPageDirection(
+            match = match,
+            oldestTimelineAt = oldest.timelineAt,
+            oldestMessageId = oldest.messageIdHex,
+            newestTimelineAt = newest.timelineAt,
+            newestMessageId = newest.messageIdHex,
+            hasMoreBefore = hasMoreBefore,
+            hasMoreAfter = hasMoreAfter,
+        )
+    return when (direction) {
+        // Anchor at the oldest held row: an unanchored page at the window cap stays
+        // head-anchored and trims what it just fetched, so it never reaches the match (#2873).
+        ConversationSearchPageDirection.OLDER -> loadOlderPage(anchorMessageIdHex = oldest.messageIdHex)
+        ConversationSearchPageDirection.NEWER -> loadNewerPage()
+        null -> false
+    }
 }

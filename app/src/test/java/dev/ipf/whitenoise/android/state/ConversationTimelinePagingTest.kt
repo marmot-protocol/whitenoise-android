@@ -205,6 +205,25 @@ class ConversationTimelinePagingTest {
             }
         }
 
+    /** A traversal whose navigation became stale after its first page requests no second page (#4224). */
+    @Test
+    fun searchTraversalStopsPagingOnceItsNavigationIsStale() =
+        runBlocking {
+            val subscription = subscriptionWith(olderPage(), olderPage())
+            withController(subscription) { controller ->
+                settle()
+                var checks = 0
+
+                val reached =
+                    controller.loadSearchResultMessageAvailable(
+                        ConversationSearchMatch(messageIdHex = TARGET_ID, timelineAt = 10uL),
+                    ) { checks++ == 0 }
+
+                assertFalse(reached)
+                assertEquals(1, subscription.backwardsCallCount)
+            }
+        }
+
     /** A row the window no longer retains, such as an optimistic local id, is never sent as an anchor. */
     @Test
     fun unretainedRowIsNeverSentAsAnAnchor() =
