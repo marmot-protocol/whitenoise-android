@@ -62,6 +62,9 @@ class DeviceLinkAttemptHistoryTest {
                 state = DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.TIMED_OUT),
             )
 
-        private fun cancelled() = expired("cancelled").copy(state = DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.CANCELLED))
+        private fun cancelled(): DeviceLinkPromptFfi {
+            val state = DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.CANCELLED)
+            return expired("cancelled").copy(state = state)
+        }
     }
 }

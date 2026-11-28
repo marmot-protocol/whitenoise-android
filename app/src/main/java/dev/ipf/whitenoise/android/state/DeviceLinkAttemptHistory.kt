@@ -42,7 +42,10 @@ internal class DeviceLinkAttemptHistory(
         preferences.all.mapValues { (_, stored) -> (stored as? Set<*>).orEmpty().mapNotNull(::decodeAttempt) },
     )
 
-    fun missed(accountRef: String): List<DeviceLinkAttempt> = recent(attempts[accountRef].orEmpty()).filterNot { it.reviewed }
+    fun missed(accountRef: String): List<DeviceLinkAttempt> {
+        val stored = attempts[accountRef].orEmpty()
+        return recent(stored).filterNot { it.reviewed }
+    }
 
     fun forget(accountRef: String) = update(attempts - accountRef)
 
