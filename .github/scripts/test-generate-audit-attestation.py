@@ -13,7 +13,7 @@ BASE_ENV = {
     "GITHUB_ACTIONS": "true",
     "GITHUB_REPOSITORY": "marmot-protocol/whitenoise-android",
     "GITHUB_WORKFLOW": "Android Staging APK",
-    "GITHUB_REF": "refs/heads/master",
+    "GITHUB_REF": "refs/heads/develop",
     "GITHUB_EVENT_NAME": "push",
     "GITHUB_ACTOR": "Datawav",
     "GITHUB_SHA": "1" * 40,
@@ -103,6 +103,7 @@ class GenerateAuditAttestationTest(unittest.TestCase):
     def test_rejects_untrusted_workflow_or_ref(self) -> None:
         for overrides in (
             {"GITHUB_WORKFLOW": "Android CI"},
+            {"GITHUB_REF": "refs/heads/master"},
             {"GITHUB_REF": "refs/pull/123/merge"},
             {"GITHUB_SHA": "short"},
             {"GITHUB_ACTIONS": "false"},
