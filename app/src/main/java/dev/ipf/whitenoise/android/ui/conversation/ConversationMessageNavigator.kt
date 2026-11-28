@@ -347,18 +347,19 @@ internal class ConversationMessageNavigator(
                 presentationState.searchState.value =
                     GlobalSearchTransitions.closeSearch(presentationState.searchState.value)
             },
-        ) { anchor ->
+        ) { anchor, isCurrent ->
             // A deep search jump can evict the original viewport from the capped
             // window. Page back to its durable local message before asking the
             // coordinator to restore the logical anchor and exact offset.
             val match = anchor.match
             if (match != null &&
-                pageBackForSearchReturn({ controller.isLoadingPage }) {
+                pageBackForSearchReturn({ controller.isLoadingPage }, isCurrent) {
                     controller.loadSearchResultMessageAvailable(match)
                 }
             ) {
                 withFrameNanos { }
             }
+            if (!isCurrent()) return@closeSearchSession
             // A saved message that could not be paged back stays the reader's search position, rather than
             // landing on whatever row now sits at its old list index.
             val saved = anchor.bookmark.anchor

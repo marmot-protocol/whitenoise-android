@@ -20,7 +20,7 @@ import org.junit.Test
  * Closing in-chat search returns the reader to where search opened (#4224). The return can wait at a paging
  * boundary, and a second close of the same session (the toolbar and system Back together) must leave it running,
  * while a newer search session or a reader scroll still supersedes it. A page already in flight delays the return
- * rather than cancelling it.
+ * rather than cancelling it, and a reader scroll stops it from paging any further.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationSearchSessionTest {
@@ -71,21 +71,32 @@ class ConversationSearchSessionTest {
             assertEquals(listOf(ScrollWrite(30, 0)), harness.writer.writes)
         }
 
-    /** A reader scroll after the close is newer intent, so the pending return leaves the list where it is. */
+    /**
+     * A reader scroll while the return waits behind an in-flight page ends the return's navigation request, so it
+     * requests no page after that page ends. The scroll cancels target navigation exactly as the screen's
+     * `onReaderScrollStarted` does.
+     */
     @Test
-    fun readerScrollSupersedesThePendingReturn() =
+    fun readerScrollWhileTheReturnWaitsRequestsNoPage() =
         runTest {
             val harness = Harness(this)
             harness.openAt(anchor("reader", listIndex = 12))
-            harness.close()
+            var loading by mutableStateOf(true)
+            var pages = 0
+            harness.navigation.closeSearchSession(scope = this, clearSearch = {}) { _, isCurrent ->
+                pageBackForSearchReturn({ loading }, isCurrent) {
+                    pages += 1
+                    true
+                }
+            }
             runCurrent()
 
-            harness.coordinator.onUserGestureStarted(anchor("scrolled", listIndex = 20))
-            harness.paging.complete(Unit)
+            harness.navigation.targetNavigation.cancel()
+            loading = false
+            Snapshot.sendApplyNotifications()
             runCurrent()
 
-            assertEquals(1, harness.returnedTo.size)
-            assertTrue(harness.writer.writes.isEmpty())
+            assertEquals(0, pages)
         }
 
     /** Opening a new search while the previous close still pages back leaves the transcript under the new search. */
@@ -139,7 +150,7 @@ class ConversationSearchSessionTest {
             var attempts = 0
             val result =
                 async {
-                    pageBackForSearchReturn({ loading }) {
+                    pageBackForSearchReturn({ loading }, { true }) {
                         attempts += 1
                         true
                     }
@@ -163,7 +174,7 @@ class ConversationSearchSessionTest {
             var attempts = 0
             val result =
                 async {
-                    pageBackForSearchReturn({ loading }) {
+                    pageBackForSearchReturn({ loading }, { true }) {
                         attempts += 1
                         if (attempts == 1) loading = true
                         attempts > 1
@@ -187,7 +198,7 @@ class ConversationSearchSessionTest {
             var attempts = 0
 
             val available =
-                pageBackForSearchReturn({ false }) {
+                pageBackForSearchReturn({ false }, { true }) {
                     attempts += 1
                     false
                 }
@@ -226,7 +237,7 @@ class ConversationSearchSessionTest {
         /** Closes search the way the conversation screen does, capturing the intent at close time. */
         fun close() {
             val expectedIntent = coordinator.intentToken
-            navigation.closeSearchSession(scope = scope, clearSearch = {}) { saved ->
+            navigation.closeSearchSession(scope = scope, clearSearch = {}) { saved, _ ->
                 paging.await()
                 returnedTo += saved.bookmark
                 coordinator.restoreBookmark(saved.bookmark, expectedIntent) { it.listIndex }

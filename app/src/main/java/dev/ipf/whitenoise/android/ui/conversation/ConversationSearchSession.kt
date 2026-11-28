@@ -43,13 +43,14 @@ internal fun ConversationNavigationState.openSearchSession(
  *
  * Only the close that ends an open session does this (#4224). The toolbar's close and system Back can both land
  * for one session, and a repeated close must not cancel the return the first one started. A later search jump
- * still supersedes that return through the shared search job, and a reader scroll through the intent the caller
- * checks in [returnTo].
+ * still supersedes that return through the shared search job. The return owns a target navigation request, and
+ * [returnTo] receives its staleness check: a reader scroll or a newer reply jump ends that request, so the return
+ * stops before it pages or scrolls again.
  */
 internal fun ConversationNavigationState.closeSearchSession(
     scope: CoroutineScope,
     clearSearch: () -> Unit,
-    returnTo: suspend (ConversationSearchScrollAnchor) -> Unit,
+    returnTo: suspend (anchor: ConversationSearchScrollAnchor, isCurrent: () -> Boolean) -> Unit,
 ) {
     if (!searchOpen) return
     searchOpen = false
@@ -58,30 +59,33 @@ internal fun ConversationNavigationState.closeSearchSession(
     val previousSearchJob = searchJob
     previousSearchJob?.cancel()
     navigateReplyJob?.cancel()
-    targetNavigation.cancel()
+    val returnRequest = targetNavigation.begin()
     targetHighlight.clear()
     val anchor = preSearchScrollAnchor ?: return
     preSearchScrollAnchor = null
     searchJob =
         scope.launch {
             previousSearchJob?.join()
-            returnTo(anchor)
+            returnTo(anchor, returnRequest::isCurrent)
         }
 }
 
 /**
  * Pages the window back to the saved position for a search return. A page already in flight, such as an automatic
  * prefetch, makes [loadMatch] report no progress, so the return waits for that page to end and tries again. A
- * message that is really gone still ends after one attempt, because nothing is loading when it fails.
+ * message that is really gone still ends after one attempt, because nothing is loading when it fails. Once
+ * [stillWanted] turns false, because the reader scrolled while the return waited, no further page is requested.
  */
 internal suspend fun pageBackForSearchReturn(
     isLoadingPage: () -> Boolean,
+    stillWanted: () -> Boolean,
     loadMatch: suspend () -> Boolean,
 ): Boolean {
     var attempts = 0
-    var available: Boolean
+    var available = false
     do {
         snapshotFlow(isLoadingPage).first { !it }
+        if (!stillWanted()) break
         available = loadMatch()
         attempts += 1
     } while (!available && isLoadingPage() && attempts < SEARCH_RETURN_PAGE_ATTEMPTS)
