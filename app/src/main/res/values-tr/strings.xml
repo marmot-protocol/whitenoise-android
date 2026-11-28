@@ -2828,6 +2828,7 @@
     <string name="remote_signer_approval_title">İmzalama uygulaman ek doğrulama istiyor</string>
     <string name="remote_signer_approval_body">Tarayıcında %1$s adresini aç, doğrulamayı tamamla ve White Noise’a dön.</string>
     <string name="remote_signer_approval_open">Açık onay sayfası</string>
+    <string name="remote_signer_approval_open_failed">Onay sayfası açılamadı. Tekrar dene.</string>
     <string name="remote_signer_approval_done">Bitirdim.</string>
     <string name="remote_signer_signing_in">Oturum açılıyor…</string>
     <string name="remote_signer_try_again">Tekrar dene.</string>

@@ -2847,6 +2847,7 @@
     <string name="remote_signer_approval_title">Deine Signier-App verlangt eine zusätzliche Bestätigung</string>
     <string name="remote_signer_approval_body">Öffne %1$s im Browser, schließe dort die Bestätigung ab und kehre dann zurück.</string>
     <string name="remote_signer_approval_open">Öffnen der Genehmigungsseite</string>
+    <string name="remote_signer_approval_open_failed">Die Freigabeseite konnte nicht geöffnet werden. Versuche es erneut.</string>
     <string name="remote_signer_approval_done">Ich bin fertig.</string>
     <string name="remote_signer_signing_in">Anmeldung läuft…</string>
     <string name="remote_signer_try_again">Versuchen Sie es noch mal .</string>

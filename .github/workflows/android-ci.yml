@@ -1528,8 +1528,10 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
+          # Use the same compiler budget as the isolated test-source compilation.
           ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
-            -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+            -Proborazzi.test.verify=true --max-workers=1 --build-cache --profile --no-daemon --stacktrace \
+            -Pkotlin.daemon.jvmargs=-Xmx5g
 
       - name: Upload reports
         if: failure()

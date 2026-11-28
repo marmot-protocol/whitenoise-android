@@ -3034,6 +3034,7 @@
     <string name="remote_signer_approval_title">Your signer needs an extra check</string>
     <string name="remote_signer_approval_body">Open %1$s in your browser, finish there, then come back.</string>
     <string name="remote_signer_approval_open">Open approval page</string>
+    <string name="remote_signer_approval_open_failed">Couldn’t open the approval page. Try again.</string>
     <string name="remote_signer_approval_done">I’ve finished</string>
     <string name="remote_signer_signing_in">Signing in…</string>
     <string name="remote_signer_try_again">Try again</string>

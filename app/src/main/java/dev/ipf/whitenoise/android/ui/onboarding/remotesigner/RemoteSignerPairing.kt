@@ -95,8 +95,18 @@ internal class RemoteSignerPairing(
     var method by mutableStateOf<RemoteSignerMethod?>(null)
         private set
 
-    /** The inline error under the link field; editing the field clears it. */
-    var linkErrorRes by mutableStateOf<Int?>(null)
+    private var rejectedLink by mutableStateOf<Pair<CharSequence, Int>?>(null)
+
+    /** The inline error belongs only to the text that failed validation. */
+    var linkErrorRes: Int?
+        get() = rejectedLink?.takeUnless { hasEditedRejectedLink }?.second
+        set(value) {
+            rejectedLink = value?.let { link.text to it }
+        }
+
+    /** A content change invalidates the error even if the user later restores the rejected link. */
+    val hasEditedRejectedLink: Boolean
+        get() = rejectedLink?.first?.contentEquals(link.text) == false
 
     /** The pasted or scanned bunker link; a masked field, never saved state. */
     val link = TextFieldState()
@@ -142,6 +152,7 @@ internal class RemoteSignerPairing(
         if (step != RemoteSignerStep.EnterLink) return
         val value = link.text.toString().trim()
         if (isBunkerLink(value)) {
+            linkErrorRes = null
             open(RemoteSignerMethod.BunkerLink, JSONObject().put("uri", value).toString())
         } else {
             linkErrorRes = R.string.remote_signer_error_not_bunker_link
@@ -162,7 +173,11 @@ internal class RemoteSignerPairing(
         val current = step as? RemoteSignerStep.Failed ?: return
         val reopen = lastOpen
         when {
-            current.failure.startOver -> back()
+            current.failure.startOver -> {
+                link.clearText()
+                linkErrorRes = null
+                back()
+            }
             // A bunker link's secret is spent once its session connected; the signer needs a fresh link.
             session == null && reopen?.first == RemoteSignerMethod.BunkerLink -> {
                 link.clearText()
@@ -188,7 +203,12 @@ internal class RemoteSignerPairing(
         val current = step
         val handled = busy || (current != RemoteSignerStep.Choose && current != RemoteSignerStep.Done)
         if (!busy && handled) {
-            if (current == RemoteSignerStep.EnterLink) link.clearText() else discard()
+            if (current == RemoteSignerStep.EnterLink) {
+                link.clearText()
+                linkErrorRes = null
+            } else {
+                discard()
+            }
             val linkPath = method == RemoteSignerMethod.BunkerLink && current != RemoteSignerStep.EnterLink
             step = if (linkPath) RemoteSignerStep.EnterLink else RemoteSignerStep.Choose
         }
@@ -200,6 +220,7 @@ internal class RemoteSignerPairing(
         link.clearText()
         usedLink = null
         lastOpen = null
+        linkErrorRes = null
         if (!busy) discard()
     }
 
