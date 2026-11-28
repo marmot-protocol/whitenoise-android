@@ -25,7 +25,9 @@
         "anchor": "fun SettingsDetailRoute(",
         "test_ids": [
           "SET-001",
-          "SET-029"
+          "SET-029",
+          "SET-085",
+          "SET-086"
         ]
       },
       {
