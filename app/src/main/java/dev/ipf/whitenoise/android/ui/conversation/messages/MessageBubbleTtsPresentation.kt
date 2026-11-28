@@ -47,9 +47,10 @@ internal class MessageBubbleTtsPresentation(
  * Called by the bubble where this block used to sit, so its single effect keeps its place in the bubble's effect
  * order and every `remember` keeps its keys and scope. The inputs are the values the bubble computed above this
  * point; nothing here reads state the bubble did not already read in the same composition.
+ *
+ * It takes one explicit input per value the old inline block read from the bubble. The body moved unchanged from
+ * the bubble, whose detekt baseline entry covered its length and branching.
  */
-// Explicit inputs, one per value the old inline block read from the bubble. The body moved unchanged from
-// MessageBubble, whose length and branching were covered by its detekt baseline entry.
 @Composable
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun rememberMessageBubbleTtsPresentation(
