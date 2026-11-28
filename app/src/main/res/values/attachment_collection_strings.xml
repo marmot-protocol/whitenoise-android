@@ -9,6 +9,9 @@
     <string name="attachment_collection_cancel">Cancel sending</string>
     <string name="attachment_collection_show_items">Show items</string>
     <string name="attachment_collection_hide_items">Hide items</string>
+    <!-- Compact line shown in the composer when a multi-attachment send stops on a failure; %1$d items still need attention out of %2$d in the send. -->
+    <string name="attachment_collection_not_sent">%1$d of %2$d not sent</string>
+    <string name="attachment_collection_hide_details">Hide details</string>
     <string name="attachment_collection_state_queued">Waiting</string>
     <string name="attachment_collection_state_preparing">Preparing</string>
     <string name="attachment_collection_state_uploading">Uploading</string>

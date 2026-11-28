@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.activity.ComponentActivity
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -36,6 +37,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
@@ -240,6 +242,42 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** A set staged after its activity stopped opens no chooser, deletes its plaintext and cancels, not fails. */
+    @Test
+    fun aHostStoppedDuringStagingCancelsTheLaunchAndDeletesTheSet() =
+        runTest {
+            clearSharedFiles()
+            val staged =
+                stageMessageShareStreams(
+                    context,
+                    "account",
+                    messageShareAttachmentSources(
+                        references = listOf(reference("one.txt", "text/plain")),
+                        retained = emptyList(),
+                    ),
+                ) { plaintext("one".encodeToByteArray()) }
+            val host =
+                Robolectric
+                    .buildActivity(ComponentActivity::class.java)
+                    .setup()
+                    .pause()
+                    .stop()
+                    .get()
+            var launches = 0
+
+            val observed =
+                runCatching {
+                    launchStagedMessageShare(staged, host) {
+                        launches += 1
+                        Result.success(Unit)
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$observed", observed is CancellationException)
+            assertEquals(0, launches)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
     /** A Markdown or text file message keeps the menu's Share, so long-pressing it can share the file (#3331). */
     @Test
     fun aMarkdownFileMessageIsShareableFromItsMenu() {
@@ -264,7 +302,7 @@ class MessageOutboundShareTest {
 
             val failure =
                 runCatching {
-                    launchStagedMessageShare(staged) { Result.failure(IOException("chooser launch failed")) }
+                    launchStagedMessageShare(staged, context) { Result.failure(IOException("chooser launch failed")) }
                 }.exceptionOrNull()
 
             assertTrue(failure is IOException)
@@ -289,7 +327,7 @@ class MessageOutboundShareTest {
 
             val observed =
                 runCatching {
-                    launchStagedMessageShare(staged) { throw cancellation }
+                    launchStagedMessageShare(staged, context) { throw cancellation }
                 }.exceptionOrNull()
 
             assertTrue(observed === cancellation)

@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
         "anchor": "fun AttachmentCollectionProgress(",
         "test_ids": [
-          "MED-045"
+          "MED-045",
+          "MED-071"
         ]
       },
       {
@@ -24,7 +25,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
         "anchor": "fun AttachmentCollectionActionRow(",
         "test_ids": [
-          "MED-045"
+          "MED-045",
+          "MED-071"
         ]
       },
       {
@@ -185,6 +187,46 @@
         "anchor": "R.string.retry",
         "test_ids": [
           "MED-045"
+        ]
+      },
+      {
+        "surface": "AttachmentCollectionBlockedLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionBlockedLine(",
+        "test_ids": [
+          "MED-071"
+        ]
+      },
+      {
+        "surface": "AttachmentCollectionHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionHeader(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_not_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_not_sent",
+        "test_ids": [
+          "MED-071"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_hide_details",
+        "test_ids": [
+          "MED-071"
+        ]
+      },
+      {
+        "surface": "R.string.details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.details",
+        "test_ids": [
+          "MED-071"
         ]
       }
     ]

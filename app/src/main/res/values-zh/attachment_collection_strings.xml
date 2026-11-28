@@ -9,6 +9,8 @@
     <string name="attachment_collection_cancel">取消发送</string>
     <string name="attachment_collection_show_items">显示项目</string>
     <string name="attachment_collection_hide_items">隐藏项目</string>
+    <string name="attachment_collection_not_sent">%1$d/%2$d 项未发送</string>
+    <string name="attachment_collection_hide_details">隐藏详细信息</string>
     <string name="attachment_collection_state_queued">等待中</string>
     <string name="attachment_collection_state_preparing">准备中</string>
     <string name="attachment_collection_state_uploading">上传中</string>

@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -136,8 +138,10 @@ internal fun AttachmentCollectionOperation.needsPanel(): Boolean =
 
 /**
  * The composer-side progress panel for one collection send: aggregate `sent / total` with a monotonic bar,
- * a status line when a failed chunk blocks the rest or a restart paused it, the matching actions, and an
- * expandable virtualized list of every item with its own state and, when failed, its own Retry.
+ * a status line when a restart paused it, the matching actions, and an expandable virtualized list of every
+ * item with its own state and, when failed, its own Retry. A send that a failed chunk blocks shrinks to one
+ * compact line with Retry, keeping the explanation, Skip, Cancel and the items behind Details, so the
+ * composer stays usable.
  */
 @Composable
 internal fun AttachmentCollectionProgress(
@@ -146,12 +150,10 @@ internal fun AttachmentCollectionProgress(
     modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable(operation.id) { mutableStateOf(false) }
-    val phase = operation.phase
-    val title =
-        if (phase == CollectionOperationPhase.PAUSED) {
-            stringResource(R.string.attachment_collection_paused, operation.published, operation.total)
-        } else {
-            stringResource(R.string.attachment_collection_progress, operation.published, operation.total)
+    // The failed chunk that holds the rest of the send, or null when nothing is blocked.
+    val blocked =
+        operation.nextChunk?.takeIf {
+            operation.phase == CollectionOperationPhase.BLOCKED && it.state == CollectionChunkState.FAILED
         }
     Surface(
         modifier = modifier.fillMaxWidth().testTag("conversation.attachment.collection.panel"),
@@ -159,22 +161,76 @@ internal fun AttachmentCollectionProgress(
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = 12.dp, vertical = if (blocked != null) 4.dp else 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = { expanded = !expanded }) {
-                    Text(stringResource(if (expanded) R.string.attachment_collection_hide_items else SHOW_ITEMS))
+            if (blocked == null) {
+                AttachmentCollectionHeader(operation, expanded) { expanded = !expanded }
+            } else {
+                AttachmentCollectionBlockedLine(operation, expanded, { actions.onRetryChunk(blocked.id) }) {
+                    expanded = !expanded
                 }
             }
-            LinearProgressIndicator(
-                progress = { operation.settled.toFloat() / operation.total.coerceAtLeast(1) },
-                modifier = Modifier.fillMaxWidth().testTag("conversation.attachment.collection.progress"),
-            )
-            AttachmentCollectionStatus(operation)
-            AttachmentCollectionActionRow(operation, actions)
+            if (blocked == null || expanded) {
+                AttachmentCollectionStatus(operation)
+                AttachmentCollectionActionRow(operation, actions)
+            }
             if (expanded) AttachmentCollectionItemList(operation, actions)
+        }
+    }
+}
+
+/** The `sent / total` title with the item toggle and the monotonic progress bar of a running or paused send. */
+@Composable
+private fun AttachmentCollectionHeader(
+    operation: AttachmentCollectionOperation,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val title =
+        if (operation.phase == CollectionOperationPhase.PAUSED) {
+            stringResource(R.string.attachment_collection_paused, operation.published, operation.total)
+        } else {
+            stringResource(R.string.attachment_collection_progress, operation.published, operation.total)
+        }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        TextButton(onClick = onToggle) {
+            Text(stringResource(if (expanded) R.string.attachment_collection_hide_items else SHOW_ITEMS))
+        }
+    }
+    LinearProgressIndicator(
+        progress = { operation.settled.toFloat() / operation.total.coerceAtLeast(1) },
+        modifier = Modifier.fillMaxWidth().testTag("conversation.attachment.collection.progress"),
+    )
+}
+
+/**
+ * One line for a blocked send: how many items were not sent out of the whole set, the one Retry that
+ * sends them on, and Details for the explanation, the other choices and every item.
+ */
+@Composable
+private fun AttachmentCollectionBlockedLine(
+    operation: AttachmentCollectionOperation,
+    expanded: Boolean,
+    onRetry: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    // Skipped and cancelled items were not sent either, so only published items are left out.
+    val unsent = operation.total - operation.published
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("conversation.attachment.collection.blocked"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.attachment_collection_not_sent, unsent, operation.total),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        TextButton(onClick = onToggle) {
+            Text(stringResource(if (expanded) R.string.attachment_collection_hide_details else R.string.details))
         }
     }
 }
@@ -196,7 +252,7 @@ private fun AttachmentCollectionStatus(operation: AttachmentCollectionOperation)
     }
 }
 
-/** Resume and Discard for a paused operation, Retry, Skip and Cancel for a blocked one, Cancel otherwise. */
+/** Resume and Discard for a paused operation, Skip and Cancel for a blocked one (its line has Retry), else Cancel. */
 @Composable
 private fun AttachmentCollectionActionRow(
     operation: AttachmentCollectionOperation,
@@ -212,7 +268,6 @@ private fun AttachmentCollectionActionRow(
                 }
             }
             blocked != null -> {
-                TextButton(onClick = { actions.onRetryChunk(blocked.id) }) { Text(stringResource(R.string.retry)) }
                 TextButton(onClick = { actions.onSkipChunk(blocked.id) }) {
                     Text(stringResource(R.string.attachment_collection_skip_failed))
                 }

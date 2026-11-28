@@ -1,0 +1,61 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Shared media file shares through the streaming chooser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "internal suspend fun shareLibraryFile(",
+        "test_ids": [
+          "GRP-018"
+        ]
+      },
+      {
+        "surface": "rememberLibraryFileShares",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "fun rememberLibraryFileShares(",
+        "test_ids": [
+          "MED-070"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "One staging share per file, kept while its row scrolls away",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "internal class LibraryFileShares(",
+        "test_ids": [
+          "MED-070"
+        ]
+      },
+      {
+        "surface": "A file gone from attachment history opens no share sheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "fun GroupAttachmentPager.libraryFileResolver(",
+        "test_ids": [
+          "MED-070"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "R.string.shared_media_share",
+        "test_ids": [
+          "MED-070"
+        ]
+      },
+      {
+        "surface": "string:media_couldnt_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/LibraryFileShare.kt",
+        "anchor": "R.string.media_couldnt_open",
+        "test_ids": [
+          "MED-070"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

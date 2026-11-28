@@ -29,6 +29,7 @@
     <string name="shared_media_video_not_selectable">Видео, выбрать нельзя</string>
     <string name="shared_media_share_photos_failed">Не удалось поделиться фото</string>
     <string name="shared_media_share_photos_unavailable">Некоторые выбранные фото больше недоступны, поэтому ничего не отправлено. Выбор с них снят. Попробуйте ещё раз.</string>
+    <string name="shared_media_share_photo_unreadable">Не удалось загрузить фото от %1$s, поэтому ничего не отправлено. Выбор с него снят. Поделитесь ещё раз, чтобы отправить остальные.</string>
     <string name="shared_media_share_photos_too_large">Эти фото слишком большие, чтобы поделиться ими вместе. Выберите меньше и попробуйте ещё раз.</string>
     <string name="shared_media_jump_to_date">Перейти к дате</string>
 </resources>

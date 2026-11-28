@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.medialibrary.FileLibraryRow
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaRow
 import dev.ipf.whitenoise.android.ui.medialibrary.VoiceLibraryRow
+import dev.ipf.whitenoise.android.ui.medialibrary.rememberLibraryFileShares
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -292,6 +293,7 @@ class DownloadNeverOpensTest {
                     appState = fixture.state,
                     documentSaveFallback =
                         rememberDocumentSaveFallback(fixture.state, MediaDownloadIntegrationFixture.GROUP),
+                    shares = rememberLibraryFileShares(controller, fixture.state),
                 )
             }
         }

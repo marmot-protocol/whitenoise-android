@@ -10,11 +10,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.lifecycle.Lifecycle
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import kotlinx.coroutines.CancellationException
 
 internal data class OutboundShareStream(
     val uri: Uri,
@@ -110,6 +113,23 @@ internal fun launchOutboundShare(
     runCatchingCancellable {
         context.startActivity(outboundShareChooser(context, sendIntent, title))
     }
+
+/**
+ * Cancels a share whose hosting activity is no longer started. Android blocks a chooser started from a stopped app
+ * without throwing, so staging that ends after the user left must not count as a share: the caller deletes what it
+ * staged and keeps its selection. A context with no hosting activity is not checked.
+ */
+internal fun requireOutboundShareHostStarted(context: Context) {
+    if (!outboundShareHostStarted(context)) throw CancellationException("outbound share host is no longer started")
+}
+
+/** Whether the activity behind [context] is at least started; a context with no hosting activity counts as started. */
+internal fun outboundShareHostStarted(context: Context): Boolean =
+    context
+        .lifecycleOwner()
+        ?.lifecycle
+        ?.currentState
+        ?.isAtLeast(Lifecycle.State.STARTED) != false
 
 internal fun inviteShareIntent(message: String): Intent = outboundShareIntent(message, emptyList())
 

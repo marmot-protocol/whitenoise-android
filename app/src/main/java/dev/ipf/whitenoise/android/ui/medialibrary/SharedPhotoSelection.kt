@@ -7,11 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.ShareSourceReadException
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentsExternally
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /** A gallery slot: the message and authored attachment index a tile was selected from. */
 private fun SharedMediaTile.slot() = messageIdHex to attachmentIndex
@@ -125,16 +127,27 @@ internal fun unavailableSelectedPhotos(
     }
 }
 
-/** Some selected photos no longer resolve in the gallery, so nothing was shared. */
+/**
+ * Some selected photos no longer resolve in the gallery, or one could not be read when [unreadable], so nothing was
+ * shared. The gallery deselects [photos], so the next Share sends the rest.
+ */
 internal class SharedPhotosUnavailableException(
     val photos: List<SharedMediaTile>,
+    val unreadable: Boolean = false,
 ) : IllegalStateException("${photos.size} selected photo(s) are no longer available")
+
+/** Reading [photo]'s verified file failed with [cause], so the failure names the photo that stopped the share. */
+private class SharedPhotoReadException(
+    val photo: SharedMediaTile,
+    cause: Throwable,
+) : IOException("selected photo could not be read", cause)
 
 /**
  * Shares the whole verified files of [photos] through one Android share sheet, with no caption and nothing else from
  * their messages. [currentPhotos] returns the gallery's current tiles, or null once the gallery no longer owns the
  * share; it is checked before anything is staged, again before the share sheet opens, and after a failed staging. A
- * selection that stopped resolving fails with [SharedPhotosUnavailableException], a set over the staging budget with
+ * selection that stopped resolving, or a photo whose file could not be read, fails with
+ * [SharedPhotosUnavailableException] naming those photos, a set over the staging budget with
  * `OutboundShareTooLargeException`, and a lost owner cancels. Each interruption deletes every staged file and opens
  * no share sheet.
  */
@@ -157,14 +170,14 @@ internal suspend fun shareSelectedPhotos(
         shareAttachmentsExternally(
             context = context,
             accountRef = accountRef,
-            attachments = photos.map { photo -> OutboundShareAttachment(photo.reference) { source(photo) } },
+            attachments = photos.map { photo -> OutboundShareAttachment(photo.reference) { readPhoto(photo, source) } },
             chooserTitle = chooserTitle,
             beforeLaunch = { requireSharedPhotosAvailable(unavailable()) },
         )
     } catch (failure: Exception) {
         // A photo removed while it was read usually fails its read; report it as unavailable so it is deselected.
         val settled = failure is CancellationException || failure is SharedPhotosUnavailableException
-        throw sharedPhotosFailure(failure, if (settled) null else unavailable())
+        throw sharedPhotosFailure(failure, if (settled) null else unavailable(), photos)
     }
 }
 
@@ -174,13 +187,48 @@ private fun requireSharedPhotosAvailable(unavailable: List<SharedMediaTile>?) {
     if (unavailable.isNotEmpty()) throw SharedPhotosUnavailableException(unavailable)
 }
 
-/** [failure], unless photos found [unavailable] after it explain it better. */
+/** Reads [photo] through [source], tagging a failure with the photo so the share can name and deselect it. */
+@Suppress("TooGenericExceptionCaught") // Any provider or download failure of this one photo is attributed to it.
+private suspend fun readPhoto(
+    photo: SharedMediaTile,
+    source: suspend (SharedMediaTile) -> AttachmentPlaintext,
+): AttachmentPlaintext =
+    try {
+        source(photo)
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (failure: Exception) {
+        throw SharedPhotoReadException(photo, failure)
+    }
+
+/**
+ * [failure], unless photos found [unavailable] after it explain it better, or it is one of [photos]' failed read or
+ * copy, which becomes that photo's unavailability so the rest of the selection can still be shared.
+ */
 private fun sharedPhotosFailure(
     failure: Exception,
     unavailable: List<SharedMediaTile>?,
-): Exception =
-    if (unavailable.isNullOrEmpty()) {
-        failure
-    } else {
-        SharedPhotosUnavailableException(unavailable).apply { addSuppressed(failure) }
+    photos: List<SharedMediaTile>,
+): Exception {
+    val unreadable =
+        when (failure) {
+            is SharedPhotoReadException -> failure.photo
+            is ShareSourceReadException -> photos.getOrNull(failure.source.attachmentIndex)
+            else -> null
+        }
+    return when {
+        !unavailable.isNullOrEmpty() ->
+            SharedPhotosUnavailableException(unavailable).apply { addSuppressed(failure.readCause()) }
+        unreadable != null ->
+            SharedPhotosUnavailableException(listOf(unreadable), unreadable = true).apply {
+                initCause(failure.readCause())
+            }
+        else -> failure
     }
+}
+
+/** The provider, download or copy failure behind a photo's failed read, or [this] for any other failure. */
+private fun Exception.readCause(): Throwable {
+    val tagged = this is SharedPhotoReadException || this is ShareSourceReadException
+    return if (tagged) cause ?: this else this
+}

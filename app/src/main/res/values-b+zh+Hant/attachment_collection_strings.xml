@@ -9,6 +9,8 @@
     <string name="attachment_collection_cancel">取消傳送</string>
     <string name="attachment_collection_show_items">顯示項目</string>
     <string name="attachment_collection_hide_items">隱藏項目</string>
+    <string name="attachment_collection_not_sent">%1$d/%2$d 項未傳送</string>
+    <string name="attachment_collection_hide_details">隱藏詳細資料</string>
     <string name="attachment_collection_state_queued">等待中</string>
     <string name="attachment_collection_state_preparing">準備中</string>
     <string name="attachment_collection_state_uploading">上傳中</string>

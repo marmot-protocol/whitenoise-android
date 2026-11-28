@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
@@ -113,6 +114,32 @@ class MediaLibraryFileShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** A file removed from attachment history while it is staged opens no share sheet and leaves no copy behind. */
+    @Test
+    fun aFileRemovedFromHistoryDuringStagingSharesNothing() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget("image/png")
+            val entry = historyEntry(1, category = AttachmentCategoryFfi.FILE)
+            val history = GroupAttachmentFixture(listOf(entry))
+            val resolve = GroupAttachmentPager(history).libraryFileResolver { "account" }
+            val shared = attachmentLibraryTiles(listOf(entry), "account").files.single()
+            assertEquals(shared, resolve(shared))
+
+            val failure =
+                runCatching {
+                    shareLibraryFile(context, "account", shared, "Share", currentRow = { resolve(shared) }) {
+                        history.rows = emptyList()
+                        history.removals++
+                        AttachmentPlaintext.Bytes("secret".encodeToByteArray())
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is CancellationException)
+            assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
     /** A row recomposed with fresh data for the same attachment still shares it. */
     @Test
     fun rowRecomposedForTheSameAttachmentStillShares() =
@@ -143,11 +170,20 @@ class MediaLibraryFileShareTest {
                 .substringBefore(end)
                 .replace(Regex("\\s+"), " ")
 
-        assertTrue("shareLibraryFile(" in row)
-        assertTrue("attachmentSource( controller, sharedRow.messageIdHex," in row)
-        assertFalse("requestAttachmentTransfer(" in row)
-        assertFalse("shareImage(" in row)
-        assertFalse("fetchBytes" in row)
+        val share =
+            librarySource("LibraryFileShare.kt")
+                .substringAfter("internal fun rememberLibraryFileShares(")
+                .substringBefore("internal suspend fun shareLibraryFile(")
+                .replace(Regex("\\s+"), " ")
+
+        assertTrue("shares.start(row)" in row)
+        assertTrue("shareLibraryFile(" in share)
+        assertTrue("attachmentSource(controller, row.messageIdHex," in share)
+        listOf(row, share).forEach { body ->
+            assertFalse("requestAttachmentTransfer(" in body)
+            assertFalse("shareImage(" in body)
+            assertFalse("fetchBytes" in body)
+        }
     }
 
     /** Plaintext of [size] bytes that writes a position pattern in bounded chunks and records how it was read. */
@@ -264,11 +300,14 @@ class MediaLibraryFileShareTest {
             ?.filter(File::isFile)
             .orEmpty()
 
-    private fun mediaLibrarySource(): String =
+    private fun mediaLibrarySource(): String = librarySource("MediaLibrary.kt")
+
+    /** The text of the media library source file [name], from the module or the repository root. */
+    private fun librarySource(name: String): String =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt"),
-        ).firstOrNull(File::isFile)?.readText() ?: error("Missing MediaLibrary.kt source file")
+            File("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/$name"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/$name"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing $name source file")
 
     private companion object {
         const val PDF = "application/pdf"

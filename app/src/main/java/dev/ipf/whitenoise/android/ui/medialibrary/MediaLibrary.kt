@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.medialibrary
 
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +32,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,7 +56,6 @@ import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.Nip30Emoji
-import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -74,12 +71,10 @@ import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
-import dev.ipf.whitenoise.android.ui.conversation.media.attachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentFile
-import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentOpener
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
@@ -87,7 +82,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChrom
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
@@ -402,6 +396,7 @@ internal fun MediaLibraryRoute(
                 paging = state,
                 onLoadMore = { scope.launch { pager?.loadMore() } },
                 resolvePhotos = pager?.selectedPhotoResolver { controller.boundAccountIdHex },
+                resolveFile = pager?.libraryFileResolver { controller.boundAccountIdHex },
             )
         }
     }
@@ -420,9 +415,12 @@ private fun MediaLibraryContent(
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
     resolvePhotos: SelectedPhotoResolver? = null,
+    resolveFile: LibraryFileResolver? = null,
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val photoShare = rememberSharedPhotoShare(tiles, controller, appState, resolvePhotos)
+    // Owned above the loading state, so loading another page does not cancel a file share.
+    val fileShares = rememberLibraryFileShares(controller, appState, resolveFile)
     var pendingDay by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
@@ -519,6 +517,7 @@ private fun MediaLibraryContent(
                         listState = filesListState,
                         controller = controller,
                         appState = appState,
+                        shares = fileShares,
                         onJumpToMessage = onJumpToMessage,
                     )
                 SharedContentCategory.Voice ->
@@ -591,13 +590,15 @@ internal fun <T> MonthSectionedColumn(
     }
 }
 
-/** Files tab of the library. */
+/** Files tab of the library; [shares] belong to the library, so a reload of this tab does not cancel them. */
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun FileLibraryTab(
     tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    shares: LibraryFileShares,
     onJumpToMessage: (String) -> Unit,
 ) {
     val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
@@ -614,6 +615,7 @@ private fun FileLibraryTab(
             controller = controller,
             appState = appState,
             documentSaveFallback = documentSaveFallback,
+            shares = shares,
         )
     }
 }
@@ -657,18 +659,17 @@ internal suspend fun downloadLibraryFile(
     }
 }
 
-/** One file row with open and save actions. */
+/** One file row with open, save and share actions; its share runs in [shares], which outlives the row. */
 @Composable
 internal fun FileLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     documentSaveFallback: dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback,
+    shares: LibraryFileShares,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val currentRow by rememberUpdatedState(row)
-    val shareChooserTitle = stringResource(R.string.shared_media_share)
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
@@ -723,7 +724,7 @@ internal fun FileLibraryRow(
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
-                .clickable(enabled = !inFlight) {
+                .clickable(enabled = !inFlight && !shares.isSharing(row)) {
                     inFlight = true
                     scope.launch {
                         val downloaded =
@@ -789,7 +790,7 @@ internal fun FileLibraryRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (inFlight) {
+        if (inFlight || shares.isSharing(row)) {
             CircularProgressIndicator(
                 modifier = Modifier.size(20.dp),
                 strokeWidth = 2.dp,
@@ -846,34 +847,8 @@ internal fun FileLibraryRow(
                         onClick = {
                             surface.close {
                                 menuOpen = false
-                                scope.launch {
-                                    val sharedRow = row
-                                    runCatchingCancellable {
-                                        shareLibraryFile(
-                                            context = context,
-                                            accountRef = checkNotNull(controller.conversationAccountRef),
-                                            row = sharedRow,
-                                            chooserTitle = shareChooserTitle,
-                                            currentRow = {
-                                                currentRow.takeIf { controller.ownsRetainedForegroundPresentation }
-                                            },
-                                        ) {
-                                            attachmentSource(
-                                                controller,
-                                                sharedRow.messageIdHex,
-                                                sharedRow.attachmentIndex,
-                                                sharedRow.reference,
-                                                sharedRow.mine,
-                                            )
-                                        }
-                                    }.onFailure { error ->
-                                        appState.presentMediaLaunchFailure(
-                                            R.string.media_couldnt_open,
-                                            "MEDIA_LIBRARY_FILE_SHARE",
-                                            error,
-                                        )
-                                    }
-                                }
+                                // The tab owns the share, so scrolling this row away does not cancel it.
+                                shares.start(row)
                             }
                         },
                     )
@@ -882,26 +857,6 @@ internal fun FileLibraryRow(
         }
     }
 }
-
-private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
-
-/** Streams a verified file under its original name while [currentRow] still identifies [row]. */
-internal suspend fun shareLibraryFile(
-    context: Context,
-    accountRef: String,
-    row: SharedMediaRow,
-    chooserTitle: String,
-    currentRow: () -> SharedMediaRow?,
-    source: suspend () -> AttachmentPlaintext,
-) = shareAttachmentExternally(
-    context = context,
-    accountRef = accountRef,
-    attachmentIndex = row.attachmentIndex,
-    reference = row.reference,
-    chooserTitle = chooserTitle,
-    isCurrent = { currentRow()?.attachmentKey() == row.attachmentKey() },
-    plaintext = source,
-)
 
 @Composable
 internal fun rememberRelativeTimestamp(recordedAt: ULong): String {

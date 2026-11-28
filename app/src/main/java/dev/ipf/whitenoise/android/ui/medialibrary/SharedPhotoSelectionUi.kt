@@ -44,6 +44,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.share.outboundShareHostStarted
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -82,14 +84,16 @@ internal fun rememberSharedPhotoShare(
         source = { photo ->
             attachmentSource(controller, photo.messageIdHex, photo.attachmentIndex, photo.reference, photo.mine)
         },
-        onFailure = { selection, error -> presentSharedPhotosFailure(appState, selection, error) },
+        onFailure = { _, error -> presentSharedPhotosFailure(appState, error) },
     )
 }
 
 /**
  * The share runs in this composition's scope, so closing the gallery or switching account, runtime or conversation
- * cancels staging and deletes what was staged. Back ends selection mode before it leaves the gallery. A failure is
- * reported only while [ownsShare] holds. [currentPhotos] returns the gallery's current tiles for the selected photos.
+ * cancels staging and deletes what was staged, as does leaving the app before the share sheet opens, which keeps the
+ * selection. Back ends selection mode before it leaves the gallery. A failure is reported only while [ownsShare]
+ * holds, and photos it found unavailable are deselected first. [currentPhotos] returns the gallery's current tiles
+ * for the selected photos.
  */
 @Suppress("LongParameterList")
 @Composable
@@ -122,7 +126,12 @@ internal fun rememberSharedPhotoShare(
                     }.onSuccess {
                         state.selection.clear()
                     }.onFailure { error ->
-                        if (ownsShare()) onFailure(state.selection, error)
+                        // In the background a failure is not reported and the selection is kept, as for a share
+                        // cancelled there, so the person finds their selection intact on return.
+                        if (!ownsShare() || !outboundShareHostStarted(context)) return@onFailure
+                        // Unavailable photos leave the selection, so the next Share sends the rest.
+                        if (error is SharedPhotosUnavailableException) state.selection.deselect(error.photos)
+                        onFailure(state.selection, error)
                     }
                 } finally {
                     state.end(self)
@@ -137,14 +146,11 @@ internal fun rememberSharedPhotoShare(
 /** Expected refusals explain what to change; anything else is reported as a share failure. */
 private fun presentSharedPhotosFailure(
     appState: WhiteNoiseAppState,
-    selection: SharedPhotoSelection,
     error: Throwable,
 ) {
     when (error) {
-        is SharedPhotosUnavailableException -> {
-            selection.deselect(error.photos)
-            appState.present(R.string.shared_media_share_photos_failed, R.string.shared_media_share_photos_unavailable)
-        }
+        is SharedPhotosUnavailableException ->
+            appState.present(R.string.shared_media_share_photos_failed, sharedPhotosUnavailableDetail(appState, error))
         is OutboundShareTooLargeException ->
             appState.present(R.string.shared_media_share_photos_failed, R.string.shared_media_share_photos_too_large)
         else ->
@@ -153,6 +159,19 @@ private fun presentSharedPhotosFailure(
                 "MEDIA_LIBRARY_PHOTOS_SHARE",
                 error,
             )
+    }
+}
+
+/** Names the one photo that could not be read, by its sender; otherwise says that some photos are gone. */
+private fun sharedPhotosUnavailableDetail(
+    appState: WhiteNoiseAppState,
+    error: SharedPhotosUnavailableException,
+): AppText {
+    val photo = error.photos.singleOrNull()?.takeIf { error.unreadable }
+    return if (photo == null) {
+        AppText.Resource(R.string.shared_media_share_photos_unavailable)
+    } else {
+        AppText.Resource(R.string.shared_media_share_photo_unreadable, listOf(appState.displayName(photo.sender)))
     }
 }
 

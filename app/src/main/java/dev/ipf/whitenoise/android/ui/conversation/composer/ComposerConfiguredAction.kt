@@ -85,7 +85,8 @@ internal fun ComposerConfiguredAction(
                 },
             ) {
                 SlotIconButton(
-                    onClick = { if (bindings.canActivate()) onMore() },
+                    // Opening the menu commits nothing, its rows recheck their own guards.
+                    onClick = { if (bindings.canEditDraft()) onMore() },
                     enabled = enabled,
                     modifier = modifier,
                 ) {
@@ -106,7 +107,7 @@ internal fun ComposerConfiguredAction(
             TextEntryEmojiAction(
                 pickerOpen = emojiPickerOpen,
                 enabled = enabled,
-                onClick = { if (bindings.canActivate()) onEmoji() },
+                onClick = { if (bindings.canEditDraft()) onEmoji() },
                 togglesKeyboard = true,
                 modifier = modifier,
                 iconSize = ComposerShortcutIconSize,
@@ -220,17 +221,26 @@ private fun ComposerOptionalShortcutAction(
     }
 }
 
-/** Plus-menu text actions share the toolbar's activation guard. */
+/**
+ * Plus-menu text actions follow the toolbar's rule and guards: Emoji edits the draft, so it stays while a dictation
+ * runs, while Dictate and Translate are left out of the menu until the transaction ends.
+ */
 private fun ComposerToolbarBindings.menuTextShortcuts(
     onEmoji: () -> Unit,
     onPaste: () -> Boolean,
     onDictation: (() -> Unit)?,
     pasteAccepted: () -> Boolean,
 ) = ComposerMenuTextShortcuts(
-    onEmoji = { if (canActivate()) onEmoji() },
+    onEmoji = { if (canEditDraft()) onEmoji() },
     onPaste = onPaste,
-    onDictation = onDictation?.let { dictate -> { if (canActivate()) dictate() } },
-    onTranslate = translate?.let { toggle -> { if (canActivate()) toggle.onToggle() } },
+    onDictation =
+        onDictation
+            ?.takeIf { usableDuringTransaction(ComposerShortcut.Dictation) }
+            ?.let { dictate -> { if (canActivate()) dictate() } },
+    onTranslate =
+        translate
+            ?.takeIf { usableDuringTransaction(ComposerShortcut.Translate) }
+            ?.let { toggle -> { if (canActivate()) toggle.onToggle() } },
     translateActive = translate?.active == true,
     pasteAccepted = pasteAccepted,
 )

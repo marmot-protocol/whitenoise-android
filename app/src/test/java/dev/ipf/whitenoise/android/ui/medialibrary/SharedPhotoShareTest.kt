@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.OUTBOUND_SHARE_MAX_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareTooLargeException
@@ -157,7 +158,7 @@ class SharedPhotoShareTest {
             assertNoShare()
         }
 
-    /** A photo whose verified source cannot be read fails the set and leaves no earlier photo staged. */
+    /** A photo whose verified source cannot be read fails the set, naming that photo, and leaves nothing staged. */
     @Test
     fun anUnavailableSourceSharesNothing() =
         runTest {
@@ -172,7 +173,62 @@ class SharedPhotoShareTest {
                     }
                 }.exceptionOrNull()
 
-            assertTrue("$failure", failure is IOException)
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
+            assertEquals("blob missing", failure.cause?.message)
+            assertNoShare()
+        }
+
+    /** A streamed photo that fails while it is copied is named as unavailable, as a failed read is. */
+    @Test
+    fun aStreamFailingMidCopyNamesItsPhoto() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", listOf(beach, harbour), "Share", { gallery }) { photo ->
+                        if (photo != harbour) return@shareSelectedPhotos AttachmentPlaintext.Bytes(bytesOf(photo))
+                        object : AttachmentPlaintext {
+                            override val size = 4L
+
+                            /** Fails as a dropped download stream does. */
+                            override fun copyTo(output: OutputStream) = throw IOException("stream dropped")
+
+                            /** Holds nothing to release. */
+                            override fun close() = Unit
+                        }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
+            assertNoShare()
+        }
+
+    /** A photo whose cached file is reclaimed after it was acquired cannot be moved or read, and is named. */
+    @Test
+    fun aReclaimedPhotoLeaseNamesItsPhoto() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", listOf(beach, harbour), "Share", { gallery }) { photo ->
+                        if (photo != harbour) return@shareSelectedPhotos AttachmentPlaintext.Bytes(bytesOf(photo))
+                        val file = File(leaseDirectory, "harbour.lease").apply { writeBytes(bytesOf(photo)) }
+                        AttachmentPlaintext.Lease(DiskByteCacheLease(file)).also { file.delete() }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
             assertNoShare()
         }
 

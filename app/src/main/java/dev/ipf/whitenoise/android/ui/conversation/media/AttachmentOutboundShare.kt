@@ -24,7 +24,7 @@ internal suspend fun shareAttachmentExternally(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     chooserTitle: String,
-    isCurrent: () -> Boolean,
+    isCurrent: suspend () -> Boolean,
     plaintext: suspend () -> AttachmentPlaintext,
 ) = shareStagedAttachments(
     context = context,
@@ -85,7 +85,7 @@ private suspend fun shareStagedAttachments(
         )
     outboundShareChooser(context, probe, chooserTitle)
     val staged = stageMessageShareStreams(context, accountRef, sources, resolveSource)
-    launchStagedMessageShare(staged, beforeLaunch) { streams ->
+    launchStagedMessageShare(staged, context, beforeLaunch) { streams ->
         launchOutboundShare(context, outboundShareIntent(null, streams), chooserTitle)
     }
 }

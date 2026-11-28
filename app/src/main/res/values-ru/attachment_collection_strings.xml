@@ -9,6 +9,8 @@
     <string name="attachment_collection_cancel">Отменить отправку</string>
     <string name="attachment_collection_show_items">Показать элементы</string>
     <string name="attachment_collection_hide_items">Скрыть элементы</string>
+    <string name="attachment_collection_not_sent">Не отправлено: %1$d из %2$d</string>
+    <string name="attachment_collection_hide_details">Скрыть подробности</string>
     <string name="attachment_collection_state_queued">Ожидает</string>
     <string name="attachment_collection_state_preparing">Подготовка</string>
     <string name="attachment_collection_state_uploading">Загрузка</string>

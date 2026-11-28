@@ -25,6 +25,8 @@
     <string name="shared_media_video_not_selectable">Video, can’t be selected</string>
     <string name="shared_media_share_photos_failed">Couldn’t share photos</string>
     <string name="shared_media_share_photos_unavailable">Some selected photos are no longer available, so nothing was shared. They’re now deselected. Try again.</string>
+    <!-- Shared media multi-photo share failure detail; %1$s is the display name of the person who sent the photo. -->
+    <string name="shared_media_share_photo_unreadable">The photo from %1$s couldn’t be loaded, so nothing was shared. It’s now deselected. Share again to send the others.</string>
     <string name="shared_media_share_photos_too_large">These photos are too large to share at once. Select fewer and try again.</string>
     <!-- Shared media filter-row action and its TalkBack label; opens a calendar where only days with loaded media can be chosen. -->
     <string name="shared_media_jump_to_date">Jump to date</string>

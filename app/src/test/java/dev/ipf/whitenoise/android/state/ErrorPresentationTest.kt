@@ -136,6 +136,7 @@ class ErrorPresentationTest {
         assertProfileImageOperations(failure, secret)
     }
 
+    /** The migrated failure operation codes each source file must present with the caught error. */
     private fun migratedOperationsBySource(): Map<String, List<String>> =
         mapOf(
             "ui/chats/newchat/NewGroupSetupScreen.kt" to listOf("NEW_GROUP_IMAGE_PREPARE"),
@@ -145,11 +146,8 @@ class ErrorPresentationTest {
             "ui/conversation/media/MediaViewer.kt" to
                 listOf("MEDIA_VIEWER_IMAGE_SHARE", "MEDIA_VIEWER_VIDEO_SHARE"),
             "ui/medialibrary/MediaLibraryVoiceTab.kt" to listOf("MEDIA_LIBRARY_VOICE_LOAD"),
-            "ui/medialibrary/MediaLibrary.kt" to
-                listOf(
-                    "MEDIA_LIBRARY_FILE_OPEN",
-                    "MEDIA_LIBRARY_FILE_SHARE",
-                ),
+            "ui/medialibrary/MediaLibrary.kt" to listOf("MEDIA_LIBRARY_FILE_OPEN"),
+            "ui/medialibrary/LibraryFileShare.kt" to listOf("MEDIA_LIBRARY_FILE_SHARE"),
             "ui/medialibrary/MediaLibraryUrlTab.kt" to listOf("MEDIA_LIBRARY_URL_OPEN"),
         )
 

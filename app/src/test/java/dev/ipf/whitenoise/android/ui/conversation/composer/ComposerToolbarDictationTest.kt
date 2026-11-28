@@ -8,12 +8,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -32,6 +38,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -48,6 +55,9 @@ private typealias DictationSession = ConversationDictationRecognitionSession
 class ComposerToolbarDictationTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
+    private lateinit var text: ComposerTextState
+    private var cameraCalls = 0
+    private var leaves = 0
 
     @Test fun activeControlsSurviveManyActionsAndARemovedLauncher() = assertActiveControls(360)
 
@@ -55,37 +65,126 @@ class ComposerToolbarDictationTest {
 
     @Test fun shortNarrowActiveRowKeepsInputAndScrollableMandatoryOutcomes() = assertActiveControls(200, 100)
 
+    /**
+     * A pinned Emoji opens the picker while dictation runs, and its emoji joins the draft without ending the dictation,
+     * while Camera and the picker's exits to other screens stay unavailable.
+     */
+    @Test
+    fun pinnedEmojiAddsToTheDraftWhileDictationRuns() {
+        val controller = renderDictating(listOf(ComposerShortcut.Emoji, ComposerShortcut.Camera))
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.attachment_camera)).assertIsNotEnabled()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+                .assertIsEnabled()
+                .performClick()
+            pickGrinningFace()
+
+            assertEquals("😀", text.valueState.value.text)
+            assertDictationStillRunning(controller)
+            composeRule.onNodeWithTag(EMOJI_PICKER_BROWSE_SETS_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithTag(EMOJI_PICKER_SETTINGS_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
+            assertEquals(0, cameraCalls + leaves)
+        } finally {
+            controller.cancel()
+        }
+    }
+
+    /** The Plus menu offers Emoji while dictation runs and leaves out attachments, Dictate and Customize. */
+    @Test
+    fun plusMenuOffersEmojiButNoAttachmentsWhileDictationRuns() {
+        val controller = renderDictating(listOf(ComposerShortcut.More))
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.attach_options)).performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("conversation.attachment.menu").assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.attachment_camera)).assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.composer_customize)).assertDoesNotExist()
+            composeRule.onNodeWithTag("conversation.attachment.menu.dictation").assertDoesNotExist()
+            composeRule.onNodeWithTag("conversation.attachment.menu.emoji").performClick()
+            pickGrinningFace()
+
+            assertEquals("😀", text.valueState.value.text)
+            assertDictationStillRunning(controller)
+            assertEquals(0, cameraCalls)
+        } finally {
+            controller.cancel()
+        }
+    }
+
+    /** With Emoji and Paste both pinned, Plus would offer nothing during dictation, so it stays disabled. */
+    @Test
+    fun plusIsDisabledDuringDictationWhenItsMenuHasNoDraftEdit() {
+        val controller = renderDictating(listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste))
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.attach_options)).assertIsNotEnabled()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsEnabled()
+        } finally {
+            controller.cancel()
+        }
+    }
+
+    /** Renders the production composer with [shortcuts] pinned while a dictation of this chat is listening. */
+    private fun renderDictating(shortcuts: List<ComposerShortcut>): ConversationDictationController {
+        saveToolbar(ComposerToolbarSettings(shortcuts, ComposerToolbarLayout.AlwaysExpanded))
+        val controller = listeningController()
+        text = ComposerTextState(TextFieldValue())
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Box(Modifier.width(420.dp).height(780.dp), contentAlignment = Alignment.BottomCenter) {
+                        ComposerBar(
+                            appState = emptyAppState(),
+                            replyingTo = null,
+                            messageTextCopy = MessageTextCopy.Default,
+                            onCancelReply = {},
+                            onSend = { _, _ -> },
+                            onCaptureFromCamera = { cameraCalls++ },
+                            dictationController = controller,
+                            dictationAccountRef = DICTATION_ACCOUNT,
+                            dictationGroupIdHex = DICTATION_CHAT,
+                            textState = text,
+                            onBrowseEmojiSets = { leaves++ },
+                            onOpenEmojiSettings = { leaves++ },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return controller
+    }
+
+    /** Waits for the picker's emoji to load, then picks the grinning face. */
+    private fun pickGrinningFace() {
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onAllNodesWithText("😀").onFirst().performClick()
+        composeRule.waitForIdle()
+    }
+
+    /** Asserts that [controller]'s dictation still owns this chat's draft and still needs its completion. */
+    private fun assertDictationStillRunning(controller: ConversationDictationController) {
+        assertTrue(controller.isOwnedBy(DICTATION_ACCOUNT, DICTATION_CHAT))
+        assertTrue(controller.completionControlsRequired)
+    }
+
     /** Checks that mandatory dictation outcomes remain reachable beside the configured toolbar. */
     @Suppress("LongMethod")
     private fun assertActiveControls(
         width: Int,
         height: Int = 600,
     ) {
-        val settings =
+        saveToolbar(
             ComposerToolbarSettings(
                 ComposerShortcut.entries - ComposerShortcut.Dictation,
                 ComposerToolbarLayout.AlwaysExpanded,
-            )
-        context
-            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .putString("composer_toolbar_v1", settings.encode())
-            .commit()
+            ),
+        )
         val appState = emptyAppState()
-        val platform = ListeningPlatform()
-        val controller =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0L) },
-                writeDraft = { _, _, _, _ -> 0L },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
-            )
-        assertTrue(controller.requestStart("synthetic-account", "synthetic-chat", TextFieldValue()))
-        platform.listener.onReady()
-        val text = ComposerTextState(TextFieldValue())
+        val controller = listeningController()
+        val draft = ComposerTextState(TextFieldValue())
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.setContent {
@@ -106,9 +205,9 @@ class ComposerToolbarDictationTest {
                                 onShareContact = {},
                                 onCreatePoll = {},
                                 dictationController = controller,
-                                dictationAccountRef = "synthetic-account",
-                                dictationGroupIdHex = "synthetic-chat",
-                                textState = text,
+                                dictationAccountRef = DICTATION_ACCOUNT,
+                                dictationGroupIdHex = DICTATION_CHAT,
+                                textState = draft,
                             )
                         }
                     }
@@ -170,6 +269,33 @@ class ComposerToolbarDictationTest {
         }
     }
 
+    /** Persists [settings] as the composer toolbar the next render reads. */
+    private fun saveToolbar(settings: ComposerToolbarSettings) {
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .putString("composer_toolbar_v1", settings.encode())
+            .commit()
+    }
+
+    /** A dictation controller whose recognizer is ready and listening for this test's chat. */
+    private fun listeningController(): ConversationDictationController {
+        val platform = ListeningPlatform()
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0L) },
+                writeDraft = { _, _, _, _ -> 0L },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+            )
+        assertTrue(controller.requestStart(DICTATION_ACCOUNT, DICTATION_CHAT, TextFieldValue()))
+        platform.listener.onReady()
+        return controller
+    }
+
     private class ListeningPlatform : ConversationDictationPlatform {
         lateinit var listener: ConversationDictationRecognitionListener
 
@@ -189,5 +315,10 @@ class ComposerToolbarDictationTest {
                 override fun destroy() = Unit
             }
         }
+    }
+
+    private companion object {
+        const val DICTATION_ACCOUNT = "synthetic-account"
+        const val DICTATION_CHAT = "synthetic-chat"
     }
 }

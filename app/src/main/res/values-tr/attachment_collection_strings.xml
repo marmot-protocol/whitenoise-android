@@ -9,6 +9,8 @@
     <string name="attachment_collection_cancel">Gönderimi iptal et</string>
     <string name="attachment_collection_show_items">Öğeleri göster</string>
     <string name="attachment_collection_hide_items">Öğeleri gizle</string>
+    <string name="attachment_collection_not_sent">%2$d öğeden %1$d tanesi gönderilmedi</string>
+    <string name="attachment_collection_hide_details">Ayrıntıları gizle</string>
     <string name="attachment_collection_state_queued">Bekliyor</string>
     <string name="attachment_collection_state_preparing">Hazırlanıyor</string>
     <string name="attachment_collection_state_uploading">Yükleniyor</string>

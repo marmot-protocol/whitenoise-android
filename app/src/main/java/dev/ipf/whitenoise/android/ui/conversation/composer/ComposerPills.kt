@@ -132,7 +132,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
-import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
@@ -1740,7 +1739,7 @@ internal fun ComposerPill(
                                                 inputContentVisible &&
                                                     inputFocusEnabled &&
                                                     toolbar.enabled &&
-                                                    (!toolbar.transactionActive || shortcut == ComposerShortcut.Paste),
+                                                    toolbar.usableDuringTransaction(shortcut),
                                             preview = toolbarPreview,
                                             draftJumps = draftJumps,
                                             onDraftJump = jumpDraft,
@@ -1904,10 +1903,7 @@ internal fun ComposerPill(
                                             inputContentVisible &&
                                                 inputFocusEnabled &&
                                                 checkNotNull(toolbar).enabled &&
-                                                (
-                                                    !checkNotNull(toolbar).transactionActive ||
-                                                        shortcut == ComposerShortcut.Paste
-                                                ),
+                                                checkNotNull(toolbar).usableDuringTransaction(shortcut),
                                         preview = toolbarPreview,
                                         draftJumps = draftJumps,
                                         onDraftJump = jumpDraft,
