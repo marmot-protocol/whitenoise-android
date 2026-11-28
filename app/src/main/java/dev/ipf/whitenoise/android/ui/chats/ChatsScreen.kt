@@ -1105,7 +1105,7 @@ internal fun ChatsScreen(
             }
 
     val chatNavigation =
-        ChatListNavigation(
+        rememberChatListNavigation(
             newChatFlowOriginHeadState = newChatFlowOriginHeadState,
             visibleItems = visibleItems,
             showArchived = showArchived,

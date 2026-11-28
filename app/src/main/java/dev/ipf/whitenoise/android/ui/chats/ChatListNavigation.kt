@@ -14,10 +14,12 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 /**
  * Opens chats and profiles from the chat list and remembers the list head the return scroll compares against.
  *
- * The screen builds one instance per composition, as it built the local functions this replaces, so each callback
- * captures the visible rows, flags and callbacks of the composition that created it. Only [newChatFlowOriginHeadState]
- * lasts longer; the screen remembers it on the account and runtime generation, as it did as a local.
+ * [rememberChatListNavigation] keys the instance on every value it holds, so a callback still sees the visible rows,
+ * flags and callbacks of the composition that created it, and a row lambda that captures it stays memoized across
+ * recompositions that leave those values equal, as the lambdas calling the old local functions did.
+ * [newChatFlowOriginHeadState] is remembered on the account and runtime generation, as it was as a local.
  */
+@Suppress("LongParameterList") // One field per value the old local functions captured.
 internal class ChatListNavigation(
     private val newChatFlowOriginHeadState: MutableState<ChatListReturnHead?>,
     private val visibleItems: List<ChatListItem>,
@@ -83,6 +85,46 @@ internal class ChatListNavigation(
         onPresentProfile(npub, visibleHead)
     }
 }
+
+@Composable
+@Suppress("LongParameterList") // Each value is also a remember key.
+internal fun rememberChatListNavigation(
+    newChatFlowOriginHeadState: MutableState<ChatListReturnHead?>,
+    visibleItems: List<ChatListItem>,
+    showArchived: Boolean,
+    advancedFolder: Boolean,
+    sourceList: List<ChatListItem>,
+    appState: WhiteNoiseAppState,
+    searchRecents: GlobalSearchRecents?,
+    globalSearchState: GlobalSearchState,
+    onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
+    onPresentProfile: (npub: String, visibleActiveListHead: ChatListReturnHead?) -> Unit,
+): ChatListNavigation =
+    remember(
+        newChatFlowOriginHeadState,
+        visibleItems,
+        showArchived,
+        advancedFolder,
+        sourceList,
+        appState,
+        searchRecents,
+        globalSearchState,
+        onOpenGroup,
+        onPresentProfile,
+    ) {
+        ChatListNavigation(
+            newChatFlowOriginHeadState = newChatFlowOriginHeadState,
+            visibleItems = visibleItems,
+            showArchived = showArchived,
+            advancedFolder = advancedFolder,
+            sourceList = sourceList,
+            appState = appState,
+            searchRecents = searchRecents,
+            globalSearchState = globalSearchState,
+            onOpenGroup = onOpenGroup,
+            onPresentProfile = onPresentProfile,
+        )
+    }
 
 /**
  * Remembers the list head held while New Message is open, on the keys it always used. Not saved: after process

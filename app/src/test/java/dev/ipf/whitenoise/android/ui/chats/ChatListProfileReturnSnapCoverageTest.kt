@@ -115,6 +115,10 @@ class ChatListProfileReturnSnapCoverageTest {
             "opening New Message must capture the visible head first",
             "chatNavigation.captureNewChatFlowOriginHead()" in openFlow,
         )
+        assertTrue(
+            "the capture must store the visible head in the flow-origin state",
+            "newChatFlowOriginHead = visibleReturnHead()" in chatsScreen.kotlinFunctionBody("captureNewChatFlowOriginHead"),
+        )
 
         val flowHost =
             chatsScreen.requiredSection(
