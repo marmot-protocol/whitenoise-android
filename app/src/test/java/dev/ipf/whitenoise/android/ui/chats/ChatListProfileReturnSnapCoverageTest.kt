@@ -62,7 +62,7 @@ class ChatListProfileReturnSnapCoverageTest {
     fun listOpensCaptureAndReturnComparesThePinnedAwareHead() {
         val chatsScreen = chatsScreenSource().motionOwnerSource()
 
-        val headBody = chatsScreen.kotlinFunctionBody("visibleReturnHead")
+        val headBody = chatsScreen.kotlinFunctionBody("chatListVisibleReturnHead")
         assertTrue(
             "list opens must capture the pinned head and first unpinned row together",
             "chatListReturnHead(visibleItems)" in headBody,
@@ -74,6 +74,10 @@ class ChatListProfileReturnSnapCoverageTest {
         assertTrue(
             "direct list opens must capture through the shared visible head",
             "visibleReturnHead()" in chatsScreen.kotlinFunctionBody("openGroupFromVisibleList"),
+        )
+        assertTrue(
+            "the open and New Message holders read the head through that shared function",
+            "chatListVisibleReturnHead(visibleItems, showArchived, advancedFolder)" in chatsScreen,
         )
 
         val returnEffect =
@@ -113,7 +117,7 @@ class ChatListProfileReturnSnapCoverageTest {
             )
         assertTrue(
             "opening New Message must capture the visible head first",
-            "chatNavigation.captureNewChatFlowOriginHead()" in openFlow,
+            "newChatFlowHead.captureNewChatFlowOriginHead()" in openFlow,
         )
         assertTrue(
             "the capture must store the visible head in the flow-origin state",
@@ -128,11 +132,11 @@ class ChatListProfileReturnSnapCoverageTest {
             )
         assertTrue(
             "a created or reopened direct chat must return against the flow-origin head",
-            "onOpenGroup(item, null, justCreated, chatNavigation.newChatFlowReturnHead())" in flowHost,
+            "onOpenGroup(item, null, justCreated, newChatFlowHead.newChatFlowReturnHead())" in flowHost,
         )
         assertTrue(
             "a created group must return against the flow-origin head",
-            "onGroupCreateCompletedOpen(item, requestToken, chatNavigation.newChatFlowReturnHead())" in flowHost,
+            "onGroupCreateCompletedOpen(item, requestToken, newChatFlowHead.newChatFlowReturnHead())" in flowHost,
         )
 
         val createdGroupOpen =

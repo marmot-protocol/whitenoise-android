@@ -1106,13 +1106,14 @@ internal fun ChatsScreen(
 
     val chatNavigation =
         rememberChatListNavigation(
-            newChatFlowOriginHeadState = newChatFlowOriginHeadState,
             visibleItems = visibleItems,
             showArchived = showArchived,
             advancedFolder = advancedFolder,
             appState = appState,
             onOpenGroup = onOpenGroup,
         )
+    val newChatFlowHead =
+        rememberChatListNewChatFlowHead(newChatFlowOriginHeadState, visibleItems, showArchived, advancedFolder)
 
     /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
     fun recordSearchOpen(entry: GlobalSearchRecent) {
@@ -1132,7 +1133,7 @@ internal fun ChatsScreen(
         mutableStateOf<NewMessageFlowLaunch?>(null)
     }
     val openNewMessageFlow = {
-        chatNavigation.captureNewChatFlowOriginHead()
+        newChatFlowHead.captureNewChatFlowOriginHead()
         showNewChatFlow = true
     }
 
@@ -1603,14 +1604,14 @@ internal fun ChatsScreen(
                     onOpenConversation = { item, justCreated ->
                         showNewChatFlow = false
                         newChatFlowLaunch = null
-                        onOpenGroup(item, null, justCreated, chatNavigation.newChatFlowReturnHead())
+                        onOpenGroup(item, null, justCreated, newChatFlowHead.newChatFlowReturnHead())
                     },
                     onClose = dismiss,
                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                     onGroupCreateCompletedOpen = { item, requestToken ->
                         showNewChatFlow = false
                         newChatFlowLaunch = null
-                        onGroupCreateCompletedOpen(item, requestToken, chatNavigation.newChatFlowReturnHead())
+                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowHead.newChatFlowReturnHead())
                     },
                 )
             }
