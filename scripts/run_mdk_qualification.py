@@ -311,7 +311,8 @@ def main():
     if audit_choice not in {'enabled', 'declined'}:
         raise ValueError('Unsupported audit qualification choice')
     facts['audit_choice'] = audit_choice
-    ports = ('-e', 'qualificationAuditChoice', audit_choice, '-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
+    audit_arguments = ('-e', 'qualificationAuditChoice', audit_choice)
+    ports = (*audit_arguments, '-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
              '-e', 'fileStoreBaseline', 'true')
     started_servers = []
     try:
@@ -384,7 +385,7 @@ def main():
                 try:
                     stop()
                     instrument('recovery-' + comparison, RECOVERY, RECOVERY_CASES,
-                               ('-e', 'comparison', comparison))
+                               (*audit_arguments, '-e', 'comparison', comparison))
                     facts['phases']['recovery_' + comparison] = 'passed'
                 except (RuntimeError, subprocess.SubprocessError) as error:
                     facts['phases']['recovery_' + comparison] = type(error).__name__ + ': ' + str(error)
