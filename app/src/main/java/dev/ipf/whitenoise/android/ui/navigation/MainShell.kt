@@ -442,7 +442,7 @@ internal fun MainShell(
             )
         }
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
-    val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
+    val ownsShareRequest: (ShareRequest) -> Boolean = { shellStateHolder.visibleShareRequest?.requestId == it.requestId }
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
@@ -709,18 +709,18 @@ internal fun MainShell(
     val stageShareToChats:
         suspend (ShareRequest, String, List<String>) -> Boolean =
         stageShare@{ request, accountRef, groupIds ->
-            if (groupIds.isEmpty() || currentShareRequestId != request.requestId) return@stageShare false
+            if (groupIds.isEmpty() || !ownsShareRequest(request)) return@stageShare false
             val staged =
                 runCatchingCancellable {
                     appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload) {
-                        currentShareRequestId == request.requestId
+                        ownsShareRequest(request)
                     }
                 }.getOrElse {
                     appState.present(R.string.share_import_storage)
                     return@stageShare false
                 }
             if (!staged) {
-                appState.present(R.string.toast_notification_account_unavailable)
+                if (ownsShareRequest(request)) appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
             openAfterStagedShare(request.requestId, accountRef, groupIds)
@@ -842,13 +842,13 @@ internal fun MainShell(
                         accountRef = accountRef,
                         targetGroupIds = listOf(directGroupId),
                         payload = request.payload,
-                        shouldCommit = { currentShareRequestId == request.requestId },
+                        shouldCommit = { ownsShareRequest(request) },
                     )
                 }
             if (stagingResult.getOrDefault(false)) {
                 clearSharePickerRequest()
                 openAfterStagedShare(request.requestId, accountRef, listOf(directGroupId))
-            } else {
+            } else if (ownsShareRequest(request)) {
                 if (shellStateHolder.promoteInboundShareRequest(request, persisted)) onShareRequestHandled(request)
                 val message =
                     if (stagingResult.isFailure) {

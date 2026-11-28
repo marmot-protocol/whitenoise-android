@@ -134,9 +134,15 @@ class MainShellShareRoutingCoverageTest {
 
     @Test
     fun signInReviewRetiresThePickerAndAnyDeferredShareOpenBeforeRoutingToDevices() {
+        val source = mainShellSource().readText()
+        assertTrue(
+            "share staging must check the live owner before recomposition can update its inputs",
+            "shellStateHolder.visibleShareRequest?.requestId == it.requestId" in source,
+        )
+        assertTrue("shouldCommit = { ownsShareRequest(request) }" in source)
+        assertTrue("                        ownsShareRequest(request)" in source)
         val route =
-            mainShellSource()
-                .readText()
+            source
                 .substringAfter("SignInDevicesRouteEffect(appState, previousActiveAccountRef) {", missingDelimiterValue = "")
                 .substringBefore("settingsDetailName = SettingsDetail.Account.name", missingDelimiterValue = "")
 
