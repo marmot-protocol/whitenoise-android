@@ -235,7 +235,8 @@ class PlaybackTransportOwnershipTest {
         rule.onNodeWithTag("voice-transport").assertIsDisplayed()
         rule.onNodeWithText("Maya").performClick()
         rule.onNodeWithText(context.getString(dev.ipf.whitenoise.android.R.string.folder_discard)).performClick()
-        assertEquals(1, opened)
+        // The shared destructive confirmation runs Discard once its exit motion ends.
+        rule.runOnIdle { assertEquals(1, opened) }
         assertTrue(appState.chatFolderPreferences.foldersFor("personal").none { it.name == "Unsaved folder" })
     }
 

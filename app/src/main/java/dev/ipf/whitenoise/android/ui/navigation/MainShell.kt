@@ -490,14 +490,7 @@ internal fun MainShell(
             appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.SETTINGS)
         }
     }
-    // The Settings pages as the stack holds them, so Back retraces the pages that were actually opened (#4095).
     val settingsStack = shellStateHolder.sectionState.settingsStack
-    val settingsSectionEntries =
-        when (section) {
-            MainSection.Chats -> emptyList()
-            MainSection.Settings -> settingsStack
-            MainSection.Diagnostics -> settingsStack + ShellRoute.Diagnostics
-        }
 
     val folderState by appState.chatFolderPreferences.state.collectAsState()
     val completeChatList =
@@ -1773,7 +1766,7 @@ internal fun MainShell(
                 val suppressRouteMotion = suppressConversationMotion
                 if (!appState.appLock.screenVisible) {
                     ShellNavDisplay(
-                        stack = CHATS_ROOT + settingsSectionEntries,
+                        stack = CHATS_ROOT + settingsSectionEntries(section, settingsStack),
                         frame = { route, entry ->
                             ShellSectionMotion(
                                 route = route,
@@ -1920,16 +1913,7 @@ internal fun MainShell(
                                     },
                                     stack = settingsStack,
                                     firstRunHelpRoot = firstRunHelpRoot,
-                                    onStackChange = { next ->
-                                        val top = next.last()
-                                        shellNav(
-                                            ShellNavEvent.ChangeSettingsDetail(
-                                                top.detail,
-                                                top.arg,
-                                                next.drop(1).dropLast(1),
-                                            ),
-                                        )
-                                    },
+                                    onStackChange = { shellNav(settingsStackChange(it)) },
                                     homeViewport = settingsHomeViewport,
                                     onHomeViewportChange = { settingsHomeViewport = it },
                                 )

@@ -7365,6 +7365,34 @@
       "remaining": "Send a real PDF with this setting and verify the recipient gets the original bytes (MED-064)."
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsClearConfirmation.kt",
+      "symbol": "DiagnosticsClearConfirmation",
+      "bindings": [
+        {
+          "case": "presentation-extra-modal-diagnostics-clear-cancel",
+          "selector": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "entry_assertion": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Diagnostics Clear confirmation; Cancel keeps the events. Covers the dialog only, not a populated event log."
+        },
+        {
+          "case": "presentation-extra-modal-diagnostics-clear-confirm",
+          "selector": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "entry_assertion": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Diagnostics Clear confirmation; the error-coloured Clear dispatches clearing. Covers the dialog only."
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
       "symbol": "ConfirmEmojiSetRemoval",
       "bindings": [

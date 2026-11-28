@@ -93,7 +93,7 @@ internal fun QrScannerDialogContent(
     onToggleTorch: () -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
-    BoxWithConstraints(
+    Box(
         modifier
             .fillMaxWidth()
             .fillMaxSize()

@@ -107,10 +107,12 @@ private fun WhiteNoiseDropdownMenuRow(
         trailingIcon =
             if (item.selected == true) {
                 {
+                    // Material's item colours leave the trailing icon untinted, so the check takes the row's colour.
                     Icon(
                         painterResource(R.drawable.ic_check),
                         contentDescription = null,
                         modifier = Modifier.size(MenuIconSize),
+                        tint = contentColor,
                     )
                 }
             } else {

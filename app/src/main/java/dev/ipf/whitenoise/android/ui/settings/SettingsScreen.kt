@@ -22,14 +22,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -81,10 +79,8 @@ import kotlinx.coroutines.launch
  * the renderer for one Settings route. A host that renders each route as its own entry, such as the shell's route
  * display, calls it once per route while this state stays in one place above them.
  *
- * [stack] is the section's Settings pages, home first, as the shell's route stack holds them. Opening a page pushes
- * it above the page that opened it and Back pops it, so Back always returns to the opener: About for Developer
- * opened from About, the search results for a page opened from them (#4095). [onStackChange] receives the whole new
- * stack, home first. A page's [ShellRoute.Settings.arg] reaches it as the item it shows.
+ * [stack] (home first) and [onStackChange] are the shell's Settings pages: opening a page pushes it above its opener
+ * and Back pops it, so Back returns to the opener (#4095). A page's [ShellRoute.Settings.arg] is the item it shows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
@@ -174,16 +170,7 @@ internal fun rememberSettingsRouteRenderer(
 
     var openProfilePictureActions by
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    // Pages below the top keep their saved state (scroll, a query) for the Back that returns to them, and lose it
-    // once they leave the stack.
-    val pageState = rememberSaveableStateHolder()
-    val pageKeys = places.map(::settingsPageStateKey)
-    val retainedPageKeys = remember { mutableSetOf<String>() }
-    SideEffect {
-        (retainedPageKeys - pageKeys.toSet()).forEach(pageState::removeState)
-        retainedPageKeys.retainAll(pageKeys.toSet())
-        retainedPageKeys += pageKeys
-    }
+    val pageState = rememberSettingsPageState(places)
     val motionDepth: (SettingsDetail?) -> Int = { route ->
         places.indexOfLast { it.detail == route }.takeIf { it >= 0 }?.plus(1) ?: settingsDetailDepth(route)
     }
@@ -428,12 +415,6 @@ private fun SettingsDetailRoute(
                 onOpenDemoChat = onOpenSupportChat,
             )
     }
-}
-
-/** The saved-state key of one open Settings page: its destination and, for a one-item page, its item. */
-private fun settingsPageStateKey(place: ShellRoute.Settings): String {
-    val item = place.arg?.let { ":$it" }.orEmpty()
-    return "settings-page:" + place.detail?.name + item
 }
 
 internal const val SETTINGS_HOME_CONTENT_TAG = "settings-home-content"
