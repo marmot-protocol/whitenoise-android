@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.QuarantinedGroupRow
 import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -48,8 +49,8 @@ class QuarantinedGroupsScreenTest {
                     onBackToChats = {},
                     onOpenDiagnostics = {},
                     onOpenSupportChat = {},
-                    detail = SettingsDetail.QuarantinedGroups,
-                    onDetailChange = { destinations += it },
+                    stack = settingsChain(SettingsDetail.QuarantinedGroups),
+                    onStackChange = { destinations += it.last().detail },
                     homeViewport = SettingsHomeViewport.Top,
                     onHomeViewportChange = {},
                 )

@@ -29,9 +29,13 @@ internal sealed interface ShellRoute {
         val item: ChatListItem? = null,
     ) : ShellRoute
 
-    /** Settings home when [detail] is null, otherwise one Settings screen. */
+    /**
+     * Settings home when [detail] is null, otherwise one Settings screen. [arg] names the one item a page shows,
+     * such as a relay URL or a license id (#4095), and is null for every page that lists or shows the whole section.
+     */
     data class Settings(
         val detail: SettingsDetail?,
+        val arg: String? = null,
     ) : ShellRoute
 
     /** The diagnostics screen, reached from a Settings screen it returns to. */
@@ -64,24 +68,56 @@ internal val CHATS_ROOT: List<ShellRoute> = listOf(ShellRoute.Chats)
 private const val MAX_SETTINGS_DEPTH = 8
 
 /**
- * The Settings chain that ends at [detail]: Settings home, then every parent named by [settingsDetailParent], then
- * [detail] itself. Parents are synthesized, never stored, exactly as master re-derives them on restore.
+ * The Settings chain that ends at [detail] with its [arg]: Settings home, then [parents], then [detail] itself.
+ *
+ * [parents] are the pages the person actually came through, so Back returns to the page that opened [detail] (About
+ * for Developer opened from About, #4095). Without them, as for a deep link, a notification or a restore that saved
+ * no chain, every parent named by [settingsDetailParent] is synthesized instead. A parent equal to [detail] cuts the
+ * chain there, so returning to a page already on the stack goes back to it rather than stacking it twice.
  */
-internal fun settingsChain(detail: SettingsDetail?): List<ShellRoute.Settings> {
-    val details = generateSequence(detail, ::settingsDetailParent).take(MAX_SETTINGS_DEPTH).toList().asReversed()
-    return listOf(ShellRoute.Settings(null)) + details.map { ShellRoute.Settings(it) }
+internal fun settingsChain(
+    detail: SettingsDetail?,
+    arg: String? = null,
+    parents: List<ShellRoute.Settings>? = null,
+): List<ShellRoute.Settings> {
+    if (detail == null) return listOf(ShellRoute.Settings(null))
+    val above =
+        parents
+            ?.filter { it.detail != null }
+            ?.let { real -> real.indexOfFirst { it.detail == detail }.let { if (it < 0) real else real.take(it) } }
+            ?.takeLast(MAX_SETTINGS_DEPTH - 1)
+            ?: generateSequence(settingsDetailParent(detail), ::settingsDetailParent)
+                .take(MAX_SETTINGS_DEPTH - 1)
+                .toList()
+                .asReversed()
+                .map { ShellRoute.Settings(it) }
+    return listOf(ShellRoute.Settings(null)) + above + ShellRoute.Settings(detail, arg)
 }
 
-/** The section entries master's saved [section] and [detail] stand for, without the root or a conversation. */
+/**
+ * The section entries master's saved [section] and [detail] stand for, without the root or a conversation. A saved
+ * [chain] (the Settings pages from the first below home to [detail]) is used as it is when it still ends at [detail],
+ * otherwise the fixed parents are synthesized.
+ */
 internal fun sectionEntries(
     section: MainSection,
     detail: SettingsDetail?,
-): List<ShellRoute> =
-    when (section) {
+    chain: List<ShellRoute.Settings>? = null,
+): List<ShellRoute> {
+    val top = chain?.lastOrNull()?.takeIf { it.detail != null && it.detail == detail }
+    val settings = settingsChain(detail, top?.arg, top?.let { chain.dropLast(1) })
+    return when (section) {
         MainSection.Chats -> emptyList()
-        MainSection.Settings -> settingsChain(detail)
-        MainSection.Diagnostics -> settingsChain(detail) + ShellRoute.Diagnostics
+        MainSection.Settings -> settings
+        MainSection.Diagnostics -> settings + ShellRoute.Diagnostics
     }
+}
+
+/** The Settings pages of [stack] below Diagnostics and any conversation, home first. Empty while Chats is shown. */
+internal fun settingsEntries(stack: List<ShellRoute>): List<ShellRoute.Settings> {
+    val section = sectionOf(stack)
+    return section.filterIsInstance<ShellRoute.Settings>()
+}
 
 /**
  * The conversation root of [stack], wherever it sits. Both account-boundary guards read this entry and never the

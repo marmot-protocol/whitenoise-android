@@ -29,7 +29,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -104,7 +104,7 @@ class SettingsScrollRestorationTest {
     /** Diagnostics and multi level details preserve the settings viewport. */
     @Test
     fun diagnosticsAndMultiLevelDetailsPreserveTheSettingsViewport() {
-        var detail by mutableStateOf<SettingsDetail?>(null)
+        var stack by mutableStateOf(settingsChain(null))
         var diagnosticsOpen by mutableStateOf(false)
         val appState = testAppState().also { it.updateDeveloperMode(true) }
         composeRule.setContent {
@@ -122,8 +122,8 @@ class SettingsScrollRestorationTest {
                             onBackToChats = {},
                             onOpenDiagnostics = { diagnosticsOpen = true },
                             onOpenSupportChat = {},
-                            detail = detail,
-                            onDetailChange = { detail = it },
+                            stack = stack,
+                            onStackChange = { stack = it },
                             homeViewport = homeViewport,
                             onHomeViewportChange = { homeViewport = it },
                         )
@@ -157,7 +157,7 @@ class SettingsScrollRestorationTest {
     /** About developer diagnostics preserves the settings viewport. */
     @Test
     fun aboutDeveloperDiagnosticsPreservesTheSettingsViewport() {
-        var detail by mutableStateOf<SettingsDetail?>(null)
+        var stack by mutableStateOf(settingsChain(null))
         var diagnosticsOpen by mutableStateOf(false)
         val appState = testAppState().also { it.updateDeveloperMode(true) }
         composeRule.setContent {
@@ -175,8 +175,8 @@ class SettingsScrollRestorationTest {
                             onBackToChats = {},
                             onOpenDiagnostics = { diagnosticsOpen = true },
                             onOpenSupportChat = {},
-                            detail = detail,
-                            onDetailChange = { detail = it },
+                            stack = stack,
+                            onStackChange = { stack = it },
                             homeViewport = homeViewport,
                             onHomeViewportChange = { homeViewport = it },
                         )
@@ -196,8 +196,10 @@ class SettingsScrollRestorationTest {
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
-        // Developer tools sits under Help & support, so two backs return to the Settings home.
-        repeat(2) { composeRule.onNodeWithContentDescription(back).performClick() }
+        // Developer returns to About, the page that opened it (#4095), then Help and Help & support lead home.
+        composeRule.onNodeWithContentDescription(back).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.about_and_licenses)).assertExists()
+        repeat(3) { composeRule.onNodeWithContentDescription(back).performClick() }
 
         assertRestoredHelpBounds(helpBounds)
     }
@@ -275,15 +277,18 @@ class SettingsScrollRestorationTest {
                             mutableStateOf(SettingsHomeViewport.Top)
                         }
                     if (showSettings()) {
-                        var detail by rememberSaveable { mutableStateOf<SettingsDetail?>(null) }
+                        var stack by
+                            rememberSaveable(stateSaver = SettingsTestStackSaver) {
+                                mutableStateOf(settingsChain(null))
+                            }
                         val appState = remember { testAppState() }
                         SettingsScreen(
                             appState = appState,
                             onBackToChats = {},
                             onOpenDiagnostics = {},
                             onOpenSupportChat = {},
-                            detail = detail,
-                            onDetailChange = { detail = it },
+                            stack = stack,
+                            onStackChange = { stack = it },
                             homeViewport = homeViewport,
                             onHomeViewportChange = { homeViewport = it },
                         )

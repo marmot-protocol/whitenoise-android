@@ -26,6 +26,39 @@ class MainShellSectionStateTest {
         assertEquals(SettingsDetail.DevicePrivacy.name, restored.settingsDetailName)
     }
 
+    /** The pages a Settings page was opened through, with an item argument, come back after process death. */
+    @Test
+    fun restoredSettingsPagesKeepTheirOpenersAndItems() {
+        val savedState = SavedStateHandle()
+        val first = MainShellSectionState(savedState)
+        first.bind("personal", 4)
+        first.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.Support))
+        val support = first.settingsStack.drop(1)
+        first.dispatchSection(ShellNavEvent.ChangeSettingsDetail(SettingsDetail.SupportRelays, parents = support))
+        val relays = first.settingsStack.drop(1)
+        first.dispatchSection(
+            ShellNavEvent.ChangeSettingsDetail(SettingsDetail.RelayDetails, "wss://relay.example", relays),
+        )
+
+        val restored =
+            MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
+        restored.bind("personal", 4)
+
+        assertEquals(first.settingsStack, restored.settingsStack)
+        assertEquals(ShellRoute.Settings(SettingsDetail.SupportRelays), restored.settingsStack.dropLast(1).last())
+        assertEquals("wss://relay.example", restored.settingsStack.last().arg)
+    }
+
+    /** A saved page name that this build no longer knows drops the saved chain, never the saved page. */
+    @Test
+    fun anUnknownSavedPageFallsBackToTheFixedParents() {
+        assertNull(decodeSettingsChain(listOf("Account", "NoSuchPage")))
+        assertEquals(
+            listOf(ShellRoute.Settings(SettingsDetail.Relays), ShellRoute.Settings(SettingsDetail.RelayDetails, "a=b")),
+            decodeSettingsChain(listOf("Relays", "RelayDetails=a=b")),
+        )
+    }
+
     @Test
     fun accountReplacementCannotRestoreThePreviousAccountsDestination() {
         val route = privacyDestination()

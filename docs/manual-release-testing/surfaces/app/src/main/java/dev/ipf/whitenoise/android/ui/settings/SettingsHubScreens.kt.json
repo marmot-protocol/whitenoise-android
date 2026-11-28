@@ -251,7 +251,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
         "anchor": "fun AccountScreen(",
         "test_ids": [
-          "SET-046"
+          "SET-046",
+          "SET-083"
         ]
       },
       {
@@ -300,6 +301,15 @@
         "anchor": "R.string.linked_devices",
         "test_ids": [
           "SET-060"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun LinkedDevicesRoute(",
+        "test_ids": [
+          "SET-060",
+          "SET-083"
         ]
       }
     ],

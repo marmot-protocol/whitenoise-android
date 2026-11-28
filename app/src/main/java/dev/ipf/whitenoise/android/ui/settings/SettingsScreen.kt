@@ -22,12 +22,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -65,6 +67,8 @@ import dev.ipf.whitenoise.android.ui.common.shapedPressFeedback
 import dev.ipf.whitenoise.android.ui.icons.filled.Help
 import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -73,9 +77,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
- * Owns the Settings section's state (search, its origin, the header-photo shortcut) and its Back handler for the
- * open [detail], and returns the renderer for one Settings route. A host that renders each route as its own entry,
- * such as the shell's route display, calls it once per route while this state stays in one place above them.
+ * Owns the Settings section's state (search and its origin) and its Back handler for the top of [stack], and returns
+ * the renderer for one Settings route. A host that renders each route as its own entry, such as the shell's route
+ * display, calls it once per route while this state stays in one place above them.
+ *
+ * [stack] is the section's Settings pages, home first, as the shell's route stack holds them. Opening a page pushes
+ * it above the page that opened it and Back pops it, so Back always returns to the opener: About for Developer
+ * opened from About, the search results for a page opened from them (#4095). [onStackChange] receives the whole new
+ * stack, home first. A page's [ShellRoute.Settings.arg] reaches it as the item it shows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
@@ -85,14 +94,16 @@ internal fun rememberSettingsRouteRenderer(
     onBackToChats: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenSupportChat: (ChatListItem) -> Unit,
-    detail: SettingsDetail?,
-    onDetailChange: (SettingsDetail?) -> Unit,
+    stack: List<ShellRoute.Settings>,
+    onStackChange: (List<ShellRoute.Settings>) -> Unit,
     homeViewport: SettingsHomeViewport,
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
     firstRunHelpRoot: SettingsDetail? = null,
 ): SettingsRouteRenderer {
+    val places = stack.filter { it.detail != null }
+    val detail = places.lastOrNull()?.detail
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
     // back fell through to the Activity and exited the app. Always
@@ -130,33 +141,27 @@ internal fun rememberSettingsRouteRenderer(
             searchOriginId = null
         }
     }
-    // The profile photo on the home header opens Profile directly, so back returns home instead of Account.
-    var profileFromHeader by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    var shareFromWalkthrough by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    val parentOf: (SettingsDetail) -> SettingsDetail? = { target ->
-        when {
-            target == firstRunHelpRoot -> null
-            target == SettingsDetail.Profile && profileFromHeader -> null
-            target == SettingsDetail.ShareConnect && shareFromWalkthrough -> SettingsDetail.LearnWhiteNoise
-            else -> settingsDetailParent(target)
-        }
+
+    /** Replaces the open pages with [next], the pages above home. */
+    fun show(next: List<ShellRoute.Settings>) {
+        if (next.isEmpty()) searchOriginId = null
+        onStackChange(listOf(ShellRoute.Settings(null)) + next)
     }
-    val changeDetail: (SettingsDetail?) -> Unit = { destination ->
-        shareFromWalkthrough = detail == SettingsDetail.LearnWhiteNoise && destination == SettingsDetail.ShareConnect
-        if (detail != null && detail == firstRunHelpRoot && destination == null) {
-            onBackToChats()
-        } else if (searchOrigin != null &&
-            detail == searchOrigin.destination &&
-            destination == detail?.let(parentOf)
-        ) {
-            searchOriginId = null
-            onDetailChange(null)
-        } else {
-            if (destination == null) searchOriginId = null
-            onDetailChange(destination)
-        }
+
+    /** Opens [target] with its [arg] above the open page, or straight above home when [fromHome]. */
+    fun open(
+        target: SettingsDetail,
+        arg: String? = null,
+        fromHome: Boolean = false,
+    ) {
+        show(settingsChain(target, arg, if (fromHome) emptyList() else places).drop(1))
     }
-    settingsBackHandler(appState.signOutInProgress, detail, parentOf, {
+
+    /** Back from the open page returns to the page that opened it, and a first-run help root leaves Settings. */
+    fun back() {
+        if (detail != null && detail == firstRunHelpRoot) onBackToChats() else show(places.dropLast(1))
+    }
+    settingsBackHandler(appState.signOutInProgress, detail, {
         if (searchOrigin != null) {
             searchOriginId = null
         } else if (searchOpen) {
@@ -165,16 +170,22 @@ internal fun rememberSettingsRouteRenderer(
         } else {
             onBackToChats()
         }
-    }, changeDetail)
+    }, ::back)
 
     var openProfilePictureActions by
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    // Pages below the top keep their saved state (scroll, a query) for the Back that returns to them, and lose it
+    // once they leave the stack.
+    val pageState = rememberSaveableStateHolder()
+    val pageKeys = places.map(::settingsPageStateKey)
+    val retainedPageKeys = remember { mutableSetOf<String>() }
+    SideEffect {
+        (retainedPageKeys - pageKeys.toSet()).forEach(pageState::removeState)
+        retainedPageKeys.retainAll(pageKeys.toSet())
+        retainedPageKeys += pageKeys
+    }
     val motionDepth: (SettingsDetail?) -> Int = { route ->
-        if (route == SettingsDetail.ShareConnect && shareFromWalkthrough) {
-            settingsDetailDepth(SettingsDetail.LearnWhiteNoise) + 1
-        } else {
-            settingsDetailDepth(route)
-        }
+        places.indexOfLast { it.detail == route }.takeIf { it >= 0 }?.plus(1) ?: settingsDetailDepth(route)
     }
     return SettingsRouteRenderer(motionDepth) { route ->
         CompositionLocalProvider(
@@ -220,53 +231,58 @@ internal fun rememberSettingsRouteRenderer(
                         ) {
                             searchOriginId = entry.id
                             searchRevealed = false
-                            onDetailChange(entry.destination)
+                            // A home control stays on home with its origin, which reveals it there.
+                            entry.destination?.let { open(it, fromHome = true) }
+                                ?: onStackChange(listOf(ShellRoute.Settings(null)))
                         }
                     },
-                    onOpenDetail = {
-                        profileFromHeader = false
-                        onDetailChange(it)
-                    },
+                    onOpenDetail = { open(it, fromHome = true) },
                     onOpenProfilePictureActions = {
-                        profileFromHeader = true
+                        // The profile photo on the home header opens Profile directly, so Back returns home.
                         openProfilePictureActions = true
-                        onDetailChange(SettingsDetail.Profile)
+                        open(SettingsDetail.Profile, fromHome = true)
                     },
                     viewport = homeViewport,
                     onViewportChange = onHomeViewportChange,
                 )
             } else {
-                SettingsDetailRoute(
-                    appState = appState,
-                    detail = route,
-                    onOpenSupportChat = onOpenSupportChat,
-                    onOpenDiagnostics = onOpenDiagnostics,
-                    onDetailChange = { target ->
-                        // Hub rows open their page from within a detail, so the header shortcut is spent.
-                        if (target != null) profileFromHeader = false
-                        changeDetail(target)
-                    },
-                    onBack = {
-                        openProfilePictureActions = false
-                        changeDetail(parentOf(route))
-                    },
-                    openProfilePictureActionsOnEntry = openProfilePictureActions,
-                    onProfilePictureActionsOpened = { openProfilePictureActions = false },
-                )
+                val place = places.lastOrNull { it.detail == route } ?: ShellRoute.Settings(route)
+                pageState.SaveableStateProvider(settingsPageStateKey(place)) {
+                    SettingsDetailRoute(
+                        appState = appState,
+                        detail = route,
+                        arg = place.arg,
+                        onOpenSupportChat = onOpenSupportChat,
+                        onOpenDiagnostics = onOpenDiagnostics,
+                        onDetailChange = { target -> if (target == null) show(emptyList()) else open(target) },
+                        onOpenItem = { target, arg -> open(target, arg) },
+                        onBack = {
+                            openProfilePictureActions = false
+                            back()
+                        },
+                        openProfilePictureActionsOnEntry = openProfilePictureActions,
+                        onProfilePictureActionsOpened = { openProfilePictureActions = false },
+                    )
+                }
             }
         }
     }
 }
 
-/** Every Settings detail destination; each returns through [onBack] to the parent chosen by the caller. */
+/**
+ * Every Settings detail destination; each returns through [onBack] to the page that opened it. [arg] is the item a
+ * one-item page shows, and [onOpenItem] opens such a page for an item.
+ */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")
 private fun SettingsDetailRoute(
     appState: WhiteNoiseAppState,
     detail: SettingsDetail,
+    arg: String?,
     onOpenSupportChat: (ChatListItem) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
+    onOpenItem: (SettingsDetail, String) -> Unit,
     onBack: () -> Unit,
     openProfilePictureActionsOnEntry: Boolean,
     onProfilePictureActionsOpened: () -> Unit,
@@ -293,7 +309,13 @@ private fun SettingsDetailRoute(
         SettingsDetail.Language -> LanguageScreen(appState, onBack = onBack)
         SettingsDetail.CustomEmoji ->
             CustomEmojiScreen(appState, onOpenSets = { onDetailChange(SettingsDetail.EmojiSets) }, onBack = onBack)
-        SettingsDetail.EmojiSets -> EmojiSetsScreen(appState, onBack = onBack)
+        SettingsDetail.EmojiSets ->
+            EmojiSetsScreen(
+                appState,
+                onBack = onBack,
+                onOpenPreview = { onOpenItem(SettingsDetail.EmojiSetPreview, it) },
+            )
+        SettingsDetail.EmojiSetPreview -> EmojiSetsScreen(appState, onBack = onBack, previewCoordinate = arg)
         SettingsDetail.Data ->
             DataUsageScreen(
                 appState,
@@ -301,7 +323,13 @@ private fun SettingsDetailRoute(
                 onOpenHistoryBackups = { onDetailChange(SettingsDetail.HistoryBackups) },
                 onOpenManageStorage = { onDetailChange(SettingsDetail.ManageStorage) },
             )
-        SettingsDetail.ManageStorage -> ManageStorageScreen(appState, onBack = onBack)
+        SettingsDetail.ManageStorage ->
+            ManageStorageScreen(
+                appState,
+                onBack = onBack,
+                onOpenList = { onOpenItem(SettingsDetail.StoredAttachments, it) },
+            )
+        SettingsDetail.StoredAttachments -> ManageStorageScreen(appState, onBack = onBack, openList = arg)
         SettingsDetail.Profile ->
             ProfileEditScreen(
                 appState = appState,
@@ -311,7 +339,9 @@ private fun SettingsDetailRoute(
             )
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = onBack)
         SettingsDetail.HistoryBackups -> HistoryBackupsScreen(appState, onBack = onBack)
-        SettingsDetail.Relays -> RelaysScreen(appState, onBack = onBack)
+        SettingsDetail.Relays ->
+            RelaysScreen(appState, onBack = onBack, onOpenRelay = { onOpenItem(SettingsDetail.RelayDetails, it) })
+        SettingsDetail.RelayDetails -> RelaysScreen(appState, onBack = onBack, selectedUrl = arg)
         SettingsDetail.Support ->
             SupportScreen(
                 appState = appState,
@@ -320,7 +350,12 @@ private fun SettingsDetailRoute(
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
         SettingsDetail.SupportRelays ->
-            RelaysScreen(appState, onBack = onBack, destination = SettingsDetail.SupportRelays)
+            RelaysScreen(
+                appState,
+                onBack = onBack,
+                destination = SettingsDetail.SupportRelays,
+                onOpenRelay = { onOpenItem(SettingsDetail.RelayDetails, it) },
+            )
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
@@ -335,7 +370,9 @@ private fun SettingsDetailRoute(
                 onBack = onBack,
                 onOpenSounds = { onDetailChange(SettingsDetail.NotificationSounds) },
                 onOpenDelivery = { onDetailChange(SettingsDetail.NotificationDelivery) },
+                onOpenProfiles = { onDetailChange(SettingsDetail.NotificationProfiles) },
             )
+        SettingsDetail.NotificationProfiles -> NotificationProfilesScreen(appState, onBack = onBack)
         SettingsDetail.NotificationSounds -> NotificationSoundsScreen(appState, onBack = onBack)
         SettingsDetail.NotificationDelivery -> NotificationDeliveryScreen(appState, onBack = onBack)
         SettingsDetail.DevicePrivacy ->
@@ -371,11 +408,16 @@ private fun SettingsDetailRoute(
             AboutScreen(
                 appState = appState,
                 onOpenDeveloper = { onDetailChange(SettingsDetail.Developer) },
+                onOpenLicenses = { onDetailChange(SettingsDetail.Licenses) },
                 versionName = BuildConfig.VERSION_NAME,
                 buildNumber = BuildConfig.VERSION_CODE.toString(),
                 mdkShortSha = BuildConfig.MDK_SHORT_SHA,
                 onBack = onBack,
             )
+        SettingsDetail.Licenses ->
+            OpenSourceLicensesScreen(onBack = onBack, onSelect = { onOpenItem(SettingsDetail.LicenseNotice, it.id) })
+        SettingsDetail.LicenseNotice -> OpenSourceLicensesScreen(onBack = onBack, selectedId = arg)
+        SettingsDetail.LinkedDevices -> LinkedDevicesRoute(appState, onBack = onBack)
         SettingsDetail.Developer ->
             DeveloperScreen(
                 appState = appState,
@@ -386,6 +428,12 @@ private fun SettingsDetailRoute(
                 onOpenDemoChat = onOpenSupportChat,
             )
     }
+}
+
+/** The saved-state key of one open Settings page: its destination and, for a one-item page, its item. */
+private fun settingsPageStateKey(place: ShellRoute.Settings): String {
+    val item = place.arg?.let { ":$it" }.orEmpty()
+    return "settings-page:" + place.detail?.name + item
 }
 
 internal const val SETTINGS_HOME_CONTENT_TAG = "settings-home-content"

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.res.Resources
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,9 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,11 +35,17 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Local, selectable notices retain the existing generated attribution without an external Activity. */
+/**
+ * Local, selectable notices retain the existing generated attribution without an external Activity. The list and one
+ * notice are two Settings pages (#4095): the list passes [onSelect], and the notice page passes [selectedId]. A
+ * notice that no longer exists, as after an update that dropped a library, returns to the list.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun OpenSourceLicensesScreen(
     onBack: () -> Unit,
+    selectedId: String? = null,
+    onSelect: (OpenSourceNotice) -> Unit = {},
     noticesLoader: suspend (Resources) -> List<OpenSourceNotice> = { readOpenSourceNotices(it) },
 ) {
     val context = LocalContext.current
@@ -53,12 +58,15 @@ internal fun OpenSourceLicensesScreen(
                     runCatchingCancellable { loader(context.resources) }
                 }
         }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    val selected = notices?.getOrNull()?.firstOrNull { it.id == selectedId }
-    val back = { if (selectedId != null) selectedId = null else onBack() }
-    BackHandler(onBack = back)
-    SettingsScaffold(title = selected?.name ?: stringResource(R.string.open_source_licenses), onBack = back) {
-        OpenSourceLicensesContent(notices, selected, { selectedId = it.id }, { retry++ })
+    val loaded = notices?.getOrNull()
+    val selected = selectedId?.let { id -> loaded?.firstOrNull { it.id == id } }
+    val currentOnBack by rememberUpdatedState(onBack)
+    LaunchedEffect(selectedId, loaded) {
+        if (selectedId != null && loaded != null && selected == null) currentOnBack()
+    }
+    val title = if (selectedId == null) stringResource(R.string.open_source_licenses) else selected?.name.orEmpty()
+    SettingsScaffold(title = title, onBack = onBack) {
+        OpenSourceLicensesContent(notices, selected, onSelect, { retry++ })
     }
 }
 

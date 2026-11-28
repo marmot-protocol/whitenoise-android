@@ -8,15 +8,18 @@ private const val SECTION_RUNTIME_KEY = "main_shell_section_runtime"
 private const val SECTION_PROCESS_KEY = "main_shell_section_process"
 private const val SECTION_NAME_KEY = "main_shell_section_name"
 private const val SECTION_DETAIL_KEY = "main_shell_section_detail"
+private const val SECTION_CHAIN_KEY = "main_shell_section_settings_chain"
 private val PROCESS_EPOCH = UUID.randomUUID().toString()
 
 /**
  * The Activity's saved copy of the route's section, written from [navigator] and read back into it once.
  *
- * Only destination enum names reach [SavedStateHandle], under the same keys and with the same account,
- * runtime-generation and process-epoch rules as before the navigator owned the route, so the section is retained
- * while the protected shell is absent behind app lock and restored after process death for the same account and
- * runtime. The section itself is read from [navigator] and changed only by its events.
+ * Destination enum names reach [SavedStateHandle], under the same keys and with the same account, runtime-generation
+ * and process-epoch rules as before the navigator owned the route, so the section is retained while the protected
+ * shell is absent behind app lock and restored after process death for the same account and runtime. The Settings
+ * pages the person came through, each with its item argument, are saved beside them, so Back after a restore still
+ * returns to the page that opened the open one (#4095). The section itself is read from [navigator] and changed only
+ * by its events.
  */
 internal class MainShellSectionState(
     private val savedState: SavedStateHandle,
@@ -27,6 +30,7 @@ internal class MainShellSectionState(
     private var runtimeProcess = savedState.get<Any>(SECTION_PROCESS_KEY) as? String
     private var savedSection = validSection(savedState.get<Any>(SECTION_NAME_KEY) as? String)
     private var savedDetail = validDetail(savedState.get<Any>(SECTION_DETAIL_KEY) as? String)
+    private var savedChain = (savedState.get<Any>(SECTION_CHAIN_KEY) as? List<*>)?.filterIsInstance<String>()
 
     // This holder's saved section reaches the process-retained navigator once, at its first bind.
     private var restored = false
@@ -45,6 +49,10 @@ internal class MainShellSectionState(
     /** The open Settings screen's name while Settings or Diagnostics is open, read from the route stack. */
     val settingsDetailName: String?
         get() = sectionProjection(navigator.stack).second?.name
+
+    /** The open Settings pages, home first, read from the route stack. Empty while Chats is the section. */
+    val settingsStack: List<ShellRoute.Settings>
+        get() = settingsEntries(navigator.stack)
 
     /** Whether an account owns the section, without which master ignores every section write. */
     val hasOwner: Boolean
@@ -73,7 +81,9 @@ internal class MainShellSectionState(
         if (!restored) {
             restored = true
             val section = mainSectionOf(savedSection)
-            navigator.dispatch(ShellNavEvent.SectionRestored(section, settingsDetailOf(savedDetail)))
+            navigator.dispatch(
+                ShellNavEvent.SectionRestored(section, settingsDetailOf(savedDetail), decodeSettingsChain(savedChain)),
+            )
         }
     }
 
@@ -120,6 +130,11 @@ internal class MainShellSectionState(
             savedDetail = detail?.name
             savedState[SECTION_DETAIL_KEY] = savedDetail
         }
+        val chain = encodeSettingsChain(settingsEntries(stack))
+        if (chain != savedChain) {
+            savedChain = chain
+            savedState[SECTION_CHAIN_KEY] = chain?.let(::ArrayList)
+        }
     }
 
     /**
@@ -137,11 +152,13 @@ internal class MainShellSectionState(
         runtimeProcess = null
         savedSection = MainSection.Chats.name
         savedDetail = null
+        savedChain = null
         savedState.remove<String>(SECTION_ACCOUNT_KEY)
         savedState.remove<Int>(SECTION_RUNTIME_KEY)
         savedState.remove<String>(SECTION_PROCESS_KEY)
         savedState.remove<String>(SECTION_NAME_KEY)
         savedState.remove<String>(SECTION_DETAIL_KEY)
+        savedState.remove<ArrayList<String>>(SECTION_CHAIN_KEY)
         if (sectionProjection(navigator.stack).first != MainSection.Chats) {
             navigator.dispatch(ShellNavEvent.ExitSettings)
         }
@@ -154,3 +171,23 @@ internal class MainShellSectionState(
 
     private fun validDetail(value: String?): String? = SettingsDetail.entries.firstOrNull { it.name == value }?.name
 }
+
+/** Separates a saved page's enum name from its argument; no [SettingsDetail] name contains it. */
+private const val SETTINGS_CHAIN_ARG_SEPARATOR = '='
+
+/** The pages of [entries] below home as `Name` or `Name=arg`, or null when only home is open. */
+internal fun encodeSettingsChain(entries: List<ShellRoute.Settings>): List<String>? =
+    entries
+        .mapNotNull { entry ->
+            entry.detail?.let { detail ->
+                entry.arg?.let { "${detail.name}$SETTINGS_CHAIN_ARG_SEPARATOR$it" } ?: detail.name
+            }
+        }.ifEmpty { null }
+
+/** Reads back [encodeSettingsChain]'s form, or null when any page is no longer a known destination. */
+internal fun decodeSettingsChain(saved: List<String>?): List<ShellRoute.Settings>? =
+    saved?.map { entry ->
+        val name = entry.substringBefore(SETTINGS_CHAIN_ARG_SEPARATOR)
+        val detail = settingsDetailOf(name) ?: return null
+        ShellRoute.Settings(detail, entry.substringAfter(SETTINGS_CHAIN_ARG_SEPARATOR, "").ifEmpty { null })
+    }

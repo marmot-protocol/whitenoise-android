@@ -52,6 +52,30 @@ internal enum class SettingsDetail {
     LearnWhiteNoise,
     NotificationSounds,
     NotificationDelivery,
+
+    // Pages that used to swap in place inside their parent (#4095). Each is a destination of its own, and the
+    // ones that show one item carry it as the route's argument, see ShellRoute.Settings.arg.
+
+    /** The bundled open-source notices, opened from About. */
+    Licenses,
+
+    /** One notice's text; its argument is the notice id. */
+    LicenseNotice,
+
+    /** The account's linked devices, opened from Account or a sign-in notice. */
+    LinkedDevices,
+
+    /** Notification profiles, opened from Notifications. */
+    NotificationProfiles,
+
+    /** One relay's lists and actions; its argument is the relay URL. */
+    RelayDetails,
+
+    /** Stored attachments of one chat or the largest overall; its argument is the list id. */
+    StoredAttachments,
+
+    /** One emoji set's preview; its argument is the set's coordinate. */
+    EmojiSetPreview,
 }
 
 internal fun firstRunHelpDetail(team: Boolean) = if (team) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise

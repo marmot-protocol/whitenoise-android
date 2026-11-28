@@ -354,9 +354,10 @@
       {
         "surface": "local-licence-navigation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "OpenSourceLicensesScreen(onBack",
+        "anchor": "onOpenLicenses()",
         "test_ids": [
-          "SET-019"
+          "SET-019",
+          "SET-083"
         ]
       },
       {

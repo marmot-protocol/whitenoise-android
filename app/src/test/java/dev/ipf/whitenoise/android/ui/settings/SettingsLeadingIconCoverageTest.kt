@@ -140,7 +140,14 @@ class SettingsLeadingIconCoverageTest(
                 val appState = freshAppState()
                 composeRule.setContent {
                     WhiteNoiseTheme {
-                        AboutScreen(appState, {}, versionName = "1.0", buildNumber = "1", mdkShortSha = "abc1234") {}
+                        AboutScreen(
+                            appState,
+                            {},
+                            {},
+                            versionName = "1.0",
+                            buildNumber = "1",
+                            mdkShortSha = "abc1234",
+                        ) {}
                     }
                 }
             }

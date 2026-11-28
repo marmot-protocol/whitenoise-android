@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
         "anchor": "fun OpenSourceLicensesScreen(",
         "test_ids": [
-          "SET-019"
+          "SET-019",
+          "SET-083"
         ]
       },
       {

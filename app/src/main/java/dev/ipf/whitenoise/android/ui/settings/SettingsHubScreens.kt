@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,8 +29,8 @@ import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
  */
 
 /**
- * Account hub: the profile, its keys, the relays that carry it and the account's
- * device roster, which opens in place and returns here on Back.
+ * Account hub: the profile, its keys, the relays that carry it and the account's device roster, which is its own
+ * Settings page that returns here on Back (#4095).
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -40,15 +39,8 @@ internal fun AccountScreen(
     onBack: () -> Unit,
     onOpenDetail: (SettingsDetail?) -> Unit,
 ) {
-    // Keyed by account so a roster opened for one profile never reopens over another.
-    var linkedDevicesOpen by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     // A sign-in notice, alert or notification for this account opens its devices directly.
-    SignInDevicesRequestEffect(appState) { linkedDevicesOpen = true }
-    if (linkedDevicesOpen) {
-        BackHandler { linkedDevicesOpen = false }
-        LinkedDevicesScreen(appState, onBack = { linkedDevicesOpen = false })
-        return
-    }
+    SignInDevicesRequestEffect(appState) { onOpenDetail(SettingsDetail.LinkedDevices) }
     val readiness =
         rememberProfileReadiness(
             appState,
@@ -62,13 +54,27 @@ internal fun AccountScreen(
             item(key = "search.Account.1") {
                 AccountHubGroup(
                     readiness = readiness,
-                    onOpenLinkedDevices = { linkedDevicesOpen = true },
+                    onOpenLinkedDevices = { onOpenDetail(SettingsDetail.LinkedDevices) },
                     onOpenDetail = onOpenDetail,
                     devicesTier = appState.devicesRowTier(),
                 )
             }
         }
     }
+}
+
+/**
+ * The account's linked devices as a Settings page. A sign-in request that arrives while it is open is taken here, as
+ * it was while the roster opened in place, so it never reopens the page after Back.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun LinkedDevicesRoute(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
+    SignInDevicesRequestEffect(appState) {}
+    LinkedDevicesScreen(appState, onBack = onBack)
 }
 
 /**
@@ -125,6 +131,7 @@ internal fun AccountHubGroup(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.linked_devices),
+                    routeKey = SettingsDetail.LinkedDevices,
                     explanation = stringResource(R.string.explanation_linked_devices_hub),
                     onClick = onOpenLinkedDevices,
                     modifier = Modifier.testTag("settings.account.linked_devices"),

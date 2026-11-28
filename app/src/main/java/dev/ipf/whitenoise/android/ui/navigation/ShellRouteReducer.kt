@@ -68,7 +68,7 @@ private fun reduceStackEvent(
         ShellNavEvent.Back -> popTop(stack)
         is ShellNavEvent.BackFrom -> reduceBackFrom(stack, event.pane)
         is ShellNavEvent.SectionRestored ->
-            CHATS_ROOT + sectionEntries(event.section, event.detail) + conversationSegment(stack)
+            CHATS_ROOT + sectionEntries(event.section, event.detail, event.chain) + conversationSegment(stack)
         else -> stack
     }
 
@@ -100,12 +100,14 @@ private fun reduceSectionEvent(
             is ShellNavEvent.OpenSettings -> settingsChain(event.detail)
             ShellNavEvent.ExitSettings -> emptyList()
             // Master keeps the detail while Chats is the section and never renders it there.
-            is ShellNavEvent.ChangeSettingsDetail ->
+            is ShellNavEvent.ChangeSettingsDetail -> {
+                val chain = settingsChain(event.detail, event.arg, event.parents)
                 when {
                     section.isEmpty() -> section
-                    section.last() == ShellRoute.Diagnostics -> settingsChain(event.detail) + ShellRoute.Diagnostics
-                    else -> settingsChain(event.detail)
+                    section.last() == ShellRoute.Diagnostics -> chain + ShellRoute.Diagnostics
+                    else -> chain
                 }
+            }
             ShellNavEvent.OpenDiagnostics ->
                 section.filterIsInstance<ShellRoute.Settings>().ifEmpty { settingsChain(null) } +
                     ShellRoute.Diagnostics

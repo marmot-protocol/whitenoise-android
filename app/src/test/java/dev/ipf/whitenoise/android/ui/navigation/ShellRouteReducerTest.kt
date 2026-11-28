@@ -107,6 +107,96 @@ class ShellRouteReducerTest {
         assertEquals(CHATS_ROOT, reduce(profile, ShellNavEvent.ExitSettings))
     }
 
+    /** A page opened from another page keeps that opener below it, so Back returns to About, not Help & support. */
+    @Test
+    fun aDetailChangeKeepsThePagesItWasOpenedThrough() {
+        val about = reduce(CHATS_ROOT, ShellNavEvent.OpenSettings(SettingsDetail.About))
+        val aboutChain = settingsEntries(about).drop(1)
+        val developer =
+            reduce(about, ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Developer, parents = aboutChain))
+        assertEquals(about + ShellRoute.Settings(SettingsDetail.Developer), developer)
+        assertEquals(about, reduce(developer, ShellNavEvent.Back))
+        val diagnostics = reduce(developer, ShellNavEvent.OpenDiagnostics)
+        assertEquals(developer, reduce(diagnostics, ShellNavEvent.Back))
+    }
+
+    /** Opening a page that is already below the top returns to it instead of stacking it a second time. */
+    @Test
+    fun aPageAlreadyOnTheStackIsReturnedTo() {
+        val parents = listOf(ShellRoute.Settings(SettingsDetail.Account), ShellRoute.Settings(SettingsDetail.Relays))
+        assertEquals(
+            listOf(ShellRoute.Chats, ShellRoute.Settings(null), ShellRoute.Settings(SettingsDetail.Account)),
+            reduce(
+                reduce(CHATS_ROOT, ShellNavEvent.OpenSettings(null)),
+                ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Account, parents = parents),
+            ),
+        )
+    }
+
+    /** A one-item page carries its item, and its fixed parents are synthesized when no opener is known. */
+    @Test
+    fun aOneItemPageCarriesItsArgument() {
+        val relay =
+            reduce(
+                reduce(CHATS_ROOT, ShellNavEvent.OpenSettings(null)),
+                ShellNavEvent.ChangeSettingsDetail(SettingsDetail.RelayDetails, arg = RELAY),
+            )
+        assertEquals(
+            listOf(
+                ShellRoute.Chats,
+                ShellRoute.Settings(null),
+                ShellRoute.Settings(SettingsDetail.Account),
+                ShellRoute.Settings(SettingsDetail.Relays),
+                ShellRoute.Settings(SettingsDetail.RelayDetails, RELAY),
+            ),
+            relay,
+        )
+        assertEquals(ShellRoute.Settings(SettingsDetail.Relays), reduce(relay, ShellNavEvent.Back).last())
+    }
+
+    /** Every page that used to open in place has a fixed parent, so a deep link still has a Back path (#4095). */
+    @Test
+    fun formerInPlacePagesHaveFixedParents() {
+        assertEquals(
+            listOf(
+                null,
+                SettingsDetail.HelpSupport,
+                SettingsDetail.Help,
+                SettingsDetail.About,
+                SettingsDetail.Licenses,
+                SettingsDetail.LicenseNotice,
+            ),
+            settingsChain(SettingsDetail.LicenseNotice).map { it.detail },
+        )
+        mapOf(
+            SettingsDetail.LinkedDevices to SettingsDetail.Account,
+            SettingsDetail.NotificationProfiles to SettingsDetail.Notifications,
+            SettingsDetail.RelayDetails to SettingsDetail.Relays,
+            SettingsDetail.StoredAttachments to SettingsDetail.ManageStorage,
+            SettingsDetail.EmojiSetPreview to SettingsDetail.EmojiSets,
+        ).forEach { (page, parent) -> assertEquals(parent, settingsChain(page).dropLast(1).last().detail) }
+    }
+
+    /** A saved chain that still ends at the saved page is restored as it is, and a stale one falls back. */
+    @Test
+    fun aRestoredSectionUsesItsSavedChainWhenItMatches() {
+        val chain =
+            listOf(
+                ShellRoute.Settings(SettingsDetail.HelpSupport),
+                ShellRoute.Settings(SettingsDetail.Help),
+                ShellRoute.Settings(SettingsDetail.About),
+                ShellRoute.Settings(SettingsDetail.Developer),
+            )
+        assertEquals(
+            CHATS_ROOT + ShellRoute.Settings(null) + chain,
+            reduce(CHATS_ROOT, ShellNavEvent.SectionRestored(MainSection.Settings, SettingsDetail.Developer, chain)),
+        )
+        assertEquals(
+            CHATS_ROOT + settingsChain(SettingsDetail.Account),
+            reduce(CHATS_ROOT, ShellNavEvent.SectionRestored(MainSection.Settings, SettingsDetail.Account, chain)),
+        )
+    }
+
     /** Diagnostics opened from Developer sits above Developer's chain and Back returns to Developer. */
     @Test
     fun diagnosticsFromDeveloperReturnsToDeveloper() {
@@ -384,6 +474,7 @@ class ShellRouteReducerTest {
         const val GROUP_TWO = "bb02"
         const val RUNTIME = 1
         const val EARLY_OPEN = 7L
+        const val RELAY = "wss://relay.example"
         val conversationA = ShellRoute.Conversation(ACCOUNT_A, GROUP_ONE, ConversationOpenContext())
         val conversationB = ShellRoute.Conversation(ACCOUNT_A, GROUP_TWO, ConversationOpenContext())
 
