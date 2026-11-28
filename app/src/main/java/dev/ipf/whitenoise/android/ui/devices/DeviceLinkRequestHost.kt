@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,8 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -90,9 +87,14 @@ internal fun DeviceLinkRequestHost(
     SideEffect { watcher.blocked = blocked }
     LaunchedEffect(watcher, appState.activeAccountRef) { watcher.reoffer() }
     var devicesOpen by remember(appState.activeAccountRef, runtimeGeneration) { mutableStateOf(false) }
+    val reporting = remember(watcher) { mutableStateOf(false) }
     if (devicesOpen && !blocked) DeviceLinkDevicesWindow(appState, onClose = { devicesOpen = false })
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
     val request = watcher.queue.presented ?: return
+    val showDevices = {
+        watcher.close()
+        devicesOpen = true
+    }
     DeviceLinkRequestPresentation(
         watcher = watcher,
         request = request,
@@ -108,10 +110,17 @@ internal fun DeviceLinkRequestHost(
         },
     ) {
         DeviceLinkApprovalGate(runtimeGeneration, request, blocked) { draft ->
-            ActiveProfileLinkRequest(appState, watcher, request, draft) {
-                watcher.close()
-                devicesOpen = true
-            }
+            ActiveProfileLinkRequest(
+                appState = appState,
+                watcher = watcher,
+                request = request,
+                draft = draft,
+                reporting = { reporting.value },
+                onReport = {
+                    launchLinkReport(appState, watcher, request, runtimeGeneration, reporting)
+                },
+                onReviewDevices = showDevices,
+            )
         }
     }
 }
@@ -192,17 +201,20 @@ internal fun WhiteNoiseAppState.profileName(accountRef: String): String {
 }
 
 /**
- * The active profile's request over the whole window. Link device and Not now go to MDK through a controller bound
+ * The active profile's request over the whole window. Link device and Don't link go to MDK through a controller bound
  * to this profile and runtime; closing the window only returns the request to the chat list's notice. A failed
  * command is shown once and leaves the request, and the choices entered, in place. Touches that began before the
  * window appeared are ignored, and a repeated request's Review devices runs [onReviewDevices].
  */
+@Suppress("LongParameterList")
 @Composable
 private fun ActiveProfileLinkRequest(
     appState: WhiteNoiseAppState,
     watcher: DeviceLinkRequestWatcher,
     request: DeviceLinkRequest,
     draft: DeviceLinkApprovalDraft,
+    reporting: () -> Boolean,
+    onReport: () -> Unit,
     onReviewDevices: () -> Unit,
 ) {
     val prompt = watcher.presentedPrompt ?: return
@@ -227,35 +239,40 @@ private fun ActiveProfileLinkRequest(
         watcher.reread(request.accountRef)
     }
     val failureMessage = rememberLinkFailureMessage(controller)
-    val shownAt = rememberShownUptime()
-    Dialog(
-        onDismissRequest = watcher::close,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        Box(Modifier.ignoringTouchesBefore(shownAt)) {
-            DeviceLinkRequestContent(
-                state = prompt.state,
-                running = controller.running,
-                onLink = { choices ->
-                    scope.launch {
-                        val current = watcher.queue.presented
-                        if (watcher.blocked || current?.id != request.id || current.repeated) return@launch
-                        if (watcher.presentedPrompt?.state != prompt.state) return@launch
-                        beforeCommand = watcher.snapshots[request.accountRef]
-                        controller.link(request.promptId, choices)
-                    }
-                },
-                onDecline = {
+
+    fun canRespond(): Boolean =
+        !reporting() &&
+            !watcher.blocked &&
+            watcher.queue.presented?.id == request.id &&
+            appState.activeAccountRef == request.accountRef &&
+            appState.runtimeGeneration == runtimeGeneration
+    val reportCurrent: () -> Unit = {
+        if (canRespond() && controller.running == null) onReport()
+    }
+    DeviceLinkConsentDialog(appState, watcher, request, prompt, ::canRespond, reportCurrent) { canApprove ->
+        DeviceLinkRequestContent(
+            state = prompt.state,
+            running = controller.running,
+            onLink = { choices ->
+                scope.launch {
+                    if (!canApprove()) return@launch
                     beforeCommand = watcher.snapshots[request.accountRef]
-                    scope.launch { controller.decline(request.promptId) }
-                },
-                onClose = watcher::close,
-                failureMessage = failureMessage,
-                draft = draft,
-                repeated = request.repeated,
-                onReviewDevices = onReviewDevices,
-            )
-        }
+                    controller.link(request.promptId, choices)
+                }
+            },
+            onDecline = {
+                beforeCommand = watcher.snapshots[request.accountRef]
+                scope.launch {
+                    if (canRespond()) controller.decline(request.promptId)
+                }
+            },
+            onClose = watcher::close,
+            failureMessage = failureMessage,
+            draft = draft,
+            repeated = request.repeated,
+            onReviewDevices = onReviewDevices,
+            onReport = reportCurrent,
+        )
     }
 }
 

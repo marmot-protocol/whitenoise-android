@@ -53,6 +53,7 @@ internal interface MediaDecodeTransport {
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
         edge: Int,
+        playbackColors: Boolean = false,
     ): MediaProbe? = null
 
     fun probeUriAt(
@@ -60,6 +61,7 @@ internal interface MediaDecodeTransport {
         uri: android.net.Uri,
         positionMs: Long,
         edge: Int,
+        playbackColors: Boolean,
     ): MediaProbe? = null
 
     fun probeBytes(
@@ -103,6 +105,7 @@ internal data class MediaDecodeRequest(
     val positionUs: Long = 0L,
     val svgRegion: ViewerSvgRegion? = null,
     val pdfPage: Int = 0,
+    val playbackColors: Boolean = false,
 )
 
 internal data class PdfResult(

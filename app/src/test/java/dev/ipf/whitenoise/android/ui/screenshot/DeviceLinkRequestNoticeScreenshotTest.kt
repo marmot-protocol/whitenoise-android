@@ -4,12 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
+import dev.ipf.whitenoise.android.ui.devices.DEVICE_LINK_DID_NOT_START_TAG
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestBanner
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestContent
 import dev.ipf.whitenoise.android.ui.devices.fixtureCode
@@ -107,7 +110,8 @@ class DeviceLinkRequestNoticeScreenshotTest {
         look: Look = Look(),
     ) {
         val comparing = DeviceLinkPromptStateFfi.Comparing(fixtureCode())
-        show(look) { DeviceLinkRequestContent(comparing, null, {}, {}, {}, repeated = true) }
+        show(look) { DeviceLinkRequestContent(comparing, null, {}, {}, {}, repeated = true, onReport = {}) }
+        compose.onNodeWithTag(DEVICE_LINK_DID_NOT_START_TAG).assertIsDisplayed()
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.devices
 
+import android.Manifest
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
@@ -37,6 +38,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Managing devices and reviewing sign-ins sends exactly what the user chose and keeps distinct actions distinct. */
@@ -134,6 +137,7 @@ class DeviceManagementContentTest {
     /** Removal needs a second, explicit confirmation; cancelling it removes nothing. */
     @Test
     fun removalNeedsConfirmation() {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.HIDE_OVERLAY_WINDOWS)
         var removals = 0
         detail(fixtureDevice("tablet", label = "Tablet"), LinkedDeviceDetailActions(onRemove = { removals++ }))
 
@@ -345,6 +349,7 @@ class DeviceManagementContentTest {
         val answers = review(signIn("a"), onMine = { mine++ })
 
         compose.onNodeWithText(context.getString(R.string.sign_in_question_new)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.sign_in_detail_new)).assertExists()
         compose.onNodeWithText(context.getString(R.string.sign_in_reject_confirm)).assertExists()
         compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).performClick()
         compose.onNodeWithTag(SIGN_IN_MINE_TAG).performClick()
@@ -412,6 +417,22 @@ class DeviceManagementContentTest {
         compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.DISMISS), answers) }
     }
 
+    @Test
+    fun anExternalSignerCanRejectAnUnknownSignIn() {
+        val answers = review(signIn("a"), readOnly = true)
+
+        compose.onNodeWithText(context.getString(R.string.sign_in_detail_new)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.sign_in_reject_confirm)).assertExists()
+        compose.onNodeWithTag(SIGN_IN_CLOSE_TAG).assertExists()
+
+        compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_MINE_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_DISMISS_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(SIGN_IN_REJECT_TAG).performClick()
+
+        compose.runOnIdle { assertEquals(listOf(SignInResponseFfi.REJECT), answers) }
+    }
+
     /** Closing the review sends no answer. */
     @Test
     fun closingTheReviewAnswersNothing() {
@@ -460,6 +481,7 @@ class DeviceManagementContentTest {
         signIn: UnrecognizedSignInFfi,
         mine: Boolean = false,
         onMine: () -> Unit = {},
+        readOnly: Boolean = false,
     ): List<SignInResponseFfi> {
         val answers = mutableListOf<SignInResponseFfi>()
         compose.setContent {
@@ -470,6 +492,7 @@ class DeviceManagementContentTest {
                     onClose = {},
                     mine = mine,
                     onMine = onMine,
+                    readOnly = readOnly,
                 )
             }
         }

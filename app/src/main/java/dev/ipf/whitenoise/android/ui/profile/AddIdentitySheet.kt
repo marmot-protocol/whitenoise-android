@@ -62,6 +62,7 @@ internal fun AddIdentitySheet(
     var removalRef by remember(session, identity) { mutableStateOf<String?>(null) }
     val amberSignerAvailable = remember(appState) { appState.isAmberSignerInstalled() }
     var remoteSigner by remember(session) { mutableStateOf<RemoteSignerEntry?>(null) }
+    val signingInState = remember(session) { mutableStateOf(false) }
     DisposableEffect(session) { onDispose { session.dispose() } }
     LaunchedEffect(
         appState.activeAccountRef,
@@ -160,6 +161,7 @@ internal fun AddIdentitySheet(
             return@MeasuredPlaybackDialog
         }
         AddAccountSheetContent(
+            signingInState = signingInState,
             amberSignerAvailable = amberSignerAvailable,
             inFlightAction = session.action,
             identity = session.key.text.toString(),

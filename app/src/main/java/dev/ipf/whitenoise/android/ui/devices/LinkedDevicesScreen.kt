@@ -71,7 +71,10 @@ internal fun LinkedDevicesContent(
             linkedDevicesChatCounts(health.counts)
             linkedDevicesMoves(linking, actions.onDismissMoveSibling)
             linkedDevicesLinking(state, linking, actions.onLinkThisDevice)
-            if (linking.availability == DeviceLinkAvailability.Available) signInReview(health.review, actions.review)
+            val canLink = linking.availability == DeviceLinkAvailability.Available
+            if (canLink || linking.externalSignerCanReview) {
+                signInReview(health.review, actions.review, canStartFresh = canLink)
+            }
             linkedDevicesMoveAction(state, linking, actions.onLinkThisDevice)
         }
     }

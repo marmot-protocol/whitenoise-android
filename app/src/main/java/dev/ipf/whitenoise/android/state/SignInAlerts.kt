@@ -57,7 +57,16 @@ internal data class SignInDevicesRequest(
     val accountRef: String,
     val id: Long,
     val accountOpened: Boolean = false,
-)
+    val linkReportGeneration: Int? = null,
+) {
+    /** A report may wait for unlock, but a profile or runtime change cancels its handoff. */
+    fun isStaleLinkReport(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+    ): Boolean =
+        linkReportGeneration != null &&
+            (linkReportGeneration != runtimeGeneration || accountRef != activeAccountRef)
+}
 
 /**
  * The app-wide view of every signed-in account's sign-in alerts, outside the Devices screen: the chat-list banner,
@@ -153,11 +162,22 @@ internal class SignInAlerts(
         snapshots = snapshots + (accountRef to snapshot.copy(alerted = alerted))
     }
 
-    /** Asks the app to open [accountRef]'s Devices screen, switching to that account first when needed. */
-    fun requestDevices(accountRef: String) =
+    /** Opens [accountRef]'s Devices screen. A link-report handoff yields to an explicit request. */
+    fun requestDevices(
+        accountRef: String,
+        linkReportGeneration: Int? = null,
+    ) {
         synchronized(lock) {
-            devicesRequest = SignInDevicesRequest(accountRef, ++requests)
+            if (linkReportGeneration == null || devicesRequest == null) {
+                devicesRequest =
+                    SignInDevicesRequest(
+                        accountRef,
+                        ++requests,
+                        linkReportGeneration = linkReportGeneration,
+                    )
+            }
         }
+    }
 
     /** Advances or clears only the matching Devices request. */
     fun updateDevicesRequest(

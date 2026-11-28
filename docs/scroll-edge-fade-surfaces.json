@@ -1884,6 +1884,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "ONB-029",
+        "SCR-001",
+        "SCR-002",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
       "calls": {
         "SettingsList": 4
@@ -2273,6 +2287,21 @@
         "SCR-002",
         "SCR-003",
         "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-079"
       ]
     },
     {

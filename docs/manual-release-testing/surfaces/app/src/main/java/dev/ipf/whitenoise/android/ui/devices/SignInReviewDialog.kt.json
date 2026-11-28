@@ -80,7 +80,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
         "anchor": "fun SignInReviewDialog(",
         "test_ids": [
-          "SET-065"
+          "SET-065",
+          "SET-080"
         ]
       },
       {
@@ -88,7 +89,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
         "anchor": "fun SignInReviewText(",
         "test_ids": [
-          "SET-065"
+          "SET-065",
+          "SET-080"
         ]
       },
       {

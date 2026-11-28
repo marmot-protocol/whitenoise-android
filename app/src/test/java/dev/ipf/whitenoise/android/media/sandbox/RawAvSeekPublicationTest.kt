@@ -31,6 +31,9 @@ import java.util.concurrent.ExecutionException
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36], shadows = [RecordingCanvasSurface::class])
 class RawAvSeekPublicationTest {
+    /** Display work runs only when a test renders, keeping adoption and drawing separately schedulable. */
+    private val display = QueuedExecutor()
+
     /** An adopted bitmap from seek zero cannot submit or credit first output after seek one. */
     @Test fun adoptedOldSeekCannotPublishAfterSeekAndMatchingNewFrameStillSubmits() {
         withEngine { engine ->
@@ -45,11 +48,12 @@ class RawAvSeekPublicationTest {
             render(engine)
             assertEquals(0, RecordingCanvasSurface.posts)
             assertEquals(0L, engine.snapshot().renderedFrame)
-            assertFalse(old.isRecycled)
+            assertTrue(old.isRecycled)
             val matching = bitmap()
             assertTrue(engine.frame(matching, 0, intent.activation, intent.seek))
             assertTrue(completion.isDone)
             assertEquals(1500L, engine.positionMs())
+            render(engine)
             assertEquals(1, RecordingCanvasSurface.posts)
             assertEquals(1L, engine.snapshot().renderedFrame)
             assertTrue(old.isRecycled)
@@ -59,19 +63,52 @@ class RawAvSeekPublicationTest {
         }
     }
 
+    /** Stopping invalidates the queued post while retaining the frame for an explicit redraw. */
+    @Test fun queuedFrameDoesNotPostAfterStop() {
+        withEngine { engine ->
+            val queued = bitmap()
+            adopt(engine, queued)
+            engine.stop()
+
+            render(engine)
+
+            assertEquals(0, RecordingCanvasSurface.posts)
+            assertEquals(0L, engine.snapshot().renderedFrame)
+            assertFalse(queued.isRecycled)
+        }
+    }
+
+    /** A retired account's queued frame cannot post after the attached surface is cleared. */
+    @Test fun queuedFrameCannotPostAfterAccountRetirement() {
+        withEngine { engine ->
+            val queued = bitmap()
+            adopt(engine, queued)
+            assertEquals(0, RecordingCanvasSurface.posts)
+
+            RawAvPlaybackEngine.retireAll()
+
+            assertEquals(1, RecordingCanvasSurface.posts) // The synchronous black clear.
+            render(engine)
+            assertEquals(1, RecordingCanvasSurface.posts)
+            assertEquals(0L, engine.snapshot().renderedFrame)
+            assertTrue(queued.isRecycled)
+        }
+    }
+
     /** A replacement surface shows the committed frame while the current paused seek is still in flight. */
     @Test fun pausedSeekReattachmentDrawsCommittedPosterBeforeMatchingPoster() {
         withSurface { surface ->
             withEngine { engine ->
                 val old = bitmap()
                 adopt(engine, old)
+                render(engine)
                 val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
                 assertEquals(0L, engine.positionMs())
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
                 render(engine)
                 assertEquals(1, RecordingCanvasSurface.posts)
-                assertEquals(1L, engine.snapshot().renderedFrame)
+                assertEquals(2L, engine.snapshot().renderedFrame)
                 assertFalse(completion.isDone)
                 assertEquals(0L, engine.positionMs())
                 val intent = engine.intent()
@@ -81,16 +118,37 @@ class RawAvSeekPublicationTest {
                         completion,
                     )
                 val matching = bitmap()
-                assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching)))
+                assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching), null))
                 assertTrue(completion.isDone)
                 assertEquals(1500L, engine.positionMs())
                 render(engine)
                 assertEquals(2, RecordingCanvasSurface.posts)
-                assertEquals(2L, engine.snapshot().renderedFrame)
+                assertEquals(3L, engine.snapshot().renderedFrame)
                 assertTrue(old.isRecycled)
                 assertFalse(matching.isRecycled)
                 engine.close()
                 assertTrue(matching.isRecycled)
+            }
+        }
+    }
+
+    @Test fun pausedSeekPreservesTheQueuedRedrawOnAReplacementSurface() {
+        withSurface { replacement ->
+            withEngine { engine ->
+                val old = bitmap()
+                adopt(engine, old)
+                render(engine)
+
+                engine.attachVideo(replacement)
+                val completion = engine.seekToAsync(1500)
+                RecordingCanvasSurface.posts = 0
+                render(engine)
+
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(2L, engine.snapshot().renderedFrame)
+                assertFalse(old.isRecycled)
+                assertFalse(completion.isDone)
+                assertEquals(0L, engine.positionMs())
             }
         }
     }
@@ -103,6 +161,7 @@ class RawAvSeekPublicationTest {
                 set(engine, "pausedUs", 800000L)
                 val old = bitmap()
                 adopt(engine, old)
+                render(engine)
                 val completion = engine.seekToAsync(1500)
                 val playing = engine.intent()
                 engine.seeked(playing.activation, playing.seek)
@@ -113,7 +172,7 @@ class RawAvSeekPublicationTest {
                 engine.setPlaying(false)
                 render(engine)
                 assertEquals(1, RecordingCanvasSurface.posts)
-                assertEquals(1L, engine.snapshot().renderedFrame)
+                assertEquals(2L, engine.snapshot().renderedFrame)
 
                 val request = takeQueuedPoster(engine)
                 assertTrue(request.explicit)
@@ -122,13 +181,13 @@ class RawAvSeekPublicationTest {
                 assertFalse(completion.isDone)
                 assertFalse(engine.snapshot().playWhenReady)
                 assertEquals(800L, engine.positionMs())
-                assertFalse(engine.posterResult(request, null))
+                assertFalse(engine.posterResult(request, null, null))
                 val refusal = assertThrows(ExecutionException::class.java) { completion.get() }
                 assertSame(refusal.cause, engine.snapshot().error)
                 val failedSeek = refusal.cause as RawPausedSeekFailure
                 assertEquals(1500L, failedSeek.positionMs)
                 assertEquals(800L, engine.positionMs())
-                assertEquals(1L, engine.snapshot().renderedFrame)
+                assertEquals(2L, engine.snapshot().renderedFrame)
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0
                 render(engine)
@@ -142,7 +201,7 @@ class RawAvSeekPublicationTest {
                 val generation = RawAvGeneration(current.activation, current.seek)
                 val retryTarget = RawAvPosterTarget(generation, failedSeek.positionMs)
                 val retryRequest = RawAvPausedSeekRequest(retryTarget, retry)
-                assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap())))
+                assertTrue(engine.posterResult(retryRequest, MediaProbe(2, 2, 4000, bitmap()), null))
                 assertEquals(1500L, engine.positionMs())
                 assertNull(engine.snapshot().error)
                 render(engine)
@@ -186,6 +245,7 @@ class RawAvSeekPublicationTest {
                             override fun onChanged() = Unit
                         },
                     prepareProbe = { null },
+                    displayExecutor = display,
                 )
             val worker = checkNotNull((field(engine, "scope") as CoroutineScope).coroutineContext[Job])
             runBlocking { worker.cancelAndJoin() }
@@ -223,18 +283,18 @@ class RawAvSeekPublicationTest {
         bitmap: Bitmap,
     ) {
         engine.javaClass
-            .getDeclaredMethod("retainFrame", Bitmap::class.java, Int::class.javaPrimitiveType)
-            .apply { isAccessible = true }
-            .invoke(engine, bitmap, 0)
+            .getDeclaredMethod(
+                "retainFrame",
+                Bitmap::class.java,
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+            ).apply { isAccessible = true }
+            .invoke(engine, bitmap, 0, -1L)
     }
 
-    /** Invokes the production guarded render path, including the actual RawVideoOutput sink. */
-    private fun render(engine: RawAvPlaybackEngine) {
-        engine.javaClass
-            .getDeclaredMethod("renderRetained")
-            .apply { isAccessible = true }
-            .invoke(engine)
-    }
+    /** Runs the production display-thread draws queued so far, including the actual RawVideoOutput sink. */
+    @Suppress("UnusedParameter") // Keeps call sites naming the engine whose queued draws run.
+    private fun render(engine: RawAvPlaybackEngine) = display.runAll()
 
     /** Reads the actual request published by pause with background workers stopped. */
     @Suppress("UNCHECKED_CAST")
@@ -299,5 +359,18 @@ class RecordingCanvasSurface {
 
     companion object {
         var posts = 0
+    }
+}
+
+/** Collects display tasks so a test decides exactly when queued draws run. */
+private class QueuedExecutor : java.util.concurrent.Executor {
+    private val tasks = ArrayDeque<Runnable>()
+
+    override fun execute(command: Runnable) {
+        tasks.addLast(command)
+    }
+
+    fun runAll() {
+        while (tasks.isNotEmpty()) tasks.removeFirst().run()
     }
 }

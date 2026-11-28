@@ -77,7 +77,7 @@
     <string name="link_request_review">Examiner</string>
     <string name="link_request_not_now">Pas maintenant</string>
     <string name="link_request_preparing">Vérification du nouvel appareil…</string>
-    <string name="link_request_compare_detail">Vérifiez que les deux appareils affichent les mêmes émojis dans le même ordre. S’ils diffèrent, appuyez sur « Pas maintenant ».</string>
+    <string name="link_request_compare_detail">Vérifiez que l’appareil dans votre main affiche les mêmes émojis dans le même ordre. Ne les lisez à personne et n’envoyez pas de capture d’écran.</string>
     <string name="link_request_label">Nom de l’appareil</string>
     <string name="link_request_label_too_long">Ce nom est trop long.</string>
     <string name="link_request_add_to_chats">Ajouter à toutes mes discussions</string>
@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">Votre clé peut se connecter n’importe où et ne peut être ni changée ni annulée. White Noise tient les appareils inconnus à l’écart de vos appareils associés, mais ne peut pas leur couper l’accès.</string>
     <string name="compromise_warning_steps_title">Que faire</string>
     <string name="compromise_warning_step_remove">1. Retirez tout appareil que vous ne reconnaissez pas.</string>
-    <string name="compromise_warning_step_signer">2. Si vous utilisez une application de signature, retirez-y les applications que vous ne reconnaissez pas.</string>
+    <string name="compromise_warning_step_signer">2. Si vous utilisez une application de signature, ouvrez ses applications connectées et retirez celles que vous ne reconnaissez pas.</string>
     <string name="compromise_warning_step_move">3. Passez à un nouveau compte. Vos contacts devront l’ajouter.</string>
     <string name="compromise_alert_review">Vérifier les appareils</string>
     <string name="compromise_warning_hide_failed">Impossible de masquer l’avertissement. Réessayez.</string>
@@ -213,4 +213,16 @@
         <item quantity="other">%d nouvelles connexions à vérifier</item>
     </plurals>
     <string name="link_request_expired_attempt">Un appareil a tenté de se lier le %1$s.</string>
+    <string name="link_consent_requested_at">Demande à %1$s</string>
+    <string name="link_consent_access">Un appareil associé peut lire vos discussions, recevoir leur historique et envoyer des messages en votre nom.</string>
+    <string name="link_consent_have_device">Continuez uniquement si vous avez commencé à configurer White Noise sur un appareil que vous avez devant vous.</string>
+    <string name="link_consent_scam">White Noise ne vous contactera jamais pour vous demander d’associer un appareil ou de vérifier des émojis. Si quelqu’un vous l’a demandé, c’est une arnaque.</string>
+    <string name="link_consent_on_call">Vous êtes en communication. Les escrocs guident souvent les victimes par téléphone pour associer un appareil.</string>
+    <string name="link_consent_with_me">Le nouvel appareil est avec moi</string>
+    <string name="link_consent_did_not_start">Je n’ai pas lancé cette demande</string>
+    <string name="link_consent_someone_asked">Quelqu’un m’a demandé de le faire</string>
+    <string name="link_consent_unlock">Déverrouillez ce téléphone pour comparer les émojis</string>
+    <string name="link_consent_lock_required">Configurez un verrouillage de l’écran sur ce téléphone pour associer un appareil.</string>
+    <string name="link_consent_report_guidance">Association refusée. Ouvrez la connexion dans Appareils pour la signaler.</string>
+    <string name="link_touch_blocked">Une autre application recouvre White Noise. Fermez sa fenêtre et réessayez.</string>
 </resources>

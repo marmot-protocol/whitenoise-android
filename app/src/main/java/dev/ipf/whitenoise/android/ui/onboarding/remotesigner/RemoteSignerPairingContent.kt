@@ -17,10 +17,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -103,7 +105,13 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
     val clipboard = remember(context) { ContextCompat.getSystemService(context, ClipboardManager::class.java) }
     val canPaste = rememberClipboardCanOfferPaste(clipboard)
     var scanning by remember { mutableStateOf(false) }
+    LaunchedEffect(pairing) {
+        snapshotFlow { pairing.hasEditedRejectedLink }.collect { edited ->
+            if (edited && pairing.hasEditedRejectedLink) pairing.linkErrorRes = null
+        }
+    }
 
+    /** Replaces the masked field from either the clipboard or the scanner. */
     fun replace(value: String) {
         pairing.link.setTextAndPlaceCursorAtEnd(value.trim())
         pairing.linkErrorRes = null

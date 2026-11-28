@@ -104,6 +104,7 @@ private class AttachmentAudioDecoder(
             }
             AvStreamFrame.End, AvStreamFrame.AudioEnd -> null
             AvStreamFrame.VideoEnd -> throw IOException("Unexpected video EOF from an audio-only worker")
+            AvStreamFrame.AudioDeferred -> throw IOException("Unexpected deferred read from an audio-only worker")
         }
 
     /** Appends the decoded PCM contribution while retaining the conversion state across chunk boundaries. */

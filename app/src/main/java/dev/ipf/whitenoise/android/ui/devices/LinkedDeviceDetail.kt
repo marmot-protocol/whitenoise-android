@@ -253,5 +253,6 @@ private fun RemoveDeviceDialog(
         onDismiss = onDismiss,
         destructive = true,
         confirmTag = DEVICE_DETAIL_REMOVE_CONFIRM_TAG,
+        protectInput = true,
     )
 }

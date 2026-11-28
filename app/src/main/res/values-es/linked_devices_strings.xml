@@ -77,7 +77,7 @@
     <string name="link_request_review">Revisar</string>
     <string name="link_request_not_now">Ahora no</string>
     <string name="link_request_preparing">Comprobando el dispositivo nuevo…</string>
-    <string name="link_request_compare_detail">Comprueba que ambos dispositivos muestren los mismos emojis en el mismo orden. Si son distintos, toca «Ahora no».</string>
+    <string name="link_request_compare_detail">Comprueba que el dispositivo que tienes en la mano muestra los mismos emojis en el mismo orden. No se los leas a nadie ni envíes una captura de pantalla.</string>
     <string name="link_request_label">Nombre del dispositivo</string>
     <string name="link_request_label_too_long">Ese nombre es demasiado largo.</string>
     <string name="link_request_add_to_chats">Añadir a todos mis chats</string>
@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">Tu clave puede iniciar sesión en cualquier lugar y no se puede cambiar ni anular. White Noise mantiene los dispositivos desconocidos fuera de tus dispositivos vinculados, pero no puede bloquearles el acceso.</string>
     <string name="compromise_warning_steps_title">Qué hacer</string>
     <string name="compromise_warning_step_remove">1. Quita cualquier dispositivo que no reconozcas.</string>
-    <string name="compromise_warning_step_signer">2. Si usas una app de firma, quita allí las apps que no reconozcas.</string>
+    <string name="compromise_warning_step_signer">2. Si usas una app de firma, abre sus aplicaciones conectadas y quita las que no reconozcas.</string>
     <string name="compromise_warning_step_move">3. Pásate a una cuenta nueva. Tus contactos tendrán que añadirla.</string>
     <string name="compromise_alert_review">Revisar dispositivos</string>
     <string name="compromise_warning_hide_failed">No se pudo ocultar la advertencia. Inténtalo de nuevo.</string>
@@ -212,4 +212,16 @@
         <item quantity="other">%d nuevos inicios de sesión por revisar</item>
     </plurals>
     <string name="link_request_expired_attempt">Un dispositivo intentó vincularse el %1$s.</string>
+    <string name="link_consent_requested_at">Solicitud a las %1$s</string>
+    <string name="link_consent_access">Un dispositivo vinculado puede leer tus chats, recibir tu historial y enviar mensajes en tu nombre.</string>
+    <string name="link_consent_have_device">Continúa solo si tú empezaste a configurar White Noise en un dispositivo que tienes delante.</string>
+    <string name="link_consent_scam">White Noise nunca se pondrá en contacto contigo para pedirte que vincules un dispositivo o compruebes emojis. Si alguien te lo pidió, es una estafa.</string>
+    <string name="link_consent_on_call">Estás en una llamada. Los estafadores suelen guiar a sus víctimas por teléfono para vincular un dispositivo.</string>
+    <string name="link_consent_with_me">Tengo el dispositivo nuevo conmigo</string>
+    <string name="link_consent_did_not_start">Yo no inicié esto</string>
+    <string name="link_consent_someone_asked">Alguien me pidió que lo hiciera</string>
+    <string name="link_consent_unlock">Desbloquea este teléfono para comparar los emojis</string>
+    <string name="link_consent_lock_required">Configura un bloqueo de pantalla en este teléfono para vincular un dispositivo.</string>
+    <string name="link_consent_report_guidance">Se rechazó la vinculación. Abre el inicio de sesión en Dispositivos para denunciarlo.</string>
+    <string name="link_touch_blocked">Otra aplicación está cubriendo White Noise. Cierra su ventana e inténtalo de nuevo.</string>
 </resources>

@@ -21,13 +21,10 @@ internal enum class SignInAlertTier {
     Compromise,
 }
 
-/**
- * Whether sign-in alerts apply to an account. Accounts with a key on this device get them; accounts that sign with
- * an external signer (Amber, NIP-46) are added here once their review is shown (#4114).
- */
+/** Sign-in alerts apply to local-key and external-signer accounts that are signed in here. */
 internal fun signInAlertsApply(account: AccountSummaryFfi): Boolean {
-    if (account.signedOut || account.unlinked) return false
-    return account.localSigning
+    if (account.unlinked) return false
+    return account.isSignedInSigningAccount()
 }
 
 /**

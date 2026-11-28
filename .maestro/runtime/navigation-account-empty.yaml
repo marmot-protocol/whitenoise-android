@@ -9,13 +9,14 @@ name: navigation-account-empty
 - tapOn:
     id: "settings.switch_profile"
 - tapOn: "Maestro Carol"
-- assertVisible: "Switch Profile, Maestro Carol"
+- assertVisible: "^(Open settings|Switch Profile), Maestro Carol$"
 - assertVisible: "Start your first conversation"
+- assertVisible: "Invite a friend"
 - assertNotVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Maestro Carol"
 - tapOn:
     id: "settings.switch_profile"
 - tapOn: "Maestro Alice"
-- assertVisible: "Switch Profile, Maestro Alice"
+- assertVisible: "^(Open settings|Switch Profile), Maestro Alice$"
 - assertVisible: "Maestro group"

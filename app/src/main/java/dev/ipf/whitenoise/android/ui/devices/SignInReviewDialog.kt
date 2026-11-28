@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
  * outside sends none. Not now is offered only while the sign-in still waits, since MDK takes it once; Mine, don't
  * link only until it is given. The rejection says what it records and what it does not do before it is pressed.
  */
+@Suppress("LongParameterList")
 @Composable
 internal fun SignInReviewDialog(
     signIn: UnrecognizedSignInFfi,
@@ -31,21 +32,24 @@ internal fun SignInReviewDialog(
     onClose: () -> Unit,
     mine: Boolean = false,
     onMine: () -> Unit = {},
+    readOnly: Boolean = false,
 ) {
     val choice = signInAnswerChoice(signIn)
     val question = if (signIn.beforeThisDevice) R.string.sign_in_question_before else R.string.sign_in_question_new
-    val waiting = signIn.state == UnrecognizedSignInStateFfi.PROMPT
+    val canDefer = !readOnly && signIn.state == UnrecognizedSignInStateFfi.PROMPT
     WhiteNoiseAlertDialog(
         onDismissRequest = onClose,
         title = { Text(stringResource(question)) },
-        text = { SignInReviewText(signIn, choice, mine) },
+        text = { SignInReviewText(signIn, choice, mine, readOnly) },
         confirmButton = {
             when (choice) {
                 SignInAnswerChoice.DismissOnly ->
-                    TextButton(
-                        onClick = { onAnswer(SignInResponseFfi.DISMISS) },
-                        modifier = Modifier.testTag(SIGN_IN_DISMISS_TAG),
-                    ) { Text(stringResource(R.string.sign_in_dismiss)) }
+                    if (!readOnly) {
+                        TextButton(
+                            onClick = { onAnswer(SignInResponseFfi.DISMISS) },
+                            modifier = Modifier.testTag(SIGN_IN_DISMISS_TAG),
+                        ) { Text(stringResource(R.string.sign_in_dismiss)) }
+                    }
                 SignInAnswerChoice.NotNowOrDontRecognize ->
                     RejectButton(R.string.sign_in_dont_recognize) { onAnswer(SignInResponseFfi.REJECT) }
                 SignInAnswerChoice.NotNowOrReject ->
@@ -53,17 +57,17 @@ internal fun SignInReviewDialog(
             }
         },
         dismissButton = {
-            if (choice == SignInAnswerChoice.NotNowOrReject && waiting) {
+            if (canDefer && choice == SignInAnswerChoice.NotNowOrReject) {
                 NotNowButton { onAnswer(SignInResponseFfi.NOT_NOW) }
             } else {
                 TextButton(onClick = onClose, modifier = Modifier.testTag(SIGN_IN_CLOSE_TAG)) {
                     Text(stringResource(R.string.close))
                 }
             }
-            if (choice == SignInAnswerChoice.NotNowOrDontRecognize && waiting) {
+            if (canDefer && choice == SignInAnswerChoice.NotNowOrDontRecognize) {
                 NotNowButton { onAnswer(SignInResponseFfi.NOT_NOW) }
             }
-            if (choice == SignInAnswerChoice.NotNowOrReject && !mine) {
+            if (!readOnly && choice == SignInAnswerChoice.NotNowOrReject && !mine) {
                 TextButton(onClick = onMine, modifier = Modifier.testTag(SIGN_IN_MINE_TAG)) {
                     Text(stringResource(R.string.sign_in_mine))
                 }
@@ -100,11 +104,12 @@ private fun SignInReviewText(
     signIn: UnrecognizedSignInFfi,
     choice: SignInAnswerChoice,
     mine: Boolean,
+    readOnly: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         signInWhen(signIn)?.let { Text(it) }
         signInSummary(signIn, mine).forEach { Text(it) }
-        if (choice != SignInAnswerChoice.DismissOnly) {
+        if (!readOnly && choice != SignInAnswerChoice.DismissOnly) {
             val detail = if (signIn.beforeThisDevice) R.string.sign_in_detail_before else R.string.sign_in_detail_new
             Text(stringResource(detail))
         }
