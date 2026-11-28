@@ -3,11 +3,14 @@ package dev.ipf.whitenoise.android.ui.onboarding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,8 +37,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ScaffoldTopBarWithNoticeSlot
@@ -164,21 +171,58 @@ internal fun WelcomeScreen(
                 .consumeWindowInsets(contentPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // First run states the promise under the mark; Add profile and returning profiles keep the mark alone.
+            val showPromise = onBack == null && savedAccounts.isEmpty()
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 val availableHeight = (maxHeight - WhiteNoiseSpacing.CompactScreenMargin * 2).coerceAtLeast(0.dp)
                 val markWidth =
                     minOf(
                         maxWidth.coerceAtMost(OnboardingMaxContentWidth) * 0.5f,
-                        availableHeight * WELCOME_MARK_ASPECT_RATIO,
+                        availableHeight * (if (showPromise) WELCOME_PROMISE_MARK_SHARE else 1f) * WELCOME_MARK_ASPECT_RATIO,
                     )
-                Icon(
-                    painterResource(R.drawable.ic_white_noise_mark),
-                    stringResource(R.string.app_name),
-                    modifier =
+                val mark: @Composable () -> Unit = {
+                    Icon(
+                        painterResource(R.drawable.ic_white_noise_mark),
+                        stringResource(R.string.app_name),
+                        modifier =
+                            Modifier
+                                .size(markWidth, markWidth / WELCOME_MARK_ASPECT_RATIO)
+                                .testTag("onboarding.welcome.mark"),
+                    )
+                }
+                if (showPromise) {
+                    // Large text can outgrow the space above the actions, so the promise scrolls instead of clipping.
+                    Column(
                         Modifier
-                            .size(markWidth, markWidth / WELCOME_MARK_ASPECT_RATIO)
-                            .testTag("onboarding.welcome.mark"),
-                )
+                            .whiteNoiseVerticalScroll(rememberScrollState())
+                            .heightIn(min = maxHeight)
+                            .widthIn(max = OnboardingMaxContentWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        mark()
+                        Spacer(Modifier.height(WhiteNoiseSpacing.Section))
+                        Text(
+                            stringResource(R.string.onboarding_welcome_headline),
+                            modifier = Modifier.fillMaxWidth().semantics { heading() }.testTag("onboarding.welcome.headline"),
+                            textAlign = TextAlign.Center,
+                            // Balanced lines keep the two short sentences from leaving one word alone.
+                            style = MaterialTheme.typography.headlineSmall.copy(lineBreak = LineBreak.Heading),
+                        )
+                        Spacer(Modifier.height(WhiteNoiseSpacing.Related))
+                        Text(
+                            stringResource(R.string.onboarding_welcome_body),
+                            modifier = Modifier.fillMaxWidth().testTag("onboarding.welcome.body"),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                } else {
+                    mark()
+                }
             }
             SettingsNativeViewport { viewport ->
                 // Match the shared buttons' native default shape and actual enabled/loading borders.
@@ -259,3 +303,6 @@ internal fun OnboardingOfflineNotice(
 }
 
 private const val WELCOME_MARK_ASPECT_RATIO = 598f / 460f
+
+/** Share of the free height the mark may use when the promise text sits below it. */
+private const val WELCOME_PROMISE_MARK_SHARE = 0.4f
