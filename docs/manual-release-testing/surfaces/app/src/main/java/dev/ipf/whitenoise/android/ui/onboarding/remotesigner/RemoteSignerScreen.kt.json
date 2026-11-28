@@ -68,6 +68,12 @@
     ],
     "settings_controls": [
       {
+        "surface": "Pairing reports a browser launch failure inside its own screen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
+        "anchor": "R.string.remote_signer_approval_open_failed",
+        "test_ids": ["ONB-029"]
+      },
+      {
         "surface": "R.string.cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
         "anchor": "R.string.cancel",

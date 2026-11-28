@@ -52,7 +52,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal fun RemoteSignerScreen(
     pairing: RemoteSignerPairing,
     onClose: () -> Unit,
-    onOpenApproval: (String) -> Unit,
+    onOpenApproval: (String) -> Boolean,
 ) {
     WindowSecureFlag()
     val step = pairing.step
@@ -124,7 +124,7 @@ private fun ColumnScope.RemoteSignerBody(
 @Composable
 private fun RemoteSignerActions(
     pairing: RemoteSignerPairing,
-    onOpenApproval: (String) -> Unit,
+    onOpenApproval: (String) -> Boolean,
 ) {
     val step = pairing.step
     if (step == RemoteSignerStep.Choose || step == RemoteSignerStep.SigningIn || step == RemoteSignerStep.Done) return
@@ -170,17 +170,23 @@ private fun RemoteSignerActions(
 private fun RemoteSignerApprovalActions(
     step: RemoteSignerStep.Approval,
     pairing: RemoteSignerPairing,
-    onOpenApproval: (String) -> Unit,
+    onOpenApproval: (String) -> Boolean,
 ) {
-    var opened by remember(step.requestId) { mutableStateOf(false) }
-    if (opened) {
+    var opened by remember(step.requestId, step.authUrl) { mutableStateOf<Boolean?>(null) }
+    if (opened == true) {
         RemoteSignerPrimary(R.string.remote_signer_approval_done, "remote_signer.approval.done") {
             pairing.approvalFinished()
         }
     }
+    if (opened == false) {
+        Text(
+            stringResource(R.string.remote_signer_approval_open_failed),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
     RemoteSignerSecondary(R.string.remote_signer_approval_open, "remote_signer.approval.open") {
-        opened = true
-        onOpenApproval(step.authUrl)
+        opened = onOpenApproval(step.authUrl)
     }
 }
 

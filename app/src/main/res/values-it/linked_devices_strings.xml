@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">La tua chiave può accedere ovunque e non può essere cambiata né annullata. White Noise tiene i dispositivi sconosciuti fuori dai tuoi dispositivi collegati, ma non può chiudere loro l’accesso.</string>
     <string name="compromise_warning_steps_title">Cosa fare</string>
     <string name="compromise_warning_step_remove">1. Rimuovi ogni dispositivo che non riconosci.</string>
-    <string name="compromise_warning_step_signer">2. Se usi un’app di firma, rimuovi lì le app che non riconosci.</string>
+    <string name="compromise_warning_step_signer">2. Se usi un’app di firma, apri le app connesse e rimuovi quelle che non riconosci.</string>
     <string name="compromise_warning_step_move">3. Passa a un nuovo account. I tuoi contatti dovranno aggiungerlo.</string>
     <string name="compromise_alert_review">Controlla i dispositivi</string>
     <string name="compromise_warning_hide_failed">Impossibile nascondere l’avviso. Riprova.</string>

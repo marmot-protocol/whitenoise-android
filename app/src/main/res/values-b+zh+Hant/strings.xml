@@ -2780,6 +2780,7 @@
     <string name="remote_signer_approval_title">你的簽名器需要額外驗證</string>
     <string name="remote_signer_approval_body">在瀏覽器中開啟 %1$s，完成驗證後返回 White Noise。</string>
     <string name="remote_signer_approval_open">開放批准頁面</string>
+    <string name="remote_signer_approval_open_failed">無法開啟核准頁面。請再試一次。</string>
     <string name="remote_signer_approval_done">我已經完成了.</string>
     <string name="remote_signer_signing_in">正在登入…</string>
     <string name="remote_signer_try_again">再試一次</string>

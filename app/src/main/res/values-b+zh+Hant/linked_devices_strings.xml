@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">你的金鑰可以在任何地方登入，且無法變更或撤銷。White Noise 會把未知裝置擋在你的已連結裝置之外，但無法將它們拒於門外。</string>
     <string name="compromise_warning_steps_title">該怎麼做</string>
     <string name="compromise_warning_step_remove">1. 移除任何你不認得的裝置。</string>
-    <string name="compromise_warning_step_signer">2. 如果你使用簽署應用程式，請在其中移除你不認得的應用程式。</string>
+    <string name="compromise_warning_step_signer">2. 如果你使用簽署應用程式，請開啟其中的「已連線應用程式」，移除不認得的應用程式。</string>
     <string name="compromise_warning_step_move">3. 改用新帳號。你的聯絡人需要重新加入它。</string>
     <string name="compromise_alert_review">查看裝置</string>
     <string name="compromise_warning_hide_failed">無法隱藏警告。請再試一次。</string>

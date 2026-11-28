@@ -2833,6 +2833,7 @@
     <string name="remote_signer_approval_title">Seu assinador precisa de uma verificação adicional</string>
     <string name="remote_signer_approval_body">Abra %1$s no navegador, conclua a verificação e volte para o White Noise.</string>
     <string name="remote_signer_approval_open">Página de aprovação aberta</string>
+    <string name="remote_signer_approval_open_failed">Não foi possível abrir a página de aprovação. Tenta novamente.</string>
     <string name="remote_signer_approval_done">Acabei.</string>
     <string name="remote_signer_signing_in">Entrando…</string>
     <string name="remote_signer_try_again">Tenta outra vez.</string>

@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">你的密钥可以在任何地方登录，且无法更改或撤销。White Noise 会把未知设备挡在你的已关联设备之外，但无法将它们拒之门外。</string>
     <string name="compromise_warning_steps_title">该怎么做</string>
     <string name="compromise_warning_step_remove">1. 移除任何你不认识的设备。</string>
-    <string name="compromise_warning_step_signer">2. 如果你使用签名应用，请在其中移除你不认识的应用。</string>
+    <string name="compromise_warning_step_signer">2. 如果你使用签名应用，请打开该应用中的“已连接应用”，移除你不认识的应用。</string>
     <string name="compromise_warning_step_move">3. 迁移到新账号。你的联系人需要重新添加它。</string>
     <string name="compromise_alert_review">查看设备</string>
     <string name="compromise_warning_hide_failed">无法隐藏警告。请重试。</string>

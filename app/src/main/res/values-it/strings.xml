@@ -2833,6 +2833,7 @@
     <string name="remote_signer_approval_title">La tua app di firma richiede un’ulteriore verifica</string>
     <string name="remote_signer_approval_body">Apri %1$s nel browser, completa la verifica e poi torna in White Noise.</string>
     <string name="remote_signer_approval_open">Pagina aperta di approvazione</string>
+    <string name="remote_signer_approval_open_failed">Impossibile aprire la pagina di approvazione. Riprova.</string>
     <string name="remote_signer_approval_done">Ho finito .</string>
     <string name="remote_signer_signing_in">Accesso in corso…</string>
     <string name="remote_signer_try_again">Prova di nuovo .</string>

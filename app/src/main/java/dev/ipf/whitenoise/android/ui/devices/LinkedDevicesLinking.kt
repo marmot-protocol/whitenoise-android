@@ -38,6 +38,7 @@ internal data class LinkedDevicesLinking(
     val moves: List<DeviceGroupMoveViewFfi> = emptyList(),
     val approvedLinkJoining: Boolean = false,
     val busy: Boolean = false,
+    val externalSignerCanReview: Boolean = false,
 )
 
 /** What the roster screen can ask its owner to do. */

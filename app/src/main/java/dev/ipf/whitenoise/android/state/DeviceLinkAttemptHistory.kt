@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
@@ -103,11 +104,11 @@ internal class DeviceLinkAttemptHistory(
 
 /** Records terminal snapshots even while the shell is stopped but the native worker is still running. */
 internal suspend fun WhiteNoiseAppState.refreshMissedDeviceLinkAttempts(accountRef: String) {
-    val watchedAccount = accounts.firstOrNull { it.label == accountRef && signInAlertsApply(it) }
+    val watchedAccount = accounts.firstOrNull { it.label == accountRef && it.tracksDeviceLinkAttempts() }
     if (!linkedDevicesAvailable() || watchedAccount == null) return
     val generation = runtimeGeneration
     val snapshot = readDeviceLinkAttemptsWithRetry(accountRef, generation) ?: return
-    val watched = accounts.filter(::signInAlertsApply)
+    val watched = accounts.filter(AccountSummaryFfi::tracksDeviceLinkAttempts)
     val stillWatched = watched.any { it.label == accountRef && it.accountIdHex == watchedAccount.accountIdHex }
     if (generation == runtimeGeneration && stillWatched) {
         deviceLinkRequests.attempts?.observe(mapOf(accountRef to snapshot), watched.mapTo(mutableSetOf()) { it.label })
@@ -116,8 +117,11 @@ internal suspend fun WhiteNoiseAppState.refreshMissedDeviceLinkAttempts(accountR
 
 /** Recovers terminal prompts still retained by MDK after account loading or reconnecting the event stream. */
 internal suspend fun WhiteNoiseAppState.refreshAllMissedDeviceLinkAttempts() {
-    accounts.filter(::signInAlertsApply).forEach { refreshMissedDeviceLinkAttempts(it.label) }
+    accounts.filter(AccountSummaryFfi::tracksDeviceLinkAttempts).forEach { refreshMissedDeviceLinkAttempts(it.label) }
 }
+
+// Reading the pairing snapshot can drive the protocol and ask an external signer to approve work.
+private fun AccountSummaryFfi.tracksDeviceLinkAttempts(): Boolean = localSigning && signInAlertsApply(this)
 
 private suspend fun WhiteNoiseAppState.readDeviceLinkAttemptsWithRetry(
     accountRef: String,

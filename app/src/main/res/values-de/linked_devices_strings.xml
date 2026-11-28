@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">Mit deinem Schlüssel kann man sich überall anmelden, und er lässt sich weder ändern noch widerrufen. White Noise hält unbekannte Geräte aus deinen verknüpften Geräten heraus, kann sie aber nicht aussperren.</string>
     <string name="compromise_warning_steps_title">Was du tun kannst</string>
     <string name="compromise_warning_step_remove">1. Entferne jedes Gerät, das du nicht erkennst.</string>
-    <string name="compromise_warning_step_signer">2. Wenn du eine Signer-App nutzt, entferne dort Apps, die du nicht erkennst.</string>
+    <string name="compromise_warning_step_signer">2. Wenn du eine Signer-App nutzt, öffne dort die verbundenen Apps und entferne unbekannte Apps.</string>
     <string name="compromise_warning_step_move">3. Zieh auf ein neues Konto um. Deine Kontakte müssen es neu hinzufügen.</string>
     <string name="compromise_alert_review">Geräte prüfen</string>
     <string name="compromise_warning_hide_failed">Die Warnung konnte nicht ausgeblendet werden. Versuche es noch einmal.</string>

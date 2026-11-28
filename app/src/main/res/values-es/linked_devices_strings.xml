@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">Tu clave puede iniciar sesión en cualquier lugar y no se puede cambiar ni anular. White Noise mantiene los dispositivos desconocidos fuera de tus dispositivos vinculados, pero no puede bloquearles el acceso.</string>
     <string name="compromise_warning_steps_title">Qué hacer</string>
     <string name="compromise_warning_step_remove">1. Quita cualquier dispositivo que no reconozcas.</string>
-    <string name="compromise_warning_step_signer">2. Si usas una app de firma, quita allí las apps que no reconozcas.</string>
+    <string name="compromise_warning_step_signer">2. Si usas una app de firma, abre sus aplicaciones conectadas y quita las que no reconozcas.</string>
     <string name="compromise_warning_step_move">3. Pásate a una cuenta nueva. Tus contactos tendrán que añadirla.</string>
     <string name="compromise_alert_review">Revisar dispositivos</string>
     <string name="compromise_warning_hide_failed">No se pudo ocultar la advertencia. Inténtalo de nuevo.</string>
