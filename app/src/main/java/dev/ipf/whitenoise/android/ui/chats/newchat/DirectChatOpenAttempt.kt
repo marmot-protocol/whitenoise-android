@@ -23,6 +23,7 @@ internal suspend fun attemptOpenOrStartProfileChat(
     abandonCreateOpenTiming: (String) -> Unit = {},
     directChatLookupAlreadyStarted: Boolean = false,
     diagnosticAttempt: DmCreationAttempt? = null,
+    invitationRecipientName: (String) -> String? = { recipientName },
 ): StartChatAttemptResult {
     val existingChatResult =
         if (retryGroupIdHex == null) {
@@ -68,6 +69,7 @@ internal suspend fun attemptOpenOrStartProfileChat(
         markCreateOpenStage = markCreateOpenStage,
         abandonCreateOpenTiming = abandonCreateOpenTiming,
         diagnosticAttempt = diagnosticAttempt,
+        invitationRecipientName = invitationRecipientName,
     )
 }
 

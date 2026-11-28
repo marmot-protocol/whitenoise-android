@@ -244,9 +244,12 @@
     <string name="error_missing_key_package_for">%1$s için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını yüklemesini veya güncellemesini ve açmasını isteyin, sonra tekrar deneyin.</string>
     <string name="invite_to_white_noise">White Noise\'a Davet Et</string>
     <string name="invite_friends">Arkadaşlarını davet et</string>
-    <string name="invite_to_white_noise_description">%1$s henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
-    <string name="unknown_invite_to_white_noise_description">Bu kullanıcı henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
     <string name="invite_message">White Noise\'da bana katıl. Telefon numarası yok. Gözetim yok. Sadece gerçek gizlilik. Buradan indir: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s henüz White Noise’da değil</string>
+    <string name="start_chat_not_on_white_noise">Bu kişi henüz White Noise’da değil</string>
+    <string name="start_chat_not_on_white_noise_detail">Bir davet gönderin. Kişi White Noise’u yükleyip açtığında tekrar deneyin.</string>
+    <string name="send_invite">Davet gönder</string>
+    <string name="invite_message_personal">White Noise’da adım %1$s. White Noise, telefon numarası gerektirmeyen özel bir mesajlaşma uygulaması. Uygulamayı yükle, Yeni sohbet’e dokun ve bana yazmak için anahtarımı yapıştır: %2$s\nİndir: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Bu alıcı geçerli bir Nostr genel anahtarı değil. Bir npub, profil bağlantısı veya hex genel anahtarı kullanın.</string>
     <string name="error_group_create_failed_retry">Şifreli sohbet ayarlanırken bir şeyler ters gitti. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="error_no_group_members_selected">Seçtiğiniz kişilerden hiçbiri eklenemedi. Sohbet ayarlarını kontrol etmelerini isteyin veya seçiminizi değiştirin.</string>

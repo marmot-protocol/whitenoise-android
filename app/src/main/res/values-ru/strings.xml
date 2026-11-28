@@ -270,9 +270,12 @@
     <string name="error_missing_key_package_for">Не удалось найти пригодный ключ чата для %1$s. Попросите установить или обновить White Noise и открыть приложение, затем повторите попытку.</string>
     <string name="invite_to_white_noise">Пригласить в White Noise</string>
     <string name="invite_friends">Пригласить друзей</string>
-    <string name="invite_to_white_noise_description">%1$s ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
-    <string name="unknown_invite_to_white_noise_description">Этот пользователь ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>
     <string name="invite_message">Присоединяйтесь ко мне в White Noise. Без номера телефона. Без слежки. Только настоящая приватность. Скачайте здесь: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s ещё не в White Noise</string>
+    <string name="start_chat_not_on_white_noise">Этого человека ещё нет в White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Отправьте приглашение. Когда этот человек установит и откроет White Noise, попробуйте снова.</string>
+    <string name="send_invite">Отправить приглашение</string>
+    <string name="invite_message_personal">Я %1$s в White Noise — это приватный мессенджер, которому не нужен номер телефона. Установи его, нажми «Новый чат» и вставь мой ключ, чтобы написать мне: %2$s\nСкачать: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Этот получатель не является действительным открытым ключом Nostr. Используйте npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_group_create_failed_retry">Что-то пошло не так при настройке зашифрованного чата. Проверьте подключение и повторите попытку.</string>
     <string name="error_no_group_members_selected">Не удалось добавить никого из выбранных. Попросите их проверить настройки чата или измените свой выбор.</string>

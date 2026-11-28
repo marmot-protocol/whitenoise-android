@@ -231,9 +231,12 @@
     <string name="error_missing_key_package_for">未找到%1$s的可用聊天金鑰。請對方安裝或更新 White Noise 並開啟應用程式，然後重試。</string>
     <string name="invite_to_white_noise">邀請加入 White Noise</string>
     <string name="invite_friends">邀請朋友</string>
-    <string name="invite_to_white_noise_description">%1$s 尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>
-    <string name="unknown_invite_to_white_noise_description">此使用者尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>
     <string name="invite_message">來 White Noise 加入我吧。無需手機號碼，沒有監控，真正保有隱私。點這裡下載：https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s 尚未加入 White Noise</string>
+    <string name="start_chat_not_on_white_noise">此人尚未加入 White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">傳送邀請給對方。對方安裝並開啟 White Noise 後，請再試一次。</string>
+    <string name="send_invite">傳送邀請</string>
+    <string name="invite_message_personal">我是 White Noise 上的 %1$s，這是一款不需要手機號碼的私密通訊應用程式。安裝後點選「新聊天」，貼上我的公鑰即可傳訊息給我：%2$s\n下載：https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_create_failed_retry">設定加密聊天時發生問題。請檢查連線，然後再試一次。</string>
     <string name="error_no_group_members_selected">無法加入任何選取的聯絡人。請對方檢查聊天設定，或變更你的選擇。</string>

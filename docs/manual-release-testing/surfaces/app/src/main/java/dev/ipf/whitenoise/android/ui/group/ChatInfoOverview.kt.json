@@ -40,9 +40,9 @@
         ]
       },
       {
-        "surface": "Quick action captions",
+        "surface": "Captioned quick actions wrap",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
-        "anchor": "if (showCaption)",
+        "anchor": "val actionModifier = Modifier.width(",
         "test_ids": [
           "GRP-001"
         ]
