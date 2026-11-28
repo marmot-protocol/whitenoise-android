@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.devices
 
+import android.Manifest
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
@@ -37,6 +38,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Managing devices and reviewing sign-ins sends exactly what the user chose and keeps distinct actions distinct. */
@@ -134,6 +137,7 @@ class DeviceManagementContentTest {
     /** Removal needs a second, explicit confirmation; cancelling it removes nothing. */
     @Test
     fun removalNeedsConfirmation() {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.HIDE_OVERLAY_WINDOWS)
         var removals = 0
         detail(fixtureDevice("tablet", label = "Tablet"), LinkedDeviceDetailActions(onRemove = { removals++ }))
 

@@ -77,7 +77,7 @@
     <string name="link_request_review">Prüfen</string>
     <string name="link_request_not_now">Nicht jetzt</string>
     <string name="link_request_preparing">Neues Gerät wird geprüft…</string>
-    <string name="link_request_compare_detail">Prüfe, ob beide Geräte dieselben Emojis in derselben Reihenfolge zeigen. Falls sie sich unterscheiden, tippe auf „Nicht jetzt“.</string>
+    <string name="link_request_compare_detail">Prüfe, ob das Gerät in deiner Hand dieselben Emojis in derselben Reihenfolge anzeigt. Lies sie niemandem vor und sende keinen Screenshot.</string>
     <string name="link_request_label">Gerätename</string>
     <string name="link_request_label_too_long">Dieser Name ist zu lang.</string>
     <string name="link_request_add_to_chats">Zu allen meinen Chats hinzufügen</string>
@@ -212,4 +212,16 @@
         <item quantity="other">%d neue Anmeldungen zu prüfen</item>
     </plurals>
     <string name="link_request_expired_attempt">Ein Gerät hat um %1$s versucht, sich zu verknüpfen.</string>
+    <string name="link_consent_requested_at">Angefragt um %1$s</string>
+    <string name="link_consent_access">Ein verknüpftes Gerät kann deine Chats lesen, den Chatverlauf abrufen und in deinem Namen Nachrichten senden.</string>
+    <string name="link_consent_have_device">Fahre nur fort, wenn du White Noise selbst auf einem Gerät vor dir einrichtest.</string>
+    <string name="link_consent_scam">White Noise wird dich nie kontaktieren und dich bitten, ein Gerät zu verknüpfen oder Emojis zu prüfen. Wenn dich jemand darum gebeten hat, ist es ein Betrugsversuch.</string>
+    <string name="link_consent_on_call">Du telefonierst gerade. Betrüger leiten Menschen oft am Telefon durch die Geräteverknüpfung.</string>
+    <string name="link_consent_with_me">Ich habe das neue Gerät vor mir</string>
+    <string name="link_consent_did_not_start">Ich habe das nicht gestartet</string>
+    <string name="link_consent_someone_asked">Jemand hat mich darum gebeten</string>
+    <string name="link_consent_unlock">Entsperre dieses Telefon, um Emojis zu vergleichen</string>
+    <string name="link_consent_lock_required">Richte auf diesem Telefon eine Displaysperre ein, um ein Gerät zu verknüpfen.</string>
+    <string name="link_consent_report_guidance">Kopplung abgelehnt. Öffne die Anmeldung unter „Geräte“, um sie zu melden.</string>
+    <string name="link_touch_blocked">Eine andere App verdeckt White Noise. Schließe ihr Fenster und versuche es erneut.</string>
 </resources>

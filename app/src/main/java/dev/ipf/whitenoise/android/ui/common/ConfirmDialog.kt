@@ -42,6 +42,7 @@ internal fun ConfirmDialog(
     confirmTag: String = "confirmation.confirm",
     cancelTag: String = "confirmation.cancel",
     emojiLabels: Boolean = true,
+    protectInput: Boolean = false,
     onDismissStart: () -> Unit = {},
 ) {
     WhiteNoiseAlertDialog(
@@ -68,7 +69,18 @@ internal fun ConfirmDialog(
                 Text(dismissLabel ?: stringResource(R.string.cancel))
             }
         },
-        title = { ConfirmText(title, emojiLabels) },
+        title = {
+            if (protectInput) {
+                ProtectDialogInput { snackbar ->
+                    Column {
+                        ConfirmText(title, emojiLabels)
+                        WhiteNoiseSnackbarHost(snackbar)
+                    }
+                }
+            } else {
+                ConfirmText(title, emojiLabels)
+            }
+        },
         text = {
             Column(
                 Modifier.fadingVerticalScroll(rememberScrollState()),

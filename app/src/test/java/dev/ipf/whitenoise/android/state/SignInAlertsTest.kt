@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -226,6 +227,23 @@ class SignInAlertsTest {
 
         alerts.updateDevicesRequest(opened)
         assertNull(alerts.devicesRequest)
+    }
+
+    @Test
+    fun linkReportCanWaitForUnlockButCannotOverrideNewerNavigation() {
+        alerts.requestDevices(ACCOUNT, linkReportGeneration = 2)
+        val queued = checkNotNull(alerts.devicesRequest)
+        assertFalse(queued.isStaleLinkReport(ACCOUNT, runtimeGeneration = 2))
+        assertTrue(queued.isStaleLinkReport("other", runtimeGeneration = 2))
+        assertTrue(queued.isStaleLinkReport(ACCOUNT, runtimeGeneration = 3))
+
+        alerts.updateDevicesRequest(queued, queued.copy(accountOpened = true))
+        assertEquals(2, alerts.devicesRequest?.linkReportGeneration)
+
+        alerts.requestDevices("other")
+        val explicit = alerts.devicesRequest
+        alerts.requestDevices(ACCOUNT, linkReportGeneration = 2)
+        assertEquals(explicit, alerts.devicesRequest)
     }
 
     private companion object {

@@ -77,7 +77,7 @@
     <string name="link_request_review">Analisar</string>
     <string name="link_request_not_now">Agora não</string>
     <string name="link_request_preparing">Verificando o novo dispositivo…</string>
-    <string name="link_request_compare_detail">Confira se os dois dispositivos mostram os mesmos emojis na mesma ordem. Se forem diferentes, toque em “Agora não”.</string>
+    <string name="link_request_compare_detail">Confira se o dispositivo na sua mão mostra os mesmos emojis na mesma ordem. Não os leia para ninguém nem envie uma captura de tela.</string>
     <string name="link_request_label">Nome para o dispositivo</string>
     <string name="link_request_label_too_long">Esse nome é longo demais.</string>
     <string name="link_request_add_to_chats">Adicionar a todas as minhas conversas</string>
@@ -213,4 +213,16 @@
         <item quantity="other">%d novas entradas para revisar</item>
     </plurals>
     <string name="link_request_expired_attempt">Um dispositivo tentou vincular-se em %1$s.</string>
+    <string name="link_consent_requested_at">Pedido às %1$s</string>
+    <string name="link_consent_access">Um dispositivo vinculado pode ler suas conversas, receber o histórico e enviar mensagens em seu nome.</string>
+    <string name="link_consent_have_device">Continue apenas se você começou a configurar o White Noise em um dispositivo que está à sua frente.</string>
+    <string name="link_consent_scam">O White Noise nunca entrará em contato para pedir que você vincule um dispositivo ou confira emojis. Se alguém pediu isso, é um golpe.</string>
+    <string name="link_consent_on_call">Você está em uma chamada. Golpistas costumam orientar as vítimas por telefone a vincular um dispositivo.</string>
+    <string name="link_consent_with_me">Estou com o novo dispositivo</string>
+    <string name="link_consent_did_not_start">Não fui eu que iniciei isso</string>
+    <string name="link_consent_someone_asked">Alguém me pediu para fazer isso</string>
+    <string name="link_consent_unlock">Desbloqueie este telefone para comparar os emojis</string>
+    <string name="link_consent_lock_required">Configure um bloqueio de tela neste telefone para vincular um dispositivo.</string>
+    <string name="link_consent_report_guidance">Vinculação recusada. Abra o acesso em Dispositivos para denunciá-lo.</string>
+    <string name="link_touch_blocked">Outro aplicativo está cobrindo o White Noise. Feche a janela dele e tente novamente.</string>
 </resources>

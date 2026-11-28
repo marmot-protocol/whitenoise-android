@@ -770,7 +770,7 @@ internal fun WhiteNoiseApp(
             }
         }
         // Inside the scope, so the device-name field of a link request also honours the incognito keyboard.
-        AppQuestionHosts(appState)
+        AppQuestionHosts(appState, topNoticeHost)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)

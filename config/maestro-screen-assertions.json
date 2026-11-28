@@ -2203,8 +2203,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestNotice.kt",
       "symbol": "DeviceLinkDevicesWindow",
       "bindings": [],
-      "remaining": "Opening Devices from a repeated request requires a second installation. SET-075 covers entering Devices from the warning and returning to Chats.",
-      "second_device": ["SET-075"]
+      "remaining": "Opening Devices from a link request requires a second installation. SET-075 covers the repeated warning and return to Chats. SET-079 covers the consent report handoff.",
+      "second_device": ["SET-075", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
@@ -2214,11 +2214,11 @@
       "second_device": ["SET-078"]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
-      "symbol": "ActiveProfileLinkRequest",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkConsent.kt",
+      "symbol": "DeviceLinkConsentDialog",
       "bindings": [],
-      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-061; add a direct assertion when the runner can seed a second device.",
-      "second_device": ["SET-061"]
+      "remaining": "The dialog requires a link from another installation. SET-061 covers link choices and dismissal; SET-079 covers consent, phone unlock and report feedback.",
+      "second_device": ["SET-061", "SET-079"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",

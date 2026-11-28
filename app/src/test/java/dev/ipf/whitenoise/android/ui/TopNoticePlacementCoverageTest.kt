@@ -65,6 +65,21 @@ class TopNoticePlacementCoverageTest {
         assertTrue("the root fallback must claim before any screen composes", fallback in 0 until lockBranch)
     }
 
+    @Test
+    fun deviceLinkWindowsUseTheRootHostForReportFeedback() {
+        val root = mainSource("ui/WhiteNoiseApp.kt").functionBody("WhiteNoiseApp")
+        assertTrue("AppQuestionHosts(appState, topNoticeHost)" in root)
+        val questions = mainSource("ui/AppQuestionHosts.kt").functionBody("AppQuestionHosts")
+        val provider = "CompositionLocalProvider(LocalTopNoticeHost provides topNoticeHost)"
+        val linkScope =
+            questions.kotlinBlockFrom(
+                openDelimiter = questions.indexOf(provider) + provider.length,
+                description = provider,
+                searchForOpening = true,
+            )
+        assertTrue("DeviceLinkRequestHost(" in linkScope)
+    }
+
     /** The shell's slot follows its persistent top strips and precedes the destination and durable bottom controls. */
     @Test
     fun theShellSlotSitsBetweenItsTopStripsAndTheDestination() {

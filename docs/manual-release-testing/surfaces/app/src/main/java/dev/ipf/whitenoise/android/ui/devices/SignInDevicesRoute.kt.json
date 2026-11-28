@@ -9,7 +9,8 @@
         "anchor": "fun SignInDevicesRouteEffect(",
         "test_ids": [
           "SET-077",
-          "SET-078"
+          "SET-078",
+          "SET-079"
         ]
       },
       {
@@ -18,7 +19,8 @@
         "anchor": "fun SignInDevicesRequestEffect(",
         "test_ids": [
           "SET-077",
-          "SET-078"
+          "SET-078",
+          "SET-079"
         ]
       },
       {
@@ -44,6 +46,14 @@
         "anchor": "R.string.sign_in_alert_badge_compromise",
         "test_ids": [
           "SET-078"
+        ]
+      },
+      {
+        "surface": "Device linking consent: R.string.link_consent_report_guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
+        "anchor": "R.string.link_consent_report_guidance",
+        "test_ids": [
+          "SET-079"
         ]
       }
     ]
