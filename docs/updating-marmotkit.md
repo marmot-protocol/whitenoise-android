@@ -190,14 +190,18 @@ RC, pin the Stable Android bundle in `MARMOT_VERSION` and commit
 }
 ```
 
-CI checks Stable pins on `develop` and `master`, and the production build checks
-again before signing. The check reads that exact verified revision of
-`stable/latest.json` on MDK's `rc-meta` history. It verifies that the recorded
+CI checks Stable pins on `develop` and `master`. Hosted and local production
+builds also run the check before building. The check reads that exact verified
+revision of `stable/latest.json` on MDK's `rc-meta` history. It verifies that the recorded
 tag still points to a commit from `develop` and that its RC version and MDK
 source match the promotion. A separate MDK release commit must have the tested
 source as its only parent. Both Android ZIP digests must match the published
 RC and Stable records. Keep the selection with the pin so production rebuilds use
 the same evidence after MDK publishes a newer Stable release.
+
+Before building production locally with a promoted pin, fetch the staging tag
+and `origin/develop` (`git fetch origin develop --tags`). The check reads MDK's
+public promotion evidence even when the MarmotKit ZIP is already cached.
 
 ### Inspect a release by hand
 

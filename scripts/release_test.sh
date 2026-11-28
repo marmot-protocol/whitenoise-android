@@ -10,10 +10,12 @@ trap 'rm -rf "$FIXTURE_DIR"' EXIT
 mkdir -p "$FIXTURE_DIR/repo/app/src/main/marmotkit" "$FIXTURE_DIR/repo/scripts" "$FIXTURE_DIR/bin"
 cp "$RELEASE_SCRIPT_UNDER_TEST" "$FIXTURE_DIR/repo/scripts/release.sh"
 cp "$REPO_DIR/scripts/check_marmotkit_release_channel.py" \
-  "$REPO_DIR/scripts/prepare_marmotkit_artifact.py" "$FIXTURE_DIR/repo/scripts/"
+  "$REPO_DIR/scripts/check_marmotkit_stable_promotion.py" \
+  "$REPO_DIR/scripts/prepare_marmotkit_artifact.py" \
+  "$REPO_DIR/scripts/sync_marmotkit_rc.py" "$FIXTURE_DIR/repo/scripts/"
 chmod +x "$FIXTURE_DIR/repo/scripts/release.sh"
 
-# Use matching coordinates even when the checkout running this test pins an RC.
+# Use the deployed pre-rollout source and digest for the legacy Stable fixture.
 write_marmotkit_lock() {
   local version="$1"
   local tag="marmotkit-v$version"
@@ -22,6 +24,9 @@ write_marmotkit_lock() {
     -e "s|^artifact-tag=.*|artifact-tag=$tag|" \
     -e "s|^artifact-url=.*|artifact-url=https://github.com/marmot-protocol/mdk/releases/download/$tag/$archive.zip|" \
     -e "s|^archive-root=.*|archive-root=$archive|" \
+    -e 's|^mdk-sha=.*|mdk-sha=3fce95465cdea1edc8456dbd1c6691d1c8dc1f2e|' \
+    -e 's|^mdk-short-sha=.*|mdk-short-sha=3fce9546|' \
+    -e 's|^artifact-sha256=.*|artifact-sha256=9f4dd11478265a24a98f1f0c40768b7e8eba8f1fbd4fe7b129b2f09198e3a8e4|' \
     "$REPO_DIR/app/src/main/marmotkit/MARMOT_VERSION" > "$FIXTURE_DIR/repo/app/src/main/marmotkit/MARMOT_VERSION"
 }
 
@@ -100,6 +105,21 @@ if output="$({
 fi
 if [[ -s "$RELEASE_TEST_GRADLE_LOG" ]]; then
   echo 'error: Gradle ran before the RC pin was rejected' >&2
+  exit 1
+fi
+
+write_marmotkit_lock 0.20.0
+for flavor in production all; do
+  if output="$({
+    cd "$FIXTURE_DIR/repo"
+    PATH="$FIXTURE_DIR/bin:$PATH" ./scripts/release.sh --flavor "$flavor" --abi universal
+  } 2>&1)" || [[ "$output" != *"record the staging tag and MDK promotion"* ]]; then
+    printf 'error: %s release did not reject a Stable pin without promotion evidence\n%s\n' "$flavor" "$output" >&2
+    exit 1
+  fi
+done
+if [[ -s "$RELEASE_TEST_GRADLE_LOG" ]]; then
+  echo 'error: Gradle ran before the unverified Stable pin was rejected' >&2
   exit 1
 fi
 
