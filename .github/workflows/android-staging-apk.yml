@@ -2,11 +2,11 @@ name: Android Staging APK
 
 # Builds a signed staging APK for internal installation. This intentionally
 # stays separate from android-ci.yml: PR validation remains credential-free,
-# while master pushes can produce a downloadable staging artifact.
+# while develop pushes can produce a downloadable staging artifact.
 
 on:
   push:
-    branches: [master]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       startup_diagnostics:
@@ -279,7 +279,7 @@ jobs:
       - name: Upload staging APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          # Unique per run so consecutive master commits don't produce
+          # Unique per run so consecutive develop commits don't produce
           # identically-named zips that collide on disk when downloaded.
           # See issue #992.
           name: whitenoise-staging-v8a-release-${{ github.run_number }}-${{ steps.sha.outputs.short }}

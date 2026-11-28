@@ -14,9 +14,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -38,11 +40,17 @@ import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.settings.EMOJI_SETS_REFRESH_TEST_TAG
+import dev.ipf.whitenoise.android.ui.settings.EMOJI_SET_LOAD_TEST_TAG
+import dev.ipf.whitenoise.android.ui.settings.EmojiSetImageSource
+import dev.ipf.whitenoise.android.ui.settings.EmojiSetImages
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
 import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
+import dev.ipf.whitenoise.android.ui.settings.emojiSetTileTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,7 +89,7 @@ class EmojiSetsScreenshotTest {
                 onBack = {},
                 onSearch = {},
                 onShow = {},
-                onLoadArtwork = {},
+                images = null,
                 onInstall = {},
                 onCancel = {},
                 onRemove = {},
@@ -102,14 +110,139 @@ class EmojiSetsScreenshotTest {
         failedBrowser("discovery_error_rtl_large", EmojiSetNotice.Error, rtl = true)
     }
 
-    /** An unopened set preview and its image-host disclosure. */
-    @Test fun previewLight() = preview("preview_light")
+    /** A discovered set opens with its image hosts and Load emoji. Tiles appear after consent. */
+    @Test fun previewLight() = gallery("preview_light", requested = false)
 
-    /** An installed preview with update and removal available. */
-    @Test fun previewDark() = preview("preview_dark", dark = true)
+    /** An installed preview with update and removal available still waits for consent to load the new version. */
+    @Test fun previewDark() = gallery("preview_dark", dark = true, requested = false, installed = updateAvailable)
 
-    /** The same preview with a mirrored layout and large text. */
-    @Test fun previewRtlLarge() = preview("preview_rtl_large", rtl = true)
+    /** The two-button update row and consent action, mirrored with large text. */
+    @Test fun previewRtlLarge() {
+        gallery("preview_rtl_large", rtl = true, requested = false, installed = updateAvailable)
+    }
+
+    /** After Load emoji: loaded art, pulsing blanks for tiles in flight and a retry mark for a failed one. */
+    @Test fun previewLoadingLight() = gallery("preview_loading_light", requested = true, pending = setOf("owl", "bee"))
+
+    /** An installed snapshot of this exact version renders from the device without asking. */
+    @Test fun previewInstalledDark() {
+        gallery("preview_installed_dark", dark = true, requested = false, installed = installedHere)
+    }
+
+    /** The loaded grid mirrored with large text. */
+    @Test fun previewLoadedRtlLarge() = gallery("preview_loaded_rtl_large", rtl = true, requested = true)
+
+    /** Install progress replaces the actions with MDK's count and Cancel. */
+    @Test fun previewInstallingLight() =
+        gallery(
+            "preview_installing_light",
+            requested = true,
+            progress = dev.ipf.marmotkit.EmojiSetInstallProgressFfi(5u, 12u, 0u),
+        )
+
+    /** Loading starts only from Load emoji, and a failed tile retries on tap. */
+    @Test fun loadEmojiAsksFirstAndRetriesFailures() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val pendingFox = CompletableDeferred<Unit>()
+        val failures = mutableSetOf("frog")
+        val source = GallerySource(failing = failures, blocked = mapOf("fox" to pendingFox))
+        val images = EmojiSetImages(galleryFixture(), source) { GalleryArt[it.first().toInt()] }
+        setTheme(dark = false, rtl = false) { galleryContent(images) }
+        composeRule.waitForIdle()
+        assertEquals("Nothing loads before the user asks", emptyList<String>(), source.requests)
+        composeRule.onNodeWithText("cdn.emoji.example", substring = true).assertExists()
+        composeRule.onNodeWithTag(emojiSetTileTestTag("fox"), useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_SET_LOAD_TEST_TAG).performClick()
+        composeRule.waitForIdle()
+        assertTrue("The cover loads after the tap", "cover" in source.requests)
+        val foxLoading = context.getString(R.string.emoji_sets_emoji_loading, ":fox:")
+        composeRule.onNodeWithContentDescription(foxLoading).assertExists()
+        pendingFox.complete(Unit)
+        composeRule.onNodeWithContentDescription(":fox:").assertExists()
+        val fox = tileWidth("fox")
+        val owl = tileWidth("owl")
+        assertTrue(
+            "Tiles in a row share its width within one pixel ($fox, $owl)",
+            fox > 0 && kotlin.math.abs(fox - owl) <= 1,
+        )
+        assertEquals("A loaded tile is fetched exactly once", 1, source.requests.count { it == "fox" })
+        assertEquals("A failed tile does not reload by itself", 1, source.requests.count { it == "frog" })
+        failures.clear()
+        val retry = composeRule.onNodeWithTag(emojiSetTileTestTag("frog"))
+        retry.assertContentDescriptionEquals(context.getString(R.string.emoji_sets_emoji_failed, ":frog:"))
+        retry.performClick()
+        composeRule.onNodeWithContentDescription(":frog:").assertExists()
+        assertEquals("Tapping a failed tile retries it once", 2, source.requests.count { it == "frog" })
+    }
+
+    private fun tileWidth(shortcode: String): Int {
+        val tile = composeRule.onNodeWithTag(emojiSetTileTestTag(shortcode), useUnmergedTree = true)
+        return tile.fetchSemanticsNode().size.width
+    }
+
+    /** Untitled sets with machine-made identifiers never show the hex as their name. */
+    @Test fun untitledHexSetIsNamedUntitled() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val hex = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+        val set = galleryFixture().copy(title = null, identifier = hex)
+        setTheme(dark = false, rtl = false) {
+            EmojiSetsContent(
+                state = EmojiSetsState(sets = listOf(set)),
+                onBack = {},
+                onSearch = {},
+                onShow = {},
+                images = null,
+                onInstall = {},
+                onCancel = {},
+                onRemove = {},
+            )
+        }
+        composeRule.onNodeWithText(context.getString(R.string.emoji_sets_untitled)).assertExists()
+        composeRule.onNodeWithText(hex, substring = true).assertDoesNotExist()
+    }
+
+    private val updateAvailable = InstalledEmojiSetStateFfi("previous", 0u, 0u, 12u, 100u, true)
+    private val installedHere = InstalledEmojiSetStateFfi("gallery", 0u, 0u, 12u, 100u, false)
+
+    @Suppress("LongParameterList")
+    private fun gallery(
+        name: String,
+        dark: Boolean = false,
+        rtl: Boolean = false,
+        requested: Boolean,
+        installed: InstalledEmojiSetStateFfi? = null,
+        pending: Set<String> = emptySet(),
+        progress: dev.ipf.marmotkit.EmojiSetInstallProgressFfi? = null,
+    ) {
+        val set = galleryFixture().copy(installed = installed)
+        val source = GallerySource(failing = setOf("frog"), pending = pending)
+        val images = EmojiSetImages(set, source) { GalleryArt[it.first().toInt()] }
+        if (requested) images.request()
+        // The pulsing blanks never settle, so frames advance by hand.
+        composeRule.mainClock.autoAdvance = false
+        setTheme(dark, rtl) { galleryContent(images, progress) }
+        composeRule.mainClock.advanceTimeBy(FRAME_SETTLE_MS)
+        ShadowLooper.idleMainLooper()
+        composeRule.mainClock.advanceTimeBy(FRAME_SETTLE_MS)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
+    }
+
+    @Composable
+    private fun galleryContent(
+        images: EmojiSetImages,
+        progress: dev.ipf.marmotkit.EmojiSetInstallProgressFfi? = null,
+    ) {
+        EmojiSetsContent(
+            state = EmojiSetsState(sets = listOf(images.set), preview = images.set, progress = progress),
+            onBack = {},
+            onSearch = {},
+            onShow = {},
+            images = images,
+            onInstall = {},
+            onCancel = {},
+            onRemove = {},
+        )
+    }
 
     /** The update check waits for the opening sync, which would otherwise drop the lookup. */
     @Test fun checkForUpdateWaitsForOpeningSync() {
@@ -121,7 +254,7 @@ class EmojiSetsScreenshotTest {
                 onBack = {},
                 onSearch = {},
                 onShow = {},
-                onLoadArtwork = {},
+                images = null,
                 onInstall = {},
                 onCancel = {},
                 onRemove = {},
@@ -161,7 +294,7 @@ class EmojiSetsScreenshotTest {
                 onBack = {},
                 onSearch = {},
                 onShow = {},
-                onLoadArtwork = {},
+                images = null,
                 onInstall = {},
                 onCancel = {},
                 onRemove = {},
@@ -187,7 +320,7 @@ class EmojiSetsScreenshotTest {
                 onBack = {},
                 onSearch = {},
                 onShow = {},
-                onLoadArtwork = {},
+                images = null,
                 onInstall = {},
                 onCancel = {},
                 onRemove = {},
@@ -215,7 +348,7 @@ class EmojiSetsScreenshotTest {
                 onBack = {},
                 onSearch = { searches += it },
                 onShow = {},
-                onLoadArtwork = {},
+                images = null,
                 onInstall = {},
                 onCancel = {},
                 onRemove = {},
@@ -267,6 +400,34 @@ class EmojiSetsScreenshotTest {
         composeRule.onNodeWithTag("emoji-set-picker").captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
     }
 
+    /** Serves drawn art by shortcode; [failing] codes throw and [pending] ones never answer. */
+    private class GallerySource(
+        val failing: Set<String> = emptySet(),
+        val pending: Set<String> = emptySet(),
+        val blocked: Map<String, CompletableDeferred<Unit>> = emptyMap(),
+    ) : EmojiSetImageSource {
+        val requests = mutableListOf<String>()
+
+        override suspend fun cover(set: dev.ipf.marmotkit.EmojiSetFfi): ByteArray {
+            requests += "cover"
+            return byteArrayOf(0)
+        }
+
+        override suspend fun emoji(
+            set: dev.ipf.marmotkit.EmojiSetFfi,
+            shortcode: String,
+            local: Boolean,
+        ): ByteArray {
+            requests += shortcode
+            // Suspend like the native fetch, so a tile recomposes as Loading before its bytes arrive.
+            kotlinx.coroutines.yield()
+            blocked[shortcode]?.await()
+            if (shortcode in pending) kotlinx.coroutines.awaitCancellation()
+            check(shortcode !in failing) { "host refused" }
+            return byteArrayOf(GalleryCodes.indexOf(shortcode).toByte())
+        }
+    }
+
     private fun setTheme(
         dark: Boolean,
         rtl: Boolean,
@@ -282,3 +443,51 @@ class EmojiSetsScreenshotTest {
         }
     }
 }
+
+private const val FRAME_SETTLE_MS = 500L
+
+private val GalleryCodes =
+    listOf("fox", "owl", "frog", "bee", "cat", "fish", "bear", "snail", "duck", "pig", "mouse", "crab")
+
+private val GalleryColors =
+    listOf(
+        0xFFFF8426,
+        0xFF8D6E63,
+        0xFF66BB6A,
+        0xFFFFCA28,
+        0xFFFFA726,
+        0xFF29B6F6,
+        0xFF795548,
+        0xFFAB47BC,
+        0xFFFFEE58,
+        0xFFF48FB1,
+        0xFFB0BEC5,
+        0xFFEF5350,
+    )
+
+/** Simple drawn faces, one per gallery shortcode. */
+private val GalleryArt: List<EmojiArt> =
+    GalleryColors.map { color ->
+        val image = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color.toInt() }
+        Canvas(image).apply {
+            drawCircle(24f, 24f, 22f, paint)
+            paint.color = Color.BLACK
+            drawCircle(16f, 19f, 3f, paint)
+            drawCircle(32f, 19f, 3f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 3f
+            drawArc(14f, 20f, 34f, 36f, 20f, 140f, false, paint)
+        }
+        EmojiArt.Decoded(image.asImageBitmap())
+    }
+
+private fun galleryFixture() =
+    emojiSetFixture().copy(
+        identifier = "gallery-friends",
+        eventIdHex = "gallery",
+        title = "Garden friends",
+        description = "Twelve colorful faces for reactions and replies.",
+        imageUrl = "https://cdn.emoji.example/cover.png",
+        emoji = GalleryCodes.map { dev.ipf.marmotkit.EmojiSetEmojiFfi(it, "https://cdn.emoji.example/$it.png") },
+    )

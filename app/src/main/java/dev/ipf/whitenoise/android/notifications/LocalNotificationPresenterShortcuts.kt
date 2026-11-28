@@ -41,22 +41,29 @@ internal suspend fun LocalNotificationPresenter.publishShortcutBeforePost(
     }.takeIf { it }?.let { shortcutId }
 }
 
-/** Publishes the separate reaction shortcut before Android classifies the card for its template. */
+/**
+ * Publishes the separate reaction shortcut before Android classifies the card for its template. A conversation or
+ * account cleanup after [channelWriteEpoch] that cleared this reaction shortcut, or its conversation, stops it.
+ */
 internal suspend fun LocalNotificationPresenter.publishReactionShortcutBeforePost(
     update: NotificationUpdateFfi,
     content: LocalNotificationContent,
+    channelWriteEpoch: Long,
     isPublishAllowed: () -> Boolean,
 ): String? {
     val id =
         reactionConversationShortcutId(update.accountRef, update.groupIdHex)
             ?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.R } ?: return null
+    val allowed = {
+        isPublishAllowed() && NotificationChannelWriteGuard.isCurrent(channelWriteEpoch, update.accountRef, id)
+    }
     val published =
         withContext(Dispatchers.Default) {
             conversationShortcuts.publishReactionShortcut(
                 update,
                 content,
                 id,
-                isPublishAllowed,
+                allowed,
             )
         }
     return id.takeIf { published }

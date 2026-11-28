@@ -1226,6 +1226,9 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                     }
                 }
+                // A sign-in MDK found while no stream listened is still announced.
+                launch { runCatchingCancellable { refreshAllSignInAlerts() } }
+                launch(Dispatchers.Main) { refreshAllMissedDeviceLinkAttempts() }
                 // A group change MDK gave up while no stream listened still tells the user, once.
                 streamNotices.launch { runCatchingCancellable { presentRetainedGroupChange(marmot) } }
                 runCatchingCancellable {

@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "activeAccountInvite",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
+        "anchor": "fun activeAccountInvite(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "NCH-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:invite_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
+        "anchor": "R.string.invite_message",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "setting:invite_message_personal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
+        "anchor": "R.string.invite_message_personal",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017",
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "setting:invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/WhiteNoiseInviteShare.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "NCH-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

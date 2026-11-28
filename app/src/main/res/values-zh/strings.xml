@@ -231,9 +231,12 @@
     <string name="error_missing_key_package_for">未找到%1$s的可用聊天密钥。请对方安装或更新 White Noise 并打开应用，然后重试。</string>
     <string name="invite_to_white_noise">邀请加入 White Noise</string>
     <string name="invite_friends">邀请好友</string>
-    <string name="invite_to_white_noise_description">%1$s 尚未加入 White Noise。分享此应用以开始安全聊天。</string>
-    <string name="unknown_invite_to_white_noise_description">该用户尚未加入 White Noise。分享此应用以开始安全聊天。</string>
     <string name="invite_message">快来 White Noise 加入我吧。无需手机号，无监控，真正的隐私。点击此处下载：https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s 尚未加入 White Noise</string>
+    <string name="start_chat_not_on_white_noise">此人尚未加入 White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">向对方发送邀请。对方安装并打开 White Noise 后，请重试。</string>
+    <string name="send_invite">发送邀请</string>
+    <string name="invite_message_personal">我是 White Noise 上的 %1$s，这是一款无需手机号的私密通讯应用。安装后点按“新聊天”，粘贴我的公钥即可给我发消息：%2$s\n下载：https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">该收件人不是有效的 Nostr 公钥。使用 npub、配置文件链接或 hex 公钥。</string>
     <string name="error_group_create_failed_retry">设置加密聊天时出了点问题。请检查连接，然后重试。</string>
     <string name="error_no_group_members_selected">未能添加任何选中的联系人。请对方检查聊天设置，或修改你的选择。</string>
@@ -1649,6 +1652,9 @@
     <string name="notification_channel_app_updates">应用更新</string>
     <string name="notification_channel_app_updates_global">应用更新 · 整个应用</string>
     <string name="notification_channel_app_updates_global_description">White Noise 应用更新的 Android 提醒方式</string>
+    <string name="notification_channel_account_security">账号安全</string>
+    <string name="notification_channel_account_security_global">账号安全 · 整个应用</string>
+    <string name="notification_channel_account_security_global_description">未知登录和安全警告的 Android 提醒方式</string>
 
     <string name="chat_bubble_colors">聊天气泡颜色</string>
     <string name="custom_emoji">自定义表情</string>
@@ -1667,9 +1673,18 @@
     <string name="emoji_sets_builtin_shown">预装 · %1$s</string>
     <string name="emoji_sets_builtin_hidden">已从选择器中隐藏。消息中仍会显示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
-    <string name="emoji_sets_load_image">加载预览图片</string>
-    <string name="emoji_sets_image_privacy">加载预览或安装表情包会向其图片服务器暴露你的 IP 地址。</string>
-    <string name="emoji_sets_preview_host">预览图片服务器：%1$s</string>
+    <string name="emoji_sets_load_emoji">加载表情</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="other">图片来自 %1$s。加载或安装时，图片托管方会收到你的 IP 地址。</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="other">另外 %1$d 个</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">加载或安装这些图片时，图片托管方会收到你的 IP 地址。</string>
+    <string name="emoji_sets_untitled">未命名的表情包</string>
+    <string name="emoji_sets_emoji_loading">正在加载 %1$s</string>
+    <string name="emoji_sets_emoji_failed">无法加载 %1$s。</string>
+    <string name="emoji_sets_emoji_unavailable">此设备上没有 %1$s。</string>
     <string name="emoji_sets_install">安装表情包</string>
     <string name="emoji_sets_update">更新表情包</string>
     <string name="emoji_sets_check_update">检查更新</string>
@@ -2829,4 +2844,11 @@
     <string name="dictation_transcribe_voice_messages_title">自动转写语音消息</string>
     <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天时显示已下载语音消息的转写文本。 需要 Offline Speech to Text。</string>
     <string name="toast_unsupported_link">不支持此链接。</string>
+    <string name="private_key_reminder_title">保存您的私钥</string>
+    <string name="private_key_reminder_body">如果您丢失了这部手机，只有使用私钥才能保留您的身份和联系人。</string>
+    <string name="private_key_reminder_save">保存密钥</string>
+    <string name="private_key_reminder_not_now">暂不</string>
+    <string name="first_run_chats_title">开始你的第一段对话</string>
+    <string name="first_run_chats_detail">邀请一位平常聊天的人。在等待期间，可以向 White Noise 团队提问。</string>
+    <string name="first_run_new_chat">新聊天</string>
 </resources>

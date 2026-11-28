@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_permission_ask_title">有人回复时及时知晓</string>
+    <string name="notification_permission_ask_message">开启通知，无需打开 White Noise 即可查看新消息和聊天邀请。</string>
+    <string name="notification_permission_ask_confirm">开启通知</string>
+    <string name="notification_permission_ask_not_now">暂不</string>
+</resources>

@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.LinkedDeviceSettingsPatch
 import dev.ipf.whitenoise.android.state.SignInReviewController
 import dev.ipf.whitenoise.android.state.SignInReviewNative
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.markSignInMine
 import dev.ipf.whitenoise.android.state.presentFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -163,7 +164,9 @@ internal fun rememberDeviceManagement(appState: WhiteNoiseAppState): DeviceManag
                 val owns = { appState.activeAccountRef == account && appState.runtimeGeneration == runtimeGeneration }
                 DeviceManagement(
                     LinkedDeviceManagementController(account, RuntimeLinkedDeviceManagement(appState), owns),
-                    SignInReviewController(account, RuntimeSignInReview(appState), owns),
+                    SignInReviewController(account, RuntimeSignInReview(appState), owns) { slot ->
+                        appState.markSignInMine(account, slot)
+                    },
                 )
             }
         }

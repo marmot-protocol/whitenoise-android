@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_permission_ask_title">Biri yanıt verdiğinde haberin olsun</string>
+    <string name="notification_permission_ask_message">White Noise\'u açmadan yeni mesajları ve sohbet davetlerini görmek için bildirimleri aç.</string>
+    <string name="notification_permission_ask_confirm">Bildirimleri aç</string>
+    <string name="notification_permission_ask_not_now">Şimdi değil</string>
+</resources>

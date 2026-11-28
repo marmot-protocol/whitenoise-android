@@ -28,7 +28,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal class KeyFileExport {
+/** [onSaved] receives the account whose key file was written, plain or encrypted. */
+internal class KeyFileExport(
+    internal val onSaved: (accountId: String) -> Unit = {},
+) {
     internal var picking by mutableStateOf(false)
     internal var request by mutableStateOf<RequestedKeyFile?>(null)
     internal var destination by mutableStateOf<Uri?>(null)
@@ -80,7 +83,8 @@ internal fun rememberKeyFileExport(appState: WhiteNoiseAppState): KeyFileExportL
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsState()
     val scope = rememberCoroutineScope()
-    val state = remember(appState) { KeyFileExport() }
+    // A saved key file retires the chat list's reminder to save that account's key (#4279).
+    val state = remember(appState) { KeyFileExport(appState.privateKeyReminders::markKeySaved) }
 
     fun canDeliver(owner: KeyFileExportOwner): Boolean =
         appState.keyFileExportOwner() == owner &&
@@ -189,7 +193,13 @@ private fun saveExport(
                 if (!saved) discardInterruptedCreatedDocument(context, uri)
                 saved
             },
-            onResult = { saved -> if (!saved) state.feedback = KeyFileExportFeedback.SaveFailed },
+            onResult = { saved ->
+                if (saved) {
+                    state.onSaved(request.owner.accountId)
+                } else {
+                    state.feedback = KeyFileExportFeedback.SaveFailed
+                }
+            },
             onFinished = { state.saving = false },
         )
     if (!started) state.saving = false

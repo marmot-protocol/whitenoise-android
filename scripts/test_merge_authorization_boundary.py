@@ -75,6 +75,23 @@ class AuthorizationBoundaryTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'secrets'):
                 validate('normal.yml',{'on':'merge_group','permissions':{},'jobs':{'test':{'if':expression}}})
 
+    def test_staging_push_filter_excludes_queue_candidates(self):
+        staging = 'android-staging-apk.yml'
+        push = {'branches': ['develop']}
+        workflow = {'permissions': {}, 'jobs': {'test': {'steps': [
+            {'env': {'KEY': '${{ secrets.SIGNING_KEY }}'}},
+        ]}}}
+        validate(staging, {**workflow, 'on': {'push': push, 'workflow_dispatch': {}}})
+        for name, events in (
+            ('other.yml', {'push': push}),
+            (staging, {'push': {'branches': ['develop*']}}),
+            (staging, {'push': {'branches': ['develop', 'gh-readonly-queue/**']}}),
+            (staging, {'push': push, 'merge_group': {}}),
+            (staging, {'push': push, 'pull_request': {}}),
+        ):
+            with self.subTest(name=name, events=events), self.assertRaisesRegex(ValueError, 'secrets'):
+                validate(name, {**workflow, 'on': events})
+
     def test_candidate_jobs_cannot_escape_through_reusable_jobs_or_environments(self):
         for job in [{'uses':'organization/repo/.github/workflows/build.yml@main'},
                     {'environment':'production','steps':[]}]:

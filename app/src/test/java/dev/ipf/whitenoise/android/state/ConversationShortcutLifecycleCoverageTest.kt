@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,11 +85,9 @@ class ConversationShortcutLifecycleCoverageTest {
     @Test
     fun accountCleanupDeletesOwnedProfileAndConversationNotificationChannels() {
         val appStateCleanup = appStateSource().readText().functionBody("clearRevokedConversationShortcutsForAccount")
-        val presenterSource =
+        val presenterCleanup =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt")
-        val presenterStart = presenterSource.indexOf("fun clearRevokedConversationShortcutsForAccount(")
-        val presenterEnd = presenterSource.indexOf("internal fun forgetConversationShortcut(", presenterStart)
-        val presenterCleanup = presenterSource.substring(presenterStart, presenterEnd)
+                .functionBody("clearRevokedConversationShortcutsForAccount")
         val shortcutsHelper =
             appModuleSource(
                 "src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
@@ -100,14 +99,6 @@ class ConversationShortcutLifecycleCoverageTest {
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannelCleanup.kt")
         val channelCleanup = cleanupSource.functionBody("deleteAccountNotificationChannels")
 
-        assertTrue(
-            "AppState account cleanup must delegate to LocalNotificationPresenter",
-            "localNotificationPresenter.clearRevokedConversationShortcutsForAccount" in appStateCleanup,
-        )
-        assertTrue(
-            "LocalNotificationPresenter must forward account cleanup to NotificationConversationShortcuts",
-            "conversationShortcuts.clearRevokedConversationShortcutsForAccount" in presenterCleanup,
-        )
         assertTrue(
             "Account cleanup must cancel each known conversation's cards, which outlive deleted channels",
             "retirement.dismissConversationMessages(accountRef, groupIdHex" in presenterCleanup &&
@@ -127,6 +118,62 @@ class ConversationShortcutLifecycleCoverageTest {
             "profileNotificationChannelAccountPrefix(accountRef)" in channelCleanup &&
                 "conversationChannelShortcutId(channel)" in channelCleanup &&
                 "deleteMatchingNotificationChannels(" in channelCleanup,
+        )
+        assertAppStateForwardsKnownGroupIds()
+        assertForwardsKnownGroupIds(
+            appStateCleanup,
+            "localNotificationPresenter.clearRevokedConversationShortcutsForAccount",
+        )
+        assertForwardsKnownGroupIds(
+            presenterCleanup,
+            "conversationShortcuts.clearRevokedConversationShortcutsForAccount",
+        )
+        assertForwardsKnownGroupIds(shortcutsHelper, "clearRevokedConversationShortcutsForAccount")
+        assertForwardsKnownGroupIds(platformCleanup, "deleteAccountNotificationChannels")
+        assertTrue(
+            "deleteAccountNotificationChannels must target the captured group ids",
+            "groupChannelShortcutIds(accountRef, knownGroupIds" in channelCleanup,
+        )
+    }
+
+    /** Asserts every AppState hop from sign-out or wipe capture to account cleanup forwards the captured group ids. */
+    private fun assertAppStateForwardsKnownGroupIds() {
+        val appState = appStateSource().readText()
+        assertForwardsKnownGroupIds(
+            appState.functionBody("signOutAndWipeActiveAccountLocked"),
+            "finishRevokedAccountWipe",
+        )
+        assertForwardsKnownGroupIds(
+            appState.functionBody("revokeAndFinishSignOutLocked"),
+            "finishRevokedAccountSignOut",
+        )
+        assertForwardsKnownGroupIds(appState.functionBody("finishRevokedAccountSignOut"), "finishOwnedSignOutLocked")
+        assertForwardsKnownGroupIds(
+            appState.functionBody("finishOwnedSignOutLocked"),
+            "clearRevokedConversationShortcutsForAccount",
+        )
+        assertForwardsKnownGroupIds(
+            appState.functionBody("finishRevokedAccountWipe"),
+            "clearRevokedConversationShortcutsForAccount",
+        )
+    }
+
+    /** Asserts [body] passes `knownGroupIds` as an argument of its call to [callee]. */
+    private fun assertForwardsKnownGroupIds(
+        body: String,
+        callee: String,
+    ) {
+        val argumentLists =
+            Regex("""(?<![\w.])${Regex.escape(callee)}\(""")
+                .findAll(body)
+                .map { match ->
+                    body.kotlinBlockFrom(match.range.last, "$callee arguments", opening = '(', closing = ')')
+                }.toList()
+        assertTrue("expected a call to $callee", argumentLists.isNotEmpty())
+        val forwardsIds = Regex("""(^|[\s,(=])knownGroupIds\s*(,|\)|$)""")
+        assertTrue(
+            "$callee must receive the captured knownGroupIds",
+            argumentLists.any { forwardsIds.containsMatchIn(it) },
         )
     }
 
@@ -168,6 +215,32 @@ class ConversationShortcutLifecycleCoverageTest {
         assertTrue(
             "captureAccountKnownGroupIds must read the departing account's pending local-delete journal groups",
             "localGroupDeleteCleanupJournal.groupIdsForAccount(accountRef)" in capture,
+        )
+        assertTrue(
+            "An unreadable journal must leave the inventory incomplete, so the unaccounted-channel check runs",
+            "journaled.isSuccess" in capture && "inventoryComplete =" in capture,
+        )
+    }
+
+    /** Both shortcut publishers in a post honour the cleanup epoch, so a stale post cannot republish a cleared one. */
+    @Test
+    fun postShortcutPublicationHonoursTheCleanupEpoch() {
+        val show =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt")
+                .functionBody("show")
+        val publish = show.substringAfter("publishShortcutBeforePost(").substringBefore("} ?:")
+        assertTrue("the message shortcut must use the channel write check", "channelWriteAllowed()" in publish)
+        assertTrue(
+            "the reaction shortcut must receive the cleanup epoch",
+            "publishReactionShortcutBeforePost(update, notificationContent, channelWriteEpoch)" in show,
+        )
+        val reaction =
+            appModuleSource(
+                "src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenterShortcuts.kt",
+            ).functionBody("publishReactionShortcutBeforePost")
+        assertTrue(
+            "the reaction shortcut must check the cleanup epoch against its own id",
+            "NotificationChannelWriteGuard.isCurrent(channelWriteEpoch, update.accountRef, id)" in reaction,
         )
     }
 
@@ -251,7 +324,6 @@ class ConversationShortcutLifecycleCoverageTest {
                 "src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRouting.kt",
             )
         val resolveBody = routingSource.functionBody("resolveForPost")
-        val setScopeBody = routingSource.functionBody("setScope")
         val mutesSource =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationMutes.kt")
         val retainBody = mutesSource.functionBody("retainProfileAlertsForAccounts")
@@ -262,8 +334,8 @@ class ConversationShortcutLifecycleCoverageTest {
                 "recordConversationChannelOwner(context, accountRef, conversationShortcutId)" in ensureBody,
         )
         assertTrue(
-            "resolveForPost and setScope must forward accountRef when creating :conv: channels",
-            "accountRef = accountRef" in resolveBody && "accountRef = conversation.accountRef" in setScopeBody,
+            "resolveForPost must forward accountRef when creating :conv: channels",
+            "accountRef = accountRef" in resolveBody,
         )
         assertTrue(
             "retainProfileAlertsForAccounts must prune stale conversation-channel owner records",

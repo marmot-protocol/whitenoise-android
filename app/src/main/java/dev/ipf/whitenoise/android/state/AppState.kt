@@ -424,6 +424,7 @@ class WhiteNoiseAppState private constructor(
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
+    internal val privateKeyReminders = PrivateKeyReminders(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
@@ -1377,6 +1378,7 @@ class WhiteNoiseAppState private constructor(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
     )
     private var defaultNotificationPermissionPromptInFlight by mutableStateOf(false)
+    internal val notificationAskMoment = NotificationAskMoment(preferences)
 
     // One-time onboarding hint for the conversation disappearing-timer chip (#335):
     // shown the first time the user opens a conversation whose timer is enabled.
@@ -4352,6 +4354,7 @@ class WhiteNoiseAppState private constructor(
                 }
             if (accepted) {
                 reconcilePendingForwardOwners(refreshedAccounts, requestToken)
+                launchMutation { refreshSignInReviewAfterAccountLoad() }
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
                 scheduleDisplayAvatarAccountReconciliation(refreshedAccounts, requestToken)
             }
@@ -5178,6 +5181,7 @@ class WhiteNoiseAppState private constructor(
         if (knownSignedOut) {
             accountListLifetime.advance {
                 accounts = reconcileCachedAccountsAfterSignOut(accounts, account)
+                signInAlerts.forget(account)
             }
         }
         clearSignedOutAccountMemory(account)
@@ -5211,6 +5215,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        accounts.firstOrNull { it.label == account }?.let { privateKeyReminders.forget(it.accountIdHex) }
         receivedVoiceTranscripts.forgetAccount(account)
         attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
@@ -5283,6 +5288,8 @@ class WhiteNoiseAppState private constructor(
                                 wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
+                                signInAlerts.wipe(wipedRef, wipedAccountId)
+                                deviceLinkRequests.forgetAccount(wipedRef)
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
@@ -6475,7 +6482,11 @@ class WhiteNoiseAppState private constructor(
             !defaultNotificationsEnableAttempted &&
             !defaultNotificationPermissionPromptInFlight &&
             !localNotificationPermissionGranted &&
-            backgroundConnectionEnabled
+            backgroundConnectionEnabled &&
+            notificationAskMoment.reached
+
+    /** A reply is now expected: a conversation opened, or an invite or this profile was shared (#4278). */
+    fun noteNotificationMoment() = notificationAskMoment.noteReplyExpected()
 
     fun markDefaultNotificationPermissionPromptLaunched() {
         defaultNotificationPermissionPromptInFlight = true
@@ -6486,7 +6497,7 @@ class WhiteNoiseAppState private constructor(
         defaultNotificationPermissionPromptInFlight = false
         if (defaultNotificationsEnableAttempted) return
         defaultNotificationsEnableAttempted = true
-        preferences.edit().putBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, true).apply()
+        preferences.edit().putBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, true).commit()
         appStateDebug { "default notifications enable attempted" }
     }
 

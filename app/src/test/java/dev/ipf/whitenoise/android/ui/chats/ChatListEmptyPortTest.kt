@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -8,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,13 +23,17 @@ class ChatListEmptyPortTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** New account retains the actual create callback. */
+    /** The shared primary action retains both the create callback and its motion origin. */
     @Test fun newAccountRetainsTheActualCreateCallback() {
         var creates = 0
-        composeRule.setContent { WhiteNoiseTheme { EmptyChats(onCreate = { creates++ }) } }
+        var origin: Rect? = null
+        composeRule.setContent {
+            WhiteNoiseTheme { EmptyChats(onCreate = { creates++ }, onCreateOrigin = { origin = it }) }
+        }
         composeRule.onNodeWithText(context.getString(R.string.chat_rows_no_chats_title)).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.new_chat)).performClick()
         assertEquals(1, creates)
+        assertTrue(origin?.isEmpty == false)
     }
 
     /** Search empty takes precedence over unread folder. */

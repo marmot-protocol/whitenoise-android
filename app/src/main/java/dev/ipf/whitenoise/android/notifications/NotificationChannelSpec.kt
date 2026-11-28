@@ -98,6 +98,22 @@ enum class NotificationChannelSpec(
         launcherBadgeByDefault = false,
     ),
 
+    /** Unknown sign-ins deserve a quiet review, even if nothing indicates key misuse. */
+    SIGN_IN_REVIEW(
+        "sign_in_review_v1",
+        ChannelImportance.DEFAULT,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
+
+    /** High importance only when MDK reports evidence of key misuse. */
+    ACCOUNT_SECURITY(
+        "account_security_v1",
+        ChannelImportance.HIGH,
+        ConversationChannelPolicy.GLOBAL_ONLY,
+        launcherBadgeByDefault = false,
+    ),
+
     /** Presentation-only summary. Child channels and their existing settings own every alert. */
     USER_EVENT_SUMMARY(
         "user_event_summary_v1",

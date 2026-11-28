@@ -246,9 +246,12 @@
     <string name="error_missing_key_package_for">Não encontramos uma chave de conversa utilizável para %1$s. Peça para ela instalar ou atualizar o White Noise e abri-lo e tente novamente.</string>
     <string name="invite_to_white_noise">Convidar para o White Noise</string>
     <string name="invite_friends">Convidar amigos</string>
-    <string name="invite_to_white_noise_description">%1$s ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
-    <string name="unknown_invite_to_white_noise_description">Este usuário ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
     <string name="invite_message">Junte-se a mim no White Noise. Sem número de telefone. Sem vigilância. Apenas privacidade real. Baixe aqui: https://www.whitenoise.chat/download</string>
+    <string name="start_chat_not_on_white_noise_for">%1$s ainda não está no White Noise</string>
+    <string name="start_chat_not_on_white_noise">Esta pessoa ainda não está no White Noise</string>
+    <string name="start_chat_not_on_white_noise_detail">Envie um convite. Quando a pessoa tiver instalado e aberto o White Noise, tente novamente.</string>
+    <string name="send_invite">Enviar convite</string>
+    <string name="invite_message_personal">Sou %1$s no White Noise, um mensageiro privado que não precisa de número de telefone. Instale o app, toque em Novo chat e cole minha chave para falar comigo: %2$s\nBaixe aqui: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Esse destinatário não é uma chave pública Nostr válida. Use um npub, link de perfil ou chave pública hex.</string>
     <string name="error_group_create_failed_retry">Algo deu errado ao configurar a conversa criptografada. Verifique sua conexão e tente novamente.</string>
     <string name="error_no_group_members_selected">Não foi possível adicionar nenhuma das pessoas selecionadas. Peça que verifiquem a configuração da conversa ou altere sua seleção.</string>
@@ -1673,6 +1676,9 @@
     <string name="notification_channel_app_updates">Atualizações do app</string>
     <string name="notification_channel_app_updates_global">Atualizações do app · Todo o app</string>
     <string name="notification_channel_app_updates_global_description">Comportamento de alertas do Android para atualizações do White Noise</string>
+    <string name="notification_channel_account_security">Segurança da conta</string>
+    <string name="notification_channel_account_security_global">Segurança da conta · Todo o app</string>
+    <string name="notification_channel_account_security_global_description">Comportamento de alertas do Android para entradas desconhecidas e avisos de segurança</string>
 
     <string name="chat_bubble_colors">Cores dos balões</string>
     <string name="custom_emoji">Emoji personalizados</string>
@@ -1692,9 +1698,20 @@
     <string name="emoji_sets_builtin_shown">Pré-instalado · %1$s</string>
     <string name="emoji_sets_builtin_hidden">Oculto no seletor. Continua aparecendo nas mensagens.</string>
     <string name="emoji_sets_update_available">Atualização disponível</string>
-    <string name="emoji_sets_load_image">Carregar imagem de prévia</string>
-    <string name="emoji_sets_image_privacy">Carregar uma prévia ou instalar um conjunto compartilha seu endereço IP com os servidores de imagens dele.</string>
-    <string name="emoji_sets_preview_host">Servidor da imagem de prévia: %1$s</string>
+    <string name="emoji_sets_load_emoji">Carregar emojis</string>
+    <plurals name="emoji_sets_image_hosts">
+        <item quantity="one">As imagens vêm de %1$s. Ao carregá-las ou instalá-las, os servidores que as hospedam recebem seu endereço IP.</item>
+        <item quantity="other">As imagens vêm de %1$s. Ao carregá-las ou instalá-las, os servidores que as hospedam recebem seu endereço IP.</item>
+    </plurals>
+    <plurals name="emoji_sets_more_hosts">
+        <item quantity="one">mais %1$d</item>
+        <item quantity="other">mais %1$d</item>
+    </plurals>
+    <string name="emoji_sets_image_hosts_unknown">Ao carregar ou instalar estas imagens, os servidores que as hospedam recebem seu endereço IP.</string>
+    <string name="emoji_sets_untitled">Conjunto sem nome</string>
+    <string name="emoji_sets_emoji_loading">Carregando %1$s</string>
+    <string name="emoji_sets_emoji_failed">Não foi possível carregar %1$s.</string>
+    <string name="emoji_sets_emoji_unavailable">%1$s não está disponível neste dispositivo.</string>
     <string name="emoji_sets_install">Instalar conjunto</string>
     <string name="emoji_sets_update">Atualizar conjunto</string>
     <string name="emoji_sets_check_update">Verificar atualização</string>
@@ -2880,4 +2897,11 @@
     <string name="dictation_transcribe_voice_messages_title">Transcrever mensagens de voz automaticamente</string>
     <string name="dictation_transcribe_voice_messages_subtitle">Mostra na conversa as transcrições das mensagens de voz baixadas. Requer o Offline Speech to Text.</string>
     <string name="toast_unsupported_link">Este link não é compatível.</string>
+    <string name="private_key_reminder_title">Guarde sua chave privada</string>
+    <string name="private_key_reminder_body">Se você perder este celular, só poderá manter sua identidade e seus contatos com a sua chave.</string>
+    <string name="private_key_reminder_save">Salvar chave</string>
+    <string name="private_key_reminder_not_now">Agora não</string>
+    <string name="first_run_chats_title">Inicie sua primeira conversa</string>
+    <string name="first_run_chats_detail">Convide alguém com quem você conversa. Enquanto espera, pergunte o que quiser à equipe do White Noise.</string>
+    <string name="first_run_new_chat">Novo chat</string>
 </resources>

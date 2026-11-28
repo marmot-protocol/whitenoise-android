@@ -23,32 +23,29 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
-import dev.ipf.whitenoise.android.share.QrShareCardRenderer
-import dev.ipf.whitenoise.android.share.QrShareCardSpec
-import dev.ipf.whitenoise.android.share.launchInviteShare
-import dev.ipf.whitenoise.android.share.launchOutboundShare
-import dev.ipf.whitenoise.android.share.outboundShareIntent
-import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
+import dev.ipf.whitenoise.android.share.activeAccountInvite
+import dev.ipf.whitenoise.android.share.shareAppInvite
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
-import dev.ipf.whitenoise.android.state.inviteFailureDetail
+import dev.ipf.whitenoise.android.state.groupCreateFailureCopyable
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
+import dev.ipf.whitenoise.android.state.startProfileChatErrorDetail
+import dev.ipf.whitenoise.android.state.startProfileChatErrorTitle
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.account.startingAccount
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCopier
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -76,7 +73,7 @@ internal fun createdGroupIdAfterProjectionUnavailable(error: Throwable): String?
     }?.takeIf { it.isNotBlank() }
 
 private fun startChatFailureReport(error: Throwable): String? =
-    if (startProfileChatFailureCopyable(error)) {
+    if (groupCreateFailureCopyable(error)) {
         privacySafeErrorPresentation("START_PROFILE_CHAT", error).report
     } else {
         null
@@ -98,24 +95,19 @@ internal fun startChatErrorUiState(
     progressHex: String,
     error: Throwable,
     recipientName: String?,
+    invitationRecipientName: (String) -> String? = { recipientName },
     displayName: (String) -> String,
 ): StartChatErrorUiState {
     val invitation = startProfileChatFailureIsMissingSetup(error)
     return StartChatErrorUiState(
         npub = npub,
         progressHex = progressHex,
-        detail =
-            inviteFailureDetail(
-                error,
-                displayName,
-                recipientName,
-                fallbackResource = R.string.error_group_create_failed_retry,
-            ),
+        detail = startProfileChatErrorDetail(error, displayName, recipientName),
         diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
         invitation = invitation,
         missingInbox = error is MarmotKitException.MissingMemberInboxRoute,
-        title = AppText.Resource(R.string.toast_couldnt_start_chat),
+        title = startProfileChatErrorTitle(error, invitationRecipientName),
     )
 }
 
@@ -137,6 +129,7 @@ internal suspend fun attemptStartProfileChat(
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
     diagnosticAttempt: DmCreationAttempt? = null,
+    invitationRecipientName: (String) -> String? = { recipientName },
 ): StartChatAttemptResult {
     val groupIdHex: String =
         try {
@@ -168,6 +161,7 @@ internal suspend fun attemptStartProfileChat(
                         progressHex = progressHex,
                         error = error,
                         recipientName = recipientName,
+                        invitationRecipientName = invitationRecipientName,
                         displayName = displayName,
                     ),
                 )
@@ -353,37 +347,15 @@ private fun NewMessageAccountScreen(
     LaunchedEffect(query) { startChatError = null }
     val clipboard = rememberClipboardCopier()
     val context = LocalContext.current
-    val inviteTitle = stringResource(R.string.invite_to_white_noise)
-    val inviteMessage = stringResource(R.string.invite_message)
+    val invite = activeAccountInvite(appState)
 
-    /** Shares a branded download QR card, retaining the existing localized text-only fallback. */
+    /** Shares the invite QR card and personal text, retaining the localized text-only fallback. */
     fun shareInvite() {
         val flowBusy = creatingHex != null || scannerSession != null || agentSettingsOpen || inviteShareInProgress
         if (!session.isCurrent() || flowBusy) return
         inviteShareInProgress = true
         appState.launchMutation {
-            val pictureResult =
-                runCatchingCancellable {
-                    val staged =
-                        QrShareCardRenderer.stage(
-                            context,
-                            QrShareCardSpec(
-                                headline = inviteTitle,
-                                qrPayload = WhiteNoiseUrls.DOWNLOAD,
-                            ),
-                        )
-                    if (session.isCurrent()) {
-                        launchOutboundShare(
-                            context,
-                            outboundShareIntent(inviteMessage, listOf(staged.stream)),
-                            inviteTitle,
-                        ).getOrThrow()
-                    }
-                }
-            if (pictureResult.isFailure && session.isCurrent()) {
-                launchInviteShare(context, inviteMessage, inviteTitle)
-                    .onFailure { appState.presentOutboundShareFailure("INVITE_SHARE", it) }
-            }
+            appState.shareAppInvite(context, invite, "INVITE_SHARE") { session.isCurrent() }
             if (session.isCurrent()) inviteShareInProgress = false
         }
     }
@@ -595,6 +567,10 @@ private fun NewMessageAccountScreen(
                                     session.currentValue { appState.loadCreatedChatListItem(id) }
                                 },
                                 displayName = appState::displayName,
+                                invitationRecipientName = { accountIdHex ->
+                                    appState.contactDisplayNameCachedOrNull(accountIdHex)
+                                        ?: recipientName?.takeUnless { abbreviatesPublicKey(it, npub) }
+                                },
                                 markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
                                 abandonCreateOpenTiming = {
                                     if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)

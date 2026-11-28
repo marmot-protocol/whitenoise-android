@@ -26,7 +26,6 @@ dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt|FONT_SIZE=
 dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt|ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt|ROUNDED_SHAPE=1
 dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt|FONT_SIZE=2
-dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt|TOP_BAR=1
 dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt|TEXT_FIELD=2
 dev/ipf/whitenoise/android/ui/group/GroupMembers.kt|TEXT_FIELD=1
 dev/ipf/whitenoise/android/ui/onboarding/IdentityEntryForm.kt|TEXT_FIELD=1

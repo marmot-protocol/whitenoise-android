@@ -72,14 +72,15 @@
         ]
       },
       {
-        "surface": "setting:share",
+        "surface": "setting:send_invite",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/StartChatErrorCard.kt",
-        "anchor": "R.string.share",
+        "anchor": "R.string.send_invite",
         "test_ids": [
           "NCH-001",
           "NCH-002",
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "NCH-006"
         ]
       },
       {
