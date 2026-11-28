@@ -16,12 +16,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -53,13 +58,22 @@ internal const val EMOJI_SETS_REFRESH_TEST_TAG = "emoji_sets.refresh"
 
 private val EmojiSetSpacing = 8.dp
 
-/** The account's NIP-51 browser and preview. Its controller is discarded when the account changes. */
+/**
+ * The account's NIP-51 browser and preview. Its controller is discarded when the account changes.
+ *
+ * In Settings the browser and one set's preview are separate pages (#4095): the browser passes [onOpenPreview], which
+ * opens a set's page by its coordinate, and that page passes the coordinate as [previewCoordinate]. Without them, as
+ * in the share flow, the preview opens in place over the browser.
+ */
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun EmojiSetsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     initialAddress: String? = null,
     targetAccount: String? = null,
+    onOpenPreview: ((String) -> Unit)? = null,
+    previewCoordinate: String? = null,
 ) {
     val activeOwner = appState.activeAccountRef
     val selected = targetAccount?.let { ref -> appState.accounts.firstOrNull { it.label == ref } }
@@ -71,20 +85,28 @@ internal fun EmojiSetsScreen(
         return
     }
     val generation = appState.runtimeGeneration
-    key(appState, activeOwner, account, generation, initialAddress) {
+    key(appState, activeOwner, account, generation, initialAddress, previewCoordinate) {
         val backend = remember { appState.emojiSetsBackend(account, generation, activeOwner) }
         val controller = remember { EmojiSetsController(backend, appState.emojiSetLibrary::invalidate) }
         val images = rememberEmojiSetImages(controller.state.preview, backend)
         val scope = rememberCoroutineScope()
+        // The browser's last search, kept for the Back that returns from a set's page.
+        var lastSearch by rememberSaveable { mutableStateOf<String?>(null) }
         val back = {
             when {
                 controller.state.progress != null -> controller.cancelInstall()
-                controller.state.preview != null && !controller.state.busy -> controller.dismissPreview()
+                previewCoordinate == null && controller.state.preview != null && !controller.state.busy ->
+                    controller.dismissPreview()
                 else -> onBack()
             }
         }
         LaunchedEffect(controller) {
-            if (initialAddress == null) {
+            val restored = lastSearch
+            if (previewCoordinate != null) {
+                controller.preview(previewCoordinate)
+            } else if (initialAddress == null && restored != null) {
+                controller.restoreSearch(restored)
+            } else if (initialAddress == null) {
                 // Show the local projection at once, then sync once per account and runtime like the sticker
                 // browser, keeping the rows usable meanwhile (#3882). Refresh forces another sync.
                 controller.load()
@@ -103,11 +125,22 @@ internal fun EmojiSetsScreen(
             onBack = back,
             onSearch = { query ->
                 val address = query.takeIf { it.startsWith("30030:") } ?: emojiSetAddress(query)
-                scope.launch {
-                    if (address == null) controller.discover(query) else controller.open(address)
+                when {
+                    address == null -> {
+                        lastSearch = query.trim().ifBlank { null }
+                        scope.launch { controller.discover(query) }
+                    }
+                    // A pasted address opens the set's own page; on that page it refreshes the set in place.
+                    onOpenPreview != null && previewCoordinate == null -> onOpenPreview(address)
+                    else -> scope.launch { controller.open(address) }
                 }
             },
-            onShow = controller::show,
+            onShow = { set -> if (onOpenPreview != null) onOpenPreview(set.coordinate) else controller.show(set) },
+            previewPage = previewCoordinate != null,
+            onRetryPreview =
+                previewCoordinate?.let { coordinate ->
+                    { scope.launch { controller.preview(coordinate) } }
+                },
             images = images,
             onInstall = { appState.launchMutation { controller.install() } },
             onCancel = controller::cancelInstall,
@@ -131,7 +164,10 @@ private fun rememberEmojiSetImages(
         }
     }
 
-/** Pure presentation for the browser and preview, with only the editable query held in Compose. */
+/**
+ * Pure presentation for the browser and preview, with only the editable query held in Compose. On a set's own page
+ * ([previewPage]) the set's status shows until it loads, with [onRetryPreview] offered once a lookup is not running.
+ */
 @Suppress("LongParameterList")
 @Composable
 internal fun EmojiSetsContent(
@@ -145,6 +181,8 @@ internal fun EmojiSetsContent(
     onRemove: () -> Unit,
     profileName: String? = null,
     builtinSets: BuiltinEmojiSetChoices? = null,
+    previewPage: Boolean = false,
+    onRetryPreview: (() -> Unit)? = null,
 ) {
     val title = stringResource(R.string.emoji_sets_title)
     val query = rememberTextFieldState()
@@ -159,7 +197,7 @@ internal fun EmojiSetsContent(
         onBack = onBack,
         titleContent = accountTitle,
         topBarActions = {
-            if (state.preview == null) {
+            if (state.preview == null && !previewPage) {
                 // Repeats the current search; also the retry path for failed or partial discovery.
                 IconButton(
                     onClick = { onSearch(query.text.toString().trim()) },
@@ -172,7 +210,20 @@ internal fun EmojiSetsContent(
         },
     ) {
         val set = state.preview
-        if (set == null) {
+        if (set == null && previewPage) {
+            // A set's own page shows its loading and any failure until the set arrives, never the browser.
+            SettingsList(listTag = "emoji_sets.preview.pending") {
+                item { EmojiSetStatus(state) }
+                // A failed lookup keeps a way to try the same set again, since Refresh belongs to the browser.
+                if (onRetryPreview != null && !state.busy && !state.discovering) {
+                    item {
+                        TextButton(onClick = onRetryPreview, modifier = Modifier.testTag("emoji_sets.preview.retry")) {
+                            Text(stringResource(R.string.retry))
+                        }
+                    }
+                }
+            }
+        } else if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
             // Images belong to one exact version and install state; a mismatch shows the unloaded preview.

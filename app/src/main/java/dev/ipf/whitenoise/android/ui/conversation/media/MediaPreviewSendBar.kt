@@ -11,17 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,12 +34,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.Radii
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
 
@@ -152,34 +148,15 @@ internal fun AddMoreThumb(
                 tint = MaterialTheme.colorScheme.onBackground,
             )
         }
-        val menuScrollState = rememberScrollState()
-        AnimatedDropdownMenu(
-            keyboardPreserving = true,
-            scrollState = menuScrollState,
-            modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+        WhiteNoiseDropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
-            shape = MenuDefaults.shape,
-            border = amoledSurfaceBorderStroke(),
-        ) { surface ->
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.attach_photo_library)) },
-                onClick = {
-                    surface.close {
-                        menuOpen = false
-                        onAddPhotos()
-                    }
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.attach_document)) },
-                onClick = {
-                    surface.close {
-                        menuOpen = false
-                        onAddDocuments()
-                    }
-                },
-            )
-        }
+            keyboardPreserving = true,
+            items =
+                listOf(
+                    WhiteNoiseMenuItem(label = stringResource(R.string.attach_photo_library), onClick = onAddPhotos),
+                    WhiteNoiseMenuItem(label = stringResource(R.string.attach_document), onClick = onAddDocuments),
+                ),
+        )
     }
 }

@@ -37,7 +37,7 @@ import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.setTtsMediaMixEnabled
-import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -397,6 +397,7 @@ class SettingsSearchNavigationTest {
         composeRule.onNodeWithTag("settings.search.result.Home.add_profile").assertIsDisplayed()
     }
 
+    /** Developer opened from a searched About returns to About, its opener, and About then returns to the search. */
     @Test fun nonOriginDetailBackRetiresOriginAndReturnsToActiveSearch() {
         val appState = mount()
         composeRule.runOnIdle { appState.updateDeveloperMode(true) }
@@ -405,8 +406,10 @@ class SettingsSearchNavigationTest {
         composeRule.onNodeWithTag("about.developer").performScrollTo()
         composeRule.onNodeWithTag("about.developer").performClick()
         composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
-        // Developer tools returns to Help & support; one more back leaves it for the active search.
-        repeat(2) { composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick() }
+        // Developer returns to About, the page that opened it (#4095); one more back leaves About for the search.
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("about.developer").assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("settings.search.field").assertTextContains("about")
     }
 
@@ -458,7 +461,8 @@ class SettingsSearchNavigationTest {
             )
         val content: @androidx.compose.runtime.Composable () -> Unit = {
             WhiteNoiseTheme {
-                var detail by rememberSaveable { mutableStateOf<SettingsDetail?>(null) }
+                var stack by
+                    rememberSaveable(stateSaver = SettingsTestStackSaver) { mutableStateOf(settingsChain(null)) }
                 var viewport by rememberSaveable(
                     stateSaver = SettingsHomeViewport.Saver,
                 ) { mutableStateOf(SettingsHomeViewport.Top) }
@@ -467,8 +471,8 @@ class SettingsSearchNavigationTest {
                     {},
                     {},
                     {},
-                    detail,
-                    { detail = it },
+                    stack,
+                    { stack = it },
                     viewport,
                     { viewport = it },
                     suppressMotion = suppressMotion,

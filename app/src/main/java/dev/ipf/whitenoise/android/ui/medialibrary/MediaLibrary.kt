@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,9 +64,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
@@ -89,7 +87,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresent
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -803,81 +800,72 @@ internal fun FileLibraryRow(
                         contentDescription = stringResource(R.string.shared_media_file_actions),
                     )
                 }
-                val menuScrollState = rememberScrollState()
-                AnimatedDropdownMenu(
-                    scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                WhiteNoiseDropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    shape = MenuDefaults.shape,
-                    border = amoledSurfaceBorderStroke(),
-                ) { surface ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.shared_media_save)) },
-                        onClick = {
-                            surface.close {
-                                menuOpen = false
-                                scope.launch {
-                                    val outcome =
-                                        runCatchingCancellable {
-                                            val file = fetchFile()
-                                            val saved =
-                                                saveDocumentWithFallback(
-                                                    context = context,
-                                                    source = file,
-                                                    fileName = row.reference.fileName,
-                                                    mediaType = row.reference.mediaType,
-                                                    fallback = documentSaveFallback,
-                                                )
-                                            check(saved) { "MediaStore save returned false" }
-                                        }
-                                    appState.presentMediaSaveOutcome(
-                                        outcome = outcome,
-                                        successTitleRes = R.string.shared_media_saved,
-                                        failureTitleRes = R.string.shared_media_save_failed,
-                                        operationCode = "MEDIA_LIBRARY_FILE_SAVE",
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.shared_media_share)) },
-                        onClick = {
-                            surface.close {
-                                menuOpen = false
-                                scope.launch {
-                                    val sharedRow = row
-                                    runCatchingCancellable {
-                                        shareLibraryFile(
-                                            context = context,
-                                            accountRef = checkNotNull(controller.conversationAccountRef),
-                                            row = sharedRow,
-                                            chooserTitle = shareChooserTitle,
-                                            currentRow = {
-                                                currentRow.takeIf { controller.ownsRetainedForegroundPresentation }
-                                            },
-                                        ) {
-                                            attachmentSource(
-                                                controller,
-                                                sharedRow.messageIdHex,
-                                                sharedRow.attachmentIndex,
-                                                sharedRow.reference,
-                                                sharedRow.mine,
-                                            )
-                                        }
-                                    }.onFailure { error ->
-                                        appState.presentMediaLaunchFailure(
-                                            R.string.media_couldnt_open,
-                                            "MEDIA_LIBRARY_FILE_SHARE",
-                                            error,
+                    items =
+                        listOf(
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.shared_media_save),
+                                onClick = {
+                                    scope.launch {
+                                        val outcome =
+                                            runCatchingCancellable {
+                                                val file = fetchFile()
+                                                val saved =
+                                                    saveDocumentWithFallback(
+                                                        context = context,
+                                                        source = file,
+                                                        fileName = row.reference.fileName,
+                                                        mediaType = row.reference.mediaType,
+                                                        fallback = documentSaveFallback,
+                                                    )
+                                                check(saved) { "MediaStore save returned false" }
+                                            }
+                                        appState.presentMediaSaveOutcome(
+                                            outcome = outcome,
+                                            successTitleRes = R.string.shared_media_saved,
+                                            failureTitleRes = R.string.shared_media_save_failed,
+                                            operationCode = "MEDIA_LIBRARY_FILE_SAVE",
                                         )
                                     }
-                                }
-                            }
-                        },
-                    )
-                }
+                                },
+                            ),
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.shared_media_share),
+                                onClick = {
+                                    scope.launch {
+                                        val sharedRow = row
+                                        runCatchingCancellable {
+                                            shareLibraryFile(
+                                                context = context,
+                                                accountRef = checkNotNull(controller.conversationAccountRef),
+                                                row = sharedRow,
+                                                chooserTitle = shareChooserTitle,
+                                                currentRow = {
+                                                    currentRow.takeIf { controller.ownsRetainedForegroundPresentation }
+                                                },
+                                            ) {
+                                                attachmentSource(
+                                                    controller,
+                                                    sharedRow.messageIdHex,
+                                                    sharedRow.attachmentIndex,
+                                                    sharedRow.reference,
+                                                    sharedRow.mine,
+                                                )
+                                            }
+                                        }.onFailure { error ->
+                                            appState.presentMediaLaunchFailure(
+                                                R.string.media_couldnt_open,
+                                                "MEDIA_LIBRARY_FILE_SHARE",
+                                                error,
+                                            )
+                                        }
+                                    }
+                                },
+                            ),
+                        ),
+                )
             }
         }
     }

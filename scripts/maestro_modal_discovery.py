@@ -15,6 +15,7 @@ MODAL_CONSTRUCTORS = frozenset({
     'AnimatedDatePickerDialog', 'AnimatedDropdownMenu', 'MeasuredPlaybackDialog',
     'WhiteNoiseAlertDialog', 'WhiteNoiseDropdownMenu', 'WhiteNoiseModalBottomSheet',
     'KeyboardSafePopup', 'ConfirmDialog', 'ChoiceDialog', 'SpeechChoiceDialog', 'PlaybackDialog',
+    'WhiteNoiseAnchoredMenu',
 })
 IDENTIFIER = r'(?:[A-Za-z_][A-Za-z0-9_]*|`[^`\n]+`)'
 DECLARATION = re.compile(r'(?P<qualified>' + IDENTIFIER + r'(?:\s*\.\s*' + IDENTIFIER + r')*)\s*\(')

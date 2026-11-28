@@ -61,9 +61,10 @@ internal fun rememberTranslationLanguageChoices(allowDetection: Boolean): Transl
 }
 
 /**
- * A target-language choice that opens the searchable language sheet. [trigger] draws the control that opens it from
- * the selected language's label, so a settings list can use its link row while a dialog keeps the default text
- * button. Language choices are not a claim that the corresponding pack is installed.
+ * A target-language choice that opens the searchable language sheet, or with [asPage] the catalog page Settings
+ * uses (#4094). [trigger] draws the control that opens it from the selected language's label, so a settings list can
+ * use its link row while a dialog keeps the default text button. Language choices are not a claim that the
+ * corresponding pack is installed.
  */
 @Composable
 internal fun TranslationLanguagePicker(
@@ -71,6 +72,7 @@ internal fun TranslationLanguagePicker(
     selected: String,
     onSelected: (String) -> Unit,
     allowDetection: Boolean = false,
+    asPage: Boolean = false,
     trigger: @Composable (label: String, open: () -> Unit) -> Unit = { label, open ->
         TextButton(onClick = open) { Text("$title: $label") }
     },
@@ -79,7 +81,18 @@ internal fun TranslationLanguagePicker(
     val choices = rememberTranslationLanguageChoices(allowDetection)
     Box {
         trigger(choices.label(selected)) { expanded = true }
-        if (expanded) {
+        if (expanded && asPage) {
+            TranslationLanguagePickerPage(
+                title = title,
+                choices = choices,
+                selected = selected,
+                onDismiss = { expanded = false },
+                onSelect = {
+                    onSelected(it)
+                    expanded = false
+                },
+            )
+        } else if (expanded) {
             TranslationLanguagePickerSheet(
                 title = title,
                 choices = choices,
@@ -97,8 +110,8 @@ internal fun TranslationLanguagePicker(
 /**
  * Global automatic translation as settings rows: the engine and provider explainers, then one group with the
  * automatic switch and a target-language link whose value names the current target. The link is the
- * [TranslationLanguagePicker]'s trigger, so it opens the same language sheet as the chat dialog; recovery for an
- * unusable target and the engine action follow the group.
+ * [TranslationLanguagePicker]'s trigger and opens the language catalog page, while the chat dialog keeps the sheet.
+ * Recovery for an unusable target and the engine action follow the group.
  */
 @Composable
 internal fun TranslationGlobalSettingsContent(preferences: TranslationPreferences) {
@@ -125,6 +138,7 @@ internal fun TranslationGlobalSettingsContent(preferences: TranslationPreference
                     title = targetTitle,
                     selected = choice.target.orEmpty(),
                     onSelected = { preferences.setGlobal(choice.enabled, it) },
+                    asPage = true,
                 ) { label, open ->
                     SettingsLink(
                         context = rowContext,

@@ -91,7 +91,15 @@
           "selector": {
             "text": "Pin"
           },
-          "scope": "chat long-press context menu reached from ChatsScreen; Pin and dismissal asserted."
+          "scope": "chat long-press context menu reached from ChatsScreen; Pin and dismissal asserted.",
+          "entry_assertion": {
+            "text": "Pin"
+          },
+          "opened_by": {
+            "longPressOn": {
+              "text": "Maestro group"
+            }
+          }
         }
       ]
     },
@@ -3135,14 +3143,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
-      "symbol": "QrScannerSheetContent",
+      "symbol": "QrScannerDialogContent",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheetContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
+          "scope": "scanner QrScannerDialogContent renders denied-permission recovery state and closes; no QR decode or camera capture claim."
         }
       ]
     },
@@ -3176,14 +3184,14 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
-      "symbol": "QrScannerSheet",
+      "symbol": "QrScannerDialog",
       "bindings": [
         {
           "case": "qr-permission-deny-close",
           "selector": {
             "text": "^Camera access needed$"
           },
-          "scope": "scanner QrScannerSheet renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
+          "scope": "scanner QrScannerDialog renders denied-permission recovery state and closes; no QR decode or camera capture claim.",
           "entry_assertion": {
             "text": "^Scan QR Code$"
           },
@@ -4786,6 +4794,25 @@
             "id": "share_connect.qr_surface"
           },
           "scope": "share/connect QR destination using generated identity and Back."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderPeopleConditionPage.kt",
+      "symbol": "SmartFolderPeopleConditionPage",
+      "bindings": [
+        {
+          "case": "smart-folders-participants-picker-back",
+          "selector": {
+            "id": "folder.peoplePage"
+          },
+          "scope": "People filter page lists people inline with search and disabled Save, and Back closes it without changing the folder.",
+          "entry_assertion": {
+            "id": "folder.peoplePage"
+          },
+          "opened_by": {
+            "id": "folder.addField.PARTICIPANTS"
+          }
         }
       ]
     },
@@ -7336,6 +7363,102 @@
         }
       ],
       "remaining": "Send a real PDF with this setting and verify the recipient gets the original bytes (MED-064)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsClearConfirmation.kt",
+      "symbol": "DiagnosticsClearConfirmation",
+      "bindings": [
+        {
+          "case": "presentation-extra-modal-diagnostics-clear-cancel",
+          "selector": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "entry_assertion": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Diagnostics Clear confirmation; Cancel keeps the events. Covers the dialog only, not a populated event log."
+        },
+        {
+          "case": "presentation-extra-modal-diagnostics-clear-confirm",
+          "selector": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "entry_assertion": {
+            "text": "Clear diagnostic events[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Diagnostics Clear confirmation; the error-coloured Clear dispatches clearing. Covers the dialog only."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetPreview.kt",
+      "symbol": "ConfirmEmojiSetRemoval",
+      "bindings": [
+        {
+          "case": "presentation-extra-modal-emojiset-remove-cancel",
+          "selector": {
+            "text": "Remove Fixture set[?]"
+          },
+          "entry_assertion": {
+            "text": "Remove Fixture set[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Emoji-set removal confirmation; Cancel keeps the set. Covers the dialog only, not an installed set's preview."
+        },
+        {
+          "case": "presentation-extra-modal-emojiset-remove-confirm",
+          "selector": {
+            "text": "Remove Fixture set[?]"
+          },
+          "entry_assertion": {
+            "text": "Remove Fixture set[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Emoji-set removal confirmation; the error-coloured Remove dispatches removal. Covers the dialog only."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseChoicePage.kt",
+      "symbol": "WhiteNoiseChoicePage",
+      "bindings": [
+        {
+          "case": "settings-translation",
+          "selector": {
+            "text": "German"
+          },
+          "scope": "Shared catalog page reached as the Settings translation target-language page; search narrows to German and Back leaves the page.",
+          "opened_by": {
+            "id": "translation.target"
+          },
+          "entry_assertion": {
+            "text": "Search languages"
+          }
+        }
+      ],
+      "remaining": "Read aloud voice page (SpeechChoicePage) needs a runtime flow with a TTS engine that lists voices."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DefaultDisappearingTimerDialog.kt",
+      "symbol": "DefaultDisappearingTimerDialog",
+      "bindings": [
+        {
+          "case": "nested-default-retention",
+          "selector": {
+            "text": "Disappearing messages"
+          },
+          "scope": "Privacy & Security default timer opens the radio choice dialog and Back closes it without a change.",
+          "opened_by": {
+            "text": "Default disappearing messages"
+          },
+          "entry_assertion": {
+            "text": "Disappearing messages"
+          }
+        }
+      ],
+      "remaining": "Preset tap-to-apply, in-place Custom with Back and Set, and Cancel are covered by Robolectric tests only."
     }
   ]
 }

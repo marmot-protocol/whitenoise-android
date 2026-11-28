@@ -771,6 +771,8 @@
     <string name="diagnostic_sent_ping_to_self">Ping a se stessi inviato in %1$s</string>
     <string name="diagnostic_send_to_self_failed">Invio a se stessi non riuscito: %1$s</string>
     <string name="clear">Cancella</string>
+    <string name="diagnostics_clear_title">Cancellare gli eventi di diagnostica?</string>
+    <string name="diagnostics_clear_detail">Gli eventi mostrati qui andranno persi. L’operazione non può essere annullata.</string>
     <string name="paste">Incolla</string>
     <string name="paste_from_clipboard">Incolla dagli appunti</string>
     <string name="paste_dictation_transcript">Incolla trascrizione</string>
@@ -1729,6 +1731,8 @@
     <string name="emoji_sets_not_found">Set o immagine non trovati. Controlla il link o riprova.</string>
     <string name="emoji_sets_changed">Questo set è cambiato. Controlla la nuova versione prima di installarla.</string>
     <string name="emoji_sets_cancelled">Installazione annullata.</string>
+    <string name="emoji_sets_remove_title">Rimuovere %1$s?</string>
+    <string name="emoji_sets_remove_detail">Rimuove il set e le sue immagini da questo dispositivo. Per usarlo di nuovo dovrai scaricarlo un’altra volta.</string>
     <string name="emoji_sets_discovery_incomplete">Alcuni relay non sono raggiungibili. I risultati potrebbero essere incompleti.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Installato con %1$d voce saltata.</item>

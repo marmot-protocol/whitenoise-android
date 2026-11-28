@@ -23,7 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +41,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
@@ -172,7 +176,10 @@ private fun EmojiSetCover(images: EmojiSetImages?) {
     }
 }
 
-/** Install, update, check or remove; during an install, only its measured progress and Cancel. */
+/**
+ * Install, update, check or remove; during an install, only its measured progress and Cancel. Remove confirms first,
+ * since getting the set back means downloading it again.
+ */
 @Suppress("LongParameterList")
 @Composable
 private fun EmojiSetActions(
@@ -220,20 +227,64 @@ private fun EmojiSetActions(
                             ),
                     ) { Text(stringResource(R.string.emoji_sets_check_update)) }
             }
-            if (installed != null) {
-                WhiteNoiseOutlinedButton(
-                    onClick = onRemove,
-                    enabled = !state.busy,
-                    modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
-                ) {
-                    Text(
-                        stringResource(R.string.remove),
-                        color = if (state.busy) Color.Unspecified else MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+            if (installed != null) EmojiSetRemoveButton(set, enabled = !state.busy, onRemove = onRemove)
         }
     }
+}
+
+/**
+ * Remove for an installed set, error-coloured while it can run. It confirms first (#4097), because getting the set
+ * back means downloading it again, which is not an Undo.
+ */
+@Composable
+private fun EmojiSetRemoveButton(
+    set: EmojiSetFfi,
+    enabled: Boolean,
+    onRemove: () -> Unit,
+) {
+    var confirmRemove by remember(set.coordinate) { mutableStateOf(false) }
+    if (confirmRemove) {
+        ConfirmEmojiSetRemoval(
+            setTitle = set.displayTitle(),
+            onDismiss = { confirmRemove = false },
+            onConfirm = {
+                confirmRemove = false
+                onRemove()
+            },
+        )
+    }
+    WhiteNoiseOutlinedButton(
+        onClick = { confirmRemove = true },
+        enabled = enabled,
+        modifier = Modifier.explain(R.string.remove, R.string.explanation_organize_emoji_remove),
+    ) {
+        Text(
+            stringResource(R.string.remove),
+            color = if (enabled) MaterialTheme.colorScheme.error else Color.Unspecified,
+        )
+    }
+}
+
+/**
+ * Confirms removing an installed emoji set (#4097). It names the set and says the images leave this device, because
+ * downloading them again is not an Undo. Remove is error-coloured and Cancel keeps the set.
+ */
+@Composable
+internal fun ConfirmEmojiSetRemoval(
+    setTitle: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.emoji_sets_remove_title, setTitle),
+        message = stringResource(R.string.emoji_sets_remove_detail),
+        confirmLabel = stringResource(R.string.remove),
+        destructive = true,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        confirmTag = "emoji_sets.remove.confirm",
+        cancelTag = "emoji_sets.remove.cancel",
+    )
 }
 
 /** MDK's measured install progress with its Cancel action. */

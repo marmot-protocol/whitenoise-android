@@ -17,8 +17,8 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatFolderSort
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
@@ -79,32 +79,32 @@ internal fun ChatFolderSaveAction(
     ) { Text(stringResource(R.string.save)) }
 }
 
-/** Confirms leaving a new folder draft; dismissing keeps editing. */
+/**
+ * Confirms leaving a new folder draft that has edits; an unchanged draft just closes without asking. Discard is the
+ * error-coloured destructive action and dismissing keeps editing.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ChatFolderDiscardDialog(
     onDiscard: () -> Unit,
     onKeepEditing: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onKeepEditing,
-        title = { Text(stringResource(R.string.folder_discard_title)) },
-        text = { Text(stringResource(R.string.folder_discard_detail)) },
-        confirmButton = {
-            TextButton(
-                onClick = onDiscard,
-                modifier =
-                    Modifier.explainOnLongPress(
-                        Explanation(
-                            stringResource(R.string.folder_discard),
-                            stringResource(R.string.explanation_organize_folder_discard),
-                        ),
-                    ),
-            ) { Text(stringResource(R.string.folder_discard)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onKeepEditing) { Text(stringResource(R.string.folder_keep_editing)) }
-        },
+    ConfirmDialog(
+        title = stringResource(R.string.folder_discard_title),
+        message = stringResource(R.string.folder_discard_detail),
+        confirmLabel = stringResource(R.string.folder_discard),
+        dismissLabel = stringResource(R.string.folder_keep_editing),
+        destructive = true,
+        emojiLabels = false,
+        onConfirm = onDiscard,
+        onDismiss = onKeepEditing,
+        confirmModifier =
+            Modifier.explainOnLongPress(
+                Explanation(
+                    stringResource(R.string.folder_discard),
+                    stringResource(R.string.explanation_organize_folder_discard),
+                ),
+            ),
     )
 }
 

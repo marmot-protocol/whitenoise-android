@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -254,14 +255,14 @@ class SettingsRouteMotionTest {
     @Test fun mountedSettingsAccountReplacementAndLockKeepTheRealDestinationPrivate() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val appState = settingsAppState(app)
-        val detail = mutableStateOf<SettingsDetail?>(null)
+        val stack = mutableStateOf(settingsChain(null))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             WhiteNoiseTheme {
-                SettingsScreen(appState, {}, {}, {}, detail.value, { detail.value = it }, SettingsHomeViewport.Top, {})
+                SettingsScreen(appState, {}, {}, {}, stack.value, { stack.value = it }, SettingsHomeViewport.Top, {})
             }
         }
-        rule.runOnIdle { detail.value = SettingsDetail.Gestures }
+        rule.runOnIdle { stack.value = settingsChain(SettingsDetail.Gestures) }
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("gestures.MessageLeft").assertExists()
         rule.runOnIdle { replaceSettingsState(appState, "setActiveAccountRef", String::class.java, "second") }

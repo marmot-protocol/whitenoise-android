@@ -43,7 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
@@ -173,7 +173,7 @@ internal fun IdentityEntryForm(
         }
     }
     if (showScanner) {
-        QrScannerSheet(
+        QrScannerDialog(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false

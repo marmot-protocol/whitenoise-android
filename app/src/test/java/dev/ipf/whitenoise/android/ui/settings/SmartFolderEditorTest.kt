@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -79,19 +80,46 @@ class SmartFolderEditorTest {
         assertFalse(root.value.not)
     }
 
+    /** The People filter opens one page that lists people inline, so Save needs a selection and no picker chains. */
     @Test fun participantConditionRequiresSelectionBeforeSaveAndPickerPreservesChoices() {
         val root = render(SmartFolderFilter.Group())
         composeRule.onNodeWithTag("folder.add.").performClick()
         composeRule.onNodeWithTag("folder.addField.PARTICIPANTS").performClick()
+        composeRule.onNodeWithTag(SMART_FOLDER_PEOPLE_PAGE_TAG).assertExists()
         composeRule.onNodeWithTag("folder.conditionDone").assertIsNotEnabled()
-        composeRule.onNodeWithTag("folder.choosePeople").performClick()
         composeRule.onNodeWithText("Agent").performClick()
-        composeRule.onNodeWithText(context.getString(R.string.done)).performClick()
         composeRule.onNodeWithTag("folder.conditionDone").assertIsEnabled().performClick()
+        composeRule.waitForIdle()
         assertEquals(
             setOf("a".repeat(64)),
             (root.value.children.single() as SmartFolderFilter.Condition).values,
         )
+    }
+
+    /** Back from an unchanged People page just closes it and leaves the rule untouched. */
+    @Test fun peoplePageBackWithoutChangesClosesAndKeepsTheRule() {
+        val initial = SmartFolderFilter.Group()
+        val root = render(initial)
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.PARTICIPANTS").performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SMART_FOLDER_PEOPLE_PAGE_TAG).assertDoesNotExist()
+        assertEquals(initial, root.value)
+    }
+
+    /** Back after choosing people asks first, and Discard closes the page without changing the rule. */
+    @Test fun peoplePageBackWithChangesConfirmsDiscard() {
+        val initial = SmartFolderFilter.Group()
+        val root = render(initial)
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.PARTICIPANTS").performClick()
+        composeRule.onNodeWithText("Agent").performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.folder_discard)).assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SMART_FOLDER_PEOPLE_PAGE_TAG).assertDoesNotExist()
+        assertEquals(initial, root.value)
     }
 
     @Test fun cancelDoesNotChangeTheRuleAndTreeEditsDoNotMutateSiblingGroups() {
@@ -127,6 +155,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.presets").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_read)).performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertTrue(root.value.all)
         val conditions =
             root.value.children
@@ -177,6 +206,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.presets").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_mentions)).performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
@@ -209,6 +239,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
@@ -366,6 +397,7 @@ class SmartFolderEditorTest {
         assertEquals(null, root.value)
         composeRule.onNodeWithTag("folder.quick.start").performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        composeRule.waitForIdle()
         assertEquals(defaultSmartFolder(), root.value)
     }
 

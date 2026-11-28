@@ -48,7 +48,7 @@ class DiagnosticsContentTest {
         composeRule.onNodeWithTag("diagnostics.action.test").assertIsNotEnabled()
     }
 
-    /** Caller updates replace the empty state, truthfully update status and expose clear exactly once. */
+    /** Caller updates replace the empty state, truthfully update status and clear exactly once after confirming. */
     @Test fun streamingUpdatesAndClearUseCurrentCallerState() {
         render()
         composeRule.runOnIdle {
@@ -60,9 +60,24 @@ class DiagnosticsContentTest {
         composeRule.onNodeWithText("sanitized event").assertIsDisplayed()
         actions()
         composeRule.onNodeWithTag("diagnostics.action.clear").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.diagnostics_clear_detail)).assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, clears) }
+        composeRule.onNodeWithTag("diagnostics.clear.confirm").performClick()
         composeRule.runOnIdle { assertEquals(1, clears) }
         composeRule.onNodeWithTag("diagnostics.empty").assertIsDisplayed()
         composeRule.onNodeWithTag("diagnostics.actions.menu").assertDoesNotExist()
+    }
+
+    /** Cancelling the Clear confirmation keeps every entry, because clearing the log cannot be undone. */
+    @Test fun cancellingClearKeepsTheEntries() {
+        render()
+        composeRule.runOnIdle { entries.value = listOf(DiagnosticLogEntry("first", 0uL, "kept event")) }
+        actions()
+        composeRule.onNodeWithTag("diagnostics.action.clear").performClick()
+        composeRule.onNodeWithTag("diagnostics.clear.cancel").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.diagnostics_clear_detail)).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(0, clears) }
+        composeRule.onNodeWithText("kept event").assertIsDisplayed()
     }
 
     /** Both send entry points preserve the production callback and dismiss only the actions popup. */

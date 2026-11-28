@@ -140,6 +140,17 @@ internal enum class UiBypassRule(
         """\bColor\(0x""",
         "Use a MaterialTheme.colorScheme role or MaterialTheme.statusColors; new palette values go in ui/theme.",
     ),
+    MENU(
+        "AnimatedDropdownMenu( / DropdownMenu(",
+        """\b(?:AnimatedDropdownMenu|DropdownMenu)\(""",
+        "Use WhiteNoiseDropdownMenu for toolbar and row menus, or WhiteNoiseAnchoredMenu for a held row " +
+            "(docs/ui-patterns.md, item menus and toolbar menus).",
+        setOf(
+            "${UI_COMMON}WhiteNoiseMenus.kt",
+            "/android/ui/design/AnimatedDropdownMenu.kt",
+            "/android/ui/design/AppMenus.kt",
+        ),
+    ),
     FONT_SIZE(
         "fontSize =",
         """\bfontSize\s*=""",

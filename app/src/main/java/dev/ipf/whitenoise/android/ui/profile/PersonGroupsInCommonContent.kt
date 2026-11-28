@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,12 +34,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
@@ -138,27 +135,19 @@ internal fun PersonGroupsInCommonContent(
                                                         contentDescription = emojiPlainText(removeLabel(group)),
                                                     )
                                                 }
-                                                val menuScrollState = rememberScrollState()
-                                                AnimatedDropdownMenu(
-                                                    expanded,
+                                                WhiteNoiseDropdownMenu(
+                                                    expanded = expanded,
                                                     onDismissRequest = { expanded = false },
-                                                    scrollState = menuScrollState,
-                                                    modifier =
-                                                        Modifier.scrollEdgeFade(
-                                                            menuScrollState,
-                                                            stableRenderTarget = true,
+                                                    items =
+                                                        listOf(
+                                                            WhiteNoiseMenuItem(
+                                                                label = removeLabel(group),
+                                                                onClick = { onRemove(group.id) },
+                                                                destructive = true,
+                                                                emojiLabel = true,
+                                                            ),
                                                         ),
-                                                ) { surface ->
-                                                    DropdownMenuItem(
-                                                        text = { EmojiLabel(removeLabel(group)) },
-                                                        onClick = {
-                                                            surface.close {
-                                                                expanded = false
-                                                                onRemove(group.id)
-                                                            }
-                                                        },
-                                                    )
-                                                }
+                                                )
                                             }
                                         }
                                     } else {

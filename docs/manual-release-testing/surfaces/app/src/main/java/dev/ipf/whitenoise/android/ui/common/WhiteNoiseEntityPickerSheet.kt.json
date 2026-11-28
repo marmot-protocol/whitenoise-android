@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "PickerRow",
+        "surface": "WhiteNoisePickerRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
-        "anchor": "fun PickerRow(",
+        "anchor": "fun WhiteNoisePickerRow(",
         "test_ids": [
           "FIND-008",
           "SET-009",

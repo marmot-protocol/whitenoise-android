@@ -343,7 +343,8 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithText("Draft").assertExists()
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_discard)).performClick()
-        assertTrue(closed)
+        // The shared confirmation runs Discard once its exit motion ends.
+        composeRule.runOnIdle { assertTrue(closed) }
         assertTrue(ChatFolderPreferences(app).foldersFor(ACCOUNT_REF).none { it.name == "Draft" })
     }
 

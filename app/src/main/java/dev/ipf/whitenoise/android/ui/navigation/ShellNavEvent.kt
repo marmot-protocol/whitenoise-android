@@ -7,8 +7,8 @@ import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
  * The only way to change the shell's route stack, which [ShellNavigator] owns. Each event names a user or system
  * intent, and [reduceShellRoute] applies it.
  *
- * Not carried by any event, because they are not route state: the Settings search origin and the header-photo
- * profile origin (screen-local `rememberSaveable` markers in the Settings screen that change where Back goes), the
+ * Not carried by any event, because they are not route state: the Settings search origin (a screen-local
+ * `rememberSaveable` marker in the Settings screen that keeps the search results open behind its result), the
  * just-created and DM-hint flags, conversation surface state such as Group Details itself (its screens above the
  * details list are entries, see [ShellRoute.ChatDetailsScreen]), and every transition
  * layer (pending open, exiting content, displaced controllers, routing overlays).
@@ -76,11 +76,14 @@ internal sealed interface ShellNavEvent {
     ) : SectionOnly
 
     /**
-     * The Settings screen moves to [detail], by a tap, a search jump or its own Back. The parents are re-synthesized,
-     * so a Back that skips a parent (search origin, header-photo profile) is expressed as this event, not as [Back].
+     * The Settings screen moves to [detail] with its [arg], by a tap, a search jump or its own Back. [parents] are the
+     * pages below it the person came through, home excluded, so Back returns to the page that opened it (#4095).
+     * Null [parents] re-synthesize the fixed parents, as a deep link does.
      */
     data class ChangeSettingsDetail(
         val detail: SettingsDetail?,
+        val arg: String? = null,
+        val parents: List<ShellRoute.Settings>? = null,
     ) : SectionOnly
 
     /** Settings is left for the chat list. */
@@ -101,10 +104,14 @@ internal sealed interface ShellNavEvent {
         val pane: ShellPane,
     ) : ShellNavEvent
 
-    /** The Activity's saved section and detail come back, as on a fresh holder or after process death. */
+    /**
+     * The Activity's saved section and detail come back, as on a fresh holder or after process death. [chain] is the
+     * saved Settings pages from the first below home to [detail], or null when none was saved.
+     */
     data class SectionRestored(
         val section: MainSection,
         val detail: SettingsDetail?,
+        val chain: List<ShellRoute.Settings>? = null,
     ) : ShellNavEvent
 
     /**

@@ -231,6 +231,7 @@ internal fun DocumentViewerFrame(
                                         onOpenExternal?.let {
                                             WhiteNoiseMenuItem(
                                                 label = stringResource(R.string.text_attachment_open_external),
+                                                icon = R.drawable.ic_open_in_new,
                                                 onClick = it,
                                             )
                                         },

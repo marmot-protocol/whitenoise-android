@@ -78,14 +78,6 @@
         ]
       },
       {
-        "surface": "smart_folder_add_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.smart_folder_add_key",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
         "surface": "smart_folder_all",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "R.string.smart_folder_all",
@@ -201,14 +193,6 @@
         "surface": "smart_folder_include_match",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "R.string.smart_folder_include_match",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
-        "surface": "smart_folder_invalid_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.smart_folder_invalid_key",
         "test_ids": [
           "FLD-004"
         ]
@@ -337,14 +321,6 @@
         "surface": "smart_folder_remove_group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "R.string.smart_folder_remove_group",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
-        "surface": "smart_folder_select_people",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.smart_folder_select_people",
         "test_ids": [
           "FLD-004"
         ]
@@ -492,22 +468,6 @@
         "surface": "R.string.explanation_organize_add_group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "R.string.explanation_organize_add_group",
-        "test_ids": [
-          "SET-057"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_organize_cond_add_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.explanation_organize_cond_add_key",
-        "test_ids": [
-          "SET-057"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_organize_cond_choose_people",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.explanation_organize_cond_choose_people",
         "test_ids": [
           "SET-057"
         ]

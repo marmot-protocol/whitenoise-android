@@ -188,6 +188,32 @@
     ],
     "HistoryBackups": [
       "settings-history-backups"
+    ],
+    "Licenses": [
+      "navigation-licenses-toolbar-back",
+      "navigation-licenses-system-back"
+    ],
+    "LicenseNotice": [
+      "navigation-licenses-toolbar-back",
+      "navigation-licenses-system-back"
+    ],
+    "LinkedDevices": [
+      "settings-linked-devices"
+    ],
+    "NotificationProfiles": [
+      "notification-profiles-create-schedule",
+      "notification-profiles-delete",
+      "notification-profiles-allowed-chats"
+    ],
+    "RelayDetails": [
+      "advanced-relays"
+    ],
+    "StoredAttachments": [
+      "settings-manage-storage"
+    ],
+    "EmojiSetPreview": [
+      "advanced-emoji-sets",
+      "presentation-extra-modal-emojiset-remove-cancel"
     ]
   },
   "main_routes": {

@@ -224,7 +224,6 @@ internal fun MainShell(
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
     // The route is read from the single route owner and changed only through `shellNav` events.
     val sectionName = shellStateHolder.sectionState.sectionName
-    val settingsDetailName = shellStateHolder.sectionState.settingsDetailName
     var firstRunHelpRoot by rememberSaveable(appState.activeAccountRef) { mutableStateOf<SettingsDetail?>(null) }
     var settingsHomeViewport by
         rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
@@ -491,7 +490,7 @@ internal fun MainShell(
             appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.SETTINGS)
         }
     }
-    val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
+    val settingsStack = shellStateHolder.sectionState.settingsStack
 
     val folderState by appState.chatFolderPreferences.state.collectAsState()
     val completeChatList =
@@ -1767,7 +1766,7 @@ internal fun MainShell(
                 val suppressRouteMotion = suppressConversationMotion
                 if (!appState.appLock.screenVisible) {
                     ShellNavDisplay(
-                        stack = CHATS_ROOT + sectionEntries(section, settingsDetail),
+                        stack = CHATS_ROOT + settingsSectionEntries(section, settingsStack),
                         frame = { route, entry ->
                             ShellSectionMotion(
                                 route = route,
@@ -1912,9 +1911,9 @@ internal fun MainShell(
                                         )
                                         updateSettingsViewport(SettingsHomeViewportEvent.OpenConversation)
                                     },
-                                    detail = route.detail,
+                                    stack = settingsStack,
                                     firstRunHelpRoot = firstRunHelpRoot,
-                                    onDetailChange = { shellNav(ShellNavEvent.ChangeSettingsDetail(it)) },
+                                    onStackChange = { shellNav(settingsStackChange(it)) },
                                     homeViewport = settingsHomeViewport,
                                     onHomeViewportChange = { settingsHomeViewport = it },
                                 )

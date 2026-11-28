@@ -18,8 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,18 +30,12 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 internal fun defaultSmartFolder() =
     SmartFolderFilter.Group(
@@ -382,6 +374,10 @@ internal fun conditionSummary(
     return (if (condition.not) stringResource(R.string.smart_folder_not) + " · " else "") + summary
 }
 
+/**
+ * Edits one filter condition without touching the draft until Save. Short conditions stay in this dialog. A People
+ * condition opens [SmartFolderPeopleConditionPage] instead, so choosing people never chains dialog → picker sheet.
+ */
 @Composable
 @Suppress(
     "LongMethod",
@@ -395,23 +391,20 @@ internal fun SmartFolderConditionDialog(
     onRemove: (() -> Unit)?,
     onDone: (SmartFolderFilter.Condition) -> Unit,
 ) {
+    if (initial.field == FolderField.PARTICIPANTS) {
+        SmartFolderPeopleConditionPage(initial, people, resolveKey, onDismiss, onRemove, onDone)
+        return
+    }
     val field = initial.field
     var mode by rememberSaveable { mutableStateOf(initial.mode) }
     var not by rememberSaveable { mutableStateOf(initial.not) }
     var optionsExpanded by rememberSaveable { mutableStateOf(initial.not) }
-    var keys by rememberSaveable { mutableStateOf(initial.values.toList()) }
     val keyword =
         rememberTextFieldState(
             if (initial.field == FolderField.TITLE) initial.values.firstOrNull().orEmpty() else "",
         )
-    val publicKey = rememberTextFieldState()
-    var picking by rememberSaveable { mutableStateOf(false) }
-    var invalidKey by rememberSaveable { mutableStateOf(false) }
-    var resolving by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val modes =
         when (field) {
-            FolderField.PARTICIPANTS -> listOf(FolderMode.ANY_OF, FolderMode.ALL_OF, FolderMode.EXCLUDES)
             FolderField.TYPE -> listOf(FolderMode.DIRECT, FolderMode.GROUP)
             FolderField.TITLE -> listOf(FolderMode.CONTAINS)
             else -> listOf(FolderMode.PRESENT, FolderMode.NONE)
@@ -421,45 +414,13 @@ internal fun SmartFolderConditionDialog(
             field,
             mode,
             when (field) {
-                FolderField.PARTICIPANTS -> keys.toSet()
                 FolderField.TITLE -> setOf(keyword.text.toString().trim())
                 else -> emptySet()
             },
             not,
         )
     val valid = SmartFolderCodec.valid(SmartFolderFilter.Group(children = listOf(condition)))
-    if (picking) {
-        val keyRows =
-            people +
-                keys
-                    .filter { key ->
-                        people.none {
-                            it.id == key
-                        }
-                    }.map {
-                        WhiteNoisePickerItem(
-                            id = it,
-                            title = it.take(16) + "…",
-                            avatarSeed = it,
-                        )
-                    }
-        WhiteNoiseEntityPickerSheet(
-            title = stringResource(R.string.smart_folder_select_people),
-            items = keyRows,
-            selectedIds = keys.toSet(),
-            multiple = true,
-            onSelect = { id ->
-                keys =
-                    if (id in keys) {
-                        keys - id
-                    } else {
-                        (keys + id).take(SmartFolderCodec.MAX_VALUES)
-                    }
-            },
-            onDismiss = { picking = false },
-            onDone = { picking = false },
-        )
-    } else {
+    run {
         WhiteNoiseAlertDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(fieldLabel(field))) },
@@ -495,77 +456,6 @@ internal fun SmartFolderConditionDialog(
                             },
                             lineLimits = TextFieldLineLimits.SingleLine,
                         )
-                    }
-                    if (field == FolderField.PARTICIPANTS) {
-                        TextButton(
-                            onClick = {
-                                picking = true
-                            },
-                            modifier =
-                                Modifier
-                                    .testTag("folder.choosePeople")
-                                    .explainOnLongPress(
-                                        Explanation(
-                                            stringResource(R.string.smart_folder_select_people),
-                                            stringResource(R.string.explanation_organize_cond_choose_people),
-                                        ),
-                                    ),
-                        ) {
-                            Text(
-                                stringResource(R.string.smart_folder_select_people) + " (${keys.size})",
-                            )
-                        }
-                        EmojiLabel(
-                            keys.joinToString { hex ->
-                                people.firstOrNull { it.id == hex }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
-                            },
-                        )
-                        if (optionsExpanded) {
-                            WhiteNoiseTextField(
-                                state = publicKey,
-                                label = { Text(stringResource(R.string.smart_folder_key)) },
-                                lineLimits = TextFieldLineLimits.SingleLine,
-                            )
-                            TextButton(
-                                enabled =
-                                    !resolving &&
-                                        keys.size < SmartFolderCodec.MAX_VALUES,
-                                modifier =
-                                    Modifier.explainOnLongPress(
-                                        Explanation(
-                                            stringResource(R.string.smart_folder_add_key),
-                                            stringResource(R.string.explanation_organize_cond_add_key),
-                                        ),
-                                    ),
-                                onClick = {
-                                    resolving = true
-                                    val input = publicKey.text.toString()
-                                    scope.launch {
-                                        val hex =
-                                            withContext(Dispatchers.IO) {
-                                                resolveKey(input)
-                                            }?.lowercase(java.util.Locale.ROOT)
-                                        invalidKey = hex == null ||
-                                            hex.length != SmartFolderCodec.PUBKEY_HEX_LENGTH ||
-                                            hex.any {
-                                                it !in '0'..'9' &&
-                                                    it !in 'a'..'f'
-                                            }
-                                        val currentInput =
-                                            field == FolderField.PARTICIPANTS &&
-                                                publicKey.text.toString() == input
-                                        if (!invalidKey && hex != null && currentInput) {
-                                            keys = (keys + hex).distinct()
-                                        }
-                                        resolving = false
-                                    }
-                                },
-                            ) { Text(stringResource(R.string.smart_folder_add_key)) }
-                            if (invalidKey) {
-                                val message = stringResource(R.string.smart_folder_invalid_key)
-                                WhiteNoiseCallout(text = message, icon = R.drawable.ic_error, isError = true)
-                            }
-                        }
                     }
                     if (field == FolderField.UNREAD) {
                         Text(
@@ -637,7 +527,7 @@ internal fun SmartFolderConditionDialog(
             },
             confirmButton = {
                 TextButton(
-                    enabled = valid && !resolving,
+                    enabled = valid,
                     onClick = {
                         onDone(condition)
                     },
@@ -678,7 +568,7 @@ private fun modeLabel(mode: FolderMode): Int =
         FolderMode.CONTAINS -> R.string.smart_folder_keyword_hint
     }
 
-private fun conditionModeLabel(
+internal fun conditionModeLabel(
     field: FolderField,
     mode: FolderMode,
 ): Int =

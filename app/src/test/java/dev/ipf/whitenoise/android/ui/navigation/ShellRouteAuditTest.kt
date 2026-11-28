@@ -20,12 +20,18 @@ import org.robolectric.annotation.Config
 class ShellRouteAuditTest {
     private val conversation = ShellRoute.Conversation("account-a", "group-1", ConversationOpenContext())
 
-    /** Every stack the reducer can build passes, and each broken shape is named. */
+    /** Every stack the reducer can build passes, including opener chains, and each broken shape is named. */
     @Test
     fun theShapeCheckFlagsEveryMalformedStack() {
         assertNull(shellRouteShapeProblem(CHATS_ROOT + settingsChain(SettingsDetail.Relays) + conversation))
         val diagnostics = CHATS_ROOT + settingsChain(SettingsDetail.Developer) + ShellRoute.Diagnostics
         assertNull(shellRouteShapeProblem(diagnostics))
+        // A page opened from another keeps that opener below it instead of its fixed parents (#4095).
+        val fromAbout = CHATS_ROOT + settingsChain(SettingsDetail.About) + ShellRoute.Settings(SettingsDetail.Developer)
+        assertNull(shellRouteShapeProblem(fromAbout))
+        val relaysFromHome = listOf(ShellRoute.Settings(null), ShellRoute.Settings(SettingsDetail.Relays))
+        assertNull(shellRouteShapeProblem(CHATS_ROOT + relaysFromHome))
+        assertNotNull(shellRouteShapeProblem(fromAbout + ShellRoute.Settings(SettingsDetail.About)))
 
         assertNotNull(shellRouteShapeProblem(emptyList()))
         assertNotNull(shellRouteShapeProblem(listOf(ShellRoute.Settings(null))))

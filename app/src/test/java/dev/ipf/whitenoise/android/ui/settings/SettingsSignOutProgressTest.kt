@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsChain
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -46,8 +47,8 @@ class SettingsSignOutProgressTest {
                     onBackToChats = { backs++ },
                     onOpenDiagnostics = {},
                     onOpenSupportChat = {},
-                    detail = null,
-                    onDetailChange = { details += it },
+                    stack = settingsChain(null),
+                    onStackChange = { details += it.last().detail },
                     homeViewport = SettingsHomeViewport.Top,
                     onHomeViewportChange = {},
                 )

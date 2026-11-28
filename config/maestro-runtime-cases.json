@@ -1743,7 +1743,7 @@
       "manual_ids": [
         "FLD-004"
       ],
-      "assertions": "An empty Participants condition cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "An empty Participants condition cannot be saved; Back from its page creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
       "postcondition": "folder-absent"
     },
     "smart-folders-participants-picker-back": {
@@ -1751,7 +1751,7 @@
       "manual_ids": [
         "FLD-004"
       ],
-      "assertions": "The participant picker cancels to the still-empty condition and disabled Save. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "The People page lists people inline with search and a disabled Save, and Back closes it without a picker chain. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
       "postcondition": "folder-absent"
     },
     "smart-folders-condition-rotation": {
@@ -3766,6 +3766,10 @@
     "presentation-extra-modal-emoji-wrapper-staged-save":{"suite":"presentation","manual_ids":["MSG-034","SET-030"],"assertions":"Save in the staged wrapper persists exact artwork bytes under the expected shortcode in its isolated store. Account integration requires separate evidence.","postcondition":"presentation-checked","presentation":"extra-modal-emoji-wrapper-staged-save","presentation_actions":["save-persisted"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-emoji-empty":{"suite":"presentation","manual_ids":["MSG-034","SET-030"],"assertions":"Actual emoji name dialog guards empty names and validates exact accepted code at its UI port; no artwork is persisted.","postcondition":"presentation-checked","presentation":"extra-modal-emoji-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-emoji-valid":{"suite":"presentation","manual_ids":["MSG-034","SET-030"],"assertions":"Actual emoji name dialog guards empty names and validates exact accepted code at its UI port; no artwork is persisted.","postcondition":"presentation-checked","presentation":"extra-modal-emoji-valid","presentation_actions":["save-handoff"],"layer":"production-presentation-ui"},
+    "presentation-extra-modal-diagnostics-clear-cancel":{"suite":"presentation","manual_ids":["SET-085"],"assertions":"Cancel in the Diagnostics Clear confirmation keeps the events. Account integration and release qualification require separate evidence.","postcondition":"presentation-checked","presentation":"extra-modal-diagnostics-clear-cancel","presentation_actions":["cancel-retained"],"layer":"production-presentation-ui"},
+    "presentation-extra-modal-diagnostics-clear-confirm":{"suite":"presentation","manual_ids":["SET-085"],"assertions":"The error-coloured Clear in the Diagnostics Clear confirmation dispatches clearing. Account integration and release qualification require separate evidence.","postcondition":"presentation-checked","presentation":"extra-modal-diagnostics-clear-confirm","presentation_actions":["clear-dispatched"],"layer":"production-presentation-ui"},
+    "presentation-extra-modal-emojiset-remove-cancel":{"suite":"presentation","manual_ids":["SET-086"],"assertions":"Cancel in the emoji-set removal confirmation keeps the set. Account integration and release qualification require separate evidence.","postcondition":"presentation-checked","presentation":"extra-modal-emojiset-remove-cancel","presentation_actions":["cancel-retained"],"layer":"production-presentation-ui"},
+    "presentation-extra-modal-emojiset-remove-confirm":{"suite":"presentation","manual_ids":["SET-086"],"assertions":"The error-coloured Remove in the emoji-set removal confirmation dispatches removal. Account integration and release qualification require separate evidence.","postcondition":"presentation-checked","presentation":"extra-modal-emojiset-remove-confirm","presentation_actions":["remove-dispatched"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-scanner-close":{"suite":"presentation","manual_ids":["ACC-003","ONB-005","ONB-006","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual scanner binding-error dialog supports Close/Retry with a bounded port, without opening a camera or changing permission.","postcondition":"presentation-checked","presentation":"extra-modal-scanner-close","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-scanner-retry":{"suite":"presentation","manual_ids":["ACC-003","ONB-005","ONB-006","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual scanner binding-error dialog supports Close/Retry with a bounded port, without opening a camera or changing permission.","postcondition":"presentation-checked","presentation":"extra-modal-scanner-retry","presentation_actions":["retry-handoff"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-audit-consent-cancel":{"suite":"presentation","manual_ids":["SEC-007","SEC-008","SEC-009","SEC-010","SEC-011","SEC-012","SEC-013"],"assertions":"Actual diagnostic export disclosure verifies Cancel/acknowledgement; no archive, upload or retained user log is created.","postcondition":"presentation-checked","presentation":"extra-modal-audit-consent-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},

@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui.qr
 import dev.ipf.whitenoise.android.core.ProfileLink
 
 /**
- * Pure scan-result parsing for [QrScannerSheet] callers. Each [QrScanUseCase]
+ * Pure scan-result parsing for [QrScannerDialog] callers. Each [QrScanUseCase]
  * maps a raw QR payload to the navigation or error outcome that surface should
  * take. Npub/nprofile payloads are validated by MarmotKit's decoder, injected as [AccountIdHexResolver],
  * so the parser itself stays pure.

@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.state.setTtsMediaMixVolume
 import dev.ipf.whitenoise.android.state.ttsEngineChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.SpeechChoicePage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.group.TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG
@@ -263,8 +264,9 @@ internal fun TextToSpeechScreen(
                     },
                 onDismiss = { picker = null },
             )
+        // Voices are a catalog that can run to dozens of entries, so they get a page with Back (#4094).
         SpeechSetting.Voice ->
-            SpeechChoiceDialog(
+            SpeechChoicePage(
                 title = stringResource(R.string.tts_voice_title),
                 choices =
                     listOf(

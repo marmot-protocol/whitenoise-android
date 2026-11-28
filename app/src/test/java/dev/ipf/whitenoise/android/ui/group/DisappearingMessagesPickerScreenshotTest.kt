@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
@@ -233,6 +235,77 @@ class DisappearingMessagesPickerScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_dark_large_rtl.png")
     }
 
+    /** The Settings default is a radio dialog (#4094): every preset is a radio row and the current one is selected. */
+    @Test
+    fun defaultDialogListsRadioPresets() {
+        renderDefault(currentSecs = 604_800L)
+        (disappearingGridSecs + 0L).forEach { secs ->
+            composeRule.onNodeWithTag(disappearingPresetTag(secs)).assertExists()
+        }
+        composeRule.onNodeWithTag(disappearingPresetTag(604_800L)).assertIsSelected()
+        captureScreenRoboImage("src/test/snapshots/default_disappearing_dialog_light.png")
+    }
+
+    /** A tap on another preset applies it and closes the dialog, with no Save step. */
+    @Test
+    fun defaultDialogAppliesOnTap() {
+        val events = mutableListOf<String>()
+        renderDefault(currentSecs = 0L, onPick = { events += "pick:$it" }, onDismiss = { events += "dismiss" })
+        composeRule.onNodeWithTag(disappearingPresetTag(604_800L)).performClick()
+        composeRule.mainClock.advanceTimeBy(DIALOG_EXIT_MS)
+        composeRule.runOnIdle { assertEquals(listOf("pick:604800", "dismiss"), events) }
+    }
+
+    /** Tapping the current value only closes, and still releases the owner so the dialog can open again. */
+    @Test
+    fun defaultDialogUnchangedPickOnlyCloses() {
+        val events = mutableListOf<String>()
+        renderDefault(currentSecs = 0L, onPick = { events += "pick:$it" }, onDismiss = { events += "dismiss" })
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).performClick()
+        composeRule.mainClock.advanceTimeBy(DIALOG_EXIT_MS)
+        composeRule.runOnIdle { assertEquals(listOf("dismiss"), events) }
+    }
+
+    /** System Back on the Custom editor returns to the rows and keeps the dialog open. */
+    @Test
+    fun defaultDialogSystemBackLeavesCustomForTheRows() {
+        var dismissed = false
+        renderDefault(currentSecs = 0L, onDismiss = { dismissed = true })
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_PAGE_TAG).assertIsDisplayed()
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(!dismissed) }
+    }
+
+    /** Custom swaps the rows for the shared controls in the same dialog, Back returns, and Set applies the value. */
+    @Test
+    fun defaultDialogCustomEditsInPlace() {
+        var picked: Long? = null
+        renderDefault(currentSecs = 0L, dark = true, onPick = { picked = it })
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_PAGE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.onNodeWithTag(disappearingUnitTag(unitIndex(DAY_SECONDS))).performClick()
+        repeat(2) { composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_INCREASE_TAG).performClick() }
+        composeRule.onNodeWithText("3 days").assertIsDisplayed()
+        captureScreenRoboImage("src/test/snapshots/default_disappearing_dialog_custom_dark_green.png")
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_SET_TAG).performClick()
+        composeRule.mainClock.advanceTimeBy(DIALOG_EXIT_MS)
+        composeRule.runOnIdle { assertEquals(3L * DAY_SECONDS, picked) }
+    }
+
+    /** The default dialog mirrored at a large font keeps every preset reachable by scrolling. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w320dp-h780dp-xhdpi")
+    fun defaultDialogLargeFontRtl() {
+        renderDefault(currentSecs = 3_600L, largeRtl = true)
+        captureScreenRoboImage("src/test/snapshots/default_disappearing_dialog_large_rtl.png")
+    }
+
     @Test
     fun twelveMonthLabelUsesPluralMonths() = assertLabel(31_104_000L, "12 months")
 
@@ -253,6 +326,32 @@ class DisappearingMessagesPickerScreenshotTest {
             WhiteNoiseTheme { androidx.compose.material3.Text(disappearingMessagesLabel(secs)) }
         }
         composeRule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    /** Renders the Settings default-timer dialog with the Settings explainer. */
+    private fun renderDefault(
+        currentSecs: Long,
+        dark: Boolean = false,
+        largeRtl: Boolean = false,
+        onPick: (Long) -> Unit = {},
+        onDismiss: () -> Unit = {},
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalDensity provides Density(LocalDensity.current.density, if (largeRtl) 1.5f else 1f),
+            ) {
+                Themed(dark, amoled = false) {
+                    DefaultDisappearingTimerDialog(
+                        currentSecs = currentSecs,
+                        explainer = context.getString(R.string.default_disappearing_messages_picker_detail),
+                        onDismiss = onDismiss,
+                        onPick = onPick,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     private fun unitIndex(seconds: Long): Int = disappearingCustomUnits.indexOfFirst { it.seconds == seconds }
@@ -295,6 +394,7 @@ class DisappearingMessagesPickerScreenshotTest {
 
     private companion object {
         const val DAY_SECONDS = 86_400L
+        const val DIALOG_EXIT_MS = 1_000L
         const val WEEK_SECONDS = 604_800L
     }
 }

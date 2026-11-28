@@ -1116,6 +1116,8 @@
     <string name="diagnostic_sent_ping_to_self">Sent ping to self in %1$s</string>
     <string name="diagnostic_send_to_self_failed">Send-to-self failed: %1$s</string>
     <string name="clear">Clear</string>
+    <string name="diagnostics_clear_title">Clear diagnostic events?</string>
+    <string name="diagnostics_clear_detail">The events shown here will be lost. This can’t be undone.</string>
     <string name="paste">Paste</string>
     <string name="paste_from_clipboard">Paste from clipboard</string>
     <string name="paste_dictation_transcript">Paste transcript</string>
@@ -2027,6 +2029,8 @@
     <string name="emoji_sets_not_found">Couldn’t find this set or image. Check the link or try again.</string>
     <string name="emoji_sets_changed">This set changed. Review the new version before installing.</string>
     <string name="emoji_sets_cancelled">Install cancelled.</string>
+    <string name="emoji_sets_remove_title">Remove %1$s?</string>
+    <string name="emoji_sets_remove_detail">Removes the set and its images from this device. To use it again, you’ll need to download it again.</string>
     <string name="emoji_sets_discovery_incomplete">Some relays couldn’t be reached. Results may be incomplete.</string>
     <plurals name="emoji_sets_skipped">
         <item quantity="one">Installed with %1$d entry skipped.</item>

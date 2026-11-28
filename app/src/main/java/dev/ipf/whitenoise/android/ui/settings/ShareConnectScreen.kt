@@ -73,7 +73,7 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
-import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.qr.QrScannerDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -100,7 +100,7 @@ internal fun ShareConnectScreen(
     isCurrent: () -> Boolean = { true },
     onScannedProfile: ((QrScanOutcome) -> Unit)? = null,
     scannerContent: @Composable (() -> Unit, (String) -> Unit) -> Unit = { dismiss, scan ->
-        QrScannerSheet(onDismiss = dismiss, onScan = scan)
+        QrScannerDialog(onDismiss = dismiss, onScan = scan)
     },
 ) {
     val account = appState.activeAccount ?: return

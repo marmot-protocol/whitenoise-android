@@ -92,8 +92,8 @@ private fun NotificationPermissionPrompt(appState: WhiteNoiseAppState) {
 
 /**
  * Notifications overview: the preview switch and links to notification profiles and the sound, delivery and
- * Android settings pages. Detailed controls live on the child pages so this screen stays short; profiles open
- * in place, as Chat folders does, so no Settings route is needed.
+ * Android settings pages. Detailed controls live on the child pages so this screen stays short. Profiles are their
+ * own Settings page, opened through [onOpenProfiles] (#4095).
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -104,13 +104,9 @@ internal fun NotificationsScreen(
     onBack: () -> Unit,
     onOpenSounds: () -> Unit = {},
     onOpenDelivery: () -> Unit = {},
+    onOpenProfiles: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    var profilesOpen by rememberSaveable { mutableStateOf(false) }
-    if (profilesOpen) {
-        NotificationProfilesScreen(appState, onBack = { profilesOpen = false })
-        return
-    }
     NotificationStateRefresh(appState)
     val activeProfile = rememberActiveNotificationProfile(appState.notificationProfiles)
     val deliveryValue =
@@ -147,7 +143,8 @@ internal fun NotificationsScreen(
                             value =
                                 activeProfile?.let { notificationProfileActiveLabel(it) }
                                     ?: stringResource(R.string.notification_profiles_value_off),
-                            onClick = { profilesOpen = true },
+                            routeKey = SettingsDetail.NotificationProfiles,
+                            onClick = onOpenProfiles,
                             modifier = Modifier.testTag("notifications.profiles"),
                             explanation = stringResource(R.string.explanation_privacy_notif_profiles),
                             leading = { SettingsLeadingIcon(R.drawable.ic_notifications_paused) },

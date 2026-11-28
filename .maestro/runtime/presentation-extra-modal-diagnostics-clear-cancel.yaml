@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-diagnostics-clear-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: "Clear diagnostic events[?]"
+- assertVisible:
+    id: diagnostics.clear.confirm
+- tapOn:
+    id: diagnostics.clear.cancel
+- assertVisible:
+    id: presentation.complete

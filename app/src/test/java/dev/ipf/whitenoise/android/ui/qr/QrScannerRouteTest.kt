@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
@@ -34,7 +36,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowDialog
 
-/** Exercise the actual sheet's permission registry, lifecycle resumption and callback ownership. */
+/** Exercise the actual full-screen scanner's permission registry, lifecycle resumption and callback ownership. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class QrScannerRouteTest {
@@ -66,7 +68,7 @@ class QrScannerRouteTest {
         composeRule.runOnIdle { assertEquals(1, mounts) }
     }
 
-    /** Revoking permission in Android settings removes the camera when this sheet resumes. */
+    /** Revoking permission in Android settings removes the camera when this scanner resumes. */
     @Test fun permissionRevocationOnResumeDisposesCamera() {
         show(granted = true)
         composeRule.onNodeWithTag("real_camera_boundary").assertExists()
@@ -100,7 +102,7 @@ class QrScannerRouteTest {
         show(granted = true)
         composeRule.runOnIdle { requireNotNull(fail)("Camera is unavailable.") }
         composeRule.onNodeWithTag("qr_scanner.error_close").performClick()
-        composeRule.onNodeWithTag(QR_SCANNER_SHEET_CONTENT_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(QR_SCANNER_CONTENT_TAG).assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(1, mounts)
             assertEquals(1, disposals)
@@ -116,7 +118,7 @@ class QrScannerRouteTest {
         composeRule.runOnIdle {
             (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
         }
-        composeRule.onNodeWithTag(QR_SCANNER_SHEET_CONTENT_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(QR_SCANNER_CONTENT_TAG).assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(1, mounts)
             assertEquals(1, disposals)
@@ -125,12 +127,29 @@ class QrScannerRouteTest {
     }
 
     /** A result after composition disposal cannot reach the production caller. */
-    @Test fun disposedSheetRejectsLateScanCallback() {
+    @Test fun disposedScannerRejectsLateScanCallback() {
         show(granted = true)
         composeRule.runOnIdle { visible.value = false }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             requireNotNull(scan)("late test payload")
+            assertEquals(0, scans)
+        }
+    }
+
+    /** Android Back on the full-screen scanner returns to its opener, disposing the camera and delivering nothing. */
+    @Test fun systemBackClosesTheFullScreenScannerWithoutResult() {
+        show(granted = true)
+        composeRule.onNodeWithTag(QR_SCANNER_CONTENT_TAG).assertExists()
+        composeRule.onNodeWithContentDescription("Drag handle").assertDoesNotExist()
+        composeRule.runOnIdle {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(QR_SCANNER_CONTENT_TAG).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(false, visible.value)
+            assertEquals(1, disposals)
             assertEquals(0, scans)
         }
     }
@@ -145,6 +164,7 @@ class QrScannerRouteTest {
         }
     }
 
+    /** An accepted scan retires the camera at once and reaches the caller exactly once, after the exit motion. */
     @Test fun acceptedScanRetiresCameraBeforeDeliveringExactlyOnceAfterHide() {
         show(granted = true)
         composeRule.waitForIdle()
@@ -153,6 +173,9 @@ class QrScannerRouteTest {
             requireNotNull(scan)("accepted synthetic payload")
             requireNotNull(scan)("duplicate synthetic payload")
             assertEquals(0, scans)
+            // Production delivers from a main-looper task, whose frame applies the write; the paused test clock
+            // has no such task, so apply it here as the looper would.
+            Snapshot.sendApplyNotifications()
         }
         composeRule.mainClock.advanceTimeBy(80)
         composeRule.runOnIdle {
@@ -165,6 +188,7 @@ class QrScannerRouteTest {
         composeRule.runOnIdle { assertEquals(1, scans) }
     }
 
+    /** Close retires camera ingress before the exit motion, and the caller hears of it only when the exit ends. */
     @Test fun closingRejectsLateCameraIngressBeforeTheExitCompletes() {
         show(granted = true)
         composeRule.waitForIdle()
@@ -186,7 +210,7 @@ class QrScannerRouteTest {
         }
     }
 
-    /** The camera slot replaces hardware only; all sheet permission/state/disposal code runs unchanged. */
+    /** The camera slot replaces hardware only; all scanner permission/state/disposal code runs unchanged. */
     private fun show(granted: Boolean) {
         permission(granted)
         lifecycle = composeRule.runOnIdle { ScreenLifecycle().apply { resumeAgain() } }
@@ -197,7 +221,7 @@ class QrScannerRouteTest {
             ) {
                 WhiteNoiseTheme {
                     if (visible.value) {
-                        QrScannerSheet(
+                        QrScannerDialog(
                             onDismiss = { visible.value = false },
                             onScan = {
                                 scans++

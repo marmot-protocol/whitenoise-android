@@ -5,8 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -142,6 +144,20 @@ class GlobalSearchRecentStripTest {
         settle()
         assertTrue(recents.entries.isEmpty())
         rule.onNodeWithTag(GLOBAL_SEARCH_RECENTS_TAG).assertDoesNotExist()
+    }
+
+    /** Holding a recent opens the shared touch-anchored item menu, whose Remove drops only that destination (#4098). */
+    @Test fun holdOpensTheItemMenuThatRemovesOnlyThatRecent() {
+        val (_, recents) = mount()
+        awaitProgress { tileExists(ACTION_TARGET) && tileExists(ACTION_SURVIVOR) }
+
+        rule.onNodeWithTag(tag(ACTION_SURVIVOR)).performTouchInput { longClick() }
+        settle()
+        rule.onNodeWithTag("${tag(ACTION_SURVIVOR)}.remove").performClick()
+        settle()
+
+        rule.onNodeWithTag(tag(ACTION_SURVIVOR)).assertDoesNotExist()
+        assertEquals(listOf(GlobalSearchRecent.Chat(ACTION_TARGET)), recents.entries)
     }
 
     /** Closing search hides the list without forgetting it. */

@@ -2,16 +2,12 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,19 +38,18 @@ internal fun rememberManageStorageController(appState: WhiteNoiseAppState): Mana
 
 /**
  * Manage Storage: what this profile keeps on the device and the ways to free space. Opening a chat or the largest
- * attachments shows that list in place, and Back returns to the overview with fresh figures.
+ * attachments shows that list as its own Settings page (#4095): the overview opens it through [onOpenList], and the
+ * list page passes its id as [openList]. Back returns to the overview with fresh figures.
  */
 @Composable
 internal fun ManageStorageScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    openList: String? = null,
+    onOpenList: (String) -> Unit = {},
 ) {
     val controller = rememberManageStorageController(appState)
     val state by controller.state.collectAsStateWithLifecycle()
-    // A new runtime retires the controller, so an open list closes with it instead of reading a retired access.
-    var list by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) {
-        mutableStateOf<String?>(null)
-    }
     val context = LocalContext.current
     LaunchedEffect(state.outcome) {
         state.outcome?.let {
@@ -62,7 +57,6 @@ internal fun ManageStorageScreen(
             controller.outcomeShown()
         }
     }
-    val openList = list
     if (openList == null) {
         ManageStorageContent(
             appState = appState,
@@ -73,17 +67,16 @@ internal fun ManageStorageScreen(
                     ownerKey = controller,
                     onRefresh = controller::refresh,
                     onAction = controller::perform,
-                    onOpenList = { list = it },
+                    onOpenList = onOpenList,
                     onLoadMoreChats = controller::loadMoreChats,
                 ),
         )
     } else {
-        BackHandler { list = null }
         StoredAttachmentsRoute(
             appState = appState,
             storage = state,
             groupIdHex = openList.takeUnless { it == LARGEST_ATTACHMENTS_LIST },
-            onBack = { list = null },
+            onBack = onBack,
             onAction = controller::perform,
         )
     }

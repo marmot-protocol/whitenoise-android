@@ -25,14 +25,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,13 +75,13 @@ import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.VIEWER_MIN_SCALE
 import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
-import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.emojiPlainText
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
@@ -438,37 +435,30 @@ internal fun AvatarViewerFrame(
                         tint = Color.White,
                     )
                 }
-                val menuScrollState = rememberScrollState()
-                AnimatedDropdownMenu(
-                    scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                WhiteNoiseDropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
-                ) { surface ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.media_save)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
-                        enabled = saveEnabled,
-                        onClick = {
-                            surface.close {
-                                onMenuOpenChange(false)
-                                onSave()
+                    items =
+                        buildList {
+                            add(
+                                WhiteNoiseMenuItem(
+                                    label = stringResource(R.string.media_save),
+                                    icon = R.drawable.ic_download,
+                                    enabled = saveEnabled,
+                                    onClick = onSave,
+                                ),
+                            )
+                            if (editActionLabel != null && onEditPicture != null) {
+                                add(
+                                    WhiteNoiseMenuItem(
+                                        label = editActionLabel,
+                                        icon = R.drawable.ic_edit,
+                                        onClick = onEditPicture,
+                                    ),
+                                )
                             }
                         },
-                    )
-                    if (editActionLabel != null && onEditPicture != null) {
-                        DropdownMenuItem(
-                            text = { Text(editActionLabel) },
-                            leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
-                            onClick = {
-                                surface.close {
-                                    onMenuOpenChange(false)
-                                    onEditPicture()
-                                }
-                            },
-                        )
-                    }
-                }
+                )
             }
         }
         // The viewer's own snackbars sit below its top controls, like every temporary banner, and clear a side

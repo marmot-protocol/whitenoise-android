@@ -240,6 +240,8 @@ internal fun DiagnosticsContent(
 ) {
     var showActions by remember { mutableStateOf(false) }
     var showHealth by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    if (confirmClear) DiagnosticsClearConfirmation(onClear) { confirmClear = false }
     if (showHealth) {
         DiagnosticsHealthSheet(
             state = state,
@@ -290,8 +292,9 @@ internal fun DiagnosticsContent(
                             WhiteNoiseMenuItem(
                                 label = stringResource(R.string.clear),
                                 icon = R.drawable.ic_delete,
-                                onClick = onClear,
+                                onClick = { confirmClear = true },
                                 enabled = entries.isNotEmpty(),
+                                destructive = true,
                                 modifier = Modifier.testTag("diagnostics.action.clear"),
                             ),
                         ),

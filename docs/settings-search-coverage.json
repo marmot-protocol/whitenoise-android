@@ -1021,6 +1021,31 @@
     },
     "VoiceNotes": {
       "catalog_id": "home.VoiceNotes"
+    },
+    "Licenses": {
+      "catalog_id": "About.licenses"
+    },
+    "LicenseNotice": {
+      "owner": "One bundled notice, an entity page reached from the Licenses list",
+      "catalog_id": "About.licenses"
+    },
+    "LinkedDevices": {
+      "catalog_id": "Account.linked_devices"
+    },
+    "NotificationProfiles": {
+      "catalog_id": "Notifications.profiles"
+    },
+    "RelayDetails": {
+      "owner": "One relay, an entity page reached from the Relays list",
+      "catalog_id": "home.Relays"
+    },
+    "StoredAttachments": {
+      "owner": "One chat's or the largest attachments, an entity page reached from Manage storage",
+      "catalog_id": "Data.manage_storage"
+    },
+    "EmojiSetPreview": {
+      "owner": "One emoji set, an entity page reached from the Emoji sets browser",
+      "catalog_id": "CustomEmoji.emoji_sets"
     }
   },
   "exclusions": {

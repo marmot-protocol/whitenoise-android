@@ -125,7 +125,8 @@ class PhotoEditorSemanticsTest {
         composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_reset))
             .performClick()
-        assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
+        // The shared menu runs a row's action once its exit animation ends.
+        composeRule.runOnIdle { assertEquals(PhotoEditRecipe.Original, holder.state.recipe) }
     }
 
     @Test
