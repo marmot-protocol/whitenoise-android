@@ -22,12 +22,25 @@ internal fun chatListVisibleReturnHead(
 }
 
 /**
+ * A remember key equal only to a key for the same instance. The visible rows are a [List], which the Compose
+ * compiler treats as unstable, so a lambda capturing them is renewed whenever a new list instance arrives, even an
+ * equal one; keying a holder on this keeps that renewal.
+ */
+private class SameInstanceKey(
+    private val value: Any,
+) {
+    override fun equals(other: Any?): Boolean = other is SameInstanceKey && other.value === value
+
+    override fun hashCode(): Int = System.identityHashCode(value)
+}
+
+/**
  * Opens chats from the chat list with the list head the return scroll compares against.
  *
- * [rememberChatListNavigation] keys the instance on every value it holds, so a callback still sees the visible rows,
- * flags and callbacks of the composition that created it, and a row lambda that captures it stays memoized across
- * recompositions that leave those values equal, as the lambdas calling the old local functions did. [appState] is
- * the screen's single instance.
+ * [rememberChatListNavigation] keys the instance on every value it holds, the visible rows by instance, so a callback
+ * still sees the visible rows, flags and callbacks of the composition that created it, and a row lambda that captures
+ * it is renewed and memoized exactly as the lambdas calling the old local functions were. [appState] is the screen's
+ * single instance.
  */
 internal class ChatListNavigation(
     private val visibleItems: List<ChatListItem>,
@@ -72,7 +85,7 @@ internal fun rememberChatListNavigation(
     appState: WhiteNoiseAppState,
     onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
 ): ChatListNavigation =
-    remember(visibleItems, showArchived, advancedFolder, appState, onOpenGroup) {
+    remember(SameInstanceKey(visibleItems), showArchived, advancedFolder, appState, onOpenGroup) {
         ChatListNavigation(
             visibleItems = visibleItems,
             showArchived = showArchived,
@@ -87,8 +100,8 @@ internal fun rememberChatListNavigation(
  * callback depends only on the visible rows, the folder flags and the held head, as the old local functions did,
  * and a change of the shell's open callback does not renew it.
  *
- * [rememberChatListNewChatFlowHead] keys the instance on every value it holds. [newChatFlowOriginHeadState] is
- * remembered on the account and runtime generation, as it was as a local.
+ * [rememberChatListNewChatFlowHead] keys the instance on every value it holds, the visible rows by instance.
+ * [newChatFlowOriginHeadState] is remembered on the account and runtime generation, as it was as a local.
  */
 internal class ChatListNewChatFlowHead(
     newChatFlowOriginHeadState: MutableState<ChatListReturnHead?>,
@@ -116,7 +129,7 @@ internal fun rememberChatListNewChatFlowHead(
     showArchived: Boolean,
     advancedFolder: Boolean,
 ): ChatListNewChatFlowHead =
-    remember(newChatFlowOriginHeadState, visibleItems, showArchived, advancedFolder) {
+    remember(newChatFlowOriginHeadState, SameInstanceKey(visibleItems), showArchived, advancedFolder) {
         ChatListNewChatFlowHead(
             newChatFlowOriginHeadState = newChatFlowOriginHeadState,
             visibleItems = visibleItems,

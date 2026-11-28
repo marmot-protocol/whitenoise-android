@@ -86,6 +86,14 @@ class ChatListProfileReturnSnapCoverageTest {
                 .substringBefore("fun rememberChatListNewChatFlowHead(")
         assertTrue("chat opens read the head through that shared function", sharedHeadRead in openHolder)
         assertTrue("the New Message head reads it through the same function", sharedHeadRead in newChatFlowHolder)
+        val openHolderKeys =
+            "remember(SameInstanceKey(visibleItems), showArchived, advancedFolder, appState, onOpenGroup)"
+        val newChatFlowHolderKeys =
+            "remember(newChatFlowOriginHeadState, SameInstanceKey(visibleItems), showArchived, advancedFolder)"
+        assertTrue(
+            "both holders renew on a new visible-row instance, as lambdas capturing the unstable list did",
+            openHolderKeys in chatsScreen && newChatFlowHolderKeys in chatsScreen,
+        )
 
         val returnEffect =
             chatsScreen.requiredSection(
