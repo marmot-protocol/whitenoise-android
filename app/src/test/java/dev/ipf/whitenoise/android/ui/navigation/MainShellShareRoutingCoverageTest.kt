@@ -44,7 +44,7 @@ class MainShellShareRoutingCoverageTest {
             mainShellSource()
                 .readText()
                 .substringAfter("if (directGroupId != null) {", missingDelimiterValue = "")
-                .substringBefore("} else if (ownsShareRequest(request)) {", missingDelimiterValue = "")
+                .substringBefore("} else if (ownsShare(request.requestId)) {", missingDelimiterValue = "")
 
         val stageIndex = directShareBranch.indexOf("stageInboundShareForFirstFrame(")
         val clearIndex = directShareBranch.indexOf("clearSharePickerRequest()")
@@ -137,13 +137,14 @@ class MainShellShareRoutingCoverageTest {
         val source = mainShellSource().readText()
         assertTrue(
             "share staging must check the live owner before recomposition can update its inputs",
-            "shellStateHolder.visibleShareRequest?.requestId == it.requestId" in source,
+            "shellStateHolder.visibleShareRequest?.requestId == id" in source,
         )
-        assertTrue("shouldCommit = { ownsShareRequest(request) }" in source)
-        assertTrue("                        ownsShareRequest(request)" in source)
+        assertTrue("shouldCommit = { ownsShare(request.requestId) }" in source)
+        assertTrue("                        ownsShare(request.requestId)" in source)
+        val routeStart = "SignInDevicesRouteEffect(appState, previousActiveAccountRef) {"
         val route =
             source
-                .substringAfter("SignInDevicesRouteEffect(appState, previousActiveAccountRef) {", missingDelimiterValue = "")
+                .substringAfter(routeStart, missingDelimiterValue = "")
                 .substringBefore("settingsDetailName = SettingsDetail.Account.name", missingDelimiterValue = "")
 
         val settingsIndex = route.indexOf("sectionName = MainSection.Settings.name")

@@ -3094,4 +3094,7 @@
     <string name="remote_signer_disconnect_body">This account stays on this device. Sending and other signed actions stop until you pair again.</string>
     <string name="remote_signer_disconnect_confirm">Disconnect</string>
     <string name="remote_signer_switcher_attention">Remote signer needs attention</string>
+    <string name="first_run_chats_title">Start your first conversation</string>
+    <string name="first_run_chats_detail">Invite someone you talk to. While you wait, ask the White Noise team anything.</string>
+    <string name="first_run_new_chat">New chat</string>
 </resources>

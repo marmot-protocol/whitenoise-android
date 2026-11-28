@@ -205,12 +205,14 @@ internal fun ChatsScreen(
     diagnosticsPrompt: @Composable () -> Unit = {},
     onFirstRunHelp: ((Boolean) -> Unit)? = null,
     onSavePrivateKey: (() -> Unit)? = null,
+    chatsActive: () -> Boolean = { true },
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
     }
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
+    val accountSheets = remember(appState.runtimeGeneration) { ChatListAccountSheets() }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
     var newChatFlowOriginHead by
@@ -1679,13 +1681,13 @@ internal fun ChatsScreen(
     }
 
     // Consent belongs to the unobstructed Chats list, after all account setup.
-    // Keep its request in the app root so leaving Chats never consumes the choice.
-    val anotherSheetVisible =
+    fun otherSheetOpen(): Boolean =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
             pendingBulkDelete != null ||
-            pendingLeaveAndDelete != null
-    if (!showNewChatFlow && !anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
+            pendingLeaveAndDelete != null ||
+            accountSheets.isOpen
+    if (!showNewChatFlow && !otherSheetOpen() && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
 
@@ -2029,6 +2031,7 @@ internal fun ChatsScreen(
                 } else {
                     ChatListTopBar(
                         appState = appState,
+                        accountSheets = accountSheets,
                         retainedAccountAvatars = retainedAccountAvatars,
                         searchOpen = searchOpen,
                         searchQuery = searchQuery,
@@ -2443,6 +2446,8 @@ internal fun ChatsScreen(
                         !appState.signOutInProgress &&
                         !appState.wipeInProgress
                 val unreadActionsAvailable = !searchOpen && !selectionMode && unreadOwnerAvailable
+                val otherScope = searchOpen || searchActive || showArchived || unreadOnly || selectedFolderId != null
+                val firstRunHelp = onFirstRunHelp.takeIf { controller.showsFirstRun(sourceList.isEmpty(), otherScope) }
                 key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
                     val listEmpty = visibleItems.isEmpty()
                     val emptyPageScroll = key(listEmpty, showArchived, unreadOnly) { rememberScrollState() }
@@ -2608,14 +2613,10 @@ internal fun ChatsScreen(
                                     appState,
                                     onCreate = openNewMessageFlow,
                                     scrollState = emptyPageScroll,
-                                    onFirstRunHelp =
-                                        onFirstRunHelp.takeIf {
-                                            controller.error == null &&
-                                                controller.archivedItems.isEmpty() &&
-                                                selectedFolderId == null &&
-                                                !searchOpen &&
-                                                !searchActive
-                                        },
+                                    onFirstRunHelp = firstRunHelp,
+                                    canShareInvite = {
+                                        chatsActive() && !showNewChatFlow && !folderManagerOpen && !otherSheetOpen()
+                                    },
                                 ) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error

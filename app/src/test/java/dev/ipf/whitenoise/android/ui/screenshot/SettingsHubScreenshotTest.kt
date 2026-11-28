@@ -29,7 +29,7 @@ import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nativePushCapabilityForContext
-import dev.ipf.whitenoise.android.ui.chats.EmptyChats
+import dev.ipf.whitenoise.android.ui.chats.FirstRunEmptyChats
 import dev.ipf.whitenoise.android.ui.settings.AccountScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.settings.HelpSupportScreen
@@ -106,7 +106,7 @@ class SettingsHubScreenshotTest {
     fun emptyChatsFirstRunHelp() =
         capture("empty_chats_first_run_help_amoled", true, amoled = true) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+                FirstRunEmptyChats(onCreate = {}, onHelp = {}, onInvite = {})
             }
         }
 
@@ -115,7 +115,7 @@ class SettingsHubScreenshotTest {
     fun emptyChatsFirstRunHelpLight() =
         capture("empty_chats_first_run_help_light", false) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+                FirstRunEmptyChats(onCreate = {}, onHelp = {}, onInvite = {})
             }
         }
 
@@ -124,7 +124,7 @@ class SettingsHubScreenshotTest {
     fun emptyChatsFirstRunHelpRtlLargeFont() =
         capture("empty_chats_first_run_help_rtl_large_font", false, rtl = true) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+                FirstRunEmptyChats(onCreate = {}, onHelp = {}, onInvite = {})
             }
         }
 

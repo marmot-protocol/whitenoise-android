@@ -2913,4 +2913,7 @@
     <string name="private_key_reminder_body">Wenn du dieses Handy verlierst, kannst du deine Identität und deine Kontakte nur mit deinem Schlüssel behalten.</string>
     <string name="private_key_reminder_save">Schlüssel speichern</string>
     <string name="private_key_reminder_not_now">Nicht jetzt</string>
+    <string name="first_run_chats_title">Starte dein erstes Gespräch</string>
+    <string name="first_run_chats_detail">Lade jemanden ein, mit dem du dich unterhältst. Während du wartest, kannst du das White Noise-Team alles fragen.</string>
+    <string name="first_run_new_chat">Neuer Chat</string>
 </resources>

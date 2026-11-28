@@ -2901,4 +2901,7 @@
     <string name="private_key_reminder_body">Si pierdes este teléfono, solo podrás conservar tu identidad y tus contactos con tu clave.</string>
     <string name="private_key_reminder_save">Guardar clave</string>
     <string name="private_key_reminder_not_now">Ahora no</string>
+    <string name="first_run_chats_title">Inicia tu primera conversación</string>
+    <string name="first_run_chats_detail">Invita a alguien con quien suelas hablar. Mientras esperas, puedes preguntarle lo que quieras al equipo de White Noise.</string>
+    <string name="first_run_new_chat">Nuevo chat</string>
 </resources>

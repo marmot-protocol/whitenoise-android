@@ -105,6 +105,14 @@ private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
 /** Stable test tag for a folder pill. */
 internal fun chatListFilterChipTag(folderId: String): String = "chats.folder.$folderId"
 
+/** Account sheets keep their own content in the header and expose their visibility to Chats. */
+internal class ChatListAccountSheets {
+    var selectorOpen by mutableStateOf(false)
+    var addIdentityOpen by mutableStateOf(false)
+
+    val isOpen: Boolean get() = selectorOpen || addIdentityOpen
+}
+
 /** Chat list header: the account avatars and quick switch, or the search field with its filter action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "UnusedParameter", "FunctionNaming")
@@ -128,23 +136,22 @@ internal fun ChatListTopBar(
     onSearchFilterCategory: ((GlobalSearchFilterCategory) -> Unit)? = null,
     onClearSearchFilters: () -> Unit = {},
     retainedAccountAvatars: RetainedAccountAvatarPixels? = null,
+    accountSheets: ChatListAccountSheets = remember(appState.runtimeGeneration) { ChatListAccountSheets() },
 ) {
-    var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
-    var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val profileState by appState.notificationProfiles.state.collectAsState()
     val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
-            showSelector = false
-            showAddIdentity = false
+            accountSheets.selectorOpen = false
+            accountSheets.addIdentityOpen = false
         }
     }
 
     /** Opens the account selector unless sign-out or a wipe is in progress. */
     fun openSelector() {
-        if (!appState.signOutInProgress && !appState.wipeInProgress) showSelector = true
+        if (!appState.signOutInProgress && !appState.wipeInProgress) accountSheets.selectorOpen = true
     }
 
     /** Switches to the tapped account through the caller's handler or the app state. */
@@ -347,29 +354,29 @@ internal fun ChatListTopBar(
             )
         }
     }
-    if (showSelector) {
+    if (accountSheets.selectorOpen) {
         AccountSelectorSheet(
             appState = appState,
-            onDismiss = { showSelector = false },
+            onDismiss = { accountSheets.selectorOpen = false },
             onAddAccountOrigin = { addIdentityOrigin = it },
             onAddAccountContour = { addIdentityContour = it },
             onAddAccount = {
-                showSelector = false
-                showAddIdentity = true
+                accountSheets.selectorOpen = false
+                accountSheets.addIdentityOpen = true
             },
-            onAccountSwitched = { showSelector = false },
+            onAccountSwitched = { accountSheets.selectorOpen = false },
             onSettings = {
-                showSelector = false
+                accountSheets.selectorOpen = false
                 onOpenSettings()
             },
         )
     }
-    if (showAddIdentity) {
+    if (accountSheets.addIdentityOpen) {
         AddIdentitySheet(
             appState = appState,
             origin = addIdentityOrigin,
             sourceContour = addIdentityContour,
-            onDismiss = { showAddIdentity = false },
+            onDismiss = { accountSheets.addIdentityOpen = false },
         )
     }
 }

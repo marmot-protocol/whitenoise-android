@@ -442,7 +442,7 @@ internal fun MainShell(
             )
         }
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
-    val ownsShareRequest: (ShareRequest) -> Boolean = { shellStateHolder.visibleShareRequest?.requestId == it.requestId }
+    val ownsShare = { id: String -> shellStateHolder.visibleShareRequest?.requestId == id }
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
@@ -671,7 +671,7 @@ internal fun MainShell(
         }
     }
 
-    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ requestId, accountRef, groupIds ->
+    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ id, accountRef, groupIds ->
         if (groupIds.isEmpty()) return@openStagedShare
         val otherCount = groupIds.size - 1
         if (accountRef == appState.activeAccountRef) {
@@ -688,7 +688,7 @@ internal fun MainShell(
         } else {
             val pending =
                 PendingStagedShareOpen(
-                    requestId = requestId,
+                    requestId = id,
                     accountRef = accountRef,
                     groupIdHex = groupIds.first(),
                     otherChatCount = otherCount,
@@ -697,10 +697,7 @@ internal fun MainShell(
             appState.launchMutation {
                 // A newer share retires this open; its delayed switch must then not change the account (#3698).
                 appState.setActiveAccount(accountRef, shouldActivate = { pendingStagedShareOpen === pending })
-                if (
-                    appState.activeAccountRef != accountRef &&
-                    pendingStagedShareOpen === pending
-                ) {
+                if (appState.activeAccountRef != accountRef && pendingStagedShareOpen === pending) {
                     pendingStagedShareOpen = null
                 }
             }
@@ -709,18 +706,18 @@ internal fun MainShell(
     val stageShareToChats:
         suspend (ShareRequest, String, List<String>) -> Boolean =
         stageShare@{ request, accountRef, groupIds ->
-            if (groupIds.isEmpty() || !ownsShareRequest(request)) return@stageShare false
+            if (groupIds.isEmpty() || !ownsShare(request.requestId)) return@stageShare false
             val staged =
                 runCatchingCancellable {
                     appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload) {
-                        ownsShareRequest(request)
+                        ownsShare(request.requestId)
                     }
                 }.getOrElse {
-                    if (ownsShareRequest(request)) appState.present(R.string.share_import_storage)
+                    if (ownsShare(request.requestId)) appState.present(R.string.share_import_storage)
                     return@stageShare false
                 }
             if (!staged) {
-                if (ownsShareRequest(request)) appState.present(R.string.toast_notification_account_unavailable)
+                if (ownsShare(request.requestId)) appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
             openAfterStagedShare(request.requestId, accountRef, groupIds)
@@ -842,13 +839,13 @@ internal fun MainShell(
                         accountRef = accountRef,
                         targetGroupIds = listOf(directGroupId),
                         payload = request.payload,
-                        shouldCommit = { ownsShareRequest(request) },
+                        shouldCommit = { ownsShare(request.requestId) },
                     )
                 }
             if (stagingResult.getOrDefault(false)) {
                 clearSharePickerRequest()
                 openAfterStagedShare(request.requestId, accountRef, listOf(directGroupId))
-            } else if (ownsShareRequest(request)) {
+            } else if (ownsShare(request.requestId)) {
                 if (shellStateHolder.promoteInboundShareRequest(request, persisted)) onShareRequestHandled(request)
                 val message =
                     if (stagingResult.isFailure) {
@@ -1823,11 +1820,14 @@ internal fun MainShell(
                                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                                 onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                 onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                                conversationReturnHead =
-                                    publishedConversationReturnHead(chatListReturnHeadSnap),
+                                conversationReturnHead = publishedConversationReturnHead(chatListReturnHeadSnap),
                                 onConversationReturnHeadHandled = {
-                                    chatListReturnHeadSnap =
-                                        onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                    chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                },
+                                chatsActive = {
+                                    appState.canShareFromChats(sectionName, selectedChat, pendingConversationOpen) &&
+                                        quickAccountSwitchTransition == null &&
+                                        shellStateHolder.visibleShareRequest == null
                                 },
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name
