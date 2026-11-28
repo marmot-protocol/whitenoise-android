@@ -97,6 +97,8 @@ internal class FakeRemoteSignerHost(
 ) : RemoteSignerPairingHost {
     val configs = mutableListOf<String>()
     val finished = mutableListOf<Pair<Nip46SessionFfiInterface, String>>()
+    val spentLinks = mutableListOf<String>()
+    var onFinish: () -> Unit = {}
     var finishError: Throwable? = null
     var failNextSession = false
     private var handedOut = 0
@@ -111,10 +113,20 @@ internal class FakeRemoteSignerHost(
         return sessions[minOf(handedOut++, sessions.lastIndex)]
     }
 
+    /** Records exactly which links the native handshake spent. */
+    override fun onBunkerLinkSpent(
+        link: String,
+        paste: BunkerClipboardPaste?,
+    ) {
+        spentLinks += link
+    }
+
+    /** Lets the test model sign-in disposing the composition during the account handoff. */
     override suspend fun finish(
         session: Nip46SessionFfiInterface,
         userHex: String,
     ) {
+        onFinish()
         finishError?.let { throw it }
         finished += session to userHex
     }

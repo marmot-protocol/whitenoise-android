@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.view.View
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -75,7 +74,7 @@ class OnboardingShortWindowImeTest {
                     onErrorChange = {},
                     onBack = {},
                     onSignIn = { signIns++ },
-                    privateKeyState = TextFieldState(SECRET),
+                    signInField = SignInFieldState(SECRET),
                 )
             }
         }

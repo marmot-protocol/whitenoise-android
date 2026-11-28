@@ -33,6 +33,12 @@ internal interface RemoteSignerPairingHost {
     /** Creates an offline MDK session off the main thread; throws for a malformed link or configuration. */
     suspend fun newSession(configJson: String): Nip46SessionFfiInterface
 
+    /** Removes a spent bunker link from the clipboard before the account handoff can close the flow. */
+    fun onBunkerLinkSpent(
+        link: String,
+        paste: BunkerClipboardPaste?,
+    )
+
     /** Signs in with, or reattaches, the verified Ready [session] for account [userHex]. */
     suspend fun finish(
         session: Nip46SessionFfiInterface,
@@ -111,16 +117,15 @@ internal class RemoteSignerPairing(
     /** The pasted or scanned bunker link; a masked field, never saved state. */
     val link = TextFieldState()
 
+    /** Evidence from the explicit provider paste that supplied the current link. */
+    var clipboardPaste: BunkerClipboardPaste? = null
+
     private var session: Nip46SessionFfiInterface? = null
     private var job: Job? = null
     private var attempt = 0L
     private var resumeStep: RemoteSignerStep = RemoteSignerStep.Connecting
     private var acknowledgedRequest: String? = null
     private var lastOpen: Pair<RemoteSignerMethod, String>? = null
-
-    /** The bunker link the finished pairing used, so the host can clear it from the clipboard; null otherwise. */
-    var usedLink: String? = null
-        private set
 
     /** Whether leaving now would abandon an account handoff that must finish. */
     val busy: Boolean
@@ -133,9 +138,11 @@ internal class RemoteSignerPairing(
     fun choose(
         chosen: RemoteSignerMethod,
         prefill: String? = null,
+        paste: BunkerClipboardPaste? = null,
     ) {
         if (busy) return
         method = chosen
+        clipboardPaste = paste
         linkErrorRes = null
         if (chosen == RemoteSignerMethod.ConnectionCode) {
             val config = JSONObject().put("relays", JSONArray(offerRelays)).put("name", REMOTE_SIGNER_CLIENT_NAME)
@@ -151,6 +158,7 @@ internal class RemoteSignerPairing(
     fun submitLink() {
         if (step != RemoteSignerStep.EnterLink) return
         val value = link.text.toString().trim()
+        clipboardPaste = clipboardPaste?.takeIf { it.matchesLink(value) }
         if (isBunkerLink(value)) {
             linkErrorRes = null
             open(RemoteSignerMethod.BunkerLink, JSONObject().put("uri", value).toString())
@@ -211,14 +219,15 @@ internal class RemoteSignerPairing(
             }
             val linkPath = method == RemoteSignerMethod.BunkerLink && current != RemoteSignerStep.EnterLink
             step = if (linkPath) RemoteSignerStep.EnterLink else RemoteSignerStep.Choose
+            if (step == RemoteSignerStep.Choose) clipboardPaste = null
         }
         return handled
     }
 
     /** Ends the flow; an account handoff already in progress finishes on its own. */
     fun dispose() {
+        clipboardPaste = null
         link.clearText()
-        usedLink = null
         lastOpen = null
         linkErrorRes = null
         if (!busy) discard()
@@ -276,9 +285,10 @@ internal class RemoteSignerPairing(
             }
     }
 
-    /** Pairs, verifies the account, then hands the session over; a replaced attempt stops at its next check. */
+    /** Completes the native handshake, retires any spent link, and gives the verified session to the account. */
     private suspend fun pair(active: Nip46SessionFfiInterface) {
         val token = attempt
+        val submittedLink = if (method == RemoteSignerMethod.BunkerLink) link.text.toString().trim() else null
         if (method == RemoteSignerMethod.ConnectionCode) {
             step = RemoteSignerStep.Connecting
             resumeStep = RemoteSignerStep.WaitingForSigner(active.pairingOffer())
@@ -305,24 +315,22 @@ internal class RemoteSignerPairing(
                     watcher.cancel()
                 }
             }
+        if (token != attempt) return
+        submittedLink?.let { host.onBunkerLinkSpent(it, clipboardPaste) }
+        clipboardPaste = null
         val wrongAccount = expectedAccountHex != null && !userHex.equals(expectedAccountHex, ignoreCase = true)
-        when {
-            token != attempt -> Unit
-            wrongAccount -> step = RemoteSignerStep.Failed(RemoteSignerFailure.WrongAccount)
-            else -> {
-                // From here the account may own the session: drop the flow's reference so it is never cancelled.
-                step = RemoteSignerStep.SigningIn
-                session = null
-                val handedOff = handOffToAccount(host, active, userHex)
-                if (handedOff) {
-                    val submitted = link.text.toString()
-                    usedLink = submitted.trim().takeIf { method == RemoteSignerMethod.BunkerLink }
-                    link.clearText()
-                    lastOpen = null
-                }
-                step =
-                    if (handedOff) RemoteSignerStep.Done else RemoteSignerStep.Failed(RemoteSignerFailure.SignInFailed)
+        if (wrongAccount) {
+            step = RemoteSignerStep.Failed(RemoteSignerFailure.WrongAccount)
+        } else {
+            // From here the account may own the session: drop the flow's reference so it is never cancelled.
+            step = RemoteSignerStep.SigningIn
+            session = null
+            val handedOff = handOffToAccount(host, active, userHex)
+            if (handedOff) {
+                link.clearText()
+                lastOpen = null
             }
+            step = if (handedOff) RemoteSignerStep.Done else RemoteSignerStep.Failed(RemoteSignerFailure.SignInFailed)
         }
     }
 

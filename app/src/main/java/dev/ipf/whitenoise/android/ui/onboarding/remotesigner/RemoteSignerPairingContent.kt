@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -111,10 +112,14 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
         }
     }
 
-    /** Replaces the masked field from either the clipboard or the scanner. */
-    fun replace(value: String) {
+    /** Replaces the field with a scan or an explicit paste and keeps any provider clipboard identity. */
+    fun replace(
+        value: String,
+        clip: ClipData? = null,
+    ) {
         pairing.link.setTextAndPlaceCursorAtEnd(value.trim())
         pairing.linkErrorRes = null
+        pairing.clipboardPaste = clip?.let { BunkerClipboardPaste.capture(it, value) }
     }
     Row(
         Modifier.fillMaxWidth(),
@@ -132,7 +137,9 @@ internal fun RemoteSignerLinkField(pairing: RemoteSignerPairing) {
                 if (pairing.link.text.isEmpty() && canPaste) {
                     SystemPasteIconButton(
                         onPaste = {
-                            clipboard.withPrimaryClipForPaste { clip -> clip.plainText(context)?.let(::replace) }
+                            clipboard.withPrimaryClipForPaste { clip ->
+                                clip.plainText(context)?.let { value -> replace(value, clip) }
+                            }
                         },
                         modifier = Modifier.padding(horizontal = 4.dp),
                     ) {

@@ -22,6 +22,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import java.security.MessageDigest
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 @Composable
@@ -96,6 +97,7 @@ internal const val COPIED_FEEDBACK_MILLIS = 2_000L
 internal const val SENSITIVE_CLIP_CLEAR_WORK = "sensitive_clipboard_clear"
 
 private const val COPIED_DIGEST_KEY = "copied_sha256"
+private const val COPIED_CLIP_ID_KEY = "dev.ipf.whitenoise.android.sensitive_clip_id"
 
 /** Keeps a new secret copy from landing between a deadline's clipboard check and its clear. */
 private val sensitiveClipLock = Any()
@@ -105,9 +107,9 @@ private val sensitiveClipLock = Any()
  *
  * WorkManager owns the deadline, so leaving the screen, a cached or killed process and a reboot do
  * not cancel it; Android may run it somewhat late. A later secret copy replaces the pending clear.
- * Only a SHA-256 digest of the text is stored with the work; at the deadline a readable clip that no
- * longer matches belongs to someone else and stays, while a clipboard the app cannot read is cleared
- * anyway.
+ * The work stores a random clip identifier and a SHA-256 digest. The identifier lets the worker reject
+ * replacement clips from their description before accessing the text. A clipboard hidden by Android
+ * is still cleared at the deadline.
  */
 internal fun copySensitiveToClipboard(
     context: Context,
@@ -116,15 +118,23 @@ internal fun copySensitiveToClipboard(
 ) {
     val appContext = context.applicationContext
     val clipboard = appContext.getSystemService(ClipboardManager::class.java) ?: return
+    val clipId = UUID.randomUUID().toString()
     val clip = ClipData.newPlainText(label, text)
-    clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-    synchronized(sensitiveClipLock) { clipboard.setPrimaryClip(clip) }
+    clip.description.extras =
+        PersistableBundle().apply {
+            putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            putString(COPIED_CLIP_ID_KEY, clipId)
+        }
     val clear =
         OneTimeWorkRequestBuilder<SensitiveClipboardClearWorker>()
             .setInitialDelay(SENSITIVE_CLIP_LIFETIME_MS, TimeUnit.MILLISECONDS)
-            .setInputData(workDataOf(COPIED_DIGEST_KEY to sensitiveClipDigest(text)))
+            .setInputData(workDataOf(COPIED_DIGEST_KEY to sensitiveClipDigest(text), COPIED_CLIP_ID_KEY to clipId))
             .build()
-    WorkManager.getInstance(appContext).enqueueUniqueWork(SENSITIVE_CLIP_CLEAR_WORK, ExistingWorkPolicy.REPLACE, clear)
+    synchronized(sensitiveClipLock) {
+        clipboard.setPrimaryClip(clip)
+        val work = WorkManager.getInstance(appContext)
+        work.enqueueUniqueWork(SENSITIVE_CLIP_CLEAR_WORK, ExistingWorkPolicy.REPLACE, clear)
+    }
 }
 
 /** Removes a copied secret at its deadline; see [copySensitiveToClipboard]. */
@@ -132,6 +142,7 @@ class SensitiveClipboardClearWorker(
     context: Context,
     params: WorkerParameters,
 ) : Worker(context, params) {
+    /** Evaluates clipboard ownership and clears the original or platform-hidden secret. */
     override fun doWork(): Result {
         val copied = inputData.getByteArray(COPIED_DIGEST_KEY)
         // Without the digest the clip's owner is unknown; clearing is safer than leaving a secret behind.
@@ -139,35 +150,55 @@ class SensitiveClipboardClearWorker(
             if (copied == null) {
                 clearSensitiveClipboard(applicationContext)
             } else {
-                clearSensitiveClipIfUnchanged(applicationContext, copied)
+                clearSensitiveClipIfUnchanged(applicationContext, copied, inputData.getString(COPIED_CLIP_ID_KEY))
             }
         }
         return Result.success()
     }
 }
 
+/** Rules out replacement clips from their description before accessing text. */
 private fun clearSensitiveClipIfUnchanged(
     context: Context,
     copied: ByteArray,
+    clipId: String?,
 ) {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    val current =
+    val description =
         try {
-            clipboard.primaryClip
+            clipboard.primaryClipDescription
         } catch (_: SecurityException) {
             null
         }
+    if (description != null && !description.matchesSensitiveCopy(clipId)) return
     // Without focus Android may hide the clip; clearing then is safer than leaving a secret behind.
+    val current =
+        try {
+            if (description == null) null else clipboard.primaryClip
+        } catch (_: SecurityException) {
+            null
+        }
     val text =
         current
             ?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)
             ?.text
             ?.toString()
-    if (current != null && (text == null || !MessageDigest.isEqual(sensitiveClipDigest(text), copied))) return
-    clearSensitiveClipboard(context)
+    val sameCopy =
+        current?.description?.matchesSensitiveCopy(clipId) == true &&
+            text != null &&
+            MessageDigest.isEqual(sensitiveClipDigest(text), copied)
+    if (current == null || sameCopy) clearSensitiveClipboard(context)
 }
 
+/** Preserves pending clears from older installs for their unmarked sensitive clips. */
+private fun ClipDescription.matchesSensitiveCopy(clipId: String?): Boolean {
+    val metadata = extras
+    return metadata?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true &&
+        metadata.getString(COPIED_CLIP_ID_KEY) == clipId
+}
+
+/** Hashes the exact copied characters for comparison without storing the secret. */
 private fun sensitiveClipDigest(text: String): ByteArray {
     val sha256 = MessageDigest.getInstance("SHA-256")
     return sha256.digest(text.toByteArray(Charsets.UTF_8))

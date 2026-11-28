@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
@@ -46,31 +45,33 @@ internal fun SignInContent(
     recoveryConsentVisible: Boolean = false,
     onRecoveryConsentConfirm: () -> Unit = {},
     onRecoveryConsentDismiss: () -> Unit = {},
-    privateKeyState: TextFieldState? = null,
+    signInField: SignInFieldState? = null,
     amberSignerAvailable: Boolean = false,
     loggingInWithAmber: Boolean = false,
     amberSignInStage: Int? = null,
     onLoginWithAmber: () -> Unit = {},
     onSignInValue: ((String) -> Unit)? = null,
     onSystemBackWhileBusy: (() -> Unit)? = null,
-    onUseRemoteSigner: ((String?) -> Unit)? = null,
+    onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
 ) {
     WindowSecureFlag()
     // The real onboarding owner supplies the native state; the fallback retains existing standalone callers/tests.
-    val key = privateKeyState ?: remember { TextFieldState(identity) }
+    val field = signInField ?: remember { SignInFieldState(identity) }
+    val key = field.key
     val changed by rememberUpdatedState(onIdentityChange)
     var lastReportedKey by remember(key) { mutableStateOf(key.text.toString()) }
 
     /** Reports a key edit once per distinct value. */
     fun reportKeyEdit(value: String) {
+        field.discardPasteForDifferentValue(value)
         if (value != lastReportedKey) {
             lastReportedKey = value
             changed(value)
         }
     }
-    if (privateKeyState == null) {
+    if (signInField == null) {
         LaunchedEffect(identity) {
-            if (key.text.toString() != identity) key.setTextAndPlaceCursorAtEnd(identity)
+            if (key.text.toString() != identity) field.replaceText(identity)
         }
     }
     LaunchedEffect(key) {
@@ -85,7 +86,7 @@ internal fun SignInContent(
         // Flush a just-typed edit before native work; its queued observer cannot erase the resulting error or consent.
         reportKeyEdit(value)
         if (onUseRemoteSigner != null && isBunkerLink(value)) {
-            onUseRemoteSigner(value.trim())
+            onUseRemoteSigner(RemoteSignerEntry(value.trim(), field.clipboardPaste))
             return
         }
         when (IdentityEntryInput.classify(value)) {
@@ -133,10 +134,18 @@ internal fun SignInContent(
             ) { Text(stringResource(R.string.sign_in)) }
         },
     ) {
-        SignInKeyField(key, busy, errorRes, ::reportKeyEdit, onErrorChange, ::submit)
+        SignInKeyField(
+            key,
+            busy,
+            errorRes,
+            ::reportKeyEdit,
+            onErrorChange,
+            ::submit,
+            onBunkerClipboardPaste = { field.clipboardPaste = it },
+        )
         if (onUseRemoteSigner != null) {
             WhiteNoiseOutlinedButton(
-                onClick = { onUseRemoteSigner(null) },
+                onClick = { onUseRemoteSigner(RemoteSignerEntry()) },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_in.remote_signer"),
             ) { Text(stringResource(R.string.remote_signer_use)) }

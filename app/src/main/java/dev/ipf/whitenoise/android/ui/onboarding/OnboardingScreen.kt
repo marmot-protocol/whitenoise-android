@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,8 +46,9 @@ internal fun OnboardingScreen(
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.ONBOARDING)
     }
-    val privateKeyState = remember { TextFieldState() }
-    val identity = privateKeyState.text.toString()
+    val signInField = remember { SignInFieldState() }
+    val keyField = signInField.key
+    val identity = keyField.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var remoteSigner by remember { mutableStateOf<RemoteSignerEntry?>(null) }
     val signingInState = remember { mutableStateOf(false) }
@@ -73,7 +72,7 @@ internal fun OnboardingScreen(
         when (step) {
             SignInStep.SignedIn, SignInStep.SetupStarted -> {
                 clearSensitiveClipboard(context)
-                privateKeyState.setTextAndPlaceCursorAtEnd("")
+                signInField.replaceText("")
                 recoveryConsentedFor = null
             }
             is SignInStep.AskRemovalConsent -> unlinkedProfile = step.accountRef
@@ -105,7 +104,7 @@ internal fun OnboardingScreen(
         if (inFlightAction != OnboardingAction.Idle || appState.retainedAccountReactivationRef != null) return
         when (action) {
             OnboardingAction.Importing -> {
-                val value = privateKeyState.text.toString().trim()
+                val value = keyField.text.toString().trim()
                 runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
             }
             OnboardingAction.AmberLogin -> {
@@ -127,7 +126,7 @@ internal fun OnboardingScreen(
             signingIn = true,
             onCancel = { unlinkedProfile = null },
             onRemove = {
-                val key = privateKeyState.text.toString().trim()
+                val key = keyField.text.toString().trim()
                 if (unlinkedProfile == label && key == identity.trim()) {
                     unlinkedProfile = null
                     runStep {
@@ -151,10 +150,10 @@ internal fun OnboardingScreen(
             appState,
             onClose = { remoteSigner = null },
             onFinished = {
-                privateKeyState.setTextAndPlaceCursorAtEnd("")
+                signInField.replaceText("")
                 remoteSigner = null
             },
-            initialLink = entry.link,
+            entry = entry,
         )
         return
     }
@@ -171,13 +170,13 @@ internal fun OnboardingScreen(
 
     OnboardingContent(
         identity = identity,
+        signInField = signInField,
         signingInState = signingInState,
-        privateKeyState = privateKeyState,
         creatingIdentity = false,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
         importErrorRes = importErrorRes,
         onIdentityChange = {
-            if (privateKeyState.text.toString() != it) privateKeyState.setTextAndPlaceCursorAtEnd(it)
+            if (keyField.text.toString() != it) signInField.replaceText(it)
             importErrorRes = null
             // Editing the field ends the attempt the acknowledgement belonged to,
             // so the key it held must not outlive it.
@@ -196,7 +195,7 @@ internal fun OnboardingScreen(
         // memory with the rest of the onboarding state.
         onRecoveryConsentConfirm = {
             val value = identity.trim()
-            if (recoveryConsentVisible && privateKeyState.text.toString().trim() == value) {
+            if (recoveryConsentVisible && keyField.text.toString().trim() == value) {
                 recoveryConsentVisible = false
                 recoveryConsentedFor = value
                 runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
@@ -212,8 +211,8 @@ internal fun OnboardingScreen(
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = { startSignInAction(OnboardingAction.AmberLogin) },
-        onUseRemoteSigner = { link ->
-            if (inFlightAction == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+        onUseRemoteSigner = { entry ->
+            if (inFlightAction == OnboardingAction.Idle) remoteSigner = entry
         },
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,

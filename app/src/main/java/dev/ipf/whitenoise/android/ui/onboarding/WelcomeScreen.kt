@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -45,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
 import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -53,7 +53,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 /** Selects Welcome or Sign In using [signingInState], which a host can retain while showing another flow. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-fun OnboardingContent(
+internal fun OnboardingContent(
     identity: String,
     creatingIdentity: Boolean,
     signingInBusy: Boolean,
@@ -76,8 +76,8 @@ fun OnboardingContent(
     reactivatingAccountLabel: String? = null,
     onContinueWithSavedAccount: (String) -> Unit = {},
     onRecoverSavedAccount: (String) -> Unit = {},
-    privateKeyState: TextFieldState? = null,
-    onUseRemoteSigner: ((String?) -> Unit)? = null,
+    signInField: SignInFieldState? = null,
+    onUseRemoteSigner: ((RemoteSignerEntry) -> Unit)? = null,
     signingInState: MutableState<Boolean> = remember { mutableStateOf(signingInBusy || loggingInWithAmber) },
 ) {
     var signingIn by signingInState
@@ -100,7 +100,7 @@ fun OnboardingContent(
             recoveryConsentVisible = recoveryConsentVisible,
             onRecoveryConsentConfirm = onRecoveryConsentConfirm,
             onRecoveryConsentDismiss = onRecoveryConsentDismiss,
-            privateKeyState = privateKeyState,
+            signInField = signInField,
             amberSignerAvailable = amberSignerAvailable,
             loggingInWithAmber = loggingInWithAmber,
             amberSignInStage = amberSignInStage,

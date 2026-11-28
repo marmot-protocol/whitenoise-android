@@ -13,6 +13,14 @@
           "ONB-029"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "The native handshake retires the pasted bunker link before handing off sign-in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFlow.kt",
+        "anchor": "override fun onBunkerLinkSpent(",
+        "test_ids": ["ONB-027"]
+      }
     ]
   },
   "discovery_exceptions": []

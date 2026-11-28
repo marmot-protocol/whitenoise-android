@@ -58,7 +58,9 @@ internal fun AddIdentitySheet(
                 onDismiss = { dismiss() },
             )
         }
-    val identity = session.key.text.toString()
+    val identity =
+        session.signInField.key.text
+            .toString()
     var removalRef by remember(session, identity) { mutableStateOf<String?>(null) }
     val amberSignerAvailable = remember(appState) { appState.isAmberSignerInstalled() }
     var remoteSigner by remember(session) { mutableStateOf<RemoteSignerEntry?>(null) }
@@ -103,7 +105,9 @@ internal fun AddIdentitySheet(
 
     /** Imports the entered key. */
     fun startImport(confirmedRemoval: String? = null) {
-        val submitted = session.key.text.toString()
+        val submitted =
+            session.signInField.key.text
+                .toString()
         if (submitted.isBlank() || submitted != identity) return
 
         fun reportError(message: Int) {
@@ -156,7 +160,7 @@ internal fun AddIdentitySheet(
                 appState,
                 onClose = { remoteSigner = null },
                 onFinished = session::dismiss,
-                initialLink = entry.link,
+                entry = entry,
             )
             return@MeasuredPlaybackDialog
         }
@@ -164,7 +168,9 @@ internal fun AddIdentitySheet(
             signingInState = signingInState,
             amberSignerAvailable = amberSignerAvailable,
             inFlightAction = session.action,
-            identity = session.key.text.toString(),
+            identity =
+                session.signInField.key.text
+                    .toString(),
             importErrorRes = session.errorRes,
             onCreate = {
                 if (session.begin(OnboardingAction.Creating)) {
@@ -181,11 +187,11 @@ internal fun AddIdentitySheet(
             onIdentityChange = session::edit,
             onErrorChange = session::error,
             onImport = { startImport() },
-            privateKeyState = session.key,
+            signInField = session.signInField,
             amberSignInStage = appState.amberSignInStage,
             onBack = this.dismiss,
-            onUseRemoteSigner = { link ->
-                if (session.action == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+            onUseRemoteSigner = { entry ->
+                if (session.action == OnboardingAction.Idle) remoteSigner = entry
             },
         )
         removalRef?.let { label ->
