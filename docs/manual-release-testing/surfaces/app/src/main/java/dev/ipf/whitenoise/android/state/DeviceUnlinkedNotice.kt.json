@@ -18,6 +18,14 @@
         "test_ids": [
           "SET-066"
         ]
+      },
+      {
+        "surface": "Linked devices: an unlinked account's notifications and shortcuts are cleared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DeviceUnlinkedNotice.kt",
+        "anchor": "fun WhiteNoiseAppState.clearUnlinkedAccountNotifications(",
+        "test_ids": [
+          "SET-081"
+        ]
       }
     ]
   },

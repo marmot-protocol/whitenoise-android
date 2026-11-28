@@ -4897,7 +4897,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
-    private suspend fun clearRevokedConversationShortcutsForAccount(
+    internal suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
         knownGroupIds: Collection<String> = emptySet(),

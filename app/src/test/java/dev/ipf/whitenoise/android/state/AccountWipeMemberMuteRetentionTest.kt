@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.state
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.os.Looper
+import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
@@ -18,6 +20,8 @@ import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -459,6 +463,48 @@ class AccountWipeMemberMuteRetentionTest {
                 assertEquals(other, state.toast)
             }
         }
+
+    /** An unlinked device takes the account's conversation shortcuts down at once and keeps the other account's. */
+    @Test
+    fun unlinkClearsOnlyTheUnlinkedAccountsShortcuts() =
+        runBlocking {
+            savedUnlinked = true
+            val removed = publishConversationShortcut(WIPED_ACCOUNT)
+            val kept = publishConversationShortcut(SURVIVING_ACCOUNT)
+
+            appState(active = SURVIVING_ACCOUNT).presentDeviceUnlinked(WIPED_ACCOUNT)
+
+            val left = ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id }
+            assertFalse("the unlinked account's shortcut must go", removed in left)
+            assertTrue("the other account's shortcut must stay", kept in left)
+        }
+
+    /** An account listed as linked again by the time the handler reads it was signed in again, so its shortcuts stay. */
+    @Test
+    fun unlinkKeepsTheShortcutsOfAnAccountSignedInAgain() =
+        runBlocking {
+            savedUnlinked = false
+            val kept = publishConversationShortcut(WIPED_ACCOUNT)
+
+            appState(active = SURVIVING_ACCOUNT).presentDeviceUnlinked(WIPED_ACCOUNT)
+
+            assertTrue(kept in ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id })
+        }
+
+    /** Publishes [account]'s conversation shortcut for [GROUP] the way notifications scope it, and returns its id. */
+    private fun publishConversationShortcut(account: String): String {
+        val id = checkNotNull(conversationShortcutId(account, GROUP))
+        val shortcut =
+            ShortcutInfoCompat
+                .Builder(context, id)
+                .setShortLabel("Chat")
+                .setIntent(Intent(Intent.ACTION_VIEW))
+                .setLongLived(true)
+                .setExtras(checkNotNull(conversationShortcutAccountExtras(account)))
+                .build()
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        return id
+    }
 
     /**
      * The unlink handler re-reads the accounts before it speaks. A removal that finishes while that read is paused

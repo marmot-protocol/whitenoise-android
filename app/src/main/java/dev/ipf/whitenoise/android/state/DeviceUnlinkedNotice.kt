@@ -15,7 +15,8 @@ internal fun deviceUnlinkedAccount(event: MarmotEventFfi) = (event as? MarmotEve
  * Tells the user this device was unlinked from [accountRef] and brings the app in line with MDK, which has already
  * signed the account out. The account list is re-read so every per-account flow keyed to a signed-in profile lets
  * go of it, whether or not it was the active one. If it was the active profile and another is still signed in, the
- * app moves to that one, otherwise the unlinked-account prompt covers its chats. Nothing is wiped here: removing the
+ * app moves to that one, otherwise the unlinked-account prompt covers its chats. The account's notifications and
+ * conversation shortcuts are taken down, as signing out here does, but its chats are not wiped: removing the
  * account from this device is the user's explicit choice. The prompt reads the account list, so when that list
  * cannot be re-read even after retries the notice is shown instead, and the unlink is never silent. The user can
  * remove the account, and even sign in to it again, before this has spoken. [copy] is the account's copy as it stood
@@ -42,11 +43,45 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
             )
         }
     }
+    clearUnlinkedAccountNotifications(accountRef, copy, listed)
     // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all.
     if (active && next != null && copies.isCurrent(accountRef, copy)) {
         setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
     }
 }
+
+/**
+ * Takes the unlinked account's notifications, conversation shortcuts and their channels off this device, as signing
+ * out here does (#4115). MDK has already signed the account out, so a removed device, perhaps a lost one, should not
+ * keep showing its messages on the lock screen or launcher. A copy that was removed, or signed in again, is left alone.
+ */
+private suspend fun WhiteNoiseAppState.clearUnlinkedAccountNotifications(
+    accountRef: String,
+    copy: Long,
+    listed: Boolean,
+) {
+    val copies = accountSession.copyLifetimes
+    if (!unlinkedNotificationsClearable(listed, accounts.firstOrNull { it.label == accountRef }?.unlinked)) return
+    if (!copies.isCurrent(accountRef, copy)) return
+    // Recording the departing channel owners lets startup retention finish if the process dies part way.
+    val knownGroupIds = runCatchingCancellable { captureAccountKnownGroupIds(accountRef) }.getOrNull().orEmpty()
+    if (!copies.isCurrent(accountRef, copy)) return
+    clearRevokedConversationShortcutsForAccount(
+        accountRef = accountRef,
+        includeUnscopedLegacy = accounts.none { it.label != accountRef && it.isSignedInSigningAccount() },
+        knownGroupIds = knownGroupIds,
+    )
+}
+
+/**
+ * Whether an unlinked account's notifications may be cleared. A list this handler re-read ([listed]) that shows the
+ * account linked again ([unlinked] false) means it was signed in again, and its new notifications stay. An unreadable
+ * list cannot show that, so MDK's report of the unlink is trusted.
+ */
+internal fun unlinkedNotificationsClearable(
+    listed: Boolean,
+    unlinked: Boolean?,
+): Boolean = !listed || unlinked != false
 
 /**
  * Takes down the notice that [accountRef] was unlinked once that account is gone from this device, and outdates any
