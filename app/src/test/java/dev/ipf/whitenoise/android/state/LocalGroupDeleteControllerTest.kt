@@ -160,10 +160,11 @@ class LocalGroupDeleteControllerTest {
 
     @Test
     fun exhaustedNativeDeleteRestoresRowAndReportsItsPhase() =
-        runTest {
+        runLocalGroupDeleteTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-            flushChatRows()
+            // Publish the debounced row on the fixture's Main dispatcher.
+            testScheduler.advanceTimeBy(20)
             assertEquals(3, fixture.calls.count { it == "deleteGroupLocal" })
             assertEquals(1, fixture.calls.count { it == "catchUpAccounts" })
             assertTrue(fixture.controller.items.any { it.id == GROUP })

@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">С вашим ключом можно войти где угодно, и его нельзя изменить или отозвать. White Noise не пускает неизвестные устройства в список привязанных, но не может закрыть им доступ.</string>
     <string name="compromise_warning_steps_title">Что делать</string>
     <string name="compromise_warning_step_remove">1. Удалите все устройства, которые вы не узнаёте.</string>
-    <string name="compromise_warning_step_signer">2. Если вы пользуетесь приложением для подписи, удалите в нём приложения, которые вы не узнаёте.</string>
+    <string name="compromise_warning_step_signer">2. Если вы пользуетесь приложением для подписи, откройте в нём список подключённых приложений и удалите незнакомые.</string>
     <string name="compromise_warning_step_move">3. Перейдите на новую учётную запись. Вашим контактам нужно будет добавить её.</string>
     <string name="compromise_alert_review">Проверить устройства</string>
     <string name="compromise_warning_hide_failed">Не удалось скрыть предупреждение. Попробуйте ещё раз.</string>

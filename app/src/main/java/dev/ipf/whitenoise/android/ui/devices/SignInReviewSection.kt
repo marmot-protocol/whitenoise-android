@@ -111,6 +111,7 @@ internal fun LazyListScope.compromiseWarning(
 internal fun LazyListScope.signInReview(
     state: SignInReviewState,
     actions: SignInReviewActions,
+    canStartFresh: Boolean = true,
 ) {
     item(key = "section.sign-ins") { SettingsSection(stringResource(R.string.sign_ins_section)) }
     if (state.list.checkFailed) {
@@ -153,7 +154,7 @@ internal fun LazyListScope.signInReview(
                     )
                 }
             }
-            if (offersStartFresh(state)) {
+            if (canStartFresh && offersStartFresh(state)) {
                 row("start_fresh") { context ->
                     SettingsAction(
                         context = context,

@@ -133,14 +133,20 @@ internal class RuntimeDeviceLink(
 internal fun rememberDeviceLinkController(appState: WhiteNoiseAppState): DeviceLinkController? {
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
+    val localSigning = appState.activeAccount?.localSigning == true
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val controller =
-        remember(accountRef, runtimeGeneration) {
+        remember(accountRef, runtimeGeneration, localSigning) {
             accountRef?.let { account ->
                 DeviceLinkController(
                     accountRef = account,
                     native = RuntimeDeviceLink(appState),
-                    owns = { appState.activeAccountRef == account && appState.runtimeGeneration == runtimeGeneration },
+                    canLink = localSigning,
+                    owns = {
+                        appState.activeAccountRef == account &&
+                            appState.runtimeGeneration == runtimeGeneration &&
+                            (appState.activeAccount?.localSigning == true) == localSigning
+                    },
                 )
             }
         }

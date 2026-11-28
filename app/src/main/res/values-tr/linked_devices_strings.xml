@@ -194,7 +194,7 @@
     <string name="compromise_warning_explainer">Anahtarınız her yerde oturum açabilir ve değiştirilemez ya da iptal edilemez. White Noise bilinmeyen cihazları bağlı cihazlarınızın dışında tutar ama onları dışarıda bırakamaz.</string>
     <string name="compromise_warning_steps_title">Ne yapmalı</string>
     <string name="compromise_warning_step_remove">1. Tanımadığınız tüm cihazları kaldırın.</string>
-    <string name="compromise_warning_step_signer">2. İmzalama uygulaması kullanıyorsanız orada tanımadığınız uygulamaları kaldırın.</string>
+    <string name="compromise_warning_step_signer">2. İmzalama uygulaması kullanıyorsanız bağlı uygulamaları açın ve tanımadığınız uygulamaları kaldırın.</string>
     <string name="compromise_warning_step_move">3. Yeni bir hesaba geçin. Kişilerinizin onu eklemesi gerekecek.</string>
     <string name="compromise_alert_review">Cihazları incele</string>
     <string name="compromise_warning_hide_failed">Uyarı gizlenemedi. Tekrar deneyin.</string>

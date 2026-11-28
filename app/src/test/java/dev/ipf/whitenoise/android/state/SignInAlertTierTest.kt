@@ -47,11 +47,14 @@ class SignInAlertTierTest {
         assertEquals(SignInAlertTier.Review, signInAlertTier(signInsToReview(listOf(old), emptySet()), emptyList()))
     }
 
-    /** Local-key accounts get alerts; external-signer, signed-out and unlinked accounts do not yet. */
+    /** Local-key and external-signer accounts get alerts while signed in and linked. */
     @Test
-    fun alertsApplyToSignedInLocalKeyAccounts() {
+    fun alertsApplyToSignedInSigningAccounts() {
         assertTrue(signInAlertsApply(account()))
-        assertFalse(signInAlertsApply(account(localSigning = false, externalSigning = true)))
+        assertTrue(signInAlertsApply(account(localSigning = false, externalSigning = true)))
+        assertFalse(signInAlertsApply(account(localSigning = false)))
+        assertFalse(signInAlertsApply(account(localSigning = false, externalSigning = true, signedOut = true)))
+        assertFalse(signInAlertsApply(account(localSigning = false, externalSigning = true, unlinked = true)))
         assertFalse(signInAlertsApply(account(signedOut = true)))
         assertFalse(signInAlertsApply(account(unlinked = true)))
     }
