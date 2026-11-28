@@ -21,7 +21,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.setDefaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
-import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerSheet
+import dev.ipf.whitenoise.android.ui.group.DefaultDisappearingTimerDialog
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
@@ -204,12 +204,14 @@ internal fun DevicePrivacyScreen(
         )
     }
     if (defaultDisappearingPicker) {
-        DisappearingMessagesPickerSheet(
+        // A Settings default is a short familiar list, so it is a radio choice dialog, not the chat's sheet (#4094).
+        DefaultDisappearingTimerDialog(
             currentSecs = defaultDisappearingSeconds,
             explainer = stringResource(R.string.default_disappearing_messages_picker_detail),
             onDismiss = { defaultDisappearingPicker = false },
             onPick = { seconds ->
                 appState.setDefaultDisappearingMessagesSeconds(seconds = seconds, accountRef = activeAccountRef)
+                defaultDisappearingPicker = false
             },
         )
     }

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -151,7 +152,10 @@ internal fun WhiteNoiseDialogChoiceRow(
     }
 }
 
-/** A rounded choice with wrapping text and one radio accessibility target across the whole row. */
+/**
+ * A rounded choice with wrapping text and one radio accessibility target across the whole row. [leading] is an
+ * optional decorative cue drawn between the radio and the text, such as a language flag; it stays out of semantics.
+ */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun WhiteNoiseChoiceRow(
@@ -164,6 +168,7 @@ internal fun WhiteNoiseChoiceRow(
     enabled: Boolean = true,
     accessibilityLabel: String? = null,
     highlightSelected: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -187,6 +192,9 @@ internal fun WhiteNoiseChoiceRow(
             enabled = enabled,
             modifier = Modifier.clearAndSetSemantics {},
         )
+        if (leading != null) {
+            Box(Modifier.padding(start = ChoiceDialogDefaults.RowOverhang).clearAndSetSemantics {}) { leading() }
+        }
         Column(
             Modifier
                 .weight(1f)
@@ -420,6 +428,37 @@ internal fun SpeechChoiceDialog(
                 enabled = acceptsInput,
             ) { Text(stringResource(R.string.cancel)) }
         },
+    )
+}
+
+/**
+ * The catalog form of [SpeechChoiceDialog] for a list someone browses, such as the read-aloud voices: the same
+ * choices on a [WhiteNoiseChoicePage] with Back, where a tap runs the choice and returns to the opener. Rows keep
+ * the dialog's `speech.choice.<index>` tags.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun SpeechChoicePage(
+    title: String,
+    choices: List<SpeechChoice>,
+    onDismiss: () -> Unit,
+) {
+    WhiteNoiseChoicePage(
+        title = title,
+        choices =
+            choices.map { choice ->
+                WhiteNoisePageChoice(
+                    value = choice,
+                    title = choice.title,
+                    subtitle = choice.subtitle,
+                    accessibilityLabel = choice.accessibilityLabel,
+                    enabled = choice.enabled,
+                )
+            },
+        selected = choices.firstOrNull { it.selected },
+        onSelect = { it.onClick() },
+        onDismiss = onDismiss,
+        rowTag = { index, _ -> "speech.choice.$index" },
     )
 }
 

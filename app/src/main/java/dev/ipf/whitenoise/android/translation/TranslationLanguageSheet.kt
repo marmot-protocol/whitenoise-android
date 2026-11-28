@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,22 +31,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoicePage
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoisePageChoice
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.text.Normalizer
 
-private val LanguageRowMinHeight = 48.dp
-private val CheckSize = 24.dp
+private val CueMinWidth = 24.dp
 private val LanguageFlagFontSize = 18.sp
 private val LanguageFlagSlotSize = 26.sp
 private const val SHEET_HEIGHT_SHARE = 0.88f
@@ -76,8 +74,9 @@ internal fun filterLanguageCodes(
 }
 
 /**
- * The one language picker: a black bottom sheet with a search field that filters on every keystroke and plain
- * rows with a check mark on the [selected] language, which starts in view. Tapping a row selects it and closes.
+ * The in-chat language picker: a bottom sheet over the conversation with a search field that filters on every
+ * keystroke and radio rows with the [selected] language, which starts in view. Tapping a row selects it and closes.
+ * Settings uses [TranslationLanguagePickerPage] instead, because there the list is a catalog to browse.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +140,10 @@ internal fun TranslationLanguagePickerSheet(
     }
 }
 
-/** The decorative cue sits beside the localized name, with a check mark on the current choice. */
+/**
+ * One language as a Material radio row (#4094): the radio marks the current choice and the decorative flag or globe
+ * cue sits beside the localized name, outside semantics.
+ */
 @Composable
 private fun TranslationLanguageRow(
     label: String,
@@ -150,44 +152,65 @@ private fun TranslationLanguageRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = LanguageRowMinHeight)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = WhiteNoiseSpacing.Section, vertical = WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        val flagWidth = with(LocalDensity.current) { LanguageFlagSlotSize.toDp() }.coerceAtLeast(CheckSize)
-        Box(Modifier.widthIn(min = flagWidth).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
-            if (flag == null) {
-                Icon(
-                    painterResource(R.drawable.ic_language),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(flag, fontSize = LanguageFlagFontSize, maxLines = 1)
-            }
-        }
-        Text(
-            label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        if (selected) {
+    WhiteNoiseChoiceRow(
+        title = label,
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier.padding(horizontal = WhiteNoiseSpacing.Related),
+        leading = { TranslationLanguageCue(flag) },
+    )
+}
+
+/** The flag for a language with one clear country, else a globe, in a slot wide enough for any flag glyph. */
+@Composable
+internal fun TranslationLanguageCue(flag: String?) {
+    val flagWidth = with(LocalDensity.current) { LanguageFlagSlotSize.toDp() }.coerceAtLeast(CueMinWidth)
+    Box(Modifier.widthIn(min = flagWidth), contentAlignment = Alignment.Center) {
+        if (flag == null) {
             Icon(
-                painterResource(R.drawable.ic_check),
+                painterResource(R.drawable.ic_language),
                 contentDescription = null,
-                modifier = Modifier.size(CheckSize).clearAndSetSemantics {},
-                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Box(Modifier.size(CheckSize))
+            Text(flag, fontSize = LanguageFlagFontSize, maxLines = 1)
         }
     }
+}
+
+/**
+ * The Settings form of the language picker: a catalog page with Back (#4094), searchable with the same accent- and
+ * case-insensitive match as the sheet, radio rows with the flag cue, and the [selected] language in view. A tap
+ * applies the language and returns to Settings.
+ */
+@Composable
+internal fun TranslationLanguagePickerPage(
+    title: String,
+    choices: TranslationLanguageChoices,
+    selected: String?,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    WhiteNoiseChoicePage(
+        title = title,
+        choices =
+            choices.codes.map { code ->
+                WhiteNoisePageChoice(
+                    value = code,
+                    title = choices.label(code),
+                    leading = { TranslationLanguageCue(translationLanguageFlag(code)) },
+                )
+            },
+        selected = selected,
+        onSelect = onSelect,
+        onDismiss = onDismiss,
+        searchPlaceholder = stringResource(R.string.translation_search_languages),
+        matches = { choice, query -> filterLanguageCodes(listOf(choice.value), choices.label, query).isNotEmpty() },
+        rowTag = { _, code -> "translation.language.$code" },
+        searchTag = "translation.language.search",
+        emptyText = stringResource(R.string.no_matches),
+    )
 }
 
 @Composable
