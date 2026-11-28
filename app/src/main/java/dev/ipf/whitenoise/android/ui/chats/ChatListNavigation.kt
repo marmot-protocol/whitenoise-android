@@ -25,7 +25,6 @@ internal class ChatListNavigation(
     private val visibleItems: List<ChatListItem>,
     private val showArchived: Boolean,
     private val advancedFolder: Boolean,
-    private val sourceList: List<ChatListItem>,
     private val appState: WhiteNoiseAppState,
     private val searchRecents: GlobalSearchRecents?,
     private val globalSearchState: GlobalSearchState,
@@ -61,7 +60,7 @@ internal class ChatListNavigation(
     fun openSearchMessage(
         groupIdHex: String,
         messageIdHex: String,
-        chats: List<ChatListItem> = sourceList,
+        chats: List<ChatListItem>,
     ) {
         val canonical = canonicalChatListGroupId(groupIdHex)
         val item =
@@ -93,7 +92,6 @@ internal fun rememberChatListNavigation(
     visibleItems: List<ChatListItem>,
     showArchived: Boolean,
     advancedFolder: Boolean,
-    sourceList: List<ChatListItem>,
     appState: WhiteNoiseAppState,
     searchRecents: GlobalSearchRecents?,
     globalSearchState: GlobalSearchState,
@@ -105,7 +103,6 @@ internal fun rememberChatListNavigation(
         visibleItems,
         showArchived,
         advancedFolder,
-        sourceList,
         appState,
         searchRecents,
         globalSearchState,
@@ -117,7 +114,6 @@ internal fun rememberChatListNavigation(
             visibleItems = visibleItems,
             showArchived = showArchived,
             advancedFolder = advancedFolder,
-            sourceList = sourceList,
             appState = appState,
             searchRecents = searchRecents,
             globalSearchState = globalSearchState,

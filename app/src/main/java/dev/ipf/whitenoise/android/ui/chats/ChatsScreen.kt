@@ -1110,7 +1110,6 @@ internal fun ChatsScreen(
             visibleItems = visibleItems,
             showArchived = showArchived,
             advancedFolder = advancedFolder,
-            sourceList = sourceList,
             appState = appState,
             searchRecents = searchRecents,
             globalSearchState = globalSearchState,
