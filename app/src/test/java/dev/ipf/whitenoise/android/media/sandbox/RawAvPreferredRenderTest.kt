@@ -227,6 +227,30 @@ class RawAvPreferredRenderTest {
             assertTrue(owner.ended)
         }
 
+    @Test fun audioReserveFollowsTheMixerWhileVideoFollowsPresentation() =
+        runBlocking {
+            val owner = Owner()
+            val sink = Sink(presentationLagUs = 80_000)
+            val session = session(owner, sink)
+            val video = ArrayDeque(listOf(video(0), video(60_000)))
+            owner.onFrame = {
+                if (owner.displayed.size == 2) {
+                    assertEquals(200_000L, sink.writtenPositionUs())
+                    assertEquals(120_000L, session.positionUs())
+                    owner.alive = false
+                }
+            }
+            session.consumeFrames(info(), 7, { track ->
+                if (track == AvStreamProtocol.VIDEO_TRACK) {
+                    video.removeFirst()
+                } else {
+                    AvStreamFrame.Audio(ByteArray(3840), 8000, 1, 0)
+                }
+            }, {})
+            assertEquals(listOf(0L, 60_000L), owner.displayed)
+            assertEquals(null, session.pause())
+        }
+
     /** Real Quarter Speed Coordinator Paces Every Video Across One Large Native Pcm Block. */
     @Test fun realQuarterSpeedCoordinatorPacesEveryVideoAcrossOneLargeNativePcmBlock() =
         runBlocking {
@@ -421,7 +445,8 @@ class RawAvPreferredRenderTest {
         var maximumQueued = 0
 
         fun read(track: Int): AvStreamFrame {
-            val selected = if (track == AvStreamProtocol.AUDIO_TRACK) audio else video
+            val audioRead = track == AvStreamProtocol.AUDIO_TRACK || track == AvStreamProtocol.AUDIO_RESERVE_TRACK
+            val selected = if (audioRead) audio else video
             while (selected.isEmpty() && cursor < packets.size) {
                 if (audio.size + video.size >= 512) throw IOException("compressed_lookahead_budget_refused")
                 val packet = packets[cursor++]
@@ -430,9 +455,9 @@ class RawAvPreferredRenderTest {
             }
             val time = selected.removeFirstOrNull()
             if (time == null) {
-                return if (track == AvStreamProtocol.AUDIO_TRACK) AvStreamFrame.AudioEnd else AvStreamFrame.VideoEnd
+                return if (audioRead) AvStreamFrame.AudioEnd else AvStreamFrame.VideoEnd
             }
-            return if (track == AvStreamProtocol.AUDIO_TRACK) {
+            return if (audioRead) {
                 audioReads++
                 if (time == 14_000_000L) crossingReads++
                 AvStreamFrame.Audio(ByteArray(320) { if (it % 2 == 1) 32 else 0 }, 8000, 1, time)
@@ -444,7 +469,9 @@ class RawAvPreferredRenderTest {
         }
     }
 
-    private class Sink : RawPcmSink {
+    private class Sink(
+        private val presentationLagUs: Long = 0,
+    ) : RawPcmSink {
         override val sampleRate = 8000
         override val channels = 1
         var accepted = 0
@@ -476,11 +503,13 @@ class RawAvPreferredRenderTest {
             return 1000
         }
 
-        override fun positionUs() = accepted.toLong() * 1_000_000 / 16000
+        override fun positionUs() = (mixerPositionUs - presentationLagUs).coerceAtLeast(0)
 
-        override fun writtenPositionUs() = positionUs()
+        override val mixerPositionUs: Long get() = writtenPositionUs()
 
-        override fun bufferedPositionUs() = positionUs()
+        override fun writtenPositionUs() = accepted.toLong() * 1_000_000 / 16000
+
+        override fun bufferedPositionUs() = writtenPositionUs()
 
         override fun drained() = ended
 

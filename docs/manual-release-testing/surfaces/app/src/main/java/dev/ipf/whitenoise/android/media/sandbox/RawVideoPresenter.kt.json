@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/RawVideoPresenter.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Bounded video presentation during playback, seeks, surface recreation and account retirement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/RawVideoPresenter.kt",
+        "anchor": "internal class RawVideoPresenter",
+        "test_ids": [
+          "MED-046"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

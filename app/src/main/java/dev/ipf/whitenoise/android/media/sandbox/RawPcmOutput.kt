@@ -126,6 +126,10 @@ internal class RawPcmOutput(
 
     @Synchronized override fun bufferedPositionUs(): Long = buffered
 
+    @get:Synchronized
+    override val mixerPositionUs: Long get() =
+        (segmentSourceUs + segment.mediaDurationUs(queue.positionUs())).coerceAtMost(written)
+
     @Synchronized override fun drained(): Boolean {
         fault?.let { throw it }
         return closed || finished

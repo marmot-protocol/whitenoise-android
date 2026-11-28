@@ -96,8 +96,11 @@ before loading `media_decoder`. Each process owns one session. Handles are
 generated identifiers checked under a mutex; stale handles cannot address a
 replacement session.
 
-- `nativeOpen(fd, offset, length, edge)` accepts a read-only selected range up
-  to 512 MiB and an output edge of 1 through 4096. Stream discovery denies all
+- `nativeOpen(fd, offset, length, edge, playbackColors)` accepts a read-only
+  selected range up to 512 MiB and an output edge of 1 through 4096.
+  The playback color option keeps the transfer of explicitly tagged SDR BT.709
+  for playing frames and in-player posters. Thumbnail generation and other
+  source encodings use the color-managed conversion. Stream discovery denies all
   probe decoders. Decoder contexts are created when the first read selects the
   requested tracks.
 - `nativeInfo(handle)` returns square-pixel display width and height, duration
@@ -136,8 +139,13 @@ This is not a process-wide or aggregate native-memory limit: dav1d internal
 allocations and runtime overhead are separate, and reference frames can
 consume more in aggregate.
 
-Playback lookahead retains at most 8 MiB of compressed packets. Each track
-can hold one pending decoded frame, and a video seek can keep one additional
+Playback lookahead retains at most 8 MiB of compressed packets. Optional PCM
+uses queued audio and lets the video decoder consume queued packets into at most
+12 retained native frames with a 40 MiB byte cap. This queue holds references to
+decoded buffers. It probes the demuxer only after the compressed queue drains
+and yields on pressure or after 40 ms of optional work at a codec boundary.
+Playback consumes the frames in order and seek clears the queue. Each track can
+also hold one pending decoded frame, and a video seek can keep one additional
 preroll frame until the target's coverage is known. The packet cap is 512,
 scaled by the video thread count (up to 2048)
 while a frame-threaded video read holds interleaved audio packets. A read selects the earlier timestamp
@@ -177,7 +185,9 @@ perceptual intent. When dimensions change, the first context resizes in the
 source pixel encoding with its color properties and HDR side data retained.
 Only then does the second context map that bounded image into full-range RGBA
 with BT.709 primaries and the sRGB transfer function. Its destination carries
-no source HDR mastering metadata. Aligned native frame buffers keep conversion
+no source HDR mastering metadata. A playing frame or in-player poster with
+explicit limited-range 8-bit BT.709 encoding and no HDR or ICC side data
+retains its source transfer. Aligned native frame buffers keep conversion
 padding private; only packed RGBA row bytes enter the shared output.
 
 Unsupported matrix or transfer metadata is refused. HDR inputs require explicit
