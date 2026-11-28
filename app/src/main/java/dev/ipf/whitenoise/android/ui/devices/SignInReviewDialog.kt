@@ -36,11 +36,11 @@ internal fun SignInReviewDialog(
 ) {
     val choice = signInAnswerChoice(signIn)
     val question = if (signIn.beforeThisDevice) R.string.sign_in_question_before else R.string.sign_in_question_new
-    val waiting = signIn.state == UnrecognizedSignInStateFfi.PROMPT
+    val canDefer = !readOnly && signIn.state == UnrecognizedSignInStateFfi.PROMPT
     WhiteNoiseAlertDialog(
         onDismissRequest = onClose,
         title = { Text(stringResource(question)) },
-        text = { SignInReviewText(signIn, choice, mine) },
+        text = { SignInReviewText(signIn, choice, mine, readOnly) },
         confirmButton = {
             when (choice) {
                 SignInAnswerChoice.DismissOnly ->
@@ -57,14 +57,14 @@ internal fun SignInReviewDialog(
             }
         },
         dismissButton = {
-            if (!readOnly && choice == SignInAnswerChoice.NotNowOrReject && waiting) {
+            if (canDefer && choice == SignInAnswerChoice.NotNowOrReject) {
                 NotNowButton { onAnswer(SignInResponseFfi.NOT_NOW) }
             } else {
                 TextButton(onClick = onClose, modifier = Modifier.testTag(SIGN_IN_CLOSE_TAG)) {
                     Text(stringResource(R.string.close))
                 }
             }
-            if (!readOnly && choice == SignInAnswerChoice.NotNowOrDontRecognize && waiting) {
+            if (canDefer && choice == SignInAnswerChoice.NotNowOrDontRecognize) {
                 NotNowButton { onAnswer(SignInResponseFfi.NOT_NOW) }
             }
             if (!readOnly && choice == SignInAnswerChoice.NotNowOrReject && !mine) {
@@ -104,11 +104,12 @@ private fun SignInReviewText(
     signIn: UnrecognizedSignInFfi,
     choice: SignInAnswerChoice,
     mine: Boolean,
+    readOnly: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         signInWhen(signIn)?.let { Text(it) }
         signInSummary(signIn, mine).forEach { Text(it) }
-        if (choice != SignInAnswerChoice.DismissOnly) {
+        if (!readOnly && choice != SignInAnswerChoice.DismissOnly) {
             val detail = if (signIn.beforeThisDevice) R.string.sign_in_detail_before else R.string.sign_in_detail_new
             Text(stringResource(detail))
         }

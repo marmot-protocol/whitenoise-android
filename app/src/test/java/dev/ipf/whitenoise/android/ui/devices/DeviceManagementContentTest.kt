@@ -349,6 +349,7 @@ class DeviceManagementContentTest {
         val answers = review(signIn("a"), onMine = { mine++ })
 
         compose.onNodeWithText(context.getString(R.string.sign_in_question_new)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.sign_in_detail_new)).assertExists()
         compose.onNodeWithText(context.getString(R.string.sign_in_reject_confirm)).assertExists()
         compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).performClick()
         compose.onNodeWithTag(SIGN_IN_MINE_TAG).performClick()
@@ -419,6 +420,10 @@ class DeviceManagementContentTest {
     @Test
     fun anExternalSignerCanRejectAnUnknownSignIn() {
         val answers = review(signIn("a"), readOnly = true)
+
+        compose.onNodeWithText(context.getString(R.string.sign_in_detail_new)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.sign_in_reject_confirm)).assertExists()
+        compose.onNodeWithTag(SIGN_IN_CLOSE_TAG).assertExists()
 
         compose.onNodeWithTag(SIGN_IN_NOT_NOW_TAG).assertDoesNotExist()
         compose.onNodeWithTag(SIGN_IN_MINE_TAG).assertDoesNotExist()
