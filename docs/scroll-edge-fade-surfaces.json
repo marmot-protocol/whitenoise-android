@@ -1545,7 +1545,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
       "calls": {
-        "SettingsList": 1
+        "SettingsList": 2
       },
       "family": "settings",
       "policy": "ordinary",
