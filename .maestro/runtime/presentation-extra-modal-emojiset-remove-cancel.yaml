@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-emojiset-remove-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: "Remove Fixture set[?]"
+- assertVisible:
+    id: emoji_sets.remove.confirm
+- tapOn:
+    id: emoji_sets.remove.cancel
+- assertVisible:
+    id: presentation.complete

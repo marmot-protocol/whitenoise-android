@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.ui.qr.ScannerErrorDialog
 import dev.ipf.whitenoise.android.ui.settings.AuditLogExportConsentDialog
 import dev.ipf.whitenoise.android.ui.settings.AuditLogExportDestinationDialog
 import dev.ipf.whitenoise.android.ui.settings.ConfirmEmojiRemoval
+import dev.ipf.whitenoise.android.ui.settings.ConfirmEmojiSetRemoval
 import dev.ipf.whitenoise.android.ui.settings.CustomEmojiNameDialog
 import dev.ipf.whitenoise.android.ui.settings.EncryptedBackupResultDialog
 import dev.ipf.whitenoise.android.ui.settings.StagedEmoji
@@ -29,6 +30,12 @@ internal fun MaestroModalPresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("extra-modal-backup-") -> BackupPresentation(fixture)
         fixture.scenario.startsWith("extra-modal-emoji-wrapper-") -> EmojiWrapperPresentation(fixture)
+        fixture.scenario.startsWith("extra-modal-emojiset-remove-") ->
+            ConfirmEmojiSetRemoval(
+                setTitle = "Fixture set",
+                onDismiss = { fixture.finish("cancel-retained") },
+                onConfirm = { fixture.finish("remove-dispatched") },
+            )
         fixture.scenario.startsWith("extra-modal-emoji-") -> EmojiNamePresentation(fixture)
         fixture.scenario.startsWith("extra-modal-scanner-") ->
             ScannerErrorDialog(

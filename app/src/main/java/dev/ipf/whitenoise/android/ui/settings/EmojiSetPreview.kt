@@ -244,19 +244,13 @@ private fun EmojiSetRemoveButton(
 ) {
     var confirmRemove by remember(set.coordinate) { mutableStateOf(false) }
     if (confirmRemove) {
-        // Removal deletes the downloaded images, and downloading them again is not an Undo.
-        ConfirmDialog(
-            title = stringResource(R.string.emoji_sets_remove_title, set.displayTitle()),
-            message = stringResource(R.string.emoji_sets_remove_detail),
-            confirmLabel = stringResource(R.string.remove),
-            destructive = true,
+        ConfirmEmojiSetRemoval(
+            setTitle = set.displayTitle(),
+            onDismiss = { confirmRemove = false },
             onConfirm = {
                 confirmRemove = false
                 onRemove()
             },
-            onDismiss = { confirmRemove = false },
-            confirmTag = "emoji_sets.remove.confirm",
-            cancelTag = "emoji_sets.remove.cancel",
         )
     }
     WhiteNoiseOutlinedButton(
@@ -269,6 +263,28 @@ private fun EmojiSetRemoveButton(
             color = if (enabled) MaterialTheme.colorScheme.error else Color.Unspecified,
         )
     }
+}
+
+/**
+ * Confirms removing an installed emoji set (#4097). It names the set and says the images leave this device, because
+ * downloading them again is not an Undo. Remove is error-coloured and Cancel keeps the set.
+ */
+@Composable
+internal fun ConfirmEmojiSetRemoval(
+    setTitle: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.emoji_sets_remove_title, setTitle),
+        message = stringResource(R.string.emoji_sets_remove_detail),
+        confirmLabel = stringResource(R.string.remove),
+        destructive = true,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        confirmTag = "emoji_sets.remove.confirm",
+        cancelTag = "emoji_sets.remove.cancel",
+    )
 }
 
 /** MDK's measured install progress with its Cancel action. */
