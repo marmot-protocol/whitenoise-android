@@ -103,7 +103,8 @@ internal class ConversationUnreadMentionJump(
         navigationState.navigateReplyJob =
             scope.launch {
                 tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
-                    val targetMessageId = nextUnreadMentionTarget(inputs) { navigationRequest.isCurrent() } ?: return@launch
+                    val targetMessageId =
+                        nextUnreadMentionTarget(inputs) { navigationRequest.isCurrent() } ?: return@launch
                     val available =
                         tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
                             controller.loadUntilMessageAvailable(targetMessageId)

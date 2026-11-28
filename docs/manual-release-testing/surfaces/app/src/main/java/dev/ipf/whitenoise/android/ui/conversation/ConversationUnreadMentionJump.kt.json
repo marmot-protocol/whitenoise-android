@@ -10,6 +10,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationUnreadMentionJump.kt",
+        "surface": "Unavailable unread mention notice",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   }
