@@ -76,7 +76,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -116,7 +115,6 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
-import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -125,7 +123,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
-import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
 import dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion
@@ -171,8 +168,6 @@ import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -655,147 +650,29 @@ internal fun MessageBubble(
             persistedFailure = persistedFailure,
             parseMarkdown = parseMarkdown,
         )
-    var activeSpeakableDocument by remember(record.messageIdHex, ttsSpeakableSource, record.contentTokens) {
-        mutableStateOf<MarkdownDocumentFfi?>(null)
-    }
-    LaunchedEffect(
-        effectiveTtsCandidate,
-        ttsSpeakableSource,
-        record.messageIdHex,
-        record.contentTokens,
-        editedMarkdownDocument,
-    ) {
-        if (!effectiveTtsCandidate || speakableIdentity == null || ttsSpeakableSource == null) {
-            activeSpeakableDocument = null
-            return@LaunchedEffect
-        }
-        // Only an active edit has a rendered document to reuse. Everything else
-        // without stored content tokens - a message saved before they existed,
-        // or one the parser gave no blocks - has to be parsed here, exactly as
-        // projectTtsSpeakableEntry parses it. Substituting a null edited
-        // document leaves no projection, and the passage below is then rejected
-        // for carrying a projection id the bubble cannot match, so read-aloud
-        // speaks with no sentence or word highlight at all.
-        if (!ttsSpeakableSource.useStoredContentTokens && editedMarkdownDocument != null) {
-            activeSpeakableDocument = editedMarkdownDocument
-            return@LaunchedEffect
-        }
-        val document =
-            resolveTtsSpeakableDocument(
-                message = record,
-                source = ttsSpeakableSource,
-                parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
-            )
-        currentCoroutineContext().ensureActive()
-        activeSpeakableDocument = document
-    }
-    val queuedTtsPresentation =
-        ttsFollowTarget?.let { target ->
-            appState.ttsController
-                .presentationEntryFor(
-                    target.sessionId,
-                    record.messageIdHex,
-                    target.projectionId,
-                    ttsSpeakableSource?.text,
-                )?.takeIf { effectiveTtsCandidate }
-        }
-    val speakableProjection =
-        remember(
-            queuedTtsPresentation,
-            activeSpeakableDocument,
-            effectiveTtsCandidate,
-            speakableIdentity,
-        ) {
-            if (queuedTtsPresentation != null) {
-                queuedTtsPresentation.speakableProjection()
-            } else if (!effectiveTtsCandidate || speakableIdentity == null) {
-                null
-            } else {
-                activeSpeakableDocument?.let { document ->
-                    messageSpeakableProjection(
-                        bodyText = speakableIdentity.bodyText,
-                        document = document,
-                        mentionDisplayName = appState::mentionSpeechName,
-                    )
-                }
-            }
-        }
-    val ttsProjectionState =
-        resolveMessageBubbleTtsProjectionState(
-            gateInput = ttsGateInput,
-            projectionId = speakableProjection?.projectionId,
-            progress = ttsReadAloudProgress,
+    val ttsPresentation =
+        rememberMessageBubbleTtsPresentation(
+            appState = appState,
+            record = record,
+            ttsSpeakableSource = ttsSpeakableSource,
+            speakableIdentity = speakableIdentity,
+            ttsGateInput = ttsGateInput,
+            effectiveTtsCandidate = effectiveTtsCandidate,
+            editedMarkdownDocument = editedMarkdownDocument,
+            visibleTranslation = visibleTranslation,
+            ttsFollowTarget = ttsFollowTarget,
+            ttsReadAloudProgress = ttsReadAloudProgress,
+            ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+            ttsRowInstance = ttsRowInstance,
+            ttsSessionId = ttsSessionId,
         )
-    val effectiveTtsPassage = ttsProjectionState.effectivePassage
-    val preparedTtsSpeech =
-        appState.ttsController.preparedSpeechFor(record.messageIdHex, speakableProjection?.projectionId)
-    val ttsProjectionResolver =
-        rememberTtsHighlightProjectionResolver(
-            speakableProjection.takeIf { visibleTranslation == null },
-            preparedTtsSpeech,
-        )
-    val ttsLeafHighlightResolver =
-        remember(effectiveTtsPassage, record.messageIdHex, ttsProjectionResolver) {
-            if (effectiveTtsPassage == null || effectiveTtsPassage.messageIdHex != record.messageIdHex) {
-                null
-            } else {
-                ttsProjectionResolver?.resolverFor(effectiveTtsPassage, record.messageIdHex)
-            }
-        }
-    val effectiveTtsFollowTarget =
-        ttsFollowTarget?.takeIf { target ->
-            target.messageIdHex == record.messageIdHex &&
-                target.projectionId == speakableProjection?.projectionId &&
-                target.sentenceIndex == effectiveTtsPassage?.sentenceIndex
-        }
-    val ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? =
-        remember(
-            effectiveTtsFollowTarget,
-            ttsProjectionResolver,
-            ttsSentenceLayoutSink,
-            ttsRowInstance,
-        ) {
-            val target = effectiveTtsFollowTarget
-            val projectionResolver = ttsProjectionResolver
-            val sink = ttsSentenceLayoutSink
-            val rowInstance = ttsRowInstance
-            when {
-                target == null || projectionResolver == null -> null
-                sink == null || rowInstance == null -> null
-                else ->
-                    { leafId: String, text: String, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates? ->
-                        val leafLayout = projectionResolver.sentenceLayoutFor(target.sentenceIndex, leafId, text)
-                        val bounds =
-                            if (layoutResult != null && coordinates != null && leafLayout != null) {
-                                ttsSentenceBoundsInWindow(layoutResult, coordinates, leafLayout.renderedRanges)
-                            } else {
-                                null
-                            }
-                        if (leafLayout == null || bounds == null) {
-                            sink.clear(target, rowInstance, leafId)
-                        } else {
-                            sink.report(
-                                ConversationTtsSentenceLayoutReport(
-                                    target = target,
-                                    rowInstance = rowInstance,
-                                    renderedLeafId = leafId,
-                                    boundsInWindow = bounds,
-                                    coverage = leafLayout.coverage,
-                                    expectedCoverage = leafLayout.expectedCoverage,
-                                ),
-                            )
-                        }
-                    }
-            }
-        }
-    val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
-    val ttsBodyExpanded =
-        rememberTtsMessageBodyExpanded(
-            messageIdHex = record.messageIdHex,
-            sourceText = speakableIdentity?.bodyText,
-            sessionId = ttsSessionId,
-            verifiedActivePassage = effectiveTtsFollowTarget != null && ttsProjectionResolver != null,
-        )
+    val speakableProjection = ttsPresentation.speakableProjection
+    val ttsProjectionResolver = ttsPresentation.ttsProjectionResolver
+    val queuedTtsPresentation = ttsPresentation.queuedTtsPresentation
+    val ttsLeafHighlightResolver = ttsPresentation.ttsLeafHighlightResolver
+    val ttsSentenceLayoutReporter = ttsPresentation.ttsSentenceLayoutReporter
+    val effectiveTtsReadAloudProgress = ttsPresentation.effectiveTtsReadAloudProgress
+    val ttsBodyExpanded = ttsPresentation.ttsBodyExpanded
     val forwardNowSeconds = (System.currentTimeMillis() / 1000L).toULong()
     val forwardEligibility =
         remember(
