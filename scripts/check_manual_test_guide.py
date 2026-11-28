@@ -206,7 +206,7 @@ SEMANTIC_OWNER_IDS = {
         "permission:android.permission.FOREGROUND_SERVICE_MICROPHONE": {"DIC-001"},
         "permission:android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING": {"NTF-006", "NTF-014"},
         "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE": {"NTF-006", "NTF-014"},
-        "permission:android.permission.HIDE_OVERLAY_WINDOWS": {"SET-078"},
+        "permission:android.permission.HIDE_OVERLAY_WINDOWS": {"SET-079"},
         "permission:android.permission.INTERNET": {"INT-006", "INT-007"},
         "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001"},
         "permission:android.permission.POST_PROMOTED_NOTIFICATIONS": {"DIC-002"},
