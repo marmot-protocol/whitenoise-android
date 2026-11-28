@@ -70,8 +70,16 @@ internal fun ConfirmDialog(
             }
         },
         title = {
-            if (protectInput) ProtectDialogInput()
-            ConfirmText(title, emojiLabels)
+            if (protectInput) {
+                ProtectDialogInput { snackbar ->
+                    Column {
+                        ConfirmText(title, emojiLabels)
+                        WhiteNoiseSnackbarHost(snackbar)
+                    }
+                }
+            } else {
+                ConfirmText(title, emojiLabels)
+            }
         },
         text = {
             Column(

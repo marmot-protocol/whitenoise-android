@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +62,8 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.findActivity
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 
 internal const val DEVICE_LINK_WITH_ME_TAG = "device_link.consent.with_me"
@@ -96,29 +99,30 @@ internal fun DeviceLinkConsentDialog(
                 securePolicy = SecureFlagPolicy.SecureOn,
             ),
     ) {
-        ProtectDialogInput()
-        Box(Modifier.ignoringTouchesBefore(shownAt)) {
-            if (request.repeated) {
-                content { false }
-            } else {
-                val accountId = appState.accounts.firstOrNull { it.label == request.accountRef }?.accountIdHex
-                DeviceLinkConsentGate(
-                    prompt = prompt,
-                    profile =
-                        DeviceLinkConsentProfile(
-                            appState.profileName(request.accountRef),
-                            accountId ?: request.accountRef,
-                            accountId?.let(appState::avatarUrl),
-                        ),
-                    stillCurrent = {
-                        canRespond() &&
-                            watcher.queue.presented?.repeated == false &&
-                            watcher.presentedPrompt?.state == prompt.state
-                    },
-                    onClose = watcher::close,
-                    onReport = onReport,
-                    content = content,
-                )
+        ProtectDialogInput {
+            Box(Modifier.ignoringTouchesBefore(shownAt)) {
+                if (request.repeated) {
+                    content { false }
+                } else {
+                    val accountId = appState.accounts.firstOrNull { it.label == request.accountRef }?.accountIdHex
+                    DeviceLinkConsentGate(
+                        prompt = prompt,
+                        profile =
+                            DeviceLinkConsentProfile(
+                                appState.profileName(request.accountRef),
+                                accountId ?: request.accountRef,
+                                accountId?.let(appState::avatarUrl),
+                            ),
+                        stillCurrent = {
+                            canRespond() &&
+                                watcher.queue.presented?.repeated == false &&
+                                watcher.presentedPrompt?.state == prompt.state
+                        },
+                        onClose = watcher::close,
+                        onReport = onReport,
+                        content = content,
+                    )
+                }
             }
         }
     }
@@ -252,12 +256,28 @@ private suspend fun reportLinkRequest(
             watcher.reread(request.accountRef)
         },
         onFailure = {
-            if (!watcher.blocked && watcher.queue.presented?.id == request.id) {
+            if (appState.awaitLinkReportVisibility(watcher, request, generation)) {
                 appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", it)
             }
         },
     )
 }
+
+/** Keeps a failed report in the app-owned coroutine while its dialog is hidden. Drops it when the request goes away. */
+private suspend fun WhiteNoiseAppState.awaitLinkReportVisibility(
+    watcher: DeviceLinkRequestWatcher,
+    request: DeviceLinkRequest,
+    generation: Int,
+): Boolean =
+    snapshotFlow {
+        val visibleRequest = watcher.queue.presented?.takeIf { it.open }
+        when {
+            activeAccountRef != request.accountRef || runtimeGeneration != generation -> false
+            visibleRequest?.id != request.id -> false
+            watcher.blocked || appLock.screenVisible || appLock.evaluationPending -> null
+            else -> true
+        }
+    }.filterNotNull().first()
 
 @Suppress("LongParameterList")
 @Composable

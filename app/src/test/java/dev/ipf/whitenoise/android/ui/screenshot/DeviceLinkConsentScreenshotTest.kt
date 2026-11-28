@@ -29,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -60,6 +61,8 @@ class DeviceLinkConsentScreenshotTest {
         compose.onNodeWithText("Comparison").assertDoesNotExist()
         compose.onNodeWithTag(DEVICE_LINK_WITH_ME_TAG).performClick()
         compose.onNodeWithTag(DEVICE_LINK_WITH_ME_TAG).assertIsDisplayed()
+        val lockRequired = RuntimeEnvironment.getApplication().getString(R.string.link_consent_lock_required)
+        compose.onNodeWithText(lockRequired).assertIsDisplayed()
         compose.onNodeWithText("Comparison").assertDoesNotExist()
     }
 
