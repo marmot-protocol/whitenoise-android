@@ -80,6 +80,7 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
         edge: Int,
+        playbackColors: Boolean,
     ): MediaProbe? = resolver.openFileDescriptor(uri, "r")?.use { probePlatformMediaFixture(it, edge, true) }
 
     override fun probe(
