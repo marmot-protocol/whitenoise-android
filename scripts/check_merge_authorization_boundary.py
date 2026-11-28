@@ -15,6 +15,8 @@ WRITE_ALLOW = {
     # Deletes release assets using the trusted close-event cleanup script.
     ('android-pr-preview-cleanup.yml', 'prune'): {'contents'},
     ('android-release-distribute.yml', 'github-draft'): {'contents'},
+    # Creates one staging tag from a manually selected, verified APK build.
+    ('android-staging-tag.yml', 'tag'): {'contents'},
     ('dependency-submission.yml', None): {'contents'},
     ('pr-screenshots.yml', None): {'issues', 'pull-requests'},
     ('codeql.yml', None): {'security-events'},
@@ -22,10 +24,13 @@ WRITE_ALLOW = {
 
 
 def validate(name, workflow):
+    """Enforce the permission and trigger boundaries for repository workflows."""
     if not isinstance(workflow, dict) or not isinstance(workflow.get('jobs'), dict):
         raise ValueError('malformed workflow')
     events=workflow.get('on',workflow.get(True))
     event_names=set(events) if isinstance(events,(dict,list)) else {events} if isinstance(events,str) else set()
+    if name == 'android-staging-tag.yml' and event_names != {'workflow_dispatch'}:
+        raise ValueError('staging tag workflow must be manual')
     queue_trigger=bool(event_names & {'merge_group','pull_request','pull_request_target'})
     if 'push' in event_names:
         settings=events.get('push') if isinstance(events,dict) else None

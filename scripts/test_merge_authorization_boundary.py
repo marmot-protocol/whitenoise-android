@@ -52,6 +52,17 @@ class AuthorizationBoundaryTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate('android-ci.yml', {'permissions': {}, 'jobs': {'merge-group-fail-fast': widened}})
 
+    def test_staging_tag_write_only_on_manual_dispatch(self):
+        """The tag job may write contents only in its own manually dispatched workflow."""
+        name = 'android-staging-tag.yml'
+        write = {'permissions': {'contents': 'write', 'actions': 'read'}}
+        workflow = {'on': {'workflow_dispatch': {}}, 'permissions': {}, 'jobs': {'tag': write}}
+        validate(name, workflow)
+        with self.assertRaisesRegex(ValueError, 'staging tag workflow must be manual'):
+            validate(name, {**workflow, 'on': {'workflow_dispatch': {}, 'pull_request': {}}})
+        with self.assertRaisesRegex(ValueError, 'unreviewed write permission'):
+            validate(name, {**workflow, 'jobs': {'another': write}})
+
     def test_reserved_or_unbounded_dynamic_job_names_are_rejected(self):
         for name in ['Android merge authorization','Android merge authorization (${{ matrix.x }})',
                      '${{ inputs.name }}','Android merge ${{ matrix.name }}','android MERGE authorization',

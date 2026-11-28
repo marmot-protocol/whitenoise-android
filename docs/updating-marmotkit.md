@@ -176,6 +176,21 @@ evidence with the pin PR and add `--verified-features` to the apply command.
 Open the pin PR against `develop`, adapt Android callers as needed and get fresh
 Android CI. Production on `master` requires a Stable pin.
 
+### Tag a staging build for testing
+
+The [Android Staging APK workflow](../.github/workflows/android-staging-apk.yml)
+builds a signed APK on pushes to `develop`. Once you've picked one to keep
+testing, copy its run ID from the Actions URL. In **Actions → Tag Android
+Staging Build**, click **Run workflow** on `develop` and enter that run ID while
+the APK artifact is available. The tag uses the build's UTC date and run number
+(`staging/YYYY.MM.DD-<run number>`). Its annotation records the exact source,
+MarmotKit pin, build run and artifact digest. Running it again for the same
+build returns the original tag.
+
+Use the selected tag as the starting point for production qualification. The
+production PR into `master` requires a Stable pin promoted from the same MDK
+source as the tested staging build.
+
 ### Inspect a release by hand
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,
