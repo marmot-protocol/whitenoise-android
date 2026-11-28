@@ -2210,8 +2210,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
       "symbol": "CompromiseAlert",
       "bindings": [],
-      "remaining": "Showing the compromise alert requires a native warning. SET-077 covers the alert, follow-up actions and dismissal.",
-      "second_device": ["SET-077"]
+      "remaining": "Showing the compromise alert requires a native warning. SET-078 covers the alert, follow-up actions and dismissal.",
+      "second_device": ["SET-078"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.annotation.SuppressLint
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -27,30 +28,40 @@ internal class SignInAlertNotifier(
     private val context = context.applicationContext
     private val tapTokens = NotificationTapTokens.create(context)
 
+    override fun shownReviewCount(accountRef: String): Int = liveReview(accountRef)?.number ?: 0
+
     @SuppressLint("MissingPermission")
     override fun postReview(
         accountRef: String,
         count: Int,
         alert: Boolean,
     ): Boolean {
-        if (!notificationPermissionGranted(context)) return false
+        val live = if (alert) null else liveReview(accountRef)
+        if (!notificationPermissionGranted(context) || (!alert && live == null)) return false
         val title = context.resources.getQuantityString(R.plurals.sign_in_alert_review_title, count, count)
         val body = context.getString(R.string.sign_in_alert_review_body)
-        return post(
-            tag = REVIEW_TAG,
-            accountRef = accountRef,
-            notification =
-                builder(accountRef, REVIEW_ID, NotificationChannelSpec.SIGN_IN_REVIEW)
-                    .setContentTitle(title)
-                    .setContentText(body)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .setOnlyAlertOnce(!alert)
-                    .setPublicVersion(
-                        publicVersion(R.string.sign_in_alert_review_public, NotificationChannelSpec.SIGN_IN_REVIEW),
-                    ).build(),
-        )
+        val channel = NotificationChannelSpec.SIGN_IN_REVIEW
+        val review =
+            builder(accountRef, REVIEW_ID, channel)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setNumber(count)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPublicVersion(publicVersion(R.string.sign_in_alert_review_public, channel))
+        if (live != null) review.quietWrite(replaceCurrentMessage = false, notificationId = REVIEW_ID, liveCard = live)
+        return post(REVIEW_TAG, accountRef, review.build())
     }
+
+    private fun liveReview(accountRef: String): Notification? =
+        runCatching {
+            val reviewTag = tag(REVIEW_TAG, accountRef)
+            context
+                .getSystemService(NotificationManager::class.java)
+                ?.activeNotifications
+                ?.firstOrNull { it.tag == reviewTag && it.id == REVIEW_ID }
+                ?.notification
+        }.getOrNull()
 
     override fun withdrawReview(accountRef: String) {
         tapTokens.remove(SignInAlertNavigation.tapKey(accountRef, REVIEW_ID))

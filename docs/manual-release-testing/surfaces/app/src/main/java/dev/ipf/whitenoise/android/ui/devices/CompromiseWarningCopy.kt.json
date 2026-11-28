@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
         "anchor": "R.string.compromise_warning_explainer",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
         "anchor": "R.string.compromise_warning_step_move",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
         "anchor": "R.string.compromise_warning_step_remove",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
         "anchor": "R.string.compromise_warning_step_signer",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseWarningCopy.kt",
         "anchor": "R.string.compromise_warning_steps_title",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       }
     ]

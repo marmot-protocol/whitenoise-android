@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "fun CompromiseAlertHost(",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "fun CompromiseAlert(",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "fun CompromiseAlertContent(",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "fun CompromiseAlertActions(",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_alert_review",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_warning_dismiss",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_warning_hide_failed",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       }
     ],
@@ -66,7 +66,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_warning_explainer",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -74,7 +74,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_warning_steps_title",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -82,7 +82,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.compromise_warning_title",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -90,7 +90,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.link_request_not_now",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       },
       {
@@ -98,7 +98,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/CompromiseAlert.kt",
         "anchor": "R.string.sign_in_alert_badge_compromise",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       }
     ]

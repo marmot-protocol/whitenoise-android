@@ -59,6 +59,28 @@ class SignInAlertNotifierTest {
         assertNamesNothing(public)
     }
 
+    @Test
+    fun aFreshNotifierUpdatesOnlyTheLiveReviewCardQuietly() {
+        SignInAlertNotifier(context).postReview(ACCOUNT, count = 2, alert = true)
+        val notifier = SignInAlertNotifier(context)
+
+        assertEquals(2, notifier.shownReviewCount(ACCOUNT))
+        assertEquals(0, notifier.shownReviewCount("other"))
+        assertTrue(notifier.postReview(ACCOUNT, count = 1, alert = false))
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(1, notification.number)
+        assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertFalse(notification.wasBuiltSilent())
+
+        manager.cancelAll()
+
+        assertEquals(0, notifier.shownReviewCount(ACCOUNT))
+        assertFalse(notifier.postReview(ACCOUNT, count = 1, alert = false))
+        assertTrue(manager.activeNotifications.isEmpty())
+        assertTrue(notifier.postReview(ACCOUNT, count = 2, alert = true))
+        assertEquals(0, manager.activeNotifications.single().notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
+    }
+
     /** The compromise notification carries the neutral public text and names nothing either. */
     @Test
     fun theCompromiseNotificationIsNeutralOnTheLockScreen() {

@@ -11,6 +11,9 @@ import kotlinx.coroutines.sync.Mutex
 
 /** Posts and withdraws one account's sign-in notifications. */
 internal interface SignInAlertNotifications {
+    /** Reads the number on the active review notification, or zero if it is gone. */
+    fun shownReviewCount(accountRef: String): Int
+
     /** Shows that [count] sign-ins wait for an answer; [alert] false updates a shown notification quietly. */
     fun postReview(
         accountRef: String,
@@ -79,7 +82,6 @@ internal class SignInAlerts(
     private val lock = Any()
     val refreshMutex = Mutex()
     private val accountIds = mutableMapOf<String, String>()
-    private val shownReviewCounts = mutableMapOf<String, Int>()
     private var requests = 0L
 
     /** The snapshot for [accountRef], or null before its first read. */
@@ -104,7 +106,6 @@ internal class SignInAlerts(
         synchronized(lock) {
             accountIds.remove(accountRef)
             if (snapshots.containsKey(accountRef)) snapshots = snapshots - accountRef
-            shownReviewCounts.remove(accountRef)
             notifications.withdrawReview(accountRef)
             notifications.withdrawCompromise(accountRef)
         }
@@ -178,19 +179,14 @@ internal class SignInAlerts(
                 warning = snapshot.warning,
                 announcedSignIns = record.announcedSignIns,
                 announcedWarning = record.announcedWarning,
-                shownReviewCount = shownReviewCounts[accountRef] ?: 0,
+                shownReviewCount = notifications.shownReviewCount(accountRef),
             )
         val reviewPosted =
             plan.reviewCount?.let { count ->
-                notifications.postReview(accountRef, count, plan.reviewAlerts).also { posted ->
-                    if (posted) shownReviewCounts[accountRef] = count
-                }
+                notifications.postReview(accountRef, count, plan.reviewAlerts)
             } ?: false
         // Withdrawn even when this process posted nothing: the notification may be from before a restart.
-        if (plan.withdrawReview) {
-            shownReviewCounts.remove(accountRef)
-            notifications.withdrawReview(accountRef)
-        }
+        if (plan.withdrawReview) notifications.withdrawReview(accountRef)
         val warningPosted = plan.postCompromise && notifications.postCompromise(accountRef)
         if (plan.withdrawCompromise) notifications.withdrawCompromise(accountRef)
         val updated =

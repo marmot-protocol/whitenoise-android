@@ -105,7 +105,7 @@
         "anchor": "fun RejectButton(",
         "test_ids": [
           "SET-065",
-          "SET-076"
+          "SET-077"
         ]
       },
       {
@@ -113,7 +113,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
         "anchor": "R.string.sign_in_dont_recognize",
         "test_ids": [
-          "SET-076"
+          "SET-077"
         ]
       },
       {
@@ -121,7 +121,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewDialog.kt",
         "anchor": "R.string.sign_in_mine",
         "test_ids": [
-          "SET-076"
+          "SET-077"
         ]
       },
       {

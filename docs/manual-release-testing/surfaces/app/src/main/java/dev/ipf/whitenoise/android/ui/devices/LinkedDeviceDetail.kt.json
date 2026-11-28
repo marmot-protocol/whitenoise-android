@@ -178,7 +178,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_remove_stolen",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       }
     ]

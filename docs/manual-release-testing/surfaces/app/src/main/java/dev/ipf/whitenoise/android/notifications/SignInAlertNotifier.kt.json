@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.plurals.sign_in_alert_review_title",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.app_name",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.sign_in_alert_compromise_body",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -35,8 +35,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.sign_in_alert_compromise_public",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -44,8 +44,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.sign_in_alert_review_body",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -53,8 +53,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/SignInAlertNotifier.kt",
         "anchor": "R.string.sign_in_alert_review_public",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       }
     ]

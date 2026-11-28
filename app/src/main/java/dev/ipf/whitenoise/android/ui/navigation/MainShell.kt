@@ -950,6 +950,9 @@ internal fun MainShell(
     SignInDevicesRouteEffect(appState, previousActiveAccountRef) {
         supersedePendingTtsDestinationNavigation()
         closeConversationForNotificationRoute()
+        pendingConversationOpen = null
+        appState.clearPresentedProfile()
+        profileGroupForegroundState.close()
         sectionName = MainSection.Settings.name
         settingsDetailName = SettingsDetail.Account.name
     }
@@ -1500,6 +1503,7 @@ internal fun MainShell(
             },
             holdingForEventCards = { controller.isHoldingInitialPageForEventCards },
         )
+        if (pendingConversationOpen?.requestId != request.requestId) return@LaunchedEffect
         // A normal cached open reaches the ready state before this deadline and
         // keeps its spinner-free transition. A first page held for its event
         // cards may extend the wait by the card budget, never more. A stuck local

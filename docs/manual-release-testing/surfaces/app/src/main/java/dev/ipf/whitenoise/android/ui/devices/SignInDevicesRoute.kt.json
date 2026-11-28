@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
         "anchor": "fun SignInDevicesRouteEffect(",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
         "anchor": "fun SignInDevicesRequestEffect(",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
         "anchor": "fun DevicesRowTrailing(",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -35,7 +35,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
         "anchor": "R.string.sign_in_alert_badge_review",
         "test_ids": [
-          "SET-076"
+          "SET-077"
         ]
       },
       {
@@ -43,7 +43,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInDevicesRoute.kt",
         "anchor": "R.string.sign_in_alert_badge_compromise",
         "test_ids": [
-          "SET-077"
+          "SET-078"
         ]
       }
     ]

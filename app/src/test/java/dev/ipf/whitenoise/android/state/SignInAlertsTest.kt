@@ -11,7 +11,10 @@ class SignInAlertsTest {
     /** Records every notification call. */
     private class Recorder : SignInAlertNotifications {
         val calls = mutableListOf<String>()
+        val activeReviews = mutableMapOf<String, Int>()
         var canPost = true
+
+        override fun shownReviewCount(accountRef: String): Int = activeReviews[accountRef] ?: 0
 
         override fun postReview(
             accountRef: String,
@@ -20,11 +23,13 @@ class SignInAlertsTest {
         ): Boolean {
             if (!canPost) return false
             calls += "review:$accountRef:$count:$alert"
+            activeReviews[accountRef] = count
             return true
         }
 
         override fun withdrawReview(accountRef: String) {
             calls += "withdraw-review:$accountRef"
+            activeReviews.remove(accountRef)
         }
 
         override fun postCompromise(accountRef: String): Boolean {
@@ -76,6 +81,20 @@ class SignInAlertsTest {
         SignInAlerts(store, restarted).publish(ACCOUNT, ID, listOf(alertSignIn("a")), emptyList())
 
         assertTrue(restarted.calls.none { it.startsWith("review:") })
+    }
+
+    @Test
+    fun aRestartUpdatesTheCountOnlyWhileTheReviewIsStillShown() {
+        val signIns = listOf(alertSignIn("a"), alertSignIn("b"), alertSignIn("c"))
+        alerts.publish(ACCOUNT, ID, signIns, emptyList())
+        recorder.calls.clear()
+
+        val restarted = SignInAlerts(store, recorder)
+        restarted.publish(ACCOUNT, ID, signIns.take(2), emptyList())
+        recorder.activeReviews.clear()
+        restarted.publish(ACCOUNT, ID, signIns.take(1), emptyList())
+
+        assertEquals(listOf("review:$ACCOUNT:2:false"), recorder.calls.filter { it.startsWith("review:") })
     }
 
     @Test

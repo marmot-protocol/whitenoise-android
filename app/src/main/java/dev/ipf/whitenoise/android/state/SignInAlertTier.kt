@@ -82,7 +82,7 @@ internal data class SignInNotificationPlan(
 /**
  * Decides the notifications for one account. Every sign-in to review is announced once, and several new at once share
  * one alert; a smaller count than the one shown is updated quietly. A warning item is announced once. Nothing waits:
- * the matching notification is withdrawn. [shownReviewCount] is the count this process last posted, 0 when none.
+ * the matching notification is withdrawn. [shownReviewCount] is the count on the active notification, 0 when none.
  */
 internal fun planSignInNotifications(
     toReview: List<UnrecognizedSignInFfi>,

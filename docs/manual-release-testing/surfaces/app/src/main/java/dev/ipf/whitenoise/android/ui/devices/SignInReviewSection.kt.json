@@ -168,7 +168,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
         "anchor": "R.string.sign_in_mine",
         "test_ids": [
-          "SET-076"
+          "SET-077"
         ]
       },
       {
@@ -176,7 +176,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
         "anchor": "R.string.sign_in_mine_state",
         "test_ids": [
-          "SET-076"
+          "SET-077"
         ]
       },
       {
@@ -185,7 +185,7 @@
         "anchor": "R.string.sign_in_claim",
         "test_ids": [
           "SET-065",
-          "SET-076"
+          "SET-077"
         ]
       }
     ]

@@ -34,8 +34,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
         "anchor": "R.string.notification_channel_account_security",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -43,8 +43,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
         "anchor": "R.string.notification_channel_account_security_global",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -52,8 +52,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
         "anchor": "R.string.notification_channel_account_security_global_description",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -61,8 +61,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
         "anchor": "R.string.sign_in_alert_badge_review",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       },
       {
@@ -70,8 +70,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
         "anchor": "R.string.sign_in_alert_review_body",
         "test_ids": [
-          "SET-076",
-          "SET-077"
+          "SET-077",
+          "SET-078"
         ]
       }
     ]
