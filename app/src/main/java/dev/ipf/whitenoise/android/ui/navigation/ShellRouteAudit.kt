@@ -75,20 +75,24 @@ internal object ShellRouteAudit {
 }
 
 /**
- * What is wrong with [stack]'s shape, or null: the chat list as the only root, a Settings chain exactly as its leaf
- * re-synthesizes it, Diagnostics only on top of that chain, at most one conversation, and above it at most one of
- * its chat-details screens.
+ * What is wrong with [stack]'s shape, or null: the chat list as the only root, a Settings chain that starts at home
+ * and holds each page at most once (the pages the person came through, or the fixed parents its leaf synthesizes,
+ * #4095), Diagnostics only on top of that chain, at most one conversation, and above it at most one of its
+ * chat-details screens.
  */
 internal fun shellRouteShapeProblem(stack: List<ShellRoute>): String? {
     val section = sectionOf(stack).drop(1)
     val above = conversationSegment(stack).drop(1)
     val chain = section.filterIsInstance<ShellRoute.Settings>()
     val leaf = chain.lastOrNull()?.detail
-    val expectedSection = if (section.isEmpty()) emptyList() else sectionEntries(sectionProjection(stack).first, leaf)
+    val pages = chain.drop(1).map { it.detail }
+    val expectedSection =
+        if (section.isEmpty()) emptyList() else sectionEntries(sectionProjection(stack).first, leaf, chain.drop(1))
     return when {
         stack.firstOrNull() != ShellRoute.Chats -> "the root is not the chat list"
         stack.drop(1).any { it == ShellRoute.Chats } -> "the chat list above the root"
-        section != expectedSection -> "the section is not the chain its leaf synthesizes"
+        section != expectedSection || pages.distinct().size != pages.size || null in pages ->
+            "the section is not a Settings chain from home"
         stack.count { it is ShellRoute.Conversation } > 1 -> "more than one conversation"
         above.any { it !is ShellRoute.ChatDetailsScreen } -> "a non-details entry above the conversation"
         above.size > 1 -> "more than one chat-details screen"
