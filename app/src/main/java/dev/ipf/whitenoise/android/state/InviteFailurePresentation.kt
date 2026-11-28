@@ -74,14 +74,6 @@ internal fun inviteFailureDetail(
             recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
                 AppText.Resource(R.string.error_invalid_key_package_for, listOf(it))
             } ?: AppText.Resource(R.string.error_invalid_key_package)
-        // A nonzero founding timer needs retention support in the recipient's key, so they need to update.
-        is MarmotKitException.IncompatibleKeyPackage ->
-            recipientFailureDetail(
-                recipientName.orEmpty(),
-                { it },
-                R.string.error_incompatible_key_package,
-                R.string.error_incompatible_key_package_for,
-            )
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
@@ -163,16 +155,26 @@ internal fun startProfileChatErrorTitle(
         AppText.Resource(R.string.toast_couldnt_start_chat)
     }
 
-/** Invitation guidance for a confirmed missing package; every other start-chat failure keeps its shared detail. */
+/**
+ * Invitation guidance for a confirmed missing package, and update guidance when the recipient's key cannot carry the
+ * DM's nonzero founding timer. Every other start-chat failure keeps its shared detail.
+ */
 internal fun startProfileChatErrorDetail(
     throwable: Throwable,
     displayName: (String) -> String,
     recipientName: String?,
 ): AppText =
-    if (startProfileChatFailureIsMissingSetup(throwable)) {
-        AppText.Resource(R.string.start_chat_not_on_white_noise_detail)
-    } else {
-        inviteFailureDetail(throwable, displayName, recipientName, R.string.error_group_create_failed_retry)
+    when {
+        startProfileChatFailureIsMissingSetup(throwable) ->
+            AppText.Resource(R.string.start_chat_not_on_white_noise_detail)
+        throwable is MarmotKitException.IncompatibleKeyPackage ->
+            recipientFailureDetail(
+                recipientName.orEmpty(),
+                { it },
+                R.string.error_incompatible_key_package,
+                R.string.error_incompatible_key_package_for,
+            )
+        else -> inviteFailureDetail(throwable, displayName, recipientName, R.string.error_group_create_failed_retry)
     }
 
 /** Offers a diagnostic report for unexpected and publish failures while keeping known recovery guidance in the UI. */
