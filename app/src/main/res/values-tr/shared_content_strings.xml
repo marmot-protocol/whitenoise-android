@@ -25,6 +25,7 @@
     <string name="shared_media_video_not_selectable">Video, seçilemez</string>
     <string name="shared_media_share_photos_failed">Fotoğraflar paylaşılamadı</string>
     <string name="shared_media_share_photos_unavailable">Seçilen bazı fotoğraflar artık kullanılamıyor, bu yüzden hiçbir şey paylaşılmadı. Seçimleri kaldırıldı. Tekrar deneyin.</string>
+    <string name="shared_media_share_photo_unreadable">%1$s kişisinden gelen fotoğraf yüklenemedi, bu yüzden hiçbir şey paylaşılmadı. Seçimi kaldırıldı. Diğerlerini göndermek için tekrar paylaşın.</string>
     <string name="shared_media_share_photos_too_large">Bu fotoğraflar birlikte paylaşılamayacak kadar büyük. Daha azını seçip tekrar deneyin.</string>
     <string name="shared_media_jump_to_date">Tarihe git</string>
 </resources>

@@ -109,6 +109,16 @@
           "MED-063"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "An unloadable selected photo is named and deselected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share_photo_unreadable",
+        "test_ids": [
+          "MED-069"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

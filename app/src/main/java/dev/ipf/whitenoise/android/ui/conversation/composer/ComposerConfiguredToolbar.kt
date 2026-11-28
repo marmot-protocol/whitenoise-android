@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.composerDraftJumpShortcuts
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlin.math.ceil
@@ -129,7 +130,10 @@ internal fun composerToolbarFittingRows(limit: Dp): Int {
     return 1 + floor(extraRows).toInt()
 }
 
-/** Live adapters are ephemeral. Only [settings] is a persisted preference. */
+/**
+ * Live adapters are ephemeral. Only [settings] is a persisted preference. While [transactionActive], only
+ * [draftEditsOpen] draft controls stay usable, rechecked through [canEditDraft] rather than [canActivate].
+ */
 internal data class ComposerToolbarBindings(
     val settings: ComposerToolbarSettings,
     val shortcuts: List<ComposerShortcut>,
@@ -137,14 +141,32 @@ internal data class ComposerToolbarBindings(
     val enabled: Boolean = true,
     val scrollEnabled: Boolean = enabled,
     val transactionActive: Boolean = false,
+    val draftEditsOpen: Boolean = false,
     val voiceLauncherVisible: Boolean = true,
     val onCustomize: (() -> Unit)? = null,
     val canActivate: () -> Boolean = { true },
+    val canEditDraft: () -> Boolean = canActivate,
     val onVoiceBounds: (Rect?) -> Unit = {},
     val onRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
     val slotModifier: @Composable (ComposerShortcut) -> Modifier = { Modifier },
     val translate: ComposerTranslateToggle? = null,
 )
+
+/**
+ * Controls that only edit or move through the current draft, or open the Plus menu that offers such edits. A dictation
+ * writes its transcript into the same draft, so they stay usable while it runs.
+ */
+internal val composerDraftEditShortcuts =
+    setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.More) + composerDraftJumpShortcuts
+
+/**
+ * The one rule for which toolbar controls work during a transaction, on either side and in the Plus menu: clipboard
+ * Paste always, draft edits while only a dictation owns the draft ([draftEditsOpen]), and nothing else.
+ */
+internal fun ComposerToolbarBindings.usableDuringTransaction(shortcut: ComposerShortcut): Boolean =
+    !transactionActive ||
+        shortcut == ComposerShortcut.Paste ||
+        (draftEditsOpen && shortcut in composerDraftEditShortcuts)
 
 /** Translate mode's toolbar adapter; [active] tints the pinned button while the preview line is shown. */
 internal data class ComposerTranslateToggle(
@@ -203,7 +225,8 @@ internal fun ComposerConfiguredToolbar(
             }
         }
     }
-    val scrollAllowed = bindings.scrollEnabled && !bindings.transactionActive
+    // A dictation leaves draft edits usable, so a scrolled toolbar can still bring them into view.
+    val scrollAllowed = bindings.scrollEnabled && (!bindings.transactionActive || bindings.draftEditsOpen)
     val viewport = modifier.width(width.coerceAtLeast(ComposerShortcutPitch)).testTag("composer.shortcuts")
     if (singleRowOverflow) {
         Row(viewport.horizontalScroll(scroll, enabled = scrollAllowed)) { slots() }

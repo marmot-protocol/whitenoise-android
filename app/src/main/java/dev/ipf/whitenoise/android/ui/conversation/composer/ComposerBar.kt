@@ -883,6 +883,10 @@ internal fun ComposerBar(
             dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true &&
             dictationController.completionControlsRequired
 
+    /** This action while no dictation owns the draft, refused again on tap, for controls that leave the composer. */
+    fun (() -> Unit).unlessDictationOwnsDraft(): (() -> Unit)? =
+        if (originDictationRequiresCompletion()) null else ({ if (!originDictationRequiresCompletion()) this() })
+
     // Translate mode belongs to one draft; edits keep the original text, so the mode closes for them.
     LaunchedEffect(composerTranslation, editingMessageId) {
         if (editingMessageId != null) composerTranslation?.close()
@@ -1522,16 +1526,29 @@ internal fun ComposerBar(
                         appState?.signOutInProgress != true &&
                         appState?.wipeInProgress != true
                 }
-                val canActivateToolbar: () -> Boolean = {
+                // Draft edits wait only for voice capture and review, a dictation writes into the same draft.
+                val canEditToolbarDraft: () -> Boolean = {
                     canReceiveComposerContent() &&
                         voiceRecordingController?.isRecording != true &&
-                        voiceReview?.clip == null &&
+                        voiceReview?.clip == null
+                }
+                val canActivateToolbar: () -> Boolean = {
+                    canEditToolbarDraft() &&
                         dictationController.composerToolbarOpen(dictationAccountRef, dictationGroupIdHex) &&
                         !attachmentSendInFlight
                 }
 
-                /** Rechecks toolbar availability when a retained attachment callback is invoked. */
-                fun guardedAttachmentAction(action: () -> Unit): () -> Unit = { if (canActivateToolbar()) action() }
+                /** Rechecks availability when invoked, the Plus menu leaves it out while a transaction is active. */
+                fun guardedAttachmentAction(action: () -> Unit): (() -> Unit)? {
+                    if (transactionActive) return null
+                    return { if (canActivateToolbar()) action() }
+                }
+
+                /** The Plus menu's row for an attachment [shortcut] that is not pinned to the toolbar. */
+                fun hiddenAttachmentAction(
+                    shortcut: ComposerShortcut,
+                    action: (() -> Unit)?,
+                ): (() -> Unit)? = action?.takeIf { shortcut in hiddenAttachments }?.let(::guardedAttachmentAction)
                 val beginCustomization: (() -> Unit)? =
                     onCustomizeToolbar?.takeIf { toolbarPreference != null }?.let { open ->
                         {
@@ -1556,8 +1573,10 @@ internal fun ComposerBar(
                                 { if (canActivateToolbar()) action() }
                             },
                         transactionActive = transactionActive,
+                        draftEditsOpen = voicePhase == VoiceComposerPhase.Idle,
                         onCustomize = beginCustomization,
                         canActivate = canActivateToolbar,
+                        canEditDraft = canEditToolbarDraft,
                         onVoiceBounds = { if (!isRecordingVoice) voiceSlotBounds = it },
                         voiceLauncherVisible = showConfiguredMic && configuredVoiceUsesSlot,
                         translate = translation?.let { ComposerTranslateToggle(it.active, it::toggle) },
@@ -1709,40 +1728,16 @@ internal fun ComposerBar(
                                 expanded = attachmentSheetState.isOpen,
                                 onDismiss = attachmentSheetState::dismiss,
                                 textShortcuts = textShortcuts.onlyHidden(hiddenMenuShortcuts),
-                                onCustomize = beginCustomization,
-                                onCamera =
-                                    onCaptureFromCamera
-                                        ?.takeIf { ComposerShortcut.Camera in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onGallery =
-                                    onPickFromGallery
-                                        ?.takeIf { ComposerShortcut.Gallery in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
+                                onCustomize = beginCustomization?.takeUnless { transactionActive },
+                                onCamera = hiddenAttachmentAction(ComposerShortcut.Camera, onCaptureFromCamera),
+                                onGallery = hiddenAttachmentAction(ComposerShortcut.Gallery, onPickFromGallery),
                                 onSearchGifs = onSearchGifs?.let(::guardedAttachmentAction),
-                                onFiles =
-                                    onPickDocument
-                                        ?.takeIf { ComposerShortcut.Files in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onLocation =
-                                    onShareLocation
-                                        ?.takeIf { ComposerShortcut.Location in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onUser =
-                                    onShareUser
-                                        ?.takeIf { ComposerShortcut.Person in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onContact =
-                                    onShareContact
-                                        ?.takeIf { ComposerShortcut.Contact in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onPoll =
-                                    onCreatePoll
-                                        ?.takeIf { ComposerShortcut.Poll in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
-                                onSticker =
-                                    onOpenStickers
-                                        ?.takeIf { ComposerShortcut.Sticker in hiddenAttachments }
-                                        ?.let(::guardedAttachmentAction),
+                                onFiles = hiddenAttachmentAction(ComposerShortcut.Files, onPickDocument),
+                                onLocation = hiddenAttachmentAction(ComposerShortcut.Location, onShareLocation),
+                                onUser = hiddenAttachmentAction(ComposerShortcut.Person, onShareUser),
+                                onContact = hiddenAttachmentAction(ComposerShortcut.Contact, onShareContact),
+                                onPoll = hiddenAttachmentAction(ComposerShortcut.Poll, onCreatePoll),
+                                onSticker = hiddenAttachmentAction(ComposerShortcut.Sticker, onOpenStickers),
                             )
                         },
                         // Which popups this pre-IME catch closes before Back reaches the keyboard, per Android version.
@@ -2041,8 +2036,8 @@ internal fun ComposerBar(
                             onSearchContentHeightChange = { measured ->
                                 if (measured > 0.dp) composerEmojiSearchRowHeight = measured
                             },
-                            onBrowseSets = onBrowseEmojiSets,
-                            onOpenSettings = onOpenEmojiSettings,
+                            onBrowseSets = onBrowseEmojiSets?.unlessDictationOwnsDraft(),
+                            onOpenSettings = onOpenEmojiSettings?.unlessDictationOwnsDraft(),
                         )
                     }
                 }

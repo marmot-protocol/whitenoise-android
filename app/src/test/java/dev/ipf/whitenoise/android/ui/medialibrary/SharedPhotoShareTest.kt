@@ -157,7 +157,7 @@ class SharedPhotoShareTest {
             assertNoShare()
         }
 
-    /** A photo whose verified source cannot be read fails the set and leaves no earlier photo staged. */
+    /** A photo whose verified source cannot be read fails the set, naming that photo, and leaves nothing staged. */
     @Test
     fun anUnavailableSourceSharesNothing() =
         runTest {
@@ -172,7 +172,10 @@ class SharedPhotoShareTest {
                     }
                 }.exceptionOrNull()
 
-            assertTrue("$failure", failure is IOException)
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(failure.unreadable)
+            assertEquals("blob missing", failure.cause?.message)
             assertNoShare()
         }
 

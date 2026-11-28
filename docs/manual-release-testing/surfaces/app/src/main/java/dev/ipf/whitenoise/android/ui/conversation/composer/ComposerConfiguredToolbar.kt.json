@@ -33,6 +33,14 @@
           "CON-042",
           "CON-048"
         ]
+      },
+      {
+        "surface": "One rule for controls usable during a dictation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredToolbar.kt",
+        "anchor": "internal fun ComposerToolbarBindings.usableDuringTransaction(",
+        "test_ids": [
+          "DIC-023"
+        ]
       }
     ]
   },

@@ -183,6 +183,14 @@
           "SET-051",
           "MSG-023"
         ]
+      },
+      {
+        "surface": "Emoji picker exits wait while dictation owns the draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "unlessDictationOwnsDraft()",
+        "test_ids": [
+          "DIC-023"
+        ]
       }
     ]
   },

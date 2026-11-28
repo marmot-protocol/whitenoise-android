@@ -4,10 +4,12 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -30,13 +32,17 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.IOException
 
-/** The gallery's share runs in its composition: leaving the gallery or losing ownership never opens a late sheet. */
+/**
+ * The gallery's share runs in its composition: leaving the gallery, leaving the app or losing ownership never opens a
+ * late sheet, and a photo that cannot be shared leaves the selection so the rest can be.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class SharedPhotoShareLifecycleTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
@@ -52,6 +58,7 @@ class SharedPhotoShareLifecycleTest {
     private var current = listOf(beach, harbour)
     private var checks = 0
     private var ownershipLostOnFinalCheck = false
+    private var harbourUnreadable = false
     private lateinit var share: SharedPhotoShare
 
     /** Mounts a gallery share whose availability checks count calls and can drop ownership on the final one. */
@@ -74,6 +81,7 @@ class SharedPhotoShareLifecycleTest {
                             if (photo == harbour) {
                                 secondRead.complete(Unit)
                                 release.await()
+                                if (harbourUnreadable) throw IOException("harbour.jpg download failed")
                             }
                             AttachmentPlaintext.Bytes(photo.messageIdHex.encodeToByteArray())
                         },
@@ -142,6 +150,40 @@ class SharedPhotoShareLifecycleTest {
         assertEquals(listOf(harbour), (failures.single() as SharedPhotosUnavailableException).photos)
     }
 
+    /** Leaving the app before the sheet opens keeps the selection, deletes the staged set and reports nothing. */
+    @Test
+    fun leavingTheAppDuringStagingKeepsTheSelection() {
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        release.complete(Unit)
+
+        composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+        assertTrue(sharedFiles().isEmpty())
+        assertEquals(listOf(beach, harbour), share.selection.photos)
+        assertTrue(failures.isEmpty())
+    }
+
+    /** A photo whose file cannot be read is named and deselected, so the next Share sends the others. */
+    @Test
+    fun anUnreadablePhotoIsDeselectedAndTheNextShareSendsTheRest() {
+        harbourUnreadable = true
+        release.complete(Unit)
+
+        composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+        assertTrue(sharedFiles().isEmpty())
+        val failure = failures.single() as SharedPhotosUnavailableException
+        assertEquals(listOf(harbour), failure.photos)
+        assertTrue(failure.unreadable)
+        assertEquals(listOf(beach), share.selection.photos)
+
+        composeRule.runOnIdle { share.start() }
+        composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertNotNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+        assertFalse(share.selection.active)
+        assertEquals(1, failures.size)
+    }
+
     /** Exiting selection mode cancels the share it was staging. */
     @Test
     fun exitingSelectionCancelsStaging() {
@@ -166,20 +208,23 @@ class SharedPhotoShareLifecycleTest {
         assertTrue(failures.isEmpty())
     }
 
+    /** Registers an external app that accepts one or several shared JPEG images. */
     private fun registerShareTarget() {
         val application = ApplicationInfo().apply { packageName = SHARE_TARGET_PACKAGE }
-        shadowOf(context.packageManager).addResolveInfoForIntent(
-            Intent(Intent.ACTION_SEND_MULTIPLE).setType("image/jpeg"),
-            ResolveInfo().apply {
-                activityInfo =
-                    ActivityInfo().apply {
-                        packageName = SHARE_TARGET_PACKAGE
-                        name = "$SHARE_TARGET_PACKAGE.ShareActivity"
-                        exported = true
-                        applicationInfo = application
-                    }
-            },
-        )
+        listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE).forEach { action ->
+            shadowOf(context.packageManager).addResolveInfoForIntent(
+                Intent(action).setType("image/jpeg"),
+                ResolveInfo().apply {
+                    activityInfo =
+                        ActivityInfo().apply {
+                            packageName = SHARE_TARGET_PACKAGE
+                            name = "$SHARE_TARGET_PACKAGE.ShareActivity"
+                            exported = true
+                            applicationInfo = application
+                        }
+                },
+            )
+        }
     }
 
     private fun sharedFiles(): List<File> =

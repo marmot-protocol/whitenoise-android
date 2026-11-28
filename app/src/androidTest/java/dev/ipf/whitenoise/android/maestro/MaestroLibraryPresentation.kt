@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.medialibrary.FileLibraryRow
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaRow
+import dev.ipf.whitenoise.android.ui.medialibrary.rememberLibraryFileShares
 
 /** Opens and dismisses the production file popup; no download, export, share or file-row click is requested. */
 @Composable
@@ -38,5 +39,6 @@ internal fun MaestroLibraryPresentation(fixture: MaestroPresentationFixture) {
         controller = controller,
         appState = fixture.appState,
         documentSaveFallback = rememberDocumentSaveFallback(fixture.appState, controller.group.groupIdHex),
+        shares = rememberLibraryFileShares(controller, fixture.appState),
     )
 }

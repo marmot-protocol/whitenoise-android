@@ -9,6 +9,8 @@
     <string name="attachment_collection_cancel">Senden abbrechen</string>
     <string name="attachment_collection_show_items">Elemente anzeigen</string>
     <string name="attachment_collection_hide_items">Elemente ausblenden</string>
+    <string name="attachment_collection_not_sent">%1$d von %2$d nicht gesendet</string>
+    <string name="attachment_collection_hide_details">Details ausblenden</string>
     <string name="attachment_collection_state_queued">Wartet</string>
     <string name="attachment_collection_state_preparing">Wird vorbereitet</string>
     <string name="attachment_collection_state_uploading">Wird hochgeladen</string>

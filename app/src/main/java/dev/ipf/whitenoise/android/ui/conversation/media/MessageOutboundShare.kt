@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.share.OutboundShareStream
 import dev.ipf.whitenoise.android.share.launchOutboundShare
 import dev.ipf.whitenoise.android.share.outboundShareChooser
 import dev.ipf.whitenoise.android.share.outboundShareIntent
+import dev.ipf.whitenoise.android.share.requireOutboundShareHostStarted
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -142,7 +143,7 @@ internal suspend fun shareMessageExternally(
                     )
             }
         }
-    launchStagedMessageShare(staged) { streams ->
+    launchStagedMessageShare(staged, context) { streams ->
         if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("shared message owner changed")
         launchOutboundShare(context, outboundShareIntent(text, streams), chooserTitle)
     }
@@ -189,15 +190,20 @@ internal class StagedMessageShareStreams(
     }
 }
 
-/** Delete the staged set if [beforeLaunch], cancellation or chooser launch interrupts publication. */
+/**
+ * Delete the staged set if [beforeLaunch], cancellation, a [host] that is no longer started or the chooser launch
+ * interrupts publication.
+ */
 internal suspend fun launchStagedMessageShare(
     staged: StagedMessageShareStreams,
+    host: Context,
     beforeLaunch: suspend () -> Unit = {},
     launch: (List<OutboundShareStream>) -> Result<Unit>,
 ) {
     try {
         beforeLaunch()
         currentCoroutineContext().ensureActive()
+        requireOutboundShareHostStarted(host)
         launch(staged.streams).getOrThrow()
     } catch (failure: Throwable) {
         staged.deletePlaintext()

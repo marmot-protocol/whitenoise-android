@@ -25,6 +25,7 @@
     <string name="shared_media_video_not_selectable">Vídeo, no se puede seleccionar</string>
     <string name="shared_media_share_photos_failed">No se pudieron compartir las fotos</string>
     <string name="shared_media_share_photos_unavailable">Algunas fotos seleccionadas ya no están disponibles, así que no se compartió nada. Se han deseleccionado. Inténtalo de nuevo.</string>
+    <string name="shared_media_share_photo_unreadable">No se pudo cargar la foto de %1$s, así que no se compartió nada. Se ha deseleccionado. Vuelve a compartir para enviar las demás.</string>
     <string name="shared_media_share_photos_too_large">Estas fotos son demasiado grandes para compartirlas a la vez. Selecciona menos e inténtalo de nuevo.</string>
     <string name="shared_media_jump_to_date">Ir a una fecha</string>
 </resources>
