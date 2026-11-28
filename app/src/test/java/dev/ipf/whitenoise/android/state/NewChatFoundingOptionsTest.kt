@@ -42,6 +42,7 @@ class NewChatFoundingOptionsTest {
             )
         }
 
+    /** A save for an account that is no longer active is refused and leaves both accounts' defaults unchanged. */
     @Test
     fun staleAccountSaveIsRejectedWithoutChangingEitherAccount() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -54,6 +55,7 @@ class NewChatFoundingOptionsTest {
         assertEquals(0L, state.defaultDisappearingMessagesSeconds("bob"))
     }
 
+    /** Each reconstructed app state starts its next DM with its own active account's saved timer. */
     @Test
     fun reconstructedActiveAccountUsesItsOwnDefaultForTheNextDirectChat() =
         runTest {
@@ -76,6 +78,7 @@ class NewChatFoundingOptionsTest {
             assertEquals(604_800L, bob.defaultDisappearingMessagesSeconds("bob"))
         }
 
+    /** A timer chosen for one named group reaches its founding options without changing the saved default. */
     @Test
     fun oneOffNamedGroupOverrideDoesNotChangeTheSavedAccountDefault() =
         runTest {
@@ -145,6 +148,7 @@ class NewChatFoundingOptionsTest {
         )
     }
 
+    /** One recorded direct-conversation start: the account, the peer and the founding timer. */
     private data class DirectStartCall(
         val account: String,
         val peer: String,
@@ -153,8 +157,10 @@ class NewChatFoundingOptionsTest {
 }
 
 private object NewChatFoundingOptionsDraftPersistence : DraftPersistence {
+    /** Starts each test with no saved drafts. */
     override fun read(): Map<String, String> = emptyMap()
 
+    /** Discards drafts so tests never touch a real draft store. */
     override fun write(
         key: String,
         value: String?,

@@ -143,6 +143,7 @@ class DirectMessageAdminFfiIntegrationTest {
         }
     }
 
+    /** One test participant: its native store, generated account and production app state. */
     private class Participant(
         val native: Marmot,
         val account: AccountSummaryFfi,
@@ -195,6 +196,7 @@ class DirectMessageAdminFfiIntegrationTest {
         }
     }
 
+    /** Draft persistence that keeps the tests isolated from the installed app's drafts. */
     private object NoDrafts : DraftPersistence {
         /** Starts each test with an empty draft store. */
         override fun read(): Map<String, String> = emptyMap()
