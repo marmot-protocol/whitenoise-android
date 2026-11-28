@@ -158,14 +158,10 @@ jobs:
           github.ref == 'refs/heads/master' ||
           github.event.pull_request.base.ref == 'master' ||
           github.event.merge_group.base_ref == 'refs/heads/master'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/check_marmotkit_stable_promotion.py
 
       - name: Verify Stable promotions on develop
         if: github.event.pull_request.base.ref == 'develop'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/check_marmotkit_stable_promotion.py --if-stable
 
       - name: Test conservative CI classification

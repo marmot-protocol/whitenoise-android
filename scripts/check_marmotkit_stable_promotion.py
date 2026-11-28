@@ -8,15 +8,16 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 if __package__:
     from . import check_marmotkit_release_channel as channel
     from . import prepare_marmotkit_artifact as artifact
-    from .sync_marmotkit_rc import RC_VERSION, parse_asset
+    from .sync_marmotkit_rc import MDK_RAW_URL, RC_VERSION, parse_asset, parse_rc
 else:
     import check_marmotkit_release_channel as channel
     import prepare_marmotkit_artifact as artifact
-    from sync_marmotkit_rc import RC_VERSION, parse_asset
+    from sync_marmotkit_rc import MDK_RAW_URL, RC_VERSION, parse_asset, parse_rc
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,13 +39,20 @@ def git(root: Path, *args: str) -> str:
 
 
 def mdk_json(path: str) -> dict:
-    """Read JSON from the official MDK repository with the workflow's read token."""
-    media_type = "application/vnd.github.raw+json" if path.startswith("contents/") else "application/vnd.github+json"
-    content = subprocess.check_output(
-        ["gh", "api", "--hostname", "github.com", "-H", f"Accept: {media_type}", f"{MDK_REPO}/{path}"],
-        timeout=30,
-    )
-    return artifact.read_json_object(content, path)
+    """Fetch public MDK metadata through the existing HTTPS-only downloader."""
+    url = f"https://api.github.com/{MDK_REPO}/{path}"
+    with tempfile.TemporaryDirectory() as work:
+        response = Path(work) / "mdk.json"
+        artifact.download(url, response)
+        return artifact.read_json_object(response.read_bytes(), path)
+
+
+def pinned_metadata(path: str, commit: str) -> dict:
+    """Read a release record from the already verified rc-meta commit."""
+    with tempfile.TemporaryDirectory() as work:
+        response = Path(work) / "mdk.json"
+        artifact.download(f"{MDK_RAW_URL}/{commit}/{path}", response)
+        return artifact.read_json_object(response.read_bytes(), path)
 
 
 def read_staging_pin(root: Path, selection: dict) -> dict[str, str]:
@@ -78,7 +86,22 @@ def read_stable_metadata(commit: str) -> dict:
     history = mdk_json(f"compare/{commit}...rc-meta?per_page=1")
     if history.get("merge_base_commit", {}).get("sha") != commit:
         raise artifact.PreparationError("MDK's promotion metadata commit must belong to rc-meta history")
-    return mdk_json(f"contents/stable/latest.json?ref={commit}")
+    return pinned_metadata("stable/latest.json", commit)
+
+
+def verify_staging_archive(staging: dict[str, str], commit: str) -> None:
+    """Bind the staged lock to the official Android RC archive at the same metadata revision."""
+    rc = parse_rc(pinned_metadata(f"rc/releases/{staging['artifact-id']}.json", commit))
+    expected = {
+        "artifact-id": rc.version,
+        "mdk-sha": rc.source_sha,
+        "artifact-tag": rc.tag,
+        "archive-root": rc.archive_root,
+        "artifact-url": rc.bundle.url,
+        "artifact-sha256": rc.bundle.sha256,
+    }
+    if any(staging[key] != value for key, value in expected.items()):
+        raise artifact.PreparationError("staging pin does not match the published Android RC archive")
 
 
 def verify_promotion(staging: dict[str, str], stable: dict[str, str], metadata: dict) -> None:
@@ -119,7 +142,9 @@ def check_production_pin(root: Path, *, if_stable: bool = False) -> None:
         raise artifact.PreparationError(f"record the staging tag and MDK promotion in {PROMOTION}")
     selection = artifact.read_json_object(promotion.read_bytes(), "Stable promotion selection")
     staging = read_staging_pin(root, selection)
-    metadata = read_stable_metadata(selection.get("mdk_meta_commit", ""))
+    meta_commit = selection.get("mdk_meta_commit", "")
+    metadata = read_stable_metadata(meta_commit)
+    verify_staging_archive(staging, meta_commit)
     verify_promotion(staging, stable, metadata)
     print(f"Stable MarmotKit {stable['artifact-id']} matches {selection['staging_tag']} ({staging['artifact-id']})")
 

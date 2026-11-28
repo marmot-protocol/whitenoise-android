@@ -30,7 +30,8 @@ class StablePromotionTest(unittest.TestCase):
         self.git("init", "-q")
         self.git("config", "user.name", "Staging fixture")
         self.git("config", "user.email", "fixture@example.com")
-        self.write_pin(self.pin(base_pin, "0.20.0-rc.4", RC_SOURCE, "e" * 64))
+        rc_pin = self.pin(base_pin, "0.20.0-rc.4", RC_SOURCE, "e" * 64)
+        self.write_pin(rc_pin)
         self.git("add", ".")
         self.git("-c", "commit.gpgsign=false", "commit", "-qm", "Staging candidate")
         candidate = self.git("rev-parse", "HEAD").strip()
@@ -40,11 +41,28 @@ class StablePromotionTest(unittest.TestCase):
         self.selection_file.write_text(json.dumps(self.selection), encoding="utf-8")
         self.stable_pin = self.pin(base_pin, "0.20.0", STABLE_SOURCE, DIGEST)
         self.write_pin(self.stable_pin)
+        rc_archive = {
+            "name": f"{rc_pin['archive-root']}.zip", "url": rc_pin["artifact-url"],
+            "sha256": rc_pin["artifact-sha256"], "size": 1234,
+        }
+        self.rc_archive = rc_archive
         self.responses = {
             f"commits/{META}": {"sha": META, "commit": {"verification": {"verified": True}}},
             f"compare/{META}...rc-meta?per_page=1": {"merge_base_commit": {"sha": META}},
             f"commits/{STABLE_SOURCE}": {"sha": STABLE_SOURCE, "parents": [{"sha": RC_SOURCE}]},
-            f"contents/stable/latest.json?ref={META}": {
+        }
+        self.records = {
+            ("rc/releases/0.20.0-rc.4.json", META): {
+                "schema": 2, "channel": "rc", "version": "0.20.0-rc.4", "base_version": "0.20.0",
+                "source_sha": RC_SOURCE, "impact": "minor",
+                "workflow_run": "https://github.com/marmot-protocol/mdk/actions/runs/1234",
+                "tracks": {"marmotkit": {"tag": rc_pin["artifact-tag"], "assets": [
+                    rc_archive,
+                    {"name": f"{rc_archive['name']}.sha256", "url": f"{rc_archive['url']}.sha256",
+                     "sha256": "e" * 64, "size": 100},
+                ]}},
+            },
+            ("stable/latest.json", META): {
                 "schema": 2, "channel": "stable", "version": "0.20.0",
                 "promoted_from_rc": "0.20.0-rc.4", "source_sha": RC_SOURCE, "release_sha": STABLE_SOURCE,
                 "tracks": {"marmotkit": {"tag": self.stable_pin["artifact-tag"], "assets": [{
@@ -53,10 +71,13 @@ class StablePromotionTest(unittest.TestCase):
                 }]}},
             },
         }
-        self.metadata = self.responses[f"contents/stable/latest.json?ref={META}"]
+        self.metadata = self.records[("stable/latest.json", META)]
         network = patch.object(promotion, "mdk_json", side_effect=lambda path: self.responses[path])
         self.addCleanup(network.stop)
         self.network = network.start()
+        records = patch.object(promotion, "pinned_metadata", side_effect=lambda path, commit: self.records[path, commit])
+        self.addCleanup(records.stop)
+        self.record_reads = records.start()
 
     def git(self, *args):
         """Run a Git fixture operation inside the temporary repository."""
@@ -116,6 +137,12 @@ class StablePromotionTest(unittest.TestCase):
         with self.assertRaisesRegex(artifact.PreparationError, "SHA-256"):
             promotion.check_production_pin(self.root)
 
+    def test_rejects_staging_archive_digest_mismatch(self):
+        """A matching RC version and commit cannot stand in for the official RC bytes."""
+        self.rc_archive["sha256"] = "f" * 64
+        with self.assertRaisesRegex(artifact.PreparationError, "published Android RC archive"):
+            promotion.check_production_pin(self.root)
+
     def test_rejects_when_staging_tag_changed(self):
         """The recorded Android commit detects a tag that was moved."""
         self.git("add", promotion.channel.LOCK.as_posix())
@@ -128,6 +155,7 @@ class StablePromotionTest(unittest.TestCase):
         with self.assertRaisesRegex(artifact.PreparationError, "origin/develop history"):
             promotion.check_production_pin(self.root)
         self.network.assert_not_called()
+        self.record_reads.assert_not_called()
 
     def test_new_pin_requires_selection_and_existing_stable_pin_still_passes(self):
         """The known deployed pin stays usable and a new pin must provide staging evidence."""
@@ -138,6 +166,7 @@ class StablePromotionTest(unittest.TestCase):
         self.write_pin(self.pin(self.stable_pin, legacy["artifact-id"], legacy["mdk-sha"], legacy["artifact-sha256"]))
         promotion.check_production_pin(self.root)
         self.network.assert_not_called()
+        self.record_reads.assert_not_called()
 
     def test_develop_accepts_rc_but_validates_a_formal_stable_pin(self):
         """Daily RC updates need no production receipt, while a Stable update does."""
@@ -149,3 +178,4 @@ class StablePromotionTest(unittest.TestCase):
         with self.assertRaisesRegex(artifact.PreparationError, "final X.Y.Z"):
             promotion.check_production_pin(self.root)
         self.network.assert_not_called()
+        self.record_reads.assert_not_called()

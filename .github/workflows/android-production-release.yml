@@ -59,8 +59,6 @@ jobs:
           printf 'name=%s\n' "$version_name" >> "$GITHUB_OUTPUT"
 
       - name: Require Stable MarmotKit
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/check_marmotkit_stable_promotion.py
 
       - name: Require production release secrets
