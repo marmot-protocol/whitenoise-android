@@ -1489,20 +1489,7 @@ internal fun MainShell(
         if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
             return@LaunchedEffect
         }
-        awaitPreparedConversationOpen(
-            awaitReady = {
-                snapshotFlow {
-                    preparedConversationCanOpen(
-                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                        hasLoadError = controller.error != null,
-                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
-                    )
-                }.filter { it }
-                    .first()
-            },
-            holdingForEventCards = { controller.isHoldingInitialPageForEventCards },
-        )
+        controller.awaitPreparedConversationOpen()
         if (pendingConversationOpen?.requestId != request.requestId) return@LaunchedEffect
         // A normal cached open reaches the ready state before this deadline and
         // keeps its spinner-free transition. A first page held for its event
