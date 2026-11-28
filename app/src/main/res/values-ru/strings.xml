@@ -2997,4 +2997,7 @@
     <string name="private_key_reminder_body">Если вы потеряете этот телефон, сохранить свой профиль и контакты можно будет только с помощью ключа.</string>
     <string name="private_key_reminder_save">Сохранить ключ</string>
     <string name="private_key_reminder_not_now">Не сейчас</string>
+    <string name="first_run_chats_title">Начните первую беседу</string>
+    <string name="first_run_chats_detail">Пригласите кого-нибудь, с кем вы общаетесь. Пока ждёте, можете задать любой вопрос команде White Noise.</string>
+    <string name="first_run_new_chat">Новый чат</string>
 </resources>
