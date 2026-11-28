@@ -87,15 +87,19 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
  * Returns null before native revocation when native or journal inventory remained incomplete while
  * [includeUnscopedLegacy] is false and an unaccounted `:conv:` channel exists on Android, or when
  * the departing ownership record and any last-signer sweep could not be durably saved after retries.
+ * Once the account was already [revoked], as when another device unlinked it, there is nothing left to hold
+ * back, so the ids that were identified are returned either way.
  */
 internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
     accountRef: String,
     includeUnscopedLegacy: Boolean = accounts.none { it.label != accountRef && it.isSignedInSigningAccount() },
+    revoked: Boolean = false,
 ): Set<String>? {
     val inventory = readAccountKnownGroupIds(accountRef)
     val groupIds = inventory.groupIds
     val unaccountedChannelRisk =
-        !inventory.inventoryComplete &&
+        !revoked &&
+            !inventory.inventoryComplete &&
             !includeUnscopedLegacy &&
             withContext(Dispatchers.IO) {
                 hasUnaccountedConversationNotificationChannels(appContext, accountRef, groupIds)
@@ -111,7 +115,7 @@ internal suspend fun WhiteNoiseAppState.captureAccountKnownGroupIds(
             }
         } -> {
             appStateDebug { "sign-out channel capture could not be saved before native revocation" }
-            null
+            groupIds.takeIf { revoked }
         }
         else -> groupIds
     }

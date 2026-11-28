@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.activeNotificationGroupIds
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * The profile [event] says was unlinked from its account by another of the account's devices, or null for any
@@ -43,11 +46,12 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(
             )
         }
     }
-    clearUnlinkedAccountNotifications(accountRef, copy, listed)
-    // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all.
+    // Beginning a switch supersedes one the user has pending, so an outdated handler must not begin it at all, and
+    // the switch is decided before the cleanup below suspends, so it cannot override a choice the user makes meanwhile.
     if (active && next != null && copies.isCurrent(accountRef, copy)) {
         setActiveAccount(next, shouldActivate = { copies.isCurrent(accountRef, copy) })
     }
+    clearUnlinkedAccountNotifications(accountRef, copy, listed)
 }
 
 /**
@@ -63,8 +67,12 @@ private suspend fun WhiteNoiseAppState.clearUnlinkedAccountNotifications(
     val copies = accountSession.copyLifetimes
     val unlinked = accounts.firstOrNull { it.label == accountRef }?.unlinked
     if (!unlinkedNotificationsClearable(listed, unlinked) || !copies.isCurrent(accountRef, copy)) return
-    // Recording the departing channel owners lets startup retention finish if the process dies part way.
-    val knownGroupIds = runCatchingCancellable { captureAccountKnownGroupIds(accountRef) }.getOrNull().orEmpty()
+    // MDK has already signed the account out, so its group inventory may be incomplete: every group still identified,
+    // from that inventory or from the account named on an active card, is cleared. Recording the departing channel
+    // owners lets startup retention finish if the process dies part way.
+    val inventory = runCatchingCancellable { captureAccountKnownGroupIds(accountRef, revoked = true) }.getOrNull()
+    val carded = withContext(Dispatchers.IO) { activeNotificationGroupIds(appContext, accountRef) }
+    val knownGroupIds = inventory.orEmpty() + carded
     if (!copies.isCurrent(accountRef, copy)) return
     clearRevokedConversationShortcutsForAccount(
         accountRef = accountRef,
