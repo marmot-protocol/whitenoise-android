@@ -9,7 +9,7 @@
         "anchor": "internal fun SmartFolderPeopleConditionPage(",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       }
     ],
@@ -92,7 +92,7 @@
         "anchor": "R.string.folder_search",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -101,7 +101,7 @@
         "anchor": "R.string.more_options",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -110,7 +110,7 @@
         "anchor": "R.string.no_matches",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -119,7 +119,7 @@
         "anchor": "R.string.save",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -128,7 +128,7 @@
         "anchor": "R.string.smart_folder_ignore",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -137,7 +137,7 @@
         "anchor": "R.string.smart_folder_include_match",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -146,7 +146,7 @@
         "anchor": "R.string.smart_folder_key",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       },
       {
@@ -155,7 +155,7 @@
         "anchor": "R.string.smart_folder_negate_condition",
         "test_ids": [
           "FLD-004",
-          "FLD-013"
+          "FLD-014"
         ]
       }
     ]

@@ -11,7 +11,7 @@
           "ACC-003",
           "ONB-005",
           "ONB-006",
-          "ACC-026"
+          "ACC-027"
         ]
       },
       {
@@ -70,7 +70,7 @@
         "anchor": "private fun ScannerStateLayer(",
         "test_ids": [
           "ACC-003",
-          "ACC-026",
+          "ACC-027",
           "ONB-005",
           "ONB-006"
         ]
