@@ -93,10 +93,71 @@ and proves registry expansion requires renewed consent despite an existing grant
 It also verifies the actual pinned JNI capability, rather than the old stale
 unsupported-build comment. Never uninstall or clear a personal device's app.
 
-With the configured staging destination, use a synthetic staging account, grant sharing,
-exercise the documented actions, background/resume, and confirm persisted events
-in the correct Aptabase application with Android/staging metadata. Check decline,
-revocation, regrant, relaunch and old-receipt upgrade. Inspect event properties and
-confirm production/staging separation, retention policy, and identifying server
-logs with the operator. An HTTP success response alone is insufficient evidence.
-No production ingestion or deployed retention verification is claimed here.
+## Aptabase qualification
+
+Qualify each release candidate or shipped build that should support aggregate
+setup and group-operation reports. Record the outcome in the release's tracking
+issue or GitHub release notes with the receipt below. The Aptabase operator reads
+persisted data; release engineers do not need ClickHouse or dashboard access.
+An HTTP success response or “Ready to share” status is not evidence of persistence.
+
+1. **Identify the build.** Record the version, version code, commit, flavor,
+   the `artifact-id` from `app/src/main/marmotkit/MARMOT_VERSION`, and the
+   environment. Pick events from the catalogue bundled in that MDK version.
+2. **Configuration.** Run `verifyStagingProductAnalyticsConfig` and
+   `verifyProductionProductAnalyticsConfig` against the build's resolved
+   configuration. Both must pass before the smoke tests.
+3. **Staging smoke.** Install the signed Staging build on a disposable device or
+   emulator. Create a synthetic account, finish setup, and grant sharing in the
+   Help Improve White Noise sheet on Chats. Create a group, add a synthetic
+   member, and send one message. Background the app and resume it so MDK flushes
+   its aggregate window. Note the UTC start and end of the test and the synthetic
+   group size. MDK stamps summaries with the start of their 15-minute window, so
+   a 17:08 action persists as 17:00. Give the operator the build details and the
+   test interval widened to the start of every 15-minute window it overlaps; do
+   not send the account key. The operator confirms that `mdk_session_started` and at least one of
+   `mdk_onboarding_step`, `mdk_account_summary` or `mdk_group_summary` persisted
+   in the staging application with Android platform, the expected app version,
+   and only catalogue properties.
+4. **Consent.** Run each phase in its own 15-minute window, during a period
+   with no other staging testing, and record each window in UTC:
+   - On the same install, revoke sharing, repeat one group action and relaunch.
+     In the next window, regrant, repeat the action, and background the app.
+   - On a fresh synthetic install, decline the sheet and perform one group
+     action. In the next window, turn on **Share usage and telemetry** in
+     Diagnostics & Improvements,
+     repeat the action, and background the app.
+
+   The operator confirms that events exist for both regrant windows and that
+   none carry the start of a revoked or declined window. Run
+   `HostTimingConsentDeviceTest` on a disposable emulator for the
+   registry-expansion and renewed-consent cases.
+5. **Production smoke.** Agree a short window with the operator first. Repeat
+   step 3 once with a synthetic account on the production build, and widen the
+   query interval to the window starts as in step 3. The operator
+   confirms the events persisted in the production application and that no
+   staging events reached it.
+6. **Operator receipt.** The operator confirms the deployed Aptabase version,
+   180-day retention covering events, derived sessions, exports and backups,
+   and that ingest, proxy and container logs do not retain IP addresses or app
+   keys beyond what the policy allows.
+
+Record pass, fail or pending for each check, with the missing prerequisite
+for any check that could not run. Keep keys, account identifiers, IP addresses
+and raw event rows out of the receipt.
+
+```text
+Aptabase qualification — <version> (<version code>, <commit>)
+MDK: <artifact-id>            Recorded: <UTC date>
+Configuration (staging / production):  pass | fail | pending
+Staging persisted events:              pass | fail | pending — <events seen>
+Consent (decline, revoke, relaunch, regrant, no replay): pass | fail | pending
+Production persisted events:           pass | fail | pending
+Retention 180 days (events, sessions, exports, backups): pass | fail | pending
+Log minimization (ingest, proxy, containers): pass | fail | pending
+Coverage: opted-in observations only. Setup abandoned before the consent
+prompt and repeat use by a specific group are not reported.
+```
+
+Group audit logs and OTLP metrics are separate destinations and are not part
+of this qualification.
